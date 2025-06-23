@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
 
@@ -57,10 +58,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   static final int BUFFER_SIZE_DEFAULT = 4 << 10; // 4 KB
 
   private final RDBTable rawTable;
+  private final String info;
 
-  private final Class<KEY> keyType;
   private final Codec<KEY> keyCodec;
-  private final Class<VALUE> valueType;
   private final Codec<VALUE> valueCodec;
 
   private final boolean supportCodecBuffer;
@@ -69,50 +69,30 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private final TableCache<KEY, VALUE> cache;
 
   /**
-   * The same as this(rawTable, codecRegistry, keyType, valueType,
-   *                  CacheType.PARTIAL_CACHE).
-   */
-  public TypedTable(RDBTable rawTable,
-      CodecRegistry codecRegistry, Class<KEY> keyType,
-      Class<VALUE> valueType) throws IOException {
-    this(rawTable, codecRegistry, keyType, valueType,
-        CacheType.PARTIAL_CACHE, "");
-  }
-
-  /**
    * Create an TypedTable from the raw table with specified cache type.
    *
    * @param rawTable The underlying (untyped) table in RocksDB.
-   * @param codecRegistry To look up codecs.
-   * @param keyType The key type.
-   * @param valueType The value type.
+   * @param keyCodec The key codec.
+   * @param valueCodec The value codec.
    * @param cacheType How to cache the entries?
-   * @param threadNamePrefix
-   * @throws IOException if failed to iterate the raw table.
+   * @throws IOException
    */
-  public TypedTable(RDBTable rawTable,
-      CodecRegistry codecRegistry, Class<KEY> keyType,
-      Class<VALUE> valueType,
-      CacheType cacheType, String threadNamePrefix) throws IOException {
+  TypedTable(RDBTable rawTable, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, CacheType cacheType) throws IOException {
     this.rawTable = Objects.requireNonNull(rawTable, "rawTable==null");
-    Objects.requireNonNull(codecRegistry, "codecRegistry == null");
+    this.keyCodec = Objects.requireNonNull(keyCodec, "keyCodec == null");
+    this.valueCodec = Objects.requireNonNull(valueCodec, "valueCodec == null");
 
-    this.keyType = Objects.requireNonNull(keyType, "keyType == null");
-    this.keyCodec = codecRegistry.getCodecFromClass(keyType);
-    Objects.requireNonNull(keyCodec, "keyCodec == null");
-
-    this.valueType = Objects.requireNonNull(valueType, "valueType == null");
-    this.valueCodec = codecRegistry.getCodecFromClass(valueType);
-    Objects.requireNonNull(valueCodec, "valueCodec == null");
+    this.info = getClassSimpleName(getClass()) + "-" + getName() + "(" + getClassSimpleName(keyCodec.getTypeClass())
+        + "->" + getClassSimpleName(valueCodec.getTypeClass()) + ")";
 
     this.supportCodecBuffer = keyCodec.supportCodecBuffer()
         && valueCodec.supportCodecBuffer();
 
+    final String threadNamePrefix = rawTable.getName() + "_";
     if (cacheType == CacheType.FULL_CACHE) {
       cache = new FullTableCache<>(threadNamePrefix);
       //fill cache
-      try (TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator =
-              iterator()) {
+      try (TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> tableIterator = iterator()) {
 
         while (tableIterator.hasNext()) {
           KeyValue< KEY, VALUE > kv = tableIterator.next();
@@ -124,8 +104,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
               CacheValue.get(EPOCH_DEFAULT, kv.getValue()));
         }
       }
-    } else {
+    } else if (cacheType == CacheType.PARTIAL_CACHE) {
       cache = new PartialTableCache<>(threadNamePrefix);
+    } else {
+      cache = TableNoCache.instance();
     }
   }
 
@@ -443,9 +425,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public String toString() {
-    return getClassSimpleName(getClass()) + "-" + getName()
-        + "(" + getClassSimpleName(keyType)
-        + "->" + getClassSimpleName(valueType) + ")";
+    return info;
   }
 
   @Override
@@ -571,14 +551,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     @Override
     public VALUE getValue() throws IOException {
       return decodeValue(rawKeyValue.getValue());
-    }
-
-    public byte[] getRawKey() throws IOException {
-      return rawKeyValue.getKey();
-    }
-
-    public byte[] getRawValue() throws IOException {
-      return rawKeyValue.getValue();
     }
   }
 

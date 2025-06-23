@@ -30,10 +30,10 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -191,17 +191,11 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * Total healthy replicas = 3 = 1 matching + 2 mismatched replicas
    */
   public int getHealthyReplicaCount() {
-    return healthyReplicaCount + healthyReplicaCountAdapter()
-        + decommissionCount + maintenanceCount;
+    return healthyReplicaCount + decommissionCount + maintenanceCount;
   }
 
   public int getUnhealthyReplicaCount() {
-    return unhealthyReplicaCount + getUnhealthyReplicaCountAdapter()
-        + unhealthyDecommissionCount + unhealthyMaintenanceCount;
-  }
-
-  protected int getUnhealthyReplicaCountAdapter() {
-    return 0;
+    return unhealthyReplicaCount + unhealthyDecommissionCount + unhealthyMaintenanceCount;
   }
 
   public int getMisMatchedReplicaCount() {
@@ -213,19 +207,11 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
   }
 
   private int getAvailableReplicas() {
-    int available = healthyReplicaCount + healthyReplicaCountAdapter();
+    int available = healthyReplicaCount;
     if (considerUnhealthy) {
-      available += unhealthyReplicaCount + getUnhealthyReplicaCountAdapter();
+      available += unhealthyReplicaCount;
     }
     return available;
-  }
-
-  /**
-   * The new replication manager now does not consider replicas with
-   * UNHEALTHY state when counting sufficient replication.
-   */
-  protected int healthyReplicaCountAdapter() {
-    return 0;
   }
 
   @Override
@@ -525,7 +511,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     vulnerable and need to be saved.
      */
     // TODO should we also consider pending deletes?
-    Set<UUID> originsOfInServiceReplicas = new HashSet<>();
+    final Set<DatanodeID> originsOfInServiceReplicas = new HashSet<>();
     for (ContainerReplica replica : replicas) {
       if (replica.getDatanodeDetails().getPersistedOpState()
           .equals(IN_SERVICE) && replica.getSequenceId().equals(container.getSequenceId())) {

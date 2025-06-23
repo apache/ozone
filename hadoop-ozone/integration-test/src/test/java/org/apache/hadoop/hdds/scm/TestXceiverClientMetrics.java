@@ -44,13 +44,11 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * This class tests the metrics of XceiverClient.
  */
-@Timeout(300)
 public class TestXceiverClientMetrics {
 
   // only for testing

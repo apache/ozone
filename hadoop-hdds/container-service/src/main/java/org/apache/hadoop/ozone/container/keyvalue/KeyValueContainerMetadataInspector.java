@@ -74,10 +74,12 @@ import org.slf4j.LoggerFactory;
  * log4j.appender.inspectorAppender.layout=org.apache.log4j.PatternLayout
  */
 public class KeyValueContainerMetadataInspector implements ContainerInspector {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
-  public static final Logger REPORT_LOG = LoggerFactory.getLogger(
-      "ContainerMetadataInspectorReport");
+  private static final Logger LOG = LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
+  public static final Logger REPORT_LOG = LoggerFactory.getLogger("ContainerMetadataInspectorReport");
+
+  public static final String SYSTEM_PROPERTY = "ozone.datanode.container.metadata.inspector";
+
+  private Mode mode;
 
   /**
    * The mode to run the inspector in.
@@ -98,11 +100,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       return name;
     }
   }
-
-  public static final String SYSTEM_PROPERTY = "ozone.datanode.container" +
-      ".metadata.inspector";
-
-  private Mode mode;
 
   public KeyValueContainerMetadataInspector(Mode mode) {
     this.mode = mode;

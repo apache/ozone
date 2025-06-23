@@ -39,13 +39,13 @@ public class ReplicatedBlockChecksumComputer extends
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicatedBlockChecksumComputer.class);
 
+  private final List<ContainerProtos.ChunkInfo> chunkInfoList;
+
   static MD5Hash digest(ByteBuffer data) {
     final MessageDigest digester = MD5Hash.getDigester();
     digester.update(data);
     return new MD5Hash(digester.digest());
   }
-
-  private final List<ContainerProtos.ChunkInfo> chunkInfoList;
 
   public ReplicatedBlockChecksumComputer(
       List<ContainerProtos.ChunkInfo> chunkInfoList) {
@@ -94,7 +94,7 @@ public class ReplicatedBlockChecksumComputer extends
     DataChecksum.Type dataChecksumType;
     long bytesPerCrc;
     long chunkSize;
-    Preconditions.checkArgument(chunkInfoList.size() > 0);
+    Preconditions.checkArgument(!chunkInfoList.isEmpty());
 
     final ContainerProtos.ChunkInfo firstChunkInfo = chunkInfoList.get(0);
     switch (firstChunkInfo.getChecksumData().getType()) {

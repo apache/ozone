@@ -21,18 +21,22 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyMetadataScanResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -56,6 +60,7 @@ public class TestBackgroundContainerMetadataScanner extends
 
   private BackgroundContainerMetadataScanner scanner;
 
+  @Override
   @BeforeEach
   public void setup() {
     super.setup();
@@ -164,6 +169,20 @@ public class TestBackgroundContainerMetadataScanner extends
   }
 
   /**
+   * Metadata scanner should not update container checksum, so any errors that may be injected here should have no
+   * effect.
+   */
+  @Test
+  @Override
+  public void testChecksumUpdateFailure() throws Exception {
+    doThrow(new IOException("Checksum update error for testing")).when(controller)
+        .updateContainerChecksum(anyLong(), any());
+    scanner.runIteration();
+    verifyContainerMarkedUnhealthy(openCorruptMetadata, atMostOnce());
+    verify(openCorruptMetadata.getContainerData(), atMostOnce()).setState(UNHEALTHY);
+  }
+
+  /**
    * A datanode will have one metadata scanner thread for the whole process.
    * When a volume fails, any the containers queued for scanning in that volume
    * should be skipped but the thread will continue to run.
@@ -180,7 +199,8 @@ public class TestBackgroundContainerMetadataScanner extends
     GenericTestUtils.waitFor(() -> metrics.getNumScanIterations() >= 1, 1000,
         5000);
     // Volume health should have been checked.
-    verify(vol, atLeastOnce()).isFailed();
+    // TODO: remove the mock return value assertion after we upgrade to spotbugs 4.8 up
+    assertFalse(verify(vol, atLeastOnce()).isFailed());
     // Scanner should not have shutdown when it encountered the failed volume.
     assertTrue(scanner.isAlive());
 

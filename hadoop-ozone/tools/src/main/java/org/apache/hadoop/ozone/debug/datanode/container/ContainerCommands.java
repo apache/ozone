@@ -46,11 +46,13 @@ import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -85,7 +87,7 @@ public class ContainerCommands extends AbstractSubcommand {
   public void loadContainersFromVolumes() throws IOException {
     OzoneConfiguration conf = getOzoneConf();
 
-    ContainerSet containerSet = new ContainerSet(null, 1000, true);
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
@@ -97,6 +99,7 @@ public class ContainerCommands extends AbstractSubcommand {
 
     volumeSet = new MutableVolumeSet(datanodeUuid, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
 
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
       MutableVolumeSet dbVolumeSet =
@@ -119,6 +122,7 @@ public class ContainerCommands extends AbstractSubcommand {
               datanodeUuid,
               containerSet,
               volumeSet,
+              volumeChoosingPolicy,
               metrics,
               containerReplicaProto -> {
               },

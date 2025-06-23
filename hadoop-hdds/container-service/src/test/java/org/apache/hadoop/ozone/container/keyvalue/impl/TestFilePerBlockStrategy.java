@@ -18,14 +18,20 @@
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +62,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -64,6 +71,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Test for FilePerBlockStrategy.
  */
 public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
+
+  @TempDir
+  private File tempDir;
 
   @Test
   public void testDeletePartialChunkWithOffsetUnsupportedRequest() {
@@ -158,7 +168,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
       ContainerProtos.ContainerDataProto.State state) throws IOException {
     KeyValueContainer keyValueContainer = getKeyValueContainer();
     keyValueContainer.getContainerData().setState(state);
-    ContainerSet containerSet = new ContainerSet(100);
+    ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(keyValueContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     ChunkBuffer.wrap(getData());
@@ -175,7 +185,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     KeyValueContainer kvContainer = getKeyValueContainer();
     KeyValueContainerData containerData = kvContainer.getContainerData();
     closedKeyValueContainer();
-    ContainerSet containerSet = new ContainerSet(100);
+    ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     keyValueHandler.writeChunkForClosedContainer(getChunkInfo(), getBlockID(), writeChunkData, kvContainer);
@@ -221,7 +231,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     KeyValueContainer kvContainer = getKeyValueContainer();
     KeyValueContainerData containerData = kvContainer.getContainerData();
     closedKeyValueContainer();
-    ContainerSet containerSet = new ContainerSet(100);
+    ContainerSet containerSet = newContainerSet();
     containerSet.addContainer(kvContainer);
     KeyValueHandler keyValueHandler = createKeyValueHandler(containerSet);
     List<ContainerProtos.ChunkInfo> chunkInfoList = new ArrayList<>();
@@ -300,7 +310,6 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
         Objects.equals(getBlockData.getChunks(), putBlockData.getChunks());
   }
 
-
   private static Stream<Arguments> getNonClosedStates() {
     return Stream.of(
         Arguments.of(ContainerProtos.ContainerDataProto.State.OPEN),
@@ -313,6 +322,10 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
       throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     String dnUuid = UUID.randomUUID().toString();
+    Path dataVolume = Paths.get(tempDir.toString(), "data");
+    Path metadataVolume = Paths.get(tempDir.toString(), "metadata");
+    conf.set(HDDS_DATANODE_DIR_KEY, dataVolume.toString());
+    conf.set(OZONE_METADATA_DIRS, metadataVolume.toString());
     MutableVolumeSet volumeSet = new MutableVolumeSet(dnUuid, conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     return ContainerTestUtils.getKeyValueHandler(conf, dnUuid, containerSet, volumeSet);

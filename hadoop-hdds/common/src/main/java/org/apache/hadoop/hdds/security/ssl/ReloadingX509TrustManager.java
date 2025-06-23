@@ -49,11 +49,11 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Evolving
 public final class ReloadingX509TrustManager implements X509TrustManager, CertificateNotification {
 
-  public static final Logger LOG =
-      LoggerFactory.getLogger(ReloadingX509TrustManager.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ReloadingX509TrustManager.class);
 
-  static final String RELOAD_ERROR_MESSAGE =
-      "Could not reload truststore (keep using existing one) : ";
+  static final String RELOAD_ERROR_MESSAGE = "Could not reload truststore (keep using existing one) : ";
+
+  private static final X509Certificate[] EMPTY = new X509Certificate[0];
 
   private final String type;
   private final AtomicReference<X509TrustManager> trustManagerRef;
@@ -123,7 +123,6 @@ public final class ReloadingX509TrustManager implements X509TrustManager, Certif
     }
   }
 
-  private static final X509Certificate[] EMPTY = new X509Certificate[0];
   @Override
   public X509Certificate[] getAcceptedIssuers() {
     X509Certificate[] issuers = EMPTY;
@@ -161,7 +160,7 @@ public final class ReloadingX509TrustManager implements X509TrustManager, Certif
   }
 
   private boolean isAlreadyUsing(List<X509Certificate> newRootCaCerts) {
-    return newRootCaCerts.size() > 0 &&
+    return !newRootCaCerts.isEmpty() &&
         currentRootCACerts.size() == newRootCaCerts.size() &&
         newRootCaCerts.stream()
             .allMatch(

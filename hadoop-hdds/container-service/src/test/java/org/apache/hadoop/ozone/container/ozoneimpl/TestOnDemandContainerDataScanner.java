@@ -25,18 +25,23 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -45,6 +50,7 @@ import org.apache.commons.compress.utils.Lists;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.junit.jupiter.api.AfterEach;
@@ -63,6 +69,7 @@ public class TestOnDemandContainerDataScanner extends
   
   private OnDemandContainerDataScanner onDemandScanner;
 
+  @Override
   @BeforeEach
   public void setup() {
     super.setup();
@@ -75,6 +82,17 @@ public class TestOnDemandContainerDataScanner extends
     setScannedTimestampRecent(healthy);
     scanContainer(healthy);
     verify(healthy, never()).scanData(any(), any());
+  }
+
+  @Test
+  public void testBypassScanGap() throws Exception {
+    setScannedTimestampRecent(healthy);
+
+    Optional<Future<?>> scanFutureOptional = onDemandScanner.scanContainerWithoutGap(healthy);
+    assertTrue(scanFutureOptional.isPresent());
+    Future<?> scanFuture = scanFutureOptional.get();
+    scanFuture.get();
+    verify(healthy, times(1)).scanData(any(), any());
   }
 
   @Test
@@ -278,6 +296,33 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(2, metrics.getNumContainersScanned());
     // numUnHealthyContainers metrics is not incremented in the 2nd iteration.
     assertEquals(1, metrics.getNumUnHealthyContainers());
+  }
+
+  @Test
+  @Override
+  public void testChecksumUpdateFailure() throws Exception {
+    doThrow(new IOException("Checksum update error for testing")).when(controller)
+        .updateContainerChecksum(anyLong(), any());
+    scanContainer(corruptData);
+    verifyContainerMarkedUnhealthy(corruptData, atMostOnce());
+    verify(corruptData.getContainerData(), atMostOnce()).setState(UNHEALTHY);
+  }
+
+  @Test
+  public void testMerkleTreeWritten() throws Exception {
+    // Merkle trees should not be written for open or deleted containers
+    for (Container<ContainerData> container : Arrays.asList(openContainer, openCorruptMetadata, deletedContainer)) {
+      scanContainer(container);
+      verify(controller, times(0))
+          .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
+    }
+
+    // Merkle trees should be written for all other containers.
+    for (Container<ContainerData> container : Arrays.asList(healthy, corruptData)) {
+      scanContainer(container);
+      verify(controller, times(1))
+          .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
+    }
   }
 
   private void scanContainer(Container<?> container) throws Exception {

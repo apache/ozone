@@ -88,7 +88,6 @@ public abstract class OMClientResponse {
     return flushFuture;
   }
 
-
   public OMLockDetails getOmLockDetails() {
     return omLockDetails;
   }

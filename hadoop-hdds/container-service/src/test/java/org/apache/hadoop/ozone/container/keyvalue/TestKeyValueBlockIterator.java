@@ -122,7 +122,6 @@ public class TestKeyValueBlockIterator {
     db = BlockUtils.getDB(containerData, conf);
   }
 
-
   @AfterEach
   public void tearDown() throws Exception {
     db.close();

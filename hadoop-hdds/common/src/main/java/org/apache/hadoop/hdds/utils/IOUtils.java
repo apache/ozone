@@ -17,8 +17,16 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import jakarta.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Properties;
+import org.apache.ratis.util.AtomicFileOutputStream;
 import org.slf4j.Logger;
 
 /**
@@ -94,5 +102,21 @@ public final class IOUtils {
    */
   public static void closeQuietly(Collection<? extends AutoCloseable> closeables) {
     close(null, closeables);
+  }
+
+  /** Write {@code properties} to the file at {@code path}, truncating any existing content. */
+  public static void writePropertiesToFile(File file, Properties properties) throws IOException {
+    try (OutputStream out = new AtomicFileOutputStream(file)) {
+      properties.store(out, null);
+    }
+  }
+
+  /** Read {@link Properties} from the file at {@code path}. */
+  public static @Nonnull Properties readPropertiesFromFile(File file) throws IOException {
+    Properties props = new Properties();
+    try (InputStream in = Files.newInputStream(file.toPath())) {
+      props.load(in);
+    }
+    return props;
   }
 }

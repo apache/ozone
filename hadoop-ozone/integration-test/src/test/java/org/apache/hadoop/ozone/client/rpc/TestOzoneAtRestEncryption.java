@@ -59,10 +59,12 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
+import org.apache.hadoop.crypto.key.kms.LoadBalancingKMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -75,6 +77,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
@@ -83,6 +86,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -95,6 +99,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -209,6 +214,33 @@ class TestOzoneAtRestEncryption {
     store = ozClient.getObjectStore();
   }
 
+  @Test
+  public void testWarmupEDEKCacheOnStartup() throws Exception {
+
+    createVolumeAndBucket("vol", "buck", BucketLayout.OBJECT_STORE);
+
+    @SuppressWarnings("unchecked") KMSClientProvider spy = getKMSClientProvider();
+    assertTrue(spy.getEncKeyQueueSize(TEST_KEY) > 0);
+
+    conf.setInt(OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY, 0);
+    cluster.restartOzoneManager();
+
+    GenericTestUtils.waitFor(new BooleanSupplier() {
+      @Override
+      public boolean getAsBoolean() {
+        final KMSClientProvider kspy = getKMSClientProvider();
+        return kspy.getEncKeyQueueSize(TEST_KEY) > 0;
+      }
+    }, 1000, 60000);
+  }
+
+  private KMSClientProvider getKMSClientProvider() {
+    LoadBalancingKMSClientProvider lbkmscp =
+        (LoadBalancingKMSClientProvider) HddsWhiteboxTestUtils.getInternalState(
+            cluster.getOzoneManager().getKmsProvider(), "extension");
+    assert lbkmscp.getProviders().length == 1;
+    return lbkmscp.getProviders()[0];
+  }
 
   @ParameterizedTest
   @EnumSource
@@ -266,22 +298,19 @@ class TestOzoneAtRestEncryption {
     Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
-    try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(StandardCharsets.UTF_8).length,
+
+    TestDataUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-        new HashMap<>())) {
-      out.write(value.getBytes(StandardCharsets.UTF_8));
-    }
+        value.getBytes(StandardCharsets.UTF_8));
+
     verifyKeyData(bucket, keyName, value, testStartTime);
     OzoneKeyDetails key1 = bucket.getKey(keyName);
 
     // Overwrite the key
-    try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(StandardCharsets.UTF_8).length,
+    TestDataUtil.createKey(bucket, keyName,
         ReplicationConfig.fromTypeAndFactor(RATIS, ONE),
-        new HashMap<>())) {
-      out.write(value.getBytes(StandardCharsets.UTF_8));
-    }
+        value.getBytes(StandardCharsets.UTF_8));
+
     OzoneKeyDetails key2 = bucket.getKey(keyName);
     assertNotEquals(key1.getFileEncryptionInfo().toString(), key2.getFileEncryptionInfo().toString());
   }
@@ -784,9 +813,9 @@ class TestOzoneAtRestEncryption {
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, "/");
-    for (int i = 0; i < rangeKVs.size(); ++i) {
-      if (rangeKVs.get(i).getKey().contains(keyName)) {
-        return rangeKVs.get(i).getValue();
+    for (Table.KeyValue<String, RepeatedOmKeyInfo> rangeKV : rangeKVs) {
+      if (rangeKV.getKey().contains(keyName)) {
+        return rangeKV.getValue();
       }
     }
     return null;

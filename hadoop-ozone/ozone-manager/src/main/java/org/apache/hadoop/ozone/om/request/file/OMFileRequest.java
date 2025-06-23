@@ -203,7 +203,7 @@ public final class OMFileRequest {
       String fileName = elements.next().toString();
       fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
       fullKeyPath.append(fileName);
-      if (missing.size() > 0) {
+      if (!missing.isEmpty()) {
         // Add all the sub-dirs to the missing list except the leaf element.
         // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt.
         // Assume /vol1/buck1/a/b/c exists, then add d, e, f into missing list.
@@ -718,6 +718,22 @@ public final class OMFileRequest {
 
     // key not found in DB
     return null;
+  }
+
+  public static OmKeyInfo getKeyInfoWithFullPath(OmKeyInfo parentInfo, OmDirectoryInfo directoryInfo) {
+    String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
+        directoryInfo.getName());
+    return OMFileRequest.getOmKeyInfo(
+        parentInfo.getVolumeName(), parentInfo.getBucketName(), directoryInfo,
+        dirName);
+  }
+
+  public static OmKeyInfo getKeyInfoWithFullPath(OmKeyInfo parentInfo, OmKeyInfo omKeyInfo) {
+    omKeyInfo.setFileName(omKeyInfo.getKeyName());
+    String fullKeyPath = OMFileRequest.getAbsolutePath(
+        parentInfo.getKeyName(), omKeyInfo.getKeyName());
+    omKeyInfo.setKeyName(fullKeyPath);
+    return omKeyInfo;
   }
 
   /**

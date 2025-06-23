@@ -72,7 +72,8 @@ import org.slf4j.LoggerFactory;
  */
 public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
-  private OzoneConfiguration conf;
+  private static final Logger LOG = LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
+
   private EventPublisher eventQueue;
   private NodeManager nodeManager;
   private ReplicationManager replicationManager;
@@ -86,6 +87,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long trackedRecommission = 0;
   private long unClosedContainers = 0;
   private long underReplicatedContainers = 0;
+
+  private Map<String, ContainerStateInWorkflow> containerStateByHost;
+
+  // The number of containers for each of under replicated and unhealthy
+  // that will be logged in detail each time a node is checked.
+  private final int containerDetailsLoggingLimit;
 
   /**
    * Inner class for snapshot of Datanode ContainerState in
@@ -131,20 +138,11 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     }
   }
 
-  private Map<String, ContainerStateInWorkflow> containerStateByHost;
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
-  // The number of containers for each of under replicated and unhealthy
-  // that will be logged in detail each time a node is checked.
-  private final int containerDetailsLoggingLimit;
-
   public DatanodeAdminMonitorImpl(
       OzoneConfiguration conf,
       EventPublisher eventQueue,
       NodeManager nodeManager,
       ReplicationManager replicationManager) {
-    this.conf = conf;
     this.eventQueue = eventQueue;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
@@ -235,7 +233,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         trackedDecomMaintenance = getTrackedNodeCount();
       }
       processTransitioningNodes();
-      if (trackedNodes.size() > 0 || pendingNodes.size() > 0) {
+      if (!trackedNodes.isEmpty() || !pendingNodes.isEmpty()) {
         LOG.info("There are {} nodes tracked for decommission and " +
             "maintenance.  {} pending nodes.",
             trackedNodes.size(), pendingNodes.size());
@@ -390,7 +388,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     Set<PipelineID> pipelines = nodeManager.getPipelines(dn
         .getDatanodeDetails());
     NodeStatus status = nodeManager.getNodeStatus(dn.getDatanodeDetails());
-    if (pipelines == null || pipelines.size() == 0
+    if (pipelines == null || pipelines.isEmpty()
         || status.operationalStateExpired()) {
       return true;
     } else {
@@ -501,7 +499,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     sb.append(replicas.stream()
         .map(Object::toString)
         .collect(Collectors.joining(",")));
-    sb.append("}");
+    sb.append('}');
     return sb.toString();
   }
 

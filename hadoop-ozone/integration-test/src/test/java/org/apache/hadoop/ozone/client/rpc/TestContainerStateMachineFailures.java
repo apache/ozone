@@ -46,14 +46,13 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -62,6 +61,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -73,7 +73,6 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -124,7 +123,6 @@ public class TestContainerStateMachineFailures {
   private static String volumeName;
   private static String bucketName;
   private static XceiverClientManager xceiverClientManager;
-  private static Random random;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -184,7 +182,6 @@ public class TestContainerStateMachineFailures {
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
-    random = new Random();
   }
 
   /**
@@ -251,7 +248,7 @@ public class TestContainerStateMachineFailures {
               .getScmContext()
               .getTermOfLeader());
       cluster.getStorageContainerManager().getScmNodeManager()
-          .addDatanodeCommand(dn.getDatanodeDetails().getUuid(), command);
+          .addDatanodeCommand(dn.getDatanodeDetails().getID(), command);
     }
 
 
@@ -264,7 +261,6 @@ public class TestContainerStateMachineFailures {
     }
     key.close();
   }
-
 
   @Test
   @Flaky("HDDS-12215")
@@ -729,7 +725,7 @@ public class TestContainerStateMachineFailures {
       Thread closeContainerThread = new Thread(r1);
       closeContainerThread.start();
       threadList.add(closeContainerThread);
-      latch.await(600, TimeUnit.SECONDS);
+      assertTrue(latch.await(600, TimeUnit.SECONDS));
       for (int i = 0; i < 101; i++) {
         threadList.get(i).join();
       }
@@ -820,14 +816,14 @@ public class TestContainerStateMachineFailures {
 
   private void induceFollowerFailure(OmKeyLocationInfo omKeyLocationInfo,
                                      int failureCount) {
-    UUID leader = omKeyLocationInfo.getPipeline().getLeaderId();
+    DatanodeID leader = omKeyLocationInfo.getPipeline().getLeaderId();
     Set<HddsDatanodeService> datanodeSet =
         TestHelper.getDatanodeServices(cluster,
             omKeyLocationInfo.getPipeline());
     int count = 0;
     for (HddsDatanodeService dn : datanodeSet) {
-      UUID dnUuid = dn.getDatanodeDetails().getUuid();
-      if (!dnUuid.equals(leader)) {
+      DatanodeID dnId = dn.getDatanodeDetails().getID();
+      if (!dnId.equals(leader)) {
         count++;
         long containerID = omKeyLocationInfo.getContainerID();
         Container container = dn
@@ -861,13 +857,12 @@ public class TestContainerStateMachineFailures {
 
     assertEquals(locationCount,
         keyInfo.getLatestVersionLocations().getLocationListCount());
-    byte[] buffer = new byte[1024];
+    byte[] buffer = new byte[Math.toIntExact(keyInfo.getDataSize())];
     try (OzoneInputStream o = objectStore.getVolume(volumeName)
         .getBucket(bucketName).readKey(key)) {
-      o.read(buffer, 0, 1024);
+      IOUtils.readFully(o, buffer);
     }
-    int end = ArrayUtils.indexOf(buffer, (byte) 0);
-    String response = new String(buffer, 0, end, StandardCharsets.UTF_8);
+    String response = new String(buffer, StandardCharsets.UTF_8);
     assertEquals(payload, response);
   }
 

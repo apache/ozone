@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -95,7 +95,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @Metric(about = "The number of dataNodes of delete transactions.")
   private MutableGaugeLong numBlockDeletionTransactionDataNodes;
 
-  private final Map<UUID, DatanodeCommandCounts> numCommandsDatanode = new ConcurrentHashMap<>();
+  private final Map<DatanodeID, DatanodeCommandCounts> numCommandsDatanode = new ConcurrentHashMap<>();
 
   private ScmBlockDeletingServiceMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
@@ -164,17 +164,24 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     this.numBlockDeletionTransactionDataNodes.set(dataNodes);
   }
 
-  public void incrDNCommandsSent(UUID id, long delta) {
+  public void incrDNCommandsSent(DatanodeID id, long delta) {
     numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
         .incrCommandsSent(delta);
   }
-  public void incrDNCommandsSuccess(UUID id, long delta) {
+
+  public void incrDNCommandsSuccess(DatanodeID id, long delta) {
     numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
         .incrCommandsSuccess(delta);
   }
-  public void incrDNCommandsFailure(UUID id, long delta) {
+
+  public void incrDNCommandsFailure(DatanodeID id, long delta) {
     numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
         .incrCommandsFailure(delta);
+  }
+
+  public void incrDNCommandsTimeout(DatanodeID id, long delta) {
+    numCommandsDatanode.computeIfAbsent(id, k -> new DatanodeCommandCounts())
+        .incrCommandsTimeout(delta);
   }
 
   public long getNumBlockDeletionCommandSent() {
@@ -237,7 +244,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     numBlockDeletionTransactionDataNodes.snapshot(builder, all);
 
     MetricsRecordBuilder recordBuilder = builder;
-    for (Map.Entry<UUID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
+    for (Map.Entry<DatanodeID, DatanodeCommandCounts> e : numCommandsDatanode.entrySet()) {
       recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
           .add(new MetricsTag(Interns.info("datanode",
               "Datanode host for deletion commands"), e.getKey().toString()))
@@ -246,7 +253,9 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
           .addGauge(DatanodeCommandCounts.COMMANDS_SUCCESSFUL_EXECUTION_BY_DN,
               e.getValue().getCommandsSuccess())
           .addGauge(DatanodeCommandCounts.COMMANDS_FAILED_EXECUTION_BY_DN,
-              e.getValue().getCommandsFailure());
+              e.getValue().getCommandsFailure())
+          .addGauge(DatanodeCommandCounts.COMMANDS_TIMEOUT_BY_DN, 
+              e.getValue().getCommandsTimeout());
     }
     recordBuilder.endRecord();
   }
@@ -258,6 +267,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     private long commandsSent;
     private long commandsSuccess;
     private long commandsFailure;
+    private long commandsTimeout;
 
     private static final MetricsInfo COMMANDS_SENT_TO_DN = Interns.info(
         "CommandsSent",
@@ -268,11 +278,17 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     private static final MetricsInfo COMMANDS_FAILED_EXECUTION_BY_DN = Interns.info(
         "CommandsFailed",
         "Number of commands sent from SCM to the datanode for deletion for which execution failed.");
+    
+    private static final MetricsInfo COMMANDS_TIMEOUT_BY_DN = Interns.info(
+        "CommandsTimeout",
+        "Number of commands timeout from SCM to DN"
+    );
 
     public DatanodeCommandCounts() {
       this.commandsSent = 0;
       this.commandsSuccess = 0;
       this.commandsFailure = 0;
+      this.commandsTimeout = 0;
     }
 
     public void incrCommandsSent(long delta) {
@@ -286,6 +302,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     public void incrCommandsFailure(long delta) {
       this.commandsFailure += delta;
     }
+    
+    public void incrCommandsTimeout(long delta) {
+      this.commandsTimeout += delta;
+    }
 
     public long getCommandsSent() {
       return commandsSent;
@@ -298,10 +318,15 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     public long getCommandsFailure() {
       return commandsFailure;
     }
+    
+    public long getCommandsTimeout() {
+      return commandsTimeout;
+    }
 
     @Override
     public String toString() {
-      return "Sent=" + commandsSent + ", Success=" + commandsSuccess + ", Failed=" + commandsFailure;
+      return "Sent=" + commandsSent + ", Success=" + commandsSuccess + ", Failed=" + commandsFailure + 
+          ", Timeout=" + commandsTimeout;
     }
   }
 
@@ -312,6 +337,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     }
     return sent;
   }
+
   public long getNumCommandsDatanodeSuccess() {
     long successCount = 0;
     for (DatanodeCommandCounts v : numCommandsDatanode.values()) {
@@ -319,6 +345,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     }
     return successCount;
   }
+
   public long getNumCommandsDatanodeFailed() {
     long failCount = 0;
     for (DatanodeCommandCounts v : numCommandsDatanode.values()) {
@@ -329,25 +356,17 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   @Override
   public String toString() {
-    StringBuffer buffer = new StringBuffer();
-    buffer.append("numBlockDeletionTransactionCreated = "
-        + numBlockDeletionTransactionCreated.value()).append("\t")
-        .append("numBlockDeletionTransactionCompleted = "
-            + numBlockDeletionTransactionCompleted.value()).append("\t")
-        .append("numBlockDeletionCommandSent = "
-            + numBlockDeletionCommandSent.value()).append("\t")
-        .append("numBlockDeletionCommandSuccess = "
-            + numBlockDeletionCommandSuccess.value()).append("\t")
-        .append("numBlockDeletionCommandFailure = "
-            + numBlockDeletionCommandFailure.value()).append("\t")
-        .append("numBlockDeletionTransactionSent = "
-            + numBlockDeletionTransactionSent.value()).append("\t")
-        .append("numBlockDeletionTransactionSuccess = "
-            + numBlockDeletionTransactionSuccess.value()).append("\t")
-        .append("numBlockDeletionTransactionFailure = "
-            + numBlockDeletionTransactionFailure.value()).append("\t")
-        .append("numDeletionCommandsPerDatanode = "
-            + numCommandsDatanode);
+    StringBuilder buffer = new StringBuilder()
+        .append("numBlockDeletionTransactionCreated = ").append(numBlockDeletionTransactionCreated.value()).append('\t')
+        .append("numBlockDeletionTransactionCompleted = ")
+        .append(numBlockDeletionTransactionCompleted.value()).append('\t')
+        .append("numBlockDeletionCommandSent = ").append(numBlockDeletionCommandSent.value()).append('\t')
+        .append("numBlockDeletionCommandSuccess = ").append(numBlockDeletionCommandSuccess.value()).append('\t')
+        .append("numBlockDeletionCommandFailure = ").append(numBlockDeletionCommandFailure.value()).append('\t')
+        .append("numBlockDeletionTransactionSent = ").append(numBlockDeletionTransactionSent.value()).append('\t')
+        .append("numBlockDeletionTransactionSuccess = ").append(numBlockDeletionTransactionSuccess.value()).append('\t')
+        .append("numBlockDeletionTransactionFailure = ").append(numBlockDeletionTransactionFailure.value()).append('\t')
+        .append("numDeletionCommandsPerDatanode = ").append(numCommandsDatanode);
     return buffer.toString();
   }
 }

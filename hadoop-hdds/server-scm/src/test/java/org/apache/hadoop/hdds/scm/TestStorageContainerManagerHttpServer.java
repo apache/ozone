@@ -52,7 +52,7 @@ public class TestStorageContainerManagerHttpServer {
   @BeforeAll
   public static void setUp() throws Exception {
     File ozoneMetadataDirectory = new File(baseDir, "metadata");
-    ozoneMetadataDirectory.mkdirs();
+    assertTrue(ozoneMetadataDirectory.mkdirs());
     conf = new OzoneConfiguration();
     keystoresDir = baseDir.getAbsolutePath();
     sslConfDir = KeyStoreTestUtil.getClasspathDir(

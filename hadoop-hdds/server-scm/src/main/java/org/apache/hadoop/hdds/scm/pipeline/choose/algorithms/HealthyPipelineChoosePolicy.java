@@ -35,7 +35,7 @@ public class HealthyPipelineChoosePolicy implements PipelineChoosePolicy {
   public Pipeline choosePipeline(List<Pipeline> pipelineList,
       PipelineRequestInformation pri) {
     Pipeline fallback = null;
-    while (pipelineList.size() > 0) {
+    while (!pipelineList.isEmpty()) {
       Pipeline pipeline = randomPolicy.choosePipeline(pipelineList, pri);
       if (pipeline.isHealthy()) {
         return pipeline;

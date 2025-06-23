@@ -204,10 +204,11 @@ public class OpenKeyCleanupService extends BackgroundService {
           if (LOG.isDebugEnabled()) {
             StringBuilder sb = new StringBuilder();
             for (OpenKeyBucket.Builder openKey : openKeyBuckets) {
-              sb.append(openKey.getVolumeName() + OZONE_URI_DELIMITER +  openKey.getBucketName() + ": ")
+              sb.append(openKey.getVolumeName()).append(OZONE_URI_DELIMITER).append(openKey.getBucketName())
+                  .append(": ")
                   .append(openKey.getKeysList().stream().map(OzoneManagerProtocolProtos.OpenKey::getName)
                       .collect(Collectors.toList()))
-                  .append("\n");
+                  .append('\n');
             }
             LOG.debug("Non-hsync'ed openKeys being deleted in current iteration: \n" + sb);
           }
@@ -226,8 +227,8 @@ public class OpenKeyCleanupService extends BackgroundService {
             if (LOG.isDebugEnabled()) {
               StringBuilder sb = new StringBuilder();
               for (CommitKeyRequest.Builder openKey : hsyncKeys) {
-                sb.append(openKey.getKeyArgs().getVolumeName() + OZONE_URI_DELIMITER +
-                        openKey.getKeyArgs().getBucketName() + ": ")
+                sb.append(openKey.getKeyArgs().getVolumeName()).append(OZONE_URI_DELIMITER)
+                    .append(openKey.getKeyArgs().getBucketName()).append(": ")
                     .append(openKey.getKeyArgs().getKeyName())
                     .append(", ");
               }
@@ -237,9 +238,11 @@ public class OpenKeyCleanupService extends BackgroundService {
         });
       }
 
+      long timeTaken = Time.monotonicNow() - startTime;
       LOG.info("Number of expired open keys submitted for deletion: {},"
               + " for commit: {}, cleanupLimit: {}, elapsed time: {}ms",
-          numOpenKeys, numHsyncKeys, cleanupLimitPerTask, Time.monotonicNow() - startTime);
+          numOpenKeys, numHsyncKeys, cleanupLimitPerTask, timeTaken);
+      ozoneManager.getPerfMetrics().setOpenKeyCleanupServiceLatencyMs(timeTaken);
       final int numKeys = numOpenKeys + numHsyncKeys;
       submittedOpenKeyCount.addAndGet(numKeys);
       return () -> numKeys;

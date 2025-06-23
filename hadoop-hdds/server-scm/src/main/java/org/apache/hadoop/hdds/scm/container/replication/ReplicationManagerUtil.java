@@ -25,10 +25,10 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,11 +46,10 @@ import org.slf4j.LoggerFactory;
  */
 public final class ReplicationManagerUtil {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ReplicationManagerUtil.class);
+
   private ReplicationManagerUtil() {
   }
-
-  private static final Logger LOG = LoggerFactory.getLogger(
-      ReplicationManagerUtil.class);
 
   /**
    * Using the passed placement policy attempt to select a list of datanodes to
@@ -78,7 +78,7 @@ public final class ReplicationManagerUtil {
     // Ensure that target datanodes have enough space to hold a complete
     // container.
     final long dataSizeRequired =
-        Math.max(container.getUsedBytes(), defaultContainerSize);
+        HddsServerUtil.requiredReplicationSpace(Math.max(container.getUsedBytes(), defaultContainerSize));
 
     int mutableRequiredNodes = requiredNodes;
     while (mutableRequiredNodes > 0) {
@@ -98,7 +98,7 @@ public final class ReplicationManagerUtil {
       }
     }
     throw new SCMException(String.format("Placement Policy: %s did not return"
-            + " any nodes. Number of required Nodes %d, Datasize Required: %d",
+            + " any nodes. Number of required Nodes %d, Data size Required: %d",
         policy.getClass(), requiredNodes, dataSizeRequired),
         SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
@@ -198,7 +198,6 @@ public final class ReplicationManagerUtil {
     return new ExcludedAndUsedNodes(excludedNodes, usedNodes);
   }
 
-
   /**
    * Simple class to hold the excluded and used nodes lists.
    */
@@ -273,14 +272,14 @@ public final class ReplicationManagerUtil {
     deleteCandidates.sort(
         Comparator.comparingLong(ContainerReplica::getSequenceId));
     if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
-      return deleteCandidates.size() > 0 ? deleteCandidates : null;
+      return !deleteCandidates.isEmpty() ? deleteCandidates : null;
     }
 
     if (containerInfo.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED) {
       List<ContainerReplica> nonUniqueOrigins =
           findNonUniqueDeleteCandidates(replicas, deleteCandidates,
               nodeStatusFn);
-      return nonUniqueOrigins.size() > 0 ? nonUniqueOrigins : null;
+      return !nonUniqueOrigins.isEmpty() ? nonUniqueOrigins : null;
     }
     return null;
   }
@@ -332,7 +331,7 @@ public final class ReplicationManagerUtil {
       Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
     // Gather the origin node IDs of replicas which are not candidates for
     // deletion.
-    Set<UUID> existingOriginNodeIDs = allReplicas.stream()
+    final Set<DatanodeID> existingOriginNodeIDs = allReplicas.stream()
         .filter(r -> !deleteCandidates.contains(r))
         .filter(r -> {
           NodeStatus status = nodeStatusFn.apply(r.getDatanodeDetails());
@@ -375,7 +374,7 @@ public final class ReplicationManagerUtil {
     return nonUniqueDeleteCandidates;
   }
 
-  private static void checkUniqueness(Set<UUID> existingOriginNodeIDs,
+  private static void checkUniqueness(Set<DatanodeID> existingOriginNodeIDs,
       List<ContainerReplica> nonUniqueDeleteCandidates,
       ContainerReplica replica) {
     if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {

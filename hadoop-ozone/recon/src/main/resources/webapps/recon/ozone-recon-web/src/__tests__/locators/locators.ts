@@ -48,6 +48,12 @@ export const datanodeLocators = {
   datanodeTableRow: (uuid: string) =>  `dntable-${uuid}`
 }
 
+export const pipelineLocators = {
+  'pipelineTable': 'pipelines-table',
+  'pipelineRowRegex': /pipelinetable-/,
+  pipelineTableRow: (uuid: string) => `pipelinetable-${uuid}`
+}
+
 export const autoReloadPanelLocators = {
   'autoreloadPanel': 'autoreload-panel',
   'refreshButton': 'autoreload-panel-refresh',

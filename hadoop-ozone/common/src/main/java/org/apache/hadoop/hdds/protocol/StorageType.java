@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.protocol;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 
 /**
  * Ozone specific storage types.

@@ -28,85 +28,73 @@ ${BUCKET}           cli-debug-bucket
 ${TESTFILE}         testfile
 ${EC_DATA}          6
 ${EC_PARITY}        3
+${OM_SERVICE_ID}    %{OM_SERVICE_ID}
 
 *** Keywords ***
 Create EC key
     [arguments]       ${bs}    ${count}
 
     Execute           dd if=/dev/urandom of=${TEMP_DIR}/testfile bs=${bs} count=${count}
-    Execute           ozone sh key put o3://om/${VOLUME}/${BUCKET}/testfile ${TEMP_DIR}/testfile -r rs-${EC_DATA}-${EC_PARITY}-1024k -t EC
+    Execute           ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile ${TEMP_DIR}/testfile -r rs-${EC_DATA}-${EC_PARITY}-1024k -t EC
 
 *** Test Cases ***
 0 data block
     Create EC key     1048576    0
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
     Should Be Equal As Integers         ${count_files}     1
 
 1 data block
     Create EC key     1048576    1
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     10
-    ${sum_size} =                       Evaluate     1048576 * 4
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
+    Should Be Equal As Integers         ${count_files}     1
 
 2 data blocks
     Create EC key     1048576    2
-    ${directory} =                      Execute read-replicas CLI tool
-    ${sum_size} =                       Evaluate     1048576 * 5
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     10
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
+    Should Be Equal As Integers         ${count_files}     1
 
 3 data blocks
     Create EC key     1048576    3
-    ${directory} =                      Execute read-replicas CLI tool
-    ${sum_size} =                       Evaluate     1048576 * 6
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     10
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size} 
-    
+    Should Be Equal As Integers         ${count_files}     1
+
 4 data blocks
     Create EC key     1048576    4
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    ${sum_size} =                       Evaluate     1048576 * 7
-    Should Be Equal As Integers         ${count_files}     10
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
+    Should Be Equal As Integers         ${count_files}     1
 
 5 data blocks
     Create EC key     1048576    5
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    ${sum_size} =                       Evaluate     1048576 * 8
-    Should Be Equal As Integers         ${count_files}     10
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
+    Should Be Equal As Integers         ${count_files}     1
 
 6 data blocks
     Create EC key     1048576    6
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    ${sum_size} =                       Evaluate     1048576 * 9
-    Should Be Equal As Integers         ${count_files}     10
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
+    Should Be Equal As Integers         ${count_files}     1
 
 6 data blocks and partial stripe
     Create EC key     1000000    7
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    ${sum_size} =                       Evaluate     1048576 * 9
     ${sum_size_last_stripe} =           Evaluate     ((1000000 * 7) % 1048576) * 4
-    Should Be Equal As Integers         ${count_files}     19
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
-    Verify Healthy EC Replica           ${directory}    2    ${sum_size_last_stripe}
+    Should Be Equal As Integers         ${count_files}     1
 
 7 data blocks and partial stripe
     Create EC key     1000000    8
-    ${directory} =                      Execute read-replicas CLI tool
+    ${directory} =                      Execute replicas verify checksums CLI tool
     ${count_files} =                    Count Files In Directory    ${directory}
-    ${sum_size} =                       Evaluate     1048576 * 9
     ${sum_size_last_stripe} =           Evaluate     1048576 * 4 + ((1000000 * 8) % 1048576)
-    Should Be Equal As Integers         ${count_files}     19
-    Verify Healthy EC Replica           ${directory}    1    ${sum_size}
-    Verify Healthy EC Replica           ${directory}    2    ${sum_size_last_stripe}
+    Should Be Equal As Integers         ${count_files}     1
+
+Test ozone debug replicas chunk-info
+    Create EC key     1048576    6
+    ${count} =        Execute           ozone debug replicas chunk-info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/testfile | jq '[.keyLocations[0][] | select(.file | test("\\\\.block$")) | .file] | length'
+    Should Be Equal As Integers         ${count}           9

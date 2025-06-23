@@ -23,19 +23,18 @@ import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Base class for scheduled scanners on a Datanode.
  */
-public abstract class AbstractBackgroundContainerScanner extends Thread {
-  public static final Logger LOG =
+public abstract class AbstractBackgroundContainerScanner implements Runnable {
+  private static final Logger LOG =
       LoggerFactory.getLogger(AbstractBackgroundContainerScanner.class);
 
   private final long dataScanInterval;
-
+  private final Thread scannerThread;
   private final AtomicBoolean stopping;
   private final AtomicBoolean pausing = new AtomicBoolean();
 
@@ -43,8 +42,13 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
       long dataScanInterval) {
     this.dataScanInterval = dataScanInterval;
     this.stopping = new AtomicBoolean(false);
-    setName(name);
-    setDaemon(true);
+
+    this.scannerThread = new Thread(this, name);
+    this.scannerThread.setDaemon(true);
+  }
+
+  public void start() {
+    scannerThread.start();
   }
 
   @Override
@@ -135,15 +139,6 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
     }
   }
 
-  public static void logUnhealthyScanResult(long containerID, ScanResult result, Logger log) {
-    LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerID, result);
-    if (log.isDebugEnabled()) {
-      StringBuilder allErrorString = new StringBuilder();
-      result.getErrors().forEach(r -> allErrorString.append(r).append('\n'));
-      log.debug("Complete list of errors detected while scanning container {}:\n{}", containerID, allErrorString);
-    }
-  }
-
   /**
    * Shutdown the current container scanning thread.
    * If the thread is already being shutdown, the call will block until the
@@ -151,14 +146,18 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
    */
   public synchronized void shutdown() {
     if (stopping.compareAndSet(false, true)) {
-      this.interrupt();
+      scannerThread.interrupt();
       try {
-        this.join();
+        scannerThread.join();
       } catch (InterruptedException ex) {
         LOG.warn("Unexpected exception while stopping data scanner.", ex);
         Thread.currentThread().interrupt();
       }
     }
+  }
+
+  public boolean isAlive() {
+    return scannerThread.isAlive();
   }
 
   public void pause() {

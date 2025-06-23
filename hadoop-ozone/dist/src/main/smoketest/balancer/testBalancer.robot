@@ -98,13 +98,13 @@ Run Balancer Status
                      Should Contain                  ${result}             ContainerBalancer is Running.
 
 Run Balancer Verbose Status
-    ${result} =      Execute                         ozone admin containerbalancer status -v
+    ${result} =      Execute                         ozone admin containerbalancer status --verbose
                      Verify Balancer Iteration       ${result}             1
                      Should Contain                  ${result}             Iteration result -    collapse_spaces=True
 
 
 Run Balancer Verbose History Status
-    ${result} =    Execute                         ozone admin containerbalancer status -v --history
+    ${result} =    Execute                         ozone admin containerbalancer status --verbose --history
                    Verify Balancer Iteration            ${result}             1
                    Verify Balancer Iteration History    ${result}
 
@@ -134,7 +134,7 @@ Get Uuid
 
 Close All Containers
     FOR     ${INDEX}    IN RANGE    15
-        ${container} =      Execute          ozone admin container list --state OPEN | jq -r 'select(.replicationConfig.data == 3) | .containerID' | head -1
+        ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.data == 3) | .containerID' | head -1
         EXIT FOR LOOP IF    "${container}" == "${EMPTY}"
                             ${message} =    Execute And Ignore Error    ozone admin container close "${container}"
                             Run Keyword If    '${message}' != '${EMPTY}'      Should Contain   ${message}   is in closing state
@@ -145,7 +145,7 @@ Close All Containers
 
 All container is closed
     ${output} =         Execute           ozone admin container list --state OPEN
-                        Should Be Empty   ${output}
+                        Should Be Equal   ${output}   [ ]
 
 Get Datanode Ozone Used Bytes Info
     [arguments]             ${uuid}

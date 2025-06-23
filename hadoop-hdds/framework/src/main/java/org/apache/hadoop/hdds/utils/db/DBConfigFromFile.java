@@ -17,11 +17,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
-
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -53,7 +50,7 @@ public final class DBConfigFromFile {
   private DBConfigFromFile() {
   }
 
-  public static File getConfigLocation() throws IOException {
+  public static File getConfigLocation() {
     String path = System.getenv(CONFIG_DIR);
 
     // Make testing easy.
@@ -109,13 +106,12 @@ public final class DBConfigFromFile {
    * @param dbFileName - The DB File Name, for example, OzoneManager.db.
    * @param cfDescs - ColumnFamily Handles.
    * @return DBOptions, Options to be used for opening/creating the DB.
-   * @throws IOException
    */
   public static ManagedDBOptions readFromFile(String dbFileName,
-      List<ColumnFamilyDescriptor> cfDescs) throws IOException {
+      List<ColumnFamilyDescriptor> cfDescs) throws RocksDatabaseException {
     Preconditions.checkNotNull(dbFileName);
     Preconditions.checkNotNull(cfDescs);
-    Preconditions.checkArgument(cfDescs.size() > 0);
+    Preconditions.checkArgument(!cfDescs.isEmpty());
 
     //TODO: Add Documentation on how to support RocksDB Mem Env.
     Env env = Env.getDefault();
@@ -133,7 +129,7 @@ public final class DBConfigFromFile {
               env, options, cfDescs, true);
 
         } catch (RocksDBException rdEx) {
-          throw toIOException("Unable to find/open Options file.", rdEx);
+          throw new RocksDatabaseException("Failed to loadOptionsFromFile " + optionsFile, rdEx);
         }
       }
     }

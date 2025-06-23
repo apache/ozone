@@ -20,10 +20,13 @@ package org.apache.hadoop.ozone.dn.checksum;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_CHECK_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION;
@@ -34,6 +37,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBER
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -43,7 +49,6 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeMa
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
-import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.writeContainerDataTreeProto;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
@@ -62,7 +67,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Properties;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -104,19 +108,19 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
+import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class tests container commands for reconciliation.
@@ -129,6 +133,7 @@ public class TestContainerCommandReconciliation {
   private static OzoneConfiguration conf;
   private static DNContainerOperationClient dnClient;
   private static final String KEY_NAME = "testkey";
+  private static final Logger LOG = LoggerFactory.getLogger(TestContainerCommandReconciliation.class);
 
   @TempDir
   private static File testDir;
@@ -148,10 +153,15 @@ public class TestContainerCommandReconciliation {
     conf.set(OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, 128 * 1024, StorageUnit.BYTES);
     conf.setStorageSize(OZONE_SCM_BLOCK_SIZE,  512 * 1024, StorageUnit.BYTES);
-    // Disable the container scanner so it does not create merkle tree files that interfere with this test.
-    // TODO: Currently container scrub sets the checksum to 0, Revert this after HDDS-10374 is merged.
-    conf.getObject(ContainerScannerConfiguration.class).setEnabled(false);
-    conf.setBoolean("hdds.container.scrub.enabled", false);
+    // Support restarting datanodes and SCM in a rolling fashion to test checksum reporting after restart.
+    // Datanodes need to heartbeat more frequently, because they will not know that SCM was restarted until they
+    // heartbeat and SCM indicates they need to re-register.
+    conf.set(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, "200ms");
+    conf.set(HDDS_HEARTBEAT_INTERVAL, "1s");
+    conf.set(OZONE_SCM_STALENODE_INTERVAL, "3s");
+    conf.set(OZONE_SCM_DEADNODE_INTERVAL, "6s");
+    conf.set(HDDS_NODE_REPORT_INTERVAL, "5s");
+    conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
 
     startMiniKdc();
     setSecureConfig();
@@ -237,7 +247,7 @@ public class TestContainerCommandReconciliation {
     StorageContainerException ex = assertThrows(StorageContainerException.class, () ->
         dnClient.getContainerChecksumInfo(containerID, targetDN.getDatanodeDetails()));
     assertEquals(ContainerProtos.Result.IO_EXCEPTION, ex.getResult());
-    assertTrue(ex.getMessage().contains("(No such file or directory"), ex.getMessage() +
+    assertTrue(ex.getMessage().contains("Checksum file does not exist"), ex.getMessage() +
         " did not contain the expected string");
   }
 
@@ -299,7 +309,6 @@ public class TestContainerCommandReconciliation {
     Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID);
     File treeFile = getContainerChecksumFile(container.getContainerData());
-    // TODO After HDDS-10379 the file will already exist and need to be overwritten.
     assertTrue(treeFile.exists());
     Files.write(treeFile.toPath(), new byte[]{},
         StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
@@ -376,20 +385,13 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    // TODO: Use On-demand container scanner to build the new container merkle tree. (HDDS-10374)
-    Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
-    kvHandler.createContainerMerkleTree(container);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
+    waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
     long dataChecksumAfterBlockDelete = containerChecksumAfterBlockDelete.getContainerMerkleTree().getDataChecksum();
     // Checksum should have changed after block delete.
     assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
-
-    // Since the container is already closed, we have manually updated the container checksum file.
-    // This doesn't update the checksum reported to SCM, and we need to trigger an ICR.
-    // Marking a container unhealthy will send an ICR.
-    kvHandler.markContainerUnhealthy(container, MetadataScanResult.deleted());
-    waitForDataChecksumsAtSCM(containerID, 2);
 
     // 3. Reconcile the container.
     cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
@@ -418,7 +420,6 @@ public class TestContainerCommandReconciliation {
     HddsDatanodeService hddsDatanodeService = cluster.getHddsDatanode(dataNodeDetails.get(0));
     DatanodeStateMachine datanodeStateMachine = hddsDatanodeService.getDatanodeStateMachine();
     Container<?> container = datanodeStateMachine.getContainer().getContainerSet().getContainer(containerID);
-    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     ContainerProtos.ContainerChecksumInfo oldContainerChecksumInfo = readChecksumFile(container.getContainerData());
     KeyValueHandler kvHandler = (KeyValueHandler) datanodeStateMachine.getContainer().getDispatcher()
         .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
@@ -427,74 +428,20 @@ public class TestContainerCommandReconciliation {
     List<BlockData> blockDatas = blockManager.listBlock(container, -1, 100);
     long oldDataChecksum = oldContainerChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
-    // 2. Corrupt first chunk for all the blocks
-    try (DBHandle db = BlockUtils.getDB(containerData, conf);
-         BatchOperation op = db.getStore().getBatchHandler().initBatchOperation()) {
-      for (BlockData blockData : blockDatas) {
-        // Modify the block metadata to simulate chunk corruption.
-        ContainerProtos.BlockData.Builder blockDataBuilder = blockData.getProtoBufMessage().toBuilder();
-        blockDataBuilder.clearChunks();
-
-        ContainerProtos.ChunkInfo chunkInfo = blockData.getChunks().get(0);
-        ContainerProtos.ChecksumData.Builder checksumDataBuilder = ContainerProtos.ChecksumData.newBuilder()
-            .setBytesPerChecksum(chunkInfo.getChecksumData().getBytesPerChecksum())
-            .setType(chunkInfo.getChecksumData().getType());
-
-        for (ByteString checksum : chunkInfo.getChecksumData().getChecksumsList()) {
-          byte[] checksumBytes = checksum.toByteArray();
-          // Modify the checksum bytes to simulate corruption.
-          checksumBytes[0] = (byte) (checksumBytes[0] - 1);
-          checksumDataBuilder.addChecksums(ByteString.copyFrom(checksumBytes)).build();
-        }
-        chunkInfo = chunkInfo.toBuilder().setChecksumData(checksumDataBuilder.build()).build();
-        blockDataBuilder.addChunks(chunkInfo);
-        for (int i = 1; i < blockData.getChunks().size(); i++) {
-          blockDataBuilder.addChunks(blockData.getChunks().get(i));
-        }
-
-        // Modify the block metadata from the container db to simulate chunk corruption.
-        db.getStore().getBlockDataTable().putWithBatch(op, containerData.getBlockKey(blockData.getLocalID()),
-            BlockData.getFromProtoBuf(blockDataBuilder.build()));
-      }
-      db.getStore().getBatchHandler().commitBatchOperation(op);
-      db.getStore().flushDB();
+    // 2. Corrupt every block in one replica.
+    for (BlockData blockData : blockDatas) {
+      long blockID = blockData.getLocalID();
+      TestContainerCorruptions.CORRUPT_BLOCK.applyTo(container, blockID);
     }
 
-    Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
-    kvHandler.createContainerMerkleTree(container);
-    // To set unhealthy for chunks that are corrupted.
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
+    waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterChunkCorruption =
         readChecksumFile(container.getContainerData());
     long dataChecksumAfterAfterChunkCorruption = containerChecksumAfterChunkCorruption
         .getContainerMerkleTree().getDataChecksum();
     // Checksum should have changed after chunk corruption.
     assertNotEquals(oldDataChecksum, dataChecksumAfterAfterChunkCorruption);
-
-    // 3. Set Unhealthy for first chunk of all blocks. This should be done by the scanner, Until then this is a
-    // manual step.
-    // TODO: Use On-demand container scanner to build the new container merkle tree (HDDS-10374)
-    Random random = new Random();
-    ContainerProtos.ContainerChecksumInfo.Builder builder = containerChecksumAfterChunkCorruption.toBuilder();
-    List<ContainerProtos.BlockMerkleTree> blockMerkleTreeList = builder.getContainerMerkleTree()
-        .getBlockMerkleTreeList();
-    builder.getContainerMerkleTreeBuilder().clearBlockMerkleTree();
-    for (ContainerProtos.BlockMerkleTree blockMerkleTree : blockMerkleTreeList) {
-      ContainerProtos.BlockMerkleTree.Builder blockMerkleTreeBuilder = blockMerkleTree.toBuilder();
-      List<ContainerProtos.ChunkMerkleTree.Builder> chunkMerkleTreeBuilderList =
-          blockMerkleTreeBuilder.getChunkMerkleTreeBuilderList();
-      chunkMerkleTreeBuilderList.get(0).setIsHealthy(false).setDataChecksum(random.nextLong());
-      blockMerkleTreeBuilder.setDataChecksum(random.nextLong());
-      builder.getContainerMerkleTreeBuilder().addBlockMerkleTree(blockMerkleTreeBuilder.build());
-    }
-    builder.getContainerMerkleTreeBuilder().setDataChecksum(random.nextLong());
-    Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
-    writeContainerDataTreeProto(container.getContainerData(), builder.getContainerMerkleTree());
-
-    // Since the container is already closed, we have manually updated the container checksum file.
-    // This doesn't update the checksum reported to SCM, and we need to trigger an ICR.
-    // Marking a container unhealthy will send an ICR.
-    kvHandler.markContainerUnhealthy(container, MetadataScanResult.deleted());
-    waitForDataChecksumsAtSCM(containerID, 2);
 
     // 4. Reconcile the container.
     cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
@@ -557,22 +504,15 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    // TODO: Use On-demand container scanner to build the new container merkle tree. (HDDS-10374)
-    Files.deleteIfExists(getContainerChecksumFile(container.getContainerData()).toPath());
-    kvHandler.createContainerMerkleTree(container);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
+    waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
     long dataChecksumAfterBlockDelete = containerChecksumAfterBlockDelete.getContainerMerkleTree().getDataChecksum();
     // Checksum should have changed after block delete.
     assertNotEquals(oldDataChecksum, dataChecksumAfterBlockDelete);
 
-    // Since the container is already closed, we have manually updated the container checksum file.
-    // This doesn't update the checksum reported to SCM, and we need to trigger an ICR.
-    // Marking a container unhealthy will send an ICR.
-    kvHandler.markContainerUnhealthy(container, MetadataScanResult.deleted());
-    waitForDataChecksumsAtSCM(containerID, 2);
     scmClient.reconcileContainer(containerID);
-
     waitForDataChecksumsAtSCM(containerID, 1);
     // Check non-zero checksum after container reconciliation
     containerReplicas = scmClient.getContainerReplicas(containerID, ClientVersion.CURRENT_VERSION);
@@ -604,11 +544,13 @@ public class TestContainerCommandReconciliation {
                 ClientVersion.CURRENT_VERSION).stream()
             .map(HddsProtos.SCMContainerReplicaProto::getDataChecksum)
             .collect(Collectors.toSet());
+        LOG.info("Waiting for {} total unique checksums from container {} to be reported to SCM. Currently {} unique" +
+            "checksums are reported.", expectedSize, containerID, dataChecksums.size());
         return dataChecksums.size() == expectedSize;
       } catch (Exception ex) {
         return false;
       }
-    }, 500, 20000);
+    }, 1000, 20000);
   }
 
   private Pair<Long, byte[]> getDataAndContainer(boolean close, int dataLen, String volumeName, String bucketName)
@@ -697,7 +639,7 @@ public class TestContainerCommandReconciliation {
     conf.set(HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_SCM/" + hostAndRealm);
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
     conf.set(OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY, "HTTP_OM/" + hostAndRealm);
-    conf.set(DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
+    conf.set(HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY, "scm/" + hostAndRealm);
 
     ozoneKeytab = new File(workDir, "scm.keytab");
     spnegoKeytab = new File(workDir, "http.keytab");
@@ -708,7 +650,7 @@ public class TestContainerCommandReconciliation {
     conf.set(HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY, spnegoKeytab.getAbsolutePath());
     conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
     conf.set(OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE, spnegoKeytab.getAbsolutePath());
-    conf.set(DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
+    conf.set(HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY, ozoneKeytab.getAbsolutePath());
   }
 
   private static void startCluster() throws Exception {

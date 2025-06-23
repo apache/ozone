@@ -98,7 +98,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     this.failoverProxyProvider = proxyProvider;
     this.rpcProxy = (ScmBlockLocationProtocolPB) RetryProxy.create(
         ScmBlockLocationProtocolPB.class, failoverProxyProvider,
-        failoverProxyProvider.getSCMBlockLocationRetryPolicy());
+        failoverProxyProvider.getRetryPolicy());
   }
 
   /**
@@ -302,6 +302,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     resp = wrappedResponse.getAddScmResponse();
     return resp.getSuccess();
   }
+
   /**
    * Sort the datanodes based on distance from client.
    * @return list of datanodes;

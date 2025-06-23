@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.hadoop.ozone.recon.codegen.JooqCodeGenerator.RECON_SCHEMA_NAME;
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.createNewDerbyDatabase;
+import static org.apache.ozone.recon.codegen.JooqCodeGenerator.RECON_SCHEMA_NAME;
+import static org.apache.ozone.recon.schema.SqlDbUtils.createNewDerbyDatabase;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;

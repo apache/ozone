@@ -60,7 +60,7 @@ public class StorageVolumeChecker {
 
   public static final int MAX_VOLUME_FAILURE_TOLERATED_LIMIT = -1;
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(StorageVolumeChecker.class);
 
   private AsyncChecker<Boolean, VolumeCheckResult> delegateChecker;

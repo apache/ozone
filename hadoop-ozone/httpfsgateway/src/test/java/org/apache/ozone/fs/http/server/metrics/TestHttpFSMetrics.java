@@ -19,6 +19,7 @@ package org.apache.ozone.fs.http.server.metrics;
 
 import static org.apache.ozone.lib.service.hadoop.FileSystemAccessService.FILE_SYSTEM_SERVICE_CREATED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.mock;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -47,19 +49,8 @@ import org.junit.jupiter.api.io.TempDir;
  * Test class for HttpFSServerMetrics.
  */
 public class TestHttpFSMetrics {
-  private static final FileSystem mockFs = mock(FileSystem.class);
-  private static final FSDataOutputStream fsDataOutputStream = mock(FSDataOutputStream.class);
-  public static class MockFileSystemAccessService extends FileSystemAccessService {
-    @Override
-    protected FileSystem createFileSystem(Configuration namenodeConf) throws IOException {
-      return mockFs;
-    }
-
-    @Override
-    protected void closeFileSystem(FileSystem fs) throws IOException {
-      // do nothing
-    }
-  }
+  private static FileSystem mockFs = mock(FileSystem.class);
+  private static FSDataOutputStream fsDataOutputStream = mock(FSDataOutputStream.class);
 
   private HttpFSServerWebApp webApp;
   private HttpFSServerMetrics metrics;
@@ -70,11 +61,11 @@ public class TestHttpFSMetrics {
   @BeforeAll
   static void init(@TempDir File dir) throws Exception {
     File tempDir = new File(dir, "temp");
-    tempDir.mkdirs();
+    assertTrue(tempDir.mkdirs());
     File logDir = new File(dir, "log");
-    logDir.mkdirs();
+    assertTrue(logDir.mkdirs());
     File confDir = new File(dir, "conf");
-    confDir.mkdirs();
+    assertTrue(confDir.mkdirs());
     System.setProperty("httpfs.home.dir", dir.getAbsolutePath());
   }
 
@@ -89,7 +80,7 @@ public class TestHttpFSMetrics {
 
     fsAccess = HttpFSServerWebApp.get().get(FileSystemAccess.class);
     metrics = HttpFSServerWebApp.getMetrics();
-    ugi = UserGroupInformation.createUserForTesting("testuser", new String[] { "testgroup" });
+    ugi = UserGroupInformation.createUserForTesting("testuser", new String[] {"testgroup"});
   }
 
   @AfterEach
@@ -106,7 +97,7 @@ public class TestHttpFSMetrics {
     long initialBytesWritten = metrics.getBytesWritten();
 
     FSOperations.FSCreate createOp = new FSOperations.FSCreate(
-        new ByteArrayInputStream("test".getBytes()),
+        new ByteArrayInputStream("test".getBytes(StandardCharsets.UTF_8)),
         "/test.txt",
         (short) 0644,
         true,
@@ -128,7 +119,7 @@ public class TestHttpFSMetrics {
     long initialBytesWritten = metrics.getBytesWritten();
 
     FSOperations.FSAppend appendOp = new FSOperations.FSAppend(
-        new ByteArrayInputStream("test".getBytes()),
+        new ByteArrayInputStream("test".getBytes(StandardCharsets.UTF_8)),
         "/test.txt");
 
     when(mockFs.append(isA(Path.class), isA(Integer.class))).thenReturn(fsDataOutputStream);
@@ -136,5 +127,20 @@ public class TestHttpFSMetrics {
 
     assertEquals(initialAppendOps + 1, metrics.getOpsAppend());
     assertEquals(initialBytesWritten + 4, metrics.getBytesWritten());
+  }
+
+  /**
+   * Mock FileSystemAccessService.
+   */
+  public static class MockFileSystemAccessService extends FileSystemAccessService {
+    @Override
+    protected FileSystem createFileSystem(Configuration namenodeConf) throws IOException {
+      return mockFs;
+    }
+
+    @Override
+    protected void closeFileSystem(FileSystem fs) throws IOException {
+      // do nothing
+    }
   }
 }

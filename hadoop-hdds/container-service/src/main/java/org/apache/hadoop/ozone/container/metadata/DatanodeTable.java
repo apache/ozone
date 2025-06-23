@@ -90,7 +90,7 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public String getName() throws IOException {
+  public String getName() {
     return table.getName();
   }
 

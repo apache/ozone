@@ -47,6 +47,8 @@
 #   * the keys are read from the snapshot and not the active file system
 #   * the contents of each key should be the same as the key name
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 

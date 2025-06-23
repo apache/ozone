@@ -25,6 +25,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 
 /**
  * Metadata object that represents a Datanode.
@@ -214,11 +215,6 @@ public final class DatanodeMetadata {
       return this;
     }
 
-    public Builder setOperationalState(NodeOperationalState operationalState) {
-      this.opState = operationalState;
-      return this;
-    }
-
     public Builder setLastHeartbeat(long lastHeartbeat) {
       this.lastHeartbeat = lastHeartbeat;
       return this;
@@ -255,30 +251,21 @@ public final class DatanodeMetadata {
       return this;
     }
 
-    public Builder setVersion(String version) {
-      this.version = version;
+    public Builder setDatanode(DatanodeInfo datanode) {
+      this.uuid = datanode.getUuidString();
+      this.hostname = datanode.getHostName();
+      this.networkLocation = datanode.getNetworkLocation();
+
+      this.opState = datanode.getPersistedOpState();
+
+      this.version = datanode.getVersion();
+      this.revision = datanode.getRevision();
+      this.layoutVersion = datanode.getLastKnownLayoutVersion().getMetadataLayoutVersion();
+
+      this.setupTime = datanode.getSetupTime();
       return this;
     }
 
-    public Builder setSetupTime(long setupTime) {
-      this.setupTime = setupTime;
-      return this;
-    }
-
-    public Builder setRevision(String revision) {
-      this.revision = revision;
-      return this;
-    }
-
-    public Builder setLayoutVersion(int layoutVersion) {
-      this.layoutVersion = layoutVersion;
-      return this;
-    }
-
-    public Builder setNetworkLocation(String networkLocation) {
-      this.networkLocation = networkLocation;
-      return this;
-    }
     /**
      * Constructs DatanodeMetadata.
      *

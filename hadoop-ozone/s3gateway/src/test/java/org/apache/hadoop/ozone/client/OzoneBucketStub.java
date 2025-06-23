@@ -344,6 +344,7 @@ public final class OzoneBucketStub extends OzoneBucket {
         .iterator();
   }
 
+  @Override
   public Iterator<? extends OzoneKey> listKeys(String keyPrefix,
       String prevKey, boolean shallow) throws IOException {
     if (!shallow) {

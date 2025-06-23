@@ -19,10 +19,12 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.UuidCodec;
+import org.apache.ratis.util.MemoizedSupplier;
 
 /**
  * ID for the pipeline, the ID is based on UUID.
@@ -34,14 +36,16 @@ public final class PipelineID {
       UuidCodec.get(), PipelineID::valueOf, c -> c.id,
       PipelineID.class, DelegatedCodec.CopyType.SHALLOW);
 
+  private final UUID id;
+  private final Supplier<HddsProtos.PipelineID> protoSupplier;
+
   public static Codec<PipelineID> getCodec() {
     return CODEC;
   }
 
-  private final UUID id;
-
   private PipelineID(UUID id) {
     this.id = id;
+    this.protoSupplier = MemoizedSupplier.valueOf(() -> buildProtobuf(id));
   }
 
   public static PipelineID randomId() {
@@ -52,12 +56,20 @@ public final class PipelineID {
     return new PipelineID(id);
   }
 
+  public static PipelineID valueOf(String id) {
+    return valueOf(UUID.fromString(id));
+  }
+
   public UUID getId() {
     return id;
   }
 
   @JsonIgnore
   public HddsProtos.PipelineID getProtobuf() {
+    return protoSupplier.get();
+  }
+
+  static HddsProtos.PipelineID buildProtobuf(UUID id) {
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
         .setMostSigBits(id.getMostSignificantBits())
         .setLeastSigBits(id.getLeastSignificantBits())
@@ -82,7 +94,7 @@ public final class PipelineID {
 
   @Override
   public String toString() {
-    return "PipelineID=" + id.toString();
+    return "Pipeline-" + id;
   }
 
   @Override

@@ -21,11 +21,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.io.IOUtils;
@@ -81,12 +80,12 @@ public class GetKeyHandler extends KeyHandler {
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
     try (InputStream input = bucket.readKey(keyName);
-        OutputStream output = new FileOutputStream(dataFile)) {
+        OutputStream output = Files.newOutputStream(dataFile.toPath())) {
       IOUtils.copyBytes(input, output, chunkSize);
     }
 
     if (isVerbose() && !"/dev/null".equals(dataFile.getAbsolutePath())) {
-      try (InputStream stream = new FileInputStream(dataFile)) {
+      try (InputStream stream = Files.newInputStream(dataFile.toPath())) {
         String hash = DigestUtils.sha256Hex(stream);
         out().printf("Downloaded file sha256 checksum : %s%n", hash);
       }

@@ -65,7 +65,6 @@ public final class DatanodeStoreCache {
     getInstance().miniClusterMode = isMiniCluster;
   }
 
-
   public void addDB(String containerDBPath, RawDB db) {
     datanodeStoreMap.putIfAbsent(containerDBPath, db);
     LOG.info("Added db {} to cache", containerDBPath);

@@ -44,6 +44,7 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
   private long getVolumeID() throws IOException {
     return omMetadataManager.getVolumeId(volumeName);
   }
+
   private long getBucketID() throws java.io.IOException {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
@@ -98,12 +99,14 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     return addKeyToOpenKeyTable(locationList, omKeyInfoFSO);
   }
 
+  @Override
   @Nonnull
   protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
     return new OMKeyCommitRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
+  @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }

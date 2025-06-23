@@ -21,20 +21,17 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
@@ -79,7 +76,6 @@ public class MutableVolumeSet implements VolumeSet {
   private final ReentrantReadWriteLock volumeSetRWLock;
 
   private final String datanodeUuid;
-  private String clusterID;
 
   private final StorageVolumeChecker volumeChecker;
   private CheckedRunnable<IOException> failedVolumeListener;
@@ -100,7 +96,6 @@ public class MutableVolumeSet implements VolumeSet {
   ) throws IOException {
     this.context = context;
     this.datanodeUuid = dnUuid;
-    this.clusterID = clusterID;
     this.conf = conf;
     this.volumeSetRWLock = new ReentrantReadWriteLock();
     this.volumeChecker = volumeChecker;
@@ -191,7 +186,7 @@ public class MutableVolumeSet implements VolumeSet {
 
     // First checking if we have any volumes, if all volumes are failed the
     // volumeMap size will be zero, and we throw Exception.
-    if (volumeMap.size() == 0) {
+    if (volumeMap.isEmpty()) {
       throw new DiskOutOfSpaceException("No storage locations configured");
     }
   }
@@ -221,7 +216,7 @@ public class MutableVolumeSet implements VolumeSet {
       throw new IOException("Interrupted while running disk check", e);
     }
 
-    if (failedVolumes.size() > 0) {
+    if (!failedVolumes.isEmpty()) {
       LOG.warn("checkAllVolumes got {} failed volumes - {}",
           failedVolumes.size(), failedVolumes);
       handleVolumeFailures(failedVolumes);
@@ -268,7 +263,7 @@ public class MutableVolumeSet implements VolumeSet {
 
     volumeChecker.checkVolume(
         volume, (healthyVolumes, failedVolumes) -> {
-          if (failedVolumes.size() > 0) {
+          if (!failedVolumes.isEmpty()) {
             LOG.warn("checkVolumeAsync callback got {} failed volumes: {}",
                 failedVolumes.size(), failedVolumes);
           } else {
@@ -279,7 +274,7 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   public void refreshAllVolumeUsage() {
-    volumeMap.forEach((k, v) -> v.refreshVolumeInfo());
+    volumeMap.forEach((k, v) -> v.refreshVolumeUsage());
   }
 
   /**
@@ -443,7 +438,7 @@ public class MutableVolumeSet implements VolumeSet {
     boolean hasEnoughVolumes;
     if (maxVolumeFailuresTolerated ==
         StorageVolumeChecker.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
-      hasEnoughVolumes = getVolumesList().size() >= 1;
+      hasEnoughVolumes = !getVolumesList().isEmpty();
     } else {
       hasEnoughVolumes = getFailedVolumesList().size() <= maxVolumeFailuresTolerated;
     }
@@ -457,66 +452,15 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   public StorageLocationReport[] getStorageReport() {
-    boolean failed;
     this.readLock();
     try {
-      StorageLocationReport[] reports = new StorageLocationReport[volumeMap
-          .size() + failedVolumeMap.size()];
+      StorageLocationReport[] reports = new StorageLocationReport[volumeMap.size() + failedVolumeMap.size()];
       int counter = 0;
-      StorageVolume volume;
-      for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
-        volume = entry.getValue();
-        Optional<VolumeInfo> volumeInfo = volume.getVolumeInfo();
-        long scmUsed = 0;
-        long remaining = 0;
-        long capacity = 0;
-        long committed = 0;
-        String rootDir = "";
-        failed = true;
-        if (volumeInfo.isPresent()) {
-          try {
-            rootDir = volumeInfo.get().getRootDir();
-            SpaceUsageSource usage = volumeInfo.get().getCurrentUsage();
-            scmUsed = usage.getUsedSpace();
-            remaining = usage.getAvailable();
-            capacity = usage.getCapacity();
-            committed = (volume instanceof HddsVolume) ?
-                ((HddsVolume) volume).getCommittedBytes() : 0;
-            failed = false;
-          } catch (UncheckedIOException ex) {
-            LOG.warn("Failed to get scmUsed and remaining for container " +
-                    "storage location {}", volumeInfo.get().getRootDir(), ex);
-            // reset scmUsed and remaining if df/du failed.
-            scmUsed = 0;
-            remaining = 0;
-            capacity = 0;
-          }
-        }
-
-        StorageLocationReport.Builder builder =
-            StorageLocationReport.newBuilder();
-        builder.setStorageLocation(rootDir)
-            .setId(volume.getStorageID())
-            .setFailed(failed)
-            .setCapacity(capacity)
-            .setRemaining(remaining)
-            .setScmUsed(scmUsed)
-            .setCommitted(committed)
-            .setStorageType(volume.getStorageType());
-        StorageLocationReport r = builder.build();
-        reports[counter++] = r;
+      for (StorageVolume volume : volumeMap.values()) {
+        reports[counter++] = volume.getReport();
       }
-      for (Map.Entry<String, StorageVolume> entry
-          : failedVolumeMap.entrySet()) {
-        volume = entry.getValue();
-        StorageLocationReport.Builder builder = StorageLocationReport
-            .newBuilder();
-        builder.setStorageLocation(volume.getStorageDir()
-            .getAbsolutePath()).setId(volume.getStorageID()).setFailed(true)
-            .setCapacity(0).setRemaining(0).setScmUsed(0).setStorageType(
-            volume.getStorageType());
-        StorageLocationReport r = builder.build();
-        reports[counter++] = r;
+      for (StorageVolume volume : failedVolumeMap.values()) {
+        reports[counter++] = volume.getReport();
       }
       return reports;
     } finally {

@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 
 /**
@@ -110,7 +110,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * Get a map of the node IDs and the corresponding data sizes moved to each node.
    * @return nodeId to size entering from node map
    */
-  public Map<UUID, Long> getSizeEnteringNodes() {
+  public Map<DatanodeID, Long> getSizeEnteringNodes() {
     return dataMoveInfo.getSizeEnteringNodes();
   }
 
@@ -118,7 +118,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * Get a map of the node IDs and the corresponding data sizes moved from each node.
    * @return nodeId to size leaving from node map
    */
-  public Map<UUID, Long> getSizeLeavingNodes() {
+  public Map<DatanodeID, Long> getSizeLeavingNodes() {
     return dataMoveInfo.getSizeLeavingNodes();
   }
 
@@ -160,7 +160,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return node transfer info proto representation
    */
   private List<StorageContainerLocationProtocolProtos.NodeTransferInfoProto> mapToProtoNodeTransferInfo(
-      Map<UUID, Long> nodes
+      Map<DatanodeID, Long> nodes
   ) {
     return nodes.entrySet()
         .stream()

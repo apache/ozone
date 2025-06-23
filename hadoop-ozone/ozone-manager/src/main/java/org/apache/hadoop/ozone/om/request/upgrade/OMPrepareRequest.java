@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
@@ -173,7 +174,7 @@ public class OMPrepareRequest extends OMClientRequest {
       Duration flushTimeout, Duration flushCheckInterval)
       throws InterruptedException, IOException {
 
-    long endTime = System.currentTimeMillis() + flushTimeout.toMillis();
+    long endTime = Time.monotonicNow() + flushTimeout.toMillis();
 
     boolean omDBFlushed = false;
     boolean ratisStateMachineApplied = false;
@@ -193,7 +194,7 @@ public class OMPrepareRequest extends OMClientRequest {
             " to Ratis state machine.", om.getOMNodeId(), minOMDBFlushIndex,
         minRatisStateMachineIndex);
     while (!(omDBFlushed && ratisStateMachineApplied) &&
-        System.currentTimeMillis() < endTime) {
+        Time.monotonicNow() < endTime) {
       // Check OM DB.
       lastOMDBFlushIndex = om.getRatisSnapshotIndex();
       omDBFlushed = (lastOMDBFlushIndex >= minOMDBFlushIndex);

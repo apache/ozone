@@ -45,7 +45,7 @@ public class StorageSize {
   }
 
   public static StorageSize parse(String value) {
-    checkState(value != null && value.length() > 0, "value cannot be blank");
+    checkState(value != null && !value.isEmpty(), "value cannot be blank");
     String sanitizedValue = value.trim().toLowerCase(Locale.ENGLISH);
     StorageUnit parsedUnit = null;
     for (StorageUnit unit : StorageUnit.values()) {

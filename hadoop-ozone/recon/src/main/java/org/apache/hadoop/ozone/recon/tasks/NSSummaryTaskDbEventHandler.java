@@ -17,12 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
-
 import java.io.IOException;
 import java.util.Map;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -45,19 +41,12 @@ public class NSSummaryTaskDbEventHandler {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
 
-  private final long nsSummaryFlushToDBMaxThreshold;
-
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
                                      ReconOMMetadataManager
-                                     reconOMMetadataManager,
-                                     OzoneConfiguration
-                                     ozoneConfiguration) {
+                                     reconOMMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
-    nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
@@ -71,15 +60,16 @@ public class NSSummaryTaskDbEventHandler {
   protected void writeNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      nsSummaryMap.keySet().forEach((Long key) -> {
+      for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
           reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
-              key, nsSummaryMap.get(key));
+              entry.getKey(), entry.getValue());
         } catch (IOException e) {
           LOG.error("Unable to write Namespace Summary data in Recon DB.",
               e);
+          throw e;
         }
-      });
+      }
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
     }
   }
@@ -201,20 +191,11 @@ public class NSSummaryTaskDbEventHandler {
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
       writeNSSummariesToDB(nsSummaryMap);
-      nsSummaryMap.clear();
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
       return false;
-    }
-    return true;
-  }
-
-  protected boolean checkAndCallFlushToDB(
-      Map<Long, NSSummary> nsSummaryMap) {
-    // if map contains more than entries, flush to DB and clear the map
-    if (null != nsSummaryMap && nsSummaryMap.size() >=
-        nsSummaryFlushToDBMaxThreshold) {
-      return flushAndCommitNSToDB(nsSummaryMap);
+    } finally {
+      nsSummaryMap.clear();
     }
     return true;
   }

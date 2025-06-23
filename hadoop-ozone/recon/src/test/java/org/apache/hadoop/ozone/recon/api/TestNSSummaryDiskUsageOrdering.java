@@ -73,6 +73,7 @@ public class TestNSSummaryDiskUsageOrdering {
   private static final String ROOT_PATH = "/";
   private static final String TEST_USER = "TestUser";
   private OMMetadataManager omMetadataManager;
+
   @BeforeEach
   public void setUp() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
@@ -106,7 +107,7 @@ public class TestNSSummaryDiskUsageOrdering {
     populateOMDB();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, ozoneConfiguration);
+            reconOMMetadataManager, 10);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 

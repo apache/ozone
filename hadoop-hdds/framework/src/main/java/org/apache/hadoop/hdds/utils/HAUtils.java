@@ -32,7 +32,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,6 +42,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -58,11 +58,9 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -78,7 +76,7 @@ import org.slf4j.LoggerFactory;
  * utility class used by SCM and OM for HA.
  */
 public final class HAUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
 
   private HAUtils() {
   }
@@ -249,9 +247,7 @@ public final class HAUtils {
       DBDefinition definition)
       throws IOException {
 
-    try (DBStore dbStore = loadDB(tempConfig, dbDir.toFile(),
-        dbName, definition)) {
-
+    try (DBStore dbStore = DBStoreBuilder.newBuilder(tempConfig, definition, dbName, dbDir).build()) {
       // Get the table name with TransactionInfo as the value. The transaction
       // info table name are different in SCM and SCM.
 
@@ -304,27 +300,6 @@ public final class HAUtils {
       return false;
     }
     return true;
-  }
-
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName, DBDefinition definition) throws IOException {
-    RocksDBConfiguration rocksDBConfiguration =
-        configuration.getObject(RocksDBConfiguration.class);
-    DBStoreBuilder dbStoreBuilder =
-        DBStoreBuilder.newBuilder(configuration, rocksDBConfiguration)
-            .setName(dbName)
-            .setPath(Paths.get(metaDir.getPath()));
-    // Add column family names and codecs.
-    for (DBColumnFamilyDefinition columnFamily : definition
-        .getColumnFamilies()) {
-
-      dbStoreBuilder.addTable(columnFamily.getName());
-      dbStoreBuilder
-          .addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());
-      dbStoreBuilder
-          .addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
-    }
-    return dbStoreBuilder.build();
   }
 
   public static File getMetaDir(DBDefinition definition,
@@ -418,7 +393,7 @@ public final class HAUtils {
     long waitDuration =
         conf.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
-    Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
+    Collection<String> scmNodes = HddsUtils.getSCMNodeIds(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
         HddsServerUtil.getScmSecurityClient(conf);
     int expectedCount = scmNodes.size() + 1;

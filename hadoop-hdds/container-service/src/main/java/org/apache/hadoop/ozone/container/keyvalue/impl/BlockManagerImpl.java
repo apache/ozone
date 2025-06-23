@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockManagerImpl implements BlockManager {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockManagerImpl.class);
 
   private ConfigurationSource config;

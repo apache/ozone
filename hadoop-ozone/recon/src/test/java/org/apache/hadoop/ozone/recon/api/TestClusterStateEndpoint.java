@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -80,7 +80,6 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
   public TestClusterStateEndpoint() {
     super();
   }
-
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -121,7 +120,6 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     reconPipelineManager.addPipeline(pipeline);
   }
 
-
   @Test
   public void testGetContainerCounts() throws Exception {
     putContainerInfos(NUM_OPEN_CONTAINERS,
@@ -161,7 +159,6 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     assertEquals("scmServiceId", clusterStateResponse.getScmServiceId());
     assertEquals("omServiceId", clusterStateResponse.getOmServiceId());
   }
-
 
   ContainerInfo newContainerInfo(long containerId,
                                  HddsProtos.LifeCycleState state) {

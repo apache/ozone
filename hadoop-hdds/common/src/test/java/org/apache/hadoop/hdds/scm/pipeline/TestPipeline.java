@@ -71,7 +71,7 @@ public class TestPipeline {
   }
 
   @Test
-  public void testReplicaIndexesSerialisedCorrectly() throws IOException {
+  public void testReplicaIndexesSerialisedCorrectly() {
     Pipeline pipeline = MockPipeline.createEcPipeline();
     HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage(1);
     Pipeline reloadedPipeline = Pipeline.getFromProtobuf(protobufMessage);

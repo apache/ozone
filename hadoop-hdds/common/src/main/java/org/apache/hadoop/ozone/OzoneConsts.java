@@ -29,8 +29,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
  */
 @InterfaceAudience.Private
 public final class OzoneConsts {
-
-
   public static final String STORAGE_DIR = "scm";
   public static final String SCM_ID = "scmUuid";
   public static final String SCM_HA = "scmHA";
@@ -68,7 +66,6 @@ public final class OzoneConsts {
   public static final String OZONE_ACL_READ_ACL = "x";
   public static final String OZONE_ACL_WRITE_ACL = "y";
 
-
   public static final String OZONE_DATE_FORMAT =
       "EEE, dd MMM yyyy HH:mm:ss zzz";
   public static final String OZONE_TIME_ZONE = "GMT";
@@ -89,7 +86,6 @@ public final class OzoneConsts {
   public static final String OZONE_URI_DELIMITER = "/";
   public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
   public static final Path ROOT_PATH = Paths.get(OZONE_ROOT);
-
 
   public static final String CONTAINER_EXTENSION = ".container";
   public static final String CONTAINER_META_PATH = "metadata";
@@ -170,6 +166,7 @@ public final class OzoneConsts {
    */
 
   public static final String OM_KEY_PREFIX = "/";
+  public static final String DOUBLE_SLASH_OM_KEY_PREFIX  = "//";
   public static final String OM_USER_PREFIX = "$";
   public static final String OM_S3_PREFIX = "S3:";
   public static final String OM_S3_CALLER_CONTEXT_PREFIX = "S3Auth:S3G|";
@@ -181,17 +178,11 @@ public final class OzoneConsts {
    */
   public static final int OZONE_SCM_CHUNK_MAX_SIZE = 32 * 1024 * 1024;
 
-
   /**
    * Quota RESET default is -1, which means quota is not set.
    */
   public static final long QUOTA_RESET = -1;
   public static final long OLD_QUOTA_DEFAULT = -2;
-
-  /**
-   * Quota Units.
-   */
-  public enum Units { TB, GB, MB, KB, B }
 
   /**
    * Object ID to identify reclaimable uncommitted blocks.
@@ -210,10 +201,6 @@ public final class OzoneConsts {
   public static final String OM_CONTEXT_ATTRIBUTE = "ozone.om";
 
   public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
-
-  private OzoneConsts() {
-    // Never Constructed
-  }
 
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
@@ -303,6 +290,13 @@ public final class OzoneConsts {
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
   public static final String REWRITE_GENERATION = "rewriteGeneration";
+  public static final String FROM_SNAPSHOT = "fromSnapshot";
+  public static final String TO_SNAPSHOT = "toSnapshot";
+  public static final String TOKEN = "token";
+  public static final String PAGE_SIZE = "pageSize";
+  public static final String FORCE_FULL_DIFF = "forceFullDiff";
+  public static final String DISABLE_NATIVE_DIFF = "disableNativeDiff";
+  public static final String JOB_STATUS = "jobStatus";
 
   // For multi-tenancy
   public static final String TENANT_ID_USERNAME_DELIMITER = "$";
@@ -538,4 +532,13 @@ public final class OzoneConsts {
    * S3G multipart upload request's ETag header key.
    */
   public static final String ETAG = "ETag";
+
+  private OzoneConsts() {
+    // Never Constructed
+  }
+
+  /**
+   * Quota Units.
+   */
+  public enum Units { TB, GB, MB, KB, B }
 }

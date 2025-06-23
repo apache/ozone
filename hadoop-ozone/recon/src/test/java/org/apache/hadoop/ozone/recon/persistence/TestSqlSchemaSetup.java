@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.sql.SQLException;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 

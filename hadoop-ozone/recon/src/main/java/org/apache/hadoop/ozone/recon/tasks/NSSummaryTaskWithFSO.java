@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -26,7 +26,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -47,14 +48,16 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTaskWithFSO.class);
 
+  private final long nsSummaryFlushToDBMaxThreshold;
+
   public NSSummaryTaskWithFSO(ReconNamespaceSummaryManager
                               reconNamespaceSummaryManager,
                               ReconOMMetadataManager
                               reconOMMetadataManager,
-                              OzoneConfiguration
-                              ozoneConfiguration) {
+                              long nsSummaryFlushToDBMaxThreshold) {
     super(reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager);
+    this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 
   // We only listen to updates from FSO-enabled KeyTable(FileTable) and DirTable
@@ -62,15 +65,23 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE);
   }
 
-  public boolean processWithFSO(OMUpdateEventBatch events) {
+  public Pair<Integer, Boolean> processWithFSO(OMUpdateEventBatch events,
+                                               int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+    int itrPos = 0;
+    while (eventIterator.hasNext() && itrPos < seekPos) {
+      eventIterator.next();
+      itrPos++;
+    }
     final Collection<String> taskTables = getTaskTables();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    int eventCounter = 0;
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, ? extends
               WithParentObjectId> omdbUpdateEvent = eventIterator.next();
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+      eventCounter++;
 
       // we only process updates on OM's FileTable and Dirtable
       String table = omdbUpdateEvent.getTable();
@@ -149,20 +160,23 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       } catch (IOException ioEx) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",
                 ioEx);
-        return false;
+        nsSummaryMap.clear();
+        return new ImmutablePair<>(seekPos, false);
       }
-      if (!checkAndCallFlushToDB(nsSummaryMap)) {
-        return false;
+      if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+        if (!flushAndCommitNSToDB(nsSummaryMap)) {
+          return new ImmutablePair<>(seekPos, false);
+        }
+        seekPos = eventCounter + 1;
       }
     }
 
     // flush and commit left out entries at end
     if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      return false;
+      return new ImmutablePair<>(seekPos, false);
     }
-
     LOG.debug("Completed a process run of NSSummaryTaskWithFSO");
-    return true;
+    return new ImmutablePair<>(seekPos, true);
   }
 
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
@@ -178,8 +192,10 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
           OmDirectoryInfo directoryInfo = kv.getValue();
           handlePutDirEvent(directoryInfo, nsSummaryMap);
-          if (!checkAndCallFlushToDB(nsSummaryMap)) {
-            return false;
+          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+            if (!flushAndCommitNSToDB(nsSummaryMap)) {
+              return false;
+            }
           }
         }
       }
@@ -194,8 +210,10 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
           OmKeyInfo keyInfo = kv.getValue();
           handlePutKeyEvent(keyInfo, nsSummaryMap);
-          if (!checkAndCallFlushToDB(nsSummaryMap)) {
-            return false;
+          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+            if (!flushAndCommitNSToDB(nsSummaryMap)) {
+              return false;
+            }
           }
         }
       }
@@ -212,6 +230,4 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     LOG.debug("Completed a reprocess run of NSSummaryTaskWithFSO");
     return true;
   }
-
-
 }

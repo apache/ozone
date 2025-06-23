@@ -22,11 +22,32 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
-    <description>
-        PMD Ruleset for Apache Ozone
-    </description>
+  <description>
+    PMD Ruleset for Apache Ozone
+  </description>
 
-    <rule ref="category/java/bestpractices.xml/MissingOverride" />
+  <rule ref="category/java/bestpractices.xml/AvoidStringBufferField" />
+  <rule ref="category/java/bestpractices.xml/ForLoopCanBeForeach"/>
+  <rule ref="category/java/bestpractices.xml/MissingOverride"/>
+  <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+  <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+  <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty" />
+  <rule ref="category/java/bestpractices.xml/SimplifiableTestAssertion" />
 
-    <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
+  <rule ref="category/java/performance.xml/AddEmptyString"/>
+  <rule ref="category/java/performance.xml/AppendCharacterWithChar" />
+  <rule ref="category/java/performance.xml/AvoidFileStream"/>
+  <rule ref="category/java/performance.xml/InefficientEmptyStringCheck"/>
+  <rule ref="category/java/performance.xml/InefficientStringBuffering"/>
+  <rule ref="category/java/performance.xml/StringInstantiation"/>
+  <rule ref="category/java/performance.xml/UseStringBufferLength"/>
+
+  <rule ref="category/java/codestyle.xml/FieldDeclarationsShouldBeAtStartOfClass">
+    <properties>
+      <property name="ignoreAnonymousClassDeclarations" value="false" />
+      <property name="ignoreEnumDeclarations" value="false" />
+    </properties>
+  </rule>
+
+  <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
 </ruleset>

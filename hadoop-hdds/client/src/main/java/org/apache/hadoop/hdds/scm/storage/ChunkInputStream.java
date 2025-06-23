@@ -462,8 +462,6 @@ public class ChunkInputStream extends InputStream
 
     ReadChunkResponseProto readChunkResponse = response.getReadChunk();
     List<ByteString> byteStrings;
-    boolean isV0 = false;
-
     if (readChunkResponse.hasData()) {
       ByteString byteString = readChunkResponse.getData();
       if (byteString.size() != reqChunkInfo.getLen()) {
@@ -475,7 +473,6 @@ public class ChunkInputStream extends InputStream
       }
       byteStrings = new ArrayList<>();
       byteStrings.add(byteString);
-      isV0 = true;
     } else {
       byteStrings = readChunkResponse.getDataBuffers().getBuffersList();
       long buffersLen = BufferUtils.getBuffersLen(byteStrings);
@@ -500,8 +497,7 @@ public class ChunkInputStream extends InputStream
           chunkInfo.getOffset();
       int bytesPerChecksum = checksumData.getBytesPerChecksum();
       int startIndex = (int) (relativeOffset / bytesPerChecksum);
-      Checksum.verifyChecksum(byteStrings, checksumData, startIndex,
-          isV0);
+      Checksum.verifyChecksum(byteStrings, checksumData, startIndex);
     }
   }
 
@@ -674,7 +670,6 @@ public class ChunkInputStream extends InputStream
       return true;
     }
   }
-
 
   /**
    * Release the buffers upto the given index.

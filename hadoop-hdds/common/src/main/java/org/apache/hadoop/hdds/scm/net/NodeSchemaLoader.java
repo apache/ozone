@@ -20,10 +20,10 @@ package org.apache.hadoop.hdds.scm.net;
 import static org.apache.commons.collections.EnumerationUtils.toList;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -66,6 +66,7 @@ public final class NodeSchemaLoader {
 
   private static final int LAYOUT_VERSION = 1;
   private static volatile NodeSchemaLoader instance = null;
+
   private NodeSchemaLoader() { }
 
   public static NodeSchemaLoader getInstance() {
@@ -109,7 +110,7 @@ public final class NodeSchemaLoader {
       if (schemaFile.exists()) {
         LOG.info("Load network topology schema file {}",
                 schemaFile.getAbsolutePath());
-        try (FileInputStream inputStream = new FileInputStream(schemaFile)) {
+        try (InputStream inputStream = Files.newInputStream(schemaFile.toPath())) {
           return loadSchemaFromStream(schemaFilePath, inputStream);
         }
       } else {
@@ -390,12 +391,13 @@ public final class NodeSchemaLoader {
             throw new IllegalArgumentException("Topology path depth doesn't "
                 + "match layer element numbers");
           }
-          for (int j = 0; j < layerIDs.length; j++) {
-            if (schemas.get(layerIDs[j]) == null) {
-              throw new IllegalArgumentException("No layer found for id " +
-                  layerIDs[j]);
+
+          for (String layerID : layerIDs) {
+            if (schemas.get(layerID) == null) {
+              throw new IllegalArgumentException("No layer found for id " + layerID);
             }
           }
+
           if (schemas.get(layerIDs[0]).getType() != LayerType.ROOT) {
             throw new IllegalArgumentException("Topology path doesn't start "
                 + "with ROOT layer");
@@ -405,8 +407,9 @@ public final class NodeSchemaLoader {
             throw new IllegalArgumentException("Topology path doesn't end "
                 + "with LEAF layer");
           }
-          for (int j = 0; j < layerIDs.length; j++) {
-            schemaList.add(schemas.get(layerIDs[j]));
+
+          for (String layerID : layerIDs) {
+            schemaList.add(schemas.get(layerID));
           }
         } else if (TOPOLOGY_ENFORCE_PREFIX.equalsIgnoreCase(tagName)) {
           enforcePrefix = Boolean.parseBoolean(value);

@@ -51,6 +51,10 @@ public final class SCMPerformanceMetrics implements MetricsSource {
   private MutableRate deleteKeyFailureLatencyNs;
   @Metric(about = "Latency for deleteKey success in nanoseconds")
   private MutableRate deleteKeySuccessLatencyNs;
+  @Metric(about = "Latency for a successful allocateBlock call in nanoseconds")
+  private MutableRate allocateBlockSuccessLatencyNs;
+  @Metric(about = "Latency for a failed allocateBlock call in nanoseconds")
+  private MutableRate allocateBlockFailureLatencyNs;
 
   public SCMPerformanceMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
@@ -78,6 +82,16 @@ public final class SCMPerformanceMetrics implements MetricsSource {
     deleteKeySuccessLatencyNs.snapshot(recordBuilder, true);
     deleteKeyFailure.snapshot(recordBuilder, true);
     deleteKeyFailureLatencyNs.snapshot(recordBuilder, true);
+    allocateBlockSuccessLatencyNs.snapshot(recordBuilder, true);
+    allocateBlockFailureLatencyNs.snapshot(recordBuilder, true);
+  }
+
+  public void updateAllocateBlockSuccessLatencyNs(long startNanos) {
+    allocateBlockSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updateAllocateBlockFailureLatencyNs(long startNanos) {
+    allocateBlockFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
   public void updateDeleteKeySuccessStats(long startNanos) {

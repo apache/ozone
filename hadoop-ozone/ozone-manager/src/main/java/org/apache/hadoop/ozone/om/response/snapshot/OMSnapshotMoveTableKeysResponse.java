@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.snapshot;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.createMergedRepeatedOmKeyInfoFromDeletedTableEntry;
 
 import jakarta.annotation.Nonnull;
@@ -35,9 +35,9 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Response for OMSnapshotMoveDeletedKeysRequest.
@@ -78,13 +78,13 @@ public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
     OmSnapshotManager omSnapshotManager = ((OmMetadataManagerImpl) omMetadataManager)
         .getOzoneManager().getOmSnapshotManager();
 
-    try (ReferenceCounted<OmSnapshot> rcOmFromSnapshot =
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmFromSnapshot =
              omSnapshotManager.getSnapshot(fromSnapshot.getSnapshotId())) {
 
       OmSnapshot fromOmSnapshot = rcOmFromSnapshot.get();
 
       if (nextSnapshot != null) {
-        try (ReferenceCounted<OmSnapshot>
+        try (UncheckedAutoCloseableSupplier<OmSnapshot>
             rcOmNextSnapshot = omSnapshotManager.getSnapshot(nextSnapshot.getSnapshotId())) {
 
           OmSnapshot nextOmSnapshot = rcOmNextSnapshot.get();

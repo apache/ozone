@@ -40,9 +40,9 @@ public abstract class AclTests extends ClusterForTests<MiniOzoneCluster> {
   public static final UserGroupInformation ADMIN_UGI =
       UserGroupInformation.createUserForTesting(ADMIN_USER, new String[] {ADMIN_GROUP});
 
-  /** Hook method for subclasses. */
-  MiniOzoneCluster.Builder newClusterBuilder() {
-    return MiniOzoneCluster.newBuilder(createOzoneConfig())
+  @Override
+  protected MiniOzoneCluster.Builder newClusterBuilder() {
+    return super.newClusterBuilder()
         .setNumDatanodes(3);
   }
 

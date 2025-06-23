@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -56,7 +57,6 @@ class TestChunkInputStream extends TestInputStreamBase {
     }
   }
 
-
   /**
    * Test to verify that data read from chunks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
@@ -76,7 +76,7 @@ class TestChunkInputStream extends TestInputStreamBase {
 
       // To read 1 byte of chunk data, ChunkInputStream should get one full
       // checksum boundary worth of data from Container and store it in buffers.
-      chunk0Stream.read(new byte[1]);
+      IOUtils.readFully(chunk0Stream, new byte[1]);
       checkBufferSizeAndCapacity(chunk0Stream.getCachedBuffers(), 1, 0,
           BYTES_PER_CHECKSUM);
 
@@ -117,7 +117,7 @@ class TestChunkInputStream extends TestInputStreamBase {
           expectedNumBuffers, expectedNumBuffers - 1, BYTES_PER_CHECKSUM);
 
       // Read the last byte of chunk and verify that the buffers are released.
-      chunk0Stream.read(new byte[1]);
+      IOUtils.readFully(chunk0Stream, new byte[1]);
       assertNull(chunk0Stream.getCachedBuffers(),
           "ChunkInputStream did not release buffers after reaching EOF.");
     }
@@ -208,14 +208,14 @@ class TestChunkInputStream extends TestInputStreamBase {
       int offset, int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
     chunkInputStream.seek(offset);
-    chunkInputStream.read(readData, 0, readDataLength);
+    IOUtils.readFully(chunkInputStream, readData);
     return readData;
   }
 
   private byte[] readDataFromChunk(ChunkInputStream chunkInputStream,
       int readDataLength) throws IOException {
     byte[] readData = new byte[readDataLength];
-    chunkInputStream.read(readData, 0, readDataLength);
+    IOUtils.readFully(chunkInputStream, readData);
     return readData;
   }
 

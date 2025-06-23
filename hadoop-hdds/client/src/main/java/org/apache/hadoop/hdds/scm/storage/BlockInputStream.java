@@ -62,8 +62,10 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockInputStream extends BlockExtendedInputStream {
 
-  public static final Logger LOG =
-      LoggerFactory.getLogger(BlockInputStream.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BlockInputStream.class);
+
+  private static final List<Validator> VALIDATORS =
+      ContainerProtocolCalls.toValidatorList((request, response) -> validate(response));
 
   private final BlockID blockID;
   private long length;
@@ -301,10 +303,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
     pipelineRef.set(readPipeline);
   }
 
-  private static final List<Validator> VALIDATORS
-      = ContainerProtocolCalls.toValidatorList(
-          (request, response) -> validate(response));
-
   private static void validate(ContainerCommandResponseProto response)
       throws IOException {
     if (!response.hasGetBlock()) {
@@ -369,7 +367,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     int len = strategy.getTargetLength();
     while (len > 0) {
       // if we are at the last chunk and have read the entire chunk, return
-      if (chunkStreams.size() == 0 ||
+      if (chunkStreams.isEmpty() ||
           (chunkStreams.size() - 1 <= chunkIndex &&
               chunkStreams.get(chunkIndex)
                   .getRemaining() == 0)) {

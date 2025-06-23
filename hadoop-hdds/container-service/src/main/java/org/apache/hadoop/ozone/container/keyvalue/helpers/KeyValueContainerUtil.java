@@ -55,13 +55,11 @@ import org.slf4j.LoggerFactory;
 
 public final class KeyValueContainerUtil {
 
+  private static final Logger LOG = LoggerFactory.getLogger(KeyValueContainerUtil.class);
+
   /* Never constructed. */
   private KeyValueContainerUtil() {
-
   }
-
-  private static final Logger LOG = LoggerFactory.getLogger(
-      KeyValueContainerUtil.class);
 
   /**
    * creates metadata path, chunks path and metadata DB for the specified

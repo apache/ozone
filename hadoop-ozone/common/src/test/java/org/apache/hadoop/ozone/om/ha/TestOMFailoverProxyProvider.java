@@ -118,7 +118,7 @@ public class TestOMFailoverProxyProvider {
     Collection<String> allNodeIds = config.getTrimmedStringCollection(ConfUtils.
         addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID));
     allNodeIds.remove(provider.getCurrentProxyOMNodeId());
-    assertTrue(allNodeIds.size() > 0,
+    assertTrue(!allNodeIds.isEmpty(),
         "This test needs at least 2 OMs");
     provider.setNextOmProxy(allNodeIds.iterator().next());
     assertEquals(0, provider.getWaitTime());

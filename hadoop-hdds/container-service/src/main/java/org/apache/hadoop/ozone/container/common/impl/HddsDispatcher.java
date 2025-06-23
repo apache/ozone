@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -71,7 +70,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
@@ -104,7 +102,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final Map<ContainerType, Handler> handlers;
   private final ConfigurationSource conf;
   private final ContainerSet containerSet;
-  private final VolumeSet volumeSet;
   private final StateContext context;
   private final float containerCloseThreshold;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
@@ -114,7 +111,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
   private long slowOpThresholdNs;
-  private VolumeUsage.MinFreeSpaceCalculator freeSpaceCalculator;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -126,7 +122,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       TokenVerifier tokenVerifier) {
     this.conf = config;
     this.containerSet = contSet;
-    this.volumeSet = volumes;
     this.context = context;
     this.handlers = handlers;
     this.metrics = metrics;
@@ -149,7 +144,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             LOG,
             HddsUtils::processForDebug,
             HddsUtils::processForDebug);
-    this.freeSpaceCalculator = new VolumeUsage.MinFreeSpaceCalculator(conf);
   }
 
   @Override
@@ -185,8 +179,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void buildMissingContainerSetAndValidate(
       Map<Long, Long> container2BCSIDMap) {
-    containerSet
-        .buildMissingContainerSetAndValidate(container2BCSIDMap);
+    containerSet.buildMissingContainerSetAndValidate(container2BCSIDMap, n -> n);
   }
 
   @Override
@@ -466,6 +459,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       container2BCSIDMap.computeIfPresent(containerId, (u, v) -> v = bcsID);
     }
   }
+
   /**
    * Create a container using the input container request.
    * @param containerRequest - the container request which requires container
@@ -621,14 +615,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .orElse(Boolean.FALSE);
     if (isOpen) {
       HddsVolume volume = container.getContainerData().getVolume();
-      SpaceUsageSource usage = volume.getCurrentUsage();
-      long volumeCapacity = usage.getCapacity();
-      long volumeFreeSpaceToSpare =
-          freeSpaceCalculator.get(volumeCapacity);
-      long volumeFree = usage.getAvailable();
-      long volumeCommitted = volume.getCommittedBytes();
-      long volumeAvailable = volumeFree - volumeCommitted;
-      return (volumeAvailable <= volumeFreeSpaceToSpare);
+      StorageLocationReport volumeReport = volume.getReport();
+      boolean full = volumeReport.getUsableSpace() <= 0;
+      if (full) {
+        LOG.info("Container {} volume is full: {}", container.getContainerData().getContainerID(), volumeReport);
+      }
+      return full;
     }
     return false;
   }

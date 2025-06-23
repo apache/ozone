@@ -73,14 +73,13 @@ public class TestOmPrefixInfo {
       OzoneAcl.AclScope scope) {
     return OmPrefixInfo.newBuilder()
         .setName(path)
-        .setAcls(new ArrayList<>(Collections.singletonList(new OzoneAcl(
+        .setAcls(new ArrayList<>(Collections.singletonList(OzoneAcl.of(
             identityType, identityString,
             scope, aclType))))
         .setObjectID(10)
         .setUpdateID(100)
         .build();
   }
-
 
   @Test
   public void testCopyObject() {
@@ -97,7 +96,7 @@ public class TestOmPrefixInfo {
 
 
     // Change acls and check.
-    omPrefixInfo.addAcl(new OzoneAcl(
+    omPrefixInfo.addAcl(OzoneAcl.of(
         IAccessAuthorizer.ACLIdentityType.USER, username,
         ACCESS, IAccessAuthorizer.ACLType.READ));
 

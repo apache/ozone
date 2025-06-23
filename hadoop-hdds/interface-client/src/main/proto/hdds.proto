@@ -151,6 +151,17 @@ message KeyValue {
 }
 
 /**
+ * Types of storage media.
+ */
+enum StorageTypeProto {
+  DISK = 1;
+  SSD = 2;
+  ARCHIVE = 3;
+  RAM_DISK = 4;
+  PROVIDED = 5;
+}
+
+/**
  * Type of the node.
  */
 enum NodeType {
@@ -269,7 +280,6 @@ message GetScmInfoResponseProto {
     required string clusterId = 1;
     required string scmId = 2;
     repeated string peerRoles = 3;
-    optional bool scmRatisEnabled = 4;
 }
 
 message AddScmRequestProto {
@@ -507,6 +517,7 @@ message CompactionFileInfoProto {
     optional string startKey = 2;
     optional string endKey = 3;
     optional string columnFamily = 4;
+    optional bool pruned = 5;
 }
 
 message CompactionLogEntryProto {

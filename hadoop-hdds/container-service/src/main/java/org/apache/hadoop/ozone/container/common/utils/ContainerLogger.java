@@ -127,7 +127,7 @@ public final class ContainerLogger {
    * @param containerData The container that was imported to this datanode.
    */
   public static void logImported(ContainerData containerData) {
-    LOG.info(getMessage(containerData));
+    LOG.info(getMessage(containerData, "Container imported"));
   }
 
   /**
@@ -136,7 +136,7 @@ public final class ContainerLogger {
    * @param containerData The container that was exported from this datanode.
    */
   public static void logExported(ContainerData containerData) {
-    LOG.info(getMessage(containerData));
+    LOG.info(getMessage(containerData, "Container exported"));
   }
 
   /**
@@ -146,6 +146,18 @@ public final class ContainerLogger {
    */
   public static void logRecovered(ContainerData containerData) {
     LOG.info(getMessage(containerData));
+  }
+
+  /**
+   * Logged when a container's checksum is updated.
+   *
+   * @param containerData The container which has the updated data checksum.
+   * @param oldDataChecksum The old data checksum.
+   */
+  public static void logChecksumUpdated(ContainerData containerData, long oldDataChecksum) {
+    LOG.warn(getMessage(containerData,
+        "Container data checksum updated from " + checksumToString(oldDataChecksum) + " to "
+            + checksumToString(containerData.getDataChecksum())));
   }
 
   /**
@@ -176,6 +188,7 @@ public final class ContainerLogger {
         "Index=" + containerData.getReplicaIndex(),
         "BCSID=" + containerData.getBlockCommitSequenceId(),
         "State=" + containerData.getState(),
+        "Volume=" + containerData.getVolume(),
         "DataChecksum=" + checksumToString(containerData.getDataChecksum()));
   }
 }

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -89,7 +90,7 @@ public class TestCloseContainerCommandHandler {
         pipelineID.getId().toString(), null);
 
     container = new KeyValueContainer(data, conf);
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
     containerSet.addContainer(container);
 
     containerHandler = mock(Handler.class);

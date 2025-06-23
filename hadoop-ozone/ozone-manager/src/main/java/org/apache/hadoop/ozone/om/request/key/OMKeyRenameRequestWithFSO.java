@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RENAME_OPEN_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -98,7 +98,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     OmKeyInfo fromKeyValue;
     Result result;
     try {
-      if (fromKeyName.length() == 0) {
+      if (fromKeyName.isEmpty()) {
         throw new OMException("Source key name is empty",
                 OMException.ResultCodes.INVALID_KEY_NAME);
       }

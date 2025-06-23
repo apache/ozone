@@ -28,15 +28,11 @@ import static org.apache.hadoop.test.LambdaTestUtils.intercept;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test concat -if supported.
  */
 public abstract class AbstractContractConcatTest extends AbstractFSContractTestBase {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(AbstractContractConcatTest.class);
 
   private Path testPath;
   private Path srcFile;

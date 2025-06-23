@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -56,8 +57,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +75,7 @@ public class QuotaRepairTask {
   private static final AtomicLong RUN_CNT = new AtomicLong(0);
   private final OzoneManager om;
   private ExecutorService executor;
+
   public QuotaRepairTask(OzoneManager ozoneManager) {
     this.om = ozoneManager;
   }
@@ -95,6 +97,7 @@ public class QuotaRepairTask {
   public static String getStatus() {
     return REPAIR_STATUS.toString();
   }
+
   private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
     OMMetadataManager activeMetaManager = null;
@@ -346,7 +349,7 @@ public class QuotaRepairTask {
           prefixUsageMap, q, isRunning, haveValue)));
     }
     int count = 0;
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     try (TableIterator<String, ? extends Table.KeyValue<String, VALUE>>
              keyIter = table.iterator()) {
       while (keyIter.hasNext()) {
@@ -363,7 +366,7 @@ public class QuotaRepairTask {
         f.get();
       }
       LOG.info("Recalculate {} completed, count {} time {}ms", strType,
-          count, (System.currentTimeMillis() - startTime));
+          count, (Time.monotonicNow() - startTime));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     } catch (InterruptedException ex) {
@@ -487,7 +490,7 @@ public class QuotaRepairTask {
       status.put("errorMsg", errorMsg);
       status.put("bucketCountDiffMap", bucketCountDiffMap);
       try {
-        return new ObjectMapper().writeValueAsString(status);
+        return JsonUtils.toJsonString(status);
       } catch (IOException e) {
         LOG.error("error in generating status", e);
         return "{}";

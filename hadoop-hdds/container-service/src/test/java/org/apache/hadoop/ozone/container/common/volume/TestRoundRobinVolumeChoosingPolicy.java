@@ -25,7 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
@@ -115,4 +117,15 @@ public class TestRoundRobinVolumeChoosingPolicy {
         "Most available space: 150 bytes");
   }
 
+  @Test
+  public void testVolumeCommittedSpace() throws Exception {
+    Map<HddsVolume, Long> initialCommittedSpace = new HashMap<>();
+    volumes.forEach(vol ->
+        initialCommittedSpace.put(vol, vol.getCommittedBytes()));
+
+    HddsVolume selectedVolume = policy.chooseVolume(volumes, 50);
+
+    assertEquals(initialCommittedSpace.get(selectedVolume) + 50,
+        selectedVolume.getCommittedBytes());
+  }
 }

@@ -148,7 +148,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HEALTHY);
+            return NodeStatus.valueOf(DECOMMISSIONING, HEALTHY);
           }
           return NodeStatus.inServiceHealthy();
         });
@@ -191,7 +191,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HEALTHY);
+            return NodeStatus.valueOf(DECOMMISSIONING, HEALTHY);
           }
           return NodeStatus.inServiceHealthy();
         });
@@ -219,7 +219,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HEALTHY);
+            return NodeStatus.valueOf(DECOMMISSIONING, HEALTHY);
           }
           return NodeStatus.inServiceHealthy();
         });
@@ -250,7 +250,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HEALTHY);
+            return NodeStatus.valueOf(DECOMMISSIONING, HEALTHY);
           }
           return NodeStatus.inServiceHealthy();
         });

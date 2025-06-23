@@ -79,7 +79,7 @@ public class SnapshotChainManager {
           "Global Snapshot chain corruption. Snapshot with snapshotId: %s is " +
               "already present in the chain.", snapshotID));
     }
-    if (globalSnapshotChain.size() > 0 && prevGlobalID == null) {
+    if (!globalSnapshotChain.isEmpty() && prevGlobalID == null) {
       throw new IOException(String.format("Snapshot chain " +
           "corruption. Adding snapshot %s as head node while there are %d " +
               "snapshots in the global snapshot chain.", snapshotID,

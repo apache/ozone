@@ -30,21 +30,6 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 public class ContainerMerkleTreeMetrics {
   private static final String METRICS_SOURCE_NAME = ContainerMerkleTreeMetrics.class.getSimpleName();
 
-  public static ContainerMerkleTreeMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    MetricsSource source = ms.getSource(METRICS_SOURCE_NAME);
-    if (source != null) {
-      ms.unregisterSource(METRICS_SOURCE_NAME);
-    }
-    return ms.register(METRICS_SOURCE_NAME, "Container Merkle Tree Metrics",
-        new ContainerMerkleTreeMetrics());
-  }
-
-  public static void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(METRICS_SOURCE_NAME);
-  }
-
   @Metric(about = "Number of Merkle tree write failure")
   private MutableCounterLong numMerkleTreeWriteFailure;
 
@@ -71,6 +56,21 @@ public class ContainerMerkleTreeMetrics {
 
   @Metric(about = "Merkle tree diff latency")
   private MutableRate merkleTreeDiffLatencyNS;
+
+  public static ContainerMerkleTreeMetrics create() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSource source = ms.getSource(METRICS_SOURCE_NAME);
+    if (source != null) {
+      ms.unregisterSource(METRICS_SOURCE_NAME);
+    }
+    return ms.register(METRICS_SOURCE_NAME, "Container Merkle Tree Metrics",
+        new ContainerMerkleTreeMetrics());
+  }
+
+  public static void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(METRICS_SOURCE_NAME);
+  }
 
   public void incrementMerkleTreeWriteFailures() {
     this.numMerkleTreeWriteFailure.incr();

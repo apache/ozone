@@ -19,8 +19,12 @@ Library             BuiltIn
 Resource            ../lib/os.robot
 Test Timeout        5 minutes
 
+*** Keywords ***
+Check command-line options
+    ${processes} =    List All Processes
+    Should Contain    ${processes}   %{HADOOP_OPTS}
+
 *** Test Cases ***
 Picks up command line options
     Pass Execution If    '%{HADOOP_OPTS}' == ''    Command-line option required for process check
-    ${processes} =    List All Processes
-    Should Contain    ${processes}   %{HADOOP_OPTS}
+    Wait Until Keyword Succeeds    3min    2sec    Check command-line options

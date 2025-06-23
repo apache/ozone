@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -97,6 +98,7 @@ public class TestOMDirectoryCreateRequest {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     AuditLogger auditLogger = mock(AuditLogger.class);
@@ -503,8 +505,8 @@ public class TestOMDirectoryCreateRequest {
         .collect(Collectors.toList());
     String prefix = "";
 
-    for (int indx = 0; indx < nodes.size(); indx++) {
-      String dirName = prefix + nodes.get(indx);
+    for (String node : nodes) {
+      String dirName = prefix + node;
       OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .get(omMetadataManager
               .getOzoneDirKey(volumeName, bucketName, dirName));
@@ -537,9 +539,9 @@ public class TestOMDirectoryCreateRequest {
 
   private String genRandomKeyName() {
     StringBuilder keyNameBuilder = new StringBuilder();
-    keyNameBuilder.append(RandomStringUtils.randomAlphabetic(5));
+    keyNameBuilder.append(RandomStringUtils.secure().nextAlphabetic(5));
     for (int i = 0; i < 3; i++) {
-      keyNameBuilder.append("/").append(RandomStringUtils.randomAlphabetic(5));
+      keyNameBuilder.append('/').append(RandomStringUtils.secure().nextAlphabetic(5));
     }
     return keyNameBuilder.toString();
   }

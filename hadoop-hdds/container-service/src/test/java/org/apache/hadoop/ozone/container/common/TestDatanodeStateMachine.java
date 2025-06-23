@@ -44,12 +44,14 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
+import org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -195,7 +197,8 @@ public class TestDatanodeStateMachine {
     File idPath = new File(
         conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR),
         OzoneConsts.OZONE_SCM_DATANODE_ID_FILE_DEFAULT);
-    idPath.delete();
+    assertTrue(idPath.createNewFile());
+    assertTrue(idPath.delete());
     DatanodeDetails datanodeDetails = getNewDatanodeDetails();
     DatanodeDetails.Port port = DatanodeDetails.newStandalonePort(
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
@@ -203,6 +206,8 @@ public class TestDatanodeStateMachine {
     ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
     try (DatanodeStateMachine stateMachine =
              new DatanodeStateMachine(datanodeDetails, conf)) {
+      VolumeChoosingPolicy volumeChoosingPolicy = stateMachine.getVolumeChoosingPolicy();
+      assertEquals(CapacityVolumeChoosingPolicy.class, volumeChoosingPolicy.getClass());
       DatanodeStateMachine.DatanodeStates currentState =
           stateMachine.getContext().getState();
       assertEquals(DatanodeStateMachine.DatanodeStates.INIT,
@@ -317,11 +322,11 @@ public class TestDatanodeStateMachine {
 
   @Test
   public void testDatanodeStateMachineWithIdWriteFail() throws Exception {
-
     File idPath = new File(
         conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR),
         OzoneConsts.OZONE_SCM_DATANODE_ID_FILE_DEFAULT);
-    idPath.delete();
+    assertTrue(idPath.createNewFile());
+    assertTrue(idPath.delete());
     DatanodeDetails datanodeDetails = getNewDatanodeDetails();
     DatanodeDetails.Port port = DatanodeDetails.newStandalonePort(
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
@@ -340,8 +345,7 @@ public class TestDatanodeStateMachine {
 
       //Set the idPath to read only, state machine will fail to write
       // datanodeId file and set the state to shutdown.
-      idPath.getParentFile().mkdirs();
-      idPath.getParentFile().setReadOnly();
+      assertTrue(idPath.getParentFile().setReadOnly());
 
       task.execute(executorService);
       DatanodeStateMachine.DatanodeStates newState =
@@ -398,10 +402,30 @@ public class TestDatanodeStateMachine {
             task.await(2, TimeUnit.SECONDS);
         assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
             newState);
-      } catch (Exception e) {
+      } catch (IOException | InterruptedException | TimeoutException | ExecutionException e) {
         fail("Unexpected exception found");
       }
     });
+  }
+
+  @Test
+  public void testStateMachineThreadPriority() throws Exception {
+    DatanodeDetails datanodeDetails = getNewDatanodeDetails();
+    DatanodeDetails.Port port = DatanodeDetails.newStandalonePort(
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
+    datanodeDetails.setPort(port);
+    try (DatanodeStateMachine stateMachine =
+             new DatanodeStateMachine(datanodeDetails, conf)) {
+      stateMachine.startDaemon();
+
+      // Wait for CmdProcessThread to initialize
+      GenericTestUtils.waitFor(()
+          ->  stateMachine.getCmdProcessThread() != null, 100, 3000);
+      Thread stateMachineThread = stateMachine.getStateMachineThread();
+      Thread cmdProcessThread = stateMachine.getCmdProcessThread();
+      // stateMachineThread priority is higher than cmdProcessThread
+      assertTrue(stateMachineThread.getPriority() > cmdProcessThread.getPriority());
+    }
   }
 
   private DatanodeDetails getNewDatanodeDetails() {

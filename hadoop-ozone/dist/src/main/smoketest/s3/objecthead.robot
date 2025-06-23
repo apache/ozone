@@ -34,6 +34,7 @@ Head existing object
     ${result} =         Execute AWSS3APICli and checkrc    put-object --bucket ${BUCKET} --key ${PREFIX}/headobject/key=value/f1 --body /tmp/testfile   0
 
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/headobject/key=value/f1   0
+                        Should Contain    ${result}          "StorageClass":
     ${result} =         Execute AWSS3APICli and checkrc    delete-object --bucket ${BUCKET} --key ${PREFIX}/headobject/key=value/f1   0
 
 Head object in non existing bucket

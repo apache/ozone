@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ByteString;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +42,7 @@ import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
@@ -68,7 +70,8 @@ public class TestRDBTableStore {
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth", "Seventh",
-          "Eighth", "Ninth");
+          "Eighth", "Ninth",
+          "Ten");
   private final List<String> prefixedFamilies = Arrays.asList(
       "PrefixFirst",
       "PrefixTwo", "PrefixThree",
@@ -147,9 +150,9 @@ public class TestRDBTableStore {
   public void putGetAndEmpty() throws Exception {
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("First")) {
       byte[] key =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
       byte[] value =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
       assertFalse(testTable.isEmpty());
       byte[] readValue = testTable.get(key);
@@ -165,15 +168,15 @@ public class TestRDBTableStore {
     List<byte[]> deletedKeys = new ArrayList<>();
     List<byte[]> validKeys = new ArrayList<>();
     byte[] value =
-        RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
     for (int x = 0; x < 100; x++) {
       deletedKeys.add(
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8));
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8));
     }
 
     for (int x = 0; x < 100; x++) {
       validKeys.add(
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8));
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8));
     }
 
     // Write all the keys and delete the keys scheduled for delete.
@@ -205,22 +208,22 @@ public class TestRDBTableStore {
     List<byte[]> keys = new ArrayList<>();
     for (int x = 0; x < 100; x++) {
       // Left pad DB keys with zeros
-      String k = String.format("%03d", x) + "-" + RandomStringUtils.random(6);
+      String k = String.format("%03d", x) + "-" + RandomStringUtils.secure().next(6);
       keys.add(k.getBytes(StandardCharsets.UTF_8));
     }
     // Some random value
-    byte[] val = RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+    byte[] val = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
 
     try (Table testTable = rdbStore.getTable("Ninth")) {
 
       // Write keys to the table
-      for (int x = 0; x < keys.size(); x++) {
-        testTable.put(keys.get(x), val);
+      for (byte[] key : keys) {
+        testTable.put(key, val);
       }
 
       // All keys should exist at this point
-      for (int x = 0; x < keys.size(); x++) {
-        assertNotNull(testTable.get(keys.get(x)));
+      for (byte[] key : keys) {
+        assertNotNull(testTable.get(key));
       }
 
       // Delete a range of keys: [10th, 20th), zero-indexed
@@ -267,9 +270,9 @@ public class TestRDBTableStore {
         BatchOperation batch = rdbStore.initBatchOperation()) {
       //given
       byte[] key =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
       byte[] value =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
       assertNull(testTable.get(key));
 
       //when
@@ -288,9 +291,9 @@ public class TestRDBTableStore {
 
       //given
       byte[] key =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
       byte[] value =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
       assertNotNull(testTable.get(key));
 
@@ -305,14 +308,27 @@ public class TestRDBTableStore {
   }
 
   @Test
+  public void putGetTypedTableCodec() throws Exception {
+    try (Table<String, String> testTable = rdbStore.getTable("Ten", StringCodec.get(), StringCodec.get())) {
+      testTable.put("test1", "123");
+      assertFalse(testTable.isEmpty());
+      assertEquals("123", testTable.get("test1"));
+    }
+    try (Table<String, ByteString> testTable = rdbStore.getTable("Ten",
+        StringCodec.get(), ByteStringCodec.get(), CacheType.NO_CACHE)) {
+      assertEquals("123", testTable.get("test1").toStringUtf8());
+    }
+  }
+
+  @Test
   public void forEachAndIterator() throws Exception {
     final int iterCount = 100;
     try (Table testTable = rdbStore.getTable("Sixth")) {
       for (int x = 0; x < iterCount; x++) {
         byte[] key =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         testTable.put(key, value);
       }
       int localCount = 0;
@@ -333,9 +349,9 @@ public class TestRDBTableStore {
 
   @Test
   public void testIsExist() throws Exception {
-    byte[] key = RandomStringUtils.random(10, true, false)
+    byte[] key = RandomStringUtils.secure().next(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
-    byte[] value = RandomStringUtils.random(10, true, false)
+    byte[] value = RandomStringUtils.secure().next(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
     final byte[] zeroSizeKey = {(byte) (key[0] + 1)};
     final byte[] zeroSizeValue = {};
@@ -357,7 +373,7 @@ public class TestRDBTableStore {
       assertEquals(0, testTable.get(zeroSizeKey).length);
 
       byte[] invalidKey =
-          RandomStringUtils.random(5).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(5).getBytes(StandardCharsets.UTF_8);
       // Test if isExist returns false for a key that is definitely not present.
       assertFalse(testTable.isExist(invalidKey));
 
@@ -391,14 +407,13 @@ public class TestRDBTableStore {
     final String tableName = families.get(0);
     try (RDBTable testTable = rdbStore.getTable(tableName)) {
       final TypedTable<String, String> typedTable = new TypedTable<>(
-          testTable, CodecRegistry.newBuilder().build(),
-          String.class, String.class);
+          testTable, StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE);
 
       for (int i = 0; i < 20; i++) {
         final int valueSize = TypedTable.BUFFER_SIZE_DEFAULT * i / 4;
         final String key = "key" + i;
         final byte[] keyBytes = codec.toPersistedFormat(key);
-        final String value = RandomStringUtils.random(valueSize, true, false);
+        final String value = RandomStringUtils.secure().next(valueSize, true, false);
         final byte[] valueBytes = codec.toPersistedFormat(value);
 
         testTable.put(keyBytes, valueBytes);
@@ -412,9 +427,9 @@ public class TestRDBTableStore {
 
   @Test
   public void testGetIfExist() throws Exception {
-    byte[] key = RandomStringUtils.random(10, true, false)
+    byte[] key = RandomStringUtils.secure().next(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
-    byte[] value = RandomStringUtils.random(10, true, false)
+    byte[] value = RandomStringUtils.secure().next(10, true, false)
         .getBytes(StandardCharsets.UTF_8);
 
     final String tableName = families.get(0);
@@ -429,7 +444,7 @@ public class TestRDBTableStore {
       assertNull(testTable.getIfExist(key));
 
       byte[] invalidKey =
-          RandomStringUtils.random(5).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(5).getBytes(StandardCharsets.UTF_8);
       // Test if isExist returns null for a key that is definitely not present.
       assertNull(testTable.getIfExist(invalidKey));
 
@@ -452,7 +467,6 @@ public class TestRDBTableStore {
     }
   }
 
-
   @Test
   public void testCountEstimatedRowsInTable() throws Exception {
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Eighth")) {
@@ -460,9 +474,9 @@ public class TestRDBTableStore {
       final int numKeys = 12345;
       for (int i = 0; i < numKeys; i++) {
         byte[] key =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         testTable.put(key, value);
       }
       long keyCount = testTable.getEstimatedKeyCount();
@@ -531,11 +545,10 @@ public class TestRDBTableStore {
     for (int i = 1; i <= num; i++) {
       byte[] key = bytesOf[i];
       byte[] value =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
       testTable.put(key, value);
     }
   }
-
 
   @Test
   public void testPrefixedIterator() throws Exception {
@@ -580,13 +593,13 @@ public class TestRDBTableStore {
     final List<Map<String, String>> data = generateKVs(prefixes, keyCount);
 
     try (TypedTable<String, String> table = rdbStore.getTable(
-        "PrefixFirst", String.class, String.class)) {
+        "PrefixFirst", StringCodec.get(), StringCodec.get())) {
       populateTable(table, data);
       for (String prefix : prefixes) {
         assertIterator(keyCount, prefix, table);
       }
 
-      final String nonExistingPrefix = RandomStringUtils.random(
+      final String nonExistingPrefix = RandomStringUtils.secure().next(
           PREFIX_LENGTH + 2, false, false);
       assertIterator(0, nonExistingPrefix, table);
     }
@@ -619,13 +632,12 @@ public class TestRDBTableStore {
   @Test
   public void testStringPrefixedIteratorCloseDb() throws Exception {
     try (Table<String, String> testTable = rdbStore.getTable(
-        "PrefixFirst", String.class, String.class)) {
+        "PrefixFirst", StringCodec.get(), StringCodec.get())) {
       // iterator should seek to right pos in the middle
       rdbStore.close();
       assertThrows(IOException.class, () -> testTable.iterator("abc"));
     }
   }
-
 
   @Test
   public void testPrefixedRangeKVs() throws Exception {
@@ -760,7 +772,7 @@ public class TestRDBTableStore {
     for (int i = 0; i < prefixCount; i++) {
       // use alphabetic chars so we get fixed length prefix when
       // convert to byte[]
-      prefixes.add(RandomStringUtils.randomAlphabetic(PREFIX_LENGTH));
+      prefixes.add(RandomStringUtils.secure().nextAlphabetic(PREFIX_LENGTH));
     }
     return prefixes;
   }
@@ -772,7 +784,7 @@ public class TestRDBTableStore {
       Map<String, String> kvs = new HashMap<>();
       for (int i = 0; i < keyCount; i++) {
         String key = prefix + i;
-        String val = RandomStringUtils.random(10);
+        String val = RandomStringUtils.secure().next(10);
         kvs.put(key, val);
       }
       data.add(kvs);

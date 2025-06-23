@@ -38,12 +38,10 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test OM's snapshot provider service.
  */
-@Timeout(300)
 public class TestOzoneManagerSnapshotProvider {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -84,10 +82,10 @@ public class TestOzoneManagerSnapshotProvider {
 
   @Test
   public void testDownloadCheckpoint() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)

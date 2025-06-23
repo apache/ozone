@@ -435,7 +435,7 @@ public abstract class TestConfigurationFieldsBase {
     StringBuilder xmlErrorMsg = new StringBuilder();
     for (Class c : configurationClasses) {
       xmlErrorMsg.append(c);
-      xmlErrorMsg.append(" ");
+      xmlErrorMsg.append(' ');
     }
     xmlErrorMsg.append("has ");
     xmlErrorMsg.append(missingXmlSize);

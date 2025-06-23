@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-import React, { useRef } from 'react';
+import React, {useRef} from 'react';
 import filesize from 'filesize';
+
 import { AxiosError } from 'axios';
 import { Popover, Table } from 'antd';
 import {
@@ -26,13 +27,16 @@ import {
 } from 'antd/es/table';
 import { CheckCircleOutlined, NodeIndexOutlined } from '@ant-design/icons';
 
-import { getFormattedTime } from '@/v2/utils/momentUtils';
-import { showDataFetchError } from '@/utils/common';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+import {getFormattedTime} from '@/v2/utils/momentUtils';
+import {showDataFetchError} from '@/utils/common';
+import {AxiosGetHelper} from '@/utils/axiosRequestHelper';
 import {
-  Container, ContainerKeysResponse, ContainerReplica,
+  Container,
+  ContainerKeysResponse,
+  ContainerReplica,
   ContainerTableProps,
-  ExpandedRowState, KeyResponse
+  ExpandedRowState,
+  KeyResponse
 } from '@/v2/types/container.types';
 
 const size = filesize.partial({ standard: 'iec' });
@@ -251,7 +255,7 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
         dataSource={dataSource}
         columns={KEY_TABLE_COLUMNS}
         pagination={paginationConfig}
-        rowKey={(record: KeyResponse) => `${record.Volume}/${record.Bucket}/${record.Key}`}
+        rowKey={(record: KeyResponse) => record.CompletePath}
         locale={{ filterTitle: '' }} />
     )
   };

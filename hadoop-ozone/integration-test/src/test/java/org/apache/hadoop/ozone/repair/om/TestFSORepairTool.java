@@ -70,7 +70,7 @@ import picocli.CommandLine;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestFSORepairTool {
 
-  public static final Logger LOG = LoggerFactory.getLogger(TestFSORepairTool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestFSORepairTool.class);
   private static final int ORDER_DRY_RUN = 1;
   //private static final int ORDER_REPAIR_SOME = 2; // TODO add test case
   private static final int ORDER_REPAIR_ALL = 3;

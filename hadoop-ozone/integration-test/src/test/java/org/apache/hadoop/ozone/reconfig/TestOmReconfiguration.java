@@ -17,17 +17,20 @@
 
 package org.apache.hadoop.ozone.reconfig;
 
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Set;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -44,15 +47,21 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
   @Test
   void reconfigurableProperties() {
-    assertProperties(getSubject(),
-        ImmutableSet.of(OZONE_ADMINISTRATORS, OZONE_READONLY_ADMINISTRATORS,
-            OZONE_OM_VOLUME_LISTALL_ALLOWED,
-            OZONE_KEY_DELETING_LIMIT_PER_TASK));
+    Set<String> expected = ImmutableSet.<String>builder()
+        .add(OZONE_ADMINISTRATORS)
+        .add(OZONE_KEY_DELETING_LIMIT_PER_TASK)
+        .add(OZONE_OM_VOLUME_LISTALL_ALLOWED)
+        .add(OZONE_READONLY_ADMINISTRATORS)
+        .add(OZONE_DIR_DELETING_SERVICE_INTERVAL)
+        .addAll(new OmConfig().reconfigurableProperties())
+        .build();
+
+    assertProperties(getSubject(), expected);
   }
 
   @Test
   void adminUsernames() throws ReconfigurationException {
-    final String newValue = randomAlphabetic(10);
+    final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
 
     getSubject().reconfigurePropertyImpl(OZONE_ADMINISTRATORS, newValue);
 
@@ -63,7 +72,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
 
   @Test
   void readOnlyAdmins() throws ReconfigurationException {
-    final String newValue = randomAlphabetic(10);
+    final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
 
     getSubject().reconfigurePropertyImpl(OZONE_READONLY_ADMINISTRATORS,
         newValue);
@@ -71,6 +80,17 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     assertEquals(
         ImmutableSet.of(newValue),
         cluster().getOzoneManager().getOmReadOnlyAdminUsernames());
+  }
+
+  @Test
+  public void maxListSize() throws ReconfigurationException {
+    final long initialValue = cluster().getOzoneManager().getConfig().getMaxListSize();
+
+    getSubject().reconfigurePropertyImpl(OmConfig.Keys.SERVER_LIST_MAX_SIZE,
+        String.valueOf(initialValue + 1));
+
+    assertEquals(initialValue + 1,
+        cluster().getOzoneManager().getConfig().getMaxListSize());
   }
 
   @Test

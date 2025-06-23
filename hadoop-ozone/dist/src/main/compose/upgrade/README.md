@@ -27,9 +27,8 @@ an older release of Ozone and a later release (which may be the local build).
     - To do this, uncomment all lines that contain `run_test` in the *test.sh* file, and execute *test.sh* either locally or on GitHub actions.
 
 2. After the release is finished and its docker image is published, add the new version to the test matrix.
-    1. Change the `OZONE_CURRENT_VERSION` variable to `OZONE_CURRENT_VERSION=<newly-released-version>`.
-    2. Comment out all `run_test` lines in *test.sh*.
-    3. Add a new line: `run_test ha non-rolling-upgrade <newly-released-version> "$OZONE_CURRENT_VERSION"` before the commented out lines.
+    1. Comment out all `run_test` lines in *test.sh*.
+    2. Add a new line: `run_test ha non-rolling-upgrade <newly-released-version> "$OZONE_CURRENT_VERSION"` before the commented out lines.
 
 ## Important Notes on Test Scope
 

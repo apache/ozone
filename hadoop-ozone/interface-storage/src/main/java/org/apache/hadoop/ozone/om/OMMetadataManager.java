@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
-import org.apache.hadoop.ozone.om.helpers.MultipartUploadKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -46,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -121,6 +121,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @param volume - Volume name
    * @param bucket - Bucket name
+   * @return /volume/bucket/
    */
   String getBucketKeyPrefix(String volume, String bucket);
 
@@ -129,6 +130,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
    *
    * @param volume - Volume name
    * @param bucket - Bucket name
+   * @return /volumeId/bucketId/
+   *    e.g. /-9223372036854772480/-9223372036854771968/
    */
   String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException;
 
@@ -161,7 +164,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return DB directory key as String.
    */
   String getOzoneDirKey(String volume, String bucket, String key);
-
 
   /**
    * Returns the DB key name of a open key in OM metadata store. Should be
@@ -464,6 +466,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, String> getSnapshotRenamedTable();
 
   Table<String, CompactionLogEntry> getCompactionLogTable();
+
   /**
    * Gets the OM Meta table.
    * @return meta table reference.
@@ -494,8 +497,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
   /**
    * Return the existing upload keys which includes volumeName, bucketName,
    * keyName.
+   * @param noPagination if true, returns all keys; if false, applies pagination
+   * @return When paginated, returns up to maxUploads + 1 entries, where the
+   *         extra entry is used to determine the next page markers
    */
-  MultipartUploadKeys getMultipartUploadKeys(String volumeName,
+  List<OmMultipartUpload> getMultipartUploadKeys(String volumeName,
           String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads,
           boolean noPagination) throws IOException;
 
@@ -606,6 +612,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return DB rename key as String.
    */
   String getRenameKey(String volume, String bucket, long objectID);
+
+  /**
+   * Given renameKey, return the volume, bucket and objectID from the key.
+   */
+  String[] splitRenameKey(String renameKey);
 
   /**
    * Returns the DB key name of a multipart upload key in OM metadata store

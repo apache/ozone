@@ -68,7 +68,7 @@ import org.slf4j.LoggerFactory;
 
 /** For testing {@link KeyValueStreamDataChannel}. */
 public class TestKeyValueStreamDataChannel {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueStreamDataChannel.class);
 
   private static final ContainerCommandRequestProto PUT_BLOCK_PROTO
@@ -82,6 +82,7 @@ public class TestKeyValueStreamDataChannel {
       .setVersion(ClientVersion.CURRENT.toProtoValue())
       .build();
   static final int PUT_BLOCK_PROTO_SIZE = PUT_BLOCK_PROTO.toByteString().size();
+
   static {
     LOG.info("PUT_BLOCK_PROTO_SIZE = {}", PUT_BLOCK_PROTO_SIZE);
   }

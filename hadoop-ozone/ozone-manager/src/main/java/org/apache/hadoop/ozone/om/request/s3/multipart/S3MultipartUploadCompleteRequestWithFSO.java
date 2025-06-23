@@ -39,17 +39,12 @@ import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadComplet
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCompleteResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Handle Multipart upload complete request.
  */
 public class S3MultipartUploadCompleteRequestWithFSO
         extends S3MultipartUploadCompleteRequest {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(S3MultipartUploadCompleteRequestWithFSO.class);
 
   public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -103,7 +98,6 @@ public class S3MultipartUploadCompleteRequestWithFSO
         keyName, transactionLogIndex);
 
   }
-
 
   @Override
   protected OmKeyInfo getOmKeyInfoFromKeyTable(String dbOzoneFileKey,

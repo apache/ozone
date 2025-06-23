@@ -27,6 +27,7 @@ import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,6 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 class RDBTable implements Table<byte[], byte[]> {
-
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBTable.class);
@@ -91,7 +91,6 @@ class RDBTable implements Table<byte[], byte[]> {
       throw new IllegalArgumentException("batch should be RDBBatchOperation");
     }
   }
-
 
   @Override
   public boolean isEmpty() throws IOException {
@@ -194,7 +193,6 @@ class RDBTable implements Table<byte[], byte[]> {
     db.delete(family, key);
   }
 
-
   @Override
   public void deleteRange(byte[] beginKey, byte[] endKey) throws IOException {
     db.deleteRange(family, beginKey, endKey);
@@ -275,10 +273,8 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
       throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter
-             = iterator(prefix);
-         DumpFileWriter fileWriter = new RDBSstFileWriter()) {
-      fileWriter.open(externalFile);
+    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter = iterator(prefix);
+         RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
       while (iter.hasNext()) {
         final KeyValue<byte[], byte[]> entry = iter.next();
         fileWriter.put(entry.getKey(), entry.getValue());
@@ -287,17 +283,15 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void loadFromFile(File externalFile) throws IOException {
-    try (DumpFileLoader fileLoader = new RDBSstFileLoader(db, family)) {
-      fileLoader.load(externalFile);
-    }
+  public void loadFromFile(File externalFile) throws RocksDatabaseException {
+    RDBSstFileLoader.load(db, family, externalFile);
   }
 
   private List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey,
       int count, boolean sequential, byte[] prefix,
       MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
-    long start = System.currentTimeMillis();
+    long start = Time.monotonicNow();
 
     if (count < 0) {
       throw new IllegalArgumentException(
@@ -332,7 +326,7 @@ class RDBTable implements Table<byte[], byte[]> {
                           currentKey, null))) {
             result.add(currentEntry);
           } else {
-            if (result.size() > 0 && sequential) {
+            if (!result.isEmpty() && sequential) {
               // if the caller asks for a sequential range of results,
               // and we met a dis-match, abort iteration from here.
               // if result is empty, we continue to look for the first match.
@@ -342,7 +336,7 @@ class RDBTable implements Table<byte[], byte[]> {
         }
       }
     } finally {
-      long end = System.currentTimeMillis();
+      long end = Time.monotonicNow();
       long timeConsumed = end - start;
       if (LOG.isDebugEnabled()) {
         if (filters != null) {

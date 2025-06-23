@@ -90,13 +90,13 @@ public enum Statistic {
     }
   }
 
+  private final String symbol;
+  private final String description;
+
   Statistic(String symbol, String description) {
     this.symbol = symbol;
     this.description = description;
   }
-
-  private final String symbol;
-  private final String description;
 
   public String getSymbol() {
     return symbol;

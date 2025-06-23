@@ -131,9 +131,9 @@ public class VolumeInfoMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(metricsSourceName);
     registry.snapshot(builder, all);
-    volume.getVolumeInfo().ifPresent(volumeInfo -> {
-      SpaceUsageSource usage = volumeInfo.getCurrentUsage();
-      long reserved = volumeInfo.getReservedInBytes();
+    volume.getVolumeUsage().ifPresent(volumeUsage -> {
+      SpaceUsageSource usage = volumeUsage.getCurrentUsage();
+      long reserved = volumeUsage.getReservedInBytes();
       builder
           .addGauge(CAPACITY, usage.getCapacity())
           .addGauge(AVAILABLE, usage.getAvailable())

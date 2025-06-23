@@ -34,6 +34,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestOzoneAddress {
 
+  private OzoneAddress address;
+
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
         {"o3://localhost:9878/"},
@@ -44,15 +46,13 @@ public class TestOzoneAddress {
     });
   }
 
-  private OzoneAddress address;
-
   @ParameterizedTest
   @MethodSource("data")
   public void checkRootUrlType(String prefix) throws OzoneClientException {
     address = new OzoneAddress("");
     address.ensureRootAddress();
 
-    address = new OzoneAddress(prefix + "");
+    address = new OzoneAddress(prefix);
     address.ensureRootAddress();
   }
 

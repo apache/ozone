@@ -48,7 +48,6 @@ public class TestOMBucketDeleteResponse {
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
 
-
   @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();

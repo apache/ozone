@@ -43,8 +43,6 @@ import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class wraps necessary container-level rpc calls for container reconciliation.
@@ -52,8 +50,6 @@ import org.slf4j.LoggerFactory;
  */
 public class DNContainerOperationClient implements AutoCloseable {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DNContainerOperationClient.class);
   private final TokenHelper tokenHelper;
   private final XceiverClientManager xceiverClientManager;
 

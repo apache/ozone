@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_READ_THREADPOOL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_READ_THREADPOOL_KEY;
-import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.CLIENT_RPC;
 
 import com.google.protobuf.BlockingService;
@@ -114,8 +113,8 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
         .ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return preserveThreadName(() -> startRpcServer(configuration, rpcAddress,
-        ReconfigureProtocolDatanodePB.class, reconfigureService, handlerCount, readThreads));
+    return startRpcServer(configuration, rpcAddress,
+        ReconfigureProtocolDatanodePB.class, reconfigureService, handlerCount, readThreads);
   }
 
   /**

@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RatisOverReplicationHandler
     extends AbstractOverReplicationHandler {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(RatisOverReplicationHandler.class);
 
   private final ReplicationManager replicationManager;
@@ -120,7 +120,7 @@ public class RatisOverReplicationHandler
     // get replicas that can be deleted, in sorted order
     List<ContainerReplica> eligibleReplicas =
         getEligibleReplicas(replicaCount, pendingOps);
-    if (eligibleReplicas.size() == 0) {
+    if (eligibleReplicas.isEmpty()) {
       LOG.info("Did not find any replicas that are eligible to be deleted for" +
           " container {}.", containerInfo);
       return 0;

@@ -357,7 +357,6 @@ public final class OzoneManagerRatisServer {
     final List<RaftPeer> newPeersList = new ArrayList<>(raftPeerMap.values());
     newPeersList.add(newRaftPeer);
 
-    checkLeaderStatus();
     SetConfigurationRequest request = new SetConfigurationRequest(clientId,
         server.getId(), raftGroupId, nextCallId(), newPeersList);
 
@@ -390,7 +389,6 @@ public final class OzoneManagerRatisServer {
         .map(Map.Entry::getValue)
         .collect(Collectors.toList());
 
-    checkLeaderStatus();
     SetConfigurationRequest request = new SetConfigurationRequest(clientId,
         server.getId(), raftGroupId, nextCallId(), newPeersList);
 
@@ -829,7 +827,7 @@ public final class OzoneManagerRatisServer {
    *
    * @return RaftServerStatus.
    */
-  public RaftServerStatus checkLeaderStatus() {
+  public RaftServerStatus getLeaderStatus() {
     final RaftServer.Division division = getServerDivision();
     if (division == null) {
       return RaftServerStatus.NOT_LEADER;

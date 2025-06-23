@@ -18,13 +18,10 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.InputStream;
 import java.lang.reflect.Field;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,10 +68,8 @@ public final class DatanodeIdYaml {
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.FLOW);
     Yaml yaml = new Yaml(options);
 
-    try (Writer writer = new OutputStreamWriter(
-        new FileOutputStream(path), StandardCharsets.UTF_8)) {
-      yaml.dump(getDatanodeDetailsYaml(datanodeDetails, conf), writer);
-    }
+    final DatanodeDetailsYaml data = getDatanodeDetailsYaml(datanodeDetails, conf);
+    YamlUtils.dump(yaml, data, path, LOG);
   }
 
   /**
@@ -83,7 +78,7 @@ public final class DatanodeIdYaml {
   public static DatanodeDetails readDatanodeIdFile(File path)
       throws IOException {
     DatanodeDetails datanodeDetails;
-    try (FileInputStream inputFileStream = new FileInputStream(path)) {
+    try (InputStream inputFileStream = Files.newInputStream(path.toPath())) {
       DatanodeDetailsYaml datanodeDetailsYaml;
       try {
         datanodeDetailsYaml =
@@ -228,6 +223,11 @@ public final class DatanodeIdYaml {
     public void setCurrentVersion(int version) {
       this.currentVersion = version;
     }
+
+    @Override
+    public String toString() {
+      return "DatanodeDetailsYaml(" + uuid + ", " + hostName + "/" + ipAddress + ")";
+    }
   }
 
   private static DatanodeDetailsYaml getDatanodeDetailsYaml(
@@ -268,7 +268,7 @@ public final class DatanodeIdYaml {
     }
 
     return new DatanodeDetailsYaml(
-        datanodeDetails.getUuid().toString(),
+        datanodeDetails.getUuidString(),
         datanodeDetails.getIpAddress(),
         datanodeDetails.getHostName(),
         datanodeDetails.getCertSerialId(),

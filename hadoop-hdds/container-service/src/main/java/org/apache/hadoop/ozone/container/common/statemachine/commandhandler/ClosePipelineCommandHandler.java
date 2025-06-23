@@ -93,7 +93,7 @@ public class ClosePipelineCommandHandler implements CommandHandler {
    * @param connectionManager - The SCMs that we are talking to.
    */
   @Override
-  public void handle(SCMCommand command, OzoneContainer ozoneContainer,
+  public void handle(SCMCommand<?> command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
     queuedCount.incrementAndGet();
     CompletableFuture.runAsync(() -> {
@@ -139,11 +139,10 @@ public class ClosePipelineCommandHandler implements CommandHandler {
           // Remove the Ratis group from the current datanode pipeline, might throw GroupMismatchException as
           // well. It is a no-op for XceiverServerSpi implementations (e.g. XceiverServerGrpc)
           server.removeGroup(pipelineIdProto);
-          LOG.info("Close Pipeline {} command on datanode {}.", pipelineID,
-              dn.getUuidString());
+          LOG.info("Close Pipeline {} command on datanode {}.", pipelineID, dn);
         } else {
           LOG.debug("Ignoring close pipeline command for pipeline {} on datanode {} " +
-              "as it does not exist", pipelineID, dn.getUuidString());
+              "as it does not exist", pipelineID, dn);
         }
       } catch (IOException e) {
         Throwable gme = HddsClientUtils.containsException(e, GroupMismatchException.class);
@@ -151,7 +150,7 @@ public class ClosePipelineCommandHandler implements CommandHandler {
           // ignore silently since this means that the group has been closed by earlier close pipeline
           // command in another datanode
           LOG.debug("The group for pipeline {} on datanode {} has been removed by earlier close " +
-              "pipeline command handled in another datanode", pipelineID, dn.getUuidString());
+              "pipeline command handled in another datanode", pipelineID, dn);
         } else {
           LOG.error("Can't close pipeline {}", pipelineID, e);
         }

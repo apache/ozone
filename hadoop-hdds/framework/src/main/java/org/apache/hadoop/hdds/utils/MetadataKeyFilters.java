@@ -46,6 +46,7 @@ public final class MetadataKeyFilters {
     return new MetadataKeyFilters.KeyPrefixFilter()
             .addFilter("#", true);
   }
+
   /**
    * Interface for RocksDB key filters.
    */

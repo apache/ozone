@@ -223,8 +223,8 @@ public class TestOzoneECClient {
     // replication in bucket, key should be EC key.
     try (OzoneOutputStream out = bucket.createKey("mykey", inputSize)) {
       assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
-      for (int i = 0; i < inputChunks.length; i++) {
-        out.write(inputChunks[i]);
+      for (byte[] inputChunk : inputChunks) {
+        out.write(inputChunk);
       }
     }
   }
@@ -274,6 +274,7 @@ public class TestOzoneECClient {
           throws IOException {
     testMultipleChunksInSingleWriteOp(0, numChunks, numChunks);
   }
+
   private void testMultipleChunksInSingleWriteOp(int offset, int bufferChunks,
                                                  int numChunks)
       throws IOException {
@@ -467,8 +468,8 @@ public class TestOzoneECClient {
       assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
       // Block Size is 2kb, so to create 3 blocks we need 6 iterations here
       for (int j = 0; j < 6; j++) {
-        for (int i = 0; i < inputChunks.length; i++) {
-          out.write(inputChunks[i]);
+        for (byte[] inputChunk : inputChunks) {
+          out.write(inputChunk);
         }
       }
     }
@@ -553,8 +554,8 @@ public class TestOzoneECClient {
         out.write(inputChunks[i]);
       }
 
-      for (int i = 0; i < lastChunk.length; i++) {
-        out.write(lastChunk[i]);
+      for (byte chunkData : lastChunk) {
+        out.write(chunkData);
       }
     }
 
@@ -738,9 +739,8 @@ public class TestOzoneECClient {
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
 
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
 
       // First let's set storage as bad
@@ -789,9 +789,8 @@ public class TestOzoneECClient {
 
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
 
       // First let's set storage as bad
@@ -929,9 +928,8 @@ public class TestOzoneECClient {
 
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
 
       // First let's set storage as bad
@@ -1000,9 +998,8 @@ public class TestOzoneECClient {
       int[] nodesIndexesToMarkFailure = new int[] {0, 4};
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
 
       // First let's set storage as bad
@@ -1089,9 +1086,8 @@ public class TestOzoneECClient {
       // Make the writes fail to trigger retry
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
       // First let's set storage as bad
       factoryStub.setFailedStorages(failedDNs);
@@ -1122,6 +1118,7 @@ public class TestOzoneECClient {
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     return writeIntoECKey(0, data.length, data, key, defaultReplicationConfig);
   }
+
   private OzoneBucket writeIntoECKey(int offset, int length, byte[] data,
       String key, DefaultReplicationConfig defaultReplicationConfig)
       throws IOException {

@@ -20,9 +20,10 @@ package org.apache.hadoop.ozone.shell.token;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.token.Token;
@@ -50,7 +51,7 @@ public class TokenOption {
 
   public Token<OzoneTokenIdentifier> decode() throws IOException {
     Credentials creds = new Credentials();
-    try (FileInputStream fis = new FileInputStream(tokenFile)) {
+    try (InputStream fis = Files.newInputStream(tokenFile.toPath())) {
       try (DataInputStream dis = new DataInputStream(fis)) {
         creds.readTokenStorageStream(dis);
       }
@@ -65,7 +66,7 @@ public class TokenOption {
 
   public void persistToken(Token<OzoneTokenIdentifier> token)
       throws IOException {
-    try (FileOutputStream fos = new FileOutputStream(tokenFile)) {
+    try (OutputStream fos = Files.newOutputStream(tokenFile.toPath())) {
       try (DataOutputStream dos = new DataOutputStream(fos)) {
         Credentials ts = new Credentials();
         ts.addToken(token.getService(), token);

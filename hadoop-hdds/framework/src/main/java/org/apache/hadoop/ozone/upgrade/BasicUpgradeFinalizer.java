@@ -24,10 +24,14 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.INVAL
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_ACTION_VALIDATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_IN_PROGRESS_MSG;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZED_MSG;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.STARTING_MSG;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_REQUIRED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.STARTING_FINALIZATION;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -44,6 +48,9 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 import org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
@@ -124,7 +131,7 @@ public abstract class BasicUpgradeFinalizer
     assertClientId(upgradeClientID);
     List<String> returningMsgs = new ArrayList<>(msgs.size() + 10);
     Status status = versionManager.getUpgradeState();
-    while (msgs.size() > 0) {
+    while (!msgs.isEmpty()) {
       returningMsgs.add(msgs.poll());
     }
     return new StatusAndMessages(status, returningMsgs);
@@ -163,9 +170,9 @@ public abstract class BasicUpgradeFinalizer
     }
 
     boolean success = false;
-    long endTime = System.currentTimeMillis() +
+    long endTime = Time.monotonicNow() +
         TimeUnit.SECONDS.toMillis(maxTimeToWaitInSeconds);
-    while (System.currentTimeMillis() < endTime) {
+    while (Time.monotonicNow() < endTime) {
       try {
         response = reportStatus(upgradeClientID, false);
         LOG.info("Finalization Messages : {} ", response.msgs());
@@ -232,7 +239,7 @@ public abstract class BasicUpgradeFinalizer
   private void assertClientId(String id) throws UpgradeException {
     if (this.clientID == null || !this.clientID.equals(id)) {
       throw new UpgradeException("Unknown client tries to get finalization " +
-          "status.\n The requestor is not the initiating client of the " +
+          "status.\n The requester is not the initiating client of the " +
           "finalization, if you want to take over, and get unsent status " +
           "messages, check -takeover option.", INVALID_REQUEST);
     }

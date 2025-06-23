@@ -90,7 +90,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
    * @param connectionManager - The SCMs that we are talking to.
    */
   @Override
-  public void handle(SCMCommand command, OzoneContainer ozoneContainer,
+  public void handle(SCMCommand<?> command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
     queuedCount.incrementAndGet();
     CompletableFuture.runAsync(() -> {
@@ -112,8 +112,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
           final RaftGroup group =
               RatisHelper.newRaftGroup(groupId, peers, priorityList);
           server.addGroup(pipelineIdProto, peers, priorityList);
-          peers.stream().filter(
-              d -> !d.getUuid().equals(dn.getUuid()))
+          peers.stream().filter(d -> !d.getID().equals(dn.getID()))
               .forEach(d -> {
                 final RaftPeer peer = RatisHelper.toRaftPeer(d);
                 try (RaftClient client = newRaftClient.apply(peer,

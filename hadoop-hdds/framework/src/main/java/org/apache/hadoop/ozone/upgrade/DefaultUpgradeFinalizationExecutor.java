@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_REQUIRED;
 
 import java.io.IOException;
 import org.slf4j.Logger;

@@ -30,16 +30,11 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Defines common methods required for volume requests.
  */
 public abstract class OMVolumeRequest extends OMClientRequest {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMVolumeRequest.class);
 
   public OMVolumeRequest(OMRequest omRequest) {
     super(omRequest);
@@ -78,7 +73,6 @@ public abstract class OMVolumeRequest extends OMClientRequest {
          .build();
     return newVolList;
   }
-
 
   /**
    * Add volume to user volume list. This method should be called after

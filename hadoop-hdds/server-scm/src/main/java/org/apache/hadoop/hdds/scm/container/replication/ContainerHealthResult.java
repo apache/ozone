@@ -27,20 +27,9 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  */
 public class ContainerHealthResult {
 
-  /**
-   * All possible container health states.
-   */
-  public enum HealthState {
-    HEALTHY,
-    UNHEALTHY,
-    UNDER_REPLICATED,
-    OVER_REPLICATED,
-    MIS_REPLICATED
-  }
-
   private final ContainerInfo containerInfo;
   private final HealthState healthState;
-  private final List<SCMCommand> commands = new ArrayList<>();
+  private final List<SCMCommand<?>> commands = new ArrayList<>();
 
   public ContainerHealthResult(ContainerInfo containerInfo,
       HealthState healthState) {
@@ -52,11 +41,11 @@ public class ContainerHealthResult {
     return healthState;
   }
 
-  public void addCommand(SCMCommand command) {
+  public void addCommand(SCMCommand<?> command) {
     commands.add(command);
   }
 
-  public List<SCMCommand> getCommands() {
+  public List<SCMCommand<?>> getCommands() {
     return commands;
   }
 
@@ -222,6 +211,7 @@ public class ContainerHealthResult {
     public void setHasUnReplicatedOfflineIndexes(boolean val) {
       hasUnReplicatedOfflineIndexes = val;
     }
+
     /**
      * Indicates whether a container has some indexes which are only on nodes
      * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
@@ -304,7 +294,7 @@ public class ContainerHealthResult {
       if (requeueCount > 0) {
         sb.append(" requeued:").append(requeueCount);
       }
-      return sb.append("}").toString();
+      return sb.append('}').toString();
     }
   }
 
@@ -400,5 +390,16 @@ public class ContainerHealthResult {
     public void setIsSafelyOverReplicated(boolean isSafelyOverReplicated) {
       this.isSafelyOverReplicated = isSafelyOverReplicated;
     }
+  }
+
+  /**
+   * All possible container health states.
+   */
+  public enum HealthState {
+    HEALTHY,
+    UNHEALTHY,
+    UNDER_REPLICATED,
+    OVER_REPLICATED,
+    MIS_REPLICATED
   }
 }

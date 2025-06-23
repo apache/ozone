@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -42,9 +43,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -52,7 +53,6 @@ import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
@@ -66,7 +66,6 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -80,13 +79,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests to verify Object store with prefix enabled cases.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(1200)
 public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   private static final Path ROOT =
       new Path(OZONE_URI_DELIMITER);
@@ -151,7 +148,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   @Test
   public void testCreateKey() throws Exception {
     String parent = "a/b/c/";
-    String file = "key" + RandomStringUtils.randomNumeric(5);
+    String file = "key" + RandomStringUtils.secure().nextNumeric(5);
     String key = parent + file;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -219,7 +216,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     String testBucketName = testBucket.getName();
 
     String parent = "a/b/c/";
-    String file = "key" + RandomStringUtils.randomNumeric(5);
+    String file = "key" + RandomStringUtils.secure().nextNumeric(5);
     String key = parent + file;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -271,7 +268,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
   @Test
   public void testLookupKey() throws Exception {
     String parent = "a/b/c/";
-    String fileName = "key" + RandomStringUtils.randomNumeric(5);
+    String fileName = "key" + RandomStringUtils.secure().nextNumeric(5);
     String key = parent + fileName;
 
     ObjectStore objectStore = client.getObjectStore();
@@ -397,7 +394,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     byte[] input = new byte[length];
     Arrays.fill(input, (byte)96);
 
-    createKeys(ozoneBucket, keys);
+    createAndAssertKeys(ozoneBucket, keys);
 
     // Root level listing keys
     Iterator<? extends OzoneKey> ozoneKeyIterator =
@@ -511,16 +508,9 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     keys.add(OmUtils.normalizeKey(key2, false));
     keys.add(OmUtils.normalizeKey(key3, false));
 
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte)96);
-
-    createKey(ozoneBucket, key1, 10, input);
-    createKey(ozoneBucket, key2, 10, input);
-    createKey(ozoneBucket, key3, 10, input);
+    createAndAssertKeys(ozoneBucket, Arrays.asList(key1, key2, key3));
 
     // Iterator with key name as prefix.
-
     Iterator<? extends OzoneKey> ozoneKeyIterator =
             ozoneBucket.listKeys("/dir1//", null);
 
@@ -562,44 +552,35 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     assertEquals(keys, outputKeys);
   }
 
-  private void createKeys(OzoneBucket ozoneBucket, List<String> keys)
+  private void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
+
     for (String key : keys) {
-      createKey(ozoneBucket, key, 10, input);
+      byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, 10);
+      // Read the key with given key name.
+      readKey(ozoneBucket, key, 10, input);
     }
   }
 
-  private void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input) throws Exception {
+  private void readKey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
+      throws Exception {
 
-    OzoneOutputStream ozoneOutputStream =
-            ozoneBucket.createKey(key, length);
-
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-
-    // Read the key with given key name.
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
     byte[] read = new byte[length];
-    ozoneInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    try (InputStream ozoneInputStream = ozoneBucket.readKey(key)) {
+      IOUtils.readFully(ozoneInputStream, read);
+    }
 
     String inputString = new String(input, StandardCharsets.UTF_8);
     assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
-            bucketName, volumeName, StandardCharsets.UTF_8);
+        bucketName, volumeName, StandardCharsets.UTF_8);
     OzoneFileSystem o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath),
-            conf);
-    FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
-    read = new byte[length];
-    fsDataInputStream.read(read, 0, length);
-    fsDataInputStream.close();
+        conf);
+    try (InputStream fsDataInputStream = o3fs.open(new Path(key))) {
+      IOUtils.readFully(fsDataInputStream, read);
+    }
 
     assertEquals(inputString, new String(read, StandardCharsets.UTF_8));
   }
@@ -757,10 +738,9 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
     String[] pathComponents = StringUtils.split(parentKey, '/');
     long parentId = bucketId;
     OmDirectoryInfo dirInfo = null;
-    for (int indx = 0; indx < pathComponents.length; indx++) {
-      String pathElement = pathComponents[indx];
-      String dbKey = omMetadataManager.getOzonePathKey(volumeId,
-              bucketId, parentId, pathElement);
+
+    for (String pathElement : pathComponents) {
+      String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentId, pathElement);
       dirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       parentId = dirInfo.getObjectID();
     }

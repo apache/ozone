@@ -38,12 +38,10 @@ public class MappedBufferManager {
       new ConcurrentHashMap<String, WeakReference<ByteBuffer>>();
   private static final Logger LOG = LoggerFactory.getLogger(MappedBufferManager.class);
   private final Semaphore semaphore;
-  private final int capacity;
   private final AtomicBoolean cleanupInProgress = new AtomicBoolean(false);
   private final Striped<Lock> lock;
 
   public MappedBufferManager(int capacity) {
-    this.capacity = capacity;
     this.semaphore = new Semaphore(capacity);
     this.lock = Striped.lazyWeakLock(1024);
   }

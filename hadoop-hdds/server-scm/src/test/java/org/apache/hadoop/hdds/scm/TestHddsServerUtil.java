@@ -25,12 +25,10 @@ import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test the HDDS server side utilities.
  */
-@Timeout(300)
 public class TestHddsServerUtil {
 
   /**

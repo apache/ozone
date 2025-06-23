@@ -78,7 +78,7 @@ import org.slf4j.LoggerFactory;
  */
 public class DeleteBlocksCommandHandler implements CommandHandler {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeleteBlocksCommandHandler.class);
 
   private final ContainerSet containerSet;
@@ -123,7 +123,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     if (command.getType() != SCMCommandProto.Type.deleteBlocksCommand) {
       LOG.warn("Skipping handling command, expected command "
@@ -188,15 +188,19 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       this.container = container;
       this.connectionManager = connectionManager;
     }
+
     public DeleteBlocksCommand getCmd() {
       return this.cmd;
     }
+
     public StateContext getContext() {
       return this.context;
     }
+
     public OzoneContainer getContainer() {
       return this.container;
     }
+
     public SCMConnectionManager getConnectionManager() {
       return this.connectionManager;
     }
@@ -208,6 +212,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   public static final class DeleteBlockTransactionExecutionResult {
     private final DeleteBlockTransactionResult result;
     private final boolean lockAcquisitionFailed;
+
     public DeleteBlockTransactionExecutionResult(
         DeleteBlockTransactionResult result, boolean lockAcquisitionFailed) {
       this.result = result;
@@ -370,27 +375,32 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder().addAllResults(results);
-      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails()
-          .getUuid().toString());
+      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails().getUuidString());
       blockDeletionACK = resultBuilder.build();
 
       // Send ACK back to SCM as long as meta updated
       // TODO Or we should wait until the blocks are actually deleted?
       if (!containerBlocks.isEmpty()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sending following block deletion ACK to SCM");
-          for (DeleteBlockTransactionResult result : blockDeletionACK
-              .getResultsList()) {
-            boolean success = result.getSuccess();
-            LOG.debug("TxId = {} : ContainerId = {} : {}",
-                result.getTxID(), result.getContainerID(), success);
-            if (success) {
-              blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
-            } else {
-              blockDeleteMetrics.incrProcessedTransactionFailCount(1);
-            }
+        int successCount = 0, failedCount = 0;
+
+        for (DeleteBlockTransactionResult result : blockDeletionACK.getResultsList()) {
+          boolean success = result.getSuccess();
+
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("TxId = {} : ContainerId = {} : {}", result.getTxID(),
+                result.getContainerID(), success);
+          }
+
+          if (success) {
+            ++successCount;
+            blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
+          } else {
+            ++failedCount;
+            blockDeleteMetrics.incrProcessedTransactionFailCount(1);
           }
         }
+        LOG.info("Sending deletion ACK to SCM, successTransactionCount = {}," +
+            "failedTransactionCount= {}", successCount, failedCount);
       }
       cmdExecuted = true;
     } finally {
@@ -642,7 +652,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       if (metrics != null) {
         metrics.incOutOfOrderDeleteBlockTransactionCount();
       }
-      LOG.info(String.format("Delete blocks for containerId: %d"
+      LOG.debug(String.format("Delete blocks for containerId: %d"
               + " is received out of order, %d < %d", containerId, delTX.getTxID(),
           containerData.getDeleteTransactionId()));
     } else if (delTX.getTxID() == containerData.getDeleteTransactionId()) {

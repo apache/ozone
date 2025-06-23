@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.proxy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMSecretKeyProtocolService;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Proxy provider for SCMSecretKeyProtocolService against a
@@ -28,6 +30,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 public class SingleSecretKeyProtocolProxyProvider
     <T extends SCMSecretKeyProtocolService.BlockingInterface>
     extends SecretKeyProtocolFailoverProxyProvider<T> {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SingleSecretKeyProtocolProxyProvider.class);
+
   private final String scmNodeId;
 
   public SingleSecretKeyProtocolProxyProvider(
@@ -47,6 +53,11 @@ public class SingleSecretKeyProtocolProxyProvider
   @Override
   public synchronized void performFailover(T currentProxy) {
     // do nothing.
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return LOG;
   }
 
   @Override

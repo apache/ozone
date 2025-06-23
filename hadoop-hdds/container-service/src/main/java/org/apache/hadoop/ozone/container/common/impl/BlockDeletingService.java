@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -216,15 +215,14 @@ public class BlockDeletingService extends BackgroundService {
           // TODO: currently EC container goes through this path.
           return true;
         }
-        UUID pipelineUUID;
+        final PipelineID pipelineID;
         try {
-          pipelineUUID = UUID.fromString(originPipelineId);
+          pipelineID = PipelineID.valueOf(originPipelineId);
         } catch (IllegalArgumentException e) {
           LOG.warn("Invalid pipelineID {} for container {}",
               originPipelineId, containerData.getContainerID());
           return false;
         }
-        PipelineID pipelineID = PipelineID.valueOf(pipelineUUID);
         // in case the ratis group does not exist, just mark it for deletion.
         if (!ratisServer.isExist(pipelineID.getProtobuf())) {
           return true;

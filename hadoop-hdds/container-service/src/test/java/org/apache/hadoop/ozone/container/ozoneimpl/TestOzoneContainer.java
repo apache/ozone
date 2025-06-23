@@ -189,7 +189,7 @@ public class TestOzoneContainer {
     for (int i = 0; i < 3; i++) {
       dbPaths[i] =
           Files.createDirectory(folder.resolve(Integer.toString(i))).toFile();
-      dbDirString.append(dbPaths[i]).append(",");
+      dbDirString.append(dbPaths[i]).append(',');
     }
     conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
         dbDirString.toString());

@@ -69,7 +69,7 @@ public final class MiniOzoneLoadGenerator {
 
   private void addLoads(Class<? extends LoadGenerator> clazz,
                         DataBuffer buffer) throws Exception {
-    String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    String bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
 
     volume.createBucket(bucketName, bucketArgs);
     LoadBucket ozoneBucket = new LoadBucket(volume.getBucket(bucketName),

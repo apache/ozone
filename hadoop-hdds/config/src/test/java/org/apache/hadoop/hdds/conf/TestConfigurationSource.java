@@ -42,9 +42,10 @@ class TestConfigurationSource {
     assertEquals(ImmutableMap.of("somePrefix.key", "value"),
         c.getPropsMatchPrefix("somePrefix."));
   }
+
   @Test
   void reconfigurableProperties() {
-    String prefix = "ozone.scm.client";
+    String prefix = "ozone.test.config";
     ImmutableSet<String> expected = ImmutableSet.of(
         prefix + ".dynamic",
         prefix + ".grandpa.dyna"
@@ -62,11 +63,34 @@ class TestConfigurationSource {
     ConfigurationExample orig = subject.getObject(ConfigurationExample.class);
     ConfigurationExample obj = subject.getObject(ConfigurationExample.class);
 
-    subject.set("ozone.scm.client.dynamic", "updated");
-    subject.setLong("ozone.scm.client.wait", orig.getWaitTime() + 42);
+    subject.set("ozone.test.config.dynamic", "updated");
+    subject.setLong("ozone.test.config.wait", orig.getWaitTime() + 42);
     subject.reconfigure(ConfigurationExample.class, obj);
 
     assertEquals("updated", obj.getDynamic());
     assertEquals(orig.getWaitTime(), obj.getWaitTime());
+  }
+
+  @Test
+  void getPropertyWithPrefixIncludedInName() {
+    MutableConfigurationSource conf = new InMemoryConfiguration();
+    String value = "newValue";
+    conf.set("ozone.test.config.with.prefix.included", value);
+
+    ConfigurationExample subject = conf.getObject(ConfigurationExample.class);
+
+    assertEquals(value, subject.getWithPrefix());
+  }
+
+  @Test
+  void setPropertyWithPrefixIncludedInName() {
+    MutableConfigurationSource conf = new InMemoryConfiguration();
+    ConfigurationExample subject = conf.getObject(ConfigurationExample.class);
+
+    String value = "newValue";
+    subject.setWithPrefix(value);
+    conf.setFromObject(subject);
+
+    assertEquals(value, conf.get("ozone.test.config.with.prefix.included"));
   }
 }

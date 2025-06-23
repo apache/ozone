@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -118,7 +117,7 @@ public class TestRDBSnapshotProvider {
             .map(a -> "".concat(a.getName()).concat(" length: ").
                 concat(String.valueOf(a.length())))
             .collect(Collectors.toList()));
-        try (OutputStream outputStream = new FileOutputStream(targetFile)) {
+        try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
           writeDBCheckpointToStream(dbCheckpoint, outputStream,
               HAUtils.getExistingSstFiles(
                   rdbSnapshotProvider.getCandidateDir()), new ArrayList<>());
@@ -229,9 +228,9 @@ public class TestRDBSnapshotProvider {
       assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
       }
     } catch (Exception e) {

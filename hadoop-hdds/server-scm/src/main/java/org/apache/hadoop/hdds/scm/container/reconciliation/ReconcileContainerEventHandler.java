@@ -81,7 +81,7 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
             .collect(Collectors.toSet());
         ReconcileContainerCommand command = new ReconcileContainerCommand(containerID.getId(), otherReplicas);
         command.setTerm(scmContext.getTermOfLeader());
-        publisher.fireEvent(DATANODE_COMMAND, new CommandForDatanode<>(replica.getUuid(), command));
+        publisher.fireEvent(DATANODE_COMMAND, new CommandForDatanode<>(replica, command));
       }
     } catch (ContainerNotFoundException ex) {
       LOG.error("Failed to start reconciliation for container {}. Container not found.", containerID);

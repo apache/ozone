@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * commands.
  */
 public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ECOverReplicationHandler.class);
 
   private final ReplicationManager replicationManager;
@@ -114,7 +114,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
     List<Integer> overReplicatedIndexes =
         replicaCount.overReplicatedIndexes(true);
     //sanity check
-    if (overReplicatedIndexes.size() == 0) {
+    if (overReplicatedIndexes.isEmpty()) {
       LOG.warn("The container {} with replicas {} was found over replicated "
           + "by EcContainerReplicaCount, but there are no over replicated "
           + "indexes returned", container.getContainerID(), replicas);
@@ -137,7 +137,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
     Set<ContainerReplica> replicasToRemove =
         selectReplicasToRemove(candidates, 1);
 
-    if (replicasToRemove.size() == 0) {
+    if (replicasToRemove.isEmpty()) {
       LOG.warn("The container {} is over replicated, but no replicas were "
           + "selected to remove by the placement policy. Replicas: {}",
           container, replicas);

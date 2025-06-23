@@ -239,7 +239,7 @@ public class TestContainerCommandsEC {
             Pipeline.PipelineState.OPEN)
         .forEach(p -> {
           try {
-            scm.getPipelineManager().closePipeline(p, false);
+            scm.getPipelineManager().closePipeline(p.getId());
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
@@ -255,7 +255,7 @@ public class TestContainerCommandsEC {
     String keyName = UUID.randomUUID().toString();
     try (OutputStream out = classBucket
         .createKey(keyName, keyLen, repConfig, new HashMap<>())) {
-      out.write(RandomUtils.nextBytes(keyLen));
+      out.write(RandomUtils.secure().randomBytes(keyLen));
     }
     long orphanContainerID = classBucket.getKey(keyName)
         .getOzoneKeyLocations().get(0).getContainerID();
@@ -268,10 +268,10 @@ public class TestContainerCommandsEC {
 
     Token<ContainerTokenIdentifier> orphanContainerToken =
         containerTokenGenerator.generateToken(
-            ANY_USER, new ContainerID(orphanContainerID));
+            ANY_USER, ContainerID.valueOf(orphanContainerID));
 
     // Close the container by closing the pipeline
-    scm.getPipelineManager().closePipeline(orphanPipeline, false);
+    scm.getPipelineManager().closePipeline(orphanPipeline.getId());
 
     // Find the datanode hosting Replica index = 2
     HddsDatanodeService dn2Service = null;
@@ -689,7 +689,7 @@ public class TestContainerCommandsEC {
       OzoneKeyDetails key = bucket.getKey(keyString);
       long conID = key.getOzoneKeyLocations().get(0).getContainerID();
       Token<ContainerTokenIdentifier> cToken = containerTokenGenerator
-          .generateToken(ANY_USER, new ContainerID(conID));
+          .generateToken(ANY_USER, ContainerID.valueOf(conID));
 
       //Close the container first.
       closeContainer(conID);
@@ -730,19 +730,19 @@ public class TestContainerCommandsEC {
 
       List<org.apache.hadoop.ozone.container.common.helpers.BlockData[]>
           blockDataArrList = new ArrayList<>();
-      try (ECContainerOperationClient ecContainerOperationClient =
-               new ECContainerOperationClient(config, certClient)) {
-        for (int j = 0; j < containerToDeletePipeline.size(); j++) {
-          Pipeline p = containerToDeletePipeline.get(j);
-          org.apache.hadoop.ozone.container.common.helpers.BlockData[]
-              blockData = ecContainerOperationClient.listBlock(
-                  conID, p.getFirstNode(),
-                  (ECReplicationConfig) p.getReplicationConfig(),
-                  cToken);
+      try (ECContainerOperationClient ecContainerOperationClient = new ECContainerOperationClient(config, certClient)) {
+        for (Pipeline deletePipeline : containerToDeletePipeline) {
+          org.apache.hadoop.ozone.container.common.helpers.BlockData[] blockData =
+              ecContainerOperationClient.listBlock(
+                  conID,
+                  deletePipeline.getFirstNode(),
+                  (ECReplicationConfig) deletePipeline.getReplicationConfig(),
+                  cToken
+              );
+
           blockDataArrList.add(blockData);
           // Delete the first index container
-          XceiverClientSpi client = xceiverClientManager.acquireClient(
-              p);
+          XceiverClientSpi client = xceiverClientManager.acquireClient(deletePipeline);
           try {
             ContainerProtocolCalls.deleteContainer(
                 client,
@@ -876,7 +876,7 @@ public class TestContainerCommandsEC {
     OzoneKeyDetails key = bucket.getKey(keyString);
     long conID = key.getOzoneKeyLocations().get(0).getContainerID();
     Token<ContainerTokenIdentifier> cToken =
-        containerTokenGenerator.generateToken(ANY_USER, new ContainerID(conID));
+        containerTokenGenerator.generateToken(ANY_USER, ContainerID.valueOf(conID));
     closeContainer(conID);
 
     Pipeline containerPipeline = scm.getPipelineManager().getPipeline(
@@ -1023,8 +1023,8 @@ public class TestContainerCommandsEC {
         new ECReplicationConfig(EC_DATA, EC_PARITY, EC_CODEC, EC_CHUNK_SIZE);
     values = new byte[ranges.length][];
     for (int i = 0; i < ranges.length; i++) {
-      int keySize = RandomUtils.nextInt(ranges[i][0], ranges[i][1]);
-      values[i] = RandomUtils.nextBytes(keySize);
+      int keySize = RandomUtils.secure().randomInt(ranges[i][0], ranges[i][1]);
+      values[i] = RandomUtils.secure().randomBytes(keySize);
       final String keyName = UUID.randomUUID().toString();
       try (OutputStream out = classBucket
           .createKey(keyName, values[i].length, repConfig, new HashMap<>())) {
@@ -1050,7 +1050,7 @@ public class TestContainerCommandsEC {
     blockTokenGenerator = new OzoneBlockTokenSecretManager(
         tokenLifetime, secretKeyClient);
     containerToken = containerTokenGenerator
-        .generateToken(ANY_USER, new ContainerID(containerID));
+        .generateToken(ANY_USER, ContainerID.valueOf(containerID));
   }
 
   public static void stopCluster() throws IOException {

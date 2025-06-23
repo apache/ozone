@@ -64,6 +64,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
 
   private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       putBlkRspFuture = null;
+
   /**
    * Creates a new ECBlockOutputStream.
    *
@@ -131,7 +132,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
         blockID = bd.getBlockID();
       }
       List<ChunkInfo> chunks = bd.getChunks();
-      if (chunks != null && chunks.size() > 0) {
+      if (chunks != null && !chunks.isEmpty()) {
         if (chunks.get(0).hasStripeChecksum()) {
           checksumBlockData = bd;
           break;
@@ -306,7 +307,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
       return null;
     }
     this.putBlkRspFuture = flushFuture;
-    return flushFuture.thenApply(r -> new PutBlockResult(0, 0, r));
+    return flushFuture.thenApply(r -> new PutBlockResult(0, r));
   }
 
   /**

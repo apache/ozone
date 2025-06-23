@@ -90,7 +90,7 @@ public class PrometheusMetricsSink implements MetricsSink {
       String key, String username) {
     StringBuilder prometheusMetricKey = new StringBuilder();
     prometheusMetricKey.append(key)
-        .append("{");
+        .append('{');
     String sep = "";
 
     List<MetricsTag> metricsTags =
@@ -110,10 +110,10 @@ public class PrometheusMetricsSink implements MetricsSink {
           .append(tagName)
           .append("=\"")
           .append(tag.value())
-          .append("\"");
+          .append('"');
       sep = ",";
     }
-    prometheusMetricKey.append("}");
+    prometheusMetricKey.append('}');
 
     return prometheusMetricKey.toString();
   }

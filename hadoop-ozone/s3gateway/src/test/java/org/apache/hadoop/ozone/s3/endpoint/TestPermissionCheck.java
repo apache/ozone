@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -86,6 +88,8 @@ public class TestPermissionCheck {
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getConfiguration()).thenReturn(conf);
     headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
@@ -140,6 +144,7 @@ public class TestPermissionCheck {
         bucketEndpoint.delete("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
+
   @Test
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
@@ -318,7 +323,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     String xml =
-        "<Tagging xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Tagging xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">" +
             "   <TagSet>" +
             "      <Tag>" +
             "         <Key>tag1</Key>" +

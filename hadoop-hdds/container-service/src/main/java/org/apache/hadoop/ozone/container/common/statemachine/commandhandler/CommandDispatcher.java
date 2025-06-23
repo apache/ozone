@@ -85,7 +85,7 @@ public final class CommandDispatcher {
    *
    * @param command - SCM Command.
    */
-  public void handle(SCMCommand command) {
+  public void handle(SCMCommand<?> command) {
     Preconditions.checkNotNull(command);
     CommandHandler handler = handlerMap.get(command.getType());
     if (handler != null) {
@@ -199,7 +199,7 @@ public final class CommandDispatcher {
           "Missing scm connection manager.");
       Preconditions.checkNotNull(this.container, "Missing ozone container.");
       Preconditions.checkNotNull(this.context, "Missing state context.");
-      Preconditions.checkArgument(this.handlerList.size() > 0,
+      Preconditions.checkArgument(!this.handlerList.isEmpty(),
           "The number of command handlers must be greater than 0.");
       return new CommandDispatcher(this.container, this.connectionManager,
           this.context, handlerList.toArray(

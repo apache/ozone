@@ -69,28 +69,13 @@ import org.slf4j.LoggerFactory;
  */
 public class HeartbeatEndpointTask
     implements Callable<EndpointStateMachine.EndPointStates> {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(HeartbeatEndpointTask.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HeartbeatEndpointTask.class);
   private final EndpointStateMachine rpcEndpoint;
-  private final ConfigurationSource conf;
   private DatanodeDetailsProto datanodeDetailsProto;
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
   private HDDSLayoutVersionManager layoutVersionManager;
-
-  /**
-   * Constructs a SCM heart beat.
-   *
-   * @param rpcEndpoint rpc Endpoint
-   * @param conf Config.
-   * @param context State context
-   */
-  public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
-                               ConfigurationSource conf, StateContext context) {
-    this(rpcEndpoint, conf, context,
-        context.getParent().getLayoutVersionManager());
-  }
 
   /**
    * Constructs a SCM heart beat.
@@ -104,7 +89,6 @@ public class HeartbeatEndpointTask
                                ConfigurationSource conf, StateContext context,
                                HDDSLayoutVersionManager versionManager) {
     this.rpcEndpoint = rpcEndpoint;
-    this.conf = conf;
     this.context = context;
     this.maxContainerActionsPerHB = conf.getInt(HDDS_CONTAINER_ACTION_MAX_LIMIT,
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
@@ -526,7 +510,7 @@ public class HeartbeatEndpointTask
 
       if (conf == null) {
         LOG.error("No config specified.");
-        throw new IllegalArgumentException("A valid configration is needed to" +
+        throw new IllegalArgumentException("A valid configuration is needed to" +
             " construct HeartbeatEndpointTask task");
       }
 

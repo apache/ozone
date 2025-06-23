@@ -72,14 +72,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ratis.proto.RaftProtos;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Tests Exception handling by Ozone Client.
  */
-@Timeout(300)
 public class TestFailureHandlingByClient {
 
   private MiniOzoneCluster cluster;
@@ -359,7 +357,6 @@ public class TestFailureHandlingByClient {
     validateData(keyName, data.getBytes(UTF_8));
   }
 
-
   @Test
   public void testContainerExclusionWithClosedContainerException()
       throws Exception {
@@ -478,7 +475,6 @@ public class TestFailureHandlingByClient {
     assertEquals(3 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8));
   }
-
 
   @Test
   public void testPipelineExclusionWithPipelineFailure() throws Exception {

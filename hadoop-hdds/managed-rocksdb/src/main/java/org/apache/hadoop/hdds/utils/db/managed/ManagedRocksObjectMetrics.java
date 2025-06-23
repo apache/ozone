@@ -37,12 +37,6 @@ public class ManagedRocksObjectMetrics {
   private static final String SOURCE_NAME =
       ManagedRocksObjectMetrics.class.getSimpleName();
 
-  private static ManagedRocksObjectMetrics create() {
-    return DefaultMetricsSystem.instance().register(SOURCE_NAME,
-        "OzoneManager DoubleBuffer Metrics",
-        new ManagedRocksObjectMetrics());
-  }
-
   @Metric(about = "Total number of managed RocksObjects that are not " +
       "closed before being GCed.")
   private MutableCounterLong totalLeakObjects;
@@ -73,5 +67,11 @@ public class ManagedRocksObjectMetrics {
   @VisibleForTesting
   long totalManagedObjects() {
     return totalManagedObjects.value();
+  }
+
+  private static ManagedRocksObjectMetrics create() {
+    return DefaultMetricsSystem.instance().register(SOURCE_NAME,
+        "OzoneManager DoubleBuffer Metrics",
+        new ManagedRocksObjectMetrics());
   }
 }

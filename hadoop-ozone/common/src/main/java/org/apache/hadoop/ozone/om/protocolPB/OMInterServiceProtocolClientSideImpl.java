@@ -36,8 +36,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolPr
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.ErrorCode;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Protocol implementation for Inter OM communication.
@@ -49,9 +47,6 @@ public class OMInterServiceProtocolClientSideImpl implements
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMInterServiceProtocolClientSideImpl.class);
 
   private final HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider;
 

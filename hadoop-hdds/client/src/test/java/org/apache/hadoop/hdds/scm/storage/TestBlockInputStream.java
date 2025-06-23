@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
 import org.junit.jupiter.api.BeforeEach;
@@ -192,7 +193,7 @@ public class TestBlockInputStream {
 
     // Seek to random positions between 0 and the block size.
     for (int i = 0; i < 10; i++) {
-      pos = RandomUtils.nextInt(0, blockSize);
+      pos = RandomUtils.secure().randomInt(0, blockSize);
       seekAndVerify(pos);
     }
   }
@@ -204,7 +205,8 @@ public class TestBlockInputStream {
     // the read should result in 3 ChunkInputStream reads
     seekAndVerify(50);
     byte[] b = new byte[200];
-    blockStream.read(b, 0, 200);
+    int bytesRead = blockStream.read(b, 0, 200);
+    assertEquals(200, bytesRead, "Expected to read 200 bytes");
     matchWithInputData(b, 50, 200);
 
     // The new position of the blockInputStream should be the last index read
@@ -252,20 +254,21 @@ public class TestBlockInputStream {
     // Seek to a position and read data
     seekAndVerify(50);
     byte[] b1 = new byte[100];
-    blockStream.read(b1, 0, 100);
+    int bytesRead1 = blockStream.read(b1, 0, 100);
+    assertEquals(100, bytesRead1, "Expected to read 100 bytes");
     matchWithInputData(b1, 50, 100);
 
     // Next read should start from the position of the last read + 1 i.e. 100
     byte[] b2 = new byte[100];
-    blockStream.read(b2, 0, 100);
+    int bytesRead2 = blockStream.read(b2, 0, 100);
+    assertEquals(100, bytesRead2, "Expected to read 100 bytes");
     matchWithInputData(b2, 150, 100);
   }
 
   @Test
   public void testRefreshPipelineFunction() throws Exception {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(BlockInputStream.LOG);
-    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(BlockInputStream.class);
+    GenericTestUtils.setLogLevel(BlockInputStream.class, Level.DEBUG);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     AtomicBoolean isRefreshed = new AtomicBoolean();
     createChunkList(5);
@@ -280,7 +283,8 @@ public class TestBlockInputStream {
       assertFalse(isRefreshed.get());
       seekAndVerify(50);
       byte[] b = new byte[200];
-      blockInputStreamWithRetry.read(b, 0, 200);
+      int bytesRead = blockInputStreamWithRetry.read(b, 0, 200);
+      assertEquals(200, bytesRead, "Expected to read 200 bytes");
       assertThat(logCapturer.getOutput()).contains("Retry read after");
       assertTrue(isRefreshed.get());
     }
@@ -388,7 +392,12 @@ public class TestBlockInputStream {
 
       // WHEN
       assertThrows(ex.getClass(),
-          () -> subject.read(new byte[len], 0, len));
+          () -> {
+            byte[] buffer = new byte[len];
+            int bytesRead = subject.read(buffer, 0, len);
+            // This line should never be reached due to the exception
+            assertEquals(len, bytesRead);
+          });
 
       // THEN
       verify(refreshFunction, never()).apply(blockID);

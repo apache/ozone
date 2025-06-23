@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
@@ -145,8 +146,7 @@ public class TestStaleRecoveringContainerScrubbingService {
   public void testScrubbingStaleRecoveringContainers(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initVersionInfo(versionInfo);
-    ContainerSet containerSet = new ContainerSet(10);
-    containerSet.setClock(testClock);
+    ContainerSet containerSet = newContainerSet(10, testClock);
     StaleRecoveringContainerScrubbingService srcss =
         new StaleRecoveringContainerScrubbingService(
             50, TimeUnit.MILLISECONDS, 10,

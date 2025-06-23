@@ -23,7 +23,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PATH_IN_ACL_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PREFIX_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.PREFIX_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.PREFIX_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -89,7 +89,6 @@ public class PrefixManagerImpl implements PrefixManager {
       LOG.error("Fail to load prefix tree");
     }
   }
-
 
   @Override
   public OMMetadataManager getMetadataManager() {
@@ -297,7 +296,7 @@ public class PrefixManagerImpl implements PrefixManager {
     List<OmPrefixInfo> prefixList = getLongestPrefixPathHelper(
         prefixTree.getLongestPrefix(ozoneObj.getPath()));
 
-    if (prefixList.size() > 0) {
+    if (!prefixList.isEmpty()) {
       // Add all acls from direct parent to key.
       OmPrefixInfo parentPrefixInfo = prefixList.get(prefixList.size() - 1);
       if (parentPrefixInfo != null) {

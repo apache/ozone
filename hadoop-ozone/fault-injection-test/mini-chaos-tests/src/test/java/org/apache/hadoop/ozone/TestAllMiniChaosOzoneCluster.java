@@ -21,33 +21,34 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 import picocli.CommandLine;
 
 /**
- * Command line utility to parse and dump a datanode ratis segment file.
+ * Test all kinds of chaos.
  */
 @CommandLine.Command(
     name = "all",
     description = "run chaos cluster across all daemons",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestAllMiniChaosOzoneCluster extends TestMiniChaosOzoneCluster
     implements Callable<Void> {
 
-  @CommandLine.ParentCommand
-  private OzoneChaosCluster chaosCluster;
+  @BeforeAll
+  void setup() {
+    setNumManagers(3, 3, true);
+
+    LoadGenerator.getClassList().forEach(this::addLoadClasses);
+    Failures.getClassList().forEach(this::addFailureClasses);
+  }
 
   @Override
   public Void call() throws Exception {
-    setNumManagers(3, 3, true);
-
-    LoadGenerator.getClassList().forEach(
-        TestMiniChaosOzoneCluster::addLoadClasses);
-    Failures.getClassList().forEach(
-        TestMiniChaosOzoneCluster::addFailureClasses);
-
+    setup();
     startChaosCluster();
-
     return null;
   }
 

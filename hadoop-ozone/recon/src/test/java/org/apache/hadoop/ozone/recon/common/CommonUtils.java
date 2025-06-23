@@ -62,7 +62,7 @@ public class CommonUtils {
       OzoneAcl.AclScope scope) {
     return OmPrefixInfo.newBuilder()
         .setName(path)
-        .setAcls(new ArrayList<>(Collections.singletonList(new OzoneAcl(
+        .setAcls(new ArrayList<>(Collections.singletonList(OzoneAcl.of(
             identityType, identityString,
             scope, aclType))))
         .setObjectID(10)

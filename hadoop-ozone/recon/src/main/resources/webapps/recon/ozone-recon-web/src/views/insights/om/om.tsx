@@ -19,17 +19,17 @@
 import React from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
-import { Table, Tabs, Menu, Dropdown, Tooltip } from 'antd';
-import { MenuProps } from 'antd/es/menu';
-import { TablePaginationConfig } from 'antd/es/table';
-import { FunnelPlotFilled, InfoCircleOutlined } from '@ant-design/icons';
-import { ActionMeta, ValueType } from "react-select";
+import {Dropdown, Menu, Table, Tabs, Tooltip} from 'antd';
+import {MenuProps} from 'antd/es/menu';
+import {TablePaginationConfig} from 'antd/es/table';
+import {FunnelPlotFilled, InfoCircleOutlined} from '@ant-design/icons';
+import {ActionMeta, ValueType} from "react-select";
 import CreatableSelect from "react-select/creatable";
 
-import { ColumnSearch } from '@/utils/columnSearch';
-import { showDataFetchError, byteToSize } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
-import { IOption } from "@/components/multiSelect/multiSelect";
+import {ColumnSearch} from '@/utils/columnSearch';
+import {byteToSize, showDataFetchError} from '@/utils/common';
+import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
+import {IOption} from "@/components/multiSelect/multiSelect";
 
 import './om.less';
 
@@ -86,6 +86,7 @@ interface IKeyResponse {
   Volume: string;
   Bucket: string;
   Key: string;
+  CompletePath: string;
   DataSize: number;
   Versions: number[];
   Blocks: object;
@@ -113,6 +114,12 @@ const KEY_TABLE_COLUMNS = [
     title: 'Key',
     dataIndex: 'Key',
     key: 'Key'
+  },
+  {
+    title: 'Path',
+    dataIndex: 'CompletePath',
+    key: 'CompletePath',
+    width: '270px'
   },
   {
     title: 'Size',

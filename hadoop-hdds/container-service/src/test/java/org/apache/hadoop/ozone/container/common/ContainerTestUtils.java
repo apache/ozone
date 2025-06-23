@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -53,6 +54,7 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -61,6 +63,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -79,6 +82,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -100,9 +104,6 @@ import org.mockito.Mockito;
  */
 public final class ContainerTestUtils {
 
-  private ContainerTestUtils() {
-  }
-
   public static final DispatcherContext WRITE_STAGE = DispatcherContext
       .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
       .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
@@ -116,6 +117,14 @@ public final class ContainerTestUtils {
 
   public static final DispatcherContext COMBINED_STAGE
       = DispatcherContext.getHandleWriteChunk();
+
+  private static final ContainerDispatcher NOOP_CONTAINER_DISPATCHER = new NoopContainerDispatcher();
+
+  private static final ContainerController EMPTY_CONTAINER_CONTROLLER
+      = new ContainerController(ContainerImplTestUtils.newContainerSet(), Collections.emptyMap());
+
+  private ContainerTestUtils() {
+  }
 
   /**
    * Creates an Endpoint class for testing purpose.
@@ -149,7 +158,8 @@ public final class ContainerTestUtils {
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);
-    return new OzoneContainer(datanodeDetails, conf, context);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+    return new OzoneContainer(datanodeDetails, conf, context, volumeChoosingPolicy);
   }
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,
@@ -404,15 +414,9 @@ public final class ContainerTestUtils {
     }
   }
 
-  private static final ContainerDispatcher NOOP_CONTAINER_DISPATCHER
-      = new NoopContainerDispatcher();
-
   public static ContainerDispatcher getNoopContainerDispatcher() {
     return NOOP_CONTAINER_DISPATCHER;
   }
-
-  private static final ContainerController EMPTY_CONTAINER_CONTROLLER
-      = new ContainerController(new ContainerSet(1000), Collections.emptyMap());
 
   public static ContainerController getEmptyContainerController() {
     return EMPTY_CONTAINER_CONTROLLER;
@@ -426,6 +430,15 @@ public final class ContainerTestUtils {
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf,
         getNoopContainerDispatcher(), getEmptyContainerController(),
         null, null);
+  }
+
+  /** Initialize {@link DatanodeLayoutStorage}.  Normally this is done during {@link HddsDatanodeService} start,
+   * have to do the same for tests that create {@link OzoneContainer} manually. */
+  public static void initializeDatanodeLayout(ConfigurationSource conf, DatanodeDetails dn) throws IOException {
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf, dn.getUuidString());
+    if (layoutStorage.getState() != INITIALIZED) {
+      layoutStorage.initialize();
+    }
   }
 
   /**

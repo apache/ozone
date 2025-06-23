@@ -42,12 +42,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -95,7 +97,6 @@ public class SCMBlockProtocolServer implements
       new AuditLogger(AuditLoggerType.SCMLOGGER);
 
   private final StorageContainerManager scm;
-  private final OzoneConfiguration conf;
   private final RPC.Server blockRpcServer;
   private final InetSocketAddress blockRpcAddress;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
@@ -108,7 +109,6 @@ public class SCMBlockProtocolServer implements
   public SCMBlockProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
-    this.conf = conf;
     this.perfMetrics = getPerfMetrics();
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
@@ -192,6 +192,7 @@ public class SCMBlockProtocolServer implements
       String owner, ExcludeList excludeList,
       String clientMachine
   ) throws IOException {
+    long startNanos = Time.monotonicNowNanos();
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("num", String.valueOf(num));
@@ -226,22 +227,30 @@ public class SCMBlockProtocolServer implements
       }
 
       auditMap.put("allocated", String.valueOf(blocks.size()));
+      String blockIDs = blocks.stream().limit(10)
+          .map(block -> block.getBlockID().toString())
+          .collect(Collectors.joining(", ", "[", "]"));
+      auditMap.put("sampleBlocks", blockIDs);
 
       if (blocks.size() < num) {
         AUDIT.logWriteFailure(buildAuditMessageForFailure(
             SCMAction.ALLOCATE_BLOCK, auditMap, null)
         );
+        perfMetrics.updateAllocateBlockFailureLatencyNs(startNanos);
       } else {
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
             SCMAction.ALLOCATE_BLOCK, auditMap));
+        perfMetrics.updateAllocateBlockSuccessLatencyNs(startNanos);
       }
 
       return blocks;
     } catch (TimeoutException ex) {
+      perfMetrics.updateAllocateBlockFailureLatencyNs(startNanos);
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.ALLOCATE_BLOCK, auditMap, ex));
       throw new IOException(ex);
     } catch (Exception ex) {
+      perfMetrics.updateAllocateBlockFailureLatencyNs(startNanos);
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.ALLOCATE_BLOCK, auditMap, ex));
       throw ex;
@@ -375,7 +384,7 @@ public class SCMBlockProtocolServer implements
       final Node client = getClientNode(clientMachine);
       List<DatanodeDetails> nodeList = new ArrayList<>();
       nodes.forEach(uuid -> {
-        DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
+        DatanodeDetails node = nodeManager.getNode(DatanodeID.fromUuidString(uuid));
         if (node != null) {
           nodeList.add(node);
         }

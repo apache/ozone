@@ -21,6 +21,7 @@ import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -96,7 +97,7 @@ public class TestReconcileContainerCommandHandler {
     subject = new ReconcileContainerCommandHandler(mockSupervisor, mock(DNContainerOperationClient.class));
     context = ContainerTestUtils.getMockContext(dnDetails, conf);
 
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
     for (int id = 1; id <= NUM_CONTAINERS; id++) {
       KeyValueContainerData data = new KeyValueContainerData(id, layout, GB,
           PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
