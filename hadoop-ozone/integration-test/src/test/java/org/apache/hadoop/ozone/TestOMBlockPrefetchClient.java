@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_MAX_BLOCKS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_PREFETCH_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -110,14 +110,14 @@ public class TestOMBlockPrefetchClient {
   @BeforeEach
   void setUp() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setInt(OZONE_OM_PREFETCH_MAX_BLOCKS, MAX_BLOCKS_PER_QUEUE);
+    conf.setInt(OZONE_OM_PREFETCH_BLOCKS_MAX, MAX_BLOCKS_PER_QUEUE);
     conf.setTimeDuration(OZONE_OM_PREFETCHED_BLOCKS_EXPIRY_INTERVAL, EXPIRY_INTERVAL_MS, TimeUnit.MILLISECONDS);
     conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, true);
     conf.setClass(ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     when(ozoneManager.isAllocateBlockCacheEnabled()).thenReturn(true);
     when(ozoneManager.getClusterMap()).thenReturn(networkTopology);
-    omBlockPrefetchClient = new OMBlockPrefetchClient(ozoneManager, scmBlockLocationProtocol);
+    omBlockPrefetchClient = new OMBlockPrefetchClient(ozoneManager);
     datanodes = createFixedDatanodes(NUM_DATANODES);
     StaticMapping.resetMap();
     StaticMapping.addNodeToRack(null, CLIENT_RACK);
