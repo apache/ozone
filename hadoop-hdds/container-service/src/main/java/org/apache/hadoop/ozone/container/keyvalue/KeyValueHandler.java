@@ -1790,7 +1790,7 @@ public class KeyValueHandler extends Handler {
           break;
         }
 
-        if (!chunkMerkleTree.getIsHealthy()) {
+        if (!chunkMerkleTree.getChecksumMatches()) {
           LOG.warn("Skipping chunk at offset {} in block {} of container {} from peer {} since peer reported it as " +
                   "unhealthy.", chunkOffset, localID, containerID, peer);
           continue;

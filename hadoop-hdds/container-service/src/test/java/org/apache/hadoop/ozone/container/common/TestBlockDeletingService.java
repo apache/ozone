@@ -49,6 +49,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -1192,11 +1193,11 @@ public class TestBlockDeletingService {
     }
     assertNotNull(checksumInfo);
 
-    List<Long> deletedBlocks = checksumInfo.getDeletedBlocksList();
+    List<ContainerProtos.BlockMerkleTree> deletedBlocks = checksumInfo.getDeletedBlocksList();
     assertEquals(numBlocks, deletedBlocks.size());
     // Create a sorted copy of the list to check the order written to the file.
-    List<Long> sortedDeletedBlocks = checksumInfo.getDeletedBlocksList().stream()
-        .sorted()
+    List<ContainerProtos.BlockMerkleTree> sortedDeletedBlocks = checksumInfo.getDeletedBlocksList().stream()
+        .sorted(Comparator.comparingLong(ContainerProtos.BlockMerkleTree::getBlockID))
         .collect(Collectors.toList());
     assertNotSame(sortedDeletedBlocks, deletedBlocks);
     assertEquals(sortedDeletedBlocks, deletedBlocks);
