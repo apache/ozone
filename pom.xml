@@ -155,7 +155,6 @@
     <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
     <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
     <maven-patch-plugin.version>1.3</maven-patch-plugin.version>
-    <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>3.3.0</maven-remote-resources-plugin.version>
     <maven-resources-plugin.version>3.3.0</maven-resources-plugin.version>
     <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
@@ -1883,11 +1882,6 @@
           <version>${exec-maven-plugin.version}</version>
         </plugin>
         <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-pdf-plugin</artifactId>
-          <version>${maven-pdf-plugin.version}</version>
-        </plugin>
-        <plugin>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-maven-plugins</artifactId>
           <version>${hadoop.version}</version>
@@ -2342,14 +2336,6 @@
             <include>**/Test*.java</include>
           </includes>
           <excludedGroups>${excluded-test-groups}</excludedGroups>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-pdf-plugin</artifactId>
-        <configuration>
-          <outputDirectory>${project.reporting.outputDirectory}</outputDirectory>
-          <includeReports>false</includeReports>
         </configuration>
       </plugin>
       <plugin>
