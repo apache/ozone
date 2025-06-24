@@ -15,15 +15,14 @@
 
 
 *** Variables ***
-${RULE}    /opt/hadoop/share/ozone/byteman/skip-put-block.btm
+${RULE1}    /opt/hadoop/share/ozone/byteman/skip-put-block.btm
+${RULE2}    /opt/hadoop/share/ozone/byteman/skip-notify-group-remove.btm
 ${vol}     vol1
 ${buck}    buck1
 ${key}     key1
-${SECURITY_ENABLED}  true
 
 *** Settings ***
 Resource            BytemanKeywords.robot
-Resource            os.robot
 Resource            ../lib/os.robot
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
@@ -33,16 +32,25 @@ Suite Teardown      Teardown Suite
 
 *** Keywords ***
 Setup Suite
-    Setup All Byteman Agents
-    Inject Fault Into Component    datanode1    ${RULE}
-    Log To Console      Kinit
-    Execute And Ignore Error     kinit -kt /etc/security/keytabs/testuser.keytab testuser/om
-
+    Inject Fault Into All Components      ${RULE1}
 
 Teardown Suite
-    Remove Fault From Component    datanode1    ${RULE}
+    Remove Fault From All Components      ${RULE1}
 
 *** Test Cases ***
-Print Byteman Port
-    ${BYTEMAN_PORT} =    Get Environment Variable    BYTEMAN_PORT
-    Log    ${BYTEMAN_PORT}
+
+Print All Byteman Rules
+    List Byteman Rules for All Components
+
+Inject Byteman Rule in one component
+    Add Byteman Rule       datanode1    ${RULE2}
+    List Byteman Rules     datanode1
+    Remove Byteman Rule    datanode1    ${RULE2}
+
+Inject Multiple Byteman Rules in one component
+    Add Byteman Rule             datanode1    ${RULE2}
+    List Byteman Rules           datanode1
+    Remove All Byteman Rules     datanode1
+    ${rules} =    List Byteman Rules    datanode1
+    Should Be Empty    ${rules}
+    Add Byteman Rule             datanode1    ${RULE1}
