@@ -17,25 +17,12 @@
 *** Variables ***
 ${RULE1}    /opt/hadoop/share/ozone/byteman/skip-put-block.btm
 ${RULE2}    /opt/hadoop/share/ozone/byteman/skip-notify-group-remove.btm
-${vol}     vol1
-${buck}    buck1
-${key}     key1
 
 *** Settings ***
 Resource            BytemanKeywords.robot
-Resource            ../lib/os.robot
-Resource            ../commonlib.robot
-Resource            ../ozone-lib/shell.robot
-Suite Setup         Setup Suite
-Suite Teardown      Teardown Suite
+Suite Setup         Inject Fault Into All Components      ${RULE1}
+Suite Teardown      Remove Fault From All Components      ${RULE1}
 
-
-*** Keywords ***
-Setup Suite
-    Inject Fault Into All Components      ${RULE1}
-
-Teardown Suite
-    Remove Fault From All Components      ${RULE1}
 
 *** Test Cases ***
 
