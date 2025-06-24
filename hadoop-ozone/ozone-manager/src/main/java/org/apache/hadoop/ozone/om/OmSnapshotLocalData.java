@@ -35,6 +35,9 @@ import org.yaml.snakeyaml.Yaml;
  */
 public abstract class OmSnapshotLocalData {
 
+  // Version of the snapshot local data. A valid version shall be greater than 0.
+  private int version;
+
   // Checksum of the YAML representation
   private String checksum;
 
@@ -66,6 +69,7 @@ public abstract class OmSnapshotLocalData {
     this.lastCompactionTime = 0L;
     this.needsCompaction = false;
     this.compactedSSTFileList = new HashMap<>();
+    this.version = 0;
     setChecksumTo0ByteArray();
   }
 
@@ -79,6 +83,7 @@ public abstract class OmSnapshotLocalData {
     this.lastCompactionTime = source.lastCompactionTime;
     this.needsCompaction = source.needsCompaction;
     this.checksum = source.checksum;
+    this.version = source.version;
 
     // Deep copy for uncompactedSSTFileList
     this.uncompactedSSTFileList = new HashMap<>();
@@ -202,12 +207,12 @@ public abstract class OmSnapshotLocalData {
 
   /**
    * Adds an entry to the compacted SST file list.
-   * @param version Version number
+   * @param ver Version number (TODO: to be clarified)
    * @param table Table name
    * @param sstFile SST file name
    */
-  public void addCompactedSSTFile(Integer version, String table, String sstFile) {
-    this.compactedSSTFileList.computeIfAbsent(version, k -> Maps.newHashMap())
+  public void addCompactedSSTFile(Integer ver, String table, String sstFile) {
+    this.compactedSSTFileList.computeIfAbsent(ver, k -> Maps.newHashMap())
         .computeIfAbsent(table, k -> Lists.newArrayList())
         .add(sstFile);
   }
@@ -263,5 +268,21 @@ public abstract class OmSnapshotLocalData {
     } catch (Exception ex) {
       throw new IOException("Unable to calculate checksum", ex);
     }
+  }
+
+  /**
+   * Returns the version of the snapshot local data.
+   * @return version
+   */
+  public int getVersion() {
+    return version;
+  }
+
+  /**
+   * Sets the version of the snapshot local data. A valid version shall be greater than 0.
+   * @param version version
+   */
+  public void setVersion(int version) {
+    this.version = version;
   }
 }

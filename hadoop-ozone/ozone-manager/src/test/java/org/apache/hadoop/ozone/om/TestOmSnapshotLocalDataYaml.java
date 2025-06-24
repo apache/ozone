@@ -62,6 +62,10 @@ public class TestOmSnapshotLocalDataYaml {
     String yamlFilePath = snapshotName + ".yaml";
 
     OmSnapshotLocalDataYaml dataYaml = new OmSnapshotLocalDataYaml();
+
+    // Set version
+    dataYaml.setVersion(42);
+    // Set SST filtered flag
     dataYaml.setSstFiltered(true);
 
     // Add some uncompacted SST files
@@ -99,6 +103,7 @@ public class TestOmSnapshotLocalDataYaml {
     OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
 
     // Verify fields
+    assertEquals(42, snapshotData.getVersion());
     assertTrue(snapshotData.getSstFiltered());
 
     Map<String, List<String>> uncompactedFiles = snapshotData.getUncompactedSSTFileList();
@@ -193,11 +198,12 @@ public class TestOmSnapshotLocalDataYaml {
     String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
 
     // Verify the YAML content contains all expected fields
-    assertThat(content).contains(OzoneConsts.IS_SST_FILTERED);
-    assertThat(content).contains(OzoneConsts.UNCOMPACTED_SST_FILE_LIST);
-    assertThat(content).contains(OzoneConsts.LAST_COMPACTION_TIME);
-    assertThat(content).contains(OzoneConsts.NEEDS_COMPACTION);
-    assertThat(content).contains(OzoneConsts.COMPACTED_SST_FILE_LIST);
-    assertThat(content).contains(OzoneConsts.CHECKSUM);
+    assertThat(content).contains(OzoneConsts.OM_SLD_VERSION);
+    assertThat(content).contains(OzoneConsts.OM_SLD_CHECKSUM);
+    assertThat(content).contains(OzoneConsts.OM_SLD_IS_SST_FILTERED);
+    assertThat(content).contains(OzoneConsts.OM_SLD_UNCOMPACTED_SST_FILE_LIST);
+    assertThat(content).contains(OzoneConsts.OM_SLD_LAST_COMPACTION_TIME);
+    assertThat(content).contains(OzoneConsts.OM_SLD_NEEDS_COMPACTION);
+    assertThat(content).contains(OzoneConsts.OM_SLD_COMPACTED_SST_FILE_LIST);
   }
 }

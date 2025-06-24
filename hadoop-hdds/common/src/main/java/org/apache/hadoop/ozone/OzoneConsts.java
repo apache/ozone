@@ -202,12 +202,14 @@ public final class OzoneConsts {
 
   public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
 
-  // YAML field constants for OmSnapshotLocalData .yaml files
-  public static final String IS_SST_FILTERED = "isSSTFiltered";
-  public static final String UNCOMPACTED_SST_FILE_LIST = "uncompactedSSTFileList";
-  public static final String LAST_COMPACTION_TIME = "lastCompactionTime";
-  public static final String NEEDS_COMPACTION = "needsCompaction";
-  public static final String COMPACTED_SST_FILE_LIST = "compactedSSTFileList";
+  // YAML field constants for OmSnapshotLocalData (thus the OM_SLD_ prefix) YAML files
+  public static final String OM_SLD_VERSION = "version";
+  public static final String OM_SLD_CHECKSUM = "checksum";
+  public static final String OM_SLD_IS_SST_FILTERED = "isSSTFiltered";
+  public static final String OM_SLD_UNCOMPACTED_SST_FILE_LIST = "uncompactedSSTFileList";
+  public static final String OM_SLD_LAST_COMPACTION_TIME = "lastCompactionTime";
+  public static final String OM_SLD_NEEDS_COMPACTION = "needsCompaction";
+  public static final String OM_SLD_COMPACTED_SST_FILE_LIST = "compactedSSTFileList";
 
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
