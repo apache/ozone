@@ -2092,6 +2092,13 @@
                       <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
                     </excludedSourceRoots>
                   </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use similar class from Apache Commons Lang</reason>
+                    <bannedImports>
+                      <bannedImport>org.eclipse.jetty.util.StringUtil</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
