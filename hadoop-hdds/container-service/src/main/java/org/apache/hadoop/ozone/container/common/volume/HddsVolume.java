@@ -322,7 +322,6 @@ public class HddsVolume extends StorageVolume {
   }
 
   public long getPendingDeletionBytes() {
-
     CachedPendingDeletion currentCache = cachedPendingDeletion;
     if (currentCache != null && !currentCache.isExpired()) {
       return currentCache.getSize();
@@ -333,18 +332,20 @@ public class HddsVolume extends StorageVolume {
       if (currentCache != null && !currentCache.isExpired()) {
         return currentCache.getSize();
       }
-
       long total = 0L;
       if (controller != null) {
         Iterable<Container<?>> containers = controller.getContainers();
-        while (containers.iterator().hasNext()) {
-          Container<?> container = containers.iterator().next();
-          total += container.getContainerData().getStatistics().getBlockPendingDeletionBytes();
+        for (Container<?> container : containers) {
+          total += container.getContainerData()
+              .getStatistics()
+              .getBlockPendingDeletionBytes();
         }
+        long cacheDurationMillis = getDatanodeConfig()
+            .getBlockDeletionInterval()
+            .multipliedBy(5)
+            .toMillis();
+        cachedPendingDeletion = new CachedPendingDeletion(total, cacheDurationMillis);
       }
-
-      long cacheDurationMinutes = getDatanodeConfig().getBlockDeletionInterval().multipliedBy(5).toMinutes();
-      cachedPendingDeletion = new CachedPendingDeletion(total, cacheDurationMinutes);
       return total;
     }
   }
@@ -663,9 +664,9 @@ public class HddsVolume extends StorageVolume {
     private final long size;
     private final long expiryTimeMillis;
 
-    CachedPendingDeletion(long size, long cacheDurationMinutes) {
+    CachedPendingDeletion(long size, long cacheDurationMillis) {
       this.size = size;
-      this.expiryTimeMillis = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(cacheDurationMinutes);
+      this.expiryTimeMillis = System.currentTimeMillis() + TimeUnit.MILLISECONDS.toMillis(cacheDurationMillis);
     }
 
     public long getSize() {

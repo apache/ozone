@@ -689,6 +689,7 @@ public abstract class ContainerData {
 
     public synchronized void resetBlockPendingDeletion() {
       blockPendingDeletion = 0;
+      blockPendingDeletionBytes = 0;
     }
 
     public synchronized void assertRead(long expectedBytes, long expectedCount) {

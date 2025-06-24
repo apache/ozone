@@ -650,8 +650,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   private long getPendingDeletionBytes(KeyValueContainerData containerData,
-                                             DeletedBlocksTransaction delTX,
-                                             DBHandle containerDB) throws IOException {
+                                       DeletedBlocksTransaction delTX,
+                                       DBHandle containerDB) throws IOException {
     Table<String, BlockData> blockDataTable = containerDB.getStore().getBlockDataTable();
     long bytesPendingDeletion = 0;
 
