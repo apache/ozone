@@ -430,11 +430,11 @@ public class KeyValueContainerData extends ContainerData {
 
   public KeyPrefixFilter getUnprefixedKeyFilter() {
     String schemaPrefix = containerPrefix();
-    return new KeyPrefixFilter().addFilter(schemaPrefix + "#", true);
+    return KeyPrefixFilter.newFilter(schemaPrefix + "#", true);
   }
 
   public KeyPrefixFilter getDeletingBlockKeyFilter() {
-    return new KeyPrefixFilter().addFilter(getDeletingBlockKeyPrefix());
+    return KeyPrefixFilter.newFilter(getDeletingBlockKeyPrefix());
   }
 
   /**

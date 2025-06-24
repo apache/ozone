@@ -423,10 +423,8 @@ public class BlockManagerImpl implements BlockManager {
         result = new ArrayList<>();
         String startKey = (startLocalID == -1) ? cData.startKeyEmpty()
             : cData.getBlockKey(startLocalID);
-        List<Table.KeyValue<String, BlockData>> range =
-            db.getStore().getBlockDataTable()
-                .getSequentialRangeKVs(startKey, count,
-                    cData.containerPrefix(), cData.getUnprefixedKeyFilter());
+        final List<Table.KeyValue<String, BlockData>> range = db.getStore().getBlockDataTable().getRangeKVs(
+            startKey, count, cData.containerPrefix(), cData.getUnprefixedKeyFilter(), true);
         for (Table.KeyValue<String, BlockData> entry : range) {
           result.add(db.getStore().getCompleteBlockData(entry.getValue(), null, entry.getKey()));
         }

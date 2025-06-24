@@ -330,10 +330,10 @@ public final class KeyValueContainerUtil {
       LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
       MetadataKeyFilters.KeyPrefixFilter filter =
           kvContainerData.getDeletingBlockKeyFilter();
-      blockPendingDeletion = store.getBlockDataTable()
-              .getSequentialRangeKVs(kvContainerData.startKeyEmpty(),
-                  Integer.MAX_VALUE, kvContainerData.containerPrefix(),
-                  filter).size();
+      blockPendingDeletion = store.getBlockDataTable().getRangeKVs(
+          kvContainerData.startKeyEmpty(), Integer.MAX_VALUE, kvContainerData.containerPrefix(), filter, true)
+          // TODO: add a count() method to avoid creating a list
+          .size();
     }
     // Set delete transaction id.
     Long delTxnId =
