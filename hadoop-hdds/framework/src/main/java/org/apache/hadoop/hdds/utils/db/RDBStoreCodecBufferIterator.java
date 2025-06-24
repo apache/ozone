@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -34,15 +33,15 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
 
   RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
       CodecBuffer prefix, Type type) {
-    super(iterator, table, prefix);
+    super(iterator, table, prefix, type);
 
     final String name = table != null ? table.getName() : null;
     this.keyBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-key", 1 << 10),
-        type.readKey() ? buffer -> getRocksDBIterator().get().key(buffer) : null);
+        getType().readKey() ? buffer -> getRocksDBIterator().get().key(buffer) : null);
     this.valueBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-value", 4 << 10),
-        type.readValue() ? buffer -> getRocksDBIterator().get().value(buffer) : null);
+        getType().readValue() ? buffer -> getRocksDBIterator().get().value(buffer) : null);
     seekToFirst();
   }
 
@@ -59,7 +58,8 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   @Override
   Table.KeyValue<CodecBuffer, CodecBuffer> getKeyValue() {
     assertOpen();
-    return Table.newKeyValue(key(), valueBuffer.getFromDb());
+    final CodecBuffer key = getType().readKey() ? key() : null;
+    return Table.newKeyValue(key, valueBuffer.getFromDb());
   }
 
   @Override
@@ -69,7 +69,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   }
 
   @Override
-  void delete(CodecBuffer key) throws IOException {
+  void delete(CodecBuffer key) throws RocksDatabaseException {
     assertOpen();
     getRocksDBTable().delete(key.asReadOnlyByteBuffer());
   }
@@ -131,7 +131,7 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
 
     CodecBuffer getFromDb() {
       if (source == null) {
-        return CodecBuffer.getEmptyBuffer();
+        return null;
       }
 
       for (prepare(); ; allocate()) {
