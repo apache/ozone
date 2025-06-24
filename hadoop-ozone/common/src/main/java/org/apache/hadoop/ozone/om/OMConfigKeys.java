@@ -104,9 +104,6 @@ public final class OMConfigKeys {
       "ozone.om.volume.listall.allowed";
   public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
 
-  public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
-      "ozone.key.deleting.limit.per.task";
-  public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
   public static final String OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.key.deleting.limit.per.task";
   public static final int OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT

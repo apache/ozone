@@ -17,11 +17,7 @@
 
 package org.apache.hadoop.ozone.om.service;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
-
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -84,8 +80,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
   private final ScmBlockLocationProtocol scmClient;
-
-  private int keyLimitPerTask;
   private int ratisByteLimit;
   private final AtomicLong deletedKeyCount;
   private final boolean deepCleanSnapshots;
@@ -98,10 +92,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     super(KeyDeletingService.class.getSimpleName(), serviceInterval,
         TimeUnit.MILLISECONDS, keyDeletionCorePoolSize,
         serviceTimeout, ozoneManager);
-    this.keyLimitPerTask = conf.getInt(OZONE_KEY_DELETING_LIMIT_PER_TASK,
-        OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
-    Preconditions.checkArgument(keyLimitPerTask >= 0,
-        OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
     int limit = (int) conf.getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
@@ -147,10 +137,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       long purgeStartTime = Time.monotonicNow();
       purgeResult = submitPurgeKeysRequest(blockDeletionResults,
           keysToModify, renameEntries, snapTableKey, expectedPreviousSnapshotId);
-      int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
-          OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
-      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
-          purgeResult, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
+      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms.",
+          purgeResult, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime);
     }
     getPerfMetrics().setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return purgeResult;
@@ -276,14 +264,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
     }
     return queue;
-  }
-
-  public int getKeyLimitPerTask() {
-    return keyLimitPerTask;
-  }
-
-  public void setKeyLimitPerTask(int keyLimitPerTask) {
-    this.keyLimitPerTask = keyLimitPerTask;
   }
 
   /**
