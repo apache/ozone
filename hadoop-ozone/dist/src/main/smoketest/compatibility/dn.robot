@@ -25,3 +25,4 @@ Picks up command line options
     ${processes} =    List All Processes
     Should Contain    ${processes}   %{HDDS_DN_OPTS}
     Should Contain    ${processes}   %{HADOOP_OPTS}
+    Should Contain    ${processes}   %{OZONE_SERVER_OPTS}

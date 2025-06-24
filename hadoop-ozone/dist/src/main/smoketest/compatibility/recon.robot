@@ -23,6 +23,7 @@ Test Timeout        5 minutes
 Check command-line options
     ${processes} =    List All Processes
     Should Contain    ${processes}   %{HADOOP_OPTS}
+    Should Contain    ${processes}   %{OZONE_SERVER_OPTS}
 
 *** Test Cases ***
 Picks up command line options

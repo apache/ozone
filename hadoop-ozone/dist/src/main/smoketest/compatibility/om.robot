@@ -24,6 +24,7 @@ Check command-line options
     ${processes} =    List All Processes
     Should Contain    ${processes}   %{HDFS_OM_OPTS}
     Should Contain    ${processes}   %{HADOOP_OPTS}
+    Should Contain    ${processes}   %{OZONE_SERVER_OPTS}
 
 *** Test Cases ***
 Picks up command line options
