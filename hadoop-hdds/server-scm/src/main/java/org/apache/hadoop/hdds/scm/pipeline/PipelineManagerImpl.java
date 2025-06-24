@@ -639,7 +639,7 @@ public class PipelineManagerImpl implements PipelineManager {
   public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
     for (DatanodeDetails node : pipeline.getNodes()) {
       if (!(node instanceof DatanodeInfo)) {
-        node = nodeManager.getNode(node.getID());
+        node = nodeManager.getDatanodeInfo(node);
       }
       if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize, null)) {
         return false;

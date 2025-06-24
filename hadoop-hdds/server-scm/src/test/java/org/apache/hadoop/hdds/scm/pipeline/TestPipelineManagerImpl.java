@@ -61,7 +61,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -75,7 +74,6 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -977,8 +975,8 @@ public class TestPipelineManagerImpl {
       // the method being tested needs NodeManager to return DatanodeInfo because DatanodeInfo has storage
       // information (it extends DatanodeDetails)
       DatanodeInfo info = new DatanodeInfo(dn, null, null);
-      info.updateStorageReports(createStorageReports(200L, 200L, 10L));
-      doReturn(info).when(mockedNodeManager).getNode(dn.getID());
+      info.updateStorageReports(HddsTestUtils.createStorageReports(dn.getID(), 200L, 200L, 10L));
+      doReturn(info).when(mockedNodeManager).getDatanodeInfo(dn);
       datanodeInfoList.add(info);
     }
     assertTrue(pipelineManager.hasEnoughSpace(pipeline, containerSize));
@@ -992,26 +990,16 @@ public class TestPipelineManagerImpl {
       So here, remaining - committed == containerSize, and hasEnoughSpace returns false.
       TODO should this return true instead?
      */
-    datanodeInfoList.get(0).updateStorageReports(createStorageReports(200L, 120L, 20L));
+    DatanodeInfo datanodeInfo = datanodeInfoList.get(0);
+    datanodeInfo.updateStorageReports(HddsTestUtils.createStorageReports(datanodeInfo.getID(), 200L, 120L,
+        20L));
     assertFalse(pipelineManager.hasEnoughSpace(pipeline, containerSize));
 
     // Case 3: All nodes do not have enough space.
     for (DatanodeInfo info : datanodeInfoList) {
-      info.updateStorageReports(createStorageReports(200L, 100L, 20L));
+      info.updateStorageReports(HddsTestUtils.createStorageReports(info.getID(), 200L, 100L, 20L));
     }
     assertFalse(pipelineManager.hasEnoughSpace(pipeline, containerSize));
-  }
-
-  private List<StorageReportProto> createStorageReports(long capacity, long remaining, long committed) {
-    return Collections.singletonList(
-        StorageReportProto.newBuilder()
-            .setStorageUuid(UUID.randomUUID().toString())
-            .setStorageLocation("test")
-            .setCapacity(capacity)
-            .setRemaining(remaining)
-            .setCommitted(committed)
-            .setScmUsed(200L - remaining)
-            .build());
   }
 
   private Set<ContainerReplica> createContainerReplicasList(
