@@ -190,7 +190,7 @@ public class PrefixParser implements Callable<Void> {
     final KeyPrefixFilter filter = getPrefixFilter(volumeId, bucketId, lastObjectId);
     final List<KeyValue<String, T>> infoList = table.getRangeKVs(null, 1000, null, filter, false);
 
-    for (KeyValue<String, ? extends WithParentObjectId> info :infoList) {
+    for (KeyValue<String, T> info : infoList) {
       Path key = Paths.get(info.getKey());
       dumpInfo(type, getEffectivePath(effectivePath,
           key.getName(1).toString()), info.getValue(), info.getKey());

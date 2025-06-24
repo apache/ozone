@@ -227,13 +227,6 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public List<KeyValue<byte[], byte[]>> getRangeKVs(
-      byte[] startKey, int count, byte[] prefix, KeyPrefixFilter filter, boolean isSequential)
-      throws RocksDatabaseException, CodecException {
-    return getRangeKVsImpl(startKey, count, prefix, filter, isSequential);
-  }
-
-  @Override
   public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
       throws RocksDatabaseException, CodecException {
     try (KeyValueIterator<byte[], byte[]> iter = iterator(prefix)) {
@@ -260,7 +253,8 @@ class RDBTable implements Table<byte[], byte[]> {
     RDBSstFileLoader.load(db, family, externalFile);
   }
 
-  private List<KeyValue<byte[], byte[]>> getRangeKVsImpl(
+  @Override
+  public List<KeyValue<byte[], byte[]>> getRangeKVs(
       byte[] startKey, int count, byte[] prefix, KeyPrefixFilter filter, boolean sequential)
       throws RocksDatabaseException, CodecException {
     long start = Time.monotonicNow();
@@ -298,16 +292,14 @@ class RDBTable implements Table<byte[], byte[]> {
       long timeConsumed = end - start;
       if (LOG.isDebugEnabled()) {
         if (filter != null) {
-          int scanned = filter.getKeysScannedNum();
-          int hinted = filter.getKeysHintedNum();
+          final int scanned = filter.getKeysScannedNum();
+          final int hinted = filter.getKeysHintedNum();
           if (scanned > 0 || hinted > 0) {
             LOG.debug("getRangeKVs ({}) numOfKeysScanned={}, numOfKeysHinted={}",
-                filter.getClass().getSimpleName(), filter.getKeysScannedNum(),
-                filter.getKeysHintedNum());
+                filter.getClass().getSimpleName(), scanned, hinted);
           }
         }
-        LOG.debug("Time consumed for getRangeKVs() is {}ms,"
-                + " result length is {}.", timeConsumed, result.size());
+        LOG.debug("Time consumed for getRangeKVs() is {}ms, result length is {}.", timeConsumed, result.size());
       }
     }
     return result;
