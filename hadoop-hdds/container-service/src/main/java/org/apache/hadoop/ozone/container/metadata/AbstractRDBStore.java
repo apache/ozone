@@ -18,10 +18,14 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -50,7 +54,9 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
     // The same config instance is used on each datanode, so we can share the
     // corresponding column family options, providing a single shared cache
     // for all containers on a datanode.
-    cfOptions = dbProfile.getColumnFamilyOptions(config);
+    Path optionsPath = Paths.get(
+        config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
+    cfOptions = dbProfile.getColumnFamilyOptions(config, optionsPath, DEFAULT_COLUMN_FAMILY_NAME);
     this.dbDef = dbDef;
     this.openReadOnly = openReadOnly;
     start(config);
@@ -60,7 +66,9 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
   public void start(ConfigurationSource config)
       throws IOException {
     if (this.store == null) {
-      ManagedDBOptions options = dbProfile.getDBOptions();
+      Path optionsPath = Paths.get(
+          config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
+      ManagedDBOptions options = dbProfile.getDBOptions(optionsPath);
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
 
