@@ -328,8 +328,9 @@ public final class KeyValueContainerUtil {
       LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
       MetadataKeyFilters.KeyPrefixFilter filter =
           kvContainerData.getDeletingBlockKeyFilter();
+
       List<? extends Table.KeyValue<String, BlockData>> data = store.getBlockDataTable()
-          .getSequentialRangeKVs(kvContainerData.startKeyEmpty(),
+          .getRangeKVs(kvContainerData.startKeyEmpty(),
               Integer.MAX_VALUE, kvContainerData.containerPrefix(),
               filter);
 

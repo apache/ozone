@@ -51,7 +51,7 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The total number of blocks pending for processing.")
   private MutableGaugeLong totalPendingBlockCount;
 
-  @Metric(about = "The total bytes used by blocks pending for processing.")
+  @Metric(about = "The total bytes used by blocks pending for deletion.")
   private MutableGaugeLong totalPendingBlockBytes;
 
   @Metric(about = "The total number of DeleteBlockTransaction received")
