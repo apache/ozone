@@ -629,11 +629,11 @@ public class OMDBInsightEndpoint {
   }
 
   /**
-   * Given an object ID, return total data size (no replication)
+   * Given an object ID, return total data size as a pair of Total Size, Total Replicated Size
    * under this object. Note:- This method is RECURSIVE.
    *
    * @param objectId the object's ID
-   * @return total used data size in bytes
+   * @return total used data size and replicated total used data size in bytes
    * @throws IOException ioEx
    */
   protected Pair<Long, Long> fetchSizeForDeletedDirectory(long objectId)
