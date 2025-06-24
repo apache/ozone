@@ -518,19 +518,19 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPrefix = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
+    final String startKey = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-         iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
-      performOperationOnKeys(iter,
-          entry -> {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Removing key {} from DeletedDirTable", entry.getKey());
-            }
-            omMetadataManager.getDeletedDirTable().deleteWithBatch(batchOperation, entry.getKey());
-            return null;
-          });
+    // Range delete end key (exclusive) - we use the next possible ASCII char after bucket name
+    // Creates the smallest key that is lexicographically larger than the startKey.
+    final String endKey = startKey + Character.MAX_VALUE;
+
+    if (LOG.isDebugEnabled()) {
+      LOG.info("Deleting key range from DeletedDirTable - startKey: {}, endKey: {}",
+          startKey, endKey);
     }
+
+    // Use deleteRange instead of iterating through each key
+    omMetadataManager.getDeletedDirTable().deleteRange(startKey, endKey);
   }
 
   @VisibleForTesting
@@ -583,24 +583,23 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPrefix =
+    final String startKey =
         omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
 
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-             iter = omMetadataManager.getDeletedTable().iterator(keyPrefix)) {
-      performOperationOnKeys(iter, entry -> {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Removing key {} from DeletedTable", entry.getKey());
-        }
-        omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation, entry.getKey());
-        return null;
-      });
+    // Range delete end key (exclusive) - we use the next possible ASCII char after bucket name
+    // Creates the smallest key that is lexicographically larger than the startKey.
+    final String endKey = startKey + Character.MAX_VALUE;
+
+    if (LOG.isDebugEnabled()) {
+      LOG.info("Deleting key range from DeletedTable - startKey: {}, endKey: {}",
+          startKey, endKey);
     }
 
-    // No need to invalidate deletedTable (or deletedDirectoryTable) table
-    // cache since entries are not added to its table cache in the first place.
-    // See OMKeyDeleteRequest and OMKeyPurgeRequest#validateAndUpdateCache.
+    // Use deleteRange instead of iterating through each key
+    omMetadataManager.getDeletedTable().deleteRange(startKey, endKey);
+
+    // No need to invalidate deletedTable cache since entries are not added to its table cache
+    // in the first place. See OMKeyDeleteRequest and OMKeyPurgeRequest#validateAndUpdateCache.
     //
     // This makes the table clean up efficient as we only need one
     // deleteRange() operation. No need to invalidate cache entries
@@ -731,7 +730,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * deletedDirectoryTable in DB don't have entries for the bucket before it sends a purgeSnapshot on a snapshot.
    * If that happens, and we just look into the cache, the addToBatch operation will fail when it tries to open
    * the DB and purgeKeys from the Snapshot because snapshot is already purged from the SnapshotInfoTable cache.
-   * Hence, it is needed to look into the table to make sure that snapshot exists somewhere either in cache or in DB.
+   * Hence, it is needed to look into the table to make sure that snapshot exists somewhere in cache or in DB.
    */
   private SnapshotInfo getSnapshotInfo(String snapshotKey) throws IOException {
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager().getSnapshotInfoTable().get(snapshotKey);

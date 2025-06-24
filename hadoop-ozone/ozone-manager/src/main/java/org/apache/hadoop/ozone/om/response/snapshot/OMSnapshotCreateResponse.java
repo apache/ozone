@@ -80,23 +80,15 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
         snapshotInfo, batchOperation);
 
     // TODO: [SNAPSHOT] Move to createOmSnapshotCheckpoint and add table lock
-    // Remove all entries from snapshotRenamedTable
-    try (TableIterator<String, ? extends Table.KeyValue<String, String>>
-        iterator = omMetadataManager.getSnapshotRenamedTable().iterator()) {
+    // Remove all entries from snapshotRenamedTable using deleteRange API
+    final String startKey = omMetadataManager.getBucketKey(
+        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName())
+        + OM_KEY_PREFIX;
 
-      String dbSnapshotBucketKey = omMetadataManager.getBucketKey(
-          snapshotInfo.getVolumeName(), snapshotInfo.getBucketName())
-          + OM_KEY_PREFIX;
-      iterator.seek(dbSnapshotBucketKey);
+    // Range delete end key (exclusive) - next possible ASCII char after bucket key
+    // Creates the smallest key that is lexicographically larger than the startKey.
+    final String endKey = startKey + Character.MAX_VALUE;
 
-      while (iterator.hasNext()) {
-        String renameDbKey = iterator.next().getKey();
-        if (!renameDbKey.startsWith(dbSnapshotBucketKey)) {
-          break;
-        }
-        omMetadataManager.getSnapshotRenamedTable()
-            .deleteWithBatch(batchOperation, renameDbKey);
-      }
-    }
+    omMetadataManager.getSnapshotRenamedTable().deleteRange(startKey, endKey);
   }
 }
