@@ -25,6 +25,7 @@ import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/ut
 import { byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError } from '@/utils/common';
 
 import { Acl } from '@/v2/types/acl.types';
+import { QuotaAllowed, QuotaInNamespace, QuotaUsed } from '@/v2/constants/description.constants';
 
 
 // ------------- Types -------------- //
@@ -115,7 +116,7 @@ type MetadataProps = {
 };
 
 type MetadataState = {
-  key: string,
+  key: string | React.ReactNode,
   value: string | number | boolean | null
 }[];
 
@@ -200,7 +201,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
 
     if (objectInfo?.quotaInNamespace !== undefined && objectInfo?.quotaInNamespace !== -1) {
       data.push({
-        key: 'Quota In Namespace',
+        key: QuotaInNamespace,
         value: objectInfo.quotaInNamespace
       });
     }
@@ -333,14 +334,14 @@ const DUMetadata: React.FC<MetadataProps> = ({
         // In case the object's quota isn't set, we should not populate the values
         if (quotaResponse.allowed !== undefined && quotaResponse.allowed !== -1) {
           data.push({
-            key: 'Quota Allowed',
+            key: QuotaAllowed,
             value: byteToSize(quotaResponse.allowed, 3)
           });
         }
 
         if (quotaResponse.used !== undefined && quotaResponse.used !== -1) {
           data.push({
-            key: 'Quota Used',
+            key: QuotaUsed,
             value: byteToSize(quotaResponse.used, 3)
           })
         }
