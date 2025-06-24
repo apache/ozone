@@ -38,7 +38,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
  */
 public class BlockData {
   private static final Codec<BlockData> CODEC = new DelegatedCodec<>(
-      Proto3Codec.get(ContainerProtos.BlockData.getDefaultInstance()),
+      // allow InvalidProtocolBufferException for backward compatibility with Schema One
+      Proto3Codec.get(ContainerProtos.BlockData.getDefaultInstance(), true),
       BlockData::getFromProtoBuf,
       BlockData::getProtoBufMessage,
       BlockData.class);
@@ -96,6 +97,9 @@ public class BlockData {
    * @return - BlockData
    */
   public static BlockData getFromProtoBuf(ContainerProtos.BlockData data) throws CodecException {
+    if (data == null) {
+      return null;
+    }
     BlockData blockData = new BlockData(
         BlockID.getFromProtobuf(data.getBlockID()));
     for (int x = 0; x < data.getMetadataCount(); x++) {

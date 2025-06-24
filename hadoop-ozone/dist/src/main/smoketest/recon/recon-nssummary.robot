@@ -26,7 +26,7 @@ ${ENDPOINT_URL}             http://recon:9888
 ${API_ENDPOINT_URL}         ${ENDPOINT_URL}/api/v1
 ${ADMIN_NAMESPACE_URL}      ${API_ENDPOINT_URL}/namespace
 ${SUMMARY_URL}              ${ADMIN_NAMESPACE_URL}/summary
-${DISK_USAGE_URL}           ${ADMIN_NAMESPACE_URL}/du
+${DISK_USAGE_URL}           ${ADMIN_NAMESPACE_URL}/usage
 ${QUOTA_USAGE_URL}          ${ADMIN_NAMESPACE_URL}/quota
 ${FILE_SIZE_DIST_URL}       ${ADMIN_NAMESPACE_URL}/dist
 ${BUCKET_LAYOUT}            FILE_SYSTEM_OPTIMIZED

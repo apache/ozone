@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -142,7 +141,7 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
       String dbKey, int expectedCnt, String keyName) {
     int countKeys = 0;
     int matchingKeys = 0;
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+    try (Table.KeyValueIterator<String, OmKeyInfo>
           itr = keyTable.iterator()) {
       itr.seek(dbKey);
       while (itr.hasNext()) {

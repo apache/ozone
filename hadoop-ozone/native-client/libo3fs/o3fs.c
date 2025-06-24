@@ -17,7 +17,7 @@
  */
 
 #include "o3fs.h"
-#include "hdfs/hdfs.h"
+#include "hdfs.h"
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdio.h>

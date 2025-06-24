@@ -621,7 +621,7 @@ public final class OzoneConfigKeys {
 
   public static final String FS_TRASH_CLASSNAME = "fs.trash.classname";
   public static final String FS_TRASH_CLASSNAME_DEFAULT =
-      "org.apache.hadoop.ozone.om.TrashPolicyOzone";
+      "org.apache.hadoop.fs.ozone.OzoneTrashPolicy";
 
   public static final String
       OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED =

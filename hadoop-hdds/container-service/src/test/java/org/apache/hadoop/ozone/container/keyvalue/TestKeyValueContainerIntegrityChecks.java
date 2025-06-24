@@ -126,9 +126,9 @@ public class TestKeyValueContainerIntegrityChecks {
     byte[] chunkData = RandomStringUtils.secure().nextAscii(CHUNK_LEN).getBytes(UTF_8);
     ChecksumData checksumData = checksum.computeChecksum(chunkData);
 
+    final long size = totalBlocks > 0 ? CHUNKS_PER_BLOCK * CHUNK_LEN * totalBlocks : 1;
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
-        containerLayoutTestInfo.getLayout(),
-        (long) CHUNKS_PER_BLOCK * CHUNK_LEN * totalBlocks,
+        containerLayoutTestInfo.getLayout(), size,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
