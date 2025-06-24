@@ -85,7 +85,7 @@ public class ReconSafeModeMgrTask {
         safeModeManager.setInSafeMode(false);
       }
     } catch (Throwable t) {
-      LOG.error("Exception in Missing Container task Thread.", t);
+      LOG.error("Exception in ReconSafeModeMgrTask Thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }

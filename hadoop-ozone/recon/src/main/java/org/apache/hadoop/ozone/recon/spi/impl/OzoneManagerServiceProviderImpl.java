@@ -309,6 +309,7 @@ public class OzoneManagerServiceProviderImpl
     }
     reconTaskController.reInitializeTasks(omMetadataManager, reconOmTaskMap);
     startSyncDataFromOM(initialDelay);
+    LOG.info("Ozone Manager Service Provider is started.");
   }
 
   private void startSyncDataFromOM(long initialDelay) {

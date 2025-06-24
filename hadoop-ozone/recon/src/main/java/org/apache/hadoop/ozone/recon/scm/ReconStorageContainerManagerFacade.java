@@ -435,6 +435,7 @@ public class ReconStorageContainerManagerFacade
     if (!this.safeModeManager.getInSafeMode()) {
       this.reconScmTasks.forEach(ReconScmTask::start);
     }
+    LOG.info("Successfully started Recon Storage Container Manager.");
   }
 
   /**
