@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-import React, { useRef, useState } from 'react';
+import React, {useRef, useState} from 'react';
 import moment from 'moment';
-import axios, { AxiosError } from 'axios';
-import { Table } from 'antd';
+import axios, {AxiosError} from 'axios';
+import {Table} from 'antd';
 
-import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
-import { byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError } from '@/utils/common';
+import {AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper} from '@/utils/axiosRequestHelper';
+import {byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError} from '@/utils/common';
 
-import { Acl } from '@/v2/types/acl.types';
+import {Acl} from '@/v2/types/acl.types';
 
 
 // ------------- Types -------------- //

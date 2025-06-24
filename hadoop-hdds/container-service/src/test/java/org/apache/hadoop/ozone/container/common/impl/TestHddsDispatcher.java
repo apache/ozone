@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -90,7 +91,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -145,8 +145,10 @@ public class TestHddsDispatcher {
     conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
     DatanodeDetails dd = randomDatanodeDetails();
-    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf,
+    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), "test", conf,
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    volumeSet.getVolumesList().forEach(e -> e.setState(StorageVolume.VolumeState.NORMAL));
+    volumeSet.startAllVolume();
 
     try {
       UUID scmId = UUID.randomUUID();
@@ -172,10 +174,10 @@ public class TestHddsDispatcher {
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
       for (ContainerType containerType : ContainerType.values()) {
-        handlers.put(containerType,
-            Handler.getHandlerForContainerType(containerType, conf,
-                context.getParent().getDatanodeDetails().getUuidString(),
-                containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER));
+        handlers.put(containerType, Handler.getHandlerForContainerType(containerType, conf,
+            context.getParent().getDatanodeDetails().getUuidString(),
+            containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER,
+            new ContainerChecksumTreeManager(conf)));
       }
       // write successfully to first container
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
@@ -294,7 +296,7 @@ public class TestHddsDispatcher {
 
     HddsVolume.Builder volumeBuilder =
         new HddsVolume.Builder(testDirPath).datanodeUuid(dd.getUuidString())
-            .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .conf(conf).usageCheckFactory(MockSpaceUsageCheckFactory.NONE).clusterID("test");
     // state of cluster : available (160) > 100  ,datanode volume
     // utilisation threshold not yet reached. container creates are successful.
     AtomicLong usedSpace = new AtomicLong(340);
@@ -306,6 +308,8 @@ public class TestHddsDispatcher {
     MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     when(volumeSet.getVolumesList())
         .thenReturn(Collections.singletonList(volumeBuilder.build()));
+    volumeSet.getVolumesList().get(0).setState(StorageVolume.VolumeState.NORMAL);
+    volumeSet.getVolumesList().get(0).start();
     try {
       UUID scmId = UUID.randomUUID();
       ContainerSet containerSet = newContainerSet();
@@ -329,7 +333,8 @@ public class TestHddsDispatcher {
         handlers.put(containerType,
             Handler.getHandlerForContainerType(containerType, conf,
                 context.getParent().getDatanodeDetails().getUuidString(),
-                containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER));
+                containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER,
+                new ContainerChecksumTreeManager(conf)));
       }
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
@@ -566,7 +571,7 @@ public class TestHddsDispatcher {
   static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf, TokenVerifier tokenVerifier) throws IOException {
     ContainerSet containerSet = newContainerSet();
-    VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
+    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     volumeSet.getVolumesList().stream().forEach(v -> {
       try {
@@ -576,6 +581,7 @@ public class TestHddsDispatcher {
         throw new RuntimeException(e);
       }
     });
+    volumeSet.startAllVolume();
     StateContext context = ContainerTestUtils.getMockContext(dd, conf);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     Map<ContainerType, Handler> handlers = Maps.newHashMap();
@@ -583,7 +589,8 @@ public class TestHddsDispatcher {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER));
+              containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER,
+              new ContainerChecksumTreeManager(conf)));
     }
 
     final HddsDispatcher hddsDispatcher = new HddsDispatcher(conf,

@@ -54,12 +54,10 @@ public final class MetadataKeyFilters {
     /**
      * Filter levelDB key with a certain condition.
      *
-     * @param preKey     previous key.
      * @param currentKey current key.
-     * @param nextKey    next key.
      * @return true if a certain condition satisfied, return false otherwise.
      */
-    boolean filterKey(byte[] preKey, byte[] currentKey, byte[] nextKey);
+    boolean filterKey(byte[] currentKey);
 
     default int getKeysScannedNum() {
       return 0;
@@ -74,28 +72,13 @@ public final class MetadataKeyFilters {
    * Utility class to filter key by a string prefix. This filter
    * assumes keys can be parsed to a string.
    */
-  public static class KeyPrefixFilter implements MetadataKeyFilter {
-
+  public static final class KeyPrefixFilter implements MetadataKeyFilter {
     private List<String> positivePrefixList = new ArrayList<>();
     private List<String> negativePrefixList = new ArrayList<>();
-    private boolean atleastOnePositiveMatch;
     private int keysScanned = 0;
     private int keysHinted = 0;
 
-    public KeyPrefixFilter() { }
-
-    /**
-     * KeyPrefixFilter constructor. It is made of positive and negative prefix
-     * list. PositivePrefixList is the list of prefixes which are accepted
-     * whereas negativePrefixList contains the list of prefixes which are
-     * rejected.
-     *
-     * @param atleastOnePositiveMatch if positive it requires key to be accepted
-     *                               by atleast one positive filter.
-     */
-    public KeyPrefixFilter(boolean atleastOnePositiveMatch) {
-      this.atleastOnePositiveMatch = atleastOnePositiveMatch;
-    }
+    private KeyPrefixFilter() { }
 
     public KeyPrefixFilter addFilter(String keyPrefix) {
       addFilter(keyPrefix, false);
@@ -129,8 +112,7 @@ public final class MetadataKeyFilters {
     }
 
     @Override
-    public boolean filterKey(byte[] preKey, byte[] currentKey,
-        byte[] nextKey) {
+    public boolean filterKey(byte[] currentKey) {
       keysScanned++;
       if (currentKey == null) {
         return false;
@@ -150,8 +132,6 @@ public final class MetadataKeyFilters {
       if (accept) {
         keysHinted++;
         return true;
-      } else if (atleastOnePositiveMatch) {
-        return false;
       }
 
       accept = !negativePrefixList.isEmpty() && negativePrefixList.stream()
@@ -189,6 +169,14 @@ public final class MetadataKeyFilters {
         }
       }
       return true;
+    }
+
+    public static KeyPrefixFilter newFilter(String prefix) {
+      return newFilter(prefix, false);
+    }
+
+    public static KeyPrefixFilter newFilter(String prefix, boolean negative) {
+      return new KeyPrefixFilter().addFilter(prefix, negative);
     }
   }
 }
