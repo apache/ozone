@@ -1171,7 +1171,7 @@
               "useBackend": false
             }
           ],
-          "title": "KeyDeletingService: Keys purged from OM",
+          "title": "KeyDeletingService: No. of keys to be purged",
           "type": "timeseries"
         },
         {
@@ -1549,7 +1549,7 @@
               "useBackend": false
             }
           ],
-          "title": "PurgeRequests: Keys Purged",
+          "title": "PurgeRequests: No. of keys purged",
           "type": "timeseries"
         },
         {
