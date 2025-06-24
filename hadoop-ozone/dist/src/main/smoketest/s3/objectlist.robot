@@ -64,3 +64,10 @@ List objects with max-keys less than config limit should return correct count
     ${count}=     Execute and checkrc    jq -r '.Contents | length' ${tmpfile}    0
     Should Be True    ${count} == 500
     Remove File   ${tmpfile}
+
+Check Bucket Ownership Verification
+    Prepare Many Objects In Bucket                                1
+    ${correct_owner} =    Get bucket owner                        ${BUCKET}
+
+    Execute AWSS3APICli and failed bucket ownership verification  list-objects-v2 --bucket ${BUCKET}  wrong-owner
+    Execute AWSS3APICli using bucket ownership verification       list-objects-v2 --bucket ${BUCKET}  ${correct_owner}

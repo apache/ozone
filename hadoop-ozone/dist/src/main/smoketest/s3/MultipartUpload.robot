@@ -373,3 +373,43 @@ Test Multipart Upload list
         ${uploadID}=    Get From List    ${uploadIDs}    ${index}
         Abort MPU    ${BUCKET}    ${key}    ${uploadID}    0
     END
+
+Check Bucket Ownership Verification
+    # 1. InitMultipartUpload
+    Execute AWSS3APICli and failed bucket ownership verification  create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/key1  wrong-owner
+    ${correct_owner}=    Get bucket owner    ${BUCKET}
+    ${uploadID}=         Execute AWSS3APICli using bucket ownership verification   create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/key1    ${correct_owner}
+    ${uploadID}=         Execute and checkrc                                       echo '${uploadID}' | jq -r '.UploadId'    0
+
+    # 2. upload-part
+    Execute AWSS3APICli and failed bucket ownership verification                   upload-part --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}  wrong-owner
+    ${ETag1} =  Execute AWSS3APICli using bucket ownership verification            upload-part --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}  ${correct_owner}
+    ${ETag1} =  Execute and checkrc                                                echo '${ETag1}' | jq -r '.ETag'    0
+
+
+    # 3. upload-part-copy
+    ${result}=    Execute AWSS3APICli                                              put-object --bucket ${BUCKET} --key ${PREFIX}/mpu/source --body /tmp/part2
+    Execute AWSS3APICli and failed bucket ownership verification                   upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/${PREFIX}/mpu/source  ${correct_owner}  wrong-owner
+    Execute AWSS3APICli and failed bucket ownership verification                   upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/${PREFIX}/mpu/source  wrong-owner       ${correct_owner}
+    ${ETag2} =  Execute AWSS3APICli using bucket ownership verification            upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/${PREFIX}/mpu/source  ${correct_owner}  ${correct_owner}
+    ${ETag2} =  Execute and checkrc                                                echo '${ETag2}' | jq -r '.CopyPartResult.ETag'    0
+
+    # 4. list-multipart-uploads
+    Execute AWSS3APICli and failed bucket ownership verification                   list-multipart-uploads --bucket ${BUCKET}  wrong-owner
+    Execute AWSS3APICli using bucket ownership verification                        list-multipart-uploads --bucket ${BUCKET}  ${correct_owner}
+
+    # 5. list-parts
+    Execute AWSS3APICli and failed bucket ownership verification                   list-parts --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID}  wrong-owner
+    Execute AWSS3APICli using bucket ownership verification                        list-parts --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID}  ${correct_owner}
+
+    # 6. complete-multipart-upload
+    ${parts}=    Set Variable                                                      {ETag=${ETag1},PartNumber=1},{ETag=${ETag2},PartNumber=2}
+    Execute AWSS3APICli and failed bucket ownership verification                   complete-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID} --multipart-upload 'Parts=[${parts}]'  wrong-owner
+    Execute AWSS3APICli using bucket ownership verification                        complete-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID} --multipart-upload 'Parts=[${parts}]'  ${correct_owner}
+
+    # create another MPU to test abort-multipart-upload
+    ${uploadID}=    Execute AWSS3APICli using bucket ownership verification        create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/aborttest    ${correct_owner}
+    ${uploadID}=    Execute and checkrc                                            echo '${uploadID}' | jq -r '.UploadId'    0
+
+    Execute AWSS3APICli and failed bucket ownership verification                   abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/aborttest --upload-id ${uploadID}  wrong-owner
+    Execute AWSS3APICli using bucket ownership verification                        abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/aborttest --upload-id ${uploadID}  ${correct_owner}

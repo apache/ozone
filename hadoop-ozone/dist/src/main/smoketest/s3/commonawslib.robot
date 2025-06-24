@@ -191,3 +191,21 @@ Revoke S3 secrets
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser2
 
+Get bucket owner
+    [arguments]    ${bucket}
+    ${owner} =     Execute     ozone sh bucket info /s3v/${bucket} | jq -r '.owner'
+    [return]       ${owner}
+
+Execute AWSS3APICli using bucket ownership verification
+    [arguments]    ${command}    ${expected_bucket_owner}    ${expected_source_bucket_owner}=${EMPTY}
+    ${cmd} =       Set Variable           ${command} --expected-bucket-owner ${expected_bucket_owner}
+    ${cmd} =       Set Variable If        '${expected_source_bucket_owner}' != '' and '${expected_source_bucket_owner}' != '${EMPTY}'    ${cmd} --expected-source-bucket-owner ${expected_source_bucket_owner}    ${cmd}
+    ${result} =    Execute AWSS3APICli    ${cmd}
+    [return]       ${result}
+
+Execute AWSS3APICli and failed bucket ownership verification
+    [arguments]    ${command}    ${wrong_bucket_owner}    ${wrong_source_bucket_owner}=${EMPTY}
+    ${cmd} =       Set Variable           ${command} --expected-bucket-owner ${wrong_bucket_owner}
+    ${cmd} =       Set Variable If        '${wrong_source_bucket_owner}' != '' and '${wrong_source_bucket_owner}' != '${EMPTY}'    ${cmd} --expected-source-bucket-owner ${wrong_source_bucket_owner}    ${cmd}
+    ${result} =    Execute AWSS3APICli and ignore error    ${cmd}
+    Should contain      ${result}         Access Denied
