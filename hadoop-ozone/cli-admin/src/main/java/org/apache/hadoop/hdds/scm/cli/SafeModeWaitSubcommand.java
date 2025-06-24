@@ -55,6 +55,11 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
       try (ScmClient scmClient = scmOption.createScmClient()) {
         long remainingTime;
         do {
+          if (scmClient.inManualSafeMode()) {
+            System.out.println("SCM is in manual safe mode. Manual intervention is required.");
+            return null;
+          }
+
           if (!scmClient.inSafeMode()) {
             System.out.println("SCM is out of safe mode.");
             return null;

@@ -1052,6 +1052,39 @@ public class SCMClientProtocolServer implements
     }
   }
 
+  /**
+   * Allow SCM to enter Safe mode.
+   *
+   * @return returns true if operation is successful.
+   * @throws IOException In case of exception while checking admin access
+   */
+  @Override
+  public boolean enterSafeMode() throws IOException {
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      boolean result = scm.enterSafeMode();
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.ENTER_SAFE_MODE, null));
+      return result;
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.ENTER_SAFE_MODE, null, ex));
+      throw ex;
+    }
+  }
+
+  /**
+   * Check if SCM is in manual safe mode.
+   *
+   * @return Returns true if SCM is in manual safe mode else returns false.
+   * @throws IOException In case of exception while connecting SCM
+   */
+  @Override
+  public boolean inManualSafeMode() throws IOException {
+    AUDIT.logReadSuccess(
+        buildAuditMessageForSuccess(SCMAction.IN_SAFE_MODE, null)
+    );
+    return scm.inManualSafeMode();
+  }
+
   @Override
   public void startReplicationManager() throws IOException {
     try {
