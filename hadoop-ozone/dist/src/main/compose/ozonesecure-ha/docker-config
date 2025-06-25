@@ -152,6 +152,7 @@ KMS-SITE.XML_hadoop.kms.proxyuser.s3g.hosts=*
 
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
+BYTEMAN_PORT=9091
 
 OZONE_DATANODE_SECURE_USER=root
 JSVC_HOME=/usr/bin
