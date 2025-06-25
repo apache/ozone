@@ -18,15 +18,18 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addBucketToDB;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -64,12 +67,13 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithEmptyBlocks(
       BucketLayout buckLayout) throws Exception {
     this.bucketLayout = buckLayout;
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OmBucketInfo omBucketInfo = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
+    long count = omBucketInfo.getPendingSnapshotDeleteNamespace();
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3);
-
-    createAndCommitResponse(keysToDelete, Status.OK);
+    omBucketInfo.incrPendingSnapshotDeleteNamespace(3);
+    createAndCommitResponse(keysToDelete, Collections.singleton(omBucketInfo), Status.OK);
 
     for (String key: keysToDelete.keySet()) {
       // open keys with no associated block data should have been removed
@@ -83,6 +87,9 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
       assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
       assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
+    omBucketInfo = omMetadataManager.getBucketTable().getSkipCache(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    assertEquals(count + 3, omBucketInfo.getPendingSnapshotDeleteNamespace());
   }
 
   /**
@@ -94,14 +101,17 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithNonEmptyBlocks(
       BucketLayout buckLayout) throws Exception {
     this.bucketLayout = buckLayout;
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OmBucketInfo omBucketInfo = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
+    long count = omBucketInfo.getPendingSnapshotDeleteNamespace();
+    long initialSpace = omBucketInfo.getPendingSnapshotDeleteBytes();
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
-
-    createAndCommitResponse(keysToDelete, Status.OK);
+    omBucketInfo.incrPendingSnapshotDeleteNamespace(3);
+    omBucketInfo.incrPendingSnapshotDeleteBytes(3 * KEY_LENGTH);
+    createAndCommitResponse(keysToDelete, Collections.singleton(omBucketInfo), Status.OK);
 
     for (Map.Entry<String, OmKeyInfo> entry: keysToDelete.entrySet()) {
       // These keys should have been moved from the open key table to the
@@ -123,6 +133,10 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
           entry.getValue().getObjectID(), entry.getKey());
       assertFalse(omMetadataManager.getDeletedTable().isExist(deleteKey));
     }
+    omBucketInfo = omMetadataManager.getBucketTable().getSkipCache(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    assertEquals(count + 3, omBucketInfo.getPendingSnapshotDeleteNamespace());
+    assertEquals(initialSpace + 3 * KEY_LENGTH, omBucketInfo.getPendingSnapshotDeleteBytes());
   }
 
   /**
@@ -135,17 +149,23 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithErrorResponse(
       BucketLayout buckLayout) throws Exception {
     this.bucketLayout = buckLayout;
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OmBucketInfo omBucketInfo = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
+    long count = omBucketInfo.getPendingSnapshotDeleteNamespace();
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
-
-    createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
+    omBucketInfo.incrPendingSnapshotDeleteNamespace(3);
+    createAndCommitResponse(keysToDelete, Collections.emptyList(), Status.INTERNAL_ERROR);
 
     for (String key: keysToDelete.keySet()) {
       // If an error occurs in the response, the batch operation moving keys
       // from the open key table to the delete table should not be committed.
       assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(key));
       assertFalse(omMetadataManager.getDeletedTable().isExist(key));
+    }
+    omBucketInfo = omMetadataManager.getBucketTable().getSkipCache(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    if (omBucketInfo != null) {
+      assertEquals(count, omBucketInfo.getPendingSnapshotDeleteNamespace());
     }
   }
 
@@ -156,7 +176,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
    * to a batch operation and committed to the database.
    * @throws Exception
    */
-  private void createAndCommitResponse(Map<String, OmKeyInfo> keysToDelete,
+  private void createAndCommitResponse(Map<String, OmKeyInfo> keysToDelete, Collection<OmBucketInfo> bucketInfos,
       Status status) throws Exception {
 
     OMResponse omResponse = OMResponse.newBuilder()
@@ -165,7 +185,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
         .build();
 
     OMOpenKeysDeleteResponse response = new OMOpenKeysDeleteResponse(omResponse,
-        keysToDelete, getBucketLayout());
+        keysToDelete, bucketInfos, getBucketLayout());
 
     // Operations are only added to the batch by this method when status is OK.
     response.checkAndUpdateDB(omMetadataManager, batchOperation);

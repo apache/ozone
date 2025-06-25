@@ -137,6 +137,7 @@ import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -160,6 +161,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
@@ -720,7 +722,7 @@ public class KeyManagerImpl implements KeyManager {
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
       int count) throws IOException {
-    List<BlockGroup> keyBlocksList = Lists.newArrayList();
+    List<PurgedKey> purgedKeys = Lists.newArrayList();
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
@@ -738,7 +740,7 @@ public class KeyManagerImpl implements KeyManager {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
         if (kv != null) {
-          List<BlockGroup> blockGroupList = Lists.newArrayList();
+          List<PurgedKey> reclaimableKeys = Lists.newArrayList();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
@@ -750,7 +752,8 @@ public class KeyManagerImpl implements KeyManager {
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
                   .addAllBlockIDs(blockIDS).build();
-              blockGroupList.add(keyBlocks);
+              reclaimableKeys.add(new PurgedKey(info.getVolumeName(), info.getBucketName(), keyBlocks,
+                  OMKeyRequest.sumBlockLengths(info)));
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);
@@ -764,11 +767,11 @@ public class KeyManagerImpl implements KeyManager {
               notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList().size()) {
             keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
           }
-          keyBlocksList.addAll(blockGroupList);
+          purgedKeys.addAll(reclaimableKeys);
         }
       }
     }
-    return new PendingKeysDeletion(keyBlocksList, keysToModify);
+    return new PendingKeysDeletion(purgedKeys, keysToModify);
   }
 
   private <V, R> List<KeyValue<String, R>> getTableEntries(String startKey,
@@ -2195,9 +2198,8 @@ public class KeyManagerImpl implements KeyManager {
           processedSubPaths = true;
           break;
         }
-        if (!table.isExist(entry.getKey())) {
-          continue;
-        }
+        //No need to check the table again as the value in cache and iterator would be same when directory
+        // deleting service runs.
         if (remainingBufLimit - objectSerializedSize < 0) {
           break;
         }
