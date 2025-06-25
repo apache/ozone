@@ -165,6 +165,7 @@ public class StorageVolumeChecker {
     final long gap = timer.monotonicNow() - lastAllVolumeSetsCheckComplete;
     if (gap < minDiskCheckGapMs) {
       metrics.incNumIterationsSkipped();
+      metrics.setLastScanSkippedTimestamp(timer.monotonicNow());
       if (LOG.isTraceEnabled()) {
         LOG.trace(
             "Skipped checking all volumes, time since last check {} is less " +
@@ -175,7 +176,7 @@ public class StorageVolumeChecker {
     }
 
     try {
-      int totalScanned = 0;
+      metrics.setNumVolumesScannedInLastIteration(0);
       for (VolumeSet volSet : registeredVolumeSets) {
         long volumeCount = volSet.getVolumesList().size();
         if (volSet instanceof MutableVolumeSet) {
@@ -188,15 +189,16 @@ public class StorageVolumeChecker {
             metrics.incNumMetadataVolumesScanned(volumeCount);
             break;
           default:
+            LOG.warn("Unknown volume type: {}", type);
             break;
           }
         }
         volSet.checkAllVolumes(this);
-        totalScanned += volSet.getVolumesList().size();
+        metrics.incrNumVolumesScannedInLastIteration(volSet.getVolumesList().size());
       }
-      metrics.setNumVolumesScannedInLastIteration(totalScanned);
       metrics.incNumScanIterations();
       lastAllVolumeSetsCheckComplete = timer.monotonicNow();
+      metrics.setLastScanExecutedTimestamp(lastAllVolumeSetsCheckComplete);
     } catch (IOException e) {
       LOG.warn("Exception while checking disks", e);
     }
