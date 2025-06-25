@@ -36,7 +36,7 @@ class BytemanLibrary:
         if result.returncode != 0:
             raise RuntimeError(f"Failed to {action_desc} for {component_name}: {result.stderr.strip()}")
         
-        logger.console(f"{action_desc} for {component_name} successful.")
+        logger.info(f"{action_desc} for {component_name} successful.")
         return result.stdout
 
     def add_byteman_rule(self, component_name, rule_file):
@@ -58,9 +58,9 @@ class BytemanLibrary:
         file_list = [line.split()[2] for line in matching_lines if len(line.split()) >= 3]
 
         if matching_lines:
-            logger.console(f"Active rules in {component_name}:\n" + "\n".join(matching_lines))
+            logger.info(f"Active rules in {component_name}:\n" + "\n".join(matching_lines))
         else:
-            logger.console(f"Active rules in {component_name}: No rules found")
+            logger.info(f"Active rules in {component_name}: No rules found")
 
         return file_list
 
@@ -70,7 +70,7 @@ class BytemanLibrary:
         rule_files = self.list_byteman_rules(component_name)
 
         if not rule_files:
-            logger.console(f"No active rules to remove for {component_name}")
+            logger.info(f"No active rules to remove for {component_name}")
             return
 
         for rule_file in rule_files:
