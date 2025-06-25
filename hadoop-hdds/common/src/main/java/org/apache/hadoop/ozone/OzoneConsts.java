@@ -533,6 +533,12 @@ public final class OzoneConsts {
    */
   public static final String ETAG = "ETag";
 
+  /**
+   * A constant string used as a separator in various contexts within
+   * the OMDBCheckpoint functions.
+   */
+  public static final String SEPARATOR = "-";
+
   private OzoneConsts() {
     // Never Constructed
   }
