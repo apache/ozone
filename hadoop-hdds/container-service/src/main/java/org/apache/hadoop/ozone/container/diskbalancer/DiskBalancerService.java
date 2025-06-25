@@ -36,6 +36,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
@@ -469,14 +470,28 @@ public class DiskBalancerService extends BackgroundService {
       Path diskBalancerTmpDir = null, diskBalancerDestDir = null;
       long containerSize = containerData.getBytesUsed();
       try {
+        // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = destVolume.getTmpDir().toPath()
             .resolve(DISK_BALANCER_DIR).resolve(String.valueOf(containerId));
-
-        // Copy container to new Volume's tmp Dir
         ozoneContainer.getController().copyContainer(containerData,
             diskBalancerTmpDir);
 
-        // Move container directory to final place on new volume
+        // Step 2: Transition to Temp container to Temp C1-RECOVERING
+        File tempContainerFile = ContainerUtils.getContainerFile(
+            diskBalancerTmpDir.toFile());
+        if (!tempContainerFile.exists()) {
+          throw new IOException("ContainerFile for container " + containerId
+              + " doesn't exist in temp directory "
+              + tempContainerFile.getAbsolutePath());
+        }
+        ContainerData tempContainerData = ContainerDataYaml
+            .readContainerFile(tempContainerFile);
+        tempContainerData.setState(ContainerProtos.ContainerDataProto.State.RECOVERING);
+
+        // overwrite the .container file with the new state.
+        ContainerDataYaml.createContainerFile(tempContainerData, tempContainerFile);
+
+        // Step 3: Move container directory to final place on new volume
         String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
             destVolume, destVolume.getClusterID());
         diskBalancerDestDir =
@@ -491,7 +506,7 @@ public class DiskBalancerService extends BackgroundService {
             StandardCopyOption.ATOMIC_MOVE,
             StandardCopyOption.REPLACE_EXISTING);
 
-        // Generate a new Container based on destDir
+        // Generate a new Container based on destDir which is in C1-RECOVERING state.
         File containerFile = ContainerUtils.getContainerFile(
             diskBalancerDestDir.toFile());
         if (!containerFile.exists()) {
@@ -506,7 +521,14 @@ public class DiskBalancerService extends BackgroundService {
             .incrementUsedSpace(containerSize);
         destVolumeIncreased = true;
 
-        // Update container for containerID
+        // Step 4: New Container state transition, C1-RECOVERING -> C1-CLOSING
+        newContainer.getContainerData().setState(
+            ContainerProtos.ContainerDataProto.State.CLOSED);
+        // The 'update' method persists the state change to the .container file.
+        newContainer.update(newContainer.getContainerData().getMetadata(),
+            true);
+
+        // Step 5: Update container for containerID and delete old container.
         Container oldContainer = ozoneContainer.getContainerSet()
             .getContainer(containerId);
         oldContainer.writeLock();

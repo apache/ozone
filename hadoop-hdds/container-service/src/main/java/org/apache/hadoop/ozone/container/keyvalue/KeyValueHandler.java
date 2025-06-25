@@ -1320,21 +1320,13 @@ public class KeyValueHandler extends Handler {
   @Override
   public Container importContainer(ContainerData originalContainerData,
       final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
-    Preconditions.checkState(originalContainerData instanceof
-        KeyValueContainerData, "Should be KeyValueContainerData instance");
-
-    KeyValueContainerData containerData = new KeyValueContainerData(
-        (KeyValueContainerData) originalContainerData);
-
-    KeyValueContainer container = new KeyValueContainer(containerData,
-        conf);
+      final TarContainerPacker packer) throws IOException {
+    KeyValueContainer container = createNewContainer(originalContainerData);
 
     HddsVolume targetVolume = originalContainerData.getVolume();
     populateContainerPathFields(container, targetVolume);
     container.importContainerData(rawContainerStream, packer);
-    ContainerLogger.logImported(containerData);
+    ContainerLogger.logImported(container.getContainerData());
     sendICR(container);
     return container;
 
@@ -1342,8 +1334,8 @@ public class KeyValueHandler extends Handler {
 
   @Override
   public void exportContainer(final Container container,
-                              final OutputStream outputStream,
-                              final TarContainerPacker packer)
+      final OutputStream outputStream,
+      final TarContainerPacker packer)
       throws IOException {
     final KeyValueContainer kvc = (KeyValueContainer) container;
     kvc.exportContainerData(outputStream, packer);
@@ -1568,14 +1560,7 @@ public class KeyValueHandler extends Handler {
   @Override
   public Container importContainer(ContainerData originalContainerData,
       final Path containerPath) throws IOException {
-    Preconditions.checkState(originalContainerData instanceof
-        KeyValueContainerData, "Should be KeyValueContainerData instance");
-
-    KeyValueContainerData containerData = new KeyValueContainerData(
-        (KeyValueContainerData) originalContainerData);
-
-    KeyValueContainer container = new KeyValueContainer(containerData,
-        conf);
+    KeyValueContainer container = createNewContainer(originalContainerData);
 
     HddsVolume volume = HddsVolumeUtil.matchHddsVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
@@ -1588,6 +1573,17 @@ public class KeyValueHandler extends Handler {
     container.populatePathFields(volume, containerPath);
     container.importContainerData(containerPath);
     return container;
+  }
+
+  private KeyValueContainer createNewContainer(
+      ContainerData originalContainerData) {
+    Preconditions.checkState(originalContainerData instanceof
+        KeyValueContainerData, "Should be KeyValueContainerData instance");
+
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        (KeyValueContainerData) originalContainerData);
+
+    return new KeyValueContainer(containerData, conf);
   }
 
   @Override
