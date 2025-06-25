@@ -151,7 +151,6 @@ public class SCMNodeManager implements NodeManager {
    * Constructs SCM machine Manager.
    */
   public SCMNodeManager(
-
       OzoneConfiguration conf,
       SCMStorageConfig scmStorageConfig,
       EventPublisher eventPublisher,

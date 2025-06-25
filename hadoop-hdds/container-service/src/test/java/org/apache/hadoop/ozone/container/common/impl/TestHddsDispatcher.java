@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -173,10 +174,10 @@ public class TestHddsDispatcher {
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
       for (ContainerType containerType : ContainerType.values()) {
-        handlers.put(containerType,
-            Handler.getHandlerForContainerType(containerType, conf,
-                context.getParent().getDatanodeDetails().getUuidString(),
-                containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER));
+        handlers.put(containerType, Handler.getHandlerForContainerType(containerType, conf,
+            context.getParent().getDatanodeDetails().getUuidString(),
+            containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER,
+            new ContainerChecksumTreeManager(conf)));
       }
       // write successfully to first container
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
@@ -332,7 +333,8 @@ public class TestHddsDispatcher {
         handlers.put(containerType,
             Handler.getHandlerForContainerType(containerType, conf,
                 context.getParent().getDatanodeDetails().getUuidString(),
-                containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER));
+                containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER,
+                new ContainerChecksumTreeManager(conf)));
       }
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
@@ -587,7 +589,8 @@ public class TestHddsDispatcher {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER));
+              containerSet, volumeSet, volumeChoosingPolicy, metrics, NO_OP_ICR_SENDER,
+              new ContainerChecksumTreeManager(conf)));
     }
 
     final HddsDispatcher hddsDispatcher = new HddsDispatcher(conf,

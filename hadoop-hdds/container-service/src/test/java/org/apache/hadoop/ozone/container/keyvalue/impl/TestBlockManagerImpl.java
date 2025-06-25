@@ -17,11 +17,13 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -36,10 +38,12 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -81,10 +85,10 @@ public class TestBlockManagerImpl {
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.config = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, config);
-    initilaze();
+    initialize();
   }
 
-  private void initilaze() throws Exception {
+  private void initialize() throws Exception {
     UUID datanodeId = UUID.randomUUID();
     HddsVolume hddsVolume = new HddsVolume.Builder(folder.toString())
         .conf(config)
@@ -194,6 +198,73 @@ public class TestBlockManagerImpl {
     assertEquals(blockData.getMetadata().size(), fromGetBlockData.getMetadata()
         .size());
 
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPutBlockForClosed(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
+    KeyValueContainerData containerData = keyValueContainer.getContainerData();
+    assertEquals(0, containerData.getBlockCount());
+    keyValueContainer.close();
+    assertEquals(CLOSED, keyValueContainer.getContainerState());
+
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      // 1. Put Block with bcsId = 1, Overwrite BCS ID = true
+      blockData1 = createBlockData(1L, 2L, 1, 0, 2048, 1);
+      blockManager.putBlockForClosedContainer(keyValueContainer, blockData1, true);
+
+      BlockData fromGetBlockData;
+      //Check Container's bcsId
+      fromGetBlockData = blockManager.getBlock(keyValueContainer, blockData.getBlockID());
+      assertEquals(1, containerData.getBlockCount());
+      assertEquals(1, containerData.getBlockCommitSequenceId());
+      assertEquals(1, fromGetBlockData.getBlockCommitSequenceId());
+      assertEquals(1, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
+      assertEquals(1, db.getStore().getMetadataTable().get(containerData.getBlockCountKey()));
+
+      // 2. Put Block with bcsId = 2, Overwrite BCS ID = false
+      BlockData blockData2 = createBlockData(1L, 3L, 1, 0, 2048, 2);
+      blockManager.putBlockForClosedContainer(keyValueContainer, blockData2, false);
+
+      // The block should be written, but we won't be able to read it, As expected BcsId < container's BcsId
+      // fails during block read.
+      assertThrows(StorageContainerException.class, () -> blockManager
+          .getBlock(keyValueContainer, blockData2.getBlockID()));
+      fromGetBlockData = db.getStore().getBlockDataTable().get(containerData.getBlockKey(blockData2.getLocalID()));
+      assertEquals(2, containerData.getBlockCount());
+      // BcsId should still be 1, as the BcsId is not overwritten
+      assertEquals(1, containerData.getBlockCommitSequenceId());
+      assertEquals(2, fromGetBlockData.getBlockCommitSequenceId());
+      assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBlockCountKey()));
+      assertEquals(1, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
+
+      // 3. Put Block with bcsId = 2, Overwrite BCS ID = true
+      // This should succeed as we are overwriting the BcsId, The container BcsId should be updated to 2
+      // The block count should not change.
+      blockManager.putBlockForClosedContainer(keyValueContainer, blockData2, true);
+      fromGetBlockData = blockManager.getBlock(keyValueContainer, blockData2.getBlockID());
+      assertEquals(2, containerData.getBlockCount());
+      assertEquals(2, containerData.getBlockCommitSequenceId());
+      assertEquals(2, fromGetBlockData.getBlockCommitSequenceId());
+      assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBlockCountKey()));
+      assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
+
+      // 4. Put Block with bcsId = 1 < container bcsId, Overwrite BCS ID = true
+      // We are overwriting an existing block with lower bcsId than container bcsId. Container bcsId should not change
+      BlockData blockData3 = createBlockData(1L, 1L, 1, 0, 2048, 1);
+      blockManager.putBlockForClosedContainer(keyValueContainer, blockData3, true);
+      fromGetBlockData = blockManager.getBlock(keyValueContainer, blockData3.getBlockID());
+      assertEquals(3, containerData.getBlockCount());
+      assertEquals(2, containerData.getBlockCommitSequenceId());
+      assertEquals(1, fromGetBlockData.getBlockCommitSequenceId());
+      assertEquals(3, db.getStore().getMetadataTable().get(containerData.getBlockCountKey()));
+      assertEquals(2, db.getStore().getMetadataTable().get(containerData.getBcsIdKey()));
+
+      // writeChunk updates the in-memory state of the used bytes, putBlock persists the in-memory state to the DB.
+      // We are only doing putBlock without writeChunk, the used bytes should be 0.
+      assertEquals(0, db.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
+    }
   }
 
   @ContainerTestVersionInfo.ContainerTest

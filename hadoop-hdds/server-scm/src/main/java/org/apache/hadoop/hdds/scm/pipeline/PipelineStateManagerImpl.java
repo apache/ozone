@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
-
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collection;
@@ -35,6 +33,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,9 +75,9 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       LOG.info("No pipeline exists in current db");
       return;
     }
-    try (Table.KeyValueIterator<PipelineID, Pipeline> iterator = pipelineStore.iterator(VALUE_ONLY)) {
+    try (TableIterator<PipelineID, Pipeline> iterator = pipelineStore.valueIterator()) {
       while (iterator.hasNext()) {
-        Pipeline pipeline = iterator.next().getValue();
+        final Pipeline pipeline = iterator.next();
         pipelineStateMap.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
       }
@@ -303,15 +302,10 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     lock.writeLock().lock();
     try {
-      if (pipelineStore != null) {
-        pipelineStore.close();
-        pipelineStore = null;
-      }
-    } catch (Exception ex) {
-      LOG.error("Pipeline store close failed", ex);
+      pipelineStore = null;
     } finally {
       lock.writeLock().unlock();
     }
@@ -322,7 +316,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       throws IOException {
     lock.writeLock().lock();
     try {
-      pipelineStore.close();
       this.pipelineStateMap = new PipelineStateMap();
       this.pipelineStore = store;
       initialize();
