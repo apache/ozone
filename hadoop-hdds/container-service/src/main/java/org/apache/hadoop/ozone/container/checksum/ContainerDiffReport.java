@@ -91,13 +91,25 @@ public class ContainerDiffReport {
     return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty();
   }
 
+  public long getNumCorruptChunks() {
+    return corruptChunks.values().stream().mapToInt(List::size).sum();
+  }
+
+  public long getNumMissingChunks() {
+    return missingChunks.values().stream().mapToInt(List::size).sum();
+  }
+
+  public long getNumMissingBlocks() {
+    return missingBlocks.size();
+  }
+
   @Override
   public String toString() {
     return "ContainerDiffReport:" +
-        " MissingBlocks= " + missingBlocks.size() + " blocks" +
-        ", MissingChunks= " + missingChunks.values().stream().mapToInt(List::size).sum()
+        " MissingBlocks= " + getNumMissingBlocks() + " blocks" +
+        ", MissingChunks= " + getNumMissingChunks()
         + " chunks from " + missingChunks.size() + " blocks" +
-        ", CorruptChunks= " + corruptChunks.values().stream().mapToInt(List::size).sum()
+        ", CorruptChunks= " + getNumCorruptChunks()
         + " chunks from " + corruptChunks.size() + " blocks";
   }
 }

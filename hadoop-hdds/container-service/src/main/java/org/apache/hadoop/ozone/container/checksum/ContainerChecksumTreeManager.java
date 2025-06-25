@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -185,9 +187,13 @@ public class ContainerChecksumTreeManager {
     // Update Container Diff metrics based on the diff report.
     if (report.needsRepair()) {
       metrics.incrementRepairContainerDiffs();
-      return report;
+      metrics.incrementCorruptChunksIdentified(report.getNumCorruptChunks());
+      metrics.incrementMissingBlocksIdentified(report.getNumMissingBlocks());
+      metrics.incrementMissingChunksIdentified(report.getNumMissingChunks());
+      System.err.println("in tree manager: " + report);
+    } else {
+      metrics.incrementNoRepairContainerDiffs();
     }
-    metrics.incrementNoRepairContainerDiffs();
     return report;
   }
 
