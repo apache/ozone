@@ -43,6 +43,7 @@ public enum DNAction implements AuditAction {
   STREAM_INIT,
   FINALIZE_BLOCK,
   ECHO,
+  GET_CONTAINER_CHECKSUM_INFO,
   READ_BLOCK;
 
   @Override

@@ -117,18 +117,14 @@ public class TestRDBStore {
 
   public void insertRandomData(RDBStore dbStore, int familyIndex)
       throws IOException {
-    try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
-        get(familyIndex))) {
-      assertNotNull(firstTable, "Table cannot be null");
-      for (int x = 0; x < 100; x++) {
-        byte[] key =
+    Table<byte[], byte[]> firstTable = dbStore.getTable(families.get(familyIndex));
+    assertNotNull(firstTable, "Table cannot be null");
+    for (int x = 0; x < 100; x++) {
+      byte[] key =
           RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
+      byte[] value =
           RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-      }
-    } catch (Exception e) {
-      throw new IOException(e);
+      firstTable.put(key, value);
     }
   }
 
@@ -191,20 +187,17 @@ public class TestRDBStore {
     byte[] value =
         RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
 
-    try (Table firstTable = rdbStore.getTable(families.get(1))) {
-      firstTable.put(key, value);
-      try (Table<byte[], byte[]> secondTable = rdbStore
-          .getTable(families.get(2))) {
-        rdbStore.move(key, firstTable, secondTable);
-        byte[] newvalue = secondTable.get(key);
-        // Make sure we have value in the second table
-        assertNotNull(newvalue);
-        //and it is same as what we wrote to the FirstTable
-        assertArrayEquals(value, newvalue);
-      }
-      // After move this key must not exist in the first table.
-      assertNull(firstTable.get(key));
-    }
+    final Table<byte[], byte[]> firstTable = rdbStore.getTable(families.get(1));
+    firstTable.put(key, value);
+    final Table<byte[], byte[]> secondTable = rdbStore.getTable(families.get(2));
+    rdbStore.move(key, firstTable, secondTable);
+    byte[] newvalue = secondTable.get(key);
+    // Make sure we have value in the second table
+    assertNotNull(newvalue);
+    //and it is same as what we wrote to the FirstTable
+    assertArrayEquals(value, newvalue);
+    // After move this key must not exist in the first table.
+    assertNull(firstTable.get(key));
   }
 
   @Test
@@ -216,20 +209,16 @@ public class TestRDBStore {
 
     byte[] nextValue =
         RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-    try (Table firstTable = rdbStore.getTable(families.get(1))) {
-      firstTable.put(key, value);
-      try (Table<byte[], byte[]> secondTable = rdbStore
-          .getTable(families.get(2))) {
-        rdbStore.move(key, nextValue, firstTable, secondTable);
-        byte[] newvalue = secondTable.get(key);
-        // Make sure we have value in the second table
-        assertNotNull(newvalue);
-        //and it is not same as what we wrote to the FirstTable, and equals
-        // the new value.
-        assertArrayEquals(nextValue, newvalue);
-      }
-    }
-
+    Table<byte[], byte[]> firstTable = rdbStore.getTable(families.get(1));
+    firstTable.put(key, value);
+    Table<byte[], byte[]> secondTable = rdbStore.getTable(families.get(2));
+    rdbStore.move(key, nextValue, firstTable, secondTable);
+    byte[] newvalue = secondTable.get(key);
+    // Make sure we have value in the second table
+    assertNotNull(newvalue);
+    //and it is not same as what we wrote to the FirstTable, and equals
+    // the new value.
+    assertArrayEquals(nextValue, newvalue);
   }
 
   @Test
@@ -250,9 +239,8 @@ public class TestRDBStore {
   @Test
   public void getTable() throws Exception {
     for (String tableName : families) {
-      try (Table table = rdbStore.getTable(tableName)) {
-        assertNotNull(table, tableName + "is null");
-      }
+      Table<byte[], byte[]> table = rdbStore.getTable(tableName);
+      assertNotNull(table, tableName + "is null");
     }
     assertThrows(IOException.class,
         () -> rdbStore.getTable("ATableWithNoName"));
@@ -315,48 +303,42 @@ public class TestRDBStore {
 
   @Test
   public void testGetDBUpdatesSince() throws Exception {
-
-    try (Table firstTable = rdbStore.getTable(families.get(1))) {
-      firstTable.put(
-          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key1"),
-          org.apache.commons.codec.binary.StringUtils
-              .getBytesUtf16("Value1"));
-      firstTable.put(
-          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key2"),
-          org.apache.commons.codec.binary.StringUtils
-              .getBytesUtf16("Value2"));
-    }
+    final Table<byte[], byte[]> firstTable = rdbStore.getTable(families.get(1));
+    firstTable.put(
+        getBytesUtf16("Key1"),
+        getBytesUtf16("Value1"));
+    firstTable.put(
+        getBytesUtf16("Key2"),
+        getBytesUtf16("Value2"));
     assertEquals(2, rdbStore.getDb().getLatestSequenceNumber());
 
     DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0);
     assertEquals(2, dbUpdatesSince.getData().size());
   }
 
+  static byte[] getBytesUtf16(String s) {
+    return s.getBytes(StandardCharsets.UTF_16);
+  }
+
   @Test
   public void testGetDBUpdatesSinceWithLimitCount() throws Exception {
 
-    try (Table firstTable = rdbStore.getTable(families.get(1))) {
-      firstTable.put(
-          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key1"),
-          org.apache.commons.codec.binary.StringUtils
-              .getBytesUtf16("Value1"));
-      firstTable.put(
-          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key2"),
-          org.apache.commons.codec.binary.StringUtils
-              .getBytesUtf16("Value2"));
-      firstTable.put(
-          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key3"),
-          org.apache.commons.codec.binary.StringUtils
-              .getBytesUtf16("Value3"));
-      firstTable.put(
-          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key4"),
-          org.apache.commons.codec.binary.StringUtils
-              .getBytesUtf16("Value4"));
-      firstTable.put(
-          org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key5"),
-          org.apache.commons.codec.binary.StringUtils
-              .getBytesUtf16("Value5"));
-    }
+    final Table<byte[], byte[]> firstTable = rdbStore.getTable(families.get(1));
+    firstTable.put(
+        getBytesUtf16("Key1"),
+        getBytesUtf16("Value1"));
+    firstTable.put(
+        getBytesUtf16("Key2"),
+        getBytesUtf16("Value2"));
+    firstTable.put(
+        getBytesUtf16("Key3"),
+        getBytesUtf16("Value3"));
+    firstTable.put(
+        getBytesUtf16("Key4"),
+        getBytesUtf16("Value4"));
+    firstTable.put(
+        getBytesUtf16("Key5"),
+        getBytesUtf16("Value5"));
     assertEquals(5, rdbStore.getDb().getLatestSequenceNumber());
 
     DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 5);
@@ -370,12 +352,10 @@ public class TestRDBStore {
     // Write data to current DB which has 6 column families at the time of
     // writing this test.
     for (String family : families) {
-      try (Table table = rdbStore.getTable(family)) {
-        byte[] key = family.getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-        table.put(key, value);
-      }
+      final Table<byte[], byte[]> table = rdbStore.getTable(family);
+      byte[] key = family.getBytes(StandardCharsets.UTF_8);
+      byte[] value = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      table.put(key, value);
     }
     // Close current DB.
     rdbStore.close();
@@ -394,21 +374,19 @@ public class TestRDBStore {
     rdbStore = newRDBStore(rdbStore.getDbLocation(), options, configSet,
         MAX_DB_UPDATES_SIZE_THRESHOLD);
     for (String family : familiesMinusOne) {
-      try (Table table = rdbStore.getTable(family)) {
-        assertNotNull(table, family + "is null");
-        Object val = table.get(family.getBytes(StandardCharsets.UTF_8));
-        assertNotNull(val);
-      }
+      final Table<byte[], byte[]> table = rdbStore.getTable(family);
+      assertNotNull(table, family + "is null");
+      Object val = table.get(family.getBytes(StandardCharsets.UTF_8));
+      assertNotNull(val);
     }
 
     // Technically the extra column family should also be open, even though
     // we do not use it.
     String extraFamily = families.get(families.size() - 1);
-    try (Table table = rdbStore.getTable(extraFamily)) {
-      assertNotNull(table, extraFamily + "is null");
-      Object val = table.get(extraFamily.getBytes(StandardCharsets.UTF_8));
-      assertNotNull(val);
-    }
+    final Table<byte[], byte[]> table = rdbStore.getTable(extraFamily);
+    assertNotNull(table, extraFamily + "is null");
+    Object val = table.get(extraFamily.getBytes(StandardCharsets.UTF_8));
+    assertNotNull(val);
   }
 
   @Test

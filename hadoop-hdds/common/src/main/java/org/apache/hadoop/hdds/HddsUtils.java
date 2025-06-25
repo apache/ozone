@@ -420,6 +420,7 @@ public final class HddsUtils {
     case ListContainer:
     case ListChunk:
     case GetCommittedBlockLength:
+    case GetContainerChecksumInfo:
       return true;
     case CloseContainer:
     case WriteChunk:
@@ -865,6 +866,11 @@ public final class HddsUtils {
     return logger.isDebugEnabled()
         ? Thread.currentThread().getStackTrace()
         : null;
+  }
+
+  /** @return Hex string representation of {@code value} */
+  public static String checksumToString(long value) {
+    return Long.toHexString(value);
   }
 
   /**

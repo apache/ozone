@@ -102,19 +102,17 @@ public class TestTypedRDBTableStore {
 
   @Test
   public void putGetAndEmpty() throws Exception {
-    try (Table<String, String> testTable = createTypedTable(
-        "First")) {
-      String key =
-          RandomStringUtils.secure().next(10);
-      String value = RandomStringUtils.secure().next(10);
-      testTable.put(key, value);
-      assertFalse(testTable.isEmpty());
-      String readValue = testTable.get(key);
-      assertEquals(value, readValue);
-    }
-    try (Table secondTable = rdbStore.getTable("Second")) {
-      assertTrue(secondTable.isEmpty());
-    }
+    final Table<String, String> testTable = createTypedTable("First");
+    String key =
+        RandomStringUtils.secure().next(10);
+    String value = RandomStringUtils.secure().next(10);
+    testTable.put(key, value);
+    assertFalse(testTable.isEmpty());
+    String readValue = testTable.get(key);
+    assertEquals(value, readValue);
+
+    final Table<byte[], byte[]> secondTable = rdbStore.getTable("Second");
+    assertTrue(secondTable.isEmpty());
   }
 
   private Table<String, String> createTypedTable(String name)
@@ -142,33 +140,29 @@ public class TestTypedRDBTableStore {
 
     // Write all the keys and delete the keys scheduled for delete.
     //Assert we find only expected keys in the Table.
-    try (Table<String, String> testTable = createTypedTable(
-        "Fourth")) {
-      for (String deletedKey : deletedKeys) {
-        testTable.put(deletedKey, value);
-        testTable.delete(deletedKey);
-      }
+    final Table<String, String> testTable = createTypedTable("Fourth");
+    for (String deletedKey : deletedKeys) {
+      testTable.put(deletedKey, value);
+      testTable.delete(deletedKey);
+    }
 
-      for (String validKey : validKeys) {
-        testTable.put(validKey, value);
-      }
+    for (String validKey : validKeys) {
+      testTable.put(validKey, value);
+    }
 
-      for (String validKey : validKeys) {
-        assertNotNull(testTable.get(validKey));
-      }
+    for (String validKey : validKeys) {
+      assertNotNull(testTable.get(validKey));
+    }
 
-      for (String deletedKey : deletedKeys) {
-        assertNull(testTable.get(deletedKey));
-      }
+    for (String deletedKey : deletedKeys) {
+      assertNull(testTable.get(deletedKey));
     }
   }
 
   @Test
   public void batchPut() throws Exception {
-
-    try (Table<String, String> testTable = createTypedTable(
-        "Fourth");
-        BatchOperation batch = rdbStore.initBatchOperation()) {
+    final Table<String, String> testTable = createTypedTable("Fourth");
+    try (BatchOperation batch = rdbStore.initBatchOperation()) {
       //given
       String key =
           RandomStringUtils.secure().next(10);
@@ -186,9 +180,8 @@ public class TestTypedRDBTableStore {
 
   @Test
   public void batchDelete() throws Exception {
-    try (Table<String, String> testTable = createTypedTable(
-        "Fourth");
-        BatchOperation batch = rdbStore.initBatchOperation()) {
+    final Table<String, String> testTable = createTypedTable("Fourth");
+    try (BatchOperation batch = rdbStore.initBatchOperation()) {
 
       //given
       String key =
@@ -215,30 +208,25 @@ public class TestTypedRDBTableStore {
   @Test
   public void forEachAndIterator() throws Exception {
     final int iterCount = 100;
-    try (Table<String, String> testTable = createTypedTable(
-        "Sixth")) {
-      for (int x = 0; x < iterCount; x++) {
-        String key =
-            RandomStringUtils.secure().next(10);
-        String value =
-            RandomStringUtils.secure().next(10);
-        testTable.put(key, value);
+    final Table<String, String> testTable = createTypedTable("Sixth");
+    for (int x = 0; x < iterCount; x++) {
+      String key = RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
+      testTable.put(key, value);
+    }
+    int localCount = 0;
+
+    try (Table.KeyValueIterator<String, String> iter = testTable.iterator()) {
+      while (iter.hasNext()) {
+        iter.next();
+        localCount++;
       }
-      int localCount = 0;
 
-      try (Table.KeyValueIterator<String, String> iter =
-          testTable.iterator()) {
-        while (iter.hasNext()) {
-          Table.KeyValue keyValue = iter.next();
-          localCount++;
-        }
+      assertEquals(iterCount, localCount);
+      iter.seekToFirst();
+      iter.forEachRemaining(TestTypedRDBTableStore::consume);
+      assertEquals(iterCount, count);
 
-        assertEquals(iterCount, localCount);
-        iter.seekToFirst();
-        iter.forEachRemaining(TestTypedRDBTableStore::consume);
-        assertEquals(iterCount, count);
-
-      }
     }
   }
 
@@ -246,33 +234,29 @@ public class TestTypedRDBTableStore {
   public void testIteratorOnException() throws Exception {
     RDBTable rdbTable = mock(RDBTable.class);
     when(rdbTable.iterator((CodecBuffer) null, Table.KeyValueIterator.Type.KEY_AND_VALUE))
-        .thenThrow(new IOException());
-    try (Table<String, String> testTable = new TypedTable<>(rdbTable,
-        StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE)) {
-      assertThrows(IOException.class, testTable::iterator);
-    }
+        .thenThrow(new RocksDatabaseException());
+    final Table<String, String> testTable = new TypedTable<>(rdbTable,
+        StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE);
+    assertThrows(IOException.class, testTable::iterator);
   }
 
   @Test
   public void testTypedTableWithCache() throws Exception {
     int iterCount = 10;
-    try (Table<String, String> testTable = createTypedTable(
-        "Seven")) {
+    final Table<String, String> testTable = createTypedTable("Seven");
 
-      for (int x = 0; x < iterCount; x++) {
-        String key = Integer.toString(x);
-        String value = Integer.toString(x);
-        testTable.addCacheEntry(new CacheKey<>(key),
-            CacheValue.get(x, value));
-      }
+    for (int x = 0; x < iterCount; x++) {
+      String key = Integer.toString(x);
+      String value = Integer.toString(x);
+      testTable.addCacheEntry(new CacheKey<>(key),
+          CacheValue.get(x, value));
+    }
 
-      // As we have added to cache, so get should return value even if it
-      // does not exist in DB.
-      for (int x = 0; x < iterCount; x++) {
-        assertEquals(Integer.toString(1),
-            testTable.get(Integer.toString(1)));
-      }
-
+    // As we have added to cache, so get should return value even if it
+    // does not exist in DB.
+    for (int x = 0; x < iterCount; x++) {
+      assertEquals(Integer.toString(1),
+          testTable.get(Integer.toString(1)));
     }
   }
 
@@ -280,142 +264,123 @@ public class TestTypedRDBTableStore {
   public void testTypedTableWithCacheWithFewDeletedOperationType()
       throws Exception {
     int iterCount = 10;
-    try (Table<String, String> testTable = createTypedTable(
-        "Seven")) {
+    final Table<String, String> testTable = createTypedTable("Seven");
 
-      for (int x = 0; x < iterCount; x++) {
-        String key = Integer.toString(x);
-        String value = Integer.toString(x);
-        if (x % 2 == 0) {
-          testTable.addCacheEntry(new CacheKey<>(key),
-              CacheValue.get(x, value));
-        } else {
-          testTable.addCacheEntry(new CacheKey<>(key),
-              CacheValue.get(x));
-        }
+    for (int x = 0; x < iterCount; x++) {
+      String key = Integer.toString(x);
+      String value = Integer.toString(x);
+      if (x % 2 == 0) {
+        testTable.addCacheEntry(new CacheKey<>(key),
+            CacheValue.get(x, value));
+      } else {
+        testTable.addCacheEntry(new CacheKey<>(key),
+            CacheValue.get(x));
       }
+    }
 
-      // As we have added to cache, so get should return value even if it
-      // does not exist in DB.
-      for (int x = 0; x < iterCount; x++) {
-        if (x % 2 == 0) {
-          assertEquals(Integer.toString(x),
-              testTable.get(Integer.toString(x)));
-        } else {
-          assertNull(testTable.get(Integer.toString(x)));
-        }
+    // As we have added to cache, so get should return value even if it
+    // does not exist in DB.
+    for (int x = 0; x < iterCount; x++) {
+      if (x % 2 == 0) {
+        assertEquals(Integer.toString(x),
+            testTable.get(Integer.toString(x)));
+      } else {
+        assertNull(testTable.get(Integer.toString(x)));
       }
+    }
 
-      ArrayList<Long> epochs = new ArrayList<>();
-      for (long i = 0; i <= 5L; i++) {
-        epochs.add(i);
+    ArrayList<Long> epochs = new ArrayList<>();
+    for (long i = 0; i <= 5L; i++) {
+      epochs.add(i);
+    }
+    testTable.cleanupCache(epochs);
+
+    GenericTestUtils.waitFor(() ->
+            ((TypedTable<String, String>) testTable).getCache().size() == 4,
+        100, 5000);
+
+
+    //Check remaining values
+    for (int x = 6; x < iterCount; x++) {
+      if (x % 2 == 0) {
+        assertEquals(Integer.toString(x),
+            testTable.get(Integer.toString(x)));
+      } else {
+        assertNull(testTable.get(Integer.toString(x)));
       }
-      testTable.cleanupCache(epochs);
-
-      GenericTestUtils.waitFor(() ->
-          ((TypedTable<String, String>) testTable).getCache().size() == 4,
-          100, 5000);
-
-
-      //Check remaining values
-      for (int x = 6; x < iterCount; x++) {
-        if (x % 2 == 0) {
-          assertEquals(Integer.toString(x),
-              testTable.get(Integer.toString(x)));
-        } else {
-          assertNull(testTable.get(Integer.toString(x)));
-        }
-      }
-
-
     }
   }
 
   @Test
   public void testIsExist() throws Exception {
-    try (Table<String, String> testTable = createTypedTable(
-        "Eighth")) {
-      String key =
-          RandomStringUtils.secure().next(10);
-      String value = RandomStringUtils.secure().next(10);
-      testTable.put(key, value);
-      assertTrue(testTable.isExist(key));
+    final Table<String, String> testTable = createTypedTable("Eighth");
+    String key = RandomStringUtils.secure().next(10);
+    String value = RandomStringUtils.secure().next(10);
+    testTable.put(key, value);
+    assertTrue(testTable.isExist(key));
 
-      String invalidKey = key + RandomStringUtils.secure().next(1);
-      assertFalse(testTable.isExist(invalidKey));
+    String invalidKey = key + RandomStringUtils.secure().next(1);
+    assertFalse(testTable.isExist(invalidKey));
 
-      testTable.delete(key);
-      assertFalse(testTable.isExist(key));
-    }
+    testTable.delete(key);
+    assertFalse(testTable.isExist(key));
   }
 
   @Test
   public void testGetIfExist() throws Exception {
-    try (Table<String, String> testTable = createTypedTable(
-        "Eighth")) {
-      String key =
-          RandomStringUtils.secure().next(10);
-      String value = RandomStringUtils.secure().next(10);
-      testTable.put(key, value);
-      assertNotNull(testTable.getIfExist(key));
+    final Table<String, String> testTable = createTypedTable("Eighth");
+    String key = RandomStringUtils.secure().next(10);
+    String value = RandomStringUtils.secure().next(10);
+    testTable.put(key, value);
+    assertNotNull(testTable.getIfExist(key));
 
-      String invalidKey = key + RandomStringUtils.secure().next(1);
-      assertNull(testTable.getIfExist(invalidKey));
+    String invalidKey = key + RandomStringUtils.secure().next(1);
+    assertNull(testTable.getIfExist(invalidKey));
 
-      testTable.delete(key);
-      assertNull(testTable.getIfExist(key));
-    }
+    testTable.delete(key);
+    assertNull(testTable.getIfExist(key));
   }
 
   @Test
   public void testIsExistCache() throws Exception {
-    try (Table<String, String> testTable = createTypedTable(
-        "Eighth")) {
-      String key =
-          RandomStringUtils.secure().next(10);
-      String value = RandomStringUtils.secure().next(10);
-      testTable.addCacheEntry(new CacheKey<>(key),
-          CacheValue.get(1L, value));
-      assertTrue(testTable.isExist(key));
+    final Table<String, String> testTable = createTypedTable("Eighth");
+    String key = RandomStringUtils.secure().next(10);
+    String value = RandomStringUtils.secure().next(10);
+    testTable.addCacheEntry(new CacheKey<>(key), CacheValue.get(1L, value));
+    assertTrue(testTable.isExist(key));
 
-      testTable.addCacheEntry(new CacheKey<>(key),
-          CacheValue.get(1L));
-      assertFalse(testTable.isExist(key));
-    }
+    testTable.addCacheEntry(new CacheKey<>(key),
+        CacheValue.get(1L));
+    assertFalse(testTable.isExist(key));
   }
 
   @Test
   public void testCountEstimatedRowsInTable() throws Exception {
-    try (Table<String, String> testTable = createTypedTable(
-        "Ninth")) {
-      // Add a few keys
-      final int numKeys = 12345;
-      for (int i = 0; i < numKeys; i++) {
-        String key =
-            RandomStringUtils.secure().next(10);
-        String value = RandomStringUtils.secure().next(10);
-        testTable.put(key, value);
-      }
-      long keyCount = testTable.getEstimatedKeyCount();
-      // The result should be larger than zero but not exceed(?) numKeys
-      assertThat(keyCount).isGreaterThan(0).isLessThanOrEqualTo(numKeys);
+    final Table<String, String> testTable = createTypedTable("Ninth");
+    // Add a few keys
+    final int numKeys = 12345;
+    for (int i = 0; i < numKeys; i++) {
+      String key =
+          RandomStringUtils.secure().next(10);
+      String value = RandomStringUtils.secure().next(10);
+      testTable.put(key, value);
     }
+    long keyCount = testTable.getEstimatedKeyCount();
+    // The result should be larger than zero but not exceed(?) numKeys
+    assertThat(keyCount).isGreaterThan(0).isLessThanOrEqualTo(numKeys);
   }
 
   @Test
   public void testByteArrayTypedTable() throws Exception {
-    try (Table<byte[], byte[]> testTable = new TypedTable<>(
-            rdbStore.getTable("Ten"),
-            ByteArrayCodec.get(), ByteArrayCodec.get(), CacheType.PARTIAL_CACHE)) {
-      byte[] key = new byte[] {1, 2, 3};
-      byte[] value = new byte[] {4, 5, 6};
-      testTable.put(key, value);
-      byte[] actualValue = testTable.get(key);
-      assertArrayEquals(value, testTable.get(key));
-      assertNotSame(value, actualValue);
-      testTable.addCacheEntry(new CacheKey<>(key),
-              CacheValue.get(1L, value));
-      assertSame(value, testTable.get(key));
-    }
+    final Table<byte[], byte[]> testTable = new TypedTable<>(rdbStore.getTable("Ten"),
+        ByteArrayCodec.get(), ByteArrayCodec.get(), CacheType.PARTIAL_CACHE);
+    byte[] key = new byte[]{1, 2, 3};
+    byte[] value = new byte[]{4, 5, 6};
+    testTable.put(key, value);
+    byte[] actualValue = testTable.get(key);
+    assertArrayEquals(value, testTable.get(key));
+    assertNotSame(value, actualValue);
+    testTable.addCacheEntry(new CacheKey<>(key), CacheValue.get(1L, value));
+    assertSame(value, testTable.get(key));
   }
 }
