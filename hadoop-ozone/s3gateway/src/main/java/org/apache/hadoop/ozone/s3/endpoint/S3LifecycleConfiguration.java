@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "LifecycleConfiguration",
     namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
-public class LifecycleConfiguration {
+public class S3LifecycleConfiguration {
   @XmlElement(name = "Rule")
   private List<Rule> rules = new ArrayList<>();
 
@@ -372,18 +372,18 @@ public class LifecycleConfiguration {
    * @param ozoneLifecycleConfiguration internal lifecycle configuration
    * @return LifecycleConfiguration XML representation
    */
-  public static LifecycleConfiguration fromOzoneLifecycleConfiguration(
+  public static S3LifecycleConfiguration fromOzoneLifecycleConfiguration(
       OzoneLifecycleConfiguration ozoneLifecycleConfiguration) {
 
-    LifecycleConfiguration lifecycleConfiguration = new LifecycleConfiguration();
+    S3LifecycleConfiguration s3LifecycleConfiguration = new S3LifecycleConfiguration();
     List<Rule> rules = new ArrayList<>();
 
     for (OzoneLifecycleConfiguration.OzoneLCRule ozoneRule : ozoneLifecycleConfiguration.getRules()) {
       rules.add(convertFromOzoneRule(ozoneRule));
     }
 
-    lifecycleConfiguration.setRules(rules);
-    return lifecycleConfiguration;
+    s3LifecycleConfiguration.setRules(rules);
+    return s3LifecycleConfiguration;
   }
 
   /**

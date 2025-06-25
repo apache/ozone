@@ -37,14 +37,14 @@ import org.xml.sax.XMLReader;
  * Custom unmarshaller to read Lifecycle configuration namespace.
  */
 public class PutBucketLifecycleConfigurationUnmarshaller
-    implements MessageBodyReader<LifecycleConfiguration>  {
+    implements MessageBodyReader<S3LifecycleConfiguration>  {
 
   private final JAXBContext context;
   private final XMLReader xmlReader;
 
   public PutBucketLifecycleConfigurationUnmarshaller() {
     try {
-      context = JAXBContext.newInstance(LifecycleConfiguration.class);
+      context = JAXBContext.newInstance(S3LifecycleConfiguration.class);
       SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
       saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       xmlReader = saxParserFactory.newSAXParser().getXMLReader();
@@ -57,11 +57,11 @@ public class PutBucketLifecycleConfigurationUnmarshaller
   @Override
   public boolean isReadable(Class<?> type, Type genericType,
       Annotation[] annotations, MediaType mediaType) {
-    return type.equals(LifecycleConfiguration.class);
+    return type.equals(S3LifecycleConfiguration.class);
   }
 
   @Override
-  public LifecycleConfiguration readFrom(Class<LifecycleConfiguration> type,
+  public S3LifecycleConfiguration readFrom(Class<S3LifecycleConfiguration> type,
       Type genericType, Annotation[] annotations, MediaType mediaType,
       MultivaluedMap<String, String> httpHeaders, InputStream inputStream)
       throws WebApplicationException {
@@ -72,7 +72,7 @@ public class PutBucketLifecycleConfigurationUnmarshaller
       filter.setContentHandler(unmarshallerHandler);
       filter.setParent(xmlReader);
       filter.parse(new InputSource(inputStream));
-      return (LifecycleConfiguration)(unmarshallerHandler.getResult());
+      return (S3LifecycleConfiguration)(unmarshallerHandler.getResult());
     } catch (Exception e) {
       throw new WebApplicationException("Can't parse request body to XML.", e);
     }

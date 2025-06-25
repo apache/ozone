@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
+import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -35,9 +35,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Testing for DeleteBucketLifecycleConfiguration.
+ * Testing for GetBucketLifecycleConfiguration.
  */
-public class TestLifecycleConfigurationDelete {
+public class TestS3LifecycleConfigurationGet {
+
   private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
@@ -52,29 +53,10 @@ public class TestLifecycleConfigurationDelete {
   }
 
   @Test
-  public void testDeleteNonExistentLifecycleConfiguration()
+  public void testGetNonExistentLifecycleConfiguration()
       throws Exception {
     try {
-      bucketEndpoint.delete("bucket1", "");
-      fail();
-    } catch (OS3Exception ex) {
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-      assertEquals(NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(),
-              ex.getCode());
-    }
-  }
-
-  @Test
-  public void testDeleteLifecycleConfiguration() throws Exception {
-    String bucketName = "bucket1";
-    bucketEndpoint.put(bucketName, null, "", null, getBody());
-    Response r = bucketEndpoint.delete(bucketName, "");
-
-    assertEquals(HTTP_NO_CONTENT, r.getStatus());
-
-    try {
-      // Make sure it was deleted.
-      bucketEndpoint.get(bucketName, null, null, null, 0, null, null,
+      bucketEndpoint.get("bucket1", null, null, null, 0, null, null,
           null, null, null, null, null, 0, "", null);
       fail();
     } catch (OS3Exception ex) {
@@ -82,6 +64,24 @@ public class TestLifecycleConfigurationDelete {
       assertEquals(NO_SUCH_LIFECYCLE_CONFIGURATION.getCode(),
           ex.getCode());
     }
+  }
+
+  @Test
+  public void testGetLifecycleConfiguration() throws Exception {
+    String bucketName = "bucket1";
+    bucketEndpoint.put(bucketName, null, "", null, getBody());
+    Response r = bucketEndpoint.get(bucketName, null, null, null, 0, null, null,
+        null, null, null, null, null, 0, "", null);
+
+    assertEquals(HTTP_OK, r.getStatus());
+    S3LifecycleConfiguration lcc =
+        (S3LifecycleConfiguration) r.getEntity();
+    assertEquals("remove logs after 30 days",
+        lcc.getRules().get(0).getId());
+    assertEquals("prefix/", lcc.getRules().get(0).getPrefix());
+    assertEquals("Enabled", lcc.getRules().get(0).getStatus());
+    assertEquals(30,
+        lcc.getRules().get(0).getExpiration().getDays().intValue());
   }
 
   private static InputStream getBody() {

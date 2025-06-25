@@ -799,13 +799,13 @@ public class BucketEndpoint extends EndpointBase {
       String bucketName, HttpHeaders httpHeaders, InputStream body)
       throws IOException, OS3Exception {
     verifyBucketOwner(bucketName, httpHeaders);
-    LifecycleConfiguration lifecycleConfiguration;
+    S3LifecycleConfiguration s3LifecycleConfiguration;
     OzoneBucket ozoneBucket = getBucket(bucketName);
     try {
-      lifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(null,
+      s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(null,
           null, null, null, null, body);
       OmLifecycleConfiguration lcc =
-          lifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket.getVolumeName(), bucketName);
+          s3LifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket.getVolumeName(), bucketName);
       ozoneBucket.setLifecycleConfiguration(lcc);
     } catch (WebApplicationException ex) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);
@@ -824,7 +824,7 @@ public class BucketEndpoint extends EndpointBase {
     verifyBucketOwner(bucketName, httpHeaders);
     OzoneLifecycleConfiguration ozoneLifecycleConfiguration =
         getLifecycleConfiguration(bucketName);
-    return Response.ok(LifecycleConfiguration.fromOzoneLifecycleConfiguration(
+    return Response.ok(S3LifecycleConfiguration.fromOzoneLifecycleConfiguration(
         ozoneLifecycleConfiguration), MediaType.APPLICATION_XML_TYPE).build();
   }
 

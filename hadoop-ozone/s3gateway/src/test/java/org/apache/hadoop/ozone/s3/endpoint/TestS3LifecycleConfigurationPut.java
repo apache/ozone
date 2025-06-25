@@ -46,7 +46,7 @@ import org.mockito.Mockito;
 /**
  * Testing for PutBucketLifecycleConfiguration.
  */
-public class TestLifecycleConfigurationPut {
+public class TestS3LifecycleConfigurationPut {
 
   private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
@@ -88,9 +88,9 @@ public class TestLifecycleConfigurationPut {
 
   @Test
   public void testPutInvalidLifecycleConfiguration() throws Exception {
-    testInvalidLifecycleConfiguration(TestLifecycleConfigurationPut::withoutAction,
+    testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withoutAction,
         HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
-    testInvalidLifecycleConfiguration(TestLifecycleConfigurationPut::withoutFilter,
+    testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withoutFilter,
         HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
     testInvalidLifecycleConfiguration(this::useDuplicateTagInAndOperator,
         HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
