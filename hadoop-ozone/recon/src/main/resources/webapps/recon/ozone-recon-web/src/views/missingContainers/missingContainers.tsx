@@ -19,13 +19,13 @@
 import React from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
-import { Table, Tooltip, Tabs } from 'antd';
-import { TablePaginationConfig } from 'antd/es/table';
-import { InfoCircleOutlined } from '@ant-design/icons';
+import {Table, Tabs, Tooltip} from 'antd';
+import {TablePaginationConfig} from 'antd/es/table';
+import {InfoCircleOutlined} from '@ant-design/icons';
 
-import { ColumnSearch } from '@/utils/columnSearch';
-import { showDataFetchError, timeFormat } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+import {ColumnSearch} from '@/utils/columnSearch';
+import {showDataFetchError, timeFormat} from '@/utils/common';
+import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
 
 import './missingContainers.less';
 

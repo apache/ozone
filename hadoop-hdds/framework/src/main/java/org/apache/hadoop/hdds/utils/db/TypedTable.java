@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
@@ -438,9 +438,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public List<KeyValue<KEY, VALUE>> getRangeKVs(
-          KEY startKey, int count, KEY prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws RocksDatabaseException, CodecException {
+      KEY startKey, int count, KEY prefix, KeyPrefixFilter filter, boolean isSequential)
+      throws RocksDatabaseException, CodecException {
+    // TODO use CodecBuffer if the key codec supports
 
     // A null start key means to start from the beginning of the table.
     // Cannot convert a null key to bytes.
@@ -448,28 +448,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     final byte[] prefixBytes = encodeKey(prefix);
 
     List<KeyValue<byte[], byte[]>> rangeKVBytes =
-        rawTable.getRangeKVs(startKeyBytes, count, prefixBytes, filters);
-    return convert(rangeKVBytes);
-  }
-
-  @Override
-  public List<KeyValue<KEY, VALUE>> getSequentialRangeKVs(
-          KEY startKey, int count, KEY prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws RocksDatabaseException, CodecException {
-
-    // A null start key means to start from the beginning of the table.
-    // Cannot convert a null key to bytes.
-    final byte[] startKeyBytes = encodeKey(startKey);
-    final byte[] prefixBytes = encodeKey(prefix);
-
-    List<KeyValue<byte[], byte[]>> rangeKVBytes =
-        rawTable.getSequentialRangeKVs(startKeyBytes, count,
-            prefixBytes, filters);
-    return convert(rangeKVBytes);
-  }
-
-  private List<KeyValue<KEY, VALUE>> convert(List<KeyValue<byte[], byte[]>> rangeKVBytes) throws CodecException {
+        rawTable.getRangeKVs(startKeyBytes, count, prefixBytes, filter, isSequential);
     final List<KeyValue<KEY, VALUE>> rangeKVs = new ArrayList<>();
     for (KeyValue<byte[], byte[]> kv : rangeKVBytes) {
       rangeKVs.add(Table.newKeyValue(decodeKey(kv.getKey()), decodeValue(kv.getValue())));
