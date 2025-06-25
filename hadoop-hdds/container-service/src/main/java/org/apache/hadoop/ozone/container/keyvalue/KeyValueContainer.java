@@ -631,19 +631,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       }
 
       // delete all other temporary data in case of any exception.
-      try {
-        if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
-          BlockUtils.removeContainerFromDB(containerData, config);
-        }
-        FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
-        FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
-        FileUtils.deleteDirectory(
-            new File(getContainerData().getContainerPath()));
-      } catch (Exception deleteex) {
-        LOG.error(
-            "Can not cleanup destination directories after a container import"
-                + " error (cid: {}", containerId, deleteex);
-      }
+      cleanupFailedImport();
       throw ex;
     } finally {
       writeUnlock();
@@ -695,24 +683,24 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         throw ex;
       }
       //delete all the temporary data in case of any exception.
-      try {
-        if (containerData.getSchemaVersion() != null &&
-            containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-          BlockUtils.removeContainerFromDB(containerData, config);
-        }
-        FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
-        FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
-        FileUtils.deleteDirectory(
-            new File(getContainerData().getContainerPath()));
-      } catch (Exception deleteex) {
-        LOG.error(
-            "Can not cleanup destination directories after a container load"
-                + " error (cid" +
-                containerData.getContainerID() + ")", deleteex);
-      }
+      cleanupFailedImport();
       throw ex;
     } finally {
       writeUnlock();
+    }
+  }
+
+  private void cleanupFailedImport() {
+    try {
+      if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
+        BlockUtils.removeContainerFromDB(containerData, config);
+      }
+      FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
+      FileUtils.deleteDirectory(new File(containerData.getChunksPath()));
+      FileUtils.deleteDirectory(new File(getContainerData().getContainerPath()));
+    } catch (Exception ex) {
+      LOG.error("Failed to cleanup destination directories for container {}",
+          containerData.getContainerID(), ex);
     }
   }
 
