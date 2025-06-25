@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ContainerCheckService;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,10 +76,18 @@ public class ContainerReader implements Runnable {
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
   private final boolean shouldDelete;
+  private final ContainerCheckService emptyContainerCheckService;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
       ConfigurationSource conf, boolean shouldDelete) {
+    this(volSet, volume, cset, conf, shouldDelete, null);
+  }
+
+  public ContainerReader(
+      MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
+      ConfigurationSource conf, boolean shouldDelete,
+      ContainerCheckService emptyContainerCheckService) {
     Preconditions.checkNotNull(volume);
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
@@ -86,6 +95,7 @@ public class ContainerReader implements Runnable {
     this.config = conf;
     this.volumeSet = volSet;
     this.shouldDelete = shouldDelete;
+    this.emptyContainerCheckService = emptyContainerCheckService;
   }
 
   @Override
@@ -170,6 +180,10 @@ public class ContainerReader implements Runnable {
           }
         }
       }
+
+      if (emptyContainerCheckService != null) {
+        emptyContainerCheckService.markVolumeCompleted(hddsVolume);
+      }
     }
     LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }
@@ -212,7 +226,7 @@ public class ContainerReader implements Runnable {
       KeyValueContainerData kvContainerData = (KeyValueContainerData)
           containerData;
       containerData.setVolume(hddsVolume);
-      KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
+      KeyValueContainerUtil.parseKVContainerData(kvContainerData, config, false, emptyContainerCheckService);
       KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
           config);
       if (kvContainer.getContainerState() == RECOVERING) {

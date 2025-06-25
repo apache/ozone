@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfig
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -90,6 +91,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ContainerCheckService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
@@ -136,6 +138,8 @@ public class OzoneContainer {
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
+  @Nullable
+  private final ContainerCheckService emptyContainerCheckService;
 
   private final ContainerChecksumTreeManager checksumTreeManager;
   private ScheduledExecutorService dbCompactionExecutorService;
@@ -156,12 +160,16 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
+  @SuppressWarnings("methodlength")
   public OzoneContainer(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context, CertificateClient certClient,
       SecretKeyVerifierClient secretKeyClient,
       VolumeChoosingPolicy volumeChoosingPolicy) throws IOException {
     config = conf;
+    Duration checkInterval = conf.getObject(DatanodeConfiguration.class).getContainerEmptyCheckInterval();
+    boolean asyncCheckEnabled =
+        conf.getObject(DatanodeConfiguration.class).isAsyncEmptyContainerCheckEnabled();
     this.datanodeDetails = datanodeDetails;
     this.context = context;
     this.volumeChecker = new StorageVolumeChecker(conf, new Timer(),
@@ -226,7 +234,12 @@ public class OzoneContainer {
               context.getParent().getDatanodeDetails().getUuidString(),
               containerSet, volumeSet, volumeChoosingPolicy, metrics, icrSender, checksumTreeManager));
     }
-
+    if (asyncCheckEnabled) {
+      this.emptyContainerCheckService = new ContainerCheckService(
+          datanodeDetails.threadNamePrefix(), checkInterval.toMillis());
+    } else {
+      this.emptyContainerCheckService = null;
+    }
     SecurityConfig secConf = new SecurityConfig(conf);
     hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
         handlers, context, metrics,
@@ -340,8 +353,11 @@ public class OzoneContainer {
         .build();
     while (volumeSetIterator.hasNext()) {
       StorageVolume volume = volumeSetIterator.next();
+      if (emptyContainerCheckService != null) {
+        emptyContainerCheckService.initializeVolumeWorker((HddsVolume) volume);
+      }
       ContainerReader containerReader = new ContainerReader(volumeSet,
-          (HddsVolume) volume, containerSet, config, true);
+          (HddsVolume) volume, containerSet, config, true, emptyContainerCheckService);
       Thread thread = threadFactory.newThread(containerReader);
       thread.start();
       volumeThreads.add(thread);
@@ -561,6 +577,9 @@ public class OzoneContainer {
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
+    if (emptyContainerCheckService != null) {
+      emptyContainerCheckService.shutdown();
+    }
     checksumTreeManager.stop();
     if (this.witnessedContainerMetadataStore != null) {
       try {

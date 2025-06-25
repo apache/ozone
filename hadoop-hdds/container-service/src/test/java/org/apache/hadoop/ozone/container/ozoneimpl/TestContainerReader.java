@@ -31,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -56,6 +58,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -67,12 +70,14 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ContainerCheckService;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 /**
  * Test ContainerReader class which loads containers from disks.
@@ -96,11 +101,15 @@ public class TestContainerReader {
   @TempDir
   private Path tempDir;
 
-  private void setup(ContainerTestVersionInfo versionInfo) throws Exception {
+  private int setup(ContainerTestVersionInfo versionInfo) throws Exception {
+    int countCount = 2;
     setLayoutAndSchemaVersion(versionInfo);
     File volumeDir =
         Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     this.conf = new OzoneConfiguration();
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setAsyncEmptyContainerCheckEnabled(true);
+    conf.setFromObject(dnConf);
     volumeSet = mock(MutableVolumeSet.class);
     containerSet = newContainerSet();
 
@@ -116,7 +125,7 @@ public class TestContainerReader {
     when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < countCount; i++) {
       KeyValueContainerData keyValueContainerData =
           new KeyValueContainerData(i, layout, (long) StorageUnit.GB.toBytes(5),
               UUID.randomUUID().toString(), datanodeId.toString());
@@ -140,6 +149,7 @@ public class TestContainerReader {
     // so it does not affect the ContainerReader, which avoids using the cache
     // at startup for performance reasons.
     ContainerCache.getInstance(conf).shutdownCache();
+    return countCount;
   }
 
   @AfterEach
@@ -633,5 +643,23 @@ public class TestContainerReader {
     schemaVersion = versionInfo.getSchemaVersion();
     conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerReaderWithAsyncCheckService(ContainerTestVersionInfo info)
+      throws Exception {
+    int countCount = setup(info);
+    ContainerCheckService mockCheckService = mock(ContainerCheckService.class);
+
+    ContainerReader containerReader = new ContainerReader(volumeSet,
+        hddsVolume, containerSet, conf, true, mockCheckService);
+
+    Thread thread = new Thread(containerReader);
+    thread.start();
+    thread.join();
+    // Asset submits an async task for echo container
+    assertEquals(countCount, containerSet.containerCount());
+    verify(mockCheckService, times(countCount))
+        .checkAsync(Mockito.eq(hddsVolume), Mockito.any(Runnable.class));
   }
 }
