@@ -65,7 +65,7 @@ public class TestLifecycleConfigurationDelete {
   }
 
   @Test
-  public void testCreateInvalidLifecycleConfiguration() throws Exception {
+  public void testDeleteLifecycleConfiguration() throws Exception {
     String bucketName = "bucket1";
     bucketEndpoint.put(bucketName, null, "", null, getBody());
     Response r = bucketEndpoint.delete(bucketName, "");

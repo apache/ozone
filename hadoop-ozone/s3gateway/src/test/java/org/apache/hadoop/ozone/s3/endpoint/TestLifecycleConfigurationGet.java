@@ -67,7 +67,7 @@ public class TestLifecycleConfigurationGet {
   }
 
   @Test
-  public void testCreateInvalidLifecycleConfiguration() throws Exception {
+  public void testGetLifecycleConfiguration() throws Exception {
     String bucketName = "bucket1";
     bucketEndpoint.put(bucketName, null, "", null, getBody());
     Response r = bucketEndpoint.get(bucketName, null, null, null, 0, null, null,

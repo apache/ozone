@@ -2790,17 +2790,17 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
       throws IOException {
-    throw new UnsupportedOperationException("getLifecycleConfiguration not support yet");
+    throw new UnsupportedOperationException("Lifecycle configuration operations are not yet supported");
   }
 
   @Override
   public void createLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
-    throw new UnsupportedOperationException("createLifecycleConfiguration not support yet");
+    throw new UnsupportedOperationException("Lifecycle configuration operations are not yet supported");
   }
 
   @Override
   public void deleteLifecycleConfiguration(String volumeName, String bucketName) throws IOException {
-    throw new UnsupportedOperationException("deleteLifecycleConfiguration not support yet");
+    throw new UnsupportedOperationException("Lifecycle configuration operations are not yet supported");
   }
 
   private static ExecutorService createThreadPoolExecutor(

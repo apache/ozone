@@ -87,7 +87,7 @@ public class TestLifecycleConfigurationPut {
   }
 
   @Test
-  public void testCreateInvalidLifecycleConfiguration() throws Exception {
+  public void testPutInvalidLifecycleConfiguration() throws Exception {
     testInvalidLifecycleConfiguration(TestLifecycleConfigurationPut::withoutAction,
         HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
     testInvalidLifecycleConfiguration(TestLifecycleConfigurationPut::withoutFilter,
@@ -120,7 +120,7 @@ public class TestLifecycleConfigurationPut {
   }
 
   @Test
-  public void testCreateInvalidExpirationDateLCC() throws Exception {
+  public void testPutInvalidExpirationDateLCC() throws Exception {
     try {
       String xml = ("<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
           ".com/doc/2006-03-01/\">" +
@@ -142,7 +142,7 @@ public class TestLifecycleConfigurationPut {
   }
 
   @Test
-  public void testCreateValidLifecycleConfiguration() throws Exception {
+  public void testPutValidLifecycleConfiguration() throws Exception {
     assertEquals(HTTP_OK, bucketEndpoint.put(
         "bucket1", null, "", null, onePrefix()).getStatus());
     assertEquals(HTTP_OK, bucketEndpoint.put(
@@ -158,7 +158,7 @@ public class TestLifecycleConfigurationPut {
   }
 
   @Test
-  public void testCreateLifecycleConfigurationFailsWithNonBucketOwner()
+  public void testPutLifecycleConfigurationFailsWithNonBucketOwner()
       throws Exception {
     HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
     when(httpHeaders.getHeaderString("x-amz-expected-bucket-owner"))

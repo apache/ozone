@@ -1104,11 +1104,14 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Creates a new lifecycle configuration.
-   * @param lifecycleConfiguration - lifecycle configuration info.
-   * @throws IOException
+   * Sets the lifecycle configuration for this bucket.
+   * This operation will completely overwrite any existing lifecycle configuration on the bucket.
+   * If the bucket already has a lifecycle configuration, it will be replaced with the new one.
+   * 
+   * @param lifecycleConfiguration - lifecycle configuration info to be set.
+   * @throws IOException if there is an error setting the lifecycle configuration.
    */
-  public void createLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
+  public void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
       throws IOException {
     proxy.createLifecycleConfiguration(lifecycleConfiguration);
   }

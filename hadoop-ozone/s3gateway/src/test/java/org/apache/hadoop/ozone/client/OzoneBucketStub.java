@@ -694,7 +694,7 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
-  public void createLifecycleConfiguration(
+  public void setLifecycleConfiguration(
       OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
     lifecyclesMap.put(lifecycleConfiguration.getBucket(),
         toOzoneLifecycleConfiguration(lifecycleConfiguration));
