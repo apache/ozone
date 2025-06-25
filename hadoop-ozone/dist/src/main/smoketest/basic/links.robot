@@ -20,8 +20,7 @@ Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 Test Timeout        4 minute
-Suite Setup         Run Keywords      Get Security Enabled From Config
-...                 AND               Create volumes
+Suite Setup         Create volumes
 
 *** Variables ***
 ${prefix}    generated
@@ -29,6 +28,7 @@ ${SCM}       scm
 
 *** Keywords ***
 Create volumes
+    Get Security Enabled From Config
     ${random} =         Generate Random String  5  [NUMBERS]
     Set Suite Variable  ${source}  ${random}-source
     Set Suite Variable  ${target}  ${random}-target

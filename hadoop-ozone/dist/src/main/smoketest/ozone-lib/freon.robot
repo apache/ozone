@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Resource            ../commonlib.robot
+Resource            ../lib/os.robot
 
 *** Variables ***
 ${OM_HA_PARAM}         ${EMPTY}

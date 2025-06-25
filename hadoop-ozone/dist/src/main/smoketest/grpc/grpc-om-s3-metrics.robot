@@ -21,8 +21,7 @@ Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
 Test Timeout        5 minutes
-Suite Setup         Run Keywords    Get Security Enabled From Config
-...                 AND             Setup s3 tests
+Suite Setup         Setup s3 tests
 
 *** Variables ***
 ${OM_URL}                   http://${OM_SERVICE_ID}:9874

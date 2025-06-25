@@ -45,7 +45,7 @@ Kinit HTTP user
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k -t /etc/security/keytabs/HTTP.keytab ${principal}
 
 Kinit test user
-    Run Keyword         Get Security Enabled From Config
+    Get Security Enabled From Config
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
     [arguments]                      ${user}       ${keytab}
     ${TEST_USER} =      Get test user principal    ${user}
@@ -59,6 +59,6 @@ Access should be denied
 
 Requires admin privilege
     [arguments]    ${command}
-    Pass Execution If   '${SECURITY_ENABLED}' == 'false'   Skip privilege check in unsecure cluster
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip privilege check in unsecure cluster
     Kinit test user     testuser2     testuser2.keytab
     Access should be denied    ${command}

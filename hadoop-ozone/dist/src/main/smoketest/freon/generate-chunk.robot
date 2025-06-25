@@ -17,11 +17,11 @@
 Documentation       Test freon chunk generation commands
 Resource            ../ozone-lib/freon.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${PREFIX}    ${EMPTY}
 
 *** Test Cases ***
 DN Chunk Generator
-    Run Keyword   Get Security Enabled From Config
     Freon DCG     prefix=dcg${PREFIX}    n=100
