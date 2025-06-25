@@ -171,6 +171,10 @@ public class VolumeInfoMetrics implements MetricsSource {
     numScans.incr();
   }
 
+  public long getNumScansSkipped() {
+    return numScansSkipped.value();
+  }
+
   public void incNumScansSkipped() {
     numScansSkipped.incr();
   }
