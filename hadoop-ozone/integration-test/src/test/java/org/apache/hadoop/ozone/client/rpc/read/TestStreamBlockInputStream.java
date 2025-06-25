@@ -236,7 +236,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
 
       byte[] readData = new byte[dataLength];
       assertTrue(keyInputStream.getPartStreams().isEmpty());
-      IOUtils.readFully(keyInputStream, readData);
+      IOUtils.read(keyInputStream, readData);
       for (byte b : readData) {
         assertEquals((byte) 0, b);
       }
