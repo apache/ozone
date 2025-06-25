@@ -262,11 +262,14 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           for (Path snapshotDir : snapshotPaths) {
             String snapshotId = OmSnapshotManager.extractSnapshotIDFromCheckpointDirName(snapshotDir.toString());
             omMetadataManager.getLock().acquireReadLock(SNAPSHOT_DB_LOCK, snapshotId);
-            // invalidate closes the snapshot DB
-            om.getOmSnapshotManager().invalidateCacheEntry(UUID.fromString(snapshotId));
-            writeDBToArchive(sstFilesToExclude, snapshotDir,
-                maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap);
-            omMetadataManager.getLock().releaseReadLock(SNAPSHOT_DB_LOCK, snapshotId);
+            try {
+              // invalidate closes the snapshot DB
+              om.getOmSnapshotManager().invalidateCacheEntry(UUID.fromString(snapshotId));
+              writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir,
+                  hardLinkFileMap);
+            } finally {
+              omMetadataManager.getLock().releaseReadLock(SNAPSHOT_DB_LOCK, snapshotId);
+            }
           }
 
         }

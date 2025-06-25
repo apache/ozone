@@ -120,6 +120,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   @BeforeEach
   void init() throws Exception {
     conf = new OzoneConfiguration();
+    // ensure cache entries are not evicted thereby snapshot db's are not closed
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
         100, TimeUnit.MINUTES);
   }
