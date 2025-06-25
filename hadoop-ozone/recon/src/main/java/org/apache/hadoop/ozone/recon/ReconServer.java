@@ -196,6 +196,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
 
   private void updateAndLogReconHealthStatus() {
     ReconContext reconContext = injector.getInstance(ReconContext.class);
+    assert reconContext != null;
 
     checkComponentAndLog(
         this.getReconStorageContainerManager(),
