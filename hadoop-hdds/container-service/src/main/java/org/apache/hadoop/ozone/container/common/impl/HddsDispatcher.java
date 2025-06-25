@@ -20,13 +20,13 @@ package org.apache.hadoop.ozone.container.common.impl;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -71,7 +71,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
+import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
@@ -390,10 +391,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         try {
           // TODO HDDS-7096 + HDDS-8781: Use on demand scanning for the open
           //  container instead.
-          handler.markContainerUnhealthy(container,
-              ScanResult.unhealthy(ScanResult.FailureType.WRITE_FAILURE,
-                  new File(container.getContainerData().getContainerPath()),
-                  new StorageContainerException(result)));
+          ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.WRITE_FAILURE,
+              new File(container.getContainerData().getContainerPath()),
+              new StorageContainerException(result));
+          handler.markContainerUnhealthy(container, DataScanResult.fromErrors(Collections.singletonList(error)));
           LOG.info("Marked Container UNHEALTHY, ContainerID: {}", containerID);
         } catch (IOException ioe) {
           // just log the error here in case marking the container fails,
@@ -420,7 +421,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // Create a specific exception that signals for on demand scanning
         // and move this general scan to where it is more appropriate.
         // Add integration tests to test the full functionality.
-        OnDemandContainerDataScanner.scanContainer(container);
+        containerSet.scanContainer(containerID);
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
@@ -829,6 +830,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case StreamInit       : return DNAction.STREAM_INIT;
     case FinalizeBlock    : return DNAction.FINALIZE_BLOCK;
     case Echo             : return DNAction.ECHO;
+    case GetContainerChecksumInfo: return DNAction.GET_CONTAINER_CHECKSUM_INFO;
     default :
       LOG.debug("Invalid command type - {}", cmdType);
       return null;

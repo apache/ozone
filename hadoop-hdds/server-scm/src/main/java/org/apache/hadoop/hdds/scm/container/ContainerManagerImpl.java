@@ -443,11 +443,6 @@ public class ContainerManagerImpl implements ContainerManager {
     return containerStateManager.contains(id);
   }
 
-  @Override
-  public void close() throws IOException {
-    containerStateManager.close();
-  }
-
   // Remove this after fixing Recon
   @Override
   @VisibleForTesting
