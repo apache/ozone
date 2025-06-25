@@ -100,6 +100,7 @@ public class ContainerMerkleTreeMetrics {
   public void incrementRepairContainerDiffs() {
     this.numRepairContainerDiff.incr();
   }
+
   public void incrementMissingBlocksIdentified(long value) {
     this.numMissingBlocksIdentified.incr(value);
   }
