@@ -258,8 +258,6 @@ public final class ContainerMerkleTreeTestUtils {
     assertEquals(expectedDiff.getCorruptChunks().size(), actualDiff.getCorruptChunks().size(),
         "Mismatch in number of corrupt chunks");
 
-    System.err.println(actualDiff);
-
     List<ContainerProtos.BlockMerkleTree> expectedMissingBlocks = expectedDiff.getMissingBlocks().stream().sorted(
         Comparator.comparing(ContainerProtos.BlockMerkleTree::getBlockID)).collect(Collectors.toList());
     List<ContainerProtos.BlockMerkleTree> actualMissingBlocks = actualDiff.getMissingBlocks().stream().sorted(

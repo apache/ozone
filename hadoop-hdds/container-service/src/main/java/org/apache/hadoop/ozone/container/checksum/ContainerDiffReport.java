@@ -106,10 +106,8 @@ public class ContainerDiffReport {
   @Override
   public String toString() {
     return "ContainerDiffReport:" +
-        " MissingBlocks= " + getNumMissingBlocks() + " blocks" +
-        ", MissingChunks= " + getNumMissingChunks()
-        + " chunks from " + missingChunks.size() + " blocks" +
-        ", CorruptChunks= " + getNumCorruptChunks()
-        + " chunks from " + corruptChunks.size() + " blocks";
+        " Missing Blocks: " + getNumMissingBlocks() +
+        " Missing Chunks: " + getNumMissingChunks() + " chunks from " + missingChunks.size() + " blocks" +
+        " Corrupt Chunks: " + getNumCorruptChunks() + " chunks from " + corruptChunks.size() + " blocks";
   }
 }

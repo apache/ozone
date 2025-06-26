@@ -67,7 +67,6 @@ class TestContainerChecksumTreeManager {
   private KeyValueContainerData container;
   private File checksumFile;
   private ContainerChecksumTreeManager checksumManager;
-//  private ContainerMerkleTreeMetrics metrics;
   private ConfigurationSource config;
 
   /**

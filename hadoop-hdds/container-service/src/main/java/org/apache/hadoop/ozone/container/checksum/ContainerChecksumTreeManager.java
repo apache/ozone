@@ -188,7 +188,6 @@ public class ContainerChecksumTreeManager {
       metrics.incrementCorruptChunksIdentified(report.getNumCorruptChunks());
       metrics.incrementMissingBlocksIdentified(report.getNumMissingBlocks());
       metrics.incrementMissingChunksIdentified(report.getNumMissingChunks());
-      System.err.println("in tree manager: " + report);
     } else {
       metrics.incrementNoRepairContainerDiffs();
     }
