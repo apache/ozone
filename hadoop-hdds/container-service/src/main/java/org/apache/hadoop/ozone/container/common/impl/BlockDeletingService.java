@@ -70,10 +70,9 @@ public class BlockDeletingService extends BackgroundService {
   @VisibleForTesting
   public BlockDeletingService(
       OzoneContainer ozoneContainer, long serviceInterval, long serviceTimeout,
-      TimeUnit timeUnit, int workerSize, ConfigurationSource conf
-  ) {
+      TimeUnit timeUnit, int workerSize, ConfigurationSource conf, ContainerChecksumTreeManager checksumTreeManager) {
     this(ozoneContainer, serviceInterval, serviceTimeout, timeUnit, workerSize,
-        conf, "", new ContainerChecksumTreeManager(conf), null);
+        conf, "", checksumTreeManager, null);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")

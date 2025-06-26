@@ -482,7 +482,7 @@ public class TestBlockDeletingService {
     OzoneContainer ozoneContainer =
         mockDependencies(containerSet, keyValueHandler);
     BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
-        1_000_000, 1_000_000, TimeUnit.SECONDS, 1, conf);
+        1_000_000, 1_000_000, TimeUnit.SECONDS, 1, conf, new ContainerChecksumTreeManager(conf));
 
     // On the first run, the container with incorrect metadata should consume
     // the block deletion limit, and the correct container with fewer pending
@@ -816,7 +816,7 @@ public class TestBlockDeletingService {
         mockDependencies(containerSet, keyValueHandler);
     BlockDeletingService svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.NANOSECONDS,
-        10, conf);
+        10, conf, new ContainerChecksumTreeManager(conf));
     svc.start();
 
     LogCapturer log = LogCapturer.captureLogs(BackgroundService.class);
