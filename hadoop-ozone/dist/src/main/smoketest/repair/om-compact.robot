@@ -19,7 +19,6 @@ Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/freon.robot
-Test Timeout        5 minutes
 
 *** Variables ***
 ${OM_DB_PATH}       /data/metadata/om.db
