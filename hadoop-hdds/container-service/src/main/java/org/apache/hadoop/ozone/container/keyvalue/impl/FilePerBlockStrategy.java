@@ -187,7 +187,7 @@ public class FilePerBlockStrategy implements ChunkManager {
     if (overwrite) {
       long fileLengthAfterWrite = offset + chunkLength;
       if (fileLengthAfterWrite > fileLengthBeforeWrite) {
-        containerData.incrBytesUsed(fileLengthAfterWrite - fileLengthBeforeWrite);
+        containerData.getStatistics().updateWrite(fileLengthAfterWrite - fileLengthBeforeWrite, false);
       }
     }
 

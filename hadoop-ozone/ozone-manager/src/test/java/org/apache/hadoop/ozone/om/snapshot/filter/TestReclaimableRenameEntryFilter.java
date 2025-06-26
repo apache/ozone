@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -44,7 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -80,9 +81,9 @@ public class TestReclaimableRenameEntryFilter extends AbstractReclaimableFilterT
       throws IOException {
     List<SnapshotInfo> snapshotInfos = getLastSnapshotInfos(volume, bucket, 1, index);
     SnapshotInfo prevSnapshotInfo = snapshotInfos.get(0);
-    OmBucketInfo bucketInfo = getOzoneManager().getBucketInfo(volume, bucket);
+    OmBucketInfo bucketInfo = getOzoneManager().getBucketManager().getBucketInfo(volume, bucket);
     if (prevSnapshotInfo != null) {
-      ReferenceCounted<OmSnapshot> prevSnap = Optional.ofNullable(prevSnapshotInfo)
+      UncheckedAutoCloseableSupplier<OmSnapshot> prevSnap = Optional.ofNullable(prevSnapshotInfo)
           .map(info -> {
             try {
               return getOmSnapshotManager().getActiveSnapshot(volume, bucket, info.getName());
@@ -110,12 +111,12 @@ public class TestReclaimableRenameEntryFilter extends AbstractReclaimableFilterT
 
   private <T> Table<String, T> getFailingMockedTable() throws IOException {
     Table<String, T> table = mock(Table.class);
-    when(table.get(anyString())).thenThrow(new IOException());
-    when(table.getIfExist(anyString())).thenThrow(new IOException());
+    when(table.get(anyString())).thenThrow(new RocksDatabaseException());
+    when(table.getIfExist(anyString())).thenThrow(new RocksDatabaseException());
     return table;
   }
 
-  private void mockOmSnapshot(ReferenceCounted<OmSnapshot> snapshot,
+  private void mockOmSnapshot(UncheckedAutoCloseableSupplier<OmSnapshot> snapshot,
                               OmBucketInfo bucketInfo, Table<String, OmKeyInfo> keyTable,
                               Table<String, OmDirectoryInfo> dirTable) {
     if (snapshot != null) {

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.PREFIX_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.PREFIX_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;

@@ -31,15 +31,18 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -122,16 +125,29 @@ public class ContainerChecksumTreeManager {
 
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
-      SortedSet<Long> sortedDeletedBlockIDs = new TreeSet<>(checksumInfoBuilder.getDeletedBlocksList());
-      sortedDeletedBlockIDs.addAll(deletedBlockIDs);
+      // TODO HDDS-13245 this conversion logic will be replaced and block checksums will be populated.
+      // Create BlockMerkleTree to wrap each input block ID.
+      List<ContainerProtos.BlockMerkleTree> deletedBlocks = deletedBlockIDs.stream()
+          .map(blockID ->
+              ContainerProtos.BlockMerkleTree.newBuilder().setBlockID(blockID).build())
+          .collect(Collectors.toList());
+      // Add the original blocks to the list.
+      deletedBlocks.addAll(checksumInfoBuilder.getDeletedBlocksList());
+      // Sort and deduplicate the list.
+      Map<Long, ContainerProtos.BlockMerkleTree> sortedDeletedBlocks = deletedBlocks.stream()
+          .collect(Collectors.toMap(ContainerProtos.BlockMerkleTree::getBlockID,
+              Function.identity(),
+              (a, b) -> a,
+              TreeMap::new));
 
       checksumInfoBuilder
           .setContainerID(containerID)
           .clearDeletedBlocks()
-          .addAllDeletedBlocks(sortedDeletedBlockIDs);
+          .addAllDeletedBlocks(sortedDeletedBlocks.values());
+
       write(data, checksumInfoBuilder.build());
       LOG.debug("Deleted block list for container {} updated with {} new blocks", data.getContainerID(),
-          sortedDeletedBlockIDs.size());
+          sortedDeletedBlocks.size());
     } finally {
       writeLock.unlock();
     }
@@ -179,8 +195,8 @@ public class ContainerChecksumTreeManager {
                                           ContainerDiffReport report) {
     ContainerProtos.ContainerMerkleTree thisMerkleTree = thisChecksumInfo.getContainerMerkleTree();
     ContainerProtos.ContainerMerkleTree peerMerkleTree = peerChecksumInfo.getContainerMerkleTree();
-    Set<Long> thisDeletedBlockSet = new HashSet<>(thisChecksumInfo.getDeletedBlocksList());
-    Set<Long> peerDeletedBlockSet = new HashSet<>(peerChecksumInfo.getDeletedBlocksList());
+    Set<Long> thisDeletedBlockSet = getDeletedBlockIDs(thisChecksumInfo);
+    Set<Long> peerDeletedBlockSet = getDeletedBlockIDs(peerChecksumInfo);
 
     if (thisMerkleTree.getDataChecksum() == peerMerkleTree.getDataChecksum()) {
       return;
@@ -259,7 +275,7 @@ public class ContainerChecksumTreeManager {
         // thisTree = Healthy, peerTree = unhealthy -> Do nothing as thisTree is healthy.
         // thisTree = Unhealthy, peerTree = Unhealthy -> Do Nothing as both are corrupt.
         if (thisChunkMerkleTree.getDataChecksum() != peerChunkMerkleTree.getDataChecksum() &&
-            !thisChunkMerkleTree.getIsHealthy()) {
+            !thisChunkMerkleTree.getChecksumMatches()) {
           reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTreeList.get(peerIdx), report::addCorruptChunk);
         }
         thisIdx++;
@@ -287,7 +303,7 @@ public class ContainerChecksumTreeManager {
 
   private void reportChunkIfHealthy(long containerID, long blockID, ContainerProtos.ChunkMerkleTree peerTree,
       BiConsumer<Long, ContainerProtos.ChunkMerkleTree> addToReport) {
-    if (peerTree.getIsHealthy()) {
+    if (peerTree.getChecksumMatches()) {
       addToReport.accept(blockID, peerTree);
     } else {
       LOG.warn("Skipping chunk at offset {} in block {} of container {} since peer reported it as " +
@@ -370,6 +386,13 @@ public class ContainerChecksumTreeManager {
       throw new IOException("Error occurred when writing container merkle tree for containerID "
           + data.getContainerID(), ex);
     }
+  }
+
+  // TODO HDDS-13245 This method will no longer be required.
+  private SortedSet<Long> getDeletedBlockIDs(ContainerProtos.ContainerChecksumInfoOrBuilder checksumInfo) {
+    return checksumInfo.getDeletedBlocksList().stream()
+        .map(ContainerProtos.BlockMerkleTree::getBlockID)
+        .collect(Collectors.toCollection(TreeSet::new));
   }
 
   /**

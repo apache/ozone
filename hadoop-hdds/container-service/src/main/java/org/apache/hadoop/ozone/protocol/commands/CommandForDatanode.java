@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.protocol.commands;
 
 import com.google.protobuf.Message;
-import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
@@ -40,9 +39,8 @@ public final class CommandForDatanode<T extends Message> implements Identifiable
     this.command = command;
   }
 
-  @Deprecated
-  public UUID getDatanodeId() {
-    return datanodeId.getUuid();
+  public DatanodeID getDatanodeId() {
+    return datanodeId;
   }
 
   public SCMCommand<T> getCommand() {

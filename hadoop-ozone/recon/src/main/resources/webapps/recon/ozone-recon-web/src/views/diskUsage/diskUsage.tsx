@@ -143,7 +143,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.setState({
       isLoading: true
     });
-    const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true&sortSubPaths=true`;
+    const duEndpoint = `/api/v1/namespace/usage?path=${path}&files=true&sortSubPaths=true`;
     const { request, controller } = AxiosGetHelper(duEndpoint, cancelPieSignal)
     cancelPieSignal = controller;
     request.then(response => {
@@ -310,7 +310,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       if (summaryResponse.status !== 'INITIALIZING' && summaryResponse.status !== 'PATH_NOT_FOUND') {
         if (summaryResponse.type === 'KEY') {
-          const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
+          const keyEndpoint = `/api/v1/namespace/usage?path=${path}&replica=true`;
           const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(keyEndpoint, cancelKeyMetadataSignal);
           cancelKeyMetadataSignal = metadataNewController;
           metadataRequest.then(response => {
@@ -559,7 +559,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
     const eChartsOptions = {
       title: {
-        text: `Disk Usage for ${returnPath} (Total Size: ${byteToSize(duResponse.size, 1)})`,
+        text: `Namespace Usage for ${returnPath} (Total Size: ${byteToSize(duResponse.size, 1)})`,
         left: 'center'
       },
       tooltip: {
@@ -600,7 +600,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     return (
       <div className='du-container'>
         <div className='page-header'>
-          Disk Usage
+          Namespace Usage
         </div>
         <div className='content-div'>
           {isLoading ? <span><LoadingOutlined /> Loading...</span> : (
@@ -670,7 +670,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
                   </div>
                   :
                   <div style={{ height: 800 }} className='metadatainformation'><br />
-                    This object is empty. Add files to it to see a visualization on disk usage.{' '}<br />
+                    This object is empty. Add files to it to see a visualization on namespace usage.{' '}<br />
                     You can also view its metadata details by clicking the top right button.
                   </div>}
                 <DetailPanel path={returnPath} keys={panelKeys} values={panelValues} visible={showPanel} />

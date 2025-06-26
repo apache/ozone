@@ -25,7 +25,7 @@
   <name>Apache Ozone Distribution</name>
   <properties>
     <!-- suffix appended to Ozone version to get Docker image version -->
-    <docker.ozone-runner.version>20241216-1-jdk21</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20250625-1-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
     <docker.ozone.image>apache/ozone</docker.ozone.image>
     <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor>
@@ -39,70 +39,87 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-container-service</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-docs</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-rocks-native</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-server-scm</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-admin</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-shell</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-common</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-csi</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-datanode</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-freon</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-httpfsgateway</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-insight</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-manager</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-recon</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-s3-secret-store</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-s3gateway</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-tools</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
 
@@ -238,14 +255,17 @@
         <dependency>
           <groupId>org.apache.ozone</groupId>
           <artifactId>ozone-filesystem-hadoop2</artifactId>
+          <scope>runtime</scope>
         </dependency>
         <dependency>
           <groupId>org.apache.ozone</groupId>
           <artifactId>ozone-filesystem-hadoop3</artifactId>
+          <scope>runtime</scope>
         </dependency>
         <dependency>
           <groupId>org.apache.ozone</groupId>
           <artifactId>ozone-filesystem-hadoop3-client</artifactId>
+          <scope>runtime</scope>
         </dependency>
       </dependencies>
     </profile>

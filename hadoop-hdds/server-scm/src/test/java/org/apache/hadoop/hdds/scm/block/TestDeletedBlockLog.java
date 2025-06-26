@@ -41,7 +41,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -76,7 +75,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -100,8 +98,8 @@ public class TestDeletedBlockLog {
   private StorageContainerManager scm;
   private List<DatanodeDetails> dnList;
   private SCMHADBTransactionBuffer scmHADBTransactionBuffer;
-  private Map<Long, ContainerInfo> containers = new HashMap<>();
-  private Map<Long, Set<ContainerReplica>> replicas = new HashMap<>();
+  private final Map<ContainerID, ContainerInfo> containers = new HashMap<>();
+  private final Map<ContainerID, Set<ContainerReplica>> replicas = new HashMap<>();
   private ScmBlockDeletingServiceMetrics metrics;
   private static final int THREE = ReplicationFactor.THREE_VALUE;
   private static final int ONE = ReplicationFactor.ONE_VALUE;
@@ -146,7 +144,7 @@ public class TestDeletedBlockLog {
     when(containerManager.getContainerReplicas(any()))
         .thenAnswer(invocationOnMock -> {
           ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
-          return replicas.get(cid.getId());
+          return replicas.get(cid);
         });
     when(containerManager.getContainer(any()))
         .thenAnswer(invocationOnMock -> {
@@ -159,7 +157,7 @@ public class TestDeletedBlockLog {
       Map<ContainerID, Long> map =
           (Map<ContainerID, Long>) invocationOnMock.getArguments()[0];
       for (Map.Entry<ContainerID, Long> e : map.entrySet()) {
-        ContainerInfo info = containers.get(e.getKey().getId());
+        ContainerInfo info = containers.get(e.getKey());
         try {
           assertThat(e.getValue()).isGreaterThan(info.getDeleteTransactionId());
         } catch (AssertionError err) {
@@ -191,9 +189,10 @@ public class TestDeletedBlockLog {
             .setDatanodeDetails(datanodeDetails)
             .build())
         .collect(Collectors.toSet());
-    containers.put(cid, container);
-    containerTable.put(ContainerID.valueOf(cid), container);
-    replicas.put(cid, replicaSet);
+    final ContainerID containerID = container.containerID();
+    containers.put(containerID, container);
+    containerTable.put(containerID, container);
+    replicas.put(containerID, replicaSet);
   }
 
   @AfterEach
@@ -226,24 +225,21 @@ public class TestDeletedBlockLog {
   }
 
   private void addTransactions(Map<Long, List<Long>> containerBlocksMap,
-      boolean shouldFlush)
-      throws IOException, TimeoutException {
+      boolean shouldFlush) throws IOException {
     deletedBlockLog.addTransactions(containerBlocksMap);
     if (shouldFlush) {
       scmHADBTransactionBuffer.flush();
     }
   }
 
-  private void incrementCount(List<Long> txIDs)
-      throws IOException, TimeoutException {
+  private void incrementCount(List<Long> txIDs) throws IOException {
     deletedBlockLog.incrementCount(txIDs);
     scmHADBTransactionBuffer.flush();
     // mock scmHADBTransactionBuffer does not flush deletedBlockLog
     deletedBlockLog.onFlush();
   }
 
-  private void resetCount(List<Long> txIDs)
-      throws IOException, TimeoutException {
+  private void resetCount(List<Long> txIDs) throws IOException {
     deletedBlockLog.resetCount(txIDs);
     scmHADBTransactionBuffer.flush();
     deletedBlockLog.onFlush();
@@ -254,7 +250,7 @@ public class TestDeletedBlockLog {
       DatanodeDetails... dns) throws IOException {
     for (DatanodeDetails dnDetails : dns) {
       deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
-          .commitTransactions(transactionResults, dnDetails.getUuid());
+          .commitTransactions(transactionResults, dnDetails.getID());
     }
     scmHADBTransactionBuffer.flush();
   }
@@ -294,7 +290,7 @@ public class TestDeletedBlockLog {
   }
 
   private List<DeletedBlocksTransaction> getTransactions(
-      int maximumAllowedBlocksNum) throws IOException, TimeoutException {
+      int maximumAllowedBlocksNum) throws IOException {
     DatanodeDeletedBlockTransactions transactions =
         deletedBlockLog.getTransactions(maximumAllowedBlocksNum, new HashSet<>(dnList));
     List<DeletedBlocksTransaction> txns = new LinkedList<>();
@@ -564,8 +560,7 @@ public class TestDeletedBlockLog {
   }
 
   private void sendSCMDeleteBlocksCommand(DatanodeID dnId, SCMCommand<?> scmCommand) {
-    deletedBlockLog.onSent(
-        DatanodeDetails.newBuilder().setUuid(dnId.getUuid()).build(), scmCommand);
+    deletedBlockLog.onSent(DatanodeDetails.newBuilder().setID(dnId).build(), scmCommand);
   }
 
   private void assertNoDuplicateTransactions(
@@ -619,7 +614,7 @@ public class TestDeletedBlockLog {
         .getProtoBufMessage());
 
     deletedBlockLog.getSCMDeletedBlockTransactionStatusManager()
-        .commitSCMCommandStatus(deleteBlockStatus, dnID.getUuid());
+        .commitSCMCommandStatus(deleteBlockStatus, dnID);
   }
 
   private void createDeleteBlocksCommandAndAction(
@@ -786,8 +781,7 @@ public class TestDeletedBlockLog {
         blocks = new ArrayList<>();
       } else {
         // verify the number of added and committed.
-        try (TableIterator<Long,
-            ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+        try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
             scm.getScmMetadataStore().getDeletedBlocksTXTable().iterator()) {
           AtomicInteger count = new AtomicInteger();
           iter.forEachRemaining((keyValue) -> count.incrementAndGet());
@@ -833,8 +827,7 @@ public class TestDeletedBlockLog {
   }
 
   @Test
-  public void testDeletedBlockTransactions()
-      throws IOException, TimeoutException {
+  public void testDeletedBlockTransactions() throws IOException {
     deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
     mockContainerHealthResult(true);
     int txNum = 10;
@@ -888,8 +881,7 @@ public class TestDeletedBlockLog {
   }
 
   @Test
-  public void testDeletedBlockTransactionsOfDeletedContainer()
-      throws IOException, TimeoutException {
+  public void testDeletedBlockTransactionsOfDeletedContainer() throws IOException {
     int txNum = 10;
     List<DeletedBlocksTransaction> blocks;
 

@@ -1,0 +1,47 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+x-byteman-config:
+  &byteman-config
+  environment:
+    BYTEMAN_HOME: /opt/byteman/
+    OZONE_SERVER_OPTS: -javaagent:/opt/byteman.jar=listener:true,address:0.0.0.0,port:${BYTEMAN_PORT}
+    BYTEMAN_PORT: ${BYTEMAN_PORT}
+
+services:
+  datanode1:
+    <<: *byteman-config
+  datanode2:
+    <<: *byteman-config
+  datanode3:
+    <<: *byteman-config
+  om1:
+    <<: *byteman-config
+  om2:
+    <<: *byteman-config
+  om3:
+    <<: *byteman-config
+  httpfs:
+    <<: *byteman-config
+  s3g:
+    <<: *byteman-config
+  scm1.org:
+    <<: *byteman-config
+  scm2.org:
+    <<: *byteman-config
+  scm3.org:
+    <<: *byteman-config
+  recon:
+    <<: *byteman-config

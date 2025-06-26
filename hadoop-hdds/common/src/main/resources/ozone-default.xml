@@ -916,7 +916,7 @@
       The full name of class which implements
       org.apache.hadoop.hdds.scm.PlacementPolicy.
       The class decides which datanode will be used to host the container replica. If not set,
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware will be used as default
       value.
     </description>
   </property>
@@ -928,7 +928,7 @@
       The full name of class which implements
       org.apache.hadoop.hdds.scm.PlacementPolicy.
       The class decides which datanode will be used to host the container replica in EC mode. If not set,
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter will be used as default
       value.
     </description>
   </property>
@@ -1562,6 +1562,15 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.compact.non.snapshot.diff.tables</name>
+    <value>false</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Enable or disable compaction of tables that are not tracked by snapshot diff when their snapshots are evicted from cache.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.rocksdb.metrics.enabled</name>
     <value>false</value>
     <tag>OZONE, OM</tag>
@@ -1689,7 +1698,7 @@
 
   <property>
     <name>hdds.scm.safemode.min.datanode</name>
-    <value>1</value>
+    <value>3</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description>Minimum DataNodes which should be registered to get SCM out of
       safe mode.
@@ -1974,6 +1983,15 @@
     <description>If this is true, there will be efficiency optimization effects
       when calling s3g list interface with delimiter '/' parameter, especially
       when there are a large number of keys.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.list.max.keys.limit</name>
+    <value>1000</value>
+    <description>
+      Maximum number of keys returned by S3 ListObjects/ListObjectsV2 API.
+      AWS default is 1000. Can be overridden per deployment in ozone-site.xml.
     </description>
   </property>
 
@@ -2771,7 +2789,7 @@
 
   <property>
     <name>fs.trash.classname</name>
-    <value>org.apache.hadoop.ozone.om.TrashPolicyOzone</value>
+    <value>org.apache.hadoop.fs.ozone.OzoneTrashPolicy</value>
     <tag>OZONE, OZONEFS, CLIENT</tag>
     <description>
       Trash Policy to be used.
@@ -3593,16 +3611,6 @@
       Thresholds for printing slow-operation audit logs.
     </description>
   </property>
-  <property>
-    <name>ozone.om.keyname.character.check.enabled</name>
-    <tag>OZONE, OM</tag>
-    <value>false</value>
-    <description>If true, then enable to check if the key name
-      contains illegal characters when creating/renaming key.
-      For the definition of illegal characters, follow the
-      rules in Amazon S3's object key naming guide.
-    </description>
-  </property>
 
   <property>
     <name>ozone.om.key.path.lock.enabled</name>
@@ -3768,18 +3776,18 @@
   <property>
     <name>ozone.snapshot.directory.service.timeout</name>
     <value>300s</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DEPRECATED</tag>
     <description>
-      Timeout value for SnapshotDirectoryCleaningService.
+      DEPRECATED. Timeout value for SnapshotDirectoryCleaningService.
     </description>
   </property>
 
   <property>
     <name>ozone.snapshot.directory.service.interval</name>
     <value>24h</value>
-    <tag>OZONE, PERFORMANCE, OM</tag>
+    <tag>OZONE, PERFORMANCE, OM, DEPRECATED</tag>
     <description>
-      The time interval between successive SnapshotDirectoryCleaningService
+      DEPRECATED. The time interval between successive SnapshotDirectoryCleaningService
       thread run.
     </description>
   </property>

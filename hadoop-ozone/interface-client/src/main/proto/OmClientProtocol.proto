@@ -1380,8 +1380,8 @@ message DeleteKeyResponse {
 }
 
 message DeletedKeys {
-    required string volumeName = 1;
-    required string bucketName = 2;
+    required string volumeName = 1 [deprecated = true];
+    required string bucketName = 2 [deprecated = true];
     repeated string keys = 3;
 }
 
@@ -1392,6 +1392,7 @@ message PurgeKeysRequest {
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
     // previous snapshotID can also be null & this field would be absent in older requests.
     optional NullableUUID expectedPreviousSnapshotID = 4;
+    repeated string renamedKeys = 5;
 }
 
 message PurgeKeysResponse {

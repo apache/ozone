@@ -38,8 +38,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -82,7 +82,7 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
     return arguments;
   }
 
-  private KeyManager mockOmSnapshot(ReferenceCounted<OmSnapshot> snapshot) {
+  private KeyManager mockOmSnapshot(UncheckedAutoCloseableSupplier<OmSnapshot> snapshot) {
     if (snapshot != null) {
       OmSnapshot omSnapshot = snapshot.get();
       KeyManager keyManager = mock(KeyManager.class);
@@ -101,10 +101,10 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
     List<SnapshotInfo> snapshotInfos = getLastSnapshotInfos(volume, bucket, 2, index);
     SnapshotInfo previousToPreviousSapshotInfo = snapshotInfos.get(0);
     SnapshotInfo prevSnapshotInfo = snapshotInfos.get(1);
-    OmBucketInfo bucketInfo = getOzoneManager().getBucketInfo(volume, bucket);
+    OmBucketInfo bucketInfo = getOzoneManager().getBucketManager().getBucketInfo(volume, bucket);
     long volumeId = getOzoneManager().getMetadataManager().getVolumeId(volume);
 
-    ReferenceCounted<OmSnapshot> prevSnap = Optional.ofNullable(prevSnapshotInfo)
+    UncheckedAutoCloseableSupplier<OmSnapshot> prevSnap = Optional.ofNullable(prevSnapshotInfo)
         .map(info -> {
           try {
             return getOmSnapshotManager().getActiveSnapshot(volume, bucket, info.getName());
@@ -112,7 +112,7 @@ public class TestReclaimableKeyFilter extends AbstractReclaimableFilterTest {
             throw new RuntimeException(e);
           }
         }).orElse(null);
-    ReferenceCounted<OmSnapshot> prevToPrevSnap = Optional.ofNullable(previousToPreviousSapshotInfo)
+    UncheckedAutoCloseableSupplier<OmSnapshot> prevToPrevSnap = Optional.ofNullable(previousToPreviousSapshotInfo)
         .map(info -> {
           try {
             return getOmSnapshotManager().getActiveSnapshot(volume, bucket, info.getName());

@@ -62,6 +62,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -468,7 +469,7 @@ public class TestOzoneContainerWithTLS {
 
   private DatanodeDetails aDatanode() {
     return MockDatanodeDetails.createDatanodeDetails(
-        UUID.randomUUID().toString(), "localhost", "0.0.0.0",
+        DatanodeID.randomID(), "localhost", "0.0.0.0",
         "/default-rack");
   }
 }
