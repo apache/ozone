@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
@@ -65,8 +64,9 @@ import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -126,6 +126,7 @@ public class OzoneContainer {
   private final XceiverServerSpi readChannel;
   private final ContainerController controller;
   private BackgroundContainerMetadataScanner metadataScanner;
+  private OnDemandContainerDataScanner onDemandScanner;
   private List<BackgroundContainerDataScanner> dataScanners;
   private List<AbstractBackgroundContainerScanner> backgroundScanners;
   private final BlockDeletingService blockDeletingService;
@@ -136,6 +137,8 @@ public class OzoneContainer {
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
   private StateContext context;
+
+  private final ContainerChecksumTreeManager checksumTreeManager;
   private ScheduledExecutorService dbCompactionExecutorService;
 
   private final ContainerMetrics metrics;
@@ -215,12 +218,13 @@ public class OzoneContainer {
       }
     };
 
+    checksumTreeManager = new ContainerChecksumTreeManager(config);
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(
               containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, volumeChoosingPolicy, metrics, icrSender));
+              containerSet, volumeSet, volumeChoosingPolicy, metrics, icrSender, checksumTreeManager));
     }
 
     SecurityConfig secConf = new SecurityConfig(conf);
@@ -265,6 +269,7 @@ public class OzoneContainer {
             blockDeletingServiceTimeout, TimeUnit.MILLISECONDS,
             blockDeletingServiceWorkerSize, config,
             datanodeDetails.threadNamePrefix(),
+            checksumTreeManager,
             context.getParent().getReconfigurationHandler());
 
     Duration recoveringContainerScrubbingSvcInterval =
@@ -346,11 +351,11 @@ public class OzoneContainer {
       for (Thread volumeThread : volumeThreads) {
         volumeThread.join();
       }
-      try (Table.KeyValueIterator<ContainerID, ContainerCreateInfo> itr
-               = getWitnessedContainerMetadataStore().getContainerCreateInfoTable().iterator(KEY_ONLY)) {
+      try (TableIterator<ContainerID, ContainerID> itr
+               = getWitnessedContainerMetadataStore().getContainerCreateInfoTable().keyIterator()) {
         final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
-          containerIds.put(itr.next().getKey(), 0L);
+          containerIds.put(itr.next(), 0L);
         }
         containerSet.buildMissingContainerSetAndValidate(containerIds, ContainerID::getId);
       }
@@ -379,8 +384,6 @@ public class OzoneContainer {
       return;
     }
 
-    initOnDemandContainerScanner(c);
-
     backgroundScanners = new LinkedList<>();
     // This config is for testing the scanners in isolation.
     if (c.isMetadataScanEnabled()) {
@@ -390,6 +393,7 @@ public class OzoneContainer {
     // This config is for testing the scanners in isolation.
     if (c.isDataScanEnabled()) {
       initContainerScanner(c);
+      initOnDemandContainerScanner(c);
     }
   }
 
@@ -436,7 +440,8 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    OnDemandContainerDataScanner.init(c, controller);
+    onDemandScanner = new OnDemandContainerDataScanner(c, controller);
+    containerSet.registerOnDemandScanner(onDemandScanner);
   }
 
   /**
@@ -455,7 +460,7 @@ public class OzoneContainer {
     for (BackgroundContainerDataScanner s : dataScanners) {
       s.shutdown();
     }
-    OnDemandContainerDataScanner.shutdown();
+    onDemandScanner.shutdown();
   }
 
   @VisibleForTesting
@@ -557,6 +562,7 @@ public class OzoneContainer {
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
+    checksumTreeManager.stop();
     if (this.witnessedContainerMetadataStore != null) {
       try {
         this.witnessedContainerMetadataStore.stop();

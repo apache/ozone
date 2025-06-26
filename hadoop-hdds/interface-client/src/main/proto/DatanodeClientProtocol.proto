@@ -105,9 +105,9 @@ enum Type {
 
   StreamInit = 19;
   StreamWrite = 20;
-
   FinalizeBlock = 21;
   Echo = 22;
+  GetContainerChecksumInfo = 23;
 }
 
 
@@ -158,6 +158,7 @@ enum Result {
   EXPORT_CONTAINER_METADATA_FAILED = 45;
   IMPORT_CONTAINER_METADATA_FAILED = 46;
   BLOCK_ALREADY_FINALIZED = 47;
+  CONTAINER_ID_MISMATCH = 48;
 }
 
 /**
@@ -214,9 +215,9 @@ message ContainerCommandRequestProto {
 
   optional   string encodedToken = 23;
   optional   uint32 version = 24;
-
   optional   FinalizeBlockRequestProto finalizeBlock = 25;
   optional   EchoRequestProto echo = 26;
+  optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
 }
 
 message ContainerCommandResponseProto {
@@ -245,11 +246,10 @@ message ContainerCommandResponseProto {
 
   optional   PutSmallFileResponseProto putSmallFile = 19;
   optional   GetSmallFileResponseProto getSmallFile = 20;
-
   optional   GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
-
   optional   FinalizeBlockResponseProto finalizeBlock = 22;
   optional   EchoResponseProto echo = 23;
+  optional   GetContainerChecksumInfoResponseProto getContainerChecksumInfo = 24;
 }
 
 message ContainerDataProto {
@@ -404,6 +404,14 @@ message EchoResponseProto {
   optional bytes payload = 1;
 }
 
+message GetContainerChecksumInfoRequestProto {
+  optional int64 containerID = 1;
+}
+
+message GetContainerChecksumInfoResponseProto {
+  optional int64 containerID = 1;
+  optional bytes containerChecksumInfo = 2;
+}
 // Chunk Operations
 
 message ChunkInfo {
@@ -544,6 +552,31 @@ message SendContainerRequest {
 }
 
 message SendContainerResponse {
+}
+
+// Each chunk contains multiple checksums. This message aggregates them into one checksum for the whole chunk.
+message ChunkMerkleTree {
+  optional int64 offset = 1;
+  optional int64 length = 2;
+  optional int64 dataChecksum = 3;
+  optional bool checksumMatches = 4;
+}
+
+message BlockMerkleTree {
+  optional int64 blockID = 1;
+  optional int64 dataChecksum = 2;
+  repeated ChunkMerkleTree chunkMerkleTree = 3;
+}
+
+message ContainerMerkleTree {
+  optional int64 dataChecksum = 1;
+  repeated BlockMerkleTree blockMerkleTree = 2;
+}
+
+message ContainerChecksumInfo {
+  optional int64 containerID = 1;
+  optional ContainerMerkleTree containerMerkleTree = 2;
+  repeated BlockMerkleTree deletedBlocks = 3;
 }
 
 service XceiverClientProtocolService {
