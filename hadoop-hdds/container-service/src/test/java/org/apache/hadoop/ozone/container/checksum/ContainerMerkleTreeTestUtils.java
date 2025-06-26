@@ -84,7 +84,7 @@ public final class ContainerMerkleTreeTestUtils {
         assertEquals(expectedChunkTree.getOffset(), actualChunkTree.getOffset());
         assertEquals(expectedChunkTree.getLength(), actualChunkTree.getLength());
         assertEquals(expectedChunkTree.getDataChecksum(), actualChunkTree.getDataChecksum());
-        assertEquals(expectedChunkTree.getIsHealthy(), actualChunkTree.getIsHealthy());
+        assertEquals(expectedChunkTree.getChecksumMatches(), actualChunkTree.getChecksumMatches());
       }
     }
   }
@@ -234,7 +234,7 @@ public final class ContainerMerkleTreeTestUtils {
           ContainerProtos.ChunkMerkleTree.Builder chunkBuilder = blockBuilder.getChunkMerkleTreeBuilder(chunkIndex);
           diff.addCorruptChunk(blockBuilder.getBlockID(), chunkBuilder.build());
           chunkBuilder.setDataChecksum(random.nextLong());
-          chunkBuilder.setIsHealthy(false);
+          chunkBuilder.setChecksumMatches(false);
           blockBuilder.setDataChecksum(random.nextLong());
           treeBuilder.setDataChecksum(random.nextLong());
           hasChunks = true;

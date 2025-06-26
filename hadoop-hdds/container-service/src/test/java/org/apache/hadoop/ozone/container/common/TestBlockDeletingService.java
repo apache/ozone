@@ -49,6 +49,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -67,13 +68,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -338,7 +339,7 @@ public class TestBlockDeletingService {
       int numOfChunksPerBlock) {
     long chunkLength = 100;
     try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
-      container.getContainerData().setBlockCount(numOfBlocksPerContainer);
+      container.getContainerData().getStatistics().setBlockCountForTesting(numOfBlocksPerContainer);
       // Set block count, bytes used and pending delete block count.
       metadata.getStore().getMetadataTable()
           .put(data.getBlockCountKey(), (long) numOfBlocksPerContainer);
@@ -380,9 +381,7 @@ public class TestBlockDeletingService {
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaTwoImpl dnStoreTwoImpl =
           (DatanodeStoreSchemaTwoImpl) ds;
-      try (
-          TableIterator<Long, ? extends Table.KeyValue<Long,
-              StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>>
+      try (Table.KeyValueIterator<Long, DeletedBlocksTransaction>
               iter = dnStoreTwoImpl.getDeleteTransactionTable().iterator()) {
         while (iter.hasNext()) {
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
@@ -396,9 +395,7 @@ public class TestBlockDeletingService {
       DatanodeStore ds = meta.getStore();
       DatanodeStoreSchemaThreeImpl dnStoreThreeImpl =
           (DatanodeStoreSchemaThreeImpl) ds;
-      try (
-          TableIterator<String, ? extends Table.KeyValue<String,
-              StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>>
+      try (Table.KeyValueIterator<String, DeletedBlocksTransaction>
               iter = dnStoreThreeImpl.getDeleteTransactionTable()
               .iterator(data.containerPrefix())) {
         while (iter.hasNext()) {
@@ -1196,11 +1193,11 @@ public class TestBlockDeletingService {
     }
     assertNotNull(checksumInfo);
 
-    List<Long> deletedBlocks = checksumInfo.getDeletedBlocksList();
+    List<ContainerProtos.BlockMerkleTree> deletedBlocks = checksumInfo.getDeletedBlocksList();
     assertEquals(numBlocks, deletedBlocks.size());
     // Create a sorted copy of the list to check the order written to the file.
-    List<Long> sortedDeletedBlocks = checksumInfo.getDeletedBlocksList().stream()
-        .sorted()
+    List<ContainerProtos.BlockMerkleTree> sortedDeletedBlocks = checksumInfo.getDeletedBlocksList().stream()
+        .sorted(Comparator.comparingLong(ContainerProtos.BlockMerkleTree::getBlockID))
         .collect(Collectors.toList());
     assertNotSame(sortedDeletedBlocks, deletedBlocks);
     assertEquals(sortedDeletedBlocks, deletedBlocks);

@@ -58,10 +58,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -617,14 +617,12 @@ public final class HddsServerUtil {
    * @param checkpoint    checkpoint file
    * @param destination   destination output stream.
    * @param toExcludeList the files to be excluded
-   * @param excludedList  the files excluded
    * @throws IOException
    */
   public static void writeDBCheckpointToStream(
       DBCheckpoint checkpoint,
       OutputStream destination,
-      List<String> toExcludeList,
-      List<String> excludedList)
+      Set<String> toExcludeList)
       throws IOException {
     try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination);
         Stream<Path> files =
@@ -636,8 +634,6 @@ public final class HddsServerUtil {
             String fileName = fileNamePath.toString();
             if (!toExcludeList.contains(fileName)) {
               includeFile(path.toFile(), fileName, archiveOutputStream);
-            } else {
-              excludedList.add(fileName);
             }
           }
         }

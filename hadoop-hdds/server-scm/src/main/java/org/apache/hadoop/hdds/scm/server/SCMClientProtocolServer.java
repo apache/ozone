@@ -50,7 +50,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -189,7 +189,7 @@ public class SCMClientProtocolServer implements
         updateRPCListenAddress(conf,
             scm.getScmNodeDetails().getClientProtocolServerAddressKey(),
             scmAddress, clientRpcServer);
-    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
+    if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       clientRpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
@@ -232,10 +232,16 @@ public class SCMClientProtocolServer implements
   public ContainerWithPipeline allocateContainer(HddsProtos.ReplicationType
       replicationType, HddsProtos.ReplicationFactor factor,
       String owner) throws IOException {
+    ReplicationConfig replicationConfig =
+        ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor);
+    return allocateContainer(replicationConfig, owner);
+  }
 
+  @Override
+  public ContainerWithPipeline allocateContainer(ReplicationConfig replicationConfig, String owner) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("replicationType", String.valueOf(replicationType));
-    auditMap.put("factor", String.valueOf(factor));
+    auditMap.put("replicationType", String.valueOf(replicationConfig.getReplicationType()));
+    auditMap.put("replication", String.valueOf(replicationConfig.getReplication()));
     auditMap.put("owner", String.valueOf(owner));
 
     try {
@@ -245,9 +251,7 @@ public class SCMClientProtocolServer implements
       }
       getScm().checkAdminAccess(getRemoteUser(), false);
       final ContainerInfo container = scm.getContainerManager()
-          .allocateContainer(
-              ReplicationConfig.fromProtoTypeAndFactor(replicationType, factor),
-              owner);
+          .allocateContainer(replicationConfig, owner);
       final Pipeline pipeline = scm.getPipelineManager()
           .getPipeline(container.getPipelineID());
       ContainerWithPipeline cp = new ContainerWithPipeline(container, pipeline);

@@ -52,6 +52,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -69,7 +70,6 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
@@ -169,6 +169,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private void createSubject() throws Exception {
     OmTestManagers omTestManagers = new OmTestManagers(conf, scmBlockTestingClient, null);
     keyManager = omTestManagers.getKeyManager();
+
     keyDeletingService = keyManager.getDeletingService();
     directoryDeletingService = keyManager.getDirDeletingService();
     writeClient = omTestManagers.getWriteClient();
@@ -345,7 +346,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       keyDeletingService.suspend();
       SnapshotDeletingService snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
       snapshotDeletingService.suspend();
-      GenericTestUtils.waitFor(() -> !keyDeletingService.isRunningOnAOS(), 1000, 10000);
+
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       OzoneManager ozoneManager = Mockito.spy(om);
@@ -435,7 +436,7 @@ class TestKeyDeletingService extends OzoneTestBase {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void testRenamedKeyReclaimation(boolean testForSnapshot)
-        throws IOException, InterruptedException, TimeoutException {
+        throws IOException, InterruptedException, TimeoutException, ExecutionException {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
       Table<String, RepeatedOmKeyInfo> deletedTable =
@@ -482,14 +483,10 @@ class TestKeyDeletingService extends OzoneTestBase {
         assertTableRowCount(snapshotRenamedTable, initialRenamedCount + 2, metadataManager);
         keyDeletingService.resume();
         assertTableRowCount(snapshotRenamedTable, initialRenamedCount + 1, metadataManager);
-        try (TableIterator<String, ? extends Table.KeyValue<String, String>> itr = snapshotRenamedTable.iterator()) {
+        try (Table.KeyValueIterator<String, String> itr = snapshotRenamedTable.iterator()) {
           itr.forEachRemaining(entry -> {
-            try {
-              String[] val = metadataManager.splitRenameKey(entry.getKey());
-              Assertions.assertEquals(Long.valueOf(val[2]), keyInfo.getObjectID());
-            } catch (IOException e) {
-              throw new UncheckedIOException(e);
-            }
+            String[] val = metadataManager.splitRenameKey(entry.getKey());
+            Assertions.assertEquals(Long.valueOf(val[2]), keyInfo.getObjectID());
           });
         }
       } finally {
@@ -620,7 +617,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       when(kds.getTasks()).thenAnswer(i -> {
         BackgroundTaskQueue queue = new BackgroundTaskQueue();
         for (UUID id : snapshotIds) {
-          queue.add(kds.new KeyDeletingTask(kds, id));
+          queue.add(kds.new KeyDeletingTask(id));
         }
         return queue;
       });
@@ -736,7 +733,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           100, 100000);
       // Check if the exclusive size is set.
       om.awaitDoubleBufferFlush();
-      try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+      try (Table.KeyValueIterator<String, SnapshotInfo>
                iterator = snapshotInfoTable.iterator()) {
         while (iterator.hasNext()) {
           Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
@@ -904,7 +901,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private static void checkSnapDeepCleanStatus(Table<String, SnapshotInfo> table, String volumeName, boolean deepClean)
       throws IOException {
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iterator = table.iterator()) {
+    try (Table.KeyValueIterator<String, SnapshotInfo> iterator = table.iterator()) {
       while (iterator.hasNext()) {
         SnapshotInfo snapInfo = iterator.next().getValue();
         if (volumeName.equals(snapInfo.getVolumeName())) {
