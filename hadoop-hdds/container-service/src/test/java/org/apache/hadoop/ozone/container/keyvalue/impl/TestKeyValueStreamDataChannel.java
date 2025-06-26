@@ -165,7 +165,6 @@ public class TestKeyValueStreamDataChannel {
     tempFile.deleteOnExit();
     HddsVolume mockVolume = mock(HddsVolume.class);
     when(mockVolume.getStorageID()).thenReturn("storageId");
-    when(mockVolume.isVolumeFull()).thenReturn(true);
     when(mockVolume.getCurrentUsage()).thenReturn(new SpaceUsageSource.Fixed(100L, 0L, 100L));
     ContainerData mockContainerData = mock(ContainerData.class);
     when(mockContainerData.getContainerID()).thenReturn(123L);
