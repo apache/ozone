@@ -1563,6 +1563,18 @@ function ozone_add_client_opts
   fi
 }
 
+## @description  Adds the OZONE_SERVER_OPTS variable to OZONE_OPTS if OZONE_SUBCMD_SUPPORTDAEMONIZATION is true
+## @audience     public
+## @stability    stable
+## @replaceable  yes
+function ozone_add_server_opts
+{
+  if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == "true" ]] && [[ -n "${OZONE_SERVER_OPTS:-}" ]]; then
+    ozone_debug "Appending OZONE_SERVER_OPTS onto OZONE_OPTS"
+    OZONE_OPTS="${OZONE_OPTS} ${OZONE_SERVER_OPTS}"
+  fi
+}
+
 ## @description  Finish configuring Hadoop specific system properties
 ## @description  prior to executing Java
 ## @audience     private

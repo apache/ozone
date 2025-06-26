@@ -513,7 +513,11 @@ public class OzoneDelegationTokenSecretManager
     LOG.info("Loading token state into token manager.");
     for (Map.Entry<OzoneTokenIdentifier, Long> entry :
         state.getTokenState().entrySet()) {
-      addPersistedDelegationToken(entry.getKey(), entry.getValue());
+      try {
+        addPersistedDelegationToken(entry.getKey(), entry.getValue());
+      } catch (Exception e) {
+        LOG.error("exception while loading delegation token from DB... ignored to continue startup", e);
+      }
     }
   }
 
@@ -528,6 +532,16 @@ public class OzoneDelegationTokenSecretManager
     byte[] password;
     if (StringUtils.isNotEmpty(identifier.getSecretKeyId())) {
       ManagedSecretKey signKey = secretKeyClient.getSecretKey(UUID.fromString(identifier.getSecretKeyId()));
+      if (signKey == null) {
+        // if delegation token expired, remove it from the store.
+        if (renewDate < Time.now()) {
+          LOG.info("Removing expired persisted delegation token {} from DB", identifier);
+          this.store.removeToken(identifier);
+        }
+
+        throw new IOException("Secret key " + UUID.fromString(identifier.getSecretKeyId()) +
+            " not found for token " + formatTokenId(identifier));
+      }
       password = signKey.sign(identifier.getBytes());
     } else {
       if (LOG.isDebugEnabled()) {
@@ -589,9 +603,6 @@ public class OzoneDelegationTokenSecretManager
   public void stop() throws IOException {
     super.stop();
     stopThreads();
-    if (this.store != null) {
-      this.store.close();
-    }
   }
 
   @VisibleForTesting

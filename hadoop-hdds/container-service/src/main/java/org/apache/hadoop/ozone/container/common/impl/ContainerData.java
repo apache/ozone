@@ -94,7 +94,11 @@ public abstract class ContainerData {
 
   private HddsVolume volume;
 
+  // Checksum of just the container file.
   private String checksum;
+
+  // Checksum of the data within the container.
+  private long dataChecksum;
 
   private boolean isEmpty;
 
@@ -107,7 +111,7 @@ public abstract class ContainerData {
   private transient Optional<Instant> lastDataScanTime = Optional.empty();
 
   public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
-  private static final String DUMMY_CHECKSUM = new String(new byte[64],
+  public static final String ZERO_CHECKSUM = new String(new byte[64],
       CHARSET_ENCODING);
 
   // Common Fields need to be stored in .container file.
@@ -148,7 +152,8 @@ public abstract class ContainerData {
     this.originPipelineId = originPipelineId;
     this.originNodeId = originNodeId;
     this.isEmpty = false;
-    setChecksumTo0ByteArray();
+    this.checksum = ZERO_CHECKSUM;
+    this.dataChecksum = 0;
   }
 
   protected ContainerData(ContainerData source) {
@@ -174,6 +179,12 @@ public abstract class ContainerData {
    * @return Path to base dir.
    */
   public abstract String getContainerPath();
+
+  /**
+   * Returns container metadata path.
+   * @return - Physical path where container file and checksum is stored.
+   */
+  public abstract String getMetadataPath();
 
   /**
    * Returns the type of the container.
@@ -454,15 +465,11 @@ public abstract class ContainerData {
     this.isEmpty = true;
   }
 
-  public void setChecksumTo0ByteArray() {
-    this.checksum = DUMMY_CHECKSUM;
-  }
-
-  public void setChecksum(String checkSum) {
+  public void setContainerFileChecksum(String checkSum) {
     this.checksum = checkSum;
   }
 
-  public String getChecksum() {
+  public String getContainerFileChecksum() {
     return this.checksum;
   }
 
@@ -513,21 +520,29 @@ public abstract class ContainerData {
    *
    * Checksum of ContainerData is calculated by setting the
    * {@link ContainerData#checksum} field to a 64-byte array with all 0's -
-   * {@link ContainerData#DUMMY_CHECKSUM}. After the checksum is calculated,
+   * {@link ContainerData#ZERO_CHECKSUM}. After the checksum is calculated,
    * the checksum field is updated with this value.
    *
    * @param yaml Yaml for ContainerType to get the ContainerData as Yaml String
    * @throws IOException
    */
-  public void computeAndSetChecksum(Yaml yaml) throws IOException {
+  public void computeAndSetContainerFileChecksum(Yaml yaml) throws IOException {
     // Set checksum to dummy value - 0 byte array, to calculate the checksum
     // of rest of the data.
-    setChecksumTo0ByteArray();
+    this.checksum = ZERO_CHECKSUM;
 
     // Dump yaml data into a string to compute its checksum
     String containerDataYamlStr = yaml.dump(this);
 
-    this.checksum = ContainerUtils.getChecksum(containerDataYamlStr);
+    this.checksum = ContainerUtils.getContainerFileChecksum(containerDataYamlStr);
+  }
+
+  public void setDataChecksum(long dataChecksum) {
+    this.dataChecksum = dataChecksum;
+  }
+
+  public long getDataChecksum() {
+    return dataChecksum;
   }
 
   /**
