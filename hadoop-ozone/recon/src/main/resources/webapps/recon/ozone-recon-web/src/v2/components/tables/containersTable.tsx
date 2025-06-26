@@ -53,7 +53,7 @@ const getDataNodeWithChecksum = (idx: number, host: string, checksum: string) =>
   return (
     <div key={idx} className='datanode-container-v2-tr'>
       <span className="datanode-container-v2-td"><NodeIndexOutlined /> {host}</span>
-      <span className="datanode-container-v2-td">/ ({checksum})</span>
+      <span className="datanode-container-v2-td">/ {checksum}</span>
     </div>
   )
 }
