@@ -45,11 +45,12 @@ public abstract class BackgroundService {
   private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
-  private final long serviceTimeoutInNanos;
+  private volatile long serviceTimeoutInNanos;
   private TimeUnit unit;
   private final int threadPoolSize;
   private final String threadNamePrefix;
   private final PeriodicalTask service;
+  private CompletableFuture<Void> future;
 
   public BackgroundService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout) {
@@ -68,6 +69,11 @@ public abstract class BackgroundService {
     this.threadNamePrefix = threadNamePrefix;
     initExecutorAndThreadGroup();
     service = new PeriodicalTask();
+    this.future = CompletableFuture.completedFuture(null);
+  }
+
+  protected CompletableFuture<Void> getFuture() {
+    return future;
   }
 
   @VisibleForTesting
@@ -84,6 +90,11 @@ public abstract class BackgroundService {
     // the corePoolSize will always less maximumPoolSize.
     // So we can directly set the corePoolSize
     exec.setCorePoolSize(size);
+  }
+
+  public synchronized void setServiceTimeoutInNanos(long newTimeout) {
+    LOG.info("{} timeout is set to {} {}", serviceName, newTimeout, TimeUnit.NANOSECONDS.name().toLowerCase());
+    this.serviceTimeoutInNanos = newTimeout;
   }
 
   @VisibleForTesting
@@ -138,7 +149,7 @@ public abstract class BackgroundService {
 
       while (!tasks.isEmpty()) {
         BackgroundTask task = tasks.poll();
-        CompletableFuture.runAsync(() -> {
+        future = future.thenCombine(CompletableFuture.runAsync(() -> {
           long startTime = System.nanoTime();
           try {
             BackgroundTaskResult result = task.call();
@@ -157,7 +168,7 @@ public abstract class BackgroundService {
                   serviceName, endTime - startTime, serviceTimeoutInNanos);
             }
           }
-        }, exec);
+        }, exec), (Void1, Void) -> null);
       }
     }
   }

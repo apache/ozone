@@ -196,7 +196,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
         getBlockID(), getChunkInfo(), WRITE_STAGE);
     rewindBufferToDataStart();
     Assertions.assertEquals(writeChunkData, readChunkData);
-    Assertions.assertEquals(containerData.getWriteBytes(), writeChunkData.remaining());
+    Assertions.assertEquals(containerData.getStatistics().getWriteBytes(), writeChunkData.remaining());
     Assertions.assertEquals(containerData.getBytesUsed(), writeChunkData.remaining());
 
     // Test Overwrite
@@ -206,7 +206,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
         getBlockID(), getChunkInfo(), WRITE_STAGE);
     rewindBufferToDataStart();
     Assertions.assertEquals(writeChunkData, readChunkData);
-    Assertions.assertEquals(containerData.getWriteBytes(), 2L * writeChunkData.remaining());
+    Assertions.assertEquals(containerData.getStatistics().getWriteBytes(), 2L * writeChunkData.remaining());
     // Overwrites won't increase the bytesUsed of a Container
     Assertions.assertEquals(containerData.getBytesUsed(), writeChunkData.remaining());
 
@@ -224,7 +224,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
         getBlockID(), newChunkInfo, WRITE_STAGE);
     newWriteChunkData.rewind();
     Assertions.assertEquals(newWriteChunkData, readChunkData);
-    Assertions.assertEquals(containerData.getWriteBytes(), 2L * writeChunkData.remaining()
+    Assertions.assertEquals(containerData.getStatistics().getWriteBytes(), 2L * writeChunkData.remaining()
         + newWriteChunkData.remaining());
     Assertions.assertEquals(containerData.getBytesUsed(), writeChunkData.remaining() + newWriteChunkData.remaining());
   }

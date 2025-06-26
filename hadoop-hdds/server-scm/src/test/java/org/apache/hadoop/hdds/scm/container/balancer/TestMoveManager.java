@@ -323,7 +323,7 @@ public class TestMoveManager {
   public void testDeleteCommandFails() throws Exception {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
-    doThrow(new ContainerNotFoundException("test"))
+    doThrow(ContainerNotFoundException.newInstanceForTesting())
         .when(containerManager).getContainer(any(ContainerID.class));
 
     ContainerReplicaOp op = new ContainerReplicaOp(

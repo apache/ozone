@@ -245,10 +245,11 @@ public class ReconUtils {
   public static StringBuilder constructFullPathPrefix(long initialParentId, String volumeName,
       String bucketName, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager) throws IOException {
-    StringBuilder fullPath = new StringBuilder();
+
     long parentId = initialParentId;
     boolean isDirectoryPresent = false;
 
+    List<String> pathSegments = new ArrayList<>();
     while (parentId != 0) {
       NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
       if (nsSummary == null) {
@@ -265,7 +266,7 @@ public class ReconUtils {
       }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
       if (!nsSummary.getDirName().isEmpty()) {
-        fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+        pathSegments.add(nsSummary.getDirName());
       }
 
       // Move to the parent ID of the current directory
@@ -273,8 +274,15 @@ public class ReconUtils {
       isDirectoryPresent = true;
     }
 
-    // Prepend the volume and bucket to the constructed path
-    fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    StringBuilder fullPath = new StringBuilder();
+    fullPath.append(volumeName).append(OM_KEY_PREFIX)
+        .append(bucketName).append(OM_KEY_PREFIX);
+
+    // Build the components in a list, then reverse and join once
+    for (int i = pathSegments.size() - 1; i >= 0; i--) {
+      fullPath.append(pathSegments.get(i)).append(OM_KEY_PREFIX);
+    }
+
     // TODO - why is this needed? It seems lke it should handle double slashes in the path name,
     //        but its not clear how they get there. This normalize call is quite expensive as it
     //        creates several objects (URI, PATH, back to string). There was a bug fixed above
@@ -282,9 +290,11 @@ public class ReconUtils {
     //        bucket name, but with that fixed, it seems like this should not be needed. All tests
     //        pass without it for key listing.
     if (isDirectoryPresent) {
-      String path = fullPath.toString();
-      fullPath.setLength(0);
-      fullPath.append(OmUtils.normalizeKey(path, true));
+      if (fullPath.indexOf("//") >= 0) {
+        String path = fullPath.toString();
+        fullPath.setLength(0);
+        fullPath.append(OmUtils.normalizeKey(path, true));
+      }
     }
     return fullPath;
   }
@@ -449,7 +459,7 @@ public class ReconUtils {
             if (lastKnonwnSnapshotTs < snapshotTimestamp) {
               if (lastKnownSnapshotFile != null) {
                 try {
-                  FileUtils.deleteDirectory(lastKnownSnapshotFile);
+                  FileUtils.forceDelete(lastKnownSnapshotFile);
                 } catch (IOException e) {
                   log.warn("Error deleting existing om db snapshot directory: {}",
                       lastKnownSnapshotFile.getAbsolutePath());

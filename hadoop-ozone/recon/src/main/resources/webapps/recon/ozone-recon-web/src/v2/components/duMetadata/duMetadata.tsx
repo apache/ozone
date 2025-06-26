@@ -270,7 +270,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
         // If the entity is a Key then fetch the Key metadata only
         if (summaryResponse.type === 'KEY') {
           const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(
-            `/api/v1/namespace/du?path=${path}&replica=true`,
+            `/api/v1/namespace/usage?path=${path}&replica=true`,
             keyMetadataSummarySignal.current
           );
           keyMetadataSummarySignal.current = metadataNewController;

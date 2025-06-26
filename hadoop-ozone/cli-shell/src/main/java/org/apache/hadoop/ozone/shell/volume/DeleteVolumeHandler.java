@@ -172,9 +172,10 @@ public class DeleteVolumeHandler extends VolumeHandler {
       final Path path = new Path(ofsPrefix);
       OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
       clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
-      FileSystem fs = FileSystem.get(clientConf);
-      if (!fs.delete(path, true)) {
-        throw new IOException("Failed to delete bucket");
+      try (FileSystem fs = FileSystem.get(clientConf)) {
+        if (!fs.delete(path, true)) {
+          throw new IOException("Failed to delete bucket");
+        }
       }
       numberOfBucketsCleaned.getAndIncrement();
       return true;
