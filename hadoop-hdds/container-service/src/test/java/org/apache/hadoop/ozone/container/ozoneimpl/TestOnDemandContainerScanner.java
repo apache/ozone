@@ -158,6 +158,31 @@ public class TestOnDemandContainerScanner extends
   }
 
   @Test
+  public void testSameOpenContainerQueuedMultipleTimes() throws Exception {
+    OnDemandContainerScanner.init(conf, controller);
+    // Given a container that has not finished scanning
+    CountDownLatch latch = new CountDownLatch(1);
+    when(openCorruptMetadata.scanMetaData())
+        .thenAnswer((Answer<ScanResult>) invocation -> {
+          latch.await();
+          return getUnhealthyScanResult();
+        });
+    Optional<Future<?>> onGoingScan = OnDemandContainerScanner
+        .scanContainer(openCorruptMetadata);
+    assertTrue(onGoingScan.isPresent());
+    assertFalse(onGoingScan.get().isDone());
+    //When scheduling the same container again
+    Optional<Future<?>> secondScan = OnDemandContainerScanner
+        .scanContainer(openCorruptMetadata);
+    //Then the second scan is not scheduled and the first scan can still finish
+    assertFalse(secondScan.isPresent());
+    latch.countDown();
+    onGoingScan.get().get();
+    verify(controller, atLeastOnce()).markContainerUnhealthy(
+        eq(openCorruptMetadata.getContainerData().getContainerID()), any());
+  }
+
+  @Test
   @Override
   public void testScannerMetrics() throws Exception {
     OnDemandContainerScanner.init(conf, controller);

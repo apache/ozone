@@ -68,6 +68,7 @@ class TestOnDemandContainerScannerIntegration
 
   static Collection<ContainerCorruptions> supportedCorruptionTypesForOpen() {
     Set<ContainerCorruptions> set = EnumSet.copyOf(supportedCorruptionTypes());
+    // Open containers will be checked only for metadata corruption, so missing block is not a valid corruption type.
     set.remove(ContainerCorruptions.MISSING_BLOCK);
     return set;
   }

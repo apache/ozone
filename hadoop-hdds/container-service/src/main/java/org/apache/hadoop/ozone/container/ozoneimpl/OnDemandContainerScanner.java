@@ -147,10 +147,12 @@ public final class OnDemandContainerScanner {
               containerId, result.getException());
           return;
         }
+        instance.metrics.incNumContainersScanned();
       } else if (container.shouldScanMetadata()) {
         // OPEN containers are scanned here for metadata only
         LOG.debug("Performing metadata-only scan for open container {}", container.getContainerData().getContainerID());
         result = container.scanMetaData();
+        instance.metrics.incNumContainersScanned();
       }
       if (!result.isHealthy()) {
         LOG.error("Corruption detected in container [{}]." +
@@ -159,8 +161,6 @@ public final class OnDemandContainerScanner {
         instance.containerController.markContainerUnhealthy(containerId,
             result);
       }
-
-      instance.metrics.incNumContainersScanned();
       Instant now = Instant.now();
       logScanCompleted(containerData, now);
       instance.containerController.updateDataScanTimestamp(containerId, now);
