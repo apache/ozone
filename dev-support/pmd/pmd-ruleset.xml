@@ -50,4 +50,5 @@
   </rule>
 
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
+  <exclude-pattern>.*/org/apache/hadoop/ozone/metrics/.*</exclude-pattern>
 </ruleset>
