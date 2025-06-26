@@ -126,7 +126,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.put("bucketName", null, null, null));
+        bucketEndpoint.put("bucketName", null, null, null, null));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -137,7 +137,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.delete("bucketName"));
+        bucketEndpoint.delete("bucketName", null));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
   @Test
@@ -163,7 +163,7 @@ public class TestPermissionCheck {
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "bucketName", null, null, null, 1000,
-        null, null, null, null, null, null, null, 0, null));
+        null, null, null, null, null, null, null, 0, null, null));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -208,7 +208,7 @@ public class TestPermissionCheck {
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
             "bucketName", null, null, null, 1000, null, null, null, null, "acl",
-            null, null, 0, null), "Expected OS3Exception with FORBIDDEN http code.");
+            null, null, 0, null, null), "Expected OS3Exception with FORBIDDEN http code.");
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -229,7 +229,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     try {
-      bucketEndpoint.put("bucketName", "acl", headers, null);
+      bucketEndpoint.put("bucketName", "acl", null, headers, null);
     } catch (Exception e) {
       assertTrue(e instanceof OS3Exception &&
           ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);

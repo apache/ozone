@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -1341,6 +1343,33 @@ public interface ClientProtocol {
    * @throws IOException
    */
   void deleteObjectTagging(String volumeName, String bucketName, String keyName)
+      throws IOException;
+
+  /**
+   * Gets the lifecycle configuration information.
+   * @param volumeName - Volume name.
+   * @param bucketName - Bucket name.
+   * @return OzoneLifecycleConfiguration or exception is thrown.
+   * @throws IOException
+   */
+  OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
+      throws IOException;
+
+  /**
+   * Creates a new lifecycle configuration.
+   * @param lifecycleConfiguration - lifecycle configuration info.
+   * @throws IOException
+   */
+  void createLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
+      throws IOException;
+
+  /**
+   * Deletes existing lifecycle configuration.
+   * @param volumeName - Volume name.
+   * @param bucketName - Bucket name.
+   * @throws IOException
+   */
+  void deleteLifecycleConfiguration(String volumeName, String bucketName)
       throws IOException;
 
 }

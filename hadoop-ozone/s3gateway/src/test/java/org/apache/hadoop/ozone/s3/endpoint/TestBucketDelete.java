@@ -61,7 +61,7 @@ public class TestBucketDelete {
 
   @Test
   public void testBucketEndpoint() throws Exception {
-    Response response = bucketEndpoint.delete(bucketName);
+    Response response = bucketEndpoint.delete(bucketName, null);
     assertEquals(HttpStatus.SC_NO_CONTENT, response.getStatus());
 
   }
@@ -69,7 +69,7 @@ public class TestBucketDelete {
   @Test
   public void testDeleteWithNoSuchBucket() throws Exception {
     try {
-      bucketEndpoint.delete("unknownbucket");
+      bucketEndpoint.delete("unknownbucket", null);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
@@ -85,7 +85,7 @@ public class TestBucketDelete {
     try {
       ObjectStoreStub stub = (ObjectStoreStub) objectStoreStub;
       stub.setBucketEmptyStatus(bucketName, false);
-      bucketEndpoint.delete(bucketName);
+      bucketEndpoint.delete(bucketName, null);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getErrorMessage(),

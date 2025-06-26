@@ -48,6 +48,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -59,11 +60,13 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.s3.commontypes.EncodingTypeObject;
 import org.apache.hadoop.ozone.s3.commontypes.KeyMetadata;
@@ -117,6 +120,7 @@ public class BucketEndpoint extends EndpointBase {
       @QueryParam("key-marker") String keyMarker,
       @QueryParam("upload-id-marker") String uploadIdMarker,
       @DefaultValue("1000") @QueryParam("max-uploads") int maxUploads,
+      @QueryParam("lifecycle") String lifecycleMarker,
       @Context HttpHeaders hh) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
@@ -128,6 +132,11 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = null;
 
     try {
+      if (lifecycleMarker != null) {
+        s3GAction = S3GAction.GET_BUCKET_LIFECYCLE;
+        return getBucketLifecycleConfiguration(bucketName, hh);
+      }
+
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
         S3BucketAcl result = getAcl(bucketName);
@@ -295,12 +304,17 @@ public class BucketEndpoint extends EndpointBase {
   @PUT
   public Response put(@PathParam("bucket") String bucketName,
                       @QueryParam("acl") String aclMarker,
+                      @QueryParam("lifecycle") String lifecycleMarker,
                       @Context HttpHeaders httpHeaders,
                       InputStream body) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
 
     try {
+      if (lifecycleMarker != null) {
+        s3GAction = S3GAction.PUT_BUCKET_LIFECYCLE;
+        return putBucketLifecycleConfiguration(bucketName, httpHeaders, body);
+      }
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_ACL;
         Response response =  putAcl(bucketName, httpHeaders, body);
@@ -418,12 +432,17 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @DELETE
-  public Response delete(@PathParam("bucket") String bucketName)
+  public Response delete(@PathParam("bucket") String bucketName,
+                         @QueryParam("lifecycle") String lifecycleMarker)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.DELETE_BUCKET;
 
     try {
+      if (lifecycleMarker != null) {
+        s3GAction = S3GAction.DELETE_BUCKET_LIFECYCLE;
+        return deleteBucketLifecycleConfiguration(bucketName, null);
+      }
       deleteS3Bucket(bucketName);
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
@@ -750,6 +769,97 @@ public class BucketEndpoint extends EndpointBase {
     // Use ownerName to fill displayName
     keyMetadata.setOwner(new S3Owner(ownerName, displayName));
     response.addKey(keyMetadata);
+  }
+
+  private void verifyBucketOwner(String bucketName, HttpHeaders httpHeaders)
+      throws OS3Exception {
+    if (httpHeaders == null) {
+      return;
+    }
+    String expectedBucketOwner = httpHeaders.getHeaderString("x-amz-expected-bucket-owner");
+    if (expectedBucketOwner == null || expectedBucketOwner.isEmpty()) {
+      return;
+    }
+
+    try {
+      String actualOwner = getBucket(bucketName).getOwner();
+      if (actualOwner != null && !actualOwner.equals(expectedBucketOwner)) {
+        LOG.debug("Bucket: {}, ExpectedBucketOwner: {}, ActualBucketOwner: {}",
+            bucketName, expectedBucketOwner, actualOwner);
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+      }
+    } catch (Exception ex) {
+      LOG.error("Owner verification failed for bucket: {}", bucketName, ex);
+      throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+    }
+  }
+
+
+  public Response putBucketLifecycleConfiguration(
+      String bucketName, HttpHeaders httpHeaders, InputStream body)
+      throws IOException, OS3Exception {
+    verifyBucketOwner(bucketName, httpHeaders);
+    S3LifecycleConfiguration s3LifecycleConfiguration;
+    OzoneBucket ozoneBucket = getBucket(bucketName);
+    try {
+      s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(null,
+          null, null, null, null, body);
+      OmLifecycleConfiguration lcc =
+          s3LifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket.getVolumeName(), bucketName);
+      ozoneBucket.setLifecycleConfiguration(lcc);
+    } catch (WebApplicationException ex) {
+      throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.ACCESS_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
+      } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, bucketName);
+      }
+    }
+    return Response.ok().build();
+  }
+
+  public Response getBucketLifecycleConfiguration(String bucketName, HttpHeaders httpHeaders)
+      throws IOException, OS3Exception {
+    verifyBucketOwner(bucketName, httpHeaders);
+    OzoneLifecycleConfiguration ozoneLifecycleConfiguration =
+        getLifecycleConfiguration(bucketName);
+    return Response.ok(S3LifecycleConfiguration.fromOzoneLifecycleConfiguration(
+        ozoneLifecycleConfiguration), MediaType.APPLICATION_XML_TYPE).build();
+  }
+
+  protected OzoneLifecycleConfiguration getLifecycleConfiguration(
+      String bucketName) throws IOException, OS3Exception {
+    try {
+      OzoneBucket ozoneBucket = getBucket(bucketName);
+      return ozoneBucket.getLifecycleConfiguration();
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND) {
+        throw S3ErrorTable.newError(
+            S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION, bucketName);
+      }
+      throw ex;
+    }
+  }
+
+  public Response deleteBucketLifecycleConfiguration(String bucketName, HttpHeaders httpHeaders)
+      throws IOException, OS3Exception {
+    verifyBucketOwner(bucketName, httpHeaders);
+    deleteLifecycleConfiguration(bucketName);
+    return Response.noContent().build();
+  }
+
+  protected void deleteLifecycleConfiguration(String bucketName)
+      throws IOException, OS3Exception {
+    try {
+      getBucket(bucketName).deleteLifecycleConfiguration();
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND) {
+        throw S3ErrorTable.newError(
+            S3ErrorTable.NO_SUCH_LIFECYCLE_CONFIGURATION, bucketName);
+      }
+      throw ex;
+    }
   }
 
   @Override

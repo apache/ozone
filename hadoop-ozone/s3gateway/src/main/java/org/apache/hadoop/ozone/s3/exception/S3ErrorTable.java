@@ -154,6 +154,10 @@ public final class S3ErrorTable {
       HTTP_FORBIDDEN
   );
 
+  public static final OS3Exception NO_SUCH_LIFECYCLE_CONFIGURATION =
+      new OS3Exception("NoSuchLifecycleConfiguration",
+      "The specified lifecycle configurations does not exist", HTTP_NOT_FOUND);
+
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
   }
