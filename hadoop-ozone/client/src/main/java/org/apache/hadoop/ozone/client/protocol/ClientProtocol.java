@@ -1349,12 +1349,11 @@ public interface ClientProtocol {
    * Gets the lifecycle configuration information.
    * @param volumeName - Volume name.
    * @param bucketName - Bucket name.
-   * @return OmLifecycleConfiguration or exception is thrown.
+   * @return OzoneLifecycleConfiguration or exception is thrown.
    * @throws IOException
    */
   OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
       throws IOException;
-
 
   /**
    * Creates a new lifecycle configuration.

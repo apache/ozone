@@ -1094,7 +1094,7 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Gets the lifecycle configuration information.
-   * @return OmLifecycleConfiguration or exception is thrown.
+   * @return OzoneLifecycleConfiguration or exception is thrown.
    * @throws IOException
    */
   @JsonIgnore
