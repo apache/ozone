@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeletedKeyBlocks;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
@@ -66,8 +67,8 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -229,12 +230,20 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
-      List<BlockGroup> keyBlocksInfoList) throws IOException {
-    List<KeyBlocks> keyBlocksProto = keyBlocksInfoList.stream()
-        .map(BlockGroup::getProto).collect(Collectors.toList());
+      List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
+    List<DeletedKeyBlocks> dkProto = keyBlocksInfoList.stream()
+        .map(DeletedBlockGroup::getProto)
+        .collect(Collectors.toList());
+
+// Build KeyBlocks (legacy format, no usedBytes)
+    List<KeyBlocks> legacy = keyBlocksInfoList.stream()
+        .map(DeletedBlockGroup::getLegacyProto)
+        .collect(Collectors.toList());
+
     DeleteScmKeyBlocksRequestProto request = DeleteScmKeyBlocksRequestProto
         .newBuilder()
-        .addAllKeyBlocks(keyBlocksProto)
+        .addAllDeletedKeyBlocks(dkProto)   // new field (#2)
+        .addAllKeyBlocks(legacy)           // old field (#1, deprecated)
         .build();
 
     SCMBlockLocationRequest wrapper = createSCMBlockRequest(

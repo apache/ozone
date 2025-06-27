@@ -408,6 +408,11 @@ message BlockID {
     optional uint64 blockCommitSequenceId = 2 [default = 0];
 }
 
+message DeletedBlock {
+  required BlockID blockId = 1;
+  optional uint64 replicatedSize = 2 [default = 0];
+}
+
 message UpgradeFinalizationStatus {
     enum Status {
         ALREADY_FINALIZED = 1;
