@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,6 +46,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
   private List<String> deleteKeyList;
   private OMRequest omRequest;
+  private static final int KEY_COUNT = 10;
 
   @Test
   public void testKeysDeleteRequest() throws Exception {
@@ -99,36 +100,75 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
     OMKeysDeleteRequest omKeysDeleteRequest =
         new OMKeysDeleteRequest(omRequest, getBucketLayout());
-    checkDeleteKeysResponseForFailure(omKeysDeleteRequest);
+    checkDeleteKeysResponseForFailure(omKeysDeleteRequest, Status.PARTIAL_DELETE);
+  }
+
+  @Test
+  public void testUpdateIDCountNoMatchKeyCount() throws Exception {
+
+    createPreRequisites();
+
+    // Add a key which not exist, which causes batch delete to fail.
+
+    omRequest = omRequest.toBuilder()
+        .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
+            .setDeleteKeys(DeleteKeyArgs.newBuilder()
+                .setBucketName(bucketName).setVolumeName(volumeName)
+                .addAllKeys(deleteKeyList).addUpdateIDs(1000))).build();
+
+    OMKeysDeleteRequest omKeysDeleteRequest =
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
+    checkDeleteKeysResponseForFailure(omKeysDeleteRequest, Status.INVALID_REQUEST);
+  }
+
+  @Test
+  public void testUpdateIDCountMatchKeyCount() throws Exception {
+
+    createPreRequisites();
+
+    // Add a key which not exist, which causes batch delete to fail.
+    // updateID of every deleteKeyList is same 1L.
+    List<Long> updateIDList = new ArrayList<>(KEY_COUNT);
+    updateIDList.forEach(id -> id = 1L);
+    omRequest = omRequest.toBuilder()
+        .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
+            .setDeleteKeys(DeleteKeyArgs.newBuilder()
+                .setBucketName(bucketName).setVolumeName(volumeName)
+                .addAllKeys(deleteKeyList).addAllUpdateIDs(updateIDList))).build();
+
+    OMKeysDeleteRequest omKeysDeleteRequest =
+        new OMKeysDeleteRequest(omRequest, getBucketLayout());
+    checkDeleteKeysResponse(omKeysDeleteRequest);
   }
 
   protected void checkDeleteKeysResponseForFailure(
-      OMKeysDeleteRequest omKeysDeleteRequest) throws java.io.IOException {
+      OMKeysDeleteRequest omKeysDeleteRequest, Status failureStatus) throws java.io.IOException {
     OMClientResponse omClientResponse =
         omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     assertFalse(omClientResponse.getOMResponse().getSuccess());
-    assertEquals(PARTIAL_DELETE,
-        omClientResponse.getOMResponse().getStatus());
+    assertEquals(failureStatus, omClientResponse.getOMResponse().getStatus());
 
     assertFalse(omClientResponse.getOMResponse()
         .getDeleteKeysResponse().getStatus());
 
     // Check keys are deleted and in response check unDeletedKey.
-    for (String deleteKey : deleteKeyList) {
-      assertNull(omMetadataManager.getKeyTable(getBucketLayout())
-          .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
-              deleteKey)));
-    }
+    if (failureStatus != Status.INVALID_REQUEST) {
+      for (String deleteKey : deleteKeyList) {
+        assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+            .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
+                deleteKey)));
+      }
 
-    DeleteKeyArgs unDeletedKeys = omClientResponse.getOMResponse()
-        .getDeleteKeysResponse().getUnDeletedKeys();
-    assertEquals(1,
-        unDeletedKeys.getKeysCount());
-    List<DeleteKeyError> keyErrors =  omClientResponse.getOMResponse().getDeleteKeysResponse()
-        .getErrorsList();
-    assertEquals(1, keyErrors.size());
-    assertEquals("dummy", unDeletedKeys.getKeys(0));
+      DeleteKeyArgs unDeletedKeys = omClientResponse.getOMResponse()
+          .getDeleteKeysResponse().getUnDeletedKeys();
+      assertEquals(1,
+          unDeletedKeys.getKeysCount());
+      List<DeleteKeyError> keyErrors = omClientResponse.getOMResponse().getDeleteKeysResponse()
+          .getErrorsList();
+      assertEquals(1, keyErrors.size());
+      assertEquals("dummy", unDeletedKeys.getKeys(0));
+    }
   }
 
   protected void createPreRequisites() throws Exception {
@@ -138,8 +178,6 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
-    int count = 10;
-
     DeleteKeyArgs.Builder deleteKeyArgs = DeleteKeyArgs.newBuilder()
         .setBucketName(bucketName).setVolumeName(volumeName);
 
@@ -148,7 +186,7 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
     String key;
 
 
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < KEY_COUNT; i++) {
       key = parentDir.concat("/key" + i);
       OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName,
           parentDir.concat("/key" + i), RatisReplicationConfig.getInstance(THREE), omMetadataManager);

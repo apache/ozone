@@ -1359,6 +1359,7 @@ message DeleteKeyArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
+    repeated uint64 updateIDs = 4; // each key's update ID when key is identified for deletion
 }
 
 message DeleteKeyError {
@@ -2377,10 +2378,11 @@ message LifecycleAction {
 message LifecycleConfiguration {
   required string volume = 1;
   required string bucket = 2;
-  optional uint64 creationTime = 3;
-  repeated LifecycleRule rules = 4;
-  optional uint64 objectID = 5;
-  optional uint64 updateID = 6;
+  required BucketLayoutProto bucketLayout = 3;
+  optional uint64 creationTime = 4;
+  repeated LifecycleRule rules = 5;
+  optional uint64 objectID = 6;
+  optional uint64 updateID = 7;
 }
 
 /**

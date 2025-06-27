@@ -186,9 +186,9 @@ class TestOmLCRule {
     LifecycleRule proto = rule1.getProtobuf();
 
     // Proto to Object
-    OmLCRule ruleFromProto1 = OmLCRule.getFromProtobuf(proto);
+    OmLCRule ruleFromProto1 = OmLCRule.getFromProtobuf(proto, BucketLayout.DEFAULT);
     assertEquals("test-rule", ruleFromProto1.getId());
-    assertNull(ruleFromProto1.getPrefix());
+    assertEquals("prefix", ruleFromProto1.getPrefix());
     assertTrue(ruleFromProto1.isEnabled());
     assertNotNull(ruleFromProto1.getExpiration());
     assertEquals(1, ruleFromProto1.getExpiration().getDays());
@@ -201,7 +201,7 @@ class TestOmLCRule {
     LifecycleRule proto2 = rule2.getProtobuf();
 
     // Proto to Object
-    OmLCRule ruleFromProto2 = OmLCRule.getFromProtobuf(proto2);
+    OmLCRule ruleFromProto2 = OmLCRule.getFromProtobuf(proto2, BucketLayout.DEFAULT);
     assertEquals("test-rule", ruleFromProto2.getId());
     assertFalse(ruleFromProto2.isEnabled());
     assertEquals("/logs/", ruleFromProto2.getPrefix());
@@ -215,7 +215,7 @@ class TestOmLCRule {
     LifecycleRule proto3 = rule3.getProtobuf();
 
     // Proto to Object
-    OmLCRule ruleFromProto3 = OmLCRule.getFromProtobuf(proto3);
+    OmLCRule ruleFromProto3 = OmLCRule.getFromProtobuf(proto3, BucketLayout.DEFAULT);
     assertEquals("test-rule", ruleFromProto3.getId());
     assertTrue(ruleFromProto3.isEnabled());
     assertEquals("", ruleFromProto3.getPrefix());

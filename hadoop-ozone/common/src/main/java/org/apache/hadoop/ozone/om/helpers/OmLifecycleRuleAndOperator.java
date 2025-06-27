@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.isValidKeyPath;
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.normalizePrefix;
+
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.util.Collections;
@@ -24,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import net.jcip.annotations.Immutable;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilterTag;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRuleAndOperator;
@@ -36,6 +40,8 @@ public final class OmLifecycleRuleAndOperator {
 
   private final Map<String, String> tags;
   private final String prefix;
+  private final String canonicalPrefix;
+  private final boolean directoryStylePrefix;
 
   private OmLifecycleRuleAndOperator() {
     throw new UnsupportedOperationException("Default constructor is not supported. Use Builder.");
@@ -44,6 +50,12 @@ public final class OmLifecycleRuleAndOperator {
   private OmLifecycleRuleAndOperator(Builder builder) {
     this.tags = Collections.unmodifiableMap(new HashMap<>(builder.tags));
     this.prefix = builder.prefix;
+    this.canonicalPrefix = builder.canonicalPrefix;
+    if (this.canonicalPrefix != null) {
+      this.directoryStylePrefix = this.canonicalPrefix.contains(OzoneConsts.OM_KEY_PREFIX);
+    } else {
+      this.directoryStylePrefix = false;
+    }
   }
 
   @Nonnull
@@ -56,6 +68,15 @@ public final class OmLifecycleRuleAndOperator {
     return prefix;
   }
 
+  @Nullable
+  public String getCanonicalPrefix() {
+    return canonicalPrefix;
+  }
+
+  public boolean isDirectoryStylePrefix() {
+    return directoryStylePrefix;
+  }
+
   /**
    * Validates the OmLifecycleRuleAndOperator.
    * Ensures the following:
@@ -66,7 +87,7 @@ public final class OmLifecycleRuleAndOperator {
    *
    * @throws OMException if the validation fails.
    */
-  public void valid() throws OMException {
+  public void valid(BucketLayout layout) throws OMException {
     boolean hasTags = tags != null && !tags.isEmpty();
     boolean hasPrefix = prefix != null;
 
@@ -87,8 +108,27 @@ public final class OmLifecycleRuleAndOperator {
           "'Prefix' alone is not allowed.",
           OMException.ResultCodes.INVALID_REQUEST);
     }
+
+    if (hasPrefix && layout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      isValidKeyPath(normalizePrefix(prefix));
+    }
   }
 
+  public boolean verify(OmKeyInfo omKeyInfo, String keyPath) {
+    if (prefix != null && !keyPath.startsWith(canonicalPrefix)) {
+      return false;
+    }
+
+    Map<String, String> keyTagList = omKeyInfo.getTags();
+    for (Map.Entry<String, String> tag: tags.entrySet()) {
+      String value = keyTagList.get(tag.getKey());
+      if (value == null || !value.equals(tag.getValue())) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 
   /**
    * The builder for the OmLifecycleRuleAndOperator class.
@@ -96,9 +136,16 @@ public final class OmLifecycleRuleAndOperator {
   public static class Builder {
     private Map<String, String> tags = new HashMap<>();
     private String prefix;
+    private String canonicalPrefix;
+    private BucketLayout bucketLayout;
 
     public Builder setPrefix(String lcPrefix) {
       this.prefix = lcPrefix;
+      return this;
+    }
+
+    public Builder setCanonicalPrefix(String canonicalPrefix) {
+      this.canonicalPrefix = canonicalPrefix;
       return this;
     }
 
@@ -113,10 +160,14 @@ public final class OmLifecycleRuleAndOperator {
       }
       return this;
     }
+    public Builder setBucketLayout(BucketLayout layout) {
+      this.bucketLayout = layout;
+      return this;
+    }
 
     public OmLifecycleRuleAndOperator build() throws OMException {
       OmLifecycleRuleAndOperator omLifecycleRuleAndOperator = new OmLifecycleRuleAndOperator(this);
-      omLifecycleRuleAndOperator.valid();
+      omLifecycleRuleAndOperator.valid(bucketLayout);
       return omLifecycleRuleAndOperator;
     }
   }
@@ -141,11 +192,20 @@ public final class OmLifecycleRuleAndOperator {
     return andOpBuilder.build();
   }
 
-  public static OmLifecycleRuleAndOperator getFromProtobuf(LifecycleRuleAndOperator andOperator) throws OMException {
+  public static OmLifecycleRuleAndOperator getFromProtobuf(LifecycleRuleAndOperator andOperator,
+      BucketLayout layout) throws OMException {
     OmLifecycleRuleAndOperator.Builder builder = new OmLifecycleRuleAndOperator.Builder();
 
     if (andOperator.hasPrefix()) {
-      builder.setPrefix(andOperator.getPrefix());
+      String prefix = andOperator.getPrefix();
+      if (layout == BucketLayout.FILE_SYSTEM_OPTIMIZED && prefix.startsWith(OzoneConsts.OM_KEY_PREFIX)) {
+        String normalizedKeyName = normalizePrefix(prefix);
+        isValidKeyPath(normalizedKeyName);
+        builder.setCanonicalPrefix(normalizedKeyName);
+      } else {
+        builder.setCanonicalPrefix(prefix);
+      }
+      builder.setPrefix(prefix);
     }
     andOperator.getTagsList().forEach(tag -> {
       builder.addTag(tag.getKey(), tag.getValue());

@@ -52,19 +52,19 @@ class TestOmLCFilter {
   @Test
   public void testValidFilter() throws OMException {
     OmLCFilter lcFilter1 = getOmLCFilterBuilder("prefix", null, null).build();
-    assertDoesNotThrow(lcFilter1::valid);
+    assertDoesNotThrow(() -> lcFilter1.valid(BucketLayout.DEFAULT));
 
     OmLCFilter lcFilter2 = getOmLCFilterBuilder(null, Pair.of("key", "value"), null).build();
-    assertDoesNotThrow(lcFilter2::valid);
+    assertDoesNotThrow(() -> lcFilter2.valid(BucketLayout.DEFAULT));
 
     OmLCFilter lcFilter3 = getOmLCFilterBuilder(null, null, VALID_OM_LC_AND_OPERATOR).build();
-    assertDoesNotThrow(lcFilter3::valid);
+    assertDoesNotThrow(() -> lcFilter3.valid(BucketLayout.DEFAULT));
 
     OmLCFilter lcFilter4 = getOmLCFilterBuilder(null, null, null).build();
-    assertDoesNotThrow(lcFilter4::valid);
+    assertDoesNotThrow(() -> lcFilter4.valid(BucketLayout.DEFAULT));
 
     OmLCFilter lcFilter5 = getOmLCFilterBuilder("", null, null).build();
-    assertDoesNotThrow(lcFilter5::valid);
+    assertDoesNotThrow(() -> lcFilter5.valid(BucketLayout.DEFAULT));
   }
 
   @Test
@@ -92,7 +92,7 @@ class TestOmLCFilter {
     // Only prefix
     OmLCFilter filter1 = getOmLCFilterBuilder("prefix", null, null).build();
     LifecycleFilter proto1 = filter1.getProtobuf();
-    OmLCFilter filterFromProto1 = OmLCFilter.getFromProtobuf(proto1);
+    OmLCFilter filterFromProto1 = OmLCFilter.getFromProtobuf(proto1, BucketLayout.DEFAULT);
     assertEquals("prefix", filterFromProto1.getPrefix());
     assertNull(filterFromProto1.getTag());
     assertNull(filterFromProto1.getAndOperator());
@@ -100,7 +100,7 @@ class TestOmLCFilter {
     // Only tag
     OmLCFilter filter2 = getOmLCFilterBuilder(null, Pair.of("key", "value"), null).build();
     LifecycleFilter proto2 = filter2.getProtobuf();
-    OmLCFilter filterFromProto2 = OmLCFilter.getFromProtobuf(proto2);
+    OmLCFilter filterFromProto2 = OmLCFilter.getFromProtobuf(proto2, BucketLayout.DEFAULT);
     assertNull(filterFromProto2.getPrefix());
     assertNotNull(filterFromProto2.getTag());
     assertEquals("key", filterFromProto2.getTag().getKey());
@@ -111,7 +111,7 @@ class TestOmLCFilter {
         "prefix", Collections.singletonMap("tag1", "value1")).build();
     OmLCFilter filter3 = getOmLCFilterBuilder(null, null, andOp).build();
     LifecycleFilter proto3 = filter3.getProtobuf();
-    OmLCFilter filterFromProto3 = OmLCFilter.getFromProtobuf(proto3);
+    OmLCFilter filterFromProto3 = OmLCFilter.getFromProtobuf(proto3, BucketLayout.DEFAULT);
     assertNull(filterFromProto3.getPrefix());
     assertNull(filterFromProto3.getTag());
     assertNotNull(filterFromProto3.getAndOperator());
@@ -119,7 +119,7 @@ class TestOmLCFilter {
     // Only prefix and prefix is ""
     OmLCFilter filter4 = getOmLCFilterBuilder("", null, null).build();
     LifecycleFilter proto4 = filter4.getProtobuf();
-    OmLCFilter filterFromProto4 = OmLCFilter.getFromProtobuf(proto4);
+    OmLCFilter filterFromProto4 = OmLCFilter.getFromProtobuf(proto4, BucketLayout.DEFAULT);
     assertEquals("", filterFromProto4.getPrefix());
     assertNull(filterFromProto4.getTag());
     assertNull(filterFromProto4.getAndOperator());

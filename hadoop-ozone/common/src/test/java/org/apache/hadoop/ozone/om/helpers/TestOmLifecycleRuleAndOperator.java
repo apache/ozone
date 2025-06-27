@@ -41,21 +41,19 @@ class TestOmLifecycleRuleAndOperator {
   public void testValidAndOperator() throws OMException {
     OmLifecycleRuleAndOperator andOperator1 =
         getOmLCAndOperatorBuilder("prefix", Collections.singletonMap("tag1", "value1")).build();
-    assertDoesNotThrow(andOperator1::valid);
+    assertDoesNotThrow(() -> andOperator1.valid(BucketLayout.DEFAULT));
 
     OmLifecycleRuleAndOperator andOperator2 =
         getOmLCAndOperatorBuilder("", Collections.singletonMap("tag1", "value1")).build();
-    assertDoesNotThrow(andOperator2::valid);
+    assertDoesNotThrow(() -> andOperator2.valid(BucketLayout.DEFAULT));
 
     OmLifecycleRuleAndOperator andOperator3 = getOmLCAndOperatorBuilder(
         "prefix", ImmutableMap.of("tag1", "value1", "tag2", "value2")).build();
-    assertDoesNotThrow(andOperator3::valid);
+    assertDoesNotThrow(() -> andOperator3.valid(BucketLayout.DEFAULT));
 
     OmLifecycleRuleAndOperator andOperator4 = getOmLCAndOperatorBuilder(
         null, ImmutableMap.of("tag1", "value1", "tag2", "value2")).build();
-    assertDoesNotThrow(andOperator4::valid);
-
-
+    assertDoesNotThrow(() -> andOperator4.valid(BucketLayout.DEFAULT));
   }
 
   @Test
@@ -79,7 +77,7 @@ class TestOmLifecycleRuleAndOperator {
     OmLifecycleRuleAndOperator andOp = getOmLCAndOperatorBuilder("prefix", tags).build();
     LifecycleRuleAndOperator proto = andOp.getProtobuf();
     OmLifecycleRuleAndOperator andOpFromProto =
-        OmLifecycleRuleAndOperator.getFromProtobuf(proto);
+        OmLifecycleRuleAndOperator.getFromProtobuf(proto, BucketLayout.DEFAULT);
     assertEquals("prefix", andOpFromProto.getPrefix());
     assertEquals(2, andOpFromProto.getTags().size());
     assertTrue(andOpFromProto.getTags().containsKey("tag1"));
@@ -91,7 +89,7 @@ class TestOmLifecycleRuleAndOperator {
     OmLifecycleRuleAndOperator andOp2 = getOmLCAndOperatorBuilder(null, tags).build();
     LifecycleRuleAndOperator proto2 = andOp2.getProtobuf();
     OmLifecycleRuleAndOperator andOpFromProto2 =
-        OmLifecycleRuleAndOperator.getFromProtobuf(proto2);
+        OmLifecycleRuleAndOperator.getFromProtobuf(proto2, BucketLayout.DEFAULT);
     assertNull(andOpFromProto2.getPrefix());
     assertEquals(2, andOpFromProto2.getTags().size());
 
@@ -99,7 +97,7 @@ class TestOmLifecycleRuleAndOperator {
     OmLifecycleRuleAndOperator andOp3 = getOmLCAndOperatorBuilder("", tags).build();
     LifecycleRuleAndOperator proto3 = andOp3.getProtobuf();
     OmLifecycleRuleAndOperator andOpFromProto3 =
-        OmLifecycleRuleAndOperator.getFromProtobuf(proto3);
+        OmLifecycleRuleAndOperator.getFromProtobuf(proto3, BucketLayout.DEFAULT);
     assertEquals("", andOpFromProto3.getPrefix());
     assertEquals(2, andOpFromProto2.getTags().size());
   }

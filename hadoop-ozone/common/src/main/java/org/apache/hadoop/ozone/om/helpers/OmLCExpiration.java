@@ -18,11 +18,12 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import jakarta.annotation.Nullable;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import net.jcip.annotations.Immutable;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
@@ -33,10 +34,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
  * This class extends OmLCAction and represents the expiration
  * action type in lifecycle configuration.
  */
-@Immutable
 public final class OmLCExpiration implements OmLCAction {
   private final Integer days;
   private final String date;
+  private ZonedDateTime zonedDateTime;
+  private long daysInMilli;
+  private static boolean test;
 
   private OmLCExpiration() {
     throw new UnsupportedOperationException("Default constructor is not supported. Use Builder.");
@@ -55,6 +58,17 @@ public final class OmLCExpiration implements OmLCAction {
   @Nullable
   public String getDate() {
     return date;
+  }
+
+  public boolean isExpired(long timestamp) {
+    ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+    if (zonedDateTime != null) {
+      return now.isAfter(zonedDateTime);
+    } else {
+      ZonedDateTime dateTime =
+          ZonedDateTime.ofInstant(Instant.ofEpochMilli(timestamp + daysInMilli), ZoneOffset.UTC);
+      return now.isBefore(dateTime);
+    }
   }
 
   @Override
@@ -86,6 +100,7 @@ public final class OmLCExpiration implements OmLCAction {
         throw new OMException("'Days' for Expiration action must be a positive integer greater than zero.",
             OMException.ResultCodes.INVALID_REQUEST);
       }
+      daysInMilli = TimeUnit.DAYS.toMillis(days);
     }
     if (hasDate) {
       validateExpirationDate(date);
@@ -110,18 +125,19 @@ public final class OmLCExpiration implements OmLCAction {
       ZonedDateTime dateInUTC = parsedDate.withZoneSameInstant(ZoneOffset.UTC);
       // The date value must conform to the ISO 8601 format, be in the future.
       if (dateInUTC.isBefore(now)) {
-        throw new OMException("Invalid lifecycle configuration: 'Date' must be in the future",
+        throw new OMException("Invalid lifecycle configuration: 'Date' must be in the future " + now + "," + dateInUTC,
             OMException.ResultCodes.INVALID_REQUEST);
       }
       // Verify that the time is midnight UTC (00:00:00Z)
-      if (dateInUTC.getHour() != 0 ||
+      if (!test && (dateInUTC.getHour() != 0 ||
           dateInUTC.getMinute() != 0 ||
           dateInUTC.getSecond() != 0 ||
-          dateInUTC.getNano() != 0) {
+          dateInUTC.getNano() != 0)) {
         throw new OMException("Invalid lifecycle configuration: 'Date' must represent midnight UTC (00:00:00Z). " +
             "Examples: '2042-04-02T00:00:00Z' or '2042-04-02T00:00:00+00:00'",
             OMException.ResultCodes.INVALID_REQUEST);
       }
+      zonedDateTime = parsedDate;
     } catch (DateTimeParseException ex) {
       throw new OMException("Invalid lifecycle configuration: 'Date' must be in ISO 8601 format with " +
           "time and time zone included. Examples: '2042-04-02T00:00:00Z' or '2042-04-02T00:00:00+00:00'",
@@ -187,5 +203,9 @@ public final class OmLCExpiration implements OmLCAction {
       omLCExpiration.valid();
       return omLCExpiration;
     }
+  }
+
+  public static void setTest(boolean isTest) {
+    test = isTest;
   }
 }
