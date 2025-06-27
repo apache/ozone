@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -184,13 +185,14 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
                 snapInfo.getVolumeName(), snapInfo.getBucketName(), remaining - moveCount);
             moveCount += deletedDirEntries.size();
             // Get all entries from snapshotRenamedTable.
-            List<Table.KeyValue<String, String>> renameEntries = snapshotKeyManager.getRenamesKeyEntries(
-                snapInfo.getVolumeName(), snapInfo.getBucketName(), null, (kv) -> true, remaining - moveCount);
-            moveCount += renameEntries.size();
+            Pair<Integer, List<Table.KeyValue<String, String>>> renameEntries =
+                snapshotKeyManager.getRenamesKeyEntries(snapInfo.getVolumeName(), snapInfo.getBucketName(), null,
+                    (kv) -> true, remaining - moveCount);
+            moveCount += renameEntries.getValue().size();
             if (moveCount > 0) {
               List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(deletedKeyEntries.size());
               List<SnapshotMoveKeyInfos> deletedDirs = new ArrayList<>(deletedDirEntries.size());
-              List<HddsProtos.KeyValue> renameKeys = new ArrayList<>(renameEntries.size());
+              List<HddsProtos.KeyValue> renameKeys = new ArrayList<>(renameEntries.getValue().size());
 
               // Convert deletedKeyEntries to SnapshotMoveKeyInfos.
               for (Table.KeyValue<String, List<OmKeyInfo>> deletedEntry : deletedKeyEntries) {
@@ -207,7 +209,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
               }
 
               // Convert renamedEntries to KeyValue.
-              for (Table.KeyValue<String, String> renameEntry : renameEntries) {
+              for (Table.KeyValue<String, String> renameEntry : renameEntries.getValue()) {
                 renameKeys.add(HddsProtos.KeyValue.newBuilder().setKey(renameEntry.getKey())
                     .setValue(renameEntry.getValue()).build());
               }
