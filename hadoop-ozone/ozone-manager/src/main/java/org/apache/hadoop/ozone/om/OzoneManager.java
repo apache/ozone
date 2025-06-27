@@ -23,6 +23,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
@@ -55,6 +56,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INTERVAL_MS_DEFAULT;
@@ -147,6 +150,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
@@ -171,6 +175,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
@@ -184,7 +189,10 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -215,6 +223,9 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.net.CachedDNSToSwitchMapping;
+import org.apache.hadoop.net.DNSToSwitchMapping;
+import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -329,6 +340,7 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.KMSUtil;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -378,6 +390,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private CertificateClient certClient;
   private SecretKeyClient secretKeyClient;
   private ScmTopologyClient scmTopologyClient;
+  private OMBlockPrefetchClient omBlockPrefetchClient;
+  private DNSToSwitchMapping dnsToSwitchMapping;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
   private OmConfig config;
@@ -427,6 +441,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final SecurityConfig secConfig;
   private S3SecretManager s3SecretManager;
   private final boolean isOmGrpcServerEnabled;
+  private final boolean isAllocateBlockCacheEnabled;
   private volatile boolean isOmRpcServerRunning = false;
   private volatile boolean isOmGrpcServerRunning = false;
   private String omComponent;
@@ -563,6 +578,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.isOmGrpcServerEnabled = conf.getBoolean(
         OZONE_OM_S3_GPRC_SERVER_ENABLED,
         OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT);
+    this.isAllocateBlockCacheEnabled = conf.getBoolean(
+        OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED,
+        OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED_DEFAULT);
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
         OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
     this.preallocateBlocksMax = conf.getInt(
@@ -610,6 +628,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
         configuration);
+    // Resolves the rack/network location of a given hostname using the configured DNSToSwitchMapping.
+    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
+        configuration.getClass(
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            TableMapping.class, DNSToSwitchMapping.class);
+    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
+        dnsToSwitchMappingClass, configuration);
+    this.dnsToSwitchMapping =
+        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
+            : new CachedDNSToSwitchMapping(newInstance));
+    this.omBlockPrefetchClient = new OMBlockPrefetchClient(this);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
@@ -1068,6 +1097,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Return config value of {@link OMConfigKeys#OZONE_OM_ALLOCATE_BLOCK_CACHE_ENABLED}.
+   */
+  public boolean isAllocateBlockCacheEnabled() {
+    return isAllocateBlockCacheEnabled;
+  }
+
+  /**
    * Throws OMException FEATURE_NOT_ENABLED if S3 multi-tenancy is not enabled.
    */
   public void checkS3MultiTenancyEnabled() throws OMException {
@@ -1280,8 +1316,67 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.scmTopologyClient = scmTopologyClient;
   }
 
+  @VisibleForTesting
+  public void setOmBlockPrefetchClient(
+      OMBlockPrefetchClient omBlockPrefetchClient) {
+    this.omBlockPrefetchClient = omBlockPrefetchClient;
+  }
+
   public NetworkTopology getClusterMap() {
     return scmTopologyClient.getClusterMap();
+  }
+
+  public OMBlockPrefetchClient getOmBlockPrefetchClient() {
+    return omBlockPrefetchClient;
+  }
+
+  @VisibleForTesting
+  public List<? extends DatanodeDetails> sortDatanodes(List<? extends DatanodeDetails> nodes, String clientMachine) {
+    final Node client = getClientNode(clientMachine, nodes);
+    return getClusterMap().sortByDistanceCost(client, nodes, nodes.size());
+  }
+
+  private Node getClientNode(String clientMachine, List<? extends DatanodeDetails> nodes) {
+    if (StringUtils.isEmpty(clientMachine)) {
+      return null;
+    }
+    List<DatanodeDetails> matchingNodes = new ArrayList<>();
+    for (DatanodeDetails node : nodes) {
+      if (node.getIpAddress().equals(clientMachine)) {
+        matchingNodes.add(node);
+      }
+    }
+    return !matchingNodes.isEmpty() ? matchingNodes.get(0) : getOtherNode(clientMachine);
+  }
+
+  private Node getOtherNode(String clientMachine) {
+    try {
+      String clientLocation = resolveNodeLocation(clientMachine);
+      if (clientLocation != null) {
+        Node rack = getClusterMap().getNode(clientLocation);
+        if (rack instanceof InnerNode) {
+          return new NodeImpl(clientMachine, clientLocation,
+              (InnerNode) rack, rack.getLevel() + 1,
+              NODE_COST_DEFAULT);
+        }
+      }
+    } catch (Exception e) {
+      LOG.warn("Could not resolve client {}: {}", clientMachine, e.getMessage());
+    }
+    return null;
+  }
+
+  private String resolveNodeLocation(String hostname) {
+    List<String> hosts = Collections.singletonList(hostname);
+    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
+    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
+      String location = resolvedHosts.get(0);
+      LOG.debug("Node {} resolved to location {}", hostname, location);
+      return location;
+    } else {
+      LOG.debug("Node resolution did not yield any result for {}", hostname);
+      return null;
+    }
   }
 
   /**
@@ -1857,6 +1952,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omS3gGrpcServer.start();
       isOmGrpcServerRunning = true;
     }
+
+    try {
+      if (isAllocateBlockCacheEnabled) {
+        omBlockPrefetchClient.start(configuration);
+      }
+    } catch (IOException ex) {
+      LOG.error("Unable to initialize OMBlockPrefetchClient ", ex);
+      throw new UncheckedIOException(ex);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (TimeoutException e) {
+      throw new RuntimeException(e);
+    }
+
     registerMXBean();
 
     setStartTime();
@@ -2355,6 +2465,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       omState = State.STOPPED;
       // Cancel the metrics timer and set to null.
+      if (omBlockPrefetchClient != null) {
+        omBlockPrefetchClient.stop();
+      }
+
       if (metricsTimer != null) {
         metricsTimer.cancel();
         metricsTimer = null;
