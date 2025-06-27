@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -238,6 +239,74 @@ public class TestDecommissionStatusSubCommand {
     p = Pattern.compile("Datanode:\\s.*host1\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
+  }
+
+  @Test
+  public void testNodeIdOptionDecommissionStatusSuccess() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.queryNode(any(), any(), any(), any()))
+        .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
+    when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
+    when(scmClient.getMetrics(any())).thenReturn(metrics.get(1));
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--node-id", nodes.get(0).getNodeID().getUuid());
+    cmd.execute(scmClient); // check status of host0
+
+    Pattern p = Pattern.compile("Datanode:\\s.*host0\\)");
+    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+    // as uuid of only host0 is passed, host1 should NOT be displayed
+    p = Pattern.compile("Datanode:\\s.*host1.\\)");
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertFalse(m.find());
+    p = Pattern.compile("UnderReplicated=.*UnClosed=");
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+    assertFalse(m.find());
+  }
+
+  @Test
+  public void testNodeIdOptionDecommissionStatusFail() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.queryNode(any(), any(), any(), any()))
+        .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
+    when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(0).getNodeID())))
+        .thenReturn(containerOnDecom);
+    when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(1).getNodeID())))
+        .thenReturn(new HashMap<>());
+    when(scmClient.getMetrics(any())).thenReturn(metrics.get(2));
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--node-id", nodes.get(1).getNodeID().getUuid());
+    cmd.execute(scmClient); // check status of host1
+
+    Pattern p = Pattern.compile("Datanode:\\s(.*)\\sis\\snot\\sin" +
+        "\\sDECOMMISSIONING", Pattern.MULTILINE);
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
+    // no host details are shown
+    p = Pattern.compile("Datanode:\\s.*host0\\)");
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertFalse(m.find());
+    p = Pattern.compile("Datanode:\\s.*host1\\)");
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertFalse(m.find());
+  }
+
+  @Test
+  public void testHostnameOptionThrowsParameterException() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    CommandLine cmdLine = new CommandLine(cmd);
+    cmdLine.parseArgs("--hostname", "some-host");
+
+    CommandLine.ParameterException ex = assertThrows(
+        CommandLine.ParameterException.class,
+        () -> cmd.execute(scmClient)
+    );
+
+    assertTrue(ex.getMessage().contains("--hostname option not supported for this command"));
   }
 
   private List<HddsProtos.Node> getNodeDetails(int n) {
