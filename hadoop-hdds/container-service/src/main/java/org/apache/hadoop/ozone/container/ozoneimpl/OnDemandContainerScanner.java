@@ -79,7 +79,7 @@ public final class OnDemandContainerScanner {
   }
 
   private Optional<Future<?>> scanContainer(Container<?> container, ContainerScanHelper helper) {
-    if (!helper.shouldScanData(container)) {
+    if (!helper.shouldScanMetadata(container)) {
       return Optional.empty();
     }
 
@@ -105,7 +105,13 @@ public final class OnDemandContainerScanner {
 
   private void performOnDemandScan(Container<?> container, ContainerScanHelper helper) {
     try {
-      helper.scanData(container, throttler, canceler);
+      if (scannerHelper.shouldScanData(container)) {
+        helper.scanData(container, throttler, canceler);
+      } else {
+        // for containers that qualify for metadata scan and not data scan,
+        // like OPEN containers, trigger a metadata-only scan
+        helper.scanMetadata(container);
+      }
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + container.getContainerData().getContainerID(), e);

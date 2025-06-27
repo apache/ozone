@@ -74,10 +74,10 @@ class TestOnDemandContainerScannerIntegration
         TestContainerCorruptions.TRUNCATED_BLOCK);
   }
 
-  static Collection<ContainerCorruptions> supportedCorruptionTypesForOpen() {
-    Set<ContainerCorruptions> set = EnumSet.copyOf(supportedCorruptionTypes());
+  static Collection<TestContainerCorruptions> supportedCorruptionTypesForOpen() {
+    Set<TestContainerCorruptions> set = EnumSet.copyOf(supportedCorruptionTypes());
     // Open containers will be checked only for metadata corruption, so missing block is not a valid corruption type.
-    set.remove(ContainerCorruptions.MISSING_BLOCK);
+    set.remove(TestContainerCorruptions.MISSING_BLOCK);
     return set;
   }
 
@@ -153,7 +153,7 @@ class TestOnDemandContainerScannerIntegration
    */
   @ParameterizedTest
   @MethodSource("supportedCorruptionTypesForOpen")
-  void testCorruptionDetectedForOpenContainers(ContainerCorruptions corruption)
+  void testCorruptionDetectedForOpenContainers(TestContainerCorruptions corruption)
       throws Exception {
     String keyName = "keyName";
 
@@ -174,8 +174,8 @@ class TestOnDemandContainerScannerIntegration
         500, 5000);
 
     // Wait for SCM to get a report of the unhealthy replica.
-    waitForScmToSeeUnhealthyReplica(openContainerID);
-    corruption.assertLogged(logCapturer);
+    waitForScmToSeeReplicaState(openContainerID, UNHEALTHY);
+    corruption.assertLogged(openContainerID, 1, logCapturer);
   }
 
 }

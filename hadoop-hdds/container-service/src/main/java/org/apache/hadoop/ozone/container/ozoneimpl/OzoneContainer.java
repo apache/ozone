@@ -125,7 +125,7 @@ public class OzoneContainer {
   private final XceiverServerSpi readChannel;
   private final ContainerController controller;
   private BackgroundContainerMetadataScanner metadataScanner;
-  private OnDemandContainerDataScanner onDemandScanner;
+  private OnDemandContainerScanner onDemandScanner;
   private List<BackgroundContainerDataScanner> dataScanners;
   private List<AbstractBackgroundContainerScanner> backgroundScanners;
   private final BlockDeletingService blockDeletingService;
