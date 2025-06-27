@@ -25,7 +25,6 @@ export COMPOSE_DIR
 export SECURITY_ENABLED=true
 export OM_SERVICE_ID="omservice"
 export SCM=scm1.org
-export COMPOSE_FILE=docker-compose.yaml:byteman.yaml
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
