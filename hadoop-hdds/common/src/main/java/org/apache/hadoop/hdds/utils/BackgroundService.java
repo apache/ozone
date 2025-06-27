@@ -146,7 +146,7 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
-
+      long serviceStartTime = System.nanoTime();
       while (!tasks.isEmpty()) {
         BackgroundTask task = tasks.poll();
         future = future.thenCombine(CompletableFuture.runAsync(() -> {
@@ -168,7 +168,18 @@ public abstract class BackgroundService {
                   serviceName, endTime - startTime, serviceTimeoutInNanos);
             }
           }
-        }, exec), (Void1, Void) -> null);
+        }, exec).exceptionally(e -> null), (Void1, Void) -> null);
+      }
+      try {
+        future.get();
+      } catch (Throwable e) {
+        LOG.error("Background service execution failed", e);
+      } finally {
+        long endTime = System.nanoTime();
+        if (endTime - serviceStartTime > serviceTimeoutInNanos) {
+          LOG.warn("{} Background service execution failed which took {}ns > {}ns(timeout)",
+              service, endTime - serviceStartTime, serviceTimeoutInNanos);
+        }
       }
     }
   }
