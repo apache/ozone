@@ -248,6 +248,27 @@ public final class ReconBasicOmKeyInfo extends WithParentObjectId {
     return builder.build();
   }
 
+  public static ReconBasicOmKeyInfo getFromProtobuf(OzoneManagerProtocolProtos.KeyInfo keyInfoProto) {
+    if (keyInfoProto == null) {
+      return null;
+    }
+
+    Builder builder = new Builder()
+        .setVolumeName(keyInfoProto.getVolumeName())
+        .setBucketName(keyInfoProto.getBucketName())
+        .setKeyName(keyInfoProto.getKeyName())
+        .setDataSize(keyInfoProto.getDataSize())
+        .setCreationTime(keyInfoProto.getCreationTime())
+        .setModificationTime(keyInfoProto.getModificationTime())
+        .setReplicationConfig(ReplicationConfig.fromProto(
+            keyInfoProto.getType(),
+            keyInfoProto.getFactor(),
+            keyInfoProto.getEcReplicationConfig()))
+        .setIsFile(!keyInfoProto.getKeyName().endsWith("/"))
+        .setParentId(keyInfoProto.getParentID());
+    return builder.build();
+  }
+
   public OzoneManagerProtocolProtos.KeyInfoProtoLight toProtobuf() {
     throw new UnsupportedOperationException("This method is not supported.");
   }
