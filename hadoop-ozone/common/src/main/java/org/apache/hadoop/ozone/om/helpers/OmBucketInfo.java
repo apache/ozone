@@ -595,67 +595,81 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return getFromProtobuf(bucketInfo, null);
   }
 
-  public static Builder newBuilderFromProtobufPartial(BucketInfo bucketInfo) {
+  /**
+   * Create a builder from the given proto.
+   * @param includeLargeFields Omitted the large fields: acl, metadata, beinfo.
+   */
+  public static Builder newBuilder(BucketInfo bucketInfo, boolean includeLargeFields) {
     Builder builder = OmBucketInfo.newBuilder()
         .setVolumeName(bucketInfo.getVolumeName())
-        .setBucketName(bucketInfo.getBucketName())
-        .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
-        .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
-        .setCreationTime(bucketInfo.getCreationTime())
-        .setUsedBytes(bucketInfo.getUsedBytes())
-        .setModificationTime(bucketInfo.getModificationTime())
-        .setQuotaInBytes(bucketInfo.getQuotaInBytes())
-        .setUsedNamespace(bucketInfo.getUsedNamespace())
-        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace());
+        .setBucketName(bucketInfo.getBucketName());
 
-    if (bucketInfo.hasDefaultReplicationConfig()) {
-      builder.setDefaultReplicationConfig(
-          DefaultReplicationConfig.fromProto(bucketInfo.getDefaultReplicationConfig()));
+    if (includeLargeFields) {
+      // acl
+      builder.setAcls(bucketInfo.getAclsList().stream().map(
+          OzoneAcl::fromProtobuf).collect(Collectors.toList()));
     }
+    builder.setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
+        .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
+        .setCreationTime(bucketInfo.getCreationTime());
+    if (includeLargeFields) {
+      // metadata
+      builder.addAllMetadata(KeyValueUtil.getFromProtobuf(bucketInfo.getMetadataList()));
+
+      if (bucketInfo.hasBeinfo()) {
+        // beinfo
+        builder.setBucketEncryptionKey(OMPBHelper.convert(bucketInfo.getBeinfo()));
+      }
+    }
+
     if (bucketInfo.hasObjectID()) {
       builder.setObjectID(bucketInfo.getObjectID());
     }
     if (bucketInfo.hasUpdateID()) {
       builder.setUpdateID(bucketInfo.getUpdateID());
     }
+    builder.setModificationTime(bucketInfo.getModificationTime());
     if (bucketInfo.hasSourceVolume()) {
       builder.setSourceVolume(bucketInfo.getSourceVolume());
     }
     if (bucketInfo.hasSourceBucket()) {
       builder.setSourceBucket(bucketInfo.getSourceBucket());
     }
-    if (bucketInfo.hasOwner()) {
-      builder.setOwner(bucketInfo.getOwner());
-    }
+    builder.setUsedBytes(bucketInfo.getUsedBytes())
+        .setQuotaInBytes(bucketInfo.getQuotaInBytes())
+        .setQuotaInNamespace(bucketInfo.getQuotaInNamespace())
+        .setUsedNamespace(bucketInfo.getUsedNamespace());
+
     if (bucketInfo.hasBucketLayout()) {
       builder.setBucketLayout(BucketLayout.fromProto(bucketInfo.getBucketLayout()));
     }
-
+    if (bucketInfo.hasOwner()) {
+      builder.setOwner(bucketInfo.getOwner());
+    }
+    if (bucketInfo.hasDefaultReplicationConfig()) {
+      builder.setDefaultReplicationConfig(
+          DefaultReplicationConfig.fromProto(bucketInfo.getDefaultReplicationConfig()));
+    }
     return builder;
   }
 
   /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo.
-   * @param bucketInfo
-   * @return instance of OmBucketInfo
+   * Creates an {@link OmBucketInfo} instance from the given {@link BucketInfo} protobuf,
+   * optionally overriding the {@link BucketLayout}.
+   * <p>
+   * This method deserializes all fields including ACLs from the protobuf.
+   *
+   * @param bucketInfo  The protobuf {@link BucketInfo} received from Ozone Manager.
+   * @param buckLayout  The {@link BucketLayout} to override in the resulting {@link OmBucketInfo}.
+   *                    If null, the layout from the protobuf is retained.
+   * @return An {@link OmBucketInfo} instance built from the provided protobuf,
+   *         with the specified bucket layout if provided.
    */
   public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo,
       BucketLayout buckLayout) {
-    Builder obib = OmBucketInfo.newBuilderFromProtobufPartial(bucketInfo)
-        .setAcls(bucketInfo.getAclsList().stream().map(
-            OzoneAcl::fromProtobuf).collect(Collectors.toList()));
+    Builder obib = OmBucketInfo.newBuilder(bucketInfo, true);
     if (buckLayout != null) {
       obib.setBucketLayout(buckLayout);
-    } else if (bucketInfo.getBucketLayout() != null) {
-      obib.setBucketLayout(
-          BucketLayout.fromProto(bucketInfo.getBucketLayout()));
-    }
-    if (bucketInfo.getMetadataList() != null) {
-      obib.addAllMetadata(KeyValueUtil
-          .getFromProtobuf(bucketInfo.getMetadataList()));
-    }
-    if (bucketInfo.hasBeinfo()) {
-      obib.setBucketEncryptionKey(OMPBHelper.convert(bucketInfo.getBeinfo()));
     }
     return obib.build();
   }

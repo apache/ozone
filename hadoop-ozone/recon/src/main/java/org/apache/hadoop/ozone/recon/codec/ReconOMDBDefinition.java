@@ -88,27 +88,35 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
  */
 public final class ReconOMDBDefinition extends DBDefinition.WithMap {
 
-  //---------------------------------------------------------------------------
-  // Volume, Bucket, Prefix and Transaction Tables:
+  /**
+   * Custom codec for bucket table which avoids deserializing ACLs, metadata and other large fields.
+   */
   private static final Codec<OmBucketInfo> CUSTOM_CODEC_FOR_BUCKET_TABLE = new DelegatedCodec<>(
       Proto2Codec.get(OzoneManagerProtocolProtos.BucketInfo.getDefaultInstance()),
       ReconOMDBDefinition::getOmBucketInfoFromProtobuf,
       null,
       OmBucketInfo.class);
-  /** bucketTable: /volume/bucket :- BucketInfo. */
+
+  /** Column family definition for bucket table: /volume/bucket -> BucketInfo. */
   public static final DBColumnFamilyDefinition<String, OmBucketInfo> BUCKET_TABLE_DEF
       = new DBColumnFamilyDefinition<>(BUCKET_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_BUCKET_TABLE);
 
-  public static final Codec<OmKeyInfo> CUSTOM_CODEC_FOR_KEY_TABLE = new DelegatedCodec<>(
+  /**
+   * Custom codec for key table which avoids deserializing ACLs, metadata and other large fields.
+   */
+  public static final Codec<OmKeyInfo> CUSTOM_OM_KEY_INFO_CODEC = new DelegatedCodec<>(
       Proto2Codec.get(OzoneManagerProtocolProtos.KeyInfo.getDefaultInstance()),
       ReconOMDBDefinition::getOmKeyInfoFromProtobuf,
       k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION),
       OmKeyInfo.class);
-  // Object Store (OBS) Tables:
-  /** keyTable: /volume/bucket/key :- KeyInfo. */
-  public static final DBColumnFamilyDefinition<String, OmKeyInfo> KEY_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(KEY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
 
+  /** Column family definition for keyTable: /volume/bucket/key :- KeyInfo. */
+  public static final DBColumnFamilyDefinition<String, OmKeyInfo> KEY_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(KEY_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
+
+  /**
+   * Custom codec for deleted table which avoids deserializing ACLs, metadata and other large fields.
+   */
   private static final Codec<RepeatedOmKeyInfo> CUSTOM_CODEC_FOR_DELETED_TABLE = new DelegatedCodec<>(
       Proto2Codec.get(OzoneManagerProtocolProtos.RepeatedKeyInfo.getDefaultInstance()),
       ReconOMDBDefinition::getRepeatedOmKeyInfoFromProto,
@@ -121,17 +129,15 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
 
   /** openKeyTable: /volume/bucket/key/id :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_KEY_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
+      = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
 
-  //---------------------------------------------------------------------------
-  // File System Optimized (FSO) Tables:
   /** fileTable: /volumeId/bucketId/parentId/fileName :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> FILE_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
+      = new DBColumnFamilyDefinition<>(FILE_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
 
   /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_FILE_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
+      = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
 
   public static final Codec<OmDirectoryInfo> CUSTOM_CODEC_FOR_DIR_TABLE = new DelegatedCodec<>(
       Proto2Codec.get(OzoneManagerProtocolProtos.DirectoryInfo.getDefaultInstance()),
@@ -144,7 +150,7 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
 
   /** deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> DELETED_DIR_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE);
+      = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
 
   // Merged column family map: OM base + Recon overrides
   public static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES;
@@ -160,17 +166,22 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
   private static final ReconOMDBDefinition INSTANCE = new ReconOMDBDefinition();
 
   /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo without deserializing ACL list.
-   * @param bucketInfo
-   * @return instance of OmBucketInfo
+   * Creates an {@link OmBucketInfo} instance from the given {@link OzoneManagerProtocolProtos.BucketInfo}
+   * protobuf without deserializing the ACL list.
+   * <p>
+   * This method is optimized for performance in read-only or analytics scenarios (e.g., Recon)
+   * where ACL information is not required.
+   *
+   * @param bucketInfo The {@link OzoneManagerProtocolProtos.BucketInfo} protobuf message.
+   * @return A partially deserialized {@link OmBucketInfo} instance with ACLs skipped.
    */
   public static OmBucketInfo getOmBucketInfoFromProtobuf(OzoneManagerProtocolProtos.BucketInfo bucketInfo) {
-    return OmBucketInfo.newBuilderFromProtobufPartial(bucketInfo).build();
+    return OmBucketInfo.newBuilder(bucketInfo, false).build();
   }
 
   //---------------------------------------------------------------------------
   public static OmKeyInfo getOmKeyInfoFromProtobuf(OzoneManagerProtocolProtos.KeyInfo keyInfo) {
-    return OmKeyInfo.newBuilderFromProtobufPartial(keyInfo).build();
+    return OmKeyInfo.newBuilder(keyInfo, false).build();
   }
 
   public static RepeatedOmKeyInfo getRepeatedOmKeyInfoFromProto(
@@ -183,12 +194,17 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
   }
 
   /**
-   * Parses DirectoryInfo protobuf and creates OmPrefixInfo.
-   * @param dirInfo
-   * @return instance of OmDirectoryInfo
+   * Creates an {@link OmDirectoryInfo} instance from the given
+   * {@link OzoneManagerProtocolProtos.DirectoryInfo} protobuf without deserializing the ACL list.
+   * <p>
+   * This method is optimized for scenarios (e.g., Recon) where ACL information is not required
+   * and performance is a priority.
+   *
+   * @param dirInfo The {@link OzoneManagerProtocolProtos.DirectoryInfo} protobuf message.
+   * @return A partially deserialized {@link OmDirectoryInfo} instance with ACLs skipped.
    */
   public static OmDirectoryInfo getOmDirInfoFromProtobuf(OzoneManagerProtocolProtos.DirectoryInfo dirInfo) {
-    return OmDirectoryInfo.newBuilderFromProtobufPartial(dirInfo).build();
+    return OmDirectoryInfo.newBuilder(dirInfo, false).build();
   }
 
   public static ReconOMDBDefinition get() {

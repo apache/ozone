@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileChecksumProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
@@ -731,29 +730,36 @@ public final class OmKeyInfo extends WithParentObjectId
     return kb.build();
   }
 
-  public static Builder newBuilderFromProtobufPartial(KeyInfo keyInfo) {
+  public static Builder newBuilder(KeyInfo keyInfo, boolean includeLargeFields) {
     if (keyInfo == null) {
       return null;
     }
 
     List<OmKeyLocationInfoGroup> omKeyLocationInfos = new ArrayList<>();
-    for (OzoneManagerProtocolProtos.KeyLocationList keyLocationList : keyInfo.getKeyLocationListList()) {
+    for (KeyLocationList keyLocationList : keyInfo.getKeyLocationListList()) {
       omKeyLocationInfos.add(
           OmKeyLocationInfoGroup.getFromProtobuf(keyLocationList));
     }
 
-    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
+    Builder builder = new Builder()
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
         .setKeyName(keyInfo.getKeyName())
-        .setOmKeyLocationInfos(omKeyLocationInfos)
         .setDataSize(keyInfo.getDataSize())
-        .setCreationTime(keyInfo.getCreationTime())
-        .setModificationTime(keyInfo.getModificationTime())
         .setReplicationConfig(ReplicationConfig
             .fromProto(keyInfo.getType(), keyInfo.getFactor(),
-                keyInfo.getEcReplicationConfig()))
-        .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()));
+                keyInfo.getEcReplicationConfig()));
+    if (includeLargeFields) {
+      builder.setOmKeyLocationInfos(omKeyLocationInfos);
+    }
+    builder.setCreationTime(keyInfo.getCreationTime())
+        .setModificationTime(keyInfo.getModificationTime());
+    if (includeLargeFields) {
+      builder.addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
+          .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
+              OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
+          .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
+    }
     if (keyInfo.hasObjectID()) {
       builder.setObjectID(keyInfo.getObjectID());
     }
@@ -763,16 +769,23 @@ public final class OmKeyInfo extends WithParentObjectId
     if (keyInfo.hasParentID()) {
       builder.setParentObjectID(keyInfo.getParentID());
     }
-    if (keyInfo.hasFileChecksum()) {
-      FileChecksum fileChecksum = OMPBHelper.convert(keyInfo.getFileChecksum());
-      builder.setFileChecksum(fileChecksum);
+    if (includeLargeFields) {
+      if (keyInfo.hasFileChecksum()) {
+        FileChecksum fileChecksum = OMPBHelper.convert(keyInfo.getFileChecksum());
+        builder.setFileChecksum(fileChecksum);
+      }
     }
-
     if (keyInfo.hasIsFile()) {
       builder.setFile(keyInfo.getIsFile());
     }
     if (keyInfo.hasOwnerName()) {
       builder.setOwnerName(keyInfo.getOwnerName());
+    }
+    if (includeLargeFields) {
+      builder.addAllTags(KeyValueUtil.getFromProtobuf(keyInfo.getTagsList()));
+      if (keyInfo.hasExpectedDataGeneration()) {
+        builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
+      }
     }
     // not persisted to DB. FileName will be filtered out from keyName
     builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
@@ -780,16 +793,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
-    Builder builder = OmKeyInfo.newBuilderFromProtobufPartial(keyInfo)
-        .addAllTags(KeyValueUtil.getFromProtobuf(keyInfo.getTagsList()))
-        .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
-            OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
-        .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
-
-    if (keyInfo.hasExpectedDataGeneration()) {
-      builder.setExpectedDataGeneration(keyInfo.getExpectedDataGeneration());
-    }
-    return builder.build();
+    return OmKeyInfo.newBuilder(keyInfo, true).build();
   }
 
   @Override

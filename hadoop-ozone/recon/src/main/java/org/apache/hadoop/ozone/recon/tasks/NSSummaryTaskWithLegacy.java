@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
-import static org.apache.hadoop.ozone.recon.codec.ReconOMDBDefinition.CUSTOM_CODEC_FOR_KEY_TABLE;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -29,10 +28,8 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -41,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.codec.ReconOMDBDefinition;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -261,8 +259,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
-      Table<String, OmKeyInfo> keyTable = omMetadataManager.getStore()
-          .getTable(KEY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_KEY_TABLE, TableCache.CacheType.NO_CACHE);
+      // Note: ReconOMDBDefinition.KEY_TABLE_DEF uses CUSTOM_OM_KEY_INFO_CODEC
+      final Table<String, OmKeyInfo> keyTable =
+          ReconOMDBDefinition.KEY_TABLE_DEF.getTable(omMetadataManager.getStore());
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
           keyTableIter = keyTable.iterator()) {
