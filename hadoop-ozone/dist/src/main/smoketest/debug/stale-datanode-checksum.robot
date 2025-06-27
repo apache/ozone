@@ -14,33 +14,22 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test read-replicas in case of a corrupt replica
+Documentation       Test checksums in case of a stale datanode
 Library             OperatingSystem
 Resource            ../lib/os.robot
-Resource            ozone-debug.robot
+Resource            ozone-debug-keywords.robot
 Test Timeout        5 minute
+
 *** Variables ***
 ${PREFIX}              ${EMPTY}
+${STALE_DATANODE}      ${EMPTY}
 ${VOLUME}              cli-debug-volume${PREFIX}
 ${BUCKET}              cli-debug-bucket
 ${TESTFILE}            testfile
-${CORRUPT_DATANODE}    ozone_datanode_1.ozone_default
+${CHECK_TYPE}          checksum
 
 *** Test Cases ***
-Test ozone debug checksums with corrupt block replica
-    ${directory} =                      Execute replicas verify checksums CLI tool
-    Set Test Variable    ${DIR}         ${directory}
-
-    ${count_files} =                    Count Files In Directory    ${directory}
-    Should Be Equal As Integers         ${count_files}     1
-
-    ${json} =                           Read Replicas Manifest
-    ${md5sum} =                         Execute     md5sum ${TEMP_DIR}/${TESTFILE} | awk '{print $1}'
-
-    FOR    ${replica}    IN RANGE    3
-        ${datanode} =    Set Variable    ${json}[blocks][0][replicas][${replica}][hostname]
-
-        IF    '${datanode}' == '${CORRUPT_DATANODE}'
-            Should Contain           ${json}[blocks][0][replicas][${replica}][exception]    Checksum mismatch
-        END
-    END
+Test checksums with a stale datanode
+    ${output} =         Execute replicas verify checksums debug tool
+    ${json} =           Parse replicas verify JSON output    ${output}
+    Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${STALE_DATANODE}  UNAVAILABLE
