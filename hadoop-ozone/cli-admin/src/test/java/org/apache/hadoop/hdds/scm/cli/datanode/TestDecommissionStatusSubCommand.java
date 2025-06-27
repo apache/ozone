@@ -43,6 +43,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
 /**
@@ -133,8 +135,9 @@ public class TestDecommissionStatusSubCommand {
     assertFalse(m.find());
   }
 
-  @Test
-  public void testIdOptionDecommissionStatusSuccess() throws IOException {
+  @ParameterizedTest
+  @ValueSource(strings = {"--id", "--node-id"})
+  public void testIdOptionDecommissionStatusSuccess(String flag) throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
@@ -142,7 +145,7 @@ public class TestDecommissionStatusSubCommand {
     when(scmClient.getMetrics(any())).thenReturn(metrics.get(1));
 
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--id", nodes.get(0).getNodeID().getUuid());
+    c.parseArgs(flag, nodes.get(0).getNodeID().getUuid());
     cmd.execute(scmClient); // check status of host0
 
     Pattern p = Pattern.compile("Datanode:\\s.*host0\\)");
@@ -158,8 +161,9 @@ public class TestDecommissionStatusSubCommand {
     assertFalse(m.find());
   }
 
-  @Test
-  public void testIdOptionDecommissionStatusFail() throws IOException {
+  @ParameterizedTest
+  @ValueSource(strings = {"--id", "--node-id"})
+  public void testIdOptionDecommissionStatusFail(String flag) throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
@@ -170,7 +174,7 @@ public class TestDecommissionStatusSubCommand {
     when(scmClient.getMetrics(any())).thenReturn(metrics.get(2));
 
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--id", nodes.get(1).getNodeID().getUuid());
+    c.parseArgs(flag, nodes.get(1).getNodeID().getUuid());
     cmd.execute(scmClient); // check status of host1
 
     Pattern p = Pattern.compile("Datanode:\\s(.*)\\sis\\snot\\sin" +
@@ -236,60 +240,6 @@ public class TestDecommissionStatusSubCommand {
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
 
-    p = Pattern.compile("Datanode:\\s.*host1\\)");
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertFalse(m.find());
-  }
-
-  @Test
-  public void testNodeIdOptionDecommissionStatusSuccess() throws IOException {
-    ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
-    when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
-    when(scmClient.getMetrics(any())).thenReturn(metrics.get(1));
-
-    CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--node-id", nodes.get(0).getNodeID().getUuid());
-    cmd.execute(scmClient); // check status of host0
-
-    Pattern p = Pattern.compile("Datanode:\\s.*host0\\)");
-    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
-    // as uuid of only host0 is passed, host1 should NOT be displayed
-    p = Pattern.compile("Datanode:\\s.*host1.\\)");
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertFalse(m.find());
-    p = Pattern.compile("UnderReplicated=.*UnClosed=");
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
-    assertFalse(m.find());
-  }
-
-  @Test
-  public void testNodeIdOptionDecommissionStatusFail() throws IOException {
-    ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
-    when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(0).getNodeID())))
-        .thenReturn(containerOnDecom);
-    when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(1).getNodeID())))
-        .thenReturn(new HashMap<>());
-    when(scmClient.getMetrics(any())).thenReturn(metrics.get(2));
-
-    CommandLine c = new CommandLine(cmd);
-    c.parseArgs("--node-id", nodes.get(1).getNodeID().getUuid());
-    cmd.execute(scmClient); // check status of host1
-
-    Pattern p = Pattern.compile("Datanode:\\s(.*)\\sis\\snot\\sin" +
-        "\\sDECOMMISSIONING", Pattern.MULTILINE);
-    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
-
-    // no host details are shown
-    p = Pattern.compile("Datanode:\\s.*host0\\)");
-    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
-    assertFalse(m.find());
     p = Pattern.compile("Datanode:\\s.*host1\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());

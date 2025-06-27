@@ -28,9 +28,7 @@ public class NodeSelectionMixin {
   @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
   private Selection selection = new Selection();
 
-  /**
-   * Precedence order: --node-id > --id (deprecated) > --uuid (deprecated).
-   */
+  //Precedence order: --node-id > --id (deprecated) > --uuid (deprecated).
   public String getNodeId() {
     return !Strings.isNullOrEmpty(selection.nodeId) ? selection.nodeId :
         !Strings.isNullOrEmpty(selection.id) ? selection.id :
