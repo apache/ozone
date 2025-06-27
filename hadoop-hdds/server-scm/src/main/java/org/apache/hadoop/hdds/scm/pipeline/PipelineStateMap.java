@@ -400,7 +400,7 @@ class PipelineStateMap {
       return pipeline;
     }
     Pipeline updatedPipeline = pipelineMap.compute(pipelineID,
-        (id, p) -> Pipeline.newBuilder(pipeline).setState(state).build());
+        (id, p) -> pipeline.toBuilder().setState(state).build());
 
     List<Pipeline> pipelineList =
         query2OpenPipelines.get(pipeline.getReplicationConfig());

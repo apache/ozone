@@ -242,7 +242,6 @@ public class TestContainerPlacement {
     } catch (NodeNotFoundException e) {
       throw new RuntimeException(e);
     } finally {
-      IOUtils.closeQuietly(containerManager);
       IOUtils.closeQuietly(scmNodeManager);
       if (xceiverClientManager != null) {
         xceiverClientManager.close();

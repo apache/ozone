@@ -108,7 +108,7 @@ public class ChunkManagerDispatcher implements ChunkManager {
         .readChunk(container, blockID, info, dispatcherContext);
 
     Preconditions.checkState(data != null);
-    container.getContainerData().updateReadStats(info.getLen());
+    container.getContainerData().getStatistics().updateRead(info.getLen());
 
     return data;
   }
