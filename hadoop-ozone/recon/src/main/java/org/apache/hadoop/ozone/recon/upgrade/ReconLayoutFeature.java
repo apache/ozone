@@ -31,7 +31,8 @@ public enum ReconLayoutFeature {
   // Represents the starting point for Recon's layout versioning system.
   INITIAL_VERSION(0, "Recon Layout Versioning Introduction"),
   TASK_STATUS_STATISTICS(1, "Recon Task Status Statistics Tracking Introduced"),
-  REPLICATED_SIZE_OF_FILES(2, "Adds replicatedSizeOfFiles to NSSummary");
+  UNHEALTHY_CONTAINER_REPLICA_MISMATCH(2, "Adding replica mismatch state to the unhealthy container table"),
+  REPLICATED_SIZE_OF_FILES(3, "Adds replicatedSizeOfFiles to NSSummary");
 
   private final int version;
   private final String description;

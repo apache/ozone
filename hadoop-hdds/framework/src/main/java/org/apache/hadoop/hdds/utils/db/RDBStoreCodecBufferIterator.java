@@ -38,7 +38,8 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
     final String name = table != null ? table.getName() : null;
     this.keyBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-key", 1 << 10),
-        getType().readKey() ? buffer -> getRocksDBIterator().get().key(buffer) : null);
+        // it has to read key for matching prefix.
+        getType().readKey() || prefix != null ? buffer -> getRocksDBIterator().get().key(buffer) : null);
     this.valueBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-value", 4 << 10),
         getType().readValue() ? buffer -> getRocksDBIterator().get().value(buffer) : null);

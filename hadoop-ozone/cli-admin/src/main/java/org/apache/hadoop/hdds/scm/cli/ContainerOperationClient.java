@@ -603,4 +603,8 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getMetrics(query);
   }
 
+  @Override
+  public void reconcileContainer(long id) throws IOException {
+    storageContainerLocationClient.reconcileContainer(id);
+  }
 }

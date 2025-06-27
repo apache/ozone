@@ -23,7 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -158,8 +157,7 @@ class TestContainerImporter {
     KeyValueContainerData containerData = spy(new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test"));
     // mock to return different checksum
-    when(containerData.getChecksum()).thenReturn("checksum1", "checksum2");
-    doNothing().when(containerData).setChecksumTo0ByteArray();
+    when(containerData.getContainerFileChecksum()).thenReturn("checksum1", "checksum2");
     // create containerImporter object
     ContainerController controllerMock = mock(ContainerController.class);
     ContainerSet containerSet = newContainerSet(0);

@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -133,8 +132,7 @@ public class TestSchemaTwoBackwardsCompatibility {
     chunkManager = new FilePerBlockStrategy(true, blockManager);
 
     containerSet = newContainerSet();
-    keyValueHandler = new KeyValueHandler(conf, datanodeUuid,
-        containerSet, volumeSet, ContainerMetrics.create(conf), c -> { });
+    keyValueHandler = ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getWriteChannel()).thenReturn(null);

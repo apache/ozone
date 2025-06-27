@@ -97,6 +97,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
@@ -1227,5 +1228,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         builder -> builder.setGetMetricsRequest(request)).getGetMetricsResponse();
     String metricsJsonStr = response.getMetricsJson();
     return metricsJsonStr;
+  }
+
+  @Override
+  public void reconcileContainer(long containerID) throws IOException {
+    ReconcileContainerRequestProto request = ReconcileContainerRequestProto.newBuilder()
+        .setContainerID(containerID)
+        .build();
+    // TODO check error handling.
+    submitRequest(Type.ReconcileContainer, builder -> builder.setReconcileContainerRequest(request));
   }
 }

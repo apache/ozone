@@ -196,9 +196,8 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
 
   /**
    * Block Iterator for KeyValue Container. This block iterator returns blocks
-   * which match with the {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter}. If no
-   * filter is specified, then default filter used is
-   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters#getUnprefixedKeyFilter()}
+   * which match with the {@link KeyPrefixFilter}.
+   * The default filter is {@link #DEFAULT_BLOCK_FILTER}.
    */
   @InterfaceAudience.Public
   public static class KeyValueBlockIterator implements
@@ -263,7 +262,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
       while (blockIterator.hasNext()) {
         Table.KeyValue<String, BlockData> keyValue = blockIterator.next();
         byte[] keyBytes = StringUtils.string2Bytes(keyValue.getKey());
-        if (blockFilter.filterKey(null, keyBytes, null)) {
+        if (blockFilter.filterKey(keyBytes)) {
           nextBlock = keyValue.getValue();
           if (LOG.isTraceEnabled()) {
             LOG.trace("Block matching with filter found: blockID is : {} for " +
@@ -296,9 +295,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
   /**
    * Block localId Iterator for KeyValue Container.
    * This Block localId iterator returns localIds
-   * which match with the {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter}. If no
-   * filter is specified, then default filter used is
-   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters#getUnprefixedKeyFilter()}
+   * which match with the {@link KeyPrefixFilter}.
    */
   @InterfaceAudience.Public
   public static class KeyValueBlockLocalIdIterator implements
@@ -351,7 +348,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
       while (blockLocalIdIterator.hasNext()) {
         Table.KeyValue<String, Long> keyValue = blockLocalIdIterator.next();
         byte[] keyBytes = StringUtils.string2Bytes(keyValue.getKey());
-        if (localIdFilter.filterKey(null, keyBytes, null)) {
+        if (localIdFilter.filterKey(keyBytes)) {
           nextLocalId = keyValue.getValue();
           if (LOG.isTraceEnabled()) {
             LOG.trace("Block matching with filter found: LocalID is : " +

@@ -361,6 +361,9 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /** @return the datanode of the given id if it exists; otherwise, return null. */
   @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
 
+  @Nullable
+  DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails);
+
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of
    * DatanodeDetails for the datanodes running at that address.

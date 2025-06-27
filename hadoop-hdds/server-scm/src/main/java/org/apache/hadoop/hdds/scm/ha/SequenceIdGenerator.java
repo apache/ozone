@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.SEQUENCE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -366,10 +366,10 @@ public class SequenceIdGenerator {
     // upgrade containerId
     if (sequenceIdTable.get(CONTAINER_ID) == null) {
       long largestContainerId = 0;
-      try (Table.KeyValueIterator<ContainerID, ContainerInfo> iterator =
-               scmMetadataStore.getContainerTable().iterator(VALUE_ONLY)) {
+      try (TableIterator<ContainerID, ContainerInfo> iterator
+          = scmMetadataStore.getContainerTable().valueIterator()) {
         while (iterator.hasNext()) {
-          ContainerInfo containerInfo = iterator.next().getValue();
+          final ContainerInfo containerInfo = iterator.next();
           largestContainerId =
               Long.max(containerInfo.getContainerID(), largestContainerId);
         }
@@ -392,19 +392,19 @@ public class SequenceIdGenerator {
       // Start from ID 2.
       // ID 1 - root certificate, ID 2 - first SCM certificate.
       long largestCertId = BigInteger.ONE.add(BigInteger.ONE).longValueExact();
-      try (Table.KeyValueIterator<BigInteger, X509Certificate> iterator =
-               scmMetadataStore.getValidSCMCertsTable().iterator(VALUE_ONLY)) {
+      try (TableIterator<BigInteger, X509Certificate> iterator
+          = scmMetadataStore.getValidSCMCertsTable().valueIterator()) {
         while (iterator.hasNext()) {
-          X509Certificate cert = iterator.next().getValue();
+          final X509Certificate cert = iterator.next();
           largestCertId = Long.max(cert.getSerialNumber().longValueExact(),
               largestCertId);
         }
       }
 
-      try (Table.KeyValueIterator<BigInteger, X509Certificate> iterator =
-               scmMetadataStore.getValidCertsTable().iterator(VALUE_ONLY)) {
+      try (TableIterator<BigInteger, X509Certificate> iterator
+          = scmMetadataStore.getValidCertsTable().valueIterator()) {
         while (iterator.hasNext()) {
-          X509Certificate cert = iterator.next().getValue();
+          final X509Certificate cert = iterator.next();
           largestCertId = Long.max(
               cert.getSerialNumber().longValueExact(), largestCertId);
         }

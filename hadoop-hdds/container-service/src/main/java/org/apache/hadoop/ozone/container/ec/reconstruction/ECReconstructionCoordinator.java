@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
-import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.encode;
+import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.util.MemoizedSupplier;
