@@ -271,8 +271,8 @@ public class SCMBlockProtocolServer implements
       totalBlocks += bg.getAllBlocks().size();
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("SCM is informed by OM to delete {} blocks",
-          keyBlocksInfoList.size());
+      LOG.debug("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
+          keyBlocksInfoList.size(), totalBlocks);
     }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();

@@ -59,7 +59,7 @@ public final class DeletedBlockGroup {
     for (HddsProtos.DeletedBlock block : proto.getBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
       blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(), containerBlockId.getLocalID()),
-          block.getUsedBytes()));
+          block.getReplicatedSize()));
     }
     return DeletedBlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlocks(blocks).build();

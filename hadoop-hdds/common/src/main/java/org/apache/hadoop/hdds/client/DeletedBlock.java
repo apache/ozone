@@ -27,19 +27,19 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 public class DeletedBlock {
 
   private BlockID blockID;
-  private long usedBytes;
+  private long replicateSize;
 
-  public DeletedBlock(BlockID blockID, long usedBytes) {
+  public DeletedBlock(BlockID blockID, long replicateSize) {
     this.blockID = blockID;
-    this.usedBytes = usedBytes;
+    this.replicateSize = replicateSize;
   }
 
   public BlockID getBlockID() {
     return this.blockID;
   }
 
-  public long getUsedBytes() {
-    return this.usedBytes;
+  public long getReplicateSize() {
+    return this.replicateSize;
   }
 
   @Override
@@ -50,21 +50,22 @@ public class DeletedBlock {
   }
 
   public void appendTo(StringBuilder sb) {
-    sb.append(" blockID: ").append(blockID.getContainerBlockID().getLocalID());
-    sb.append(" usedBytes: ").append(usedBytes);
+    sb.append(" localID: ").append(blockID.getContainerBlockID().getLocalID());
+    sb.append(" containerID: ").append(blockID.getContainerBlockID().getContainerID());
+    sb.append(" replicateSize: ").append(replicateSize);
   }
 
   @JsonIgnore
   public HddsProtos.DeletedBlock getProtobuf() {
     return HddsProtos.DeletedBlock.newBuilder()
         .setBlockId(blockID.getProtobuf())
-        .setUsedBytes(usedBytes).build();
+        .setReplicatedSize(replicateSize).build();
   }
 
   @JsonIgnore
   public static DeletedBlock getFromProtobuf(HddsProtos.DeletedBlock deletedBlockID) {
     return new DeletedBlock(
-        BlockID.getFromProtobuf(deletedBlockID.getBlockId()), deletedBlockID.getUsedBytes());
+        BlockID.getFromProtobuf(deletedBlockID.getBlockId()), deletedBlockID.getReplicatedSize());
   }
 
   @Override
@@ -77,12 +78,12 @@ public class DeletedBlock {
     }
     DeletedBlock delBlockID = (DeletedBlock) o;
     return this.getBlockID().equals(delBlockID.getBlockID())
-        && this.getUsedBytes() == delBlockID.getUsedBytes();
+        && this.getReplicateSize() == delBlockID.getReplicateSize();
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(blockID.getContainerBlockID().getContainerID(), blockID.getContainerBlockID().getLocalID(),
-        usedBytes);
+        replicateSize);
   }
 }

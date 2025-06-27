@@ -18,7 +18,10 @@
 package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -27,7 +30,9 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.DeletedBlock;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -38,7 +43,10 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.common.DeletedBlockGroup;
-import org.junit.jupiter.api.Test;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -51,15 +59,25 @@ public class TestDeletionService {
   private static final String KEY_NAME = "testkey";
   private static final int KEY_SIZE = 5 * 1024; // 5 KB
 
-  @Test
-  public void testDeletedKeyBytesPropagatedToSCM() throws Exception {
+  public static Stream<Arguments> replicaType() {
+    return Stream.of(
+        arguments("RATIS", "ONE"),
+        arguments("RATIS", "THREE")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("replicaType")
+  public void testDeletedKeyBytesPropagatedToSCM(String type, String factor) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.set(OZONE_REPLICATION_TYPE, type);
+    conf.set(OZONE_REPLICATION, factor);
     MiniOzoneCluster cluster = null;
 
     try {
       // Step 1: Start MiniOzoneCluster
-      cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+      cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
       cluster.waitForClusterToBeReady();
 
       // Step 2: Create volume, bucket, and write a key
@@ -69,7 +87,7 @@ public class TestDeletionService {
       OzoneBucket bucket = client.getObjectStore().getVolume(VOLUME_NAME).getBucket(BUCKET_NAME);
       byte[] data = new byte[KEY_SIZE];
       try (OzoneOutputStream out = bucket.createKey(KEY_NAME, KEY_SIZE,
-          ReplicationType.RATIS, ReplicationFactor.ONE, new HashMap<>())) {
+          ReplicationType.valueOf(type), ReplicationFactor.valueOf(factor), new HashMap<>())) {
         out.write(data);
       }
 
@@ -93,9 +111,10 @@ public class TestDeletionService {
       // Step 6: Calculate and assert used bytes
       long totalUsedBytes = captor.getValue().stream()
           .flatMap(group -> group.getAllBlocks().stream())
-          .mapToLong(DeletedBlock::getUsedBytes)
+          .mapToLong(DeletedBlock::getReplicateSize)
           .sum();
-      assertEquals(KEY_SIZE, totalUsedBytes);
+      assertEquals(QuotaUtil.getReplicatedSize(KEY_SIZE, RatisReplicationConfig.getInstance(
+          ReplicationFactor.valueOf(factor).toProto())), totalUsedBytes);
     } finally {
       if (cluster != null) {
         cluster.shutdown();
