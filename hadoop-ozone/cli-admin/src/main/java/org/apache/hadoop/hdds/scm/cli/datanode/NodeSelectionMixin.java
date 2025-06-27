@@ -29,7 +29,7 @@ public class NodeSelectionMixin {
   private Selection selection = new Selection();
 
   /**
-   * Precedence order: --node-id > --id (deprecated) > --uuid (deprecated)
+   * Precedence order: --node-id > --id (deprecated) > --uuid (deprecated).
    */
   public String getNodeId() {
     return !Strings.isNullOrEmpty(selection.nodeId) ? selection.nodeId :
