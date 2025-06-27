@@ -105,7 +105,7 @@ public final class OnDemandContainerScanner {
 
   private void performOnDemandScan(Container<?> container, ContainerScanHelper helper) {
     try {
-      if (scannerHelper.shouldScanData(container)) {
+      if (helper.shouldScanData(container)) {
         helper.scanData(container, throttler, canceler);
       } else {
         // for containers that qualify for metadata scan and not data scan,
