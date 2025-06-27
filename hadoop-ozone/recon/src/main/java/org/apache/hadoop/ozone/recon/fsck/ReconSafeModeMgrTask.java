@@ -82,10 +82,14 @@ public class ReconSafeModeMgrTask {
       }
       // Exceeded safe mode grace period. Exit safe mode
       if (safeModeManager.getInSafeMode()) {
+        LOG.warn("Recon could not exit safe mode after {} ms. Exiting safe mode anyway. " +
+            "Please check for any unexpected startup issues", timeElapsed);
         safeModeManager.setInSafeMode(false);
+      } else {
+        LOG.info("Recon exited safe mode after {} ms.", timeElapsed);
       }
     } catch (Throwable t) {
-      LOG.error("Exception in Missing Container task Thread.", t);
+      LOG.error("Exception in ReconSafeModeMgrTask Thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
