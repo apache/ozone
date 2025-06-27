@@ -19,8 +19,10 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getDeletedContainerResult;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyMetadataScanResult;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -40,7 +42,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -120,7 +121,14 @@ public abstract class TestContainerScannersAbstract {
   public abstract void testShutdownDuringScan() throws Exception;
 
   @Test
-  public abstract void testUnhealthyContainerNotRescanned() throws Exception;
+  public abstract void testUnhealthyContainerRescanned() throws Exception;
+
+  /**
+   * When the container checksum cannot be updated, the scan should still complete and move the container state without
+   * throwing an exception.
+   */
+  @Test
+  public abstract void testChecksumUpdateFailure() throws Exception;
 
   // HELPER METHODS
 
@@ -168,8 +176,6 @@ public abstract class TestContainerScannersAbstract {
     // and test it.
     when(unhealthy.shouldScanData()).thenCallRealMethod();
     assertTrue(unhealthy.shouldScanData());
-    when(unhealthy.shouldScanMetadata()).thenCallRealMethod();
-    assertTrue(unhealthy.shouldScanMetadata());
 
     when(unhealthy.getContainerData().getVolume()).thenReturn(vol);
 
@@ -187,30 +193,35 @@ public abstract class TestContainerScannersAbstract {
   }
 
   private ContainerController mockContainerController() {
+    DataScanResult healthyData = getHealthyDataScanResult();
+    DataScanResult unhealthyData = getUnhealthyDataScanResult();
+    MetadataScanResult healthyMetadata = getHealthyMetadataScanResult();
+    MetadataScanResult unhealthyMetadata = getUnhealthyMetadataScanResult();
+
     // healthy container
     ContainerTestUtils.setupMockContainer(healthy,
-        true, ScanResult.healthy(), ScanResult.healthy(),
+        true, healthyMetadata, healthyData,
         CONTAINER_SEQ_ID, vol);
 
     // Open container (only metadata can be scanned)
     ContainerTestUtils.setupMockContainer(openContainer,
-        false, ScanResult.healthy(), ScanResult.healthy(),
+        false, healthyMetadata, healthyData,
         CONTAINER_SEQ_ID, vol);
 
     // unhealthy container (corrupt data)
     ContainerTestUtils.setupMockContainer(corruptData,
-        true, ScanResult.healthy(), getUnhealthyScanResult(),
+        true, healthyMetadata, unhealthyData,
         CONTAINER_SEQ_ID, vol);
 
     // unhealthy container (corrupt metadata). To simulate container still
     // being open while metadata is corrupted, shouldScanData will return false.
     ContainerTestUtils.setupMockContainer(openCorruptMetadata,
-        false, getUnhealthyScanResult(), ScanResult.healthy(),
+        false, unhealthyMetadata, unhealthyData,
         CONTAINER_SEQ_ID, vol);
 
     // Mock container that has been deleted during scan.
     ContainerTestUtils.setupMockContainer(deletedContainer,
-        true, ScanResult.healthy(), getDeletedContainerResult(),
+        true, healthyMetadata, DataScanResult.deleted(),
         CONTAINER_SEQ_ID, vol);
 
     containers.addAll(Arrays.asList(healthy, corruptData, openCorruptMetadata,
