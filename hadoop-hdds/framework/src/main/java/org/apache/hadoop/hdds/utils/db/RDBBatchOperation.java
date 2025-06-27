@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
@@ -50,7 +52,7 @@ public class RDBBatchOperation implements BatchOperation {
 
   private final OpCache opCache = new OpCache();
 
-  private enum Op { DELETE }
+  private enum Op { DELETE, DELETE_RANGE, PUT }
 
   private static void debug(Supplier<String> message) {
     if (LOG.isTraceEnabled()) {
@@ -141,7 +143,7 @@ public class RDBBatchOperation implements BatchOperation {
        * When dbValue is a byte[]/{@link ByteBuffer}, it represents a put-op.
        * Otherwise, it represents a delete-op (dbValue is {@link Op#DELETE}).
        */
-      private final Map<Bytes, Object> ops = new HashMap<>();
+      private final Map<Bytes, Pair<Op, Object>> ops = new HashMap<>();
       private boolean isCommit;
 
       private long batchSize;
@@ -149,6 +151,7 @@ public class RDBBatchOperation implements BatchOperation {
       private int discardedCount;
       private int putCount;
       private int delCount;
+      private int delRangeCount;
 
       FamilyCache(ColumnFamily family) {
         this.family = family;
@@ -158,16 +161,20 @@ public class RDBBatchOperation implements BatchOperation {
       void prepareBatchWrite() throws RocksDatabaseException {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         isCommit = true;
-        for (Map.Entry<Bytes, Object> op : ops.entrySet()) {
+        for (Map.Entry<Bytes, Pair<Op, Object>> op : ops.entrySet()) {
           final Bytes key = op.getKey();
-          final Object value = op.getValue();
-          if (value instanceof byte[]) {
+          final Object value = op.getValue().getValue();
+          final Op opType = op.getValue().getKey();
+          if (opType == Op.PUT && value instanceof byte[]) {
             family.batchPut(writeBatch, key.array(), (byte[]) value);
-          } else if (value instanceof CodecBuffer) {
+          } else if (opType == Op.PUT && value instanceof CodecBuffer) {
             family.batchPut(writeBatch, key.asReadOnlyByteBuffer(),
                 ((CodecBuffer) value).asReadOnlyByteBuffer());
-          } else if (value == Op.DELETE) {
+          } else if (opType == Op.DELETE) {
             family.batchDelete(writeBatch, key.array());
+          } else if (opType == Op.DELETE_RANGE) {
+            Pair<byte[], byte[]> valuePair = (Pair<byte[], byte[]>) value;
+            family.batchDeleteRange(writeBatch, valuePair.getKey(), valuePair.getValue());
           } else {
             throw new IllegalStateException("Unexpected value: " + value
                 + ", class=" + value.getClass().getSimpleName());
@@ -178,17 +185,17 @@ public class RDBBatchOperation implements BatchOperation {
       }
 
       private String summary() {
-        return String.format("  %s %s, #put=%s, #del=%s", this,
-            batchSizeDiscardedString(), putCount, delCount);
+        return String.format("  %s %s, #put=%s, #del=%s, #delRange=%s", this,
+            batchSizeDiscardedString(), putCount, delCount, delRangeCount);
       }
 
       void clear() {
         final boolean warn = !isCommit && batchSize > 0;
         String details = warn ? summary() : null;
 
-        for (Object value : ops.values()) {
-          if (value instanceof CodecBuffer) {
-            ((CodecBuffer) value).release(); // the key will also be released
+        for (Pair<Op, Object> value : ops.values()) {
+          if (value.getValue() instanceof CodecBuffer) {
+            ((CodecBuffer) value.getValue()).release(); // the key will also be released
           }
         }
         ops.clear();
@@ -198,13 +205,15 @@ public class RDBBatchOperation implements BatchOperation {
         }
       }
 
-      void putOrDelete(Bytes key, int keyLen, Object val, int valLen) {
+      void putOrDelete(Bytes key, int keyLen, Object val, int valLen, Op opType) {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         batchSize += keyLen + valLen;
-        // remove previous first in order to call release()
-        final Object previous = ops.remove(key);
-        if (previous != null) {
-          final boolean isPut = previous != Op.DELETE;
+        // remove previous first in order to call release().
+        // DELETE_RANGE operations will not be removed or overwritten because their keys will be unique within a batch.
+        final Pair<Op, Object> previousEntry = ops.remove(key);
+        if (previousEntry != null) {
+          final Object previous = previousEntry.getValue();
+          final boolean isPut = previousEntry.getKey() == Op.PUT;
           final int preLen;
           if (!isPut) {
             preLen = 0;
@@ -223,11 +232,12 @@ public class RDBBatchOperation implements BatchOperation {
           debug(() -> String.format("%s overwriting a previous %s", this,
               isPut ? "put (value: " + byteSize2String(preLen) + ")" : "del"));
         }
-        final Object overwritten = ops.put(key, val);
+        final Object overwritten = ops.put(key, Pair.of(opType, val));
         Preconditions.checkState(overwritten == null);
 
         debug(() -> String.format("%s %s, %s; key=%s", this,
-            valLen == 0 ? delString(keyLen) : putString(keyLen, valLen),
+            opType == Op.PUT ? putString(keyLen, valLen) :
+                (opType == Op.DELETE ? delString(keyLen) : delRangeString(keyLen, valLen)),
             batchSizeDiscardedString(), key));
       }
 
@@ -237,17 +247,24 @@ public class RDBBatchOperation implements BatchOperation {
         // always release the key with the value
         value.getReleaseFuture().thenAccept(v -> key.release());
         putOrDelete(new Bytes(key), key.readableBytes(),
-            value, value.readableBytes());
+            value, value.readableBytes(), Op.PUT);
       }
 
       void put(byte[] key, byte[] value) {
         putCount++;
-        putOrDelete(new Bytes(key), key.length, value, value.length);
+        putOrDelete(new Bytes(key), key.length, value, value.length, Op.PUT);
       }
 
       void delete(byte[] key) {
         delCount++;
-        putOrDelete(new Bytes(key), key.length, Op.DELETE, 0);
+        putOrDelete(new Bytes(key), key.length, ArrayUtils.EMPTY_BYTE_ARRAY, 0, Op.DELETE);
+      }
+
+      void deleteRange(byte[] startKey, byte[] endKey) {
+        delRangeCount++;
+        byte[] sequenceKey = ArrayUtils.addAll(startKey,
+            ByteBuffer.allocate(Integer.BYTES).putInt(delRangeCount).array());
+        putOrDelete(new Bytes(sequenceKey), startKey.length, Pair.of(startKey, endKey), endKey.length, Op.DELETE_RANGE);
       }
 
       String putString(int keySize, int valueSize) {
@@ -258,6 +275,11 @@ public class RDBBatchOperation implements BatchOperation {
       String delString(int keySize) {
         return String.format("del(key: %s), #del=%s",
             byteSize2String(keySize), delCount);
+      }
+
+      String delRangeString(int keySize, int valueSize) {
+        return String.format("delRange(key: %s, value: %s), #delRange=%s",
+            byteSize2String(keySize), byteSize2String(valueSize), delRangeCount);
       }
 
       String batchSizeDiscardedString() {
@@ -287,6 +309,11 @@ public class RDBBatchOperation implements BatchOperation {
           .delete(key);
     }
 
+    void deleteRange(ColumnFamily family, byte[] startKey, byte[] endKey) {
+      name2cache.computeIfAbsent(family.getName(), k -> new FamilyCache(family))
+          .deleteRange(startKey, endKey);
+    }
+
     /** Prepare batch write for the entire cache. */
     UncheckedAutoCloseable prepareBatchWrite() throws RocksDatabaseException {
       for (Map.Entry<String, FamilyCache> e : name2cache.entrySet()) {
@@ -305,6 +332,7 @@ public class RDBBatchOperation implements BatchOperation {
     String getCommitString() {
       int putCount = 0;
       int delCount = 0;
+      int delRangeCount = 0;
       int opSize = 0;
       int discardedCount = 0;
       int discardedSize = 0;
@@ -312,15 +340,16 @@ public class RDBBatchOperation implements BatchOperation {
       for (FamilyCache f : name2cache.values()) {
         putCount += f.putCount;
         delCount += f.delCount;
+        delRangeCount += f.delRangeCount;
         opSize += f.batchSize;
         discardedCount += f.discardedCount;
         discardedSize += f.discardedSize;
       }
 
-      final int opCount = putCount + delCount;
+      final int opCount = putCount + delCount + delRangeCount;
       return String.format(
-          "#put=%s, #del=%s, batchSize: %s, discarded: %s, committed: %s",
-          putCount, delCount,
+          "#put=%s, #del=%s, #delRange=%s, batchSize: %s, discarded: %s, committed: %s",
+          putCount, delCount, delRangeCount,
           countSize2String(opCount, opSize),
           countSize2String(discardedCount, discardedSize),
           countSize2String(opCount - discardedCount, opSize - discardedSize));
@@ -373,5 +402,9 @@ public class RDBBatchOperation implements BatchOperation {
 
   public void put(ColumnFamily family, byte[] key, byte[] value) {
     opCache.put(family, key, value);
+  }
+
+  public void deleteRange(ColumnFamily family, byte[] beginKey, byte[] endKey) {
+    opCache.deleteRange(family, beginKey, endKey);
   }
 }

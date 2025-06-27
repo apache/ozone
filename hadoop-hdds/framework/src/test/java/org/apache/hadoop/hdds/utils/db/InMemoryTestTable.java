@@ -85,6 +85,11 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type) {
     throw new UnsupportedOperationException();
   }

@@ -73,6 +73,11 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws CodecException {
+    table.deleteRangeWithBatch(batch, beginKey, endKey);
+  }
+
+  @Override
   public final KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type) {
     throw new UnsupportedOperationException("Iterating tables directly is not" +
         " supported for datanode containers due to differing schema " +

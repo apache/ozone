@@ -386,6 +386,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws CodecException {
+    rawTable.deleteRangeWithBatch(batch, encodeKey(beginKey), encodeKey(endKey));
+  }
+
+  @Override
   public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
       throws RocksDatabaseException, CodecException {
     if (supportCodecBuffer) {
@@ -594,7 +599,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
     /**
      * Covert the given {@link Table.KeyValue}
-     * from ({@link RAW}, {@link RAW}) to ({@link KEY}, {@link VALUE}).
+     * from ({@link RAW}, {@link RAW}) to ({@link KEY}, {@@link VALUE}).
      */
     abstract KeyValue<KEY, VALUE> convert(KeyValue<RAW, RAW> raw) throws CodecException;
 

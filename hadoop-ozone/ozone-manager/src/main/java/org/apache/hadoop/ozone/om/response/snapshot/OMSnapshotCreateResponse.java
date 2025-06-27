@@ -25,8 +25,6 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_T
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -84,11 +82,10 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
     final String startKey = omMetadataManager.getBucketKey(
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName())
         + OM_KEY_PREFIX;
+    // endKey is the smallest key that is lexicographically larger than the startKey. (exclusive)
+    final String endKey = startKey.substring(0, startKey.length() - 1) +
+        (char)(startKey.charAt(startKey.length() - 1) + 1);
 
-    // Range delete end key (exclusive) - next possible ASCII char after bucket key
-    // Creates the smallest key that is lexicographically larger than the startKey.
-    final String endKey = startKey + Character.MAX_VALUE;
-
-    omMetadataManager.getSnapshotRenamedTable().deleteRange(startKey, endKey);
+    omMetadataManager.getSnapshotRenamedTable().deleteRangeWithBatch(batchOperation, startKey, endKey);
   }
 }

@@ -142,6 +142,15 @@ public interface Table<KEY, VALUE> {
    */
   void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException;
 
+  /**
+   * Deletes a range of keys from the metadata store as part of a batch operation.
+   *
+   * @param batch the batch operation
+   * @param beginKey start metadata key
+   * @param endKey end metadata key
+   */
+  void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws  CodecException;
+
   /** The same as iterator(null, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator() throws RocksDatabaseException, CodecException {
     return iterator(null, KeyValueIterator.Type.KEY_AND_VALUE);

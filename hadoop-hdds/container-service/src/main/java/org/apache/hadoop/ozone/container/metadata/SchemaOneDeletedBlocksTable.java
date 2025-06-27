@@ -78,6 +78,11 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   @Override
+  public void deleteRangeWithBatch(BatchOperation batch, String beginKey, String endKey) throws CodecException {
+    super.deleteRangeWithBatch(batch, prefix(beginKey), prefix(endKey));
+  }
+
+  @Override
   public boolean isExist(String key) throws RocksDatabaseException, CodecException {
     return super.isExist(prefix(key));
   }

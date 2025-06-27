@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.hadoop.hdds.utils.db.DBDefinition.LOG;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -89,8 +90,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
@@ -519,18 +518,17 @@ public final class OmSnapshotManager implements AutoCloseable {
 
     // Range delete start key (inclusive)
     final String startKey = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
-
-    // Range delete end key (exclusive) - we use the next possible ASCII char after bucket name
-    // Creates the smallest key that is lexicographically larger than the startKey.
-    final String endKey = startKey + Character.MAX_VALUE;
+    // endKey is the smallest key that is lexicographically larger than the startKey. (exclusive)
+    final String endKey = startKey.substring(0, startKey.length() - 1) +
+        (char)(startKey.charAt(startKey.length() - 1) + 1);
 
     if (LOG.isDebugEnabled()) {
-      LOG.info("Deleting key range from DeletedDirTable - startKey: {}, endKey: {}",
+      LOG.debug("Deleting key range from DeletedDirTable - startKey: {}, endKey: {}",
           startKey, endKey);
     }
 
     // Use deleteRange instead of iterating through each key
-    omMetadataManager.getDeletedDirTable().deleteRange(startKey, endKey);
+    omMetadataManager.getDeletedDirTable().deleteRangeWithBatch(batchOperation, startKey, endKey);
   }
 
   @VisibleForTesting
@@ -583,21 +581,18 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String startKey =
-        omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
-
-    // Range delete end key (exclusive) - we use the next possible ASCII char after bucket name
-    // Creates the smallest key that is lexicographically larger than the startKey.
-    final String endKey = startKey + Character.MAX_VALUE;
+    final String startKey = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
+    // endKey is the smallest key that is lexicographically larger than the startKey. (exclusive)
+    final String endKey = startKey.substring(0, startKey.length() - 1) +
+        (char)(startKey.charAt(startKey.length() - 1) + 1);
 
     if (LOG.isDebugEnabled()) {
-      LOG.info("Deleting key range from DeletedTable - startKey: {}, endKey: {}",
+      LOG.debug("Deleting key range from DeletedTable - startKey: {}, endKey: {}",
           startKey, endKey);
     }
 
     // Use deleteRange instead of iterating through each key
-    omMetadataManager.getDeletedTable().deleteRange(startKey, endKey);
-
+    omMetadataManager.getDeletedTable().deleteRangeWithBatch(batchOperation, startKey, endKey);
     // No need to invalidate deletedTable cache since entries are not added to its table cache
     // in the first place. See OMKeyDeleteRequest and OMKeyPurgeRequest#validateAndUpdateCache.
     //
