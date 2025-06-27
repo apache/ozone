@@ -349,4 +349,9 @@ public class MockPipelineManager implements PipelineManager {
   public boolean isPipelineCreationFrozen() {
     return false;
   }
+
+  @Override
+  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
+    return false;
+  }
 }

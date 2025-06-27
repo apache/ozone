@@ -147,7 +147,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     client = cluster.newClient();
     om = cluster.getOzoneManager();
     bucket1 = TestDataUtil.createVolumeAndBucket(
-        client, VOLUME_NAME, BUCKET_NAME_ONE, BucketLayout.DEFAULT);
+        client, VOLUME_NAME, BUCKET_NAME_ONE, BucketLayout.DEFAULT, null);
   }
 
   @AfterAll
