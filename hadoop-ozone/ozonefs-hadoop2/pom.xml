@@ -24,6 +24,7 @@
   <packaging>jar</packaging>
   <name>Apache Ozone FS Hadoop 2.x compatibility</name>
   <properties>
+    <mdep.analyze.skip>true</mdep.analyze.skip>
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
   </properties>
   <dependencies>

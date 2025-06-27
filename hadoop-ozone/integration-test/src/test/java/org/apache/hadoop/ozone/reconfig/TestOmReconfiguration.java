@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone.reconfig;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableSet;
@@ -51,6 +53,8 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_KEY_DELETING_LIMIT_PER_TASK)
         .add(OZONE_OM_VOLUME_LISTALL_ALLOWED)
         .add(OZONE_READONLY_ADMINISTRATORS)
+        .add(OZONE_DIR_DELETING_SERVICE_INTERVAL)
+        .add(OZONE_THREAD_NUMBER_DIR_DELETION)
         .addAll(new OmConfig().reconfigurableProperties())
         .build();
 

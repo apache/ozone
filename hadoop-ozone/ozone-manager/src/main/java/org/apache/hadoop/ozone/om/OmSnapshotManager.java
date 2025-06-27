@@ -295,7 +295,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getBoolean(OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES,
             OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT);
     this.snapshotCache = new SnapshotCache(loader, softCacheSize, ozoneManager.getMetrics(),
-        cacheCleanupServiceInterval, compactNonSnapshotDiffTables);
+        cacheCleanupServiceInterval, compactNonSnapshotDiffTables, ozoneManager.getMetadataManager().getLock());
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
         ozoneManager, snapDiffJobCf, snapDiffReportCf,
@@ -758,10 +758,15 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   public static String getSnapshotPath(OzoneConfiguration conf,
-                                       SnapshotInfo snapshotInfo) {
+      SnapshotInfo snapshotInfo) {
+    return getSnapshotPath(conf, snapshotInfo.getCheckpointDirName());
+  }
+
+  public static String getSnapshotPath(OzoneConfiguration conf,
+      String checkpointDirName) {
     return OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
-        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+        OM_DB_NAME + checkpointDirName;
   }
 
   public static boolean isSnapshotKey(String[] keyParts) {

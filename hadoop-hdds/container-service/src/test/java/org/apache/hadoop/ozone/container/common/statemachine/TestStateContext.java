@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.LambdaTestUtils;
@@ -706,6 +707,7 @@ public class TestStateContext {
     ctx.addCommand(ReplicateContainerCommand.forTest(3));
     ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
+    ctx.addCommand(new ReconcileContainerCommand(4, Collections.emptySet()));
 
     Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
     assertEquals(3,
@@ -714,6 +716,8 @@ public class TestStateContext {
         summary.get(SCMCommandProto.Type.closePipelineCommand).intValue());
     assertEquals(1,
         summary.get(SCMCommandProto.Type.closeContainerCommand).intValue());
+    assertEquals(1,
+        summary.get(SCMCommandProto.Type.reconcileContainerCommand).intValue());
   }
 
   @Test
