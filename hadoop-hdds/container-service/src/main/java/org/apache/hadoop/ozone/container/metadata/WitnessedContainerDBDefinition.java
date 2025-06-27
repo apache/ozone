@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -30,17 +29,17 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
 
-  private static final String CONTAINER_IDS_TABLE_NAME = "containerIds";
+  private static final String CONTAINER_CREATE_INFO_TABLE_NAME = "ContainerCreateInfoTable";
 
-  public static final DBColumnFamilyDefinition<ContainerID, String>
-      CONTAINER_IDS_TABLE = new DBColumnFamilyDefinition<>(
-      CONTAINER_IDS_TABLE_NAME,
+  public static final DBColumnFamilyDefinition<ContainerID, ContainerCreateInfo>
+      CONTAINER_CREATE_INFO_TABLE_DEF = new DBColumnFamilyDefinition<>(
+      CONTAINER_CREATE_INFO_TABLE_NAME,
       ContainerID.getCodec(),
-      StringCodec.get());
+      ContainerCreateInfo.getCodec());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
-      CONTAINER_IDS_TABLE);
+      CONTAINER_CREATE_INFO_TABLE_DEF);
 
   private static final WitnessedContainerDBDefinition INSTANCE = new WitnessedContainerDBDefinition();
 
@@ -62,7 +61,7 @@ public final class WitnessedContainerDBDefinition extends DBDefinition.WithMap {
     return ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR;
   }
 
-  DBColumnFamilyDefinition<ContainerID, String> getContainerIdsTable() {
-    return CONTAINER_IDS_TABLE;
+  DBColumnFamilyDefinition<ContainerID, ContainerCreateInfo> getContainerCreateInfoTableDef() {
+    return CONTAINER_CREATE_INFO_TABLE_DEF;
   }
 }

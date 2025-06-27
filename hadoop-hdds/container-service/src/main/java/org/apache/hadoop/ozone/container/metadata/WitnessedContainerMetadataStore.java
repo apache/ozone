@@ -29,5 +29,5 @@ public interface WitnessedContainerMetadataStore extends DBStoreManager {
    *
    * @return Table
    */
-  Table<ContainerID, String> getContainerIdsTable();
+  Table<ContainerID, ContainerCreateInfo> getContainerCreateInfoTable();
 }
