@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
@@ -344,6 +345,12 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public DatanodeDetails getNode(DatanodeID id) {
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
     return null;
   }
 

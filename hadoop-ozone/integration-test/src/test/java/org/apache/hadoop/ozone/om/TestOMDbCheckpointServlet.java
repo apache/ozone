@@ -229,6 +229,8 @@ public class TestOMDbCheckpointServlet {
 
     doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(),
         anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
   }
 
   @Test

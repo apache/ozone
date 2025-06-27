@@ -203,8 +203,14 @@ public class WritableECContainerProvider
 
     Pipeline newPipeline = pipelineManager.createPipeline(repConfig,
         excludedNodes, Collections.emptyList());
+    // the returned ContainerInfo should not be null (due to not enough space in the Datanodes specifically) because
+    // this is a new pipeline and pipeline creation checks for sufficient space in the Datanodes
     ContainerInfo container =
         containerManager.getMatchingContainer(size, owner, newPipeline);
+    if (container == null) {
+      // defensive null handling
+      throw new IOException("Could not allocate a new container");
+    }
     pipelineManager.openPipeline(newPipeline.getId());
     LOG.info("Created and opened new pipeline {}", newPipeline);
     return container;
