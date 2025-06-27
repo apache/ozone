@@ -28,8 +28,13 @@ public class NodeSelectionMixin {
   @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
   private Selection selection = new Selection();
 
+  /**
+   * Precedence order: --node-id > --id (deprecated) > --uuid (deprecated)
+   */
   public String getNodeId() {
-    return selection.getEffectiveNodeId();
+    return !Strings.isNullOrEmpty(selection.nodeId) ? selection.nodeId :
+        !Strings.isNullOrEmpty(selection.id) ? selection.id :
+            !Strings.isNullOrEmpty(selection.uuid) ? selection.uuid : "";
   }
 
   public String getHostname() {
@@ -58,12 +63,5 @@ public class NodeSelectionMixin {
 
     @CommandLine.Option(names = "--ip", description = "IP address of the datanode", defaultValue = "")
     private String ip;
-
-    //Falling back to deprecated --id or --uuid for backward compatibility
-    String getEffectiveNodeId() {
-      return !Strings.isNullOrEmpty(nodeId) ? nodeId :
-          !Strings.isNullOrEmpty(id) ? id :
-              !Strings.isNullOrEmpty(uuid) ? uuid : "";
-    }
   }
 }

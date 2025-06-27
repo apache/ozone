@@ -58,7 +58,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
   }
 
   @CommandLine.ArgGroup(multiplicity = "1")
-  private ExclusiveArguments exclusiveArguments;
+  private NodeSelectionArguments exclusiveArguments;
 
   @CommandLine.Option(names = {"-c", "--count"}, description = "Number of " +
       "datanodes to display (Default: ${DEFAULT-VALUE}).",
@@ -273,7 +273,7 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     }
   }
 
-  private static class ExclusiveArguments extends NodeSelectionMixin {
+  private static class NodeSelectionArguments extends NodeSelectionMixin {
     @Deprecated
     @CommandLine.Option(names = {"--address"}, paramLabel = "ADDRESS",
         description = "Show info by datanode ip or hostname address.",
