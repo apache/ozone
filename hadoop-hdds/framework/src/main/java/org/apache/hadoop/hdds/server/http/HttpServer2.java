@@ -80,6 +80,8 @@ import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
+import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilter;
+import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilterInitializer;
 import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -649,6 +651,9 @@ public final class HttpServer2 implements FilterContainer {
         if ((c instanceof AuthenticationFilterInitializer) && builder.securityEnabled) {
           addFilter("authentication",
               AuthenticationFilter.class.getName(), filterConfig);
+        } else if ((c instanceof ProxyUserAuthenticationFilterInitializer) && builder.securityEnabled) {
+          addFilter("authentication",
+              ProxyUserAuthenticationFilter.class.getName(), filterConfig);
         } else {
           c.initFilter(this, hadoopConf);
         }
