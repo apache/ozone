@@ -49,12 +49,6 @@ public class StorageVolumeScannerMetrics {
   @Metric("number of checks skipped because the minimum gap since the last check had not elapsed")
   private MutableCounterLong numIterationsSkipped;
 
-  @Metric("timestamp when the scanner was last executed successfully")
-  private MutableGaugeLong lastScanExecutedTimestamp;
-
-  @Metric("timestamp when the scanner was last skipped")
-  private MutableGaugeLong lastScanSkippedTimestamp;
-
   public StorageVolumeScannerMetrics() {
   }
 
@@ -123,20 +117,6 @@ public class StorageVolumeScannerMetrics {
 
   public void incNumIterationsSkipped() {
     numIterationsSkipped.incr();
-  }
-
-  /**
-   * Return the timestamp when the scanner was last executed successfully.
-   */
-  public void setLastScanExecutedTimestamp(long timestamp) {
-    lastScanExecutedTimestamp.set(timestamp);
-  }
-
-  /**
-   * Return the timestamp when the scanner was last skipped.
-   */
-  public void setLastScanSkippedTimestamp(long timestamp) {
-    lastScanSkippedTimestamp.set(timestamp);
   }
 
   public void unregister() {

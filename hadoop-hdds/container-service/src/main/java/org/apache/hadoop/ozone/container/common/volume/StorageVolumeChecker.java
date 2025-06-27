@@ -165,7 +165,6 @@ public class StorageVolumeChecker {
     final long gap = timer.monotonicNow() - lastAllVolumeSetsCheckComplete;
     if (gap < minDiskCheckGapMs) {
       metrics.incNumIterationsSkipped();
-      metrics.setLastScanSkippedTimestamp(timer.monotonicNow());
       if (LOG.isTraceEnabled()) {
         LOG.trace(
             "Skipped checking all volumes, time since last check {} is less " +
@@ -198,7 +197,6 @@ public class StorageVolumeChecker {
       }
       metrics.incNumScanIterations();
       lastAllVolumeSetsCheckComplete = timer.monotonicNow();
-      metrics.setLastScanExecutedTimestamp(lastAllVolumeSetsCheckComplete);
     } catch (IOException e) {
       LOG.warn("Exception while checking disks", e);
     }
