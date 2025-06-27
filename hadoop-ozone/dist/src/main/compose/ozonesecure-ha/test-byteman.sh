@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,18 +15,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-HADOOP_IMAGE=apache/hadoop
-HADOOP_VERSION=${hadoop.version}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
-OZONE_RUNNER_IMAGE=apache/ozone-runner
-OZONE_TESTKRB5_IMAGE=${docker.ozone-testkr5b.image}
-OZONE_VOLUME=./data
-OZONE_OPTS=
-RANGER_DB_IMAGE=postgres
-RANGER_DB_IMAGE_VERSION=12
-RANGER_IMAGE=ghcr.io/adoroszlai/ranger-admin
-RANGER_IMAGE_VERSION=0ae34250d3af672776fca6a53047699adf3afce5-${ranger.version}-8
-RANGER_VERSION=${ranger.version}
-BYTEMAN_PORT=9091
-BYTEMAN_HOME=/opt/byteman/
+#suite:HA-secure
+
+set -u -o pipefail
+
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
+
+export SECURITY_ENABLED=true
+export OM_SERVICE_ID="omservice"
+export SCM=scm1.org
+export COMPOSE_FILE=docker-compose.yaml:byteman.yaml
+
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../testlib.sh"
+
+start_docker_env
+
+## Run virtual host test cases
+execute_robot_test om1 ozone-fi/byteman_faults_sample.robot
