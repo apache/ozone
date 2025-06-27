@@ -97,7 +97,7 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
       null,
       OmBucketInfo.class);
 
-  /** Column family definition for bucket table: /volume/bucket -> BucketInfo. */
+  /** Column family definition for bucket table: /volume/bucket - BucketInfo. */
   public static final DBColumnFamilyDefinition<String, OmBucketInfo> BUCKET_TABLE_DEF
       = new DBColumnFamilyDefinition<>(BUCKET_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_BUCKET_TABLE);
 
@@ -110,7 +110,7 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
       k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION),
       OmKeyInfo.class);
 
-  /** Column family definition for keyTable: /volume/bucket/key :- KeyInfo. */
+  /** Column family definition for keyTable: /volume/bucket/key - KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> KEY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(KEY_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
 
@@ -131,11 +131,11 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_KEY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(OPEN_KEY_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
 
-  /** fileTable: /volumeId/bucketId/parentId/fileName :- KeyInfo. */
+  /** fileTable: /volumeId/bucketId/parentId/fileName - KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> FILE_TABLE_DEF
       = new DBColumnFamilyDefinition<>(FILE_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
 
-  /** openFileTable: /volumeId/bucketId/parentId/fileName/id :- KeyInfo. */
+  /** openFileTable: /volumeId/bucketId/parentId/fileName/id - KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> OPEN_FILE_TABLE_DEF
       = new DBColumnFamilyDefinition<>(OPEN_FILE_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
 
@@ -144,11 +144,11 @@ public final class ReconOMDBDefinition extends DBDefinition.WithMap {
       ReconOMDBDefinition::getOmDirInfoFromProtobuf,
       null,
       OmDirectoryInfo.class);
-  /** directoryTable: /volumeId/bucketId/parentId/dirName :- DirInfo. */
+  /** directoryTable: /volumeId/bucketId/parentId/dirName - DirInfo. */
   public static final DBColumnFamilyDefinition<String, OmDirectoryInfo> DIRECTORY_TABLE_DEF
       = new DBColumnFamilyDefinition<>(DIRECTORY_TABLE, StringCodec.get(), CUSTOM_CODEC_FOR_DIR_TABLE);
 
-  /** deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo. */
+  /** deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId - KeyInfo. */
   public static final DBColumnFamilyDefinition<String, OmKeyInfo> DELETED_DIR_TABLE_DEF
       = new DBColumnFamilyDefinition<>(DELETED_DIR_TABLE, StringCodec.get(), CUSTOM_OM_KEY_INFO_CODEC);
 
