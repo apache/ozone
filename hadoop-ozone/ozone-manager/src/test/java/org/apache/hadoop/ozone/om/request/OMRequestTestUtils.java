@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -1083,13 +1083,13 @@ public final class OMRequestTestUtils {
         .addAllKeyLocations(new ArrayList<>())
         .addMetadata(KeyValue.newBuilder()
             .setKey(OzoneConsts.ETAG)
-            .setValue(DatatypeConverter.printHexBinary(
+            .setValue(Hex.encodeHexString(
                 new DigestInputStream(
                     new ByteArrayInputStream(
                         RandomStringUtils.secure().nextAlphanumeric((int) size)
                             .getBytes(StandardCharsets.UTF_8)),
                     eTagProvider)
-                    .getMessageDigest().digest()))
+                    .getMessageDigest().digest()).toUpperCase())
             .build());
     // Just adding dummy list. As this is for UT only.
 

@@ -96,7 +96,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -3649,8 +3649,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
     ozoneOutputStream.getMetadata().put(ETAG,
-        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
-            .toLowerCase());
+        Hex.encodeHexString(eTagProvider.digest(data)));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
@@ -3660,8 +3659,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 2, omMultipartInfo.getUploadID());
     ozoneOutputStream.getMetadata().put(ETAG,
-        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
-            .toLowerCase());
+        Hex.encodeHexString(eTagProvider.digest(data)));
     ozoneOutputStream.write(data, 0, data.length);
 
     Map<Integer, String> partsMap = new LinkedHashMap<>();
@@ -4315,8 +4313,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     ozoneOutputStream.write(data, 0,
         data.length);
     ozoneOutputStream.getMetadata().put(ETAG,
-        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
-            .toLowerCase());
+        Hex.encodeHexString(eTagProvider.digest(data)));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
@@ -4911,8 +4908,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     ozoneStreamOutput.write(ByteBuffer.wrap(sampleData), 0,
         valueLength);
     ozoneStreamOutput.getMetadata().put(OzoneConsts.ETAG,
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance(OzoneConsts.MD5_HASH)
-            .digest(sampleData)).toLowerCase());
+        Hex.encodeHexString(MessageDigest.getInstance(OzoneConsts.MD5_HASH)
+            .digest(sampleData)));
     ozoneStreamOutput.close();
 
     OzoneMultipartUploadPartListParts parts =

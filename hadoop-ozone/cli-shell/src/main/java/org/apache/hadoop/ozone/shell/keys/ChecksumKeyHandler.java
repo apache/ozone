@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.client.OzoneClientUtils.getFileChecksumWit
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import java.io.IOException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -91,8 +92,8 @@ public class ChecksumKeyHandler extends KeyHandler {
           name, dataSize, client.getObjectStore().getClientProxy());
 
       this.algorithm = fileChecksum.getAlgorithmName();
-      this.checksum = javax.xml.bind.DatatypeConverter.printHexBinary(
-          fileChecksum.getBytes());
+      this.checksum = Hex.encodeHexString(
+          fileChecksum.getBytes()).toUpperCase();
     }
   }
 }

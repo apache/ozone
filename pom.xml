@@ -2077,6 +2077,13 @@
                       <bannedImport>org.eclipse.jetty.util.StringUtil</bannedImport>
                     </bannedImports>
                   </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use similar class from Apache Commons Codec</reason>
+                    <bannedImports>
+                      <bannedImport>javax.xml.bind.DatatypeConverter</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>

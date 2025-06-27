@@ -48,7 +48,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -622,8 +622,8 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
             uploadPartRequest,
             RequestBody.fromByteBuffer(bb));
 
-        assertEquals(DatatypeConverter.printHexBinary(
-            calculateDigest(fileInputStream, 0, partSize)).toLowerCase(), partResponse.eTag());
+        assertEquals(Hex.encodeHexString(
+            calculateDigest(fileInputStream, 0, partSize)), partResponse.eTag());
 
         CompletedPart part = CompletedPart.builder()
             .partNumber(partNumber)

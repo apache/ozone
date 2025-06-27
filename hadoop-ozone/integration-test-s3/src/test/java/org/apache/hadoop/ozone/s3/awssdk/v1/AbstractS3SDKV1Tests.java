@@ -94,7 +94,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -1176,8 +1176,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
         PartETag partETag = uploadResult.getPartETag();
         assertEquals(i, partETag.getPartNumber());
-        assertEquals(DatatypeConverter.printHexBinary(
-            calculateDigest(fileInputStream, 0, (int) partSize)).toLowerCase(), partETag.getETag());
+        assertEquals(Hex.encodeHexString(
+            calculateDigest(fileInputStream, 0, (int) partSize)), partETag.getETag());
         partETags.add(partETag);
 
         filePosition += partSize;

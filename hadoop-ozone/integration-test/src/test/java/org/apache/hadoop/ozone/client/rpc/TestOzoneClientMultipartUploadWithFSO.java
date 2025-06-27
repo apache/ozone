@@ -46,7 +46,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
@@ -447,8 +447,7 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
     ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
-        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
-            .toLowerCase());
+        Hex.encodeHexString(eTagProvider.digest(data)));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
@@ -458,8 +457,7 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 2, uploadID);
     ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
-        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
-            .toLowerCase());
+        Hex.encodeHexString(eTagProvider.digest(data)));
     ozoneOutputStream.write(data, 0, data.length);
 
     Map<Integer, String> partsMap = new LinkedHashMap<>();
@@ -1090,8 +1088,7 @@ public abstract class TestOzoneClientMultipartUploadWithFSO implements NonHATest
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
     ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
-        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
-            .toLowerCase());
+        Hex.encodeHexString(eTagProvider.digest(data)));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
