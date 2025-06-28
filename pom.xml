@@ -50,7 +50,7 @@
     <commons-codec.version>1.18.0</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.27.1</commons-compress.version>
-    <commons-configuration2.version>2.11.0</commons-configuration2.version>
+    <commons-configuration2.version>2.12.0</commons-configuration2.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
     <commons-fileupload.version>1.5</commons-fileupload.version>
     <commons-io.version>2.18.0</commons-io.version>
