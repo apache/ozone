@@ -47,7 +47,7 @@
     <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
     <commons-cli.version>1.8.0</commons-cli.version>
-    <commons-codec.version>1.17.1</commons-codec.version>
+    <commons-codec.version>1.18.0</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
