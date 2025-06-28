@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
  * different kind of tables.
  */
 @InterfaceStability.Evolving
-public interface Table<KEY, VALUE> extends AutoCloseable {
+public interface Table<KEY, VALUE> {
 
   /**
    * Puts a key-value pair into the store.
@@ -239,9 +239,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   }
 
   /**
-   * Returns a certain range of key value pairs as a list based on a
-   * startKey or count. Further a {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter}
-   * can be added to * filter keys if necessary.
+   * Returns a certain range of key value pairs as a list based on a startKey or count.
    * To prevent race conditions while listing
    * entries, this implementation takes a snapshot and lists the entries from
    * the snapshot. This may, on the other hand, cause the range result slight
@@ -255,44 +253,33 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * The count argument is to limit number of total entries to return,
    * the value for count must be an integer greater than 0.
    * <p>
-   * This method allows to specify one or more
-   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter}
-   * to filter keys by certain condition. Once given, only the entries
-   * whose key passes all the filters will be included in the result.
+   * This method allows to specify a {@link KeyPrefixFilter} to filter keys.
+   * Once given, only the entries whose key passes all the filters will be included in the result.
    *
    * @param startKey a start key.
    * @param count max number of entries to return.
    * @param prefix fixed key schema specific prefix
-   * @param filters customized one or more
-   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter}.
+   * @param filter for filtering keys
+   * @param isSequential does it require sequential keys?
    * @return a list of entries found in the database or an empty list if the
    * startKey is invalid.
    * @throws IllegalArgumentException if count is less than 0.
    */
   List<KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey,
-          int count, KEY prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
+          int count, KEY prefix, KeyPrefixFilter filter, boolean isSequential)
           throws RocksDatabaseException, CodecException;
 
-  /**
-   * This method is very similar to {@link #getRangeKVs}, the only
-   * different is this method is supposed to return a sequential range
-   * of elements based on the filters. While iterating the elements,
-   * if it met any entry that cannot pass the filter, the iterator will stop
-   * from this point without looking for next match. If no filter is given,
-   * this method behaves just like {@link #getRangeKVs}.
-   *
-   * @param startKey a start key.
-   * @param count max number of entries to return.
-   * @param prefix fixed key schema specific prefix
-   * @param filters customized one or more
-   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter}.
-   * @return a list of entries found in the database.
-   */
-  List<KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey,
-          int count, KEY prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws RocksDatabaseException, CodecException;
+  /** The same as getRangeKVs(startKey, count, prefix, filter, false). */
+  default List<KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey, int count, KEY prefix, KeyPrefixFilter filter)
+      throws RocksDatabaseException, CodecException {
+    return getRangeKVs(startKey, count, prefix, filter, false);
+  }
+
+  /** The same as getRangeKVs(startKey, count, prefix, null). */
+  default List<KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey, int count, KEY prefix)
+      throws RocksDatabaseException, CodecException {
+    return getRangeKVs(startKey, count, prefix, null);
+  }
 
   /**
    * Deletes all keys with the specified prefix from the metadata store
@@ -338,8 +325,9 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       return value;
     }
 
+    /** @return the value serialized byte size if it is available; otherwise, return -1. */
     public int getValueByteSize() {
-      return valueByteSize;
+      return value != null ? valueByteSize : -1;
     }
 
     @Override
@@ -366,7 +354,7 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value) {
-    return newKeyValue(key, value, 0);
+    return newKeyValue(key, value, -1);
   }
 
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value, int valueByteSize) {
