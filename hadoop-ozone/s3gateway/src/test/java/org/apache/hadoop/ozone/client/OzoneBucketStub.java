@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -549,8 +549,8 @@ public final class OzoneBucketStub extends OzoneBucket {
           PartInfo partInfo = new PartInfo(partEntry.getKey(),
               partEntry.getValue().getPartName(),
               Time.now(), partEntry.getValue().getContent().length,
-              DatatypeConverter.printHexBinary(eTagProvider.digest(partEntry
-                  .getValue().getContent())).toLowerCase());
+              Hex.encodeHexString(eTagProvider.digest(partEntry
+                  .getValue().getContent())));
           partInfoList.add(partInfo);
           count++;
         }

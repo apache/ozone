@@ -102,8 +102,8 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.StreamingOutput;
-import javax.xml.bind.DatatypeConverter;
 import net.jcip.annotations.Immutable;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -337,9 +337,8 @@ public class ObjectEndpoint extends EndpointBase {
           perf.appendMetaLatencyNanos(metadataLatencyNs);
           putLength = IOUtils.copyLarge(digestInputStream, output, 0, length,
               new byte[getIOBufferSize(length)]);
-          eTag = DatatypeConverter.printHexBinary(
-                  digestInputStream.getMessageDigest().digest())
-              .toLowerCase();
+          eTag = Hex.encodeHexString(
+                  digestInputStream.getMessageDigest().digest());
           output.getMetadata().put(ETAG, eTag);
         }
       }
@@ -1082,7 +1081,7 @@ public class ObjectEndpoint extends EndpointBase {
               new byte[getIOBufferSize(length)]);
           byte[] digest = digestInputStream.getMessageDigest().digest();
           ozoneOutputStream.getMetadata()
-              .put(ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
+              .put(ETAG, Hex.encodeHexString(digest));
           outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);
@@ -1234,7 +1233,7 @@ public class ObjectEndpoint extends EndpointBase {
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = IOUtils.copyLarge(src, dest, 0, srcKeyLen, new byte[getIOBufferSize(srcKeyLen)]);
-        String eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
+        String eTag = Hex.encodeHexString(src.getMessageDigest().digest());
         dest.getMetadata().put(ETAG, eTag);
       }
     }

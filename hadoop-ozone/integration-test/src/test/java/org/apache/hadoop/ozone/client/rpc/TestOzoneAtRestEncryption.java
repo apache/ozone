@@ -60,7 +60,7 @@ import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
@@ -740,8 +740,7 @@ class TestOzoneAtRestEncryption {
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
     multipartStreamKey.write(dataBuffer, 0, length);
     multipartStreamKey.getMetadata().put(OzoneConsts.ETAG,
-        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
-            .toLowerCase());
+        Hex.encodeHexString(eTagProvider.digest(data)));
     multipartStreamKey.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
@@ -758,8 +757,7 @@ class TestOzoneAtRestEncryption {
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
     ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
-        DatatypeConverter.printHexBinary(eTagProvider.digest(data))
-            .toLowerCase());
+        Hex.encodeHexString(eTagProvider.digest(data)));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =

@@ -41,7 +41,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -283,8 +283,8 @@ public abstract class TestOzoneFSWithObjectStoreCreate implements NonHATests.Tes
     // This should succeed, as we check during creation of part or during
     // complete MPU.
     ozoneOutputStream.getMetadata().put(ETAG,
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance(MD5_HASH)
-            .digest(b)).toLowerCase());
+        Hex.encodeHexString(MessageDigest.getInstance(MD5_HASH)
+            .digest(b)));
     ozoneOutputStream.close();
 
     Map<Integer, String> partsMap = new HashMap<>();

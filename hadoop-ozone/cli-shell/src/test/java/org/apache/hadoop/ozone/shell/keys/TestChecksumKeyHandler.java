@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -110,8 +111,8 @@ public class TestChecksumKeyHandler {
     assertEquals(keySize, json.get("dataSize").asLong());
     assertEquals("COMPOSITE-CRC32", json.get("algorithm").asText());
 
-    String expectedChecksum = javax.xml.bind.DatatypeConverter.printHexBinary(
-        CrcUtil.intToBytes(Integer.valueOf(CHECKSUM)));
+    String expectedChecksum = Hex.encodeHexString(
+        CrcUtil.intToBytes(Integer.valueOf(CHECKSUM))).toUpperCase();
     assertEquals(expectedChecksum, json.get("checksum").asText());
   }
 

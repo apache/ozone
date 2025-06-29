@@ -29,7 +29,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -217,8 +217,8 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
     ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance(OzoneConsts.MD5_HASH)
-            .digest(data)).toLowerCase());
+        Hex.encodeHexString(MessageDigest.getInstance(OzoneConsts.MD5_HASH)
+            .digest(data)));
     ozoneOutputStream.close();
 
     if (bucket.getBucketLayout() == BucketLayout.OBJECT_STORE) {

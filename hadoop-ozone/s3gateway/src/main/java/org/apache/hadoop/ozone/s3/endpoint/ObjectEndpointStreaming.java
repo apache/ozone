@@ -27,7 +27,7 @@ import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
 import java.util.Map;
 import javax.ws.rs.core.Response;
-import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -107,8 +107,7 @@ final class ObjectEndpointStreaming {
         length, replicationConfig, keyMetadata, tags)) {
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
-      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
-          .toLowerCase();
+      eTag = Hex.encodeHexString(body.getMessageDigest().digest());
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
     }
@@ -132,8 +131,7 @@ final class ObjectEndpointStreaming {
       long metadataLatencyNs =
           METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
-      String eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
-          .toLowerCase();
+      String eTag = Hex.encodeHexString(body.getMessageDigest().digest());
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
     }
@@ -171,8 +169,8 @@ final class ObjectEndpointStreaming {
         long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
         long putLength =
             writeToStreamOutput(streamOutput, body, chunkSize, length);
-        eTag = DatatypeConverter.printHexBinary(
-            body.getMessageDigest().digest()).toLowerCase();
+        eTag = Hex.encodeHexString(
+            body.getMessageDigest().digest());
         ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
         METRICS.incPutKeySuccessLength(putLength);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
