@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -250,6 +251,52 @@ public class TestStorageVolumeChecker {
     assertEquals(0, containerSet.getContainerMap().size());
 
     ozoneContainer.stop();
+  }
+
+  /**
+   * Test numScansSkipped metric from VolumeInfoMetrics when volume check is skipped.
+   */
+  @Test
+  public void testNumScansSkipped() throws Exception {
+    initTest(VolumeCheckResult.HEALTHY);
+
+    final List<HddsVolume> volumes = makeVolumes(3, expectedVolumeHealth);
+
+    FakeTimer timer = new FakeTimer();
+    final StorageVolumeChecker checker =
+        new StorageVolumeChecker(new OzoneConfiguration(), timer, "");
+
+    VolumeInfoMetrics metrics1 = new VolumeInfoMetrics("test-volume-1", volumes.get(0));
+    VolumeInfoMetrics metrics2 = new VolumeInfoMetrics("test-volume-2", volumes.get(1));
+    VolumeInfoMetrics metrics3 = new VolumeInfoMetrics("test-volume-3", volumes.get(2));
+    when(volumes.get(0).getVolumeInfoStats()).thenReturn(metrics1);
+    when(volumes.get(1).getVolumeInfoStats()).thenReturn(metrics2);
+    when(volumes.get(2).getVolumeInfoStats()).thenReturn(metrics3);
+
+    checker.checkAllVolumes(volumes);
+
+    // No volume skipped on first call
+    assertEquals(0, metrics1.getNumScansSkipped());
+    assertEquals(0, metrics2.getNumScansSkipped());
+    assertEquals(0, metrics3.getNumScansSkipped());
+
+    // Second call skipped because msSinceLastCheck (8 mins) < minMsBetweenChecks (10 mins)
+    timer.advance(480_000);
+    checker.checkAllVolumes(volumes);
+
+    assertEquals(1, metrics1.getNumScansSkipped());
+    assertEquals(1, metrics2.getNumScansSkipped());
+    assertEquals(1, metrics3.getNumScansSkipped());
+
+    // Third call should not skip volumes as msSinceLastCheck (11 mins) > minMsBetweenChecks (10 mins)
+    timer.advance(180_000);
+    checker.checkAllVolumes(volumes);
+
+    assertEquals(1, metrics1.getNumScansSkipped());
+    assertEquals(1, metrics2.getNumScansSkipped());
+    assertEquals(1, metrics3.getNumScansSkipped());
+
+    checker.shutdownAndWait(0, TimeUnit.SECONDS);
   }
 
   /**

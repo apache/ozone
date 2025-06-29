@@ -478,4 +478,9 @@ public class MutableVolumeSet implements VolumeSet {
       this.readUnlock();
     }
   }
+
+  public StorageVolume.VolumeType getVolumeType() {
+    return volumeType;
+  }
+
 }
