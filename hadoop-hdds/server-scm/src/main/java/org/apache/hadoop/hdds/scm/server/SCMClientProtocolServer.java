@@ -50,7 +50,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -1649,30 +1648,13 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
-      String hostName, int pageSize, String startItem) throws IOException {
+  public GetVolumeInfosResponseProto getVolumeInfos() throws IOException {
 
     GetVolumeInfosResponseProto.Builder getVolumeInfosResponseBuilder =
         GetVolumeInfosResponseProto.newBuilder();
 
     NodeManager scmNodeManager = scm.getScmNodeManager();
     List<? extends DatanodeDetails> allNodes = scmNodeManager.getAllNodes();
-
-    // If the UUID is not empty,
-    // we will filter the DNs that meet the UUID requirements.
-    if (StringUtils.isNotBlank(uuid)) {
-      allNodes = allNodes.stream().filter(filter ->
-                      StringUtils.equals(filter.getUuid().toString(), uuid)).
-              collect(Collectors.toList());
-    }
-
-    // If the hostName is not empty,
-    // we will filter the DNs that meet the hostName requirements.
-    if (StringUtils.isNotBlank(hostName)) {
-      allNodes = allNodes.stream().filter(filter ->
-                      StringUtils.equals(filter.getHostName(), hostName)).
-              collect(Collectors.toList());
-    }
 
     // If the filtered list is empty, we will return directly.
     if (CollectionUtils.isEmpty(allNodes)) {
@@ -1681,44 +1663,8 @@ public class SCMClientProtocolServer implements
 
     // We convert it to a list of VolumeInfoProto.
     List<VolumeInfoProto> volumeInfos = convertToVolumeInfos(allNodes);
-    switch (displayMode.toUpperCase()) {
-    case "FAILED":
-      // Display only failed volumes
-      volumeInfos = volumeInfos.stream().filter(filter -> filter.getFailed()).
-          collect(Collectors.toList());
-      break;
-    case "HEALTHY":
-      // Display only health volumes
-      volumeInfos = volumeInfos.stream().filter(filter -> !filter.getFailed()).
-          collect(Collectors.toList());
-      break;
-    case "ALL":
-    default:
-      break;
-    }
-
-    // If startItem is specified, find its position in the volumeInfos list
-    int startIndex = 0;
-    if (StringUtils.isNotBlank(startItem)) {
-      for (int i = 0; i < volumeInfos.size(); i++) {
-        HddsProtos.DatanodeIDProto dataNodeId = volumeInfos.get(i).getDataNodeId();
-        DatanodeID datanodeID = DatanodeID.of(dataNodeId.getUuid());
-        DatanodeID startItemID = DatanodeID.of(UUID.fromString(startItem));
-        if (startItemID.equals(datanodeID) ||
-            volumeInfos.get(i).getHostName().equals(startItem)) {
-          startIndex = i + 1; // skip the startItem itself
-          break;
-        }
-      }
-    }
-    List<VolumeInfoProto> currentVolumeInfos = volumeInfos;
-    if (pageSize > 0) {
-      int endIndex = Math.min(startIndex + pageSize, volumeInfos.size());
-      currentVolumeInfos = volumeInfos.subList(startIndex, endIndex);
-    }
-
-    if (CollectionUtils.isNotEmpty(currentVolumeInfos)) {
-      getVolumeInfosResponseBuilder.addAllVolumeInfos(currentVolumeInfos);
+    if (CollectionUtils.isNotEmpty(volumeInfos)) {
+      getVolumeInfosResponseBuilder.addAllVolumeInfos(volumeInfos);
     }
 
     return getVolumeInfosResponseBuilder.build();

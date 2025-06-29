@@ -1383,16 +1383,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
    */
   public GetVolumeInfosResponseProto getVolumeInfos(
       GetVolumeInfosRequestProto request) throws IOException {
-
-    // Prepare parameters
-    String uuid = request.getUuid();
-    String hostName = request.getHostName();
-    String displayMode = request.getDisplayMode();
-    String startItem = request.getStartItem();
-    int pageSize = request.getPageSize();
-
     // Invoke method and return result
-    return impl.getVolumeInfos(displayMode, uuid, hostName, pageSize, startItem);
+    return impl.getVolumeInfos();
   }
   
   public ReconcileContainerResponseProto reconcileContainer(ReconcileContainerRequestProto request) throws IOException {

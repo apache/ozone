@@ -604,27 +604,9 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getMetrics(query);
   }
 
-  /**
-   * Get getVolumeInfos based on query conditions.
-   *
-   * @param displayMode Represents the mode for displaying volumes.
-   * Options include "all" for all volumes, "failed" for failed volumes,
-   * and "normal" for normal volumes.
-   * @param uuid datanode uuid String.
-   * @param hostName datanode hostName String.
-   * @param pageSize Records displayed per page.
-   * @param startItem the starting item for pagination,
-   *                  used to fetch the next set of results.
-   * @return Volume Information List.
-   * @throws IOException
-   * I/O exceptions that may occur during the process of querying the volume.
-   */
   @Override
-  public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid, String hostName, int pageSize,
-      String startItem) throws IOException {
-    GetVolumeInfosResponseProto response = storageContainerLocationClient.getVolumeInfos(
-        displayMode, uuid, hostName, pageSize, startItem);
-    return response;
+  public GetVolumeInfosResponseProto getVolumeInfos() throws IOException {
+    return storageContainerLocationClient.getVolumeInfos();
   }
   
   @Override

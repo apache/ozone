@@ -682,11 +682,6 @@ message GetMetricsResponseProto {
 }
 
 message GetVolumeInfosRequestProto {
-  optional string displayMode = 1;
-  optional string uuid = 2;
-  optional string hostName = 3;
-  optional int32 pageSize = 4;
-  optional string startItem = 5;
 }
 
 message GetVolumeInfosResponseProto {

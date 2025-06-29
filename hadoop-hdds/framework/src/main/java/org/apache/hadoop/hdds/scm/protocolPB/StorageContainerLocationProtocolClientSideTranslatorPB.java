@@ -1234,31 +1234,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public GetVolumeInfosResponseProto getVolumeInfos(String displayMode, String uuid,
-      String hostName, int pageSize, String startItem) throws IOException {
-
+  public GetVolumeInfosResponseProto getVolumeInfos() throws IOException {
     // Prepare parameters.
     GetVolumeInfosRequestProto.Builder requestBuilder =
             GetVolumeInfosRequestProto.newBuilder();
-
-    if (StringUtils.isNotBlank(displayMode)) {
-      requestBuilder.setDisplayMode(displayMode);
-    }
-
-    if (StringUtils.isNotBlank(uuid)) {
-      requestBuilder.setUuid(uuid);
-    }
-
-    if (StringUtils.isNotBlank(hostName)) {
-      requestBuilder.setHostName(hostName);
-    }
-
-    if (StringUtils.isNotBlank(startItem)) {
-      requestBuilder.setStartItem(startItem);
-    }
-
-    requestBuilder.setPageSize(pageSize);
-
     // Submit request.
     GetVolumeInfosResponseProto response = submitRequest(Type.GetVolumeFailureInfos,
         builder -> builder.setGetVolumeInfosRequest(requestBuilder.build())).

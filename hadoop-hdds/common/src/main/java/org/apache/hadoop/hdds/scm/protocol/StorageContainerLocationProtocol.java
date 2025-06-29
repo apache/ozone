@@ -496,20 +496,11 @@ public interface StorageContainerLocationProtocol extends Closeable {
   /**
    * Retrieves volume information based on the specified query parameters.
    *
-   * @param displayMode Represents the mode for displaying volumes.
-   * Options include "all" for all volumes, "failed" for failed volumes,
-   * and "normal" for normal volumes.
-   * @param uuid datanode uuid String.
-   * @param hostName datanode hostName String.
-   * @param pageSize Records displayed per page.
-   * @param startItem The starting point for pagination.
    * @return Volume Information List.
    * @throws IOException
    * I/O exceptions that may occur during the process of querying the volume.
    */
-  GetVolumeInfosResponseProto getVolumeInfos(
-      String displayMode, String uuid, String hostName, int pageSize, String startItem)
-      throws IOException;
+  GetVolumeInfosResponseProto getVolumeInfos() throws IOException;
   
   /**
    * Trigger a reconcile command to datanodes for the current container ID.
