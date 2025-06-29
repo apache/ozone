@@ -26,9 +26,11 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -63,17 +65,16 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
    * Constructs the metadata store and starts the DB services.
    *
    * @param config - Ozone Configuration.
-   * @throws IOException - on Failure.
    */
   protected AbstractDatanodeStore(ConfigurationSource config,
       AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
-      throws IOException {
+      throws RocksDatabaseException, CodecException {
     super(dbDef, config, openReadOnly);
   }
 
   @Override
   protected DBStore initDBStore(DBStoreBuilder dbStoreBuilder, ManagedDBOptions options, ConfigurationSource config)
-      throws IOException {
+      throws RocksDatabaseException, CodecException {
     AbstractDatanodeDBDefinition dbDefinition = this.getDbDef();
     if (dbDefinition instanceof DatanodeSchemaOneDBDefinition ||
         dbDefinition instanceof DatanodeSchemaTwoDBDefinition) {
@@ -182,15 +183,12 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
     return this.finalizeBlocksTableWithIterator;
   }
 
-  protected static void checkTableStatus(Table<?, ?> table, String name)
-          throws IOException {
-    String logMessage = "Unable to get a reference to %s table. Cannot " +
-            "continue.";
-    String errMsg = "Inconsistent DB state, Table - %s. Please check the" +
-            " logs for more info.";
+  static void checkTableStatus(Table<?, ?> table, String name) throws RocksDatabaseException {
     if (table == null) {
-      LOG.error(String.format(logMessage, name));
-      throw new IOException(String.format(errMsg, name));
+      final RocksDatabaseException e = new RocksDatabaseException(
+          "Failed to get table " + name + ": Please check the logs for more info.");
+      LOG.error("", e);
+      throw e;
     }
   }
 

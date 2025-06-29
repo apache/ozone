@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.cache.CacheLoader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
@@ -100,7 +101,7 @@ class TestSnapshotCache {
           when(table1.getName()).thenReturn("table1");
           when(table2.getName()).thenReturn("table2");
           when(keyTable.getName()).thenReturn("keyTable"); // This is in COLUMN_FAMILIES_TO_TRACK_IN_DAG
-          ArrayList tables = new ArrayList();
+          final List<Table<?, ?>> tables = new ArrayList<>();
           tables.add(table1);
           tables.add(table2);
           tables.add(keyTable);

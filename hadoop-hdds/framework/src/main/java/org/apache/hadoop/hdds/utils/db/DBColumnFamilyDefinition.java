@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.ratis.util.JavaUtils.getClassSimpleName;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -72,11 +71,12 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
         DBColumnFamilyDefinition::getName);
   }
 
-  public TypedTable<KEY, VALUE> getTable(DBStore db) throws IOException {
+  public TypedTable<KEY, VALUE> getTable(DBStore db) throws RocksDatabaseException, CodecException {
     return db.getTable(tableName, keyCodec, valueCodec);
   }
 
-  public TypedTable<KEY, VALUE> getTable(DBStore db, CacheType cacheType) throws IOException {
+  public TypedTable<KEY, VALUE> getTable(DBStore db, CacheType cacheType)
+      throws RocksDatabaseException, CodecException {
     return db.getTable(tableName, keyCodec, valueCodec, cacheType);
   }
 

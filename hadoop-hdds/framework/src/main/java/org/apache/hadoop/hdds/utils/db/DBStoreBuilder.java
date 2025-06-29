@@ -30,7 +30,6 @@ import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -107,8 +106,8 @@ public final class DBStoreBuilder {
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
    */
-  public static DBStore createDBStore(ConfigurationSource configuration,
-      DBDefinition definition) throws IOException {
+  public static DBStore createDBStore(ConfigurationSource configuration, DBDefinition definition)
+      throws RocksDatabaseException {
     return newBuilder(configuration, definition, null, null).build();
   }
 
@@ -200,10 +199,10 @@ public final class DBStoreBuilder {
    *
    * @return DBStore
    */
-  public RDBStore build() throws IOException {
+  public RDBStore build() throws RocksDatabaseException {
     if (StringUtils.isBlank(dbname) || (dbPath == null)) {
       LOG.error("Required Parameter missing.");
-      throw new IOException("Required parameter is missing. Please make sure "
+      throw new RocksDatabaseException("Required parameter is missing. Please make sure "
           + "Path and DB name is provided.");
     }
 
@@ -219,7 +218,7 @@ public final class DBStoreBuilder {
 
       File dbFile = getDBFile();
       if (!dbFile.getParentFile().exists()) {
-        throw new IOException("The DB destination directory should exist.");
+        throw new RocksDatabaseException("The DB destination directory should exist.");
       }
 
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
@@ -432,7 +431,7 @@ public final class DBStoreBuilder {
           if (option != null) {
             LOG.info("Using RocksDB DBOptions from {}.ini file", dbname);
           }
-        } catch (IOException ex) {
+        } catch (RocksDatabaseException ex) {
           LOG.info("Unable to read RocksDB DBOptions from {}", dbname, ex);
         } finally {
           columnFamilyDescriptors.forEach(d -> d.getOptions().close());
@@ -443,15 +442,15 @@ public final class DBStoreBuilder {
     return option;
   }
 
-  private File getDBFile() throws IOException {
+  private File getDBFile() throws RocksDatabaseException {
     if (dbPath == null) {
       LOG.error("DB path is required.");
-      throw new IOException("A Path to for DB file is needed.");
+      throw new RocksDatabaseException("A Path to for DB file is needed.");
     }
 
     if (StringUtils.isBlank(dbname)) {
       LOG.error("DBName is a required.");
-      throw new IOException("A valid DB name is required.");
+      throw new RocksDatabaseException("A valid DB name is required.");
     }
     return Paths.get(dbPath.toString(), dbname).toFile();
   }
