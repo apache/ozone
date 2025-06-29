@@ -1681,7 +1681,8 @@ public class SCMClientProtocolServer implements
     }
     return result;
   }
-  
+
+  @Override
   public void reconcileContainer(long longContainerID) throws IOException {
     ContainerID containerID = ContainerID.valueOf(longContainerID);
     getScm().checkAdminAccess(getRemoteUser(), false);
