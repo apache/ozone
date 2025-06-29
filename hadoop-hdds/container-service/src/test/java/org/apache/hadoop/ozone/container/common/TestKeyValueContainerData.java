@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import java.util.UUID;
@@ -116,4 +118,20 @@ public class TestKeyValueContainerData {
     assertEquals(kvData.getSchemaVersion(), newKvData.getSchemaVersion());
   }
 
+  @ContainerTestVersionInfo.ContainerTest
+  public void testNeedsDataChecksum(ContainerTestVersionInfo versionInfo) {
+    initVersionInfo(versionInfo);
+
+    KeyValueContainerData containerData = new KeyValueContainerData(1, layout, MAXSIZE, UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+
+    assertFalse(containerData.isEmpty());
+    assertTrue(containerData.needsDataChecksum());
+    assertEquals(0, containerData.getDataChecksum());
+
+    containerData.setDataChecksum(123L);
+    assertFalse(containerData.isEmpty());
+    assertFalse(containerData.needsDataChecksum());
+    assertEquals(123L, containerData.getDataChecksum());
+  }
 }
