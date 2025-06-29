@@ -37,11 +37,18 @@ public class PendingKeysDeletion {
 
   private Map<String, RepeatedOmKeyInfo> keysToModify;
   private List<BlockGroup> keyBlocksList;
+  private Map<String, Long> keyBlockReplicatedSize;
+  private int notReclaimableKeyCount;
+
 
   public PendingKeysDeletion(List<BlockGroup> keyBlocksList,
-       Map<String, RepeatedOmKeyInfo> keysToModify) {
+       Map<String, RepeatedOmKeyInfo> keysToModify,
+       Map<String, Long> keyBlockReplicatedSize,
+       int notReclaimableKeyCount) {
     this.keysToModify = keysToModify;
     this.keyBlocksList = keyBlocksList;
+    this.keyBlockReplicatedSize = keyBlockReplicatedSize;
+    this.notReclaimableKeyCount = notReclaimableKeyCount;
   }
 
   public Map<String, RepeatedOmKeyInfo> getKeysToModify() {
@@ -50,5 +57,13 @@ public class PendingKeysDeletion {
 
   public List<BlockGroup> getKeyBlocksList() {
     return keyBlocksList;
+  }
+
+  public Map<String, Long> getKeyBlockReplicatedSize() {
+    return keyBlockReplicatedSize;
+  }
+
+  public int getNotReclaimableKeyCount() {
+    return notReclaimableKeyCount;
   }
 }
