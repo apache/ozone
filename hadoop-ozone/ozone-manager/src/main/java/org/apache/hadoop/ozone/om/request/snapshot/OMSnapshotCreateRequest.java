@@ -230,7 +230,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       omMetrics.incNumSnapshotCreateFails();
       LOG.error("Failed to create snapshot '{}' with snapshotId: '{}' under " +
               "path '{}'",
-          snapshotName, snapshotInfo.getSnapshotId(), snapshotPath);
+          snapshotName, snapshotInfo.getSnapshotId(), snapshotPath, exception);
     }
     return omClientResponse;
   }
