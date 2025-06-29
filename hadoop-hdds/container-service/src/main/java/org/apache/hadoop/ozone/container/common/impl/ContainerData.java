@@ -104,6 +104,9 @@ public abstract class ContainerData {
 
   private int replicaIndex;
 
+  @Nullable
+  private String yamlData;
+
   /** Timestamp of last data scan (milliseconds since Unix Epoch).
    * {@code null} if not yet scanned (or timestamp not recorded,
    * eg. in prior versions). */
@@ -192,6 +195,15 @@ public abstract class ContainerData {
    */
   public ContainerType getContainerType() {
     return containerType;
+  }
+
+  @Nullable
+  public String getYamlData() {
+    return yamlData;
+  }
+
+  public void setYamlData(@Nullable String yamlData) {
+    this.yamlData = yamlData;
   }
 
   /**
