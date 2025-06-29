@@ -206,7 +206,7 @@ public final class KeyValueContainerUtil {
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
       ConfigurationSource config) throws IOException {
-    parseKVContainerData(kvContainerData, config, false);
+    parseKVContainerData(kvContainerData, config, false, null);
   }
 
   /**
@@ -217,7 +217,8 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
-      ConfigurationSource config, boolean skipVerifyChecksum) throws IOException {
+      ConfigurationSource config, boolean skipVerifyChecksum,
+      ContainerCheckService emptyContainerCheckService) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
 
@@ -251,7 +252,7 @@ public final class KeyValueContainerUtil {
     if (kvContainerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
         populateContainerMetadata(kvContainerData,
-            db.getStore(), bCheckChunksFilePath);
+            db.getStore(), bCheckChunksFilePath, emptyContainerCheckService);
       }
       return;
     }
@@ -274,7 +275,8 @@ public final class KeyValueContainerUtil {
             "instance was retrieved from the cache. This should only happen " +
             "in tests");
       }
-      populateContainerMetadata(kvContainerData, store, bCheckChunksFilePath);
+      populateContainerMetadata(kvContainerData, store, bCheckChunksFilePath,
+          emptyContainerCheckService);
     } finally {
       if (cachedDB != null) {
         // If we get a cached instance, calling close simply decrements the
@@ -314,7 +316,7 @@ public final class KeyValueContainerUtil {
 
   private static void populateContainerMetadata(
       KeyValueContainerData kvContainerData, DatanodeStore store,
-      boolean bCheckChunksFilePath)
+      boolean bCheckChunksFilePath, ContainerCheckService emptyContainerCheckService)
       throws IOException {
     Table<String, Long> metadataTable = store.getMetadataTable();
 
@@ -378,8 +380,24 @@ public final class KeyValueContainerUtil {
       Files.createDirectories(chunksDir.toPath());
     }
 
-    if (noBlocksInContainer(store, kvContainerData, bCheckChunksFilePath)) {
-      kvContainerData.markAsEmpty();
+    // Asynchronously checks if the container is empty when Datanode starts
+    if (emptyContainerCheckService != null) {
+      emptyContainerCheckService.checkAsync(
+          kvContainerData.getVolume(), () -> {
+            try {
+              if (noBlocksInContainer(store, kvContainerData, bCheckChunksFilePath)) {
+                kvContainerData.markAsEmpty();
+              }
+            } catch (Throwable e) {
+              LOG.error("Failed to check if container {} is empty",
+                  kvContainerData.getContainerID(), e);
+            }
+          }
+      );
+    } else {
+      if (noBlocksInContainer(store, kvContainerData, bCheckChunksFilePath)) {
+        kvContainerData.markAsEmpty();
+      }
     }
 
     // Run advanced container inspection/repair operations if specified on
