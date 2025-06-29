@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.codec.ReconOMDBDefinition;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -183,8 +184,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
-      Table<String, OmDirectoryInfo> dirTable =
-          omMetadataManager.getDirectoryTable();
+      final Table<String, OmDirectoryInfo> dirTable =
+          ReconOMDBDefinition.DIRECTORY_TABLE_DEF.getTable(omMetadataManager.getStore());
       try (TableIterator<String,
               ? extends Table.KeyValue<String, OmDirectoryInfo>>
                 dirTableIter = dirTable.iterator()) {
@@ -201,8 +202,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       }
 
       // Get fileTable used by FSO
-      Table<String, OmKeyInfo> keyTable =
-          omMetadataManager.getFileTable();
+      // Note: ReconOMDBDefinition.FILE_TABLE_DEF uses CUSTOM_OM_KEY_INFO_CODEC
+      final Table<String, OmKeyInfo> keyTable =
+          ReconOMDBDefinition.FILE_TABLE_DEF.getTable(omMetadataManager.getStore());
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
               keyTableIter = keyTable.iterator()) {
