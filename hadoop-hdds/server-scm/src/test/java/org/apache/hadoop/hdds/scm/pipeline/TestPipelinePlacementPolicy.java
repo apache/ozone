@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -49,6 +48,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -189,7 +189,7 @@ public class TestPipelinePlacementPolicy {
     //    nodeManager.getClusterNetworkTopologyMap(), anchor, excludedNodes);
     assertThat(excludedNodes).doesNotContain(nextNode);
     // next node should not be the same as anchor.
-    assertNotSame(anchor.getUuid(), nextNode.getUuid());
+    assertNotSame(anchor.getID(), nextNode.getID());
     // next node should be on the same rack based on topology.
     assertEquals(anchor.getNetworkLocation(), nextNode.getNetworkLocation());
   }
@@ -388,15 +388,14 @@ public class TestPipelinePlacementPolicy {
 
   private DatanodeDetails overwriteLocationInNode(
       DatanodeDetails datanode, Node node) {
-    DatanodeDetails result = DatanodeDetails.newBuilder()
-        .setUuid(datanode.getUuid())
+    return DatanodeDetails.newBuilder()
+        .setID(datanode.getID())
         .setHostName(datanode.getHostName())
         .setIpAddress(datanode.getIpAddress())
         .addPort(datanode.getStandalonePort())
         .addPort(datanode.getRatisPort())
         .addPort(datanode.getRestPort())
         .setNetworkLocation(node.getNetworkLocation()).build();
-    return result;
   }
 
   private List<DatanodeDetails> overWriteLocationInNodes(
@@ -427,7 +426,7 @@ public class TestPipelinePlacementPolicy {
     // NODES should be sufficient.
     assertEquals(nodesRequired, pickedNodes1.size());
     // make sure pipeline placement policy won't select duplicated NODES.
-    assertTrue(checkDuplicateNodesUUID(pickedNodes1));
+    assertTrue(checkDuplicateNodesID(pickedNodes1));
 
     // majority of healthy NODES are heavily engaged in pipelines.
     int majorityHeavy = healthyNodes.size() / 2 + 2;
@@ -610,11 +609,11 @@ public class TestPipelinePlacementPolicy {
     return dns;
   }
 
-  private boolean checkDuplicateNodesUUID(List<DatanodeDetails> nodes) {
-    HashSet<UUID> uuids = nodes.stream().
-        map(DatanodeDetails::getUuid).
+  private boolean checkDuplicateNodesID(List<DatanodeDetails> nodes) {
+    HashSet<DatanodeID> ids = nodes.stream().
+        map(DatanodeDetails::getID).
         collect(Collectors.toCollection(HashSet::new));
-    return uuids.size() == nodes.size();
+    return ids.size() == nodes.size();
   }
 
   private void insertHeavyNodesIntoNodeManager(
