@@ -202,6 +202,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
+      ozoneManager.getOmSnapshotManager().decrementInFlightSnapshotCount();
       if (acquiredSnapshotLock) {
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK,
@@ -291,8 +292,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
             snapshotInfo);
         throw new IOException(exception.getMessage(), exception);
-      } finally {
-        ozoneManager.getOmSnapshotManager().decrementInFlightSnapshotCount();
       }
     }
   }

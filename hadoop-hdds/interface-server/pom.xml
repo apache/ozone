@@ -46,6 +46,12 @@
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
     </dependency>
+    <dependency>
+      <!-- for generated sources, Java 11+ -->
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>

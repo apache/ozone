@@ -31,8 +31,8 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.Message;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
@@ -90,7 +90,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
     if (!nodeManager.isNodeRegistered(datanodeDetails)) {
       LOG.info("SCM received heartbeat from an unregistered datanode {}. " +
           "Asking datanode to re-register.", datanodeDetails);
-      UUID dnID = datanodeDetails.getUuid();
+      DatanodeID dnID = datanodeDetails.getID();
       nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
 
       commands = nodeManager.getCommandQueue(dnID);

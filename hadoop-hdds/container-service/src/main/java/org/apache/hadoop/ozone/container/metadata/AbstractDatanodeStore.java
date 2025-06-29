@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -197,9 +196,8 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
 
   /**
    * Block Iterator for KeyValue Container. This block iterator returns blocks
-   * which match with the {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter}. If no
-   * filter is specified, then default filter used is
-   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters#getUnprefixedKeyFilter()}
+   * which match with the {@link KeyPrefixFilter}.
+   * The default filter is {@link #DEFAULT_BLOCK_FILTER}.
    */
   @InterfaceAudience.Public
   public static class KeyValueBlockIterator implements
@@ -208,9 +206,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
     private static final Logger LOG = LoggerFactory.getLogger(
             KeyValueBlockIterator.class);
 
-    private final TableIterator<String, ? extends Table.KeyValue<String,
-            BlockData>>
-            blockIterator;
+    private final Table.KeyValueIterator<String, BlockData> blockIterator;
     private static final KeyPrefixFilter DEFAULT_BLOCK_FILTER =
             MetadataKeyFilters.getUnprefixedKeyFilter();
     private final KeyPrefixFilter blockFilter;
@@ -221,9 +217,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
      * KeyValueBlockIterator to iterate unprefixed blocks in a container.
      * @param iterator - The underlying iterator to apply the block filter to.
      */
-    KeyValueBlockIterator(long containerID,
-            TableIterator<String, ? extends Table.KeyValue<String, BlockData>>
-                    iterator) {
+    KeyValueBlockIterator(long containerID, Table.KeyValueIterator<String, BlockData> iterator) {
       this.containerID = containerID;
       this.blockIterator = iterator;
       this.blockFilter = DEFAULT_BLOCK_FILTER;
@@ -235,8 +229,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
      * @param filter - Block filter, filter to be applied for blocks
      */
     KeyValueBlockIterator(long containerID,
-            TableIterator<String, ? extends Table.KeyValue<String, BlockData>>
-                    iterator, KeyPrefixFilter filter) {
+        Table.KeyValueIterator<String, BlockData> iterator, KeyPrefixFilter filter) {
       this.containerID = containerID;
       this.blockIterator = iterator;
       this.blockFilter = filter;
@@ -269,7 +262,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
       while (blockIterator.hasNext()) {
         Table.KeyValue<String, BlockData> keyValue = blockIterator.next();
         byte[] keyBytes = StringUtils.string2Bytes(keyValue.getKey());
-        if (blockFilter.filterKey(null, keyBytes, null)) {
+        if (blockFilter.filterKey(keyBytes)) {
           nextBlock = keyValue.getValue();
           if (LOG.isTraceEnabled()) {
             LOG.trace("Block matching with filter found: blockID is : {} for " +
@@ -302,9 +295,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
   /**
    * Block localId Iterator for KeyValue Container.
    * This Block localId iterator returns localIds
-   * which match with the {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter}. If no
-   * filter is specified, then default filter used is
-   * {@link org.apache.hadoop.hdds.utils.MetadataKeyFilters#getUnprefixedKeyFilter()}
+   * which match with the {@link KeyPrefixFilter}.
    */
   @InterfaceAudience.Public
   public static class KeyValueBlockLocalIdIterator implements
@@ -313,8 +304,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
     private static final Logger LOG = LoggerFactory.getLogger(
         KeyValueBlockLocalIdIterator.class);
 
-    private final TableIterator<String, ? extends Table.KeyValue<String,
-        Long>> blockLocalIdIterator;
+    private final Table.KeyValueIterator<String, Long> blockLocalIdIterator;
     private final KeyPrefixFilter localIdFilter;
     private Long nextLocalId;
     private final long containerID;
@@ -325,8 +315,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
      * @param filter - BlockLocalId filter to be applied for block localIds.
      */
     KeyValueBlockLocalIdIterator(long containerID,
-        TableIterator<String, ? extends Table.KeyValue<String, Long>>
-        iterator, KeyPrefixFilter filter) {
+        Table.KeyValueIterator<String, Long> iterator, KeyPrefixFilter filter) {
       this.containerID = containerID;
       this.blockLocalIdIterator = iterator;
       this.localIdFilter = filter;
@@ -359,7 +348,7 @@ public class AbstractDatanodeStore extends AbstractRDBStore<AbstractDatanodeDBDe
       while (blockLocalIdIterator.hasNext()) {
         Table.KeyValue<String, Long> keyValue = blockLocalIdIterator.next();
         byte[] keyBytes = StringUtils.string2Bytes(keyValue.getKey());
-        if (localIdFilter.filterKey(null, keyBytes, null)) {
+        if (localIdFilter.filterKey(keyBytes)) {
           nextLocalId = keyValue.getValue();
           if (LOG.isTraceEnabled()) {
             LOG.trace("Block matching with filter found: LocalID is : " +

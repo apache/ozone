@@ -350,8 +350,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       when(omMetadataManager.getTable(tableName)).thenReturn(table);
       when(mockIter.hasNext()).thenReturn(true, true, true, true, true, false);
 
-      TypedTable.TypedKeyValue mockKeyValue =
-          mock(TypedTable.TypedKeyValue.class);
+      final Table.KeyValue mockKeyValue = mock(Table.KeyValue.class);
 
       if (tableName.equals(DELETED_TABLE)) {
         RepeatedOmKeyInfo keyInfo = mock(RepeatedOmKeyInfo.class);

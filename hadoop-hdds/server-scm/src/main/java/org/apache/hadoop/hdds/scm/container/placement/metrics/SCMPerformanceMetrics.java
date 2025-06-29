@@ -43,9 +43,9 @@ public final class SCMPerformanceMetrics implements MetricsSource {
   private MetricsRegistry registry;
   private static SCMPerformanceMetrics instance;
 
-  @Metric(about = "Number of failed deleteKey operations")
+  @Metric(about = "Number of failed deleteKeys")
   private MutableCounterLong deleteKeyFailure;
-  @Metric(about = "Number of successful deleteKey operations")
+  @Metric(about = "Number of success deleteKeys")
   private MutableCounterLong deleteKeySuccess;
   @Metric(about = "Latency for deleteKey failure in nanoseconds")
   private MutableRate deleteKeyFailureLatencyNs;
@@ -55,6 +55,10 @@ public final class SCMPerformanceMetrics implements MetricsSource {
   private MutableRate allocateBlockSuccessLatencyNs;
   @Metric(about = "Latency for a failed allocateBlock call in nanoseconds")
   private MutableRate allocateBlockFailureLatencyNs;
+  @Metric(about = "Total blocks taken in each key delete cycle.")
+  private MutableCounterLong deleteKeyBlocksSuccess;
+  @Metric(about = "Total blocks taken in each key delete cycle failure.")
+  private MutableCounterLong deleteKeyBlocksFailure;
 
   public SCMPerformanceMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
@@ -84,6 +88,8 @@ public final class SCMPerformanceMetrics implements MetricsSource {
     deleteKeyFailureLatencyNs.snapshot(recordBuilder, true);
     allocateBlockSuccessLatencyNs.snapshot(recordBuilder, true);
     allocateBlockFailureLatencyNs.snapshot(recordBuilder, true);
+    deleteKeyBlocksSuccess.snapshot(recordBuilder, true);
+    deleteKeyBlocksFailure.snapshot(recordBuilder, true);
   }
 
   public void updateAllocateBlockSuccessLatencyNs(long startNanos) {
@@ -94,14 +100,22 @@ public final class SCMPerformanceMetrics implements MetricsSource {
     allocateBlockFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateDeleteKeySuccessStats(long startNanos) {
-    deleteKeySuccess.incr();
+  public void updateDeleteKeySuccessStats(long keys, long startNanos) {
+    deleteKeySuccess.incr(keys);
     deleteKeySuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
-  public void updateDeleteKeyFailureStats(long startNanos) {
-    deleteKeyFailure.incr();
+  public void updateDeleteKeyFailureStats(long keys, long startNanos) {
+    deleteKeyFailure.incr(keys);
     deleteKeyFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  public void updateDeleteKeySuccessBlocks(long keys) {
+    deleteKeyBlocksSuccess.incr(keys);
+  }
+
+  public void updateDeleteKeyFailedBlocks(long keys) {
+    deleteKeyBlocksFailure.incr(keys);
   }
 }
 

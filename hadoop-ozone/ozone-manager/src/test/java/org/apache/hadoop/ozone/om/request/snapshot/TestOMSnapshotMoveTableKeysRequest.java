@@ -81,6 +81,9 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
 
   @Test
   public void testValidateAndUpdateCacheWithNextSnapshotInactive() throws Exception {
+    long initialSnapshotMoveTableKeysCount = getOmSnapshotIntMetrics().getNumSnapshotMoveTableKeys();
+    long initialSnapshotMoveTableKeysFailCount = getOmSnapshotIntMetrics().getNumSnapshotMoveTableKeysFails();
+
     createSnapshots(true);
     snapshotInfo2 = deleteSnapshot(snapshotInfo2, 0);
     OzoneManagerProtocolProtos.OMRequest omRequest = moveSnapshotTableKeyRequest(snapshotInfo1.getSnapshotId(),
@@ -92,6 +95,11 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
     Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_SNAPSHOT_ERROR,
         omClientResponse.getOMResponse().getStatus());
+
+    Assertions.assertEquals(initialSnapshotMoveTableKeysCount,
+        getOmSnapshotIntMetrics().getNumSnapshotMoveTableKeys());
+    Assertions.assertEquals(initialSnapshotMoveTableKeysFailCount + 1,
+        getOmSnapshotIntMetrics().getNumSnapshotMoveTableKeysFails());
   }
 
   @Test
@@ -186,6 +194,9 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    long initialSnapshotMoveTableKeysCount = getOmSnapshotIntMetrics().getNumSnapshotMoveTableKeys();
+    long initialSnapshotMoveTableKeysFailCount = getOmSnapshotIntMetrics().getNumSnapshotMoveTableKeysFails();
+
     createSnapshots(true);
     String invalidVolumeName = UUID.randomUUID().toString();
     String invalidBucketName = UUID.randomUUID().toString();
@@ -203,6 +214,11 @@ public class TestOMSnapshotMoveTableKeysRequest extends TestSnapshotRequestAndRe
     Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
+
+    Assertions.assertEquals(initialSnapshotMoveTableKeysCount + 1,
+        getOmSnapshotIntMetrics().getNumSnapshotMoveTableKeys());
+    Assertions.assertEquals(initialSnapshotMoveTableKeysFailCount,
+        getOmSnapshotIntMetrics().getNumSnapshotMoveTableKeysFails());
   }
 
   @Test

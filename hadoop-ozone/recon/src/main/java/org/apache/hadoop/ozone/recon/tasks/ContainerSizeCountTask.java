@@ -111,7 +111,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
     final long currentSize;
 
     if (usedBytes < 0) {
-      LOG.warn("Negative usedBytes ({}) for container {}, treating it as 0",
+      LOG.debug("Negative usedBytes ({}) for container {}, treating it as 0",
           usedBytes, id);
       currentSize = 0;
     } else {

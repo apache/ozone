@@ -135,6 +135,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
+import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotTestUtils.StubbedPersistentMap;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage;
@@ -150,7 +151,6 @@ import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -370,7 +370,8 @@ public class TestSnapshotDiffManager {
 
     omSnapshotManager = mock(OmSnapshotManager.class);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
-    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics, 0);
+    SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics, 0, true,
+        new OmReadOnlyLock());
 
     when(omSnapshotManager.getActiveSnapshot(anyString(), anyString(), anyString()))
         .thenAnswer(invocationOnMock -> {
@@ -1302,7 +1303,6 @@ public class TestSnapshotDiffManager {
    * startup.
    */
   @Test
-  @Flaky("HDDS-10490")
   public void testLoadJobsOnStartUp() throws Exception {
     for (int i = 0; i < snapshotInfoList.size(); i++) {
       uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(i),
@@ -1616,7 +1616,6 @@ public class TestSnapshotDiffManager {
    * short-circuited based on previous one.
    */
   @Test
-  @Flaky("HDDS-12361")
   public void testGetSnapshotDiffReportJob() throws Exception {
     for (int i = 0; i < jobStatuses.size(); i++) {
       uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(i),

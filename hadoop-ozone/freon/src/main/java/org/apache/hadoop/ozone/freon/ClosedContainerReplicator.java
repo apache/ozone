@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -231,8 +232,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
               volumeChoosingPolicy,
               metrics,
               containerReplicaProto -> {
-              });
-      handler.setClusterID(clusterID);
+              },
+              // Since this a Freon tool, this instance is not part of a running datanode.
+              new ContainerChecksumTreeManager(conf));
+      handler.setClusterID(UUID.randomUUID().toString());
       handlers.put(containerType, handler);
     }
 

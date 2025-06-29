@@ -17,11 +17,7 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-
 import java.io.IOException;
-import java.util.Collections;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -51,15 +47,10 @@ public class BlockExistenceVerifier implements ReplicaVerifier {
   }
 
   @Override
-  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation,
-      int replicaIndex) {
+  public BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation) {
     XceiverClientSpi client = null;
     try {
-      Pipeline pipeline = Pipeline.newBuilder(keyLocation.getPipeline())
-          .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
-          .setNodes(Collections.singletonList(datanode))
-          .setReplicaIndexes(Collections.singletonMap(datanode, replicaIndex))
-          .build();
+      Pipeline pipeline = keyLocation.getPipeline().copyForReadFromNode(datanode);
 
       client = xceiverClientManager.acquireClientForReadData(pipeline);
       ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls.getBlock(

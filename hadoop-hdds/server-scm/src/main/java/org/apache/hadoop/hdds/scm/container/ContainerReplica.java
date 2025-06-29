@@ -45,6 +45,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final long keyCount;
   private final long bytesUsed;
   private final boolean isEmpty;
+  private final long dataChecksum;
 
   private ContainerReplica(ContainerReplicaBuilder b) {
     this.containerID = Objects.requireNonNull(b.containerID, "containerID == null");
@@ -56,6 +57,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     this.replicaIndex = b.replicaIndex;
     this.isEmpty = b.isEmpty;
     this.sequenceId = b.sequenceId;
+    this.dataChecksum = b.dataChecksum;
   }
 
   public ContainerID getContainerID() {
@@ -118,6 +120,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
   public boolean isEmpty() {
     return isEmpty;
+  }
+
+  public long getDataChecksum() {
+    return dataChecksum;
   }
 
   @Override
@@ -188,6 +194,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         + ", keyCount=" + keyCount
         + ", bytesUsed=" + bytesUsed
         + ", " + (isEmpty ? "empty" : "non-empty")
+        + ", dataChecksum=" + dataChecksum
         + '}';
   }
 
@@ -205,6 +212,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private long keyCount;
     private int replicaIndex;
     private boolean isEmpty;
+    private long dataChecksum;
 
     /**
      * Set Container Id.
@@ -276,6 +284,11 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
     public ContainerReplicaBuilder setEmpty(boolean empty) {
       isEmpty = empty;
+      return this;
+    }
+
+    public ContainerReplicaBuilder setDataChecksum(long dataChecksum) {
+      this.dataChecksum = dataChecksum;
       return this;
     }
 

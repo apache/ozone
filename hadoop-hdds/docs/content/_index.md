@@ -25,10 +25,10 @@ weight: -10
 
 {{<figure class="ozone-usage" src="/ozone-usage.png" width="60%">}}
 
-*_Ozone is a scalable, redundant, and distributed object store for Hadoop. <p>
+*_Ozone is a scalable, redundant, and distributed object store for Big data workloads. <p>
 Apart from scaling to billions of objects of varying sizes,
 Ozone can function effectively in containerized environments
-like Kubernetes._* <p>
+like Kubernetes._*
 
 Applications like Apache Spark, Hive and YARN, work without any modifications when using Ozone. Ozone comes with a [Java client library]({{<ref "JavaApi.md">}}), [S3 protocol support]({{< ref "S3.md" >}}), and a [command line interface]({{< ref "Cli.md" >}})  which makes it easy to use Ozone.
 
@@ -38,3 +38,4 @@ Ozone consists of volumes, buckets, and keys:
 * Buckets are similar to directories. A bucket can contain any number of keys, but buckets cannot contain other buckets.
 * Keys are similar to files.
 
+Check out the [Getting Started](start/) guide to dive right in and learn how to run Ozone on your machine or in the cloud.

@@ -241,6 +241,11 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-annotation-processing</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <!-- required for HttpServer2 -->
       <groupId>org.slf4j</groupId>
       <artifactId>jcl-over-slf4j</artifactId>
@@ -332,20 +337,6 @@
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>com.coderplus.maven.plugins</groupId>
-        <artifactId>copy-rename-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>rename-generated-config</id>
-            <phase>process-classes</phase>
-          </execution>
-          <execution>
-            <id>rename-generated-test-config</id>
-            <phase>process-test-classes</phase>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>

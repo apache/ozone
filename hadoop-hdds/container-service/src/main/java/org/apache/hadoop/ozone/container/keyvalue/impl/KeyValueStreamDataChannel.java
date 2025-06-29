@@ -59,6 +59,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
       throws IOException {
     getMetrics().incContainerOpsMetrics(getType());
     assertOpen();
+    assertSpaceAvailability(referenceCounted.get().remaining());
 
     return writeBuffers(referenceCounted, buffers, this::writeFileChannel);
   }

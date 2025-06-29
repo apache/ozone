@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -112,7 +113,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     when(keyTableOBS.iterator()).thenReturn(mockIterOBS);
     // Simulate three keys then end.
     when(mockIterOBS.hasNext()).thenReturn(true, true, true, false);
-    TypedTable.TypedKeyValue mockKeyValueOBS = mock(TypedTable.TypedKeyValue.class);
+    final Table.KeyValue mockKeyValueOBS = mock(Table.KeyValue.class);
     when(mockIterOBS.next()).thenReturn(mockKeyValueOBS);
     when(mockKeyValueOBS.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1], omKeyInfos[2]);
 
@@ -123,7 +124,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     TypedTable.TypedTableIterator mockIterFSO = mock(TypedTable.TypedTableIterator.class);
     when(keyTableFSO.iterator()).thenReturn(mockIterFSO);
     when(mockIterFSO.hasNext()).thenReturn(true, true, true, false);
-    TypedTable.TypedKeyValue mockKeyValueFSO = mock(TypedTable.TypedKeyValue.class);
+    final Table.KeyValue mockKeyValueFSO = mock(Table.KeyValue.class);
     when(mockIterFSO.next()).thenReturn(mockKeyValueFSO);
     when(mockKeyValueFSO.getValue()).thenReturn(omKeyInfos[0], omKeyInfos[1], omKeyInfos[2]);
 
@@ -305,8 +306,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
     TypedTable.TypedTableIterator mockKeyIterLegacy = mock(TypedTable.TypedTableIterator.class);
     TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable.TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(TypedTable.TypedKeyValue.class);
-    TypedTable.TypedKeyValue mockKeyValueFso = mock(TypedTable.TypedKeyValue.class);
+    final Table.KeyValue mockKeyValueLegacy = mock(Table.KeyValue.class);
+    final Table.KeyValue mockKeyValueFso = mock(Table.KeyValue.class);
 
     when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
     when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);

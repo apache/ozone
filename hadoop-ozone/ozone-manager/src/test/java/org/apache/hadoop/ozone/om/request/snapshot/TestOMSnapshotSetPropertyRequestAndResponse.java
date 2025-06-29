@@ -28,8 +28,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -62,8 +62,8 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
 
   @Test
   public void testValidateAndUpdateCache() throws IOException {
-    long initialSnapshotSetPropertyCount = getOmMetrics().getNumSnapshotSetProperties();
-    long initialSnapshotSetPropertyFailCount = getOmMetrics().getNumSnapshotSetPropertyFails();
+    long initialSnapshotSetPropertyCount = getOmSnapshotIntMetrics().getNumSnapshotSetProperties();
+    long initialSnapshotSetPropertyFailCount = getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails();
 
     createSnapshotDataForTest();
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
@@ -91,10 +91,10 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
     }
 
     assertEquals(initialSnapshotSetPropertyCount + snapshotUpdateSizeRequests.size(),
-        getOmMetrics().getNumSnapshotSetProperties());
-    assertEquals(initialSnapshotSetPropertyFailCount, getOmMetrics().getNumSnapshotSetPropertyFails());
+        getOmSnapshotIntMetrics().getNumSnapshotSetProperties());
+    assertEquals(initialSnapshotSetPropertyFailCount, getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails());
     // Check if the exclusive size is set.
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (Table.KeyValueIterator<String, SnapshotInfo>
              iterator = getOmMetadataManager().getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
@@ -112,8 +112,8 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
    */
   @Test
   public void testValidateAndUpdateCacheFailure() throws IOException {
-    long initialSnapshotSetPropertyCount = getOmMetrics().getNumSnapshotSetProperties();
-    long initialSnapshotSetPropertyFailCount = getOmMetrics().getNumSnapshotSetPropertyFails();
+    long initialSnapshotSetPropertyCount = getOmSnapshotIntMetrics().getNumSnapshotSetProperties();
+    long initialSnapshotSetPropertyFailCount = getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails();
 
     createSnapshotDataForTest();
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
@@ -122,7 +122,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
     OmMetadataManagerImpl mockedMetadataManager = mock(OmMetadataManagerImpl.class);
     Table<String, SnapshotInfo> mockedSnapshotInfoTable = mock(Table.class);
 
-    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new IOException("Injected fault error."));
+    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new CodecException("Injected fault error."));
     when(mockedMetadataManager.getSnapshotInfoTable()).thenReturn(mockedSnapshotInfoTable);
     when(getOzoneManager().getMetadataManager()).thenReturn(mockedMetadataManager);
 
@@ -138,9 +138,9 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
       assertEquals(INTERNAL_ERROR, omSnapshotSetPropertyResponse.getOMResponse().getStatus());
     }
 
-    assertEquals(initialSnapshotSetPropertyCount, getOmMetrics().getNumSnapshotSetProperties());
+    assertEquals(initialSnapshotSetPropertyCount, getOmSnapshotIntMetrics().getNumSnapshotSetProperties());
     assertEquals(initialSnapshotSetPropertyFailCount + snapshotUpdateSizeRequests.size(),
-        getOmMetrics().getNumSnapshotSetPropertyFails());
+        getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails());
   }
 
   private void assertCacheValues(String dbKey) {
@@ -155,7 +155,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
   private List<OMRequest> createSnapshotUpdateSizeRequest()
       throws IOException {
     List<OMRequest> omRequests = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (Table.KeyValueIterator<String, SnapshotInfo>
              iterator = getOmMetadataManager().getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
         String snapDbKey = iterator.next().getKey();

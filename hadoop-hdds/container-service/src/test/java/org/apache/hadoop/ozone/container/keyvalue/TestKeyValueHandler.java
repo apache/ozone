@@ -18,17 +18,29 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
@@ -42,8 +54,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
@@ -51,22 +65,30 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -74,9 +96,14 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -93,28 +120,36 @@ public class TestKeyValueHandler {
 
   @TempDir
   private Path tempDir;
-
-  private static final String DATANODE_UUID = UUID.randomUUID().toString();
+  @TempDir
+  private Path dbFile;
 
   private static final long DUMMY_CONTAINER_ID = 9999;
   private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
+  private static final String DATANODE_UUID = UUID.randomUUID().toString();
+  private static final String CLUSTER_ID = UUID.randomUUID().toString();
 
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
+  private OzoneConfiguration conf;
+  private ContainerSet mockContainerSet;
   private long maxContainerSize;
 
   @BeforeEach
-  public void setup() throws StorageContainerException {
-    OzoneConfiguration conf = new OzoneConfiguration();
+  public void setup() throws IOException {
     // Create mock HddsDispatcher and KeyValueHandler.
+    conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, tempDir.toString());
+    conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     handler = mock(KeyValueHandler.class);
 
     HashMap<ContainerType, Handler> handlers = new HashMap<>();
     handlers.put(ContainerType.KeyValueContainer, handler);
 
+    mockContainerSet = Mockito.mock(ContainerSet.class);
+
     dispatcher = new HddsDispatcher(
         new OzoneConfiguration(),
-        mock(ContainerSet.class),
+        mockContainerSet,
         mock(VolumeSet.class),
         handlers,
         mock(StateContext.class),
@@ -281,7 +316,7 @@ public class TestKeyValueHandler {
     File metadataDir =
         Files.createDirectory(tempDir.resolve("metadataDir")).toFile();
 
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, datanodeDir.getAbsolutePath());
     conf.set(OZONE_METADATA_DIRS, metadataDir.getAbsolutePath());
     MutableVolumeSet
@@ -289,17 +324,14 @@ public class TestKeyValueHandler {
         null, StorageVolume.VolumeType.DATA_VOLUME, null);
     try {
       ContainerSet cset = newContainerSet();
-      int[] interval = new int[1];
-      interval[0] = 2;
-      ContainerMetrics metrics = new ContainerMetrics(interval);
       DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
       StateContext context = ContainerTestUtils.getMockContext(
           datanodeDetails, conf);
 
       // Ensures that KeyValueHandler falls back to FILE_PER_BLOCK.
       conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, "FILE_PER_CHUNK");
-      new KeyValueHandler(conf, context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet,
-          metrics, c -> { });
+      ContainerTestUtils.getKeyValueHandler(conf,
+          context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet);
       assertEquals(ContainerLayoutVersion.FILE_PER_BLOCK,
           conf.getEnum(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_CHUNK));
     } finally {
@@ -321,13 +353,20 @@ public class TestKeyValueHandler {
   @ContainerLayoutTestInfo.ContainerTest
   public void testCloseInvalidContainer(ContainerLayoutVersion layoutVersion)
       throws IOException {
-    long containerID = 1234L;
-    OzoneConfiguration conf = new OzoneConfiguration();
-    KeyValueContainerData kvData = new KeyValueContainerData(containerID,
+    KeyValueHandler keyValueHandler = createKeyValueHandler(tempDir);
+    conf = new OzoneConfiguration();
+    KeyValueContainerData kvData = new KeyValueContainerData(DUMMY_CONTAINER_ID,
         layoutVersion,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
+    kvData.setMetadataPath(tempDir.toString());
+    kvData.setDbFile(dbFile.toFile());
     KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    ContainerCommandRequestProto createContainerRequest =
+        createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID);
+    keyValueHandler.handleCreateContainer(createContainerRequest, container);
+
+    // Make the container state as invalid.
     kvData.setState(ContainerProtos.ContainerDataProto.State.INVALID);
 
     // Create Close container request
@@ -341,12 +380,10 @@ public class TestKeyValueHandler {
             .build();
     dispatcher.dispatch(closeContainerRequest, null);
 
-    when(handler.handleCloseContainer(any(), any()))
-        .thenCallRealMethod();
-    doCallRealMethod().when(handler).closeContainer(any());
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
-        handler.handleCloseContainer(closeContainerRequest, container);
+        keyValueHandler.handleCloseContainer(closeContainerRequest, container);
+    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
 
     assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
         response.getResult(),
@@ -359,7 +396,7 @@ public class TestKeyValueHandler {
     final long containerID = 1L;
     final String clusterId = UUID.randomUUID().toString();
     final String datanodeId = UUID.randomUUID().toString();
-    final ConfigurationSource conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     final ContainerSet containerSet = spy(newContainerSet());
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
@@ -381,14 +418,14 @@ public class TestKeyValueHandler {
     assertEquals(1, hddsVolumeList.size());
 
     final ContainerMetrics metrics = ContainerMetrics.create(conf);
-    
+
     final AtomicInteger icrReceived = new AtomicInteger(0);
 
     final KeyValueHandler kvHandler = new KeyValueHandler(conf,
         datanodeId, containerSet, volumeSet, metrics,
-        c -> icrReceived.incrementAndGet());
+        c -> icrReceived.incrementAndGet(), new ContainerChecksumTreeManager(conf));
     kvHandler.setClusterID(clusterId);
-    
+
     final ContainerCommandRequestProto createContainer =
         createContainerRequest(datanodeId, containerID);
 
@@ -399,7 +436,7 @@ public class TestKeyValueHandler {
     }).when(containerSet).addContainer(any());
 
     semaphore.acquire();
-    CompletableFuture.runAsync(() -> 
+    CompletableFuture.runAsync(() ->
         kvHandler.handleCreateContainer(createContainer, null)
     );
 
@@ -409,7 +446,7 @@ public class TestKeyValueHandler {
     semaphore.release();
 
     LOG.info("Committed bytes: {}", hddsVolume.getCommittedBytes());
-    
+
     // release committed bytes as exception is thrown
     GenericTestUtils.waitFor(() -> hddsVolume.getCommittedBytes() == 0,
             1000, 50000);
@@ -423,7 +460,7 @@ public class TestKeyValueHandler {
       final long containerID = 1L;
       final String clusterId = UUID.randomUUID().toString();
       final String datanodeId = UUID.randomUUID().toString();
-      final ConfigurationSource conf = new OzoneConfiguration();
+      conf = new OzoneConfiguration();
       final ContainerSet containerSet = newContainerSet();
       final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
@@ -449,7 +486,7 @@ public class TestKeyValueHandler {
 
       final KeyValueHandler kvHandler = new KeyValueHandler(conf,
           datanodeId, containerSet, volumeSet, metrics,
-          c -> icrReceived.incrementAndGet());
+          c -> icrReceived.incrementAndGet(), new ContainerChecksumTreeManager(conf));
       kvHandler.setClusterID(clusterId);
 
       final ContainerCommandRequestProto createContainer =
@@ -522,7 +559,7 @@ public class TestKeyValueHandler {
     final HddsVolume hddsVolume = mock(HddsVolume.class);
     when(hddsVolume.getDeletedContainerDir()).thenReturn(new File(""));
 
-    final ConfigurationSource conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     final ContainerMetrics metrics = ContainerMetrics.create(conf);
     final AtomicInteger icrReceived = new AtomicInteger(0);
     final long containerBytesUsed = 1024 * 1024;
@@ -530,7 +567,7 @@ public class TestKeyValueHandler {
     // We're testing KeyValueHandler in this test, all the other objects are mocked
     final KeyValueHandler kvHandler = new KeyValueHandler(conf,
         datanodeId, containerSet, volumeSet, metrics,
-        c -> icrReceived.incrementAndGet());
+        c -> icrReceived.incrementAndGet(), new ContainerChecksumTreeManager(conf));
     kvHandler.setClusterID(clusterId);
 
     // Setup ContainerData and Container mocks
@@ -563,13 +600,134 @@ public class TestKeyValueHandler {
     verify(hddsVolume, times(1)).decrementUsedSpace(eq(containerBytesUsed));
   }
 
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testContainerChecksumInvocation(ContainerLayoutVersion layoutVersion) throws Exception {
+    conf = new OzoneConfiguration();
+
+    KeyValueContainerData data = new KeyValueContainerData(123L, layoutVersion, GB,
+        PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
+    data.setMetadataPath(tempDir.toString());
+    data.setDbFile(dbFile.toFile());
+
+    Container container = new KeyValueContainer(data, conf);
+    createBlockMetaData(data, 5, 3);
+    ContainerSet containerSet = newContainerSet();
+    containerSet.addContainer(container);
+
+    // Allows checking the invocation count of the lambda.
+    AtomicInteger icrCount = new AtomicInteger(0);
+    IncrementalReportSender<Container> icrSender = c -> {
+      // Check that the ICR contains expected info about the container.
+      ContainerReplicaProto report = c.getContainerReport();
+      long reportedID = report.getContainerID();
+      Assertions.assertEquals(container.getContainerData().getContainerID(), reportedID);
+
+      long reportDataChecksum = report.getDataChecksum();
+      assertNotEquals(0, reportDataChecksum,
+          "Container report should have populated the checksum field with a non-zero value.");
+      icrCount.incrementAndGet();
+    };
+
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf, randomDatanodeDetails().getUuidString(), containerSet,
+        mock(MutableVolumeSet.class), mock(ContainerMetrics.class), icrSender, new ContainerChecksumTreeManager(conf));
+
+    Assertions.assertEquals(0, icrCount.get());
+    // This should trigger container report validation in the ICR handler above.
+    DNContainerOperationClient mockDnClient = mock(DNContainerOperationClient.class);
+    DatanodeDetails peer1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails peer2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails peer3 = MockDatanodeDetails.randomDatanodeDetails();
+    when(mockDnClient.getContainerChecksumInfo(anyLong(), any())).thenReturn(null);
+    keyValueHandler.reconcileContainer(mockDnClient, container, Sets.newHashSet(peer1, peer2, peer3));
+    // Make sure all the replicas are used for reconciliation.
+    Mockito.verify(mockDnClient, atMostOnce()).getContainerChecksumInfo(anyLong(), eq(peer1));
+    Mockito.verify(mockDnClient, atMostOnce()).getContainerChecksumInfo(anyLong(), eq(peer2));
+    Mockito.verify(mockDnClient, atMostOnce()).getContainerChecksumInfo(anyLong(), eq(peer3));
+    Assertions.assertEquals(1, icrCount.get());
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testUpdateContainerChecksum(ContainerLayoutVersion layoutVersion) throws Exception {
+    conf = new OzoneConfiguration();
+    KeyValueContainerData data = new KeyValueContainerData(123L, layoutVersion, GB,
+        PipelineID.randomId().toString(), randomDatanodeDetails().getUuidString());
+    data.setMetadataPath(tempDir.toString());
+    data.setDbFile(dbFile.toFile());
+    KeyValueContainer container = new KeyValueContainer(data, conf);
+    KeyValueContainerData containerData = container.getContainerData();
+    ContainerSet containerSet = ContainerImplTestUtils.newContainerSet();
+    containerSet.addContainer(container);
+
+    // Allows checking the invocation count of the lambda.
+    AtomicInteger icrCount = new AtomicInteger(0);
+    ContainerMerkleTreeWriter treeWriter = buildTestTree(conf);
+    final long updatedDataChecksum = treeWriter.toProto().getDataChecksum();
+    IncrementalReportSender<Container> icrSender = c -> {
+      // Check that the ICR contains expected info about the container.
+      ContainerReplicaProto report = c.getContainerReport();
+      long reportedID = report.getContainerID();
+      Assertions.assertEquals(containerData.getContainerID(), reportedID);
+
+      assertEquals(updatedDataChecksum, report.getDataChecksum());
+      icrCount.incrementAndGet();
+    };
+
+    ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf, randomDatanodeDetails().getUuidString(), containerSet,
+        mock(MutableVolumeSet.class), mock(ContainerMetrics.class), icrSender, checksumManager);
+
+
+    // Initially, container should have no checksum information.
+    assertEquals(0, containerData.getDataChecksum());
+    assertFalse(checksumManager.read(containerData).isPresent());
+    assertEquals(0, icrCount.get());
+
+    // Update container with checksum information.
+    keyValueHandler.updateContainerChecksum(container, treeWriter);
+    // Check ICR sent. The ICR sender verifies that the expected checksum is present in the report.
+    assertEquals(1, icrCount.get());
+    // Check checksum in memory.
+    assertEquals(updatedDataChecksum, containerData.getDataChecksum());
+    // Check disk content.
+    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData).get();
+    assertTreesSortedAndMatch(treeWriter.toProto(), checksumInfo.getContainerMerkleTree());
+  }
+
+  @Test
+  public void testGetContainerChecksumInfoOnInvalidContainerStates() {
+    when(handler.handleGetContainerChecksumInfo(any(), any())).thenCallRealMethod();
+
+    // Only mock what is necessary for the request to fail. This test does not cover allowed states.
+    KeyValueContainer container = mock(KeyValueContainer.class);
+    KeyValueContainerData containerData = mock(KeyValueContainerData.class);
+    when(container.getContainerData()).thenReturn(containerData);
+
+    ContainerCommandRequestProto request = mock(ContainerCommandRequestProto.class);
+    when(request.hasGetContainerChecksumInfo()).thenReturn(true);
+    when(request.getCmdType()).thenReturn(ContainerProtos.Type.GetContainerChecksumInfo);
+    when(request.getTraceID()).thenReturn("123");
+
+    Set<State> disallowedStates = EnumSet.allOf(State.class);
+    disallowedStates.removeAll(EnumSet.of(CLOSED, QUASI_CLOSED, UNHEALTHY));
+
+    for (State state : disallowedStates) {
+      when(containerData.getState()).thenReturn(state);
+      ContainerProtos.ContainerCommandResponseProto response = handler.handleGetContainerChecksumInfo(request,
+          container);
+      assertNotNull(response);
+      assertEquals(ContainerProtos.Result.UNCLOSED_CONTAINER_IO, response.getResult());
+      assertTrue(response.getMessage().contains(state.toString()), "Response message did not contain the container " +
+          "state " + state);
+    }
+  }
+
   @Test
   public void testDeleteContainerTimeout() throws IOException {
     final String testDir = tempDir.toString();
     final long containerID = 1L;
     final String clusterId = UUID.randomUUID().toString();
     final String datanodeId = UUID.randomUUID().toString();
-    final ConfigurationSource conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     final Clock clock = mock(Clock.class);
@@ -602,7 +760,7 @@ public class TestKeyValueHandler {
 
     final KeyValueHandler kvHandler = new KeyValueHandler(conf,
         datanodeId, containerSet, volumeSet, null, metrics,
-        c -> icrReceived.incrementAndGet(), clock);
+        c -> icrReceived.incrementAndGet(), clock, new ContainerChecksumTreeManager(conf));
     kvHandler.setClusterID(clusterId);
 
     final ContainerCommandRequestProto createContainer =
@@ -635,5 +793,35 @@ public class TestKeyValueHandler {
                 .setContainerType(ContainerType.KeyValueContainer).build())
         .setContainerID(containerID).setPipelineID(UUID.randomUUID().toString())
         .build();
+  }
+
+  private KeyValueHandler createKeyValueHandler(Path path) throws IOException {
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(path.toString()).conf(conf)
+        .clusterID(CLUSTER_ID).datanodeUuid(DATANODE_UUID)
+        .volumeSet(volumeSet)
+        .build();
+    hddsVolume.format(CLUSTER_ID);
+    hddsVolume.createWorkingDir(CLUSTER_ID, null);
+    hddsVolume.createTmpDirs(CLUSTER_ID);
+    when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
+    final KeyValueHandler kvHandler = ContainerTestUtils.getKeyValueHandler(conf,
+        DATANODE_UUID, containerSet, volumeSet);
+    kvHandler.setClusterID(CLUSTER_ID);
+    // Clean up metrics for next tests.
+    hddsVolume.getVolumeInfoStats().unregister();
+    hddsVolume.getVolumeIOStats().unregister();
+    ContainerMetrics.remove();
+
+    // Register the on-demand container scanner with the container set used by the KeyValueHandler.
+    ContainerController controller = new ContainerController(containerSet,
+        Collections.singletonMap(ContainerType.KeyValueContainer, kvHandler));
+    OnDemandContainerDataScanner onDemandScanner = new OnDemandContainerDataScanner(
+        conf.getObject(ContainerScannerConfiguration.class), controller);
+    containerSet.registerOnDemandScanner(onDemandScanner);
+
+    return kvHandler;
   }
 }

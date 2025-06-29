@@ -100,6 +100,7 @@ public class TestS3GatewayMetrics {
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
+    bucketEndpoint.setHeaders(headers);
     keyEndpoint.setHeaders(headers);
     metrics = bucketEndpoint.getMetrics();
 
@@ -145,7 +146,7 @@ public class TestS3GatewayMetrics {
     bucketEndpoint.get(bucketName, null,
         null, null, 1000, null,
         null, "random", null,
-        null, null, null, 0, null).getEntity();
+        null, null, null, 0).getEntity();
 
     long curMetric = metrics.getGetBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -158,7 +159,7 @@ public class TestS3GatewayMetrics {
     // Searching for a bucket that does not exist
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "newBucket", null, null, null, 1000, null, null, "random", null,
-        null, null, null, 0, null));
+        null, null, null, 0));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -170,7 +171,7 @@ public class TestS3GatewayMetrics {
   public void testCreateBucketSuccess() throws Exception {
 
     long oriMetric = metrics.getCreateBucketSuccess();
-    assertDoesNotThrow(() -> bucketEndpoint.put("newBucket", null, null, null));
+    assertDoesNotThrow(() -> bucketEndpoint.put("newBucket", null, null));
     long curMetric = metrics.getCreateBucketSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -181,7 +182,7 @@ public class TestS3GatewayMetrics {
 
     // Creating an error by trying to create a bucket that already exists
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
-        bucketName, null, null, null));
+        bucketName, null, null));
     assertEquals(HTTP_CONFLICT, e.getHttpCode());
     assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
 
@@ -222,7 +223,7 @@ public class TestS3GatewayMetrics {
     Response response =
         bucketEndpoint.get(bucketName, null, null,
             null, 0, null, null,
-            null, null, "acl", null, null, 0, null);
+            null, null, "acl", null, null, 0);
     long curMetric = metrics.getGetAclSuccess();
     assertEquals(HTTP_OK, response.getStatus());
     assertEquals(1L, curMetric - oriMetric);
@@ -235,7 +236,7 @@ public class TestS3GatewayMetrics {
     // Failing the getACL endpoint by applying ACL on a non-Existent Bucket
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
         "random_bucket", null, null, null, 0, null,
-        null, null, null, "acl", null, null, 0, null));
+        null, null, null, "acl", null, null, 0));
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), e.getCode());
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
         e.getErrorMessage());
@@ -251,7 +252,7 @@ public class TestS3GatewayMetrics {
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("userAccessControlList.xml");
 
-    bucketEndpoint.put("b1", ACL_MARKER, headers, inputBody);
+    bucketEndpoint.put("b1", ACL_MARKER, inputBody);
     inputBody.close();
     long curMetric = metrics.getPutAclSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -265,7 +266,7 @@ public class TestS3GatewayMetrics {
     InputStream inputBody = TestBucketAcl.class.getClassLoader()
         .getResourceAsStream("userAccessControlList.xml");
     try {
-      assertThrows(OS3Exception.class, () -> bucketEndpoint.put("unknown_bucket", ACL_MARKER, headers,
+      assertThrows(OS3Exception.class, () -> bucketEndpoint.put("unknown_bucket", ACL_MARKER,
           inputBody));
     } finally {
       inputBody.close();

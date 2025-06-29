@@ -118,31 +118,19 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
       Map<String, String> renameEntries = new HashMap<>();
       snapshot.getMetadataManager().getDeletedTable().iterator()
           .forEachRemaining(entry -> {
-            try {
-              deletedTable.add(OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder().setKey(entry.getKey())
-                  .addAllKeyInfos(entry.getValue().getOmKeyInfoList().stream().map(omKeyInfo -> omKeyInfo.getProtobuf(
-                      ClientVersion.CURRENT_VERSION)).collect(Collectors.toList())).build());
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
+            deletedTable.add(OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder().setKey(entry.getKey())
+                .addAllKeyInfos(entry.getValue().getOmKeyInfoList().stream().map(omKeyInfo -> omKeyInfo.getProtobuf(
+                    ClientVersion.CURRENT_VERSION)).collect(Collectors.toList())).build());
           });
 
       snapshot.getMetadataManager().getDeletedDirTable().iterator()
           .forEachRemaining(entry -> {
-            try {
-              deletedDirTable.add(OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder().setKey(entry.getKey())
-                  .addKeyInfos(entry.getValue().getProtobuf(ClientVersion.CURRENT_VERSION)).build());
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
+            deletedDirTable.add(OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder().setKey(entry.getKey())
+                .addKeyInfos(entry.getValue().getProtobuf(ClientVersion.CURRENT_VERSION)).build());
           });
       snapshot.getMetadataManager().getSnapshotRenamedTable().iterator().forEachRemaining(entry -> {
-        try {
-          renamedTable.add(HddsProtos.KeyValue.newBuilder().setKey(entry.getKey()).setValue(entry.getValue()).build());
-          renameEntries.put(entry.getKey(), entry.getValue());
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
+        renamedTable.add(HddsProtos.KeyValue.newBuilder().setKey(entry.getKey()).setValue(entry.getValue()).build());
+        renameEntries.put(entry.getKey(), entry.getValue());
       });
       OMSnapshotMoveTableKeysResponse response = new OMSnapshotMoveTableKeysResponse(
           OzoneManagerProtocolProtos.OMResponse.newBuilder().setStatus(OzoneManagerProtocolProtos.Status.OK)
@@ -160,20 +148,16 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
       AtomicInteger count = new AtomicInteger();
       nextMetadataManager.getDeletedTable().iterator().forEachRemaining(entry -> {
         count.getAndIncrement();
-        try {
-          int maxCount = count.get() >= 6 && count.get() <= 8 ? 20 : 10;
-          Assertions.assertEquals(maxCount, entry.getValue().getOmKeyInfoList().size());
-          List<Long> versions = entry.getValue().getOmKeyInfoList().stream().map(OmKeyInfo::getKeyLocationVersions)
-              .map(omKeyInfo -> omKeyInfo.get(0).getVersion()).collect(Collectors.toList());
-          List<Long> expectedVersions = new ArrayList<>();
-          if (maxCount == 20) {
-            expectedVersions.addAll(LongStream.range(10, 20).boxed().collect(Collectors.toList()));
-          }
-          expectedVersions.addAll(LongStream.range(0, 10).boxed().collect(Collectors.toList()));
-          Assertions.assertEquals(expectedVersions, versions);
-        } catch (IOException e) {
-          throw new RuntimeException(e);
+        int maxCount = count.get() >= 6 && count.get() <= 8 ? 20 : 10;
+        Assertions.assertEquals(maxCount, entry.getValue().getOmKeyInfoList().size());
+        List<Long> versions = entry.getValue().getOmKeyInfoList().stream().map(OmKeyInfo::getKeyLocationVersions)
+            .map(omKeyInfo -> omKeyInfo.get(0).getVersion()).collect(Collectors.toList());
+        List<Long> expectedVersions = new ArrayList<>();
+        if (maxCount == 20) {
+          expectedVersions.addAll(LongStream.range(10, 20).boxed().collect(Collectors.toList()));
         }
+        expectedVersions.addAll(LongStream.range(0, 10).boxed().collect(Collectors.toList()));
+        Assertions.assertEquals(expectedVersions, versions);
       });
       Assertions.assertEquals(15, count.get());
       count.set(0);
@@ -182,12 +166,8 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
       Assertions.assertEquals(15, count.get());
       count.set(0);
       nextMetadataManager.getSnapshotRenamedTable().iterator().forEachRemaining(entry -> {
-        try {
-          String expectedValue = renameEntries.getOrDefault(entry.getKey(), entry.getValue());
-          Assertions.assertEquals(expectedValue, entry.getValue());
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
+        String expectedValue = renameEntries.getOrDefault(entry.getKey(), entry.getValue());
+        Assertions.assertEquals(expectedValue, entry.getValue());
         count.getAndIncrement();
       });
       Assertions.assertEquals(15, count.get());

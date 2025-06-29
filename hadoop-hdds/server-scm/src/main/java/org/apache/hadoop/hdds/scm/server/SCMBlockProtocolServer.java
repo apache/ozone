@@ -44,7 +44,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -146,7 +146,7 @@ public class SCMBlockProtocolServer implements
         updateRPCListenAddress(
             conf, scm.getScmNodeDetails().getBlockProtocolServerAddressKey(),
             scmBlockAddress, blockRpcServer);
-    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
+    if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       blockRpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
@@ -266,11 +266,14 @@ public class SCMBlockProtocolServer implements
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("SCM is informed by OM to delete {} blocks",
-          keyBlocksInfoList.size());
+    long totalBlocks = 0;
+    for (BlockGroup bg : keyBlocksInfoList) {
+      totalBlocks += bg.getBlockIDList().size();
     }
-
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
+          keyBlocksInfoList.size(), totalBlocks);
+    }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
@@ -278,12 +281,17 @@ public class SCMBlockProtocolServer implements
     long startNanos = Time.monotonicNowNanos();
     try {
       scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
-      perfMetrics.updateDeleteKeySuccessStats(startNanos);
+      perfMetrics.updateDeleteKeySuccessBlocks(totalBlocks);
+      perfMetrics.updateDeleteKeySuccessStats(keyBlocksInfoList.size(), startNanos);
       resultCode = ScmBlockLocationProtocolProtos.
           DeleteScmBlockResult.Result.success;
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Total number of blocks ACK by SCM in this cycle: " + totalBlocks);
+      }
     } catch (IOException ioe) {
       e = ioe;
-      perfMetrics.updateDeleteKeyFailureStats(startNanos);
+      perfMetrics.updateDeleteKeyFailedBlocks(totalBlocks);
+      perfMetrics.updateDeleteKeyFailureStats(keyBlocksInfoList.size(), startNanos);
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
       switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
           IO_EXCEPTION) {

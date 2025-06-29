@@ -730,10 +730,10 @@ public class SnapshotDiffManager implements AutoCloseable {
     // If executor cannot take any more job, remove the job form DB and return
     // the Rejected Job status with wait time.
     try {
+      updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
       snapDiffExecutor.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
           volumeName, bucketName, fromSnapshotName, toSnapshotName,
           forceFullDiff, disableNativeDiff));
-      updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
               bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),

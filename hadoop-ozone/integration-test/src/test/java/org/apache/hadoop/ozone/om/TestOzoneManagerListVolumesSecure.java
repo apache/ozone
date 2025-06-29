@@ -47,6 +47,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -98,6 +100,11 @@ public class TestOzoneManagerListVolumesSecure {
   private File userKeytab2;
   private UserGroupInformation userUGI1;
   private UserGroupInformation userUGI2;
+
+  @BeforeAll
+  static void setup() {
+    DefaultMetricsSystem.setMiniClusterMode(true);
+  }
 
   @BeforeEach
   public void init() throws Exception {

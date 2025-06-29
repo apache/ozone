@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -102,7 +103,7 @@ public final class HddsTestUtils {
   public static DatanodeDetails getDatanodeDetails(
       RegisteredCommand registeredCommand) {
     return MockDatanodeDetails.createDatanodeDetails(
-        registeredCommand.getDatanode().getUuidString(),
+        registeredCommand.getDatanode().getID(),
         registeredCommand.getDatanode().getHostName(),
         registeredCommand.getDatanode().getIpAddress(),
         null);
@@ -251,6 +252,19 @@ public final class HddsTestUtils {
         0,
         capacity,
         StorageTypeProto.DISK);
+  }
+
+  public static List<StorageReportProto> createStorageReports(DatanodeID nodeID, long capacity, long remaining,
+                                                              long committed) {
+    return Collections.singletonList(
+        StorageReportProto.newBuilder()
+            .setStorageUuid(nodeID.toString())
+            .setStorageLocation("test")
+            .setCapacity(capacity)
+            .setRemaining(remaining)
+            .setCommitted(committed)
+            .setScmUsed(200L - remaining)
+            .build());
   }
 
   public static StorageReportProto createStorageReport(DatanodeID nodeId, String path,

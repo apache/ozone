@@ -328,7 +328,7 @@ public class TestInfoSubCommand {
   }
 
   private ContainerWithPipeline getContainerWithPipeline(long containerID) {
-    Pipeline pipeline = new Pipeline.Builder()
+    Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.CLOSED)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .setId(PipelineID.randomId())
@@ -349,7 +349,7 @@ public class TestInfoSubCommand {
   }
 
   private ContainerWithPipeline getECContainerWithPipeline() {
-    Pipeline pipeline = new Pipeline.Builder()
+    Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.CLOSED)
         .setReplicationConfig(new ECReplicationConfig(3, 2))
         .setId(PipelineID.randomId())

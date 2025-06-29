@@ -64,10 +64,6 @@
       <artifactId>picocli</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
-    </dependency>
-    <dependency>
       <groupId>jakarta.annotation</groupId>
       <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
@@ -83,10 +79,6 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-text</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -127,6 +119,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-managed-rocksdb</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-server-framework</artifactId>
     </dependency>
     <dependency>
@@ -140,10 +136,6 @@
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-grpc</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-netty</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
@@ -164,10 +156,6 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk18on</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk18on</artifactId>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
@@ -241,16 +229,6 @@
       </testResource>
     </testResources>
     <plugins>
-      <plugin>
-        <groupId>com.coderplus.maven.plugins</groupId>
-        <artifactId>copy-rename-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>rename-generated-config</id>
-            <phase>process-classes</phase>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>

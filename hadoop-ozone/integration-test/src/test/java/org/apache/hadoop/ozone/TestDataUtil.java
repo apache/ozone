@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -247,7 +246,7 @@ public final class TestDataUtil {
   public static void cleanupDeletedTable(OzoneManager ozoneManager) throws IOException {
     Table<String, RepeatedOmKeyInfo> deletedTable = ozoneManager.getMetadataManager().getDeletedTable();
     List<String> nameList = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> keyIter = deletedTable.iterator()) {
+    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> keyIter = deletedTable.iterator()) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         nameList.add(kv.getKey());
@@ -265,7 +264,7 @@ public final class TestDataUtil {
   public static void cleanupOpenKeyTable(OzoneManager ozoneManager, BucketLayout bucketLayout) throws IOException {
     Table<String, OmKeyInfo> openKeyTable = ozoneManager.getMetadataManager().getOpenKeyTable(bucketLayout);
     List<String> nameList = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = openKeyTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> keyIter = openKeyTable.iterator()) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
         nameList.add(kv.getKey());

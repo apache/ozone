@@ -105,6 +105,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReconcileContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerReportResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
@@ -733,6 +735,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
             .build();
+          
       case GetVolumeFailureInfos:
         GetVolumeInfosRequestProto getVolumeInfosRequest = request.getGetVolumeInfosRequest();
         GetVolumeInfosResponseProto getVolumeInfosResponse = getVolumeInfos(getVolumeInfosRequest);
@@ -740,6 +743,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setGetVolumeInfosResponse(getVolumeInfosResponse)
+            .build();
+      
+      case ReconcileContainer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -763,9 +773,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,
       int clientVersion) throws IOException {
-    ContainerWithPipeline cp = impl
-        .allocateContainer(request.getReplicationType(),
-            request.getReplicationFactor(), request.getOwner());
+    ReplicationConfig replicationConfig = ReplicationConfig.fromProto(request.getReplicationType(), 
+        request.getReplicationFactor(),
+        request.getEcReplicationConfig()
+    );
+    ContainerWithPipeline cp = impl.allocateContainer(replicationConfig, request.getOwner());
     return ContainerResponseProto.newBuilder()
         .setContainerWithPipeline(cp.getProtobuf(clientVersion))
         .setErrorCode(ContainerResponseProto.Error.success)
@@ -1381,5 +1393,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
     // Invoke method and return result
     return impl.getVolumeInfos(displayMode, uuid, hostName, pageSize, startItem);
+  }
+  
+  public ReconcileContainerResponseProto reconcileContainer(ReconcileContainerRequestProto request) throws IOException {
+    impl.reconcileContainer(request.getContainerID());
+    return ReconcileContainerResponseProto.getDefaultInstance();
   }
 }

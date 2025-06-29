@@ -91,6 +91,11 @@ public final class S3Consts {
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
 
+  // Bucket owner condition headers
+  // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-owner-condition.html
+  public static final String EXPECTED_BUCKET_OWNER_HEADER = "x-amz-expected-bucket-owner";
+  public static final String EXPECTED_SOURCE_BUCKET_OWNER_HEADER = "x-amz-source-expected-bucket-owner";
+
   //Never Constructed
   private S3Consts() {
 

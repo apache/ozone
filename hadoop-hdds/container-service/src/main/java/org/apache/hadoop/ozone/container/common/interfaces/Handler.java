@@ -17,19 +17,22 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.time.Clock;
+import java.util.Collection;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -74,12 +77,12 @@ public abstract class Handler {
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final VolumeChoosingPolicy volumeChoosingPolicy,
       final ContainerMetrics metrics,
-      IncrementalReportSender<Container> icrSender) {
+      IncrementalReportSender<Container> icrSender, ContainerChecksumTreeManager checksumManager) {
     switch (containerType) {
     case KeyValueContainer:
       return new KeyValueHandler(config,
           datanodeId, contSet, volumeSet, volumeChoosingPolicy, metrics,
-          icrSender, Clock.systemUTC());
+          icrSender, Clock.systemUTC(), checksumManager);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
           containerType + "doesn't exist.");
@@ -153,6 +156,18 @@ public abstract class Handler {
       throws IOException;
 
   /**
+   * Updates the container checksum information on disk and in memory and sends an ICR if the container checksum was
+   * changed from its previous value.
+   *
+   * @param container The container to update
+   * @param treeWriter The container merkle tree with the updated information about the container
+   * @throws IOException For errors sending an ICR or updating the container checksum on disk. If the disk update
+   * fails, the checksum in memory will not be updated and an ICR will not be sent.
+   */
+  public abstract void updateContainerChecksum(Container container, ContainerMerkleTreeWriter treeWriter)
+      throws IOException;
+
+  /**
    * Marks the container Unhealthy. Moves the container to UNHEALTHY state.
    *
    * @param container container to update
@@ -194,6 +209,14 @@ public abstract class Handler {
    */
   public abstract void deleteContainer(Container container, boolean force)
       throws IOException;
+
+  /**
+   * Triggers reconciliation of this container replica's data with its peers.
+   * @param container container to be reconciled.
+   * @param peers The other datanodes with a copy of this container whose data should be checked.
+   */
+  public abstract void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
+      Collection<DatanodeDetails> peers) throws IOException;
 
   /**
    * Deletes the given files associated with a block of the container.

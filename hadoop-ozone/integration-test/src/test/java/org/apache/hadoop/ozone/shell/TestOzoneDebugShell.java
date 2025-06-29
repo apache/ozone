@@ -103,7 +103,8 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
     String[] args = new String[] {
         getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
         getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY),
-        "replicas", "verify", "--checksums", "--block-existence", fullKeyPath, "--output-dir", "/"//, "--all-results"
+        "replicas", "verify", "--checksums", "--block-existence", "--container-state", fullKeyPath,
+        //, "--all-results"
     };
 
     int exitCode = ozoneDebugShell.execute(args);

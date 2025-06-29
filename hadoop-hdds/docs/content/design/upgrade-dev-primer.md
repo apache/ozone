@@ -84,12 +84,12 @@ An action run once during finalization of layout version (feature). This action 
 Used to flush all transactions to disk, take a DB snapshot, and purge the logs, leaving Ratis in a clean state without unapplied log entries. This prepares the OM for upgrades/downgrades so that no request in the log is applied to the database in the old version of the code in one OM, and the new version of the code in another OM.
 
 To prepare an OM quorum, run
- 
-    ozone admin om -id=<om-sevice-id> prepare
+
+    ozone admin om prepare -id=<om-sevice-id>
 
 To cancel preparation of an OM quorum, run
- 
-    ozone admin om -id=<om-sevice-id> cancelprepare
+
+    ozone admin om cancelprepare -id=<om-service-id>
 
 
 ## When do you bring in a change as a Layout feature?

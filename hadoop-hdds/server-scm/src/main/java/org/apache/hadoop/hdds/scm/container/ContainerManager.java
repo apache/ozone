@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import java.io.Closeable;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
@@ -35,8 +35,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
  * ContainerManager is responsible for keeping track of all Containers and
  * managing all containers operations like creating, deleting etc.
  */
-public interface ContainerManager extends Closeable {
-
+public interface ContainerManager {
   /**
    * Reinitialize the containerManager with the updated container store.
    * @param containerStore Container Table
@@ -191,8 +190,10 @@ public interface ContainerManager extends Closeable {
    * @param owner - the user which requires space in its owned container
    * @param pipeline - pipeline to which the container should belong.
    * @param excludedContainerIDS - containerIds to be excluded.
-   * @return ContainerInfo for the matching container.
+   * @return ContainerInfo for the matching container, or null if a container could not be found and could not be
+   * allocated
    */
+  @Nullable
   ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline,
                                      Set<ContainerID> excludedContainerIDS);

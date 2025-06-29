@@ -100,7 +100,6 @@ public class TestContainerStateManager {
 
   @AfterEach
   public void tearDown() throws Exception {
-    containerStateManager.close();
     if (dbStore != null) {
       dbStore.close();
     }

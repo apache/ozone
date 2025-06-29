@@ -379,6 +379,20 @@ public final class TestHelper {
     }
   }
 
+  public static void waitForScmContainerState(MiniOzoneCluster cluster, long containerID,
+                                              HddsProtos.LifeCycleState lifeCycleState)
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() ->  {
+      try {
+        HddsProtos.LifeCycleState state = cluster.getStorageContainerManager().getContainerManager()
+            .getContainer(ContainerID.valueOf(containerID)).getState();
+        return state == lifeCycleState;
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 500, 100 * 1000);
+  }
+
   public static StateMachine getStateMachine(MiniOzoneCluster cluster)
       throws Exception {
     return getStateMachine(cluster.getHddsDatanodes().get(0), null);

@@ -36,15 +36,6 @@ public class ContainerException extends SCMException {
   }
 
   /**
-   * Constructs an {@code ContainerException} with {@code null}
-   * as its error detail message.
-   * @param resultCode ResultCode for the exception
-   */
-  public ContainerException(ResultCodes resultCode) {
-    super(resultCode);
-  }
-
-  /**
    * Constructs an {@code ContainerException} with the specified detail message.
    *
    * @param message

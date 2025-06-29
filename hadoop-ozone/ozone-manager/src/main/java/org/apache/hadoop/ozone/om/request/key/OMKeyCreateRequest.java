@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -92,10 +93,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       ozoneManager.checkFeatureEnabled(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
     }
 
-    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
-        .setSnapshotReservedWord(keyArgs.getKeyName())
-        .setKeyName(keyArgs.getKeyName()).build();
-    validateKey(ozoneManager, validateArgs);
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
+    if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
+      OmUtils.validateKeyName(keyArgs.getKeyName());
+    }
+
 
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),

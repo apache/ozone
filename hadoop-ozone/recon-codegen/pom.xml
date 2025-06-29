@@ -44,14 +44,6 @@
       <artifactId>hadoop-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-config</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-common</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.jooq</groupId>
       <artifactId>jooq</artifactId>
     </dependency>
@@ -69,11 +61,13 @@
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
-      <artifactId>spring-jdbc</artifactId>
+      <artifactId>spring-tx</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.springframework</groupId>
-      <artifactId>spring-tx</artifactId>
+      <!-- for javadoc with Java9+; check if can be removed with HDDS-11142 -->
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
+      <scope>provided</scope>
     </dependency>
   </dependencies>
 

@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.ratis.util.function.CheckedFunction;
 
@@ -274,7 +273,14 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   void refresh(OmKeyInfo key) throws IOException;
 
   /**
-   * Returns an iterator for pending deleted directories.
+   * Returns an iterator for pending deleted directories all buckets.
+   */
+  default TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries() throws IOException {
+    return getDeletedDirEntries(null, null);
+  }
+
+  /**
+   * Returns an iterator for pending deleted directories for volume and bucket.
    * @throws IOException
    */
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
@@ -301,7 +307,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException
    */
   DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long remainingBufLimit) throws IOException;
+      OmKeyInfo parentInfo, CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
+      long remainingBufLimit) throws IOException;
 
   /**
    * Returns all sub files under the given parent directory.
@@ -311,7 +318,8 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException
    */
   DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long remainingBufLimit)
+      long bucketId, OmKeyInfo parentInfo,
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, long remainingBufLimit)
           throws IOException;
 
   /**
@@ -343,12 +351,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @return Background service.
    */
   SnapshotDeletingService getSnapshotDeletingService();
-
-  /**
-   * Returns the instance of Snapshot Directory service.
-   * @return Background service.
-   */
-  SnapshotDirectoryCleaningService getSnapshotDirectoryService();
 
   /**
    * Returns the instance of CompactionService.

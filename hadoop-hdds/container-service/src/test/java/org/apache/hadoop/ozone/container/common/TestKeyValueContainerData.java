@@ -21,10 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
@@ -59,12 +59,11 @@ public class TestKeyValueContainerData {
     String containerDBType = "RocksDB";
     ContainerProtos.ContainerDataProto.State state =
         ContainerProtos.ContainerDataProto.State.CLOSED;
-    AtomicLong val = new AtomicLong(0);
     UUID pipelineId = UUID.randomUUID();
     UUID datanodeId = UUID.randomUUID();
     HddsVolume vol = mock(HddsVolume.class);
 
-    KeyValueContainerData kvData = new KeyValueContainerData(containerId,
+    final KeyValueContainerData kvData = new KeyValueContainerData(containerId,
         layout,
         MAXSIZE, pipelineId.toString(), datanodeId.toString());
     kvData.setVolume(vol);
@@ -75,43 +74,40 @@ public class TestKeyValueContainerData {
         .getState());
     assertEquals(0, kvData.getMetadata().size());
     assertEquals(0, kvData.getNumPendingDeletionBlocks());
-    assertEquals(val.get(), kvData.getReadBytes());
-    assertEquals(val.get(), kvData.getWriteBytes());
-    assertEquals(val.get(), kvData.getReadCount());
-    assertEquals(val.get(), kvData.getWriteCount());
-    assertEquals(val.get(), kvData.getBlockCount());
-    assertEquals(val.get(), kvData.getNumPendingDeletionBlocks());
+    final ContainerData.Statistics statistics = kvData.getStatistics();
+    statistics.assertRead(0, 0);
+    statistics.assertWrite(0, 0);
+    statistics.assertBlock(0, 0, 0);
     assertEquals(MAXSIZE, kvData.getMaxSize());
+    assertEquals(0, kvData.getDataChecksum());
 
     kvData.setState(state);
     kvData.setContainerDBType(containerDBType);
     kvData.setChunksPath(path);
     kvData.setMetadataPath(path);
     kvData.setReplicaIndex(4);
-    kvData.incrReadBytes(10);
-    kvData.incrWriteBytes(10);
-    kvData.incrReadCount();
-    kvData.incrWriteCount();
-    kvData.incrBlockCount();
+    statistics.updateRead(10);
+    statistics.incrementBlockCount();
+    kvData.updateWriteStats(10, true);
     kvData.incrPendingDeletionBlocks(1);
     kvData.setSchemaVersion(
         VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf));
+    long expectedDataHash =  1234L;
+    kvData.setDataChecksum(expectedDataHash);
 
     assertEquals(state, kvData.getState());
     assertEquals(containerDBType, kvData.getContainerDBType());
     assertEquals(path, kvData.getChunksPath());
     assertEquals(path, kvData.getMetadataPath());
 
-    assertEquals(10, kvData.getReadBytes());
-    assertEquals(10, kvData.getWriteBytes());
-    assertEquals(1, kvData.getReadCount());
-    assertEquals(1, kvData.getWriteCount());
-    assertEquals(1, kvData.getBlockCount());
-    assertEquals(1, kvData.getNumPendingDeletionBlocks());
+    statistics.assertRead(10, 1);
+    statistics.assertWrite(10, 1);
+    statistics.assertBlock(0, 1, 1);
     assertEquals(pipelineId.toString(), kvData.getOriginPipelineId());
     assertEquals(datanodeId.toString(), kvData.getOriginNodeId());
     assertEquals(VersionedDatanodeFeatures.SchemaV3.chooseSchemaVersion(conf),
         kvData.getSchemaVersion());
+    assertEquals(expectedDataHash, kvData.getDataChecksum());
 
     KeyValueContainerData newKvData = new KeyValueContainerData(kvData);
     assertEquals(kvData.getReplicaIndex(), newKvData.getReplicaIndex());

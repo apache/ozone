@@ -24,7 +24,7 @@ import java.lang.annotation.Target;
 import org.apache.hadoop.ozone.Versioned;
 
 /**
- * Annotations to register a validator. {@link org.apache.ozone.annotations.RegisterValidatorProcessor}
+ * Annotations to register a validator. {@code org.apache.ozone.annotations.RegisterValidatorProcessor}
  * enforces other annotation to have the following methods:
  * applyBefore : Returns an enum which implement {@link Versioned}
  * requestType: Returns an Enum value.

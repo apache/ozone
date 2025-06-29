@@ -222,7 +222,6 @@ EPL 2.0
    jakarta.annotation:jakarta.annotation-api
    jakarta.ws.rs:jakarta.ws.rs-api
    org.aspectj:aspectjrt
-   org.aspectj:aspectjweaver
    org.glassfish.hk2.external:aopalliance-repackaged
    org.glassfish.hk2.external:jakarta.inject
    org.glassfish.hk2.external:javax.inject
@@ -231,7 +230,6 @@ EPL 2.0
    org.glassfish.hk2:hk2-locator
    org.glassfish.hk2:hk2-utils
    org.glassfish.hk2:osgi-resource-locator
-   org.glassfish.jersey.containers:jersey-container-servlet
    org.glassfish.jersey.containers:jersey-container-servlet-core
    org.glassfish.jersey.core:jersey-client
    org.glassfish.jersey.core:jersey-common
@@ -463,7 +461,6 @@ MIT
    org.bouncycastle:bcutil-jdk18on
    org.checkerframework:checker-qual
    org.codehaus.mojo:animal-sniffer-annotations
-   org.kohsuke.metainf-services:metainf-services
    org.slf4j:jcl-over-slf4j
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
@@ -480,7 +477,6 @@ BSD 3-Clause
 
    com.github.vlsi.mxgraph:jgraphx
    com.google.protobuf:protobuf-java
-   com.google.protobuf:protobuf-java-util
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer

@@ -56,9 +56,12 @@ public class ContainerMetrics implements Closeable {
   @Metric private MutableCounterLong containerForceDelete;
   @Metric private MutableCounterLong numReadStateMachine;
   @Metric private MutableCounterLong bytesReadStateMachine;
+  @Metric private MutableCounterLong numContainerReconciledWithoutChanges;
+  @Metric private MutableCounterLong numContainerReconciledWithChanges;
 
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
+  private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsForClosedContainer;
   private final EnumMap<ContainerProtos.Type, MutableRate> opsLatency;
   private final EnumMap<ContainerProtos.Type, MutableQuantiles[]> opsLatQuantiles;
   private MetricsRegistry registry = null;
@@ -68,6 +71,7 @@ public class ContainerMetrics implements Closeable {
     MutableQuantiles[] latQuantiles = new MutableQuantiles[len];
     this.numOpsArray = new EnumMap<>(ContainerProtos.Type.class);
     this.opsBytesArray = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsForClosedContainer = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatency = new EnumMap<>(ContainerProtos.Type.class);
     this.opsLatQuantiles = new EnumMap<>(ContainerProtos.Type.class);
     this.registry = new MetricsRegistry("StorageContainerMetrics");
@@ -76,7 +80,9 @@ public class ContainerMetrics implements Closeable {
       numOpsArray.put(type, registry.newCounter(
           "num" + type, "number of " + type + " ops", (long) 0));
       opsBytesArray.put(type, registry.newCounter(
-          "bytes" + type, "bytes used by " + type + "op", (long) 0));
+          "bytes" + type, "bytes used by " + type + " op", (long) 0));
+      opsForClosedContainer.put(type, registry.newCounter("bytesForClosedContainer" + type,
+          "bytes used by " + type + " for closed container op", (long) 0));
       opsLatency.put(type, registry.newRate("latencyNs" + type, type + " op"));
 
       for (int j = 0; j < len; j++) {
@@ -125,6 +131,10 @@ public class ContainerMetrics implements Closeable {
     opsBytesArray.get(type).incr(bytes);
   }
 
+  public void incClosedContainerBytesStats(ContainerProtos.Type type, long bytes) {
+    opsForClosedContainer.get(type).incr(bytes);
+  }
+
   public void incContainerDeleteFailedBlockCountNotZero() {
     containerDeleteFailedBlockCountNotZero.incr();
   }
@@ -163,5 +173,13 @@ public class ContainerMetrics implements Closeable {
 
   public long getBytesReadStateMachine() {
     return bytesReadStateMachine.value();
+  }
+
+  public void incContainerReconciledWithoutChanges() {
+    numContainerReconciledWithoutChanges.incr();
+  }
+
+  public void incContainerReconciledWithChanges() {
+    numContainerReconciledWithChanges.incr();
   }
 }

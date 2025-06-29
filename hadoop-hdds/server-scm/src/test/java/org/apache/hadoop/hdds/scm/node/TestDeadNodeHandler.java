@@ -263,7 +263,7 @@ public class TestDeadNodeHandler {
     //deadNodeHandler.onMessage call will not change this
     assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
-    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
+    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getID(), cmd.getType()));
 
     verify(publisher).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
     verify(deletedBlockLog).onDatanodeDead(datanode1.getID());

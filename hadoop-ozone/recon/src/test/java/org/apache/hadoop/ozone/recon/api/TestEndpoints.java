@@ -97,6 +97,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -833,10 +834,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .TypedTableIterator.class);
     TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(
-        TypedTable.TypedKeyValue.class);
-    TypedTable.TypedKeyValue mockKeyValueFso = mock(
-        TypedTable.TypedKeyValue.class);
+    final Table.KeyValue mockKeyValueLegacy = mock(Table.KeyValue.class);
+    final Table.KeyValue mockKeyValueFso = mock(Table.KeyValue.class);
 
     when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
     when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);

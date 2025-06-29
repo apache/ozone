@@ -41,8 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -51,7 +51,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedLogger;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
-import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.InfoLogLevel;
 import org.rocksdb.StatsLevel;
@@ -69,7 +68,7 @@ public final class DBStoreBuilder {
       LoggerFactory.getLogger(ManagedRocksDB.ORIGINAL_CLASS);
 
   public static final String DEFAULT_COLUMN_FAMILY_NAME =
-      StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
+      org.apache.hadoop.hdds.StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
 
   // DB PKIProfile used by ROCKDB instances.
   public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
@@ -202,7 +201,7 @@ public final class DBStoreBuilder {
    * @return DBStore
    */
   public RDBStore build() throws IOException {
-    if (StringUtil.isBlank(dbname) || (dbPath == null)) {
+    if (StringUtils.isBlank(dbname) || (dbPath == null)) {
       LOG.error("Required Parameter missing.");
       throw new IOException("Required parameter is missing. Please make sure "
           + "Path and DB name is provided.");
@@ -421,7 +420,7 @@ public final class DBStoreBuilder {
 
     List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
 
-    if (StringUtil.isNotBlank(dbname)) {
+    if (StringUtils.isNotBlank(dbname)) {
       for (TableConfig tc : tableConfigs) {
         columnFamilyDescriptors.add(tc.getDescriptor());
       }
@@ -450,7 +449,7 @@ public final class DBStoreBuilder {
       throw new IOException("A Path to for DB file is needed.");
     }
 
-    if (StringUtil.isBlank(dbname)) {
+    if (StringUtils.isBlank(dbname)) {
       LOG.error("DBName is a required.");
       throw new IOException("A valid DB name is required.");
     }

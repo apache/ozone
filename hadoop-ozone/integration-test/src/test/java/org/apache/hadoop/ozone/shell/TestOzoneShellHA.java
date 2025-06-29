@@ -69,6 +69,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
+import org.apache.hadoop.fs.ozone.OzoneTrashPolicy;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -92,7 +93,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -991,17 +991,17 @@ public class TestOzoneShellHA {
 
   /**
    * Helper function to retrieve Ozone client configuration for ozone
-   * trash testing with TrashPolicyOzone.
+   * trash testing with OzoneTrashPolicy.
    * @param hostPrefix Scheme + Authority. e.g. ofs://om-service-test1
    * @param configuration Server config to generate client config from.
    * @return Config ofs configuration added with fs.trash.classname
-   * = TrashPolicyOzone.
+   * = OzoneTrashPolicy.
    */
   private OzoneConfiguration getClientConfForOzoneTrashPolicy(
           String hostPrefix, OzoneConfiguration configuration) {
     OzoneConfiguration clientConf =
             getClientConfForOFS(hostPrefix, configuration);
-    clientConf.setClass("fs.trash.classname", TrashPolicyOzone.class,
+    clientConf.setClass("fs.trash.classname", OzoneTrashPolicy.class,
             TrashPolicy.class);
     return clientConf;
   }
@@ -1186,7 +1186,7 @@ public class TestOzoneShellHA {
 
     // Test delete from Trash directory removes item from filesystem
 
-    // setup configuration to use TrashPolicyOzone
+    // setup configuration to use OzoneTrashPolicy
     // (default is TrashPolicyDefault)
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf =

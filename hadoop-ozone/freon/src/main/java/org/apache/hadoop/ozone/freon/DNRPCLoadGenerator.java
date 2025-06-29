@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
-
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -26,7 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientCreator;
@@ -144,10 +141,7 @@ public class DNRPCLoadGenerator extends BaseFreonGenerator
         LOG.warn("Read only is not set to true for GRPC, setting it to true");
         readOnly = true;
       }
-      pipeline = Pipeline.newBuilder(pipeline)
-          .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-              getLegacyFactor(pipeline.getReplicationConfig())))
-          .build();
+      pipeline = pipeline.copyForRead();
     }
     encodedContainerToken = scmClient.getEncodedContainerToken(containerID);
     XceiverClientFactory xceiverClientManager;
