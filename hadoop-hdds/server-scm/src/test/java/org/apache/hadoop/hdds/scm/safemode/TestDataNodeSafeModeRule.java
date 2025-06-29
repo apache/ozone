@@ -63,11 +63,9 @@ public class TestDataNodeSafeModeRule {
     nodeManager = mock(NodeManager.class);
     eventQueue = new EventQueue();
 
-    // Mock SCMSafeModeManager for DataNodeSafeModeRule dependencies
     SCMSafeModeManager mockSafeModeManager = mock(SCMSafeModeManager.class);
     when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
 
-    // Create DataNodeSafeModeRule directly without using SafeModeRuleFactory
     rule = new DataNodeSafeModeRule(eventQueue, ozoneConfiguration, nodeManager, mockSafeModeManager);
     assertNotNull(rule);
 
