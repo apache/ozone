@@ -52,6 +52,7 @@ public class TestDataNodeSafeModeRule {
   private DataNodeSafeModeRule rule;
   private EventQueue eventQueue;
   private NodeManager nodeManager;
+  private SCMSafeModeManager mockSafeModeManager;
 
   private void setup(int requiredDns) throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
@@ -63,8 +64,7 @@ public class TestDataNodeSafeModeRule {
     nodeManager = mock(NodeManager.class);
     eventQueue = new EventQueue();
 
-    SCMSafeModeManager mockSafeModeManager = mock(SCMSafeModeManager.class);
-    when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
+    mockSafeModeManager = mock(SCMSafeModeManager.class);
 
     rule = new DataNodeSafeModeRule(eventQueue, ozoneConfiguration, nodeManager, mockSafeModeManager);
     assertNotNull(rule);
@@ -76,6 +76,7 @@ public class TestDataNodeSafeModeRule {
   public void testDataNodeSafeModeRuleWithNoNodes() throws Exception {
     int requiredDns = 1;
     setup(requiredDns);
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(
@@ -99,6 +100,7 @@ public class TestDataNodeSafeModeRule {
   public void testDataNodeSafeModeRuleWithMultipleNodes() throws Exception {
     int requiredDns = 3;
     setup(requiredDns);
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
 
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(
@@ -135,6 +137,7 @@ public class TestDataNodeSafeModeRule {
   public void testDataNodeSafeModeRuleWithNodeManager() throws Exception {
     int requiredDns = 2;
     setup(requiredDns);
+    when(mockSafeModeManager.getInSafeMode()).thenReturn(true);
     
     rule.setValidateBasedOnReportProcessing(false);
 
