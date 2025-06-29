@@ -382,7 +382,7 @@ public class TestOzoneTenantShell {
     checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
 
     // Check volume creation
-    OmVolumeArgs volArgs = cluster.getOzoneManager().getVolumeInfo("finance");
+    OmVolumeArgs volArgs = cluster.getOMLeader().getVolumeInfo("finance");
     assertEquals("finance", volArgs.getVolume());
 
     // Creating the tenant with the same name again should fail
