@@ -129,13 +129,13 @@ public abstract class BackgroundService {
    * Returns the service interval in milliseconds.
    * @return long interval in milliseconds
    */
-  protected long getIntervalMs() {
+  protected synchronized long getIntervalMs() {
     return TimeUnit.MILLISECONDS.convert(this.interval, this.unit);
   }
 
   public abstract BackgroundTaskQueue getTasks();
 
-  protected void execTaskCompletion() {}
+  protected void execTaskCompletion() { }
 
   /**
    * Run one or more background tasks concurrently.
