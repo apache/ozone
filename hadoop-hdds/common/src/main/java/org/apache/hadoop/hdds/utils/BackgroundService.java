@@ -131,7 +131,7 @@ public abstract class BackgroundService {
 
   public abstract BackgroundTaskQueue getTasks();
 
-  protected void execTaskCompletion() {}
+  protected void execTaskCompletion() { }
 
   /**
    * Run one or more background tasks concurrently.
