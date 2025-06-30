@@ -77,13 +77,13 @@ This extra indirection helps tremendously with scaling Ozone. SCM has far
 less block data to process and the namespace service (Ozone Manager) as a
 different service are critical to scaling Ozone.
 
-## Volume Management
+## Data Volume Management
 
 ### What is a Volume?
 
 In the context of an Ozone DataNode, a "volume" refers to a physical disk or storage device managed by the DataNode. Each volume can store many containers, which are the fundamental units of storage in Ozone. This is different from the "volume" concept in Ozone Manager, which refers to a namespace for organizing buckets and keys.
 
-The status of volumes, including used space, available space and whether or not they are operational or removed, can be looked up from DataNode Web UI.
+The status of volumes, including used space, available space and whether or not they are operational (healthy) or failed, can be looked up from DataNode Web UI.
 
 ### Defining Volumes with hdds.datanode.dir
 
