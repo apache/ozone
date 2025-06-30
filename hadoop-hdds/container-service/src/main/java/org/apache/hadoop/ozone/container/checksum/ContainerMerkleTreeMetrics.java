@@ -45,6 +45,15 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Number of container diff that requires repair")
   private MutableCounterLong numRepairContainerDiff;
 
+  @Metric(about = "Number of missing blocks identified during container reconciliation")
+  private MutableCounterLong numMissingBlocksIdentified;
+
+  @Metric(about = "Number of missing chunks identified during container reconciliation")
+  private MutableCounterLong numMissingChunksIdentified;
+
+  @Metric(about = "Number of corrupt chunks identified during container reconciliation")
+  private MutableCounterLong numCorruptChunksIdentified;
+
   @Metric(about = "Merkle tree write latency")
   private MutableRate merkleTreeWriteLatencyNS;
 
@@ -92,6 +101,18 @@ public class ContainerMerkleTreeMetrics {
     this.numRepairContainerDiff.incr();
   }
 
+  public void incrementMissingBlocksIdentified(long value) {
+    this.numMissingBlocksIdentified.incr(value);
+  }
+
+  public void incrementMissingChunksIdentified(long value) {
+    this.numMissingChunksIdentified.incr(value);
+  }
+
+  public void incrementCorruptChunksIdentified(long value) {
+    this.numCorruptChunksIdentified.incr(value);
+  }
+
   public MutableRate getWriteContainerMerkleTreeLatencyNS() {
     return this.merkleTreeWriteLatencyNS;
   }
@@ -118,5 +139,17 @@ public class ContainerMerkleTreeMetrics {
 
   public long getMerkleTreeDiffFailure() {
     return this.numMerkleTreeDiffFailure.value();
+  }
+
+  public long getMissingBlocksIdentified() {
+    return this.numMissingBlocksIdentified.value();
+  }
+
+  public long getMissingChunksIdentified() {
+    return this.numMissingChunksIdentified.value();
+  }
+
+  public long getCorruptChunksIdentified() {
+    return this.numCorruptChunksIdentified.value();
   }
 }
