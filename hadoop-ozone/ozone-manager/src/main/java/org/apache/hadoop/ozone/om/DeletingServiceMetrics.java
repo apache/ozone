@@ -222,7 +222,7 @@ public final class DeletingServiceMetrics {
 
   private void checkAndResetMetrics() {
     long currentTime = Instant.now().getEpochSecond();
-    if (metricsResetTimeStamp == null || metricsResetTimeStamp.value() == 0) {
+    if (metricsResetTimeStamp.value() == 0) {
       this.metricsResetTimeStamp.set(currentTime);
     }
     if (currentTime - metricsResetTimeStamp.value() > METRIC_RESET_INTERVAL) {

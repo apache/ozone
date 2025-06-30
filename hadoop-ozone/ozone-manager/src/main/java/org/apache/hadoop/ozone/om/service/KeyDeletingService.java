@@ -133,7 +133,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       String snapTableKey, UUID expectedPreviousSnapshotId, Map<String, Long> keyBlockReplicatedSize)
       throws IOException {
     long startTime = Time.monotonicNow();
-    Pair<Pair<Integer, Long>, Boolean> purgeResult = Pair.of(Pair.of(0,0L), false);
+    Pair<Pair<Integer, Long>, Boolean> purgeResult = Pair.of(Pair.of(0, 0L), false);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send {} key(s) to SCM: {}",
           keyBlocksList.size(), keyBlocksList);
@@ -262,7 +262,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
     } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.", e);
-      return Pair.of(Pair.of(0,0L), false);
+      return Pair.of(Pair.of(0, 0L), false);
     }
 
     return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
@@ -417,9 +417,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             // Validating if the previous snapshot is still the same before purging the blocks.
             SnapshotUtils.validatePreviousSnapshotId(currentSnapshotInfo, snapshotChainManager,
                 expectedPreviousSnapshotId);
-            Pair<Pair<Integer, Long>, Boolean> purgeResult = processKeyDeletes(keyBlocksList, pendingKeysDeletion.getKeysToModify(),
-                renamedTableEntries, snapshotTableKey, expectedPreviousSnapshotId,
-                pendingKeysDeletion.getKeyBlockReplicatedSize());
+            Pair<Pair<Integer, Long>, Boolean> purgeResult = processKeyDeletes(keyBlocksList,
+                pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey,
+                expectedPreviousSnapshotId, pendingKeysDeletion.getKeyBlockReplicatedSize());
             remainNum -= purgeResult.getKey().getKey();
             successStatus = purgeResult.getValue();
             getMetrics().incrNumKeysProcessed(keyBlocksList.size());
@@ -528,21 +528,21 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
   }
 
-  private class DeletionStats {
-    final AtomicLong reclaimedKeyCount = new AtomicLong(0L);
-    final AtomicLong reclaimedKeySize = new AtomicLong(0L);
-    final AtomicLong iteratedKeyCount = new AtomicLong(0L);
-    final AtomicLong notReclaimableKeyCount = new AtomicLong(0L);
+  private static class DeletionStats {
+    private final AtomicLong reclaimedKeyCount = new AtomicLong(0L);
+    private final AtomicLong reclaimedKeySize = new AtomicLong(0L);
+    private final AtomicLong iteratedKeyCount = new AtomicLong(0L);
+    private final AtomicLong notReclaimableKeyCount = new AtomicLong(0L);
 
-    void updateDeletionStats(long reclaimedKeyCount, long reclaimedKeySize,
-                                       long iteratedKeyCount, long notReclaimableKeyCount) {
-      this.reclaimedKeyCount.addAndGet(reclaimedKeyCount);
-      this.reclaimedKeySize.addAndGet(reclaimedKeySize);
-      this.iteratedKeyCount.addAndGet(iteratedKeyCount);
-      this.notReclaimableKeyCount.addAndGet(notReclaimableKeyCount);
+    private void updateDeletionStats(long reclaimedKeys, long reclaimedSize,
+                                       long iteratedKeys, long notReclaimableKeys) {
+      this.reclaimedKeyCount.addAndGet(reclaimedKeys);
+      this.reclaimedKeySize.addAndGet(reclaimedSize);
+      this.iteratedKeyCount.addAndGet(iteratedKeys);
+      this.notReclaimableKeyCount.addAndGet(notReclaimableKeys);
     }
 
-    void reset() {
+    private void reset() {
       reclaimedKeyCount.set(0L);
       reclaimedKeySize.set(0L);
       iteratedKeyCount.set(0L);

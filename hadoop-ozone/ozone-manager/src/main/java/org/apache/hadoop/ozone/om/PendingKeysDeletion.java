@@ -40,7 +40,6 @@ public class PendingKeysDeletion {
   private Map<String, Long> keyBlockReplicatedSize;
   private int notReclaimableKeyCount;
 
-
   public PendingKeysDeletion(List<BlockGroup> keyBlocksList,
        Map<String, RepeatedOmKeyInfo> keysToModify,
        Map<String, Long> keyBlockReplicatedSize,
