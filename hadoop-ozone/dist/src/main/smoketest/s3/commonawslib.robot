@@ -201,7 +201,8 @@ Execute AWSS3APICli using bucket ownership verification
     ${cmd} =       Set Variable           ${command} --expected-bucket-owner ${expected_bucket_owner}
     ${cmd} =       Set Variable If        '${expected_source_bucket_owner}' != '${EMPTY}'    ${cmd} --expected-source-bucket-owner ${expected_source_bucket_owner}    ${cmd}
     ${result} =    Execute AWSS3APICli    ${cmd}
-    [return]       ${result}
+    Should Not Contain    ${result}    Access Denied
+    [return]              ${result}
 
 Execute AWSS3APICli and failed bucket ownership verification
     [arguments]    ${command}    ${wrong_bucket_owner}    ${wrong_source_bucket_owner}=${EMPTY}
