@@ -97,6 +97,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -150,7 +151,7 @@ public class TestPipelineManagerImpl {
             OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) /
         HddsProtos.ReplicationFactor.THREE.getNumber();
     scmContext = new SCMContext.Builder().setIsInSafeMode(true)
-        .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.PRE_CHECKS_PASSED)
+        .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
         .setLeader(true).setIsPreCheckComplete(true)
         .setSCM(scm).build();
     serviceManager = new SCMServiceManager();
@@ -617,8 +618,7 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, false));
+    scmContext.updateSafeModeStatus(SafeModeStatus.INITIAL);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     assertThrows(IOException.class,
@@ -638,8 +638,7 @@ public class TestPipelineManagerImpl {
         .contains(pipeline));
 
     // Simulate safemode check exiting.
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     GenericTestUtils.waitFor(() -> !pipelineManager.getPipelines().isEmpty(),
         100, 10000);
     pipelineManager.close();
@@ -654,21 +653,18 @@ public class TestPipelineManagerImpl {
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
 
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, false));
+    scmContext.updateSafeModeStatus(SafeModeStatus.INITIAL);
     assertTrue(pipelineManager.getSafeModeStatus());
     assertFalse(pipelineManager.isPipelineCreationAllowed());
 
     // First pass pre-check as true, but safemode still on
     // Simulate safemode check exiting.
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     assertTrue(pipelineManager.getSafeModeStatus());
     assertTrue(pipelineManager.isPipelineCreationAllowed());
 
     // Then also turn safemode off
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(false, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
     assertFalse(pipelineManager.getSafeModeStatus());
     assertTrue(pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();

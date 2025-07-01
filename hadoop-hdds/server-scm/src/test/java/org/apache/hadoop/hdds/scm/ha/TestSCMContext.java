@@ -63,12 +63,12 @@ public class TestSCMContext {
     assertFalse(scmContext.isPreCheckComplete());
 
     // in safe mode, pass preCheck
-    scmContext.updateSafeModeStatus(SafeModeStatus.of(true, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     assertTrue(scmContext.isInSafeMode());
     assertTrue(scmContext.isPreCheckComplete());
 
     // out of safe mode
-    scmContext.updateSafeModeStatus(SafeModeStatus.of(false, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
     assertFalse(scmContext.isInSafeMode());
     assertTrue(scmContext.isPreCheckComplete());
   }
