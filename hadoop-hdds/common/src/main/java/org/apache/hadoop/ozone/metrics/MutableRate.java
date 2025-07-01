@@ -18,13 +18,11 @@
 package org.apache.hadoop.ozone.metrics;
 
 /**
- * The class was added in order to use it later for non-blocking metrics as it was not possible
- * to inherit from the existing ones.
- * A version of {@link org.apache.hadoop.metrics2.lib.MutableRate}.
+ * A convenient mutable metric for throughput measurement.
  */
 public class MutableRate extends MutableStat {
 
-  public MutableRate(String name, String description, boolean extended) {
+  MutableRate(String name, String description, boolean extended) {
     super(name, description, "Ops", "Time", extended);
   }
 }

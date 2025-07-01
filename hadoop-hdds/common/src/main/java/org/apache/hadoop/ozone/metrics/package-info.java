@@ -16,6 +16,6 @@
  */
 
 /**
- * The package contains custom non-synchronized metrics classes.
+ * The package contains custom metrics classes to reduce locking in the current metric system.
  */
 package org.apache.hadoop.ozone.metrics;

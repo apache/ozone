@@ -17,18 +17,19 @@
 
 package org.apache.hadoop.ozone.metrics;
 
+import static org.apache.hadoop.metrics2.lib.Interns.info;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MutableMetric;
 import org.apache.hadoop.metrics2.util.SampleStat;
 import org.apache.hadoop.util.Time;
 
 /**
- * The class was added in order to use it later for non-blocking metrics as it was not possible
- * to inherit from the existing ones.
- * A version of {@link org.apache.hadoop.metrics2.lib.MutableStat}.
+ * A mutable metric with stats.
+ *
+ * Useful for keeping throughput/latency stats.
  */
 public class MutableStat extends MutableMetric {
   private final MetricsInfo numInfo;
@@ -39,98 +40,149 @@ public class MutableStat extends MutableMetric {
   private final MetricsInfo minInfo;
   private final MetricsInfo maxInfo;
   private final MetricsInfo iNumInfo;
-  private final org.apache.hadoop.metrics2.util.SampleStat intervalStat;
-  private final org.apache.hadoop.metrics2.util.SampleStat prevStat;
-  private final org.apache.hadoop.metrics2.util.SampleStat.MinMax minMax;
-  private long numSamples;
-  private long snapshotTimeStamp;
-  private boolean extended;
-  private boolean updateTimeStamp;
 
-  public MutableStat(String name, String description, String sampleName, String valueName, boolean extended) {
-    this.intervalStat = new org.apache.hadoop.metrics2.util.SampleStat();
-    this.prevStat = new org.apache.hadoop.metrics2.util.SampleStat();
-    this.minMax = new org.apache.hadoop.metrics2.util.SampleStat.MinMax();
-    this.numSamples = 0L;
-    this.snapshotTimeStamp = 0L;
-    this.extended = false;
-    this.updateTimeStamp = false;
+  private final SampleStat intervalStat = new SampleStat();
+  private final SampleStat prevStat = new SampleStat();
+  private final SampleStat.MinMax minMax = new SampleStat.MinMax();
+  private long numSamples = 0;
+  private long snapshotTimeStamp = 0;
+  private boolean extended = false;
+  private boolean updateTimeStamp = false;
+
+  /**
+   * Construct a sample statistics metric.
+   * @param name        of the metric
+   * @param description of the metric
+   * @param sampleName  of the metric (e.g. "Ops")
+   * @param valueName   of the metric (e.g. "Time", "Latency")
+   * @param extended    create extended stats (stdev, min/max etc.) by default.
+   */
+  public MutableStat(String name, String description,
+                     String sampleName, String valueName, boolean extended) {
     String ucName = StringUtils.capitalize(name);
     String usName = StringUtils.capitalize(sampleName);
     String uvName = StringUtils.capitalize(valueName);
     String desc = StringUtils.uncapitalize(description);
     String lsName = StringUtils.uncapitalize(sampleName);
     String lvName = StringUtils.uncapitalize(valueName);
-    this.numInfo = Interns.info(ucName + "Num" + usName, "Number of " + lsName + " for " + desc);
-    this.iNumInfo = Interns.info(ucName + "INum" + usName, "Interval number of " + lsName + " for " + desc);
-    this.avgInfo = Interns.info(ucName + "Avg" + uvName, "Average " + lvName + " for " + desc);
-    this.stdevInfo = Interns.info(ucName + "Stdev" + uvName, "Standard deviation of " + lvName + " for " + desc);
-    this.iMinInfo = Interns.info(ucName + "IMin" + uvName, "Interval min " + lvName + " for " + desc);
-    this.iMaxInfo = Interns.info(ucName + "IMax" + uvName, "Interval max " + lvName + " for " + desc);
-    this.minInfo = Interns.info(ucName + "Min" + uvName, "Min " + lvName + " for " + desc);
-    this.maxInfo = Interns.info(ucName + "Max" + uvName, "Max " + lvName + " for " + desc);
+    numInfo = info(ucName +"Num"+ usName, "Number of "+ lsName +" for "+ desc);
+    iNumInfo = info(ucName +"INum"+ usName,
+        "Interval number of "+ lsName +" for "+ desc);
+    avgInfo = info(ucName +"Avg"+ uvName, "Average "+ lvName +" for "+ desc);
+    stdevInfo = info(ucName +"Stdev"+ uvName,
+        "Standard deviation of "+ lvName +" for "+ desc);
+    iMinInfo = info(ucName +"IMin"+ uvName,
+        "Interval min "+ lvName +" for "+ desc);
+    iMaxInfo = info(ucName + "IMax"+ uvName,
+        "Interval max "+ lvName +" for "+ desc);
+    minInfo = info(ucName +"Min"+ uvName, "Min "+ lvName +" for "+ desc);
+    maxInfo = info(ucName +"Max"+ uvName, "Max "+ lvName +" for "+ desc);
     this.extended = extended;
   }
 
-  public MutableStat(String name, String description, String sampleName, String valueName) {
+  /**
+   * Construct a snapshot stat metric with extended stat off by default.
+   * @param name        of the metric
+   * @param description of the metric
+   * @param sampleName  of the metric (e.g. "Ops")
+   * @param valueName   of the metric (e.g. "Time", "Latency")
+   */
+  public MutableStat(String name, String description,
+                     String sampleName, String valueName) {
     this(name, description, sampleName, valueName, false);
   }
 
+  /**
+   * Set whether to display the extended stats (stdev, min/max etc.) or not.
+   * @param extended enable/disable displaying extended stats
+   */
   public synchronized void setExtended(boolean extended) {
     this.extended = extended;
   }
 
+  /**
+   * Set whether to update the snapshot time or not.
+   * @param updateTimeStamp enable update stats snapshot timestamp
+   */
   public synchronized void setUpdateTimeStamp(boolean updateTimeStamp) {
     this.updateTimeStamp = updateTimeStamp;
   }
-
+  /**
+   * Add a number of samples and their sum to the running stat
+   *
+   * Note that although use of this method will preserve accurate mean values,
+   * large values for numSamples may result in inaccurate variance values due
+   * to the use of a single step of the Welford method for variance calculation.
+   * @param numSamples  number of samples
+   * @param sum of the samples
+   */
   public synchronized void add(long numSamples, long sum) {
-    this.intervalStat.add(numSamples, (double)sum);
-    this.setChanged();
+    intervalStat.add(numSamples, sum);
+    setChanged();
   }
 
+  /**
+   * Add a snapshot to the metric.
+   * @param value of the metric
+   */
   public synchronized void add(long value) {
-    this.intervalStat.add((double)value);
-    this.minMax.add((double)value);
-    this.setChanged();
+    intervalStat.add(value);
+    minMax.add(value);
+    setChanged();
   }
 
+  @Override
   public synchronized void snapshot(MetricsRecordBuilder builder, boolean all) {
-    if (all || this.changed()) {
-      this.numSamples += this.intervalStat.numSamples();
-      builder.addCounter(this.numInfo, this.numSamples).addGauge(this.avgInfo, this.intervalStat.mean());
-      if (this.extended) {
-        builder.addGauge(this.stdevInfo, this.intervalStat.stddev()).addGauge(this.iMinInfo, this.intervalStat.min()).addGauge(this.iMaxInfo, this.intervalStat.max()).addGauge(this.minInfo, this.minMax.min()).addGauge(this.maxInfo, this.minMax.max()).addGauge(this.iNumInfo, this.intervalStat.numSamples());
+    if (all || changed()) {
+      numSamples += intervalStat.numSamples();
+      builder.addCounter(numInfo, numSamples)
+          .addGauge(avgInfo, intervalStat.mean());
+      if (extended) {
+        builder.addGauge(stdevInfo, intervalStat.stddev())
+            .addGauge(iMinInfo, intervalStat.min())
+            .addGauge(iMaxInfo, intervalStat.max())
+            .addGauge(minInfo, minMax.min())
+            .addGauge(maxInfo, minMax.max())
+            .addGauge(iNumInfo, intervalStat.numSamples());
       }
-
-      if (this.changed()) {
-        if (this.numSamples > 0L) {
-          this.intervalStat.copyTo(this.prevStat);
-          this.intervalStat.reset();
-          if (this.updateTimeStamp) {
-            this.snapshotTimeStamp = Time.monotonicNow();
+      if (changed()) {
+        if (numSamples > 0) {
+          intervalStat.copyTo(prevStat);
+          intervalStat.reset();
+          if (updateTimeStamp) {
+            snapshotTimeStamp = Time.monotonicNow();
           }
         }
-
-        this.clearChanged();
+        clearChanged();
       }
     }
-
   }
 
+  /**
+   * Return a SampleStat object that supports
+   * calls like StdDev and Mean.
+   * @return SampleStat
+   */
   public SampleStat lastStat() {
-    return this.changed() ? this.intervalStat : this.prevStat;
+    return changed() ? intervalStat : prevStat;
   }
 
+  /**
+   * Reset the all time min max of the metric.
+   */
   public void resetMinMax() {
-    this.minMax.reset();
+    minMax.reset();
   }
 
+  /**
+   * @return Return the SampleStat snapshot timestamp.
+   */
   public long getSnapshotTimeStamp() {
-    return this.snapshotTimeStamp;
+    return snapshotTimeStamp;
   }
 
+  @Override
   public String toString() {
-    return this.lastStat().toString();
+    return lastStat().toString();
   }
 }

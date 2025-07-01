@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.metrics;
 
+import static org.apache.hadoop.metrics2.lib.Interns.info;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.text.DecimalFormat;
 import java.util.Map;
@@ -28,141 +30,215 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MutableMetric;
 import org.apache.hadoop.metrics2.util.Quantile;
 import org.apache.hadoop.metrics2.util.QuantileEstimator;
 import org.apache.hadoop.metrics2.util.SampleQuantiles;
+
 /**
- * The class was added in order to use it later for non-blocking metrics as it was not possible
- * to inherit from the existing ones.
- * A version of {@link org.apache.hadoop.metrics2.lib.MutableQuantiles}.
+ * Watches a stream of long values, maintaining online estimates of specific
+ * quantiles with provably low error bounds. This is particularly useful for
+ * accurate high-percentile (e.g. 95th, 99th) latency metrics.
  */
 public class MutableQuantiles extends MutableMetric {
+
   @VisibleForTesting
-  public static final Quantile[] QUANTILES = new Quantile[]{new Quantile((double)0.5F, 0.05), new Quantile((double)0.75F, 0.025), new Quantile(0.9, 0.01), new Quantile(0.95, 0.005), new Quantile(0.99, 0.001)};
+  public static final Quantile[] QUANTILES = {new Quantile(0.50, 0.050),
+      new Quantile(0.75, 0.025), new Quantile(0.90, 0.010),
+      new Quantile(0.95, 0.005), new Quantile(0.99, 0.001)};
+
   private MetricsInfo numInfo;
   private MetricsInfo[] quantileInfos;
   private int intervalSecs;
   private static DecimalFormat decimalFormat = new DecimalFormat("###.####");
+
   private QuantileEstimator estimator;
-  private long previousCount = 0L;
+  private long previousCount = 0;
   private ScheduledFuture<?> scheduledTask = null;
+
   @VisibleForTesting
   protected Map<Quantile, Long> previousSnapshot = null;
-  private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, (new ThreadFactoryBuilder()).setDaemon(true).setNameFormat("MutableQuantiles-%d").build());
 
-  public MutableQuantiles(String name, String description, String sampleName, String valueName, int interval) {
+  private static final ScheduledExecutorService scheduler = Executors
+      .newScheduledThreadPool(1, new ThreadFactoryBuilder().setDaemon(true)
+          .setNameFormat("MutableQuantiles-%d").build());
+
+  /**
+   * Instantiates a new {@link MutableQuantiles} for a metric that rolls itself
+   * over on the specified time interval.
+   *
+   * @param name
+   *          of the metric
+   * @param description
+   *          long-form textual description of the metric
+   * @param sampleName
+   *          type of items in the stream (e.g., "Ops")
+   * @param valueName
+   *          type of the values
+   * @param interval
+   *          rollover interval (in seconds) of the estimator
+   */
+  public MutableQuantiles(String name, String description, String sampleName,
+                          String valueName, int interval) {
     String ucName = StringUtils.capitalize(name);
     String usName = StringUtils.capitalize(sampleName);
     String uvName = StringUtils.capitalize(valueName);
     String desc = StringUtils.uncapitalize(description);
     String lsName = StringUtils.uncapitalize(sampleName);
     String lvName = StringUtils.uncapitalize(valueName);
-    this.setInterval(interval);
-    this.setNumInfo(
-        Interns.info(ucName + "Num" + usName, String.format("Number of %s for %s with %ds interval", lsName, desc, interval)));
-    this.scheduledTask = scheduler.scheduleWithFixedDelay(new RolloverSample(this), (long)interval, (long)interval, TimeUnit.SECONDS);
-    Quantile[] quantilesArray = this.getQuantiles();
-    this.setQuantileInfos(quantilesArray.length);
-    this.setQuantiles(ucName, uvName, desc, lvName, decimalFormat);
-    this.setEstimator(new SampleQuantiles(quantilesArray));
+
+    setInterval(interval);
+    setNumInfo(info(ucName + "Num" + usName, String.format(
+        "Number of %s for %s with %ds interval", lsName, desc, interval)));
+    scheduledTask = scheduler.scheduleWithFixedDelay(new RolloverSample(this),
+        interval, interval, TimeUnit.SECONDS);
+    // Construct the MetricsInfos for the quantiles, converting to percentiles
+    Quantile[] quantilesArray = getQuantiles();
+    setQuantileInfos(quantilesArray.length);
+    setQuantiles(ucName, uvName, desc, lvName, decimalFormat);
+    setEstimator(new SampleQuantiles(quantilesArray));
   }
 
+  /**
+   * Sets quantileInfo.
+   *
+   * @param ucName capitalized name of the metric
+   * @param uvName capitalized type of the values
+   * @param desc uncapitalized long-form textual description of the metric
+   * @param lvName uncapitalized type of the values
+   * @param pDecimalFormat Number formatter for percentile value
+   */
   void setQuantiles(String ucName, String uvName, String desc, String lvName, DecimalFormat pDecimalFormat) {
-    for(int i = 0; i < QUANTILES.length; ++i) {
-      double percentile = (double)100.0F * QUANTILES[i].quantile;
+    for (int i = 0; i < QUANTILES.length; i++) {
+      double percentile = 100 * QUANTILES[i].quantile;
       String nameTemplate = ucName + pDecimalFormat.format(percentile) + "thPercentile" + uvName;
-      String descTemplate = pDecimalFormat.format(percentile) + " percentile " + lvName + " with " + this.getInterval() + " second interval for " + desc;
-      this.addQuantileInfo(i, Interns.info(nameTemplate, descTemplate));
+      String descTemplate = pDecimalFormat.format(percentile) + " percentile " + lvName
+          + " with " + getInterval() + " second interval for " + desc;
+      addQuantileInfo(i, info(nameTemplate, descTemplate));
     }
-
   }
 
-  public MutableQuantiles() {
-  }
+  public MutableQuantiles() {}
 
+  @Override
   public synchronized void snapshot(MetricsRecordBuilder builder, boolean all) {
-    Quantile[] quantilesArray = this.getQuantiles();
-    if (all || this.changed()) {
-      builder.addGauge(this.numInfo, this.previousCount);
-
-      for(int i = 0; i < quantilesArray.length; ++i) {
-        long newValue = 0L;
-        if (this.previousSnapshot != null) {
-          newValue = (Long)this.previousSnapshot.get(quantilesArray[i]);
+    Quantile[] quantilesArray = getQuantiles();
+    if (all || changed()) {
+      builder.addGauge(numInfo, previousCount);
+      for (int i = 0; i < quantilesArray.length; i++) {
+        long newValue = 0;
+        // If snapshot is null, we failed to update since the window was empty
+        if (previousSnapshot != null) {
+          newValue = previousSnapshot.get(quantilesArray[i]);
         }
-
-        builder.addGauge(this.quantileInfos[i], newValue);
+        builder.addGauge(quantileInfos[i], newValue);
       }
-
-      if (this.changed()) {
-        this.clearChanged();
+      if (changed()) {
+        clearChanged();
       }
     }
-
   }
 
   public synchronized void add(long value) {
-    this.estimator.insert(value);
+    estimator.insert(value);
   }
 
+  /**
+   * Returns the array of Quantiles declared in MutableQuantiles.
+   *
+   * @return array of Quantiles
+   */
   public synchronized Quantile[] getQuantiles() {
     return QUANTILES;
   }
 
+  /**
+   * Set info about the metrics.
+   *
+   * @param pNumInfo info about the metrics.
+   */
   public synchronized void setNumInfo(MetricsInfo pNumInfo) {
     this.numInfo = pNumInfo;
   }
 
+  /**
+   * Initialize quantileInfos array.
+   *
+   * @param length of the quantileInfos array.
+   */
   public synchronized void setQuantileInfos(int length) {
     this.quantileInfos = new MetricsInfo[length];
   }
 
+  /**
+   * Add entry to quantileInfos array.
+   *
+   * @param i array index.
+   * @param info info to be added to  quantileInfos array.
+   */
   public synchronized void addQuantileInfo(int i, MetricsInfo info) {
     this.quantileInfos[i] = info;
   }
 
+  /**
+   * Set the rollover interval (in seconds) of the estimator.
+   *
+   * @param pIntervalSecs of the estimator.
+   */
   public synchronized void setInterval(int pIntervalSecs) {
     this.intervalSecs = pIntervalSecs;
   }
 
+  /**
+   * Get the rollover interval (in seconds) of the estimator.
+   *
+   * @return  intervalSecs of the estimator.
+   */
   public synchronized int getInterval() {
-    return this.intervalSecs;
+    return intervalSecs;
   }
 
   public void stop() {
-    if (this.scheduledTask != null) {
-      this.scheduledTask.cancel(false);
+    if (scheduledTask != null) {
+      scheduledTask.cancel(false);
     }
-
-    this.scheduledTask = null;
+    scheduledTask = null;
   }
 
+  /**
+   * Get the quantile estimator.
+   *
+   * @return the quantile estimator
+   */
   @VisibleForTesting
   public synchronized QuantileEstimator getEstimator() {
-    return this.estimator;
+    return estimator;
   }
 
   public synchronized void setEstimator(QuantileEstimator quantileEstimator) {
     this.estimator = quantileEstimator;
   }
 
+  /**
+   * Runnable used to periodically roll over the internal
+   * {@link SampleQuantiles} every interval.
+   */
   private static class RolloverSample implements Runnable {
+
     MutableQuantiles parent;
 
     public RolloverSample(MutableQuantiles parent) {
       this.parent = parent;
     }
 
+    @Override
     public void run() {
-      synchronized(this.parent) {
-        this.parent.previousCount = this.parent.estimator.getCount();
-        this.parent.previousSnapshot = this.parent.estimator.snapshot();
-        this.parent.estimator.clear();
+      synchronized (parent) {
+        parent.previousCount = parent.estimator.getCount();
+        parent.previousSnapshot = parent.estimator.snapshot();
+        parent.estimator.clear();
       }
-
-      this.parent.setChanged();
+      parent.setChanged();
     }
   }
 }
