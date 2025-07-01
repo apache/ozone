@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -103,6 +104,7 @@ public class TestDeadNodeHandler {
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     scmContext = new SCMContext.Builder().setIsInSafeMode(true)
+        .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
         .setLeader(true).setIsPreCheckComplete(true)
         .setSCM(scm).build();
     pipelineManager =

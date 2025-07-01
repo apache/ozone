@@ -32,6 +32,7 @@ public class TestSCMServiceManager {
     SCMContext scmContext = new SCMContext.Builder()
         .setLeader(false)
         .setTerm(1)
+        .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.INITIAL)
         .setIsInSafeMode(true)
         .setIsPreCheckComplete(false)
         .buildMaybeInvalid();
@@ -102,6 +103,7 @@ public class TestSCMServiceManager {
     SCMContext scmContext = new SCMContext.Builder()
         .setLeader(false)
         .setTerm(1)
+        .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.INITIAL)
         .setIsInSafeMode(true)
         .setIsPreCheckComplete(false)
         .buildMaybeInvalid();

@@ -95,6 +95,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -197,6 +198,7 @@ public class TestSCMNodeManager {
       throws IOException, AuthenticationException {
     scm = HddsTestUtils.getScm(config);
     scmContext = new SCMContext.Builder().setIsInSafeMode(true)
+        .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.PRE_CHECKS_PASSED)
         .setLeader(true).setIsPreCheckComplete(true)
         .setSCM(scm).build();
     PipelineManagerImpl pipelineManager =

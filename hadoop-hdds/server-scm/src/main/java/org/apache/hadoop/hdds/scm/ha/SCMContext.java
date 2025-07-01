@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +73,7 @@ public final class SCMContext {
   private SCMContext(Builder b) {
     isLeader = b.isLeader;
     term = b.term;
-    safeModeStatus = SafeModeStatus.of(b.isInSafeMode, b.isPreCheckComplete);
+    safeModeStatus = b.safeModeStatus;
     finalizationCheckpoint = b.finalizationCheckpoint;
     scm = b.scm;
     threadNamePrefix = b.threadNamePrefix;
@@ -276,6 +277,7 @@ public final class SCMContext {
      */
     private boolean isLeader = false;
     private long term = INVALID_TERM;
+    private SafeModeStatus safeModeStatus = SafeModeStatus.OUT_OF_SAFE_MODE;
     private boolean isInSafeMode = false;
     private boolean isPreCheckComplete = true;
     private OzoneStorageContainerManager scm = null;
@@ -289,6 +291,11 @@ public final class SCMContext {
 
     public Builder setTerm(long newTerm) {
       this.term = newTerm;
+      return this;
+    }
+
+    public Builder setSafeModeStatus(SafeModeStatus status) {
+      this.safeModeStatus = status;
       return this;
     }
 
@@ -320,7 +327,8 @@ public final class SCMContext {
     }
 
     public SCMContext build() {
-      Preconditions.checkNotNull(scm, "scm == null");
+      Objects.requireNonNull(scm, "scm == null");
+      Preconditions.assertSame(SafeModeStatus.of(isInSafeMode, isPreCheckComplete), safeModeStatus, "safeModeStatus");
       return buildMaybeInvalid();
     }
 

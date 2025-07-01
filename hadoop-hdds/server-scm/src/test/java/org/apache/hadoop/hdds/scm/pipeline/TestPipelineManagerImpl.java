@@ -150,6 +150,7 @@ public class TestPipelineManagerImpl {
             OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) /
         HddsProtos.ReplicationFactor.THREE.getNumber();
     scmContext = new SCMContext.Builder().setIsInSafeMode(true)
+        .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.PRE_CHECKS_PASSED)
         .setLeader(true).setIsPreCheckComplete(true)
         .setSCM(scm).build();
     serviceManager = new SCMServiceManager();

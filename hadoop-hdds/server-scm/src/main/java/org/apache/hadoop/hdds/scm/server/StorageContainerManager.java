@@ -712,6 +712,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .setTerm(0)
           .setIsInSafeMode(true)
           .setIsPreCheckComplete(false)
+          .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.INITIAL)
           .setSCM(this)
           .setThreadNamePrefix(threadNamePrefix)
           .setFinalizationCheckpoint(finalizationManager.getCheckpoint())
