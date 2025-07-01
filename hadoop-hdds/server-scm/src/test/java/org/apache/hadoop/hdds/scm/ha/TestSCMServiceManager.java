@@ -33,8 +33,6 @@ public class TestSCMServiceManager {
         .setLeader(false)
         .setTerm(1)
         .setSafeModeStatus(SafeModeStatus.INITIAL)
-        .setIsInSafeMode(true)
-        .setIsPreCheckComplete(false)
         .buildMaybeInvalid();
 
     // A service runs when it is leader.
@@ -102,8 +100,6 @@ public class TestSCMServiceManager {
         .setLeader(false)
         .setTerm(1)
         .setSafeModeStatus(SafeModeStatus.INITIAL)
-        .setIsInSafeMode(true)
-        .setIsPreCheckComplete(false)
         .buildMaybeInvalid();
 
     // A service runs when it is leader and out of safe mode.

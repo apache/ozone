@@ -197,7 +197,6 @@ public class ReconStorageContainerManagerFacade
     this.reconContext = reconContext;
     this.scmContext = new SCMContext.Builder()
         .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.OUT_OF_SAFE_MODE)
-        .setIsPreCheckComplete(true)
         .setSCM(this)
         .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);

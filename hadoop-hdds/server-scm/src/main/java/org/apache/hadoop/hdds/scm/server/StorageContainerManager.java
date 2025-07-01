@@ -710,8 +710,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmContext = new SCMContext.Builder()
           .setLeader(false)
           .setTerm(0)
-          .setIsInSafeMode(true)
-          .setIsPreCheckComplete(false)
           .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.INITIAL)
           .setSCM(this)
           .setThreadNamePrefix(threadNamePrefix)

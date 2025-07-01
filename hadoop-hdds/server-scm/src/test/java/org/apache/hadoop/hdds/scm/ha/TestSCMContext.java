@@ -55,8 +55,6 @@ public class TestSCMContext {
     // in safe mode
     SCMContext scmContext = new SCMContext.Builder()
         .setSafeModeStatus(SafeModeStatus.INITIAL)
-        .setIsInSafeMode(true)
-        .setIsPreCheckComplete(false)
         .buildMaybeInvalid();
 
     assertTrue(scmContext.isInSafeMode());

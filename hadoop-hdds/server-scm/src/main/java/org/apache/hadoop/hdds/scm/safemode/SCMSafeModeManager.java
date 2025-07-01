@@ -242,15 +242,6 @@ public class SCMSafeModeManager implements SafeModeManager {
       this.preCheckPassed = preCheckPassed;
     }
 
-    public static SafeModeStatus of(boolean safeMode, boolean preCheck) {
-      for (SafeModeStatus status : values()) {
-        if (status.safeModeStatus == safeMode && status.preCheckPassed == preCheck) {
-          return status;
-        }
-      }
-      throw new IllegalArgumentException("Invalid " + toString(safeMode, preCheck));
-    }
-
     public boolean isInSafeMode() {
       return safeModeStatus;
     }

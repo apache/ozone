@@ -103,9 +103,9 @@ public class TestDeadNodeHandler {
     eventQueue = new EventQueue();
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
-    scmContext = new SCMContext.Builder().setIsInSafeMode(true)
+    scmContext = new SCMContext.Builder()
         .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
-        .setLeader(true).setIsPreCheckComplete(true)
+        .setLeader(true)
         .setSCM(scm).build();
     pipelineManager =
         (PipelineManagerImpl)scm.getPipelineManager();

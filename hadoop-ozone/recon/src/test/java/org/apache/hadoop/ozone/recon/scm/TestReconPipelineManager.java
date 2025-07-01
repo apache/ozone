@@ -149,9 +149,9 @@ public class TestReconPipelineManager {
       StorageContainerManager mock = mock(StorageContainerManager.class);
       when(mock.getScmNodeDetails())
           .thenReturn(mock(SCMNodeDetails.class));
-      scmContext = new SCMContext.Builder().setIsInSafeMode(true)
+      scmContext = new SCMContext.Builder()
               .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.PRE_CHECKS_PASSED)
-              .setLeader(true).setIsPreCheckComplete(true)
+              .setLeader(true)
               .setSCM(mock).build();
       reconPipelineManager.setScmContext(scmContext);
       reconPipelineManager.addPipeline(validPipeline);

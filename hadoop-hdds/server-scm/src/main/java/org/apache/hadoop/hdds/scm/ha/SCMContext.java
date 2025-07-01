@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -278,8 +277,6 @@ public final class SCMContext {
     private boolean isLeader = false;
     private long term = INVALID_TERM;
     private SafeModeStatus safeModeStatus = SafeModeStatus.OUT_OF_SAFE_MODE;
-    private boolean isInSafeMode = false;
-    private boolean isPreCheckComplete = true;
     private OzoneStorageContainerManager scm = null;
     private FinalizationCheckpoint finalizationCheckpoint = FinalizationCheckpoint.FINALIZATION_COMPLETE;
     private String threadNamePrefix = "";
@@ -296,16 +293,6 @@ public final class SCMContext {
 
     public Builder setSafeModeStatus(SafeModeStatus status) {
       this.safeModeStatus = status;
-      return this;
-    }
-
-    public Builder setIsInSafeMode(boolean inSafeMode) {
-      this.isInSafeMode = inSafeMode;
-      return this;
-    }
-
-    public Builder setIsPreCheckComplete(boolean preCheckComplete) {
-      this.isPreCheckComplete = preCheckComplete;
       return this;
     }
 
@@ -328,7 +315,6 @@ public final class SCMContext {
 
     public SCMContext build() {
       Objects.requireNonNull(scm, "scm == null");
-      Preconditions.assertSame(SafeModeStatus.of(isInSafeMode, isPreCheckComplete), safeModeStatus, "safeModeStatus");
       return buildMaybeInvalid();
     }
 
