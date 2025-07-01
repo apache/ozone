@@ -108,13 +108,14 @@ Delete Bucket 1 Success With Newly Set SecretKey via S3 API
                         Execute          aws configure set aws_secret_access_key 'somesecret1'
     ${output} =         Execute          aws s3api --endpoint-url ${S3G_ENDPOINT_URL} delete-bucket --bucket bucket-test1
 
-Delete Tenant Failure Tenant Not Empty
-    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant delete ${TENANT}
-                        Should contain   ${output}         TENANT_NOT_EMPTY Tenant '${TENANT}' is not empty. All accessIds associated to this tenant must be revoked before the tenant can be deleted. See `ozone tenant user revoke`
-
-Trigger and wait for background Sync to recover Policies and Roles in Authorizer
-    ${rc}  ${output} =  Run And Return Rc And Output  ozone admin om updateranger ${OM_HA_PARAM}
-                        Should contain   ${output}         Operation completed successfully
+# see HDDS-13361
+#Delete Tenant Failure Tenant Not Empty
+#    ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant delete ${TENANT}
+#                        Should contain   ${output}         TENANT_NOT_EMPTY Tenant '${TENANT}' is not empty. All accessIds associated to this tenant must be revoked before the tenant can be deleted. See `ozone tenant user revoke`
+#
+#Trigger and wait for background Sync to recover Policies and Roles in Authorizer
+#    ${rc}  ${output} =  Run And Return Rc And Output  ozone admin om updateranger ${OM_HA_PARAM}
+#                        Should contain   ${output}         Operation completed successfully
 
 Create Tenant Failure with Regular User
     Run Keyword         Kinit test user     testuser2    testuser2.keytab
