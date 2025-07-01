@@ -23,7 +23,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.MutableMetric;
-import org.apache.hadoop.metrics2.util.SampleStat;
 import org.apache.hadoop.util.Time;
 
 /**
