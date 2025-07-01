@@ -905,33 +905,11 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   public void decrementInFlightSnapshotCount() {
-    /*
-     * There is a race condition here because of which
-     * inFlightSnapshotCount could become negative sometimes.
-     *
-     * When we get a call back from Ratis on notifyLeaderReady,
-     * we assume that all the pending transactions (from RaftLog)
-     * are applied to the SateMachine and we go a head and reset the
-     * inFlightSnapshotCount to 0. The expectation here is that after
-     * the leader election we want to start inFlightSnapshotCount from 0.
-     *
-     * The applyTransaction in OzoneManagerStateMachine processes
-     * the calls in an async manner and returns a CompletableFuture,
-     * the transactions are not yet fully processed by the
-     * OzoneManagerStateMachine when Ratis notifies leader ready. (RATIS-2313)
-     *
-     * Because of the async processing in OzoneManagerStateMachine and
-     * Ratis not waiting for the CompletableFuture to complete, we mark the
-     * leader as ready (reset inFlightSnapshotCount to 0) even before we complete
-     * processing all the pending transactions from the old term. If there is a
-     * create snapshot transaction in the Raft Log from old term and it gets
-     * processed after we reset inFlightSnapshotCount, the count would become -1
-     * as we decrement the inFlightSnapshotCount when the OMSnapshotCreateRequest
-     * processing is completed.
-     *
-     * The workaround here is to make sure that we don't make inFlightSnapshotCount
-     * negative. We should be able to remove the workaround after RATIS-2313.
-     */
+    // TODO this is a work around for the accounting logic of `inFlightSnapshotCount`.
+    //    - It incorrectly assumes that LeaderReady means that there are no inflight snapshot requests.
+    //    We may consider fixing it by waiting all the pending requests in notifyLeaderReady().
+    //    - Also, it seems to have another bug that the PrepareState could disallow snapshot requests.
+    //    In such case, `inFlightSnapshotCount` won't be decremented.
     int result = inFlightSnapshotCount.decrementAndGet();
     if (result < 0) {
       resetInFlightSnapshotCount();
