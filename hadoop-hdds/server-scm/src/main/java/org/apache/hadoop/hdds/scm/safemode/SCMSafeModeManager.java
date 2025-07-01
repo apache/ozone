@@ -244,20 +244,29 @@ public class SCMSafeModeManager implements SafeModeManager {
   }
 
   /**
-   * Class used during SafeMode status event.
+   * Possible states of SCM SafeMode.
    */
-  public static final class SafeModeStatus {
+  public enum SafeModeStatus {
+
+    INITIAL(true, false),
+    PRE_CHECKS_PASSED(true, true),
+    OUT_OF_SAFE_MODE(false, true);
 
     private final boolean safeModeStatus;
     private final boolean preCheckPassed;
 
-    private SafeModeStatus(boolean safeModeState, boolean preCheckPassed) {
+    SafeModeStatus(boolean safeModeState, boolean preCheckPassed) {
       this.safeModeStatus = safeModeState;
       this.preCheckPassed = preCheckPassed;
     }
 
     public static SafeModeStatus of(boolean safeMode, boolean preCheck) {
-      return new SafeModeStatus(safeMode, preCheck);
+      for (SafeModeStatus status : values()) {
+        if (status.safeModeStatus == safeMode && status.preCheckPassed == preCheck) {
+          return status;
+        }
+      }
+      throw new IllegalArgumentException("Invalid " + toString(safeMode, preCheck));
     }
 
     public boolean isInSafeMode() {
@@ -270,6 +279,10 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     @Override
     public String toString() {
+      return toString(safeModeStatus, preCheckPassed);
+    }
+
+    private static String toString(boolean safeModeStatus, boolean preCheckPassed) {
       return "SafeModeStatus{" +
           "safeModeStatus=" + safeModeStatus +
           ", preCheckPassed=" + preCheckPassed +
