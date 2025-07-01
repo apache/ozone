@@ -71,7 +71,6 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   private final AtomicBoolean inSafeMode = new AtomicBoolean(true);
   private final AtomicBoolean preCheckComplete = new AtomicBoolean(false);
-  private final AtomicBoolean forceExitSafeMode = new AtomicBoolean(false);
   private final Map<String, SafeModeExitRule<?>> exitRules = new HashMap<>();
   private final Set<String> preCheckRules = new HashSet<>();
   private final Set<String> validatedRules = new HashSet<>();
@@ -102,7 +101,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     final boolean isSafeModeEnabled = conf.getBoolean(HDDS_SCM_SAFEMODE_ENABLED, HDDS_SCM_SAFEMODE_ENABLED_DEFAULT);
     if (!isSafeModeEnabled) {
       LOG.info("Safemode is disabled, skipping Safemode rule validation and force exiting Safemode.");
-      exitSafeMode(true);
+      exitSafeMode();
     }
   }
 
@@ -120,7 +119,7 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   private void emitSafeModeStatus() {
     final SafeModeStatus safeModeStatus = SafeModeStatus.of(
-        getInSafeMode(), getPreCheckComplete(), isForceExitSafeMode());
+        getInSafeMode(), getPreCheckComplete());
     scmContext.updateSafeModeStatus(safeModeStatus);
 
     // notify SCMServiceManager
@@ -153,7 +152,7 @@ public class SCMSafeModeManager implements SafeModeManager {
     if (validatedRules.size() == exitRules.size()) {
       // All rules are satisfied, we can exit safe mode.
       LOG.info("ScmSafeModeManager, all rules are successfully validated");
-      exitSafeMode(false);
+      exitSafeMode();
     }
   }
 
@@ -171,15 +170,14 @@ public class SCMSafeModeManager implements SafeModeManager {
   }
 
   public void forceExitSafeMode() {
-    exitSafeMode(true);
+    exitSafeMode();
   }
 
-  private void exitSafeMode(boolean force) {
+  private void exitSafeMode() {
     LOG.info("SCM exiting safe mode.");
     // If safemode is exiting, then pre-check must also have passed.
     preCheckComplete.set(true);
     inSafeMode.set(false);
-    forceExitSafeMode.set(force);
 
     // TODO: Remove handler registration as there is no need to listen to
     //   register events anymore.
@@ -235,10 +233,6 @@ public class SCMSafeModeManager implements SafeModeManager {
     return preCheckComplete.get();
   }
 
-  public boolean isForceExitSafeMode() {
-    return forceExitSafeMode.get();
-  }
-
   public static Logger getLogger() {
     return LOG;
   }
@@ -254,23 +248,16 @@ public class SCMSafeModeManager implements SafeModeManager {
    */
   public static final class SafeModeStatus {
 
-    // TODO: forceExitSafeMode value is not used anywhere, check and remove (HDDS-12957).
     private final boolean safeModeStatus;
     private final boolean preCheckPassed;
-    private final boolean forceExitSafeMode;
 
-    private SafeModeStatus(boolean safeModeState, boolean preCheckPassed, boolean forceExitSafeMode) {
+    private SafeModeStatus(boolean safeModeState, boolean preCheckPassed) {
       this.safeModeStatus = safeModeState;
       this.preCheckPassed = preCheckPassed;
-      this.forceExitSafeMode = forceExitSafeMode;
     }
 
     public static SafeModeStatus of(boolean safeMode, boolean preCheck) {
-      return of(safeMode, preCheck, false);
-    }
-
-    public static SafeModeStatus of(boolean safeMode, boolean preCheck, boolean forceExit) {
-      return new SafeModeStatus(safeMode, preCheck, forceExit);
+      return new SafeModeStatus(safeMode, preCheck);
     }
 
     public boolean isInSafeMode() {
@@ -279,10 +266,6 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     public boolean isPreCheckComplete() {
       return preCheckPassed;
-    }
-
-    public boolean isForceExitSafeMode() {
-      return forceExitSafeMode;
     }
 
     @Override
