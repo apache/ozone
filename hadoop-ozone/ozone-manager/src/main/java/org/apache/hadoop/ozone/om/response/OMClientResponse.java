@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 public abstract class OMClientResponse {
 
   private final OMResponse omResponse;
-  /** Used only for non-Ratis. */
   private OMLockDetails omLockDetails;
 
   public OMClientResponse(OMResponse omResponse) {
