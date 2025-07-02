@@ -170,3 +170,6 @@ OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 OZONE-SITE.XML_hdds.secret.key.rotate.duration=5m
 OZONE-SITE.XML_hdds.secret.key.rotate.check.duration=1m
 OZONE-SITE.XML_hdds.secret.key.expiry.duration=1h
+OZONE-SITE.XML_ozone.manager.delegation.token.max-lifetime=30m
+OZONE-SITE.XML_ozone.manager.delegation.token.renew-interval=5m
+OZONE-SITE.XML_ozone.manager.delegation.remover.scan.interval=1m
