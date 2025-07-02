@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -167,7 +168,7 @@ public class RDBStore implements DBStore {
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
-    } catch (Exception e) {
+    } catch (IOException | RuntimeException e) {
       try {
         close();
       } catch (Exception suppressed) {
