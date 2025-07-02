@@ -92,7 +92,6 @@ public class RDBStore implements DBStore {
     this.dbOptions = dbOptions;
     this.statistics = statistics;
 
-    Exception exception = null;
     try {
       if (enableCompactionDag) {
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
@@ -168,17 +167,13 @@ public class RDBStore implements DBStore {
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
-
-    } catch (RuntimeException e) {
-      exception = e;
-      throw new IllegalStateException("Failed to create RDBStore from " + dbFile, e);
     } catch (Exception e) {
-      exception = e;
-      throw new RocksDatabaseException("Failed to create RDBStore from " + dbFile, e);
-    } finally {
-      if (exception != null) {
+      try {
         close();
+      } catch (Exception suppressed) {
+        e.addSuppressed(suppressed);
       }
+      throw new RocksDatabaseException("Failed to create RDBStore from " + dbFile, e);
     }
 
     if (LOG.isDebugEnabled()) {

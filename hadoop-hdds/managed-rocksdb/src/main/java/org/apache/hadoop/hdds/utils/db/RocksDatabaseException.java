@@ -32,7 +32,7 @@ public class RocksDatabaseException extends IOException {
     return cause instanceof RocksDBException ? getStatus((RocksDBException) cause) + ": " + message : message;
   }
 
-  /** Construct from the given {@link RocksDBException} cause. */
+  /** Construct from the given cause. */
   public RocksDatabaseException(String message, Exception cause) {
     super(getMessage(message, cause), cause);
   }

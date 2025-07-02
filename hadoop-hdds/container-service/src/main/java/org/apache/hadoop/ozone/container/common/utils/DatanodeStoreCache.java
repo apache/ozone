@@ -113,8 +113,8 @@ public final class DatanodeStoreCache {
       return;
     }
 
-    for (Map.Entry<String, RawDB> entry : datanodeStoreMap.entrySet()) {
-      entry.getValue().getStore().stop();
+    for (RawDB db : datanodeStoreMap.values()) {
+      db.getStore().stop();
     }
     datanodeStoreMap.clear();
   }
