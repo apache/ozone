@@ -64,16 +64,16 @@ import org.mockito.stubbing.Answer;
  * Unit tests for the on-demand container scanner.
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
-public class TestOnDemandContainerDataScanner extends
+public class TestOnDemandContainerScanner extends
     TestContainerScannersAbstract {
-  
-  private OnDemandContainerDataScanner onDemandScanner;
+
+  private OnDemandContainerScanner onDemandScanner;
 
   @Override
   @BeforeEach
   public void setup() {
     super.setup();
-    onDemandScanner = new OnDemandContainerDataScanner(conf, controller);
+    onDemandScanner = new OnDemandContainerScanner(conf, controller);
   }
 
   @Test
@@ -170,6 +170,28 @@ public class TestOnDemandContainerDataScanner extends
   }
 
   @Test
+  public void testSameOpenContainerQueuedMultipleTimes() throws Exception {
+    //Given a container that has not finished scanning
+    CountDownLatch latch = new CountDownLatch(1);
+    when(openCorruptMetadata.scanMetaData())
+        .thenAnswer((Answer<ScanResult>) invocation -> {
+          latch.await();
+          return getUnhealthyDataScanResult();
+        });
+    Optional<Future<?>> onGoingScan = onDemandScanner.scanContainer(openCorruptMetadata);
+    assertTrue(onGoingScan.isPresent());
+    assertFalse(onGoingScan.get().isDone());
+    //When scheduling the same container again
+    Optional<Future<?>> secondScan = onDemandScanner.scanContainer(openCorruptMetadata);
+    //Then the second scan is not scheduled and the first scan can still finish
+    assertFalse(secondScan.isPresent());
+    latch.countDown();
+    onGoingScan.get().get();
+    verify(controller, atLeastOnce()).markContainerUnhealthy(
+        eq(openCorruptMetadata.getContainerData().getContainerID()), any());
+  }
+
+  @Test
   @Override
   public void testScannerMetrics() throws Exception {
     ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
@@ -184,7 +206,7 @@ public class TestOnDemandContainerDataScanner extends
     //Containers with shouldScanData = false shouldn't increase
     // the number of scanned containers
     assertEquals(0, metrics.getNumUnHealthyContainers());
-    assertEquals(2, metrics.getNumContainersScanned());
+    assertEquals(4, metrics.getNumContainersScanned());
   }
 
   @Test
@@ -209,7 +231,7 @@ public class TestOnDemandContainerDataScanner extends
     scanContainer(corruptData);
     verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
     scanContainer(openCorruptMetadata);
-    verifyContainerMarkedUnhealthy(openCorruptMetadata, never());
+    verifyContainerMarkedUnhealthy(openCorruptMetadata, atLeastOnce());
     scanContainer(openContainer);
     verifyContainerMarkedUnhealthy(openContainer, never());
     // Deleted containers should not be marked unhealthy
