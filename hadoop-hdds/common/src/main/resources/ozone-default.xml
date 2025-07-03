@@ -2184,6 +2184,20 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.ratis.pending.write.byte-limit</name>
+    <value>32MB</value>
+    <tag>OZONE, DEBUG, OM, RATIS</tag>
+    <description>Raft's Pending writes Byte limit.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.pending.write.num-limit</name>
+    <value>4096</value>
+    <tag>OZONE, DEBUG, OM, RATIS</tag>
+    <description>Raft's number of pending writes.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.ratis.log.purge.gap</name>
     <value>1000000</value>
     <tag>OZONE, OM, RATIS</tag>
