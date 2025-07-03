@@ -1,6 +1,9 @@
 ---
 title: Production Deployment
 weight: 6
+menu:
+  main:
+    parent: Getting Started
 ---
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more

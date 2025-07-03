@@ -1,6 +1,9 @@
 ---
 title: 生产环境部署
 weight: 6
+menu:
+  main:
+    parent: 快速入门
 ---
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
