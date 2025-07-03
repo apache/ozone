@@ -122,4 +122,3 @@ hdds.datanode.dir | none | Determines where HDDS data will be stored on the loca
 hdds.datanode.dir.du.reserved | none | Reserved space in bytes per volume. Always leave this much space free for non dfs use.
 ozone.metadata.dirs | none | Directory to store persisted data (RocksDB).
 ozone.recon.address | 0.0.0.0:9891 | RPC address of the Recon. Use <host:port> to connect Recon.
-
