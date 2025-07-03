@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.hadoop.hdds.utils.db.DBDefinition.LOG;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -89,8 +90,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
@@ -518,19 +517,18 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPrefix = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
+    final String startKey = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
+    // endKey is the smallest key that is lexicographically larger than the startKey. (exclusive)
+    final String endKey = startKey.substring(0, startKey.length() - 1) +
+        (char)(startKey.charAt(startKey.length() - 1) + 1);
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-         iter = omMetadataManager.getDeletedDirTable().iterator(keyPrefix)) {
-      performOperationOnKeys(iter,
-          entry -> {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Removing key {} from DeletedDirTable", entry.getKey());
-            }
-            omMetadataManager.getDeletedDirTable().deleteWithBatch(batchOperation, entry.getKey());
-            return null;
-          });
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Deleting key range from DeletedDirTable - startKey: {}, endKey: {}",
+          startKey, endKey);
     }
+
+    // Use deleteRange instead of iterating through each key
+    omMetadataManager.getDeletedDirTable().deleteRangeWithBatch(batchOperation, startKey, endKey);
   }
 
   @VisibleForTesting
@@ -541,34 +539,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   @VisibleForTesting
   public SnapshotDiffCleanupService getSnapshotDiffCleanupService() {
     return snapshotDiffCleanupService;
-  }
-
-  /**
-   * Helper method to perform operation on keys with a given iterator.
-   * @param keyIter TableIterator
-   * @param operationFunction operation to be performed for each key.
-   */
-  private static void performOperationOnKeys(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> keyIter,
-      CheckedFunction<Table.KeyValue<String, ?>,
-      Void, IOException> operationFunction) throws IOException {
-    // Continue only when there are entries of snapshot (bucket) scope
-    // in deletedTable in the first place
-    // Loop until prefix matches.
-    // Start performance tracking timer
-    long startTime = System.nanoTime();
-    while (keyIter.hasNext()) {
-      Table.KeyValue<String, ?> entry = keyIter.next();
-      operationFunction.apply(entry);
-    }
-    // Time took for the iterator to finish (in ns)
-    long timeElapsed = System.nanoTime() - startTime;
-    if (timeElapsed >= DB_TABLE_ITER_LOOP_THRESHOLD_NS) {
-      // Print time elapsed
-      LOG.warn("Took {} ns to find endKey. Caller is {}", timeElapsed,
-          new Throwable().fillInStackTrace().getStackTrace()[1]
-              .getMethodName());
-    }
   }
 
   /**
@@ -583,24 +553,20 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPrefix =
-        omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
+    final String startKey = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
+    // endKey is the smallest key that is lexicographically larger than the startKey. (exclusive)
+    final String endKey = startKey.substring(0, startKey.length() - 1) +
+        (char)(startKey.charAt(startKey.length() - 1) + 1);
 
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
-             iter = omMetadataManager.getDeletedTable().iterator(keyPrefix)) {
-      performOperationOnKeys(iter, entry -> {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Removing key {} from DeletedTable", entry.getKey());
-        }
-        omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation, entry.getKey());
-        return null;
-      });
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Deleting key range from DeletedTable - startKey: {}, endKey: {}",
+          startKey, endKey);
     }
 
-    // No need to invalidate deletedTable (or deletedDirectoryTable) table
-    // cache since entries are not added to its table cache in the first place.
-    // See OMKeyDeleteRequest and OMKeyPurgeRequest#validateAndUpdateCache.
+    // Use deleteRange instead of iterating through each key
+    omMetadataManager.getDeletedTable().deleteRangeWithBatch(batchOperation, startKey, endKey);
+    // No need to invalidate deletedTable cache since entries are not added to its table cache
+    // in the first place. See OMKeyDeleteRequest and OMKeyPurgeRequest#validateAndUpdateCache.
     //
     // This makes the table clean up efficient as we only need one
     // deleteRange() operation. No need to invalidate cache entries
@@ -731,7 +697,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * deletedDirectoryTable in DB don't have entries for the bucket before it sends a purgeSnapshot on a snapshot.
    * If that happens, and we just look into the cache, the addToBatch operation will fail when it tries to open
    * the DB and purgeKeys from the Snapshot because snapshot is already purged from the SnapshotInfoTable cache.
-   * Hence, it is needed to look into the table to make sure that snapshot exists somewhere either in cache or in DB.
+   * Hence, it is needed to look into the table to make sure that snapshot exists somewhere in cache or in DB.
    */
   private SnapshotInfo getSnapshotInfo(String snapshotKey) throws IOException {
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager().getSnapshotInfoTable().get(snapshotKey);
