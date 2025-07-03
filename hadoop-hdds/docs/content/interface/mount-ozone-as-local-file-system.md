@@ -29,7 +29,9 @@ This document explains how to mount an Ozone bucket to a POSIX-compatible local 
 
 ## Performance Warning
 
-**Important:** While convenient, mounting Ozone via `goofys` and S3 Gateway will likely result in significantly lower performance compared to using native Ozone file system interfaces (e.g., Ozone File System (OFS) or Ozone Distributed File System (O3FS)). This method is generally suitable for light workloads, occasional access, or scenarios where POSIX compatibility is a strict requirement and performance is not critical. For high-performance applications, consider using Ozone's native client interfaces.
+<div class="alert alert-warning" role="alert">
+While convenient, mounting Ozone via `goofys` and S3 Gateway will likely result in significantly lower performance compared to using native Ozone file system interfaces (e.g., Ozone File System (OFS) or Ozone Distributed File System (O3FS)). This method is generally suitable for light workloads, occasional access, or scenarios where POSIX compatibility is a strict requirement and performance is not critical. For high-performance applications, consider using Ozone's native client interfaces.
+</div>
 
 ## Prerequisites
 
