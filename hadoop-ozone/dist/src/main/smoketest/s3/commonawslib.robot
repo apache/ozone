@@ -193,11 +193,6 @@ Revoke S3 secrets
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser2
 
-Get bucket owner
-    [arguments]    ${bucket}
-    ${owner} =     Execute     ozone sh bucket info /s3v/${bucket} | jq -r '.owner'
-    [return]       ${owner}
-
 Execute AWSS3APICli using bucket ownership verification
     [arguments]    ${command}    ${expected_bucket_owner}    ${expected_source_bucket_owner}=${EMPTY}
     ${cmd} =       Set Variable           ${command} --expected-bucket-owner ${expected_bucket_owner}
