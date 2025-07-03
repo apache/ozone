@@ -57,7 +57,7 @@ Ratis handles concurrent logs per node.
 ## Configuration
 - `hdds.container.ratis.datanode.storage.dir` (no default)
     - A list of metadata directory paths.
-      - `ozone.scm.datanode.pipeline.limit` (default: 2)
+- `ozone.scm.datanode.pipeline.limit` (default: 2)
     - The maximum number of pipelines per datanode can be engaged in.
       The value 0 means that
       the pipeline limit per datanode will be determined
