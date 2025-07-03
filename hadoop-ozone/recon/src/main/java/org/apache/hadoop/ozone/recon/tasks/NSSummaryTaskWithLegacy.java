@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.codec.ReconOMDBDefinition;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -258,8 +259,9 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
 
     try {
-      Table<String, OmKeyInfo> keyTable =
-          omMetadataManager.getKeyTable(LEGACY_BUCKET_LAYOUT);
+      // Note: ReconOMDBDefinition.KEY_TABLE_DEF uses CUSTOM_OM_KEY_INFO_CODEC
+      final Table<String, OmKeyInfo> keyTable =
+          ReconOMDBDefinition.KEY_TABLE_DEF.getTable(omMetadataManager.getStore());
 
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
           keyTableIter = keyTable.iterator()) {

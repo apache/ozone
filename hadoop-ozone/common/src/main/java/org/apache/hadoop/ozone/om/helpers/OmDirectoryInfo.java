@@ -208,34 +208,43 @@ public class OmDirectoryInfo extends WithParentObjectId
     return pib.build();
   }
 
-  /**
-   * Parses DirectoryInfo protobuf and creates OmPrefixInfo.
-   * @param dirInfo
-   * @return instance of OmDirectoryInfo
-   */
-  public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
+  public static Builder newBuilder(DirectoryInfo dirInfo, boolean includeLargeFields) {
     OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilder()
-            .setName(dirInfo.getName())
-            .setCreationTime(dirInfo.getCreationTime())
-            .setModificationTime(dirInfo.getModificationTime())
-            .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
-    if (dirInfo.getMetadataList() != null) {
-      opib.addAllMetadata(KeyValueUtil
-              .getFromProtobuf(dirInfo.getMetadataList()));
+        .setName(dirInfo.getName())
+        .setCreationTime(dirInfo.getCreationTime())
+        .setModificationTime(dirInfo.getModificationTime());
+
+    if (includeLargeFields) {
+      if (dirInfo.getMetadataList() != null) {
+        opib.addAllMetadata(KeyValueUtil.getFromProtobuf(dirInfo.getMetadataList()));
+      }
+      opib.setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
     }
     if (dirInfo.hasObjectID()) {
       opib.setObjectID(dirInfo.getObjectID());
     }
-    if (dirInfo.hasParentID()) {
-      opib.setParentObjectID(dirInfo.getParentID());
-    }
     if (dirInfo.hasUpdateID()) {
       opib.setUpdateID(dirInfo.getUpdateID());
+    }
+    if (dirInfo.hasParentID()) {
+      opib.setParentObjectID(dirInfo.getParentID());
     }
     if (dirInfo.hasOwnerName()) {
       opib.setOwner(dirInfo.getOwnerName());
     }
-    return opib.build();
+    return opib;
+  }
+
+  /**
+   * Creates an {@link OmDirectoryInfo} instance from the given {@link DirectoryInfo} protobuf.
+   * <p>
+   * This method deserializes all fields, including ACLs, from the provided protobuf message.
+   *
+   * @param dirInfo The {@link DirectoryInfo} protobuf received from Ozone Manager.
+   * @return An {@link OmDirectoryInfo} instance fully constructed from the protobuf.
+   */
+  public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
+    return OmDirectoryInfo.newBuilder(dirInfo, true).build();
   }
 
   @Override
