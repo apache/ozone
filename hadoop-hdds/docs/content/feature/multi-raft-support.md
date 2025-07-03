@@ -3,7 +3,7 @@ title: "Multi-Raft Support in Ozone"
 menu:
   main:
     parent: Features
-summary: "Enables each DataNode to participate in multiple Ratis pipelines concurrently to improve resource utilization and write throughput."
+summary: "Enables each Datanode to participate in multiple Ratis pipelines concurrently to improve resource utilization and write throughput."
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -22,28 +22,59 @@ summary: "Enables each DataNode to participate in multiple Ratis pipelines concu
   limitations under the License.
 -->
 
-## Overview
-The early Ozone versions supported one Raft pipeline per DataNode, which meant each DataNode could only participate in one Ratis replication group (pipeline) at a time. This limited its concurrent write handling capacity for replicated data and could lead to under-utilization of resources.
+## Multi-Raft in Datanodes
 
-Multi-Raft support allows a DataNode to be part of multiple Ratis pipelines at once,
-improving write throughput and ensuring better utilization of disk and network resources.
-This is particularly useful when DataNodes have multiple disks.
+Multi-Raft support allows a Datanode to participate
+multiple Ratis replication groups (pipelines) at the same time
+for improving write throughput and ensuring better utilization
+of disk and network resources.
+This is particularly useful when Datanodes have multiple disks
+or the network has a very high bandwidth.
+
+### Background
+
+The early Ozone versions supported only one Raft pipeline per Datanode.
+This limited its concurrent write handling capacity for replicated data
+and led to under-utilization of resources.
+The use of Multi-Raft tremendously improved the resource utilization.
 
 ## Prerequisites
 - Ozone 0.5.0 or later
 - Replication type: RATIS
-- Multiple metadata volumes on each DataNode (via `hdds.container.ratis.datanode.storage.dir`)
-- Adequate CPU, memory, and network bandwidth
+- Multiple metadata directories on each Datanode
+  (via `hdds.container.ratis.datanode.storage.dir`)
+  - Adequate CPU, memory, and network bandwidth
 
 ## How It Works
-SCM can now create overlapping pipelines: each DataNode can join multiple Raft groups, up to a configurable limit. This boosts concurrency and avoids idle nodes. Raft logs are stored separately on different metadata volumes to reduce disk contention. Ratis handles concurrent logs per node.
+SCM can now create overlapping pipelines:
+each Datanode can join multiple Raft groups
+up to a configurable limit.
+This boosts concurrency and avoids idle nodes and idle disks.
+Raft logs are stored separately on different metadata directories
+in order to reduce disk contention.
+Ratis handles concurrent logs per node.
+
+## Configuration
+- `hdds.container.ratis.datanode.storage.dir` (no default)
+    - A list of metadata directory paths.
+      - `ozone.scm.datanode.pipeline.limit` (default: 2)
+    - The maximum number of pipelines per datanode can be engaged in.
+      The value 0 means that
+      the pipeline limit per datanode will be determined
+      by the number of metadata disks reported per datanode;
+      see the next property.
+- `ozone.scm.pipeline.per.metadata.disk` (default: 2)
+    - The maximum number of pipelines for a datanode is determined
+      by the number of disks in that datanode.
+      This property is effective only when the previous property is set to 0.
+      The value of this property must be greater than 0.
 
 ## How to Use
-1. Configure DataNode metadata volumes:
+1. Configure Datanode metadata directories:
    ```xml
    <property>
      <name>hdds.container.ratis.datanode.storage.dir</name>
-     <value>/disk1/ratis,/disk2/ratis</value>
+     <value>/disk1/ratis,/disk2/ratis,/disk3/ratis,/disk4/ratis</value>
    </property>
    ```
 2. Set pipeline limits in `ozone-site.xml`:
@@ -57,30 +88,25 @@ SCM can now create overlapping pipelines: each DataNode can join multiple Raft g
      <value>2</value>
    </property>
    ```
-3. Restart SCM and DataNodes.
+3. Restart SCM and Datanodes.
 4. Validate with:
    ```bash
    ozone admin pipeline list
    ozone admin datanode list
    ```
 
-## Configuration
-- `ozone.scm.datanode.pipeline.limit` (default: 2)
-  - Max number of pipelines per datanode can be engaged in.
-    Setting the value to 0 means the pipeline limit per dn will be determined
-    by the no of metadata volumes reported per dn.
-- `ozone.scm.pipeline.per.metadata.disk` (default: 2)
-  - Number of pipelines to be created per metadata volume.
-- `hdds.container.ratis.datanode.storage.dir`: list of metadata volume paths
 
 ## Operational Tips
-- Monitor with `ozone admin` CLI and Recon UI
-- Ensure pipeline count matches expectations
-For optimal I/O isolation, configure `hdds.container.ratis.datanode.storage.dir` with paths on multiple distinct physical disks. Ratis will distribute pipeline logs accordingly.
-- Be cautious with very high pipeline counts (memory/CPU overhead)
+- Monitor with `ozone admin` CLI and the Recon UI.
+- Ensure pipeline count matches expectations.
+  For optimal I/O isolation,
+  configure `hdds.container.ratis.datanode.storage.dir`
+  with paths on multiple distinct physical disks.
+  The Ratis pipelines will be distributed accordingly.
+  - Be cautious with very high pipeline counts due to memory/CPU overhead.
 
 ## Limitations
-- Global config: cannot set per-node limits
+- Global configuration: cannot set per-node limits
 - Requires restart after changing storage dirs
 - No effect on Erasure-Coding (EC) pipelines
 
