@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumMatches;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
@@ -350,13 +351,14 @@ public class TestContainerReconciliationWithMockDatanodes {
      */
     public long checkAndGetDataChecksum(long containerID) {
       KeyValueContainer container = getContainer(containerID);
+      KeyValueContainerData containerData = container.getContainerData();
       long dataChecksum = 0;
       try {
         Optional<ContainerProtos.ContainerChecksumInfo> containerChecksumInfo =
-            handler.getChecksumManager().read(container.getContainerData());
+            handler.getChecksumManager().read(containerData);
         assertTrue(containerChecksumInfo.isPresent());
         dataChecksum = containerChecksumInfo.get().getContainerMerkleTree().getDataChecksum();
-        assertEquals(container.getContainerData().getDataChecksum(), dataChecksum);
+        verifyAllDataChecksumMatches(containerData, conf);
       } catch (IOException ex) {
         fail("Failed to read container checksum from disk", ex);
       }
