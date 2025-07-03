@@ -252,10 +252,6 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     @Override
     public String toString() {
-      return toString(safeModeStatus, preCheckPassed);
-    }
-
-    private static String toString(boolean safeModeStatus, boolean preCheckPassed) {
       return "SafeModeStatus{" +
           "safeModeStatus=" + safeModeStatus +
           ", preCheckPassed=" + preCheckPassed +
