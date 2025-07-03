@@ -1,8 +1,9 @@
 ---
 title: Protect In-Transit Traffic
 name: Protect In-Transit Traffic
-parent: security
-menu: main
+menu:
+  main:
+    parent: Security
 weight: 6
 ---
 <!---
@@ -24,11 +25,11 @@ weight: 6
 
 # Protecting In-Transit Traffic
 
-This document describes how to protect data in transit within Apache Ozone.
+This document describes how to protect data in transit within Apache Ozone, both between the cluster and clients, and internally within the cluster.
 
 ## Hadoop RPC Encryption
 
-To encrypt client-OM (Ozone Manager) communication, configure `hadoop.rpc.protection` to `privacy` in your `core-site.xml`. This ensures that all data exchanged over Hadoop RPC is encrypted.
+Ozone traffic, whether between the cluster and client, or internal inside the cluster, may be transferred via Hadoop RPC (e.g. client to Ozone Manager). To encrypt client-OM (Ozone Manager) communication, configure `hadoop.rpc.protection` to `privacy` in your `core-site.xml`. This ensures that all data exchanged over Hadoop RPC is encrypted.
 
 ```xml
 <property>
@@ -39,7 +40,7 @@ To encrypt client-OM (Ozone Manager) communication, configure `hadoop.rpc.protec
 
 ## gRPC TLS Encryption
 
-To enable TLS for gRPC traffic, set `hdds.grpc.tls.enabled` to `true`. This encrypts communication between Ozone services that use gRPC.
+Ozone traffic may also be transferred via gRPC (e.g., Ratis write pipeline or client reading blocks from DataNode). To enable TLS for gRPC traffic, set `hdds.grpc.tls.enabled` to `true`. This encrypts communication between Ozone services that use gRPC.
 
 ```xml
 <property>
