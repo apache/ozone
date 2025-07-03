@@ -52,3 +52,7 @@ Ozone traffic may also be transferred via gRPC (e.g., Ratis write pipeline or cl
 ## Ozone HTTP Web Console
 
 For information on securing the Ozone HTTP web console, please refer to the [Securing HTTP](https://ozone.apache.org/docs/latest/security/securing-http.html) documentation.
+
+## Further Reading
+
+For details on the specific network ports used by Ozone roles and the types of transport between them, refer to the [Network Ports](../concept/NetworkPorts.md) documentation.
