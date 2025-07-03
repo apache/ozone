@@ -90,6 +90,83 @@ ozone scm --bootstrap
 
 Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone --daemon start scm`.
 
+## SCM Leader Transfer
+
+The `ozone admin scm transfer` command allows you to manually transfer the leadership of the Storage Container Manager (SCM) Raft group to a specific SCM node or to a randomly chosen follower.
+
+### Usage
+
+```bash
+ozone admin scm transfer -id <SCM_SERVICE_ID> -n <NEW_LEADER_ID>
+ozone admin scm transfer -id <SCM_SERVICE_ID> -r
+```
+
+*   `-id, --service-id`: Specifies the SCM Service ID.
+*   `-n, --newLeaderId, --new-leader-id`: The node ID of the SCM to which leadership will be transferred (e.g., `scm1`).
+*   `-r, --random`: Randomly chooses a follower to transfer leadership to.
+
+### Example
+
+To transfer leadership to `scm2` in a cluster with service ID `cluster1`:
+
+```bash
+ozone admin scm transfer -id cluster1 -n scm2
+```
+
+To transfer leadership to a random follower:
+
+```bash
+ozone admin scm transfer -id cluster1 -r
+```
+
+## SCM Service Roles Listing
+
+The `ozone admin scm roles` command lists all Storage Container Managers and their respective Raft server roles (leader, follower, or candidate).
+
+### Usage
+
+```bash
+ozone admin scm roles [--json | --table]
+```
+
+*   `--json`: (Optional) Formats the output as JSON.
+*   `--table`: (Optional) Formats the output as a table.
+
+### Example
+
+To list SCM roles:
+
+```bash
+ozone admin scm roles
+```
+
+Example output:
+
+```
+host1:9876:LEADER:scm1:192.168.1.1
+host2:9876:FOLLOWER:scm2:192.168.1.2
+host3:9876:FOLLOWER:scm3:192.168.1.3
+```
+
+To list SCM roles as a table:
+
+```bash
+ozone admin scm roles --table
+```
+
+Example table output:
+
+```
+Storage Container Manager Roles
+---------------------------------------------------
+Host Name | Ratis Port | Role     | Node ID | Host Address
+---------------------------------------------------
+host1     | 9876       | LEADER   | scm1    | 192.168.1.1
+host2     | 9876       | FOLLOWER | scm2    | 192.168.1.2
+host3     | 9876       | FOLLOWER | scm3    | 192.168.1.3
+---------------------------------------------------
+```
+
 ## Auto-bootstrap
 
 In some environments (e.g. Kubernetes) we need to have a common, unified way to initialize SCM HA quorum. As a reminder, the standard initialization flow is the following:

@@ -125,6 +125,84 @@ ozone om [global options (optional)] --bootstrap --force
 
 Note that using the _force_ option during bootstrap could crash the OM process if it does not have updated configurations.
 
+## OM Leader Transfer
+
+The `ozone admin om transfer` command allows you to manually transfer the leadership of the Ozone Manager (OM) Raft group to a specific OM node or to a randomly chosen follower.
+
+### Usage
+
+```bash
+ozone admin om transfer -id <OM_SERVICE_ID> -n <NEW_LEADER_ID>
+ozone admin om transfer -id <OM_SERVICE_ID> -r
+```
+
+*   `-id, --service-id`: Specifies the Ozone Manager Service ID.
+*   `-n, --newLeaderId, --new-leader-id`: The node ID of the OM to which leadership will be transferred (e.g., `om1`).
+*   `-r, --random`: Randomly chooses a follower to transfer leadership to.
+
+### Example
+
+To transfer leadership to `om2` in a cluster with service ID `cluster1`:
+
+```bash
+ozone admin om transfer -id cluster1 -n om2
+```
+
+To transfer leadership to a random follower:
+
+```bash
+ozone admin om transfer -id cluster1 -r
+```
+
+## OM Service Roles Listing
+
+The `ozone admin om roles` command lists all Ozone Managers and their respective Raft server roles (leader, follower, or candidate).
+
+### Usage
+
+```bash
+ozone admin om roles [-id <OM_SERVICE_ID>] [--json | --table]
+```
+
+*   `-id, --service-id`: (Optional) Specifies the Ozone Manager Service ID.
+*   `--json`: (Optional) Formats the output as JSON.
+*   `--table`: (Optional) Formats the output as a table.
+
+### Example
+
+To list OM roles for `cluster1`:
+
+```bash
+ozone admin om roles -id cluster1
+```
+
+Example output:
+
+```
+om1 : LEADER (host1)
+om2 : FOLLOWER (host2)
+om3 : FOLLOWER (host3)
+```
+
+To list OM roles as a table:
+
+```bash
+ozone admin om roles -id cluster1 --table
+```
+
+Example table output:
+
+```
+Ozone Manager Roles
+-------------------
+Host Name | Node ID | Role
+-------------------
+host1     | om1     | LEADER
+host2     | om2     | FOLLOWER
+host3     | om3     | FOLLOWER
+-------------------
+```
+
 ## Automatic Snapshot Installation for Stale Ozone Managers
 
 Sometimes an OM follower node may be offline or fall far behind the OM leader's raft log.
