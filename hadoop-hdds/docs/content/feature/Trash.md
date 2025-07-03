@@ -71,4 +71,4 @@ The trash emptier is a background process that periodically deletes files from t
 </property>
 ```
 
-If this property is not set, it defaults to the value of `fs.trash.interval`.
+If this property is not set, it defaults to the value of `fs.trash.checkpoint.interval`.
