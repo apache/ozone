@@ -36,6 +36,10 @@ Ozone traffic, whether between the cluster and client, or internal inside the cl
 </property>
 ```
 
+### ozone.om.transport.class
+
+While the default is `org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory`, it is possible to specify a gRPC based transport using the `ozone.om.transport.class` configuration property: `org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory`. In this case, the Hadoop RPC configuration is not applicable.
+
 ## gRPC TLS Encryption
 
 Ozone traffic may also be transferred via gRPC (e.g., Ratis write pipeline or client reading blocks from DataNode). To enable TLS for gRPC traffic, set `hdds.grpc.tls.enabled` to `true`. This encrypts communication between Ozone services that use gRPC.
