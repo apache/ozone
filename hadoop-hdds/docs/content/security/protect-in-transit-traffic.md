@@ -23,8 +23,6 @@ weight: 6
     limitations under the License.
 -->
 
-# Protecting In-Transit Traffic
-
 This document describes how to protect data in transit within Apache Ozone, both between the cluster and clients, and internally within the cluster.
 
 ## Hadoop RPC Encryption
