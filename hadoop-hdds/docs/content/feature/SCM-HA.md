@@ -94,6 +94,8 @@ Note: both commands perform one-time initialization.  SCM still needs to be star
 
 The `ozone admin scm transfer` command allows you to manually transfer the leadership of the Storage Container Manager (SCM) Raft group to a specific SCM node or to a randomly chosen follower.
 
+Be aware of the node's status(eg. Safemode, Operational status), ozone currently has no ability to check the target node's status before transfering the leadership.
+
 ### Usage
 
 ```bash
