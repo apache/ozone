@@ -73,6 +73,7 @@ public class RDBStore implements DBStore {
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
   private final ManagedStatistics statistics;
+  private final int manualCompactionMaxSubCompactions;
 
   @SuppressWarnings("parameternumber")
   RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
@@ -92,6 +93,8 @@ public class RDBStore implements DBStore {
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
     this.statistics = statistics;
+    this.manualCompactionMaxSubCompactions = configuration.getObject(RocksDBConfiguration.class)
+        .getManualCompactionMaxSubCompactions();
 
     Exception exception = null;
     try {
@@ -216,8 +219,8 @@ public class RDBStore implements DBStore {
 
   @Override
   public void compactDB() throws IOException {
-    try (ManagedCompactRangeOptions options =
-             new ManagedCompactRangeOptions()) {
+    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+      options.setMaxSubcompactions(manualCompactionMaxSubCompactions);
       db.compactDB(options);
     }
   }
@@ -225,6 +228,7 @@ public class RDBStore implements DBStore {
   @Override
   public void compactTable(String tableName) throws IOException {
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+      options.setMaxSubcompactions(manualCompactionMaxSubCompactions);
       compactTable(tableName, options);
     }
   }

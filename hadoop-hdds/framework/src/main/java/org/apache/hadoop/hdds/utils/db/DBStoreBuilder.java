@@ -323,11 +323,9 @@ public final class DBStoreBuilder {
 
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
-        tableConfigs.add(new TableConfig(name,
-                getCfOptions(rocksDbCfWriteBufferSize)));
-      } else {
-        tableConfigs.add(new TableConfig(name, options));
+        options = getCfOptions(rocksDbCfWriteBufferSize);
       }
+      tableConfigs.add(new TableConfig(name, options));
     }
 
     return tableConfigs;

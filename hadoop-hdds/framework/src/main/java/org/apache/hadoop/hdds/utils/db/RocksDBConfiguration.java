@@ -84,6 +84,13 @@ public class RocksDBConfiguration {
           + "Default 0 means no limit.")
   private long walSizeLimit = 0;
 
+  @Config(key = "rocksdb.manual.compaction.max.sub.compactions",
+      type = ConfigType.INT,
+      defaultValue = "1",
+      tags = {OM},
+      description = "Maximum number of sub compactions to use when manual compacting. Default 1 means no limit.")
+  private int manualCompactionMaxSubCompactions = 1;
+
   public void setRocksdbLoggingEnabled(boolean enabled) {
     this.rocksdbLogEnabled = enabled;
   }
@@ -138,5 +145,9 @@ public class RocksDBConfiguration {
 
   public int getKeepLogFileNum() {
     return rocksdbKeepLogFileNum;
+  }
+
+  public int getManualCompactionMaxSubCompactions() {
+    return manualCompactionMaxSubCompactions;
   }
 }
