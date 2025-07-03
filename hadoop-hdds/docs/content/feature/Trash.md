@@ -72,13 +72,3 @@ The trash emptier is a background process that periodically deletes files from t
 ```
 
 If this property is not set, it defaults to the value of `fs.trash.interval`.
-
-### Manually Emptying the Trash
-
-You can also manually and permanently delete files from the trash using the `-expunge` command:
-
-```bash
-ozone fs -expunge
-```
-
-This command will immediately remove all files from your trash directory. This action is irreversible.
