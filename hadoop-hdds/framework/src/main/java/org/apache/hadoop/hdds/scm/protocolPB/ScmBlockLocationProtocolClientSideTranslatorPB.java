@@ -232,13 +232,13 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
 
     // Build KeyBlocks (legacy format, no usedBytes)
-    List<KeyBlocks> legacy = keyBlocksInfoList.stream()
+    List<KeyBlocks> keyBlocksProto = keyBlocksInfoList.stream()
         .map(DeletedBlockGroup::getProto)
         .collect(Collectors.toList());
 
     DeleteScmKeyBlocksRequestProto request = DeleteScmKeyBlocksRequestProto
-        .newBuilder() // new field (#2)
-        .addAllKeyBlocks(legacy)           // old field (#1, deprecated)
+        .newBuilder()
+        .addAllKeyBlocks(keyBlocksProto)
         .build();
 
     SCMBlockLocationRequest wrapper = createSCMBlockRequest(
