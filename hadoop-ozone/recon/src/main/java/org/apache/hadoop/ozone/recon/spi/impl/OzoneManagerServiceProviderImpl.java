@@ -247,6 +247,8 @@ public class OzoneManagerServiceProviderImpl
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
       LOG.error("Error starting Recon OM Metadata Manager.", ioEx);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.INTERNAL_ERROR);
     } catch (RuntimeException runtimeException) {
       LOG.warn("Unexpected runtime error starting Recon OM Metadata Manager.", runtimeException);
       LOG.warn("Trying to delete existing recon OM snapshot DB and fetch new one.");
@@ -309,6 +311,7 @@ public class OzoneManagerServiceProviderImpl
     }
     reconTaskController.reInitializeTasks(omMetadataManager, reconOmTaskMap);
     startSyncDataFromOM(initialDelay);
+    LOG.info("Ozone Manager Service Provider is started.");
   }
 
   private void startSyncDataFromOM(long initialDelay) {
