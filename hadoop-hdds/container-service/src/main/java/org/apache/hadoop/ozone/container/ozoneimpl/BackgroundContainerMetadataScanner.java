@@ -65,7 +65,7 @@ public class BackgroundContainerMetadataScanner extends
       LOG.debug("Container [{}] has been deleted during the metadata scan.", containerID);
       return;
     }
-    if (!result.hasErrors()) {
+    if (result.hasErrors()) {
       scanHelper.handleUnhealthyScanResult(containerID, result);
     }
 

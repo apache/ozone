@@ -74,7 +74,7 @@ public final class ContainerScanHelper {
       } catch (IOException ex) {
         log.warn("Failed to update container checksum after scan of container {}", containerId, ex);
       }
-      if (!result.hasErrors()) {
+      if (result.hasErrors()) {
         handleUnhealthyScanResult(containerId, result);
       }
       metrics.incNumContainersScanned();

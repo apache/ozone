@@ -183,7 +183,7 @@ public class KeyValueContainerCheck {
     MetadataScanResult metadataResult = fastCheck();
     if (metadataResult.isDeleted()) {
       return DataScanResult.deleted();
-    } else if (!metadataResult.hasErrors()) {
+    } else if (metadataResult.hasErrors()) {
       return DataScanResult.unhealthyMetadata(metadataResult);
     }
 
