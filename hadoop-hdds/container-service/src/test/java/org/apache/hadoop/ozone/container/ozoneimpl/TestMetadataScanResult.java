@@ -31,7 +31,7 @@ class TestMetadataScanResult {
   void testFromEmptyErrors() {
     // No errors means the scan result is healthy.
     MetadataScanResult result = MetadataScanResult.fromErrors(Collections.emptyList());
-    assertTrue(!result.hasErrors());
+    assertFalse(result.hasErrors());
     assertFalse(result.isDeleted());
     assertTrue(result.getErrors().isEmpty());
     assertTrue(result.toString().contains("0 errors"));
@@ -41,7 +41,7 @@ class TestMetadataScanResult {
   void testFromErrors() {
     MetadataScanResult result =
         MetadataScanResult.fromErrors(Arrays.asList(getMetadataScanError(), getMetadataScanError()));
-    assertFalse(!result.hasErrors());
+    assertTrue(result.hasErrors());
     assertFalse(result.isDeleted());
     assertEquals(2, result.getErrors().size());
     assertTrue(result.toString().contains("2 errors"));
@@ -50,7 +50,7 @@ class TestMetadataScanResult {
   @Test
   void testDeleted() {
     MetadataScanResult result = MetadataScanResult.deleted();
-    assertTrue(!result.hasErrors());
+    assertFalse(result.hasErrors());
     assertTrue(result.isDeleted());
     assertTrue(result.getErrors().isEmpty());
     assertTrue(result.toString().contains("deleted"));
