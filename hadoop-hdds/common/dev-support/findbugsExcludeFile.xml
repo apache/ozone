@@ -27,4 +27,7 @@
     <Method name="update" />
     <Bug pattern="SF_SWITCH_FALLTHROUGH,SF_SWITCH_NO_DEFAULT" />
   </Match>
+  <Match>
+    <Package name="org.apache.hadoop.ozone.metrics"/>
+  </Match>
 </FindBugsFilter>
