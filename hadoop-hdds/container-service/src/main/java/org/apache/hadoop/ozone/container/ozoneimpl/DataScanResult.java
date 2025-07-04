@@ -45,7 +45,7 @@ public final class DataScanResult extends MetadataScanResult {
    * This data scan result will have an empty data tree with a zero checksum to indicate that no data was scanned.
    */
   public static DataScanResult unhealthyMetadata(MetadataScanResult result) {
-    Preconditions.checkArgument(!result.isHealthy());
+    Preconditions.checkArgument(!result.hasErrors());
     return new DataScanResult(result.getErrors(), new ContainerMerkleTreeWriter(), false);
   }
 
