@@ -1,0 +1,69 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Interrupt RocksDB compaction operations for testing
+
+RULE CompactionRangeDelay
+CLASS org.apache.hadoop.hdds.utils.db.RocksDatabase
+METHOD compactRange(ColumnFamily, byte[], byte[], ManagedCompactRangeOptions)
+AT ENTRY
+IF TRUE
+DO
+   System.out.println("FAULT INJECTION: Delaying compaction for column family: " + $1.getName());
+   Thread.sleep(3000);
+ENDRULE
+
+RULE CompactionRangeException
+CLASS org.apache.hadoop.hdds.utils.db.RocksDatabase  
+METHOD compactRange(ColumnFamily, byte[], byte[], ManagedCompactRangeOptions)
+AT ENTRY
+BIND counter = incrementCounter("compactionFailures")
+IF counter % 3 == 0
+DO
+   System.out.println("FAULT INJECTION: Simulating compaction failure for: " + $1.getName());
+   throw new RuntimeException("Simulated compaction failure - restart required");
+ENDRULE
+
+RULE CompactionServiceDelay
+CLASS org.apache.hadoop.ozone.om.service.CompactionService
+METHOD compactFully
+AT ENTRY
+IF TRUE
+DO
+   System.out.println("FAULT INJECTION: Delaying CompactionService.compactFully for table: " + $1);
+   Thread.sleep(2000);
+ENDRULE
+
+RULE CompactionBeginListener
+CLASS org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer$1
+METHOD onCompactionBegin
+AT ENTRY
+IF TRUE
+DO
+   System.out.println("FAULT INJECTION: Intercepted compaction begin");
+   # Simulate processing delay
+   Thread.sleep(1000);
+ENDRULE
+
+RULE CompactionCompletedListener
+CLASS org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer$2
+METHOD onCompactionCompleted
+AT ENTRY
+BIND counter = incrementCounter("compactionCompletedInterrupts")
+IF counter % 2 == 0
+DO
+   System.out.println("FAULT INJECTION: Interrupting compaction completion processing");
+   Thread.sleep(5000);
+ENDRULE 
