@@ -965,7 +965,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           try {
             metadataManager.stop();
           } catch (Exception ex) {
-           LOG.warn("Failed to stop metadataManager", e);
+            LOG.warn("Failed to stop metadataManager", e);
           }
         }
         throw e;
