@@ -45,6 +45,8 @@ volume named `/s3v` to store all S3 buckets (this is configurable via the `ozone
 
 Each S3 bucket created is represented as a bucket under the `/s3v` volume in Ozone. Objects (keys) are stored within those buckets. This mapping is transparent to the end user.
 
+The default bucket layout for S3 buckets (`OBJECT_STORE`) can be configured using the `ozone.s3g.default.bucket.layout` property. This property defines the storage layout for buckets created via the S3 gateway.
+
 ## S3 Gateway in the Ozone Architecture
 
 The S3 Gateway does the following:
@@ -106,3 +108,4 @@ For more details, refer to the other documentation:
 - [Ozone S3 Gateway Interface]({{< ref "S3" >}})
 - [S3 Multi-Tenancy]({{< ref "S3-Multi-Tenancy" >}})
 - [Securing S3]({{< ref "SecuringS3" >}})
+- [Network Ports]({{< ref "NetworkPorts" >}})
