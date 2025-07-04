@@ -69,8 +69,5 @@ Check bucket ownership verification
     ${bucket} =           Create bucket
     ${correct_owner} =    Get bucket owner    ${bucket}
 
-    Execute AWSS3APICli and failed bucket ownership verification   put-bucket-acl --bucket ${bucket} --grant-full-control id=${correct_owner}  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification        put-bucket-acl --bucket ${bucket} --grant-full-control id=${correct_owner}  ${correct_owner}
-
-    Execute AWSS3APICli and failed bucket ownership verification   get-bucket-acl --bucket ${bucket}    wrong-owner
-    Execute AWSS3APICli using bucket ownership verification        get-bucket-acl --bucket ${bucket}    ${correct_owner}
+    Execute AWSS3APICli with bucket owner check        put-bucket-acl --bucket ${bucket} --grant-full-control id=${correct_owner}  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check        get-bucket-acl --bucket ${bucket}    ${correct_owner}

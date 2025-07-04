@@ -69,5 +69,4 @@ Check Bucket Ownership Verification
     Prepare Many Objects In Bucket                                1
     ${correct_owner} =    Get bucket owner                        ${BUCKET}
 
-    Execute AWSS3APICli and failed bucket ownership verification  list-objects-v2 --bucket ${BUCKET}  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification       list-objects-v2 --bucket ${BUCKET}  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check                   list-objects-v2 --bucket ${BUCKET}  ${correct_owner}

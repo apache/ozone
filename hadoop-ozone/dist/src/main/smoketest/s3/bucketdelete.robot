@@ -65,5 +65,4 @@ Check bucket ownership verification
     ${bucket} =           Create bucket to be deleted
     ${correct_owner} =    Get bucket owner    ${bucket}
 
-    Execute AWSS3APICli and failed bucket ownership verification  delete-bucket --bucket ${bucket}  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification       delete-bucket --bucket ${bucket}  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check       delete-bucket --bucket ${bucket}  ${correct_owner}

@@ -79,13 +79,10 @@ Check Bucket Ownership Verification
     ${correct_owner} =    Get bucket owner    ${BUCKET}
 
     #Create tagging
-    Execute AWSS3APICli and failed bucket ownership verification    put-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --tagging '{"TagSet": [{ "Key": "tag-key1", "Value": "tag-value1" }]}'  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification         put-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --tagging '{"TagSet": [{ "Key": "tag-key1", "Value": "tag-value1" }]}'  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check                     put-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --tagging '{"TagSet": [{ "Key": "tag-key1", "Value": "tag-value1" }]}'  ${correct_owner}
 
     #Get object tagging
-    Execute AWSS3APICli and failed bucket ownership verification    get-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification         get-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check                     get-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  ${correct_owner}
 
     #Delete object tagging
-    Execute AWSS3APICli and failed bucket ownership verification    delete-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification         delete-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check                     delete-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  ${correct_owner}

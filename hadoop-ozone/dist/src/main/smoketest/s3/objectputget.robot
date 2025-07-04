@@ -308,14 +308,11 @@ Check Bucket Ownership Verification
     Execute             echo "Randomtext" > /tmp/testfile
     ${correct_owner} =    Get bucket owner    ${BUCKET}
     # test put
-    Execute AWSS3APICli and failed bucket ownership verification    put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile  ${correct_owner}
 
     # test get
-    Execute AWSS3APICli and failed bucket ownership verification    get-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 /tmp/testfile  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification         get-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 /tmp/testfile  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check         get-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 /tmp/testfile  ${correct_owner}
 
     # create directory
-    Execute                                                         touch /tmp/emptyfile
-    Execute AWSS3APICli and failed bucket ownership verification    put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/dir/ --body /tmp/emptyfile  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/dir/ --body /tmp/emptyfile  ${correct_owner}
+    Execute                                             touch /tmp/emptyfile
+    Execute AWSS3APICli with bucket owner check         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/dir/ --body /tmp/emptyfile  ${correct_owner}

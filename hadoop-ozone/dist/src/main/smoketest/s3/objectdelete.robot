@@ -75,8 +75,7 @@ Check Bucket Ownership Verification
     ${result} =         Execute AWSS3APICli and checkrc                 put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile   0
     ${correct_owner} =    Get bucket owner                              ${BUCKET}
     # delete single object
-    Execute AWSS3APICli and failed bucket ownership verification        delete-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification             delete-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check                         delete-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  ${correct_owner}
 
     # delete multiple objects
     Execute                                                             echo "Randomtext" > /tmp/testfile1
@@ -87,5 +86,4 @@ Check Bucket Ownership Verification
     ${delete_json} =    Set Variable                                    {"Objects": [{"Key": "${PREFIX}/bucketownercondition/key=value/multi1"}, {"Key": "${PREFIX}/bucketownercondition/key=value/multi2"}]}
     ${delete_file} =    Set Variable                                    /tmp/delete_objects.json
     Execute                                                             echo '${delete_json}' > ${delete_file}
-    Execute AWSS3APICli and failed bucket ownership verification        delete-objects --bucket ${BUCKET} --delete file://${delete_file}  wrong-owner
-    Execute AWSS3APICli using bucket ownership verification             delete-objects --bucket ${BUCKET} --delete file://${delete_file}  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check                         delete-objects --bucket ${BUCKET} --delete file://${delete_file}  ${correct_owner}

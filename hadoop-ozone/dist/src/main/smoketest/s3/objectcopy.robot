@@ -122,8 +122,5 @@ Check Bucket Ownership Verification
     ${correct_dest_owner} =     Get bucket owner    ${DESTBUCKET}
     ${correct_source_owner} =   Get bucket owner    ${BUCKET}
 
-    ${result} =    Execute AWSS3ApiCli                            put-object --bucket ${BUCKET} --key ${PREFIX}/copyowner/key=value/f1 --body /tmp/testfile
-    Execute AWSS3APICli and failed bucket ownership verification  copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyowner/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyowner/key=value/f1  wrong-owner            ${correct_source_owner}
-    Execute AWSS3APICli and failed bucket ownership verification  copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyowner/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyowner/key=value/f1  ${correct_dest_owner}  wrong-owner
-
-    Execute AWSS3APICli using bucket ownership verification       copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyowner/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyowner/key=value/f1  ${correct_dest_owner}  ${correct_source_owner}
+    Execute AWSS3ApiCli                             put-object --bucket ${BUCKET} --key ${PREFIX}/copyowner/key=value/f1 --body /tmp/testfile
+    Execute AWSS3APICli with bucket owner check     copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyowner/key=value/f1 --copy-source ${BUCKET}/${PREFIX}/copyowner/key=value/f1  ${correct_dest_owner}  ${correct_source_owner}
