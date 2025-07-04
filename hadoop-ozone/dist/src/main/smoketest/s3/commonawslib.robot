@@ -195,7 +195,7 @@ Revoke S3 secrets
 
 Get bucket owner
     [arguments]    ${bucket}
-    ${owner} =     Execute     ozone sh bucket info /s3v/${bucket} | jq -r '.owner'
+    ${owner} =     Execute    aws s3api --endpoint-url ${ENDPOINT_URL} get-bucket-acl --bucket ${bucket} | jq -r .Owner.DisplayName
     [return]       ${owner}
 
 Execute AWSS3APICli using bucket ownership verification
