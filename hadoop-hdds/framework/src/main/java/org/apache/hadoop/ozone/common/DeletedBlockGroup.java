@@ -22,7 +22,6 @@ import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeletedKeyBlocks;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
 
 /**
@@ -46,15 +45,15 @@ public final class DeletedBlockGroup {
     return groupID;
   }
 
-  public DeletedKeyBlocks getProto() {
-    DeletedKeyBlocks.Builder kbb = DeletedKeyBlocks.newBuilder();
+  public KeyBlocks getProto() {
+    KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
     for (DeletedBlock block : blocks) {
       kbb.addBlocks(block.getProtobuf());
     }
     return kbb.setKey(groupID).build();
   }
 
-  public static DeletedBlockGroup getFromProto(DeletedKeyBlocks proto) {
+  public static DeletedBlockGroup getFromProto(KeyBlocks proto) {
     List<DeletedBlock> blocks = new ArrayList<>();
     for (HddsProtos.DeletedBlock block : proto.getBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
@@ -63,34 +62,6 @@ public final class DeletedBlockGroup {
     }
     return DeletedBlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlocks(blocks).build();
-  }
-
-  /** ------------------------------------------------------------------
-   * Build the *legacy* wire format (KeyBlocks) — used when talking to an
-   * older SCM that doesn’t understand usedBytes.  Each BlockID is copied
-   * exactly, but the size field is absent.
-   * ------------------------------------------------------------------ */
-  public KeyBlocks getLegacyProto() {
-    KeyBlocks.Builder kb = KeyBlocks.newBuilder().setKey(groupID);
-    for (DeletedBlock b : blocks) {
-      kb.addBlocks(b.getBlockID().getProtobuf());
-    }
-    return kb.build();
-  }
-
-  /** ------------------------------------------------------------------
-   * Convert a legacy KeyBlocks message (which has no usedBytes) into the
-   * richer DeletedBlockGroup representation by defaulting size to 0.
-   * ------------------------------------------------------------------ */
-  public static DeletedBlockGroup fromLegacy(KeyBlocks proto) {
-    List<DeletedBlock> list = new ArrayList<>();
-    for (HddsProtos.BlockID bid : proto.getBlocksList()) {
-      list.add(new DeletedBlock(BlockID.getFromProtobuf(bid), 0L));
-    }
-    return new Builder()
-        .setKeyName(proto.getKey())
-        .addAllBlocks(list)
-        .build();
   }
 
   public static Builder newBuilder() {

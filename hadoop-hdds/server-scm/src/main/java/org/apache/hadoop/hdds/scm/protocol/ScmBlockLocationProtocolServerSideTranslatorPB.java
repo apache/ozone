@@ -231,16 +231,9 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
 
     List<DeletedBlockGroup> infoList;
 
-    if (req.getDeletedKeyBlocksCount() > 0) {
-      // New callers: use the size-aware list.
-      infoList = req.getDeletedKeyBlocksList().stream()
-          .map(DeletedBlockGroup::getFromProto)
-          .collect(Collectors.toList());
-    } else {
-      infoList = req.getKeyBlocksList().stream()
-          .map(DeletedBlockGroup::fromLegacy)
-          .collect(Collectors.toList());
-    }
+    infoList = req.getKeyBlocksList().stream()
+        .map(DeletedBlockGroup::getFromProto)
+        .collect(Collectors.toList());
 
     final List<DeleteBlockGroupResult> results =
         impl.deleteKeyBlocks(infoList);

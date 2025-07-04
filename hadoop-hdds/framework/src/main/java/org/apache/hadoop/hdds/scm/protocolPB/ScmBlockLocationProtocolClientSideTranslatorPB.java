@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeletedKeyBlocks;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
@@ -231,18 +230,14 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
-    List<DeletedKeyBlocks> dkProto = keyBlocksInfoList.stream()
+
+    // Build KeyBlocks (legacy format, no usedBytes)
+    List<KeyBlocks> legacy = keyBlocksInfoList.stream()
         .map(DeletedBlockGroup::getProto)
         .collect(Collectors.toList());
 
-// Build KeyBlocks (legacy format, no usedBytes)
-    List<KeyBlocks> legacy = keyBlocksInfoList.stream()
-        .map(DeletedBlockGroup::getLegacyProto)
-        .collect(Collectors.toList());
-
     DeleteScmKeyBlocksRequestProto request = DeleteScmKeyBlocksRequestProto
-        .newBuilder()
-        .addAllDeletedKeyBlocks(dkProto)   // new field (#2)
+        .newBuilder() // new field (#2)
         .addAllKeyBlocks(legacy)           // old field (#1, deprecated)
         .build();
 
