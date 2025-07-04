@@ -53,7 +53,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_EDEKCACHELOADER_INITIAL_DELAY_MS_KEY;
@@ -522,8 +521,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
             .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
-            .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
-                this::reconfOzoneKeyDeletingLimitPerTask)
             .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval)
             .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion);
 
@@ -5147,16 +5144,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Load conf {} : {}, and now readOnly admins are: {}",
         OZONE_READONLY_ADMINISTRATORS, newVal, pReadOnlyAdmins);
     return String.valueOf(newVal);
-  }
-
-  private String reconfOzoneKeyDeletingLimitPerTask(String newVal) {
-    Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
-        OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
-    getConfiguration().set(OZONE_KEY_DELETING_LIMIT_PER_TASK, newVal);
-
-    getKeyManager().getDeletingService()
-        .setKeyLimitPerTask(Integer.parseInt(newVal));
-    return newVal;
   }
 
   private String reconfigureAllowListAllVolumes(String newVal) {
