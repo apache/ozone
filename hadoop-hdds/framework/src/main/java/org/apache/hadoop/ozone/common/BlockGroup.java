@@ -49,7 +49,7 @@ public final class BlockGroup {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
     for (BlockID block : blockIDs) {
       DeletedBlock blockProto = new DeletedBlock(block, 0);
-      kbb.addBlocks(blockProto.getProtobuf());
+      kbb.addDeletedBlocks(blockProto.getProtobuf());
     }
     return kbb.setKey(groupID).build();
   }
@@ -61,7 +61,7 @@ public final class BlockGroup {
    */
   public static BlockGroup getFromProto(KeyBlocks proto) {
     List<BlockID> blockIDs = new ArrayList<>();
-    for (HddsProtos.DeletedBlock block : proto.getBlocksList()) {
+    for (HddsProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
       blockIDs.add(new BlockID(block.getBlockId().getContainerBlockID().getContainerID(),
           block.getBlockId().getContainerBlockID().getLocalID()));
     }

@@ -30,15 +30,15 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyB
 public final class DeletedBlockGroup {
 
   private String groupID;
-  private List<DeletedBlock> blocks;
+  private List<DeletedBlock> deletedBlocks;
 
-  private DeletedBlockGroup(String groupID, List<DeletedBlock> blocks) {
+  private DeletedBlockGroup(String groupID, List<DeletedBlock> deletedBlocks) {
     this.groupID = groupID;
-    this.blocks = blocks;
+    this.deletedBlocks = deletedBlocks;
   }
 
   public List<DeletedBlock> getAllBlocks() {
-    return blocks;
+    return deletedBlocks;
   }
 
   public String getGroupID() {
@@ -47,18 +47,28 @@ public final class DeletedBlockGroup {
 
   public KeyBlocks getProto() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
-    for (DeletedBlock block : blocks) {
-      kbb.addBlocks(block.getProtobuf());
+    for (DeletedBlock block : deletedBlocks) {
+      kbb.addDeletedBlocks(block.getProtobuf());
     }
     return kbb.setKey(groupID).build();
   }
 
   public static DeletedBlockGroup getFromProto(KeyBlocks proto) {
     List<DeletedBlock> blocks = new ArrayList<>();
-    for (HddsProtos.DeletedBlock block : proto.getBlocksList()) {
+    for (HddsProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
       blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(), containerBlockId.getLocalID()),
           block.getReplicatedSize()));
+    }
+    return DeletedBlockGroup.newBuilder().setKeyName(proto.getKey())
+        .addAllBlocks(blocks).build();
+  }
+
+  public static DeletedBlockGroup getFromLegacyProto(KeyBlocks proto) {
+    List<DeletedBlock> blocks = new ArrayList<>();
+    for (HddsProtos.BlockID block : proto.getBlocksList()) {
+      HddsProtos.ContainerBlockID containerBlockId = block.getContainerBlockID();
+      blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(), containerBlockId.getLocalID()), -1L));
     }
     return DeletedBlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlocks(blocks).build();
@@ -72,7 +82,7 @@ public final class DeletedBlockGroup {
   public String toString() {
     return "DeletedBlockGroup[" +
         "groupID='" + groupID + '\'' +
-        ", blocks=" + blocks +
+        ", deletedBlocks=" + deletedBlocks +
         ']';
   }
 

@@ -106,10 +106,10 @@ public class TestDeletionService {
       // Step 5: Verify deleteBlocks call and capture argument
       ArgumentCaptor<List<DeletedBlockGroup>> captor =
           ArgumentCaptor.forClass(List.class);
-      verify(spyManager, timeout(50000)).deleteBlocks(captor.capture());
+      verify(spyManager, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
 
       // Step 6: Calculate and assert used bytes
-      long totalUsedBytes = captor.getValue().stream()
+      long totalUsedBytes = captor.getAllValues().get(0).stream()
           .flatMap(group -> group.getAllBlocks().stream())
           .mapToLong(DeletedBlock::getReplicateSize)
           .sum();

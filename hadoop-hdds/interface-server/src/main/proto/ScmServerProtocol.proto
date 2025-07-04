@@ -171,7 +171,7 @@ message DeleteScmKeyBlocksRequestProto {
 
   // Field kept for rolling upgrades.  It contains KeyBlocks without
   // per-block size information.
-  repeated KeyBlocks keyBlocks = 1 [deprecated = true];
+  repeated KeyBlocks keyBlocks = 1;
 }
 
 /**
@@ -183,7 +183,8 @@ message DeleteScmKeyBlocksRequestProto {
  */
 message KeyBlocks {
   required string key = 1;
-  repeated DeletedBlock blocks = 2;
+  repeated BlockID blocks = 2;
+  repeated DeletedBlock deletedBlocks = 3;
 }
 
 /**
