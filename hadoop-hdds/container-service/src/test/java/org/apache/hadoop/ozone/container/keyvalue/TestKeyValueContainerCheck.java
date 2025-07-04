@@ -186,7 +186,7 @@ public class TestKeyValueContainerCheck
     result = kvCheck.fullCheck(throttler, null);
     result.getErrors().forEach(e -> LOG.info("Error detected: {}", e));
 
-    assertFalse(!result.hasErrors());
+    assertTrue(result.hasErrors());
     // Check that all data errors were detected in order.
     assertEquals(expectedErrors.size(), result.getErrors().size());
     List<FailureType> actualErrors = result.getErrors().stream()
