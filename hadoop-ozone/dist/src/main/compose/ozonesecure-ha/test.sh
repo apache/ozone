@@ -51,3 +51,6 @@ for bucket in link; do
   ## Exclude virtual-host.robot
   exclude="--exclude virtual-host --exclude no-bucket-type"
 done
+
+# Run Fault Injection tests at the end
+execute_robot_test s3g ozone-fi/byteman_faults_sample.robot
