@@ -122,8 +122,3 @@ Verify EC Replication Config
                    Should Match Regexp      ${result}       ^(?m)${data}$
                    Should Match Regexp      ${result}       ^(?m)${parity}$
                    Should Match Regexp      ${result}       ^(?m)${chunksize}$
-
-Get bucket owner
-    [arguments]    ${bucket}
-    ${owner} =     Execute     ozone sh bucket info /s3v/${bucket} | jq -r '.owner'
-    [return]       ${owner}
