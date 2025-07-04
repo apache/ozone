@@ -32,7 +32,7 @@ This design lets users leverage the rich ecosystem of S3-compatible applications
 
 Ozone’s S3 Gateway acts as a **REST front-end** that speaks the S3 protocol and bridges it to the Ozone backend. It is **stateless**, meaning it does not persist data or metadata locally between requests – all state is stored in the Ozone cluster itself.
 
-Being stateless allows multiple S3 Gateway instances to run in parallel behind a load balancer for scaling and high availability. The gateway supports a broad set of S3 operations – create/delete buckets, PUT/GET objects, list objects, perform multipart uploads – using standard S3 SDKs or CLI tools.
+Being stateless allows multiple S3 Gateway instances to run in parallel behind a load balancer for scaling and high availability. The idea of stateless also allows S3G to be deployed in Kubernetes quite easily. The gateway supports a broad set of S3 operations – create/delete buckets, PUT/GET objects, list objects, perform multipart uploads – using standard S3 SDKs or CLI tools.
 
 Under the hood, each operation is translated into the appropriate Ozone calls:
 - A PUT object request becomes a `putKey` write operation.
@@ -90,6 +90,7 @@ This simplifies scaling and failure recovery.
 
 ### Authentication and Security
 Supports AWS Signature-style authentication (if enabled):
+- Only AWS Signature V4 is supported (the older AWS Signature V2 is not).
 - Validates access/secret keys via OM
 - Uses OM’s stored credentials
 - Relies on OM for final authorization
