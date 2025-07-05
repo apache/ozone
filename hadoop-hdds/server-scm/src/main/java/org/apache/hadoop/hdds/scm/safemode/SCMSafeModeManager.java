@@ -237,12 +237,6 @@ public class SCMSafeModeManager implements SafeModeManager {
     return LOG;
   }
 
-  // TODO: This will be removed by HDDS-12955
-  public double getCurrentContainerThreshold() {
-    return ((RatisContainerSafeModeRule) exitRules.get("RatisContainerSafeModeRule"))
-        .getCurrentContainerThreshold();
-  }
-
   /**
    * Class used during SafeMode status event.
    */

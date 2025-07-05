@@ -138,7 +138,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory;
+import org.apache.hadoop.hdds.scm.safemode.RatisContainerSafeModeRule;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeRuleFactory;
 import org.apache.hadoop.hdds.scm.security.RootCARotationManager;
 import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
@@ -1977,7 +1979,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   @VisibleForTesting
   public double getCurrentContainerThreshold() {
-    return scmSafeModeManager.getCurrentContainerThreshold();
+    RatisContainerSafeModeRule rule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(RatisContainerSafeModeRule.class);
+    return rule != null ? rule.getCurrentContainerThreshold() : 1.0;
   }
 
   @Override
