@@ -216,9 +216,7 @@ public class ProxyServer {
         }
 
         for (String value : headerValues) {
-          // Convert header names to lowercase because HttpServer capitalizes the first letter,
-          // but s3g expects lowercase header names.
-          conn.addRequestProperty(headerName.toLowerCase(), value);
+          conn.addRequestProperty(headerName, value);
         }
       }
     }
