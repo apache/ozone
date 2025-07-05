@@ -241,6 +241,14 @@ public class ProxyServer {
     }
   }
 
+  /**
+   * Checks if a header is a hop-by-hop header that should not be forwarded by proxies.
+   * These headers are meaningful only for a single transport-level connection.
+   *
+   * @param header the header name to check (case-insensitive)
+   * @return true if the header should be filtered out, false otherwise
+   * @see <a href="https://datatracker.ietf.org/doc/html/rfc7230#section-6.1">RFC 7230 Section 6.1</a>
+   */
   private boolean isHopByHopHeader(String header) {
     String lowerName = header.toLowerCase();
     return "connection".equals(lowerName) || "keep-alive".equals(lowerName)
