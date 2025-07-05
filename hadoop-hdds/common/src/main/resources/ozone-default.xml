@@ -4558,12 +4558,12 @@
   </property>
   <property>
     <name>hdds.secret.key.expiry.duration</name>
-    <value>7d</value>
+    <value>9d</value>
     <tag>SCM, SECURITY</tag>
     <description>
       The duration for which symmetric secret keys issued by SCM are valid.
-      This default value, in combination with hdds.secret.key.rotate.duration=1d, results in 7 secret keys (for the
-      last 7 days) are kept valid at any point of time.
+      This default value, in combination with hdds.secret.key.rotate.duration=1d, results in 9 secret keys (for the
+      last 9 days) are kept valid at any point of time.
     </description>
   </property>
   <property>

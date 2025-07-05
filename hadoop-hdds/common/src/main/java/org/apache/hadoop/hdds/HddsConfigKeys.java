@@ -255,7 +255,7 @@ public final class HddsConfigKeys {
 
   public static final String HDDS_SECRET_KEY_EXPIRY_DURATION =
       "hdds.secret.key.expiry.duration";
-  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "7d";
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "9d";
 
   public static final String HDDS_SECRET_KEY_ROTATE_DURATION =
       "hdds.secret.key.rotate.duration";
