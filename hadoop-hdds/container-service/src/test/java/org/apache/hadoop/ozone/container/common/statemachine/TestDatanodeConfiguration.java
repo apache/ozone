@@ -274,4 +274,12 @@ public class TestDatanodeConfiguration {
     assertEquals(expected, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
+
+  @Test
+  public void defaultMinFreeSpacePercentIsValid() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.unset(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT); // ensure default
+    DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
+    assertEquals(0.001f, subject.getMinFreeSpaceRatio(), 1e-6);
+  }
 }
