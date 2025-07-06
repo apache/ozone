@@ -104,7 +104,7 @@ ozone admin scm transfer -id <SCM_SERVICE_ID> -r
 ```
 
 *   `-id, --service-id`: Specifies the SCM Service ID.
-*   `-n, --newLeaderId, --new-leader-id`: The node ID of the SCM to which leadership will be transferred (e.g., `scm1`).
+*   `-n, --newLeaderId, --new-leader-id`: The SCM UUID (Raft peer ID) of the SCM to which leadership will be transferred (e.g., `e6877ce5-56cd-4f0b-ad60-4c8ef9000882`).
 *   `-r, --random`: Randomly chooses a follower to transfer leadership to.
 
 ### Example
