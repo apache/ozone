@@ -1,6 +1,6 @@
 ---
 name: Ozone
-title: Overview
+title: An Introduction to Apache Ozone
 menu: main
 weight: -10
 ---
@@ -21,21 +21,63 @@ weight: -10
   limitations under the License.
 -->
 
-# Apache Ozone
+# An Introduction to Apache Ozone
+
+**Apache Ozone is a highly scalable, distributed object store built for big data applications.** It can store billions of objects, both large and small, and is designed to run effectively in on-premise and containerized environments like Kubernetes.
+
+Think of it as a private, on-premise storage platform that speaks the S3 protocol, while also offering native support for the Hadoop ecosystem.
 
 {{<figure class="ozone-usage" src="/ozone-usage.png" width="60%">}}
 
-*_Ozone is a scalable, redundant, and distributed object store for Big data workloads. <p>
-Apart from scaling to billions of objects of varying sizes,
-Ozone can function effectively in containerized environments
-like Kubernetes._*
+---
 
-Applications like Apache Spark, Hive and YARN, work without any modifications when using Ozone. Ozone comes with a [Java client library]({{<ref "JavaApi.md">}}), [S3 protocol support]({{< ref "S3.md" >}}), and a [command line interface]({{< ref "Cli.md" >}})  which makes it easy to use Ozone.
+### Why Use Ozone?
 
-Ozone consists of volumes, buckets, and keys:
+*   **Massive Scalability:** Ozone's architecture separates namespace management from block management, allowing it to scale to billions of objects without the limitations found in traditional filesystems.
+*   **S3-Compatible:** Use the vast ecosystem of S3 tools, SDKs, and applications you already know. Ozone's S3 Gateway provides a compatible REST interface.
+*   **Hadoop Ecosystem Native:** Applications like Apache Spark, Hive, and YARN can use Ozone as their storage backend without any modifications, making it a powerful replacement or complement to HDFS.
+*   **Cloud-Native Ready:** Ozone is designed to be deployed and managed in containerized environments like Kubernetes, supporting modern, cloud-native data architectures.
 
-* Volumes are similar to user accounts. Only administrators can create or delete volumes.
-* Buckets are similar to directories. A bucket can contain any number of keys, but buckets cannot contain other buckets.
-* Keys are similar to files.
+---
 
-Check out the [Getting Started](start/) guide to dive right in and learn how to run Ozone on your machine or in the cloud.
+### How It Compares
+
+| Feature | Apache Ozone | HDFS (Hadoop Distributed File System)                                                            | Amazon S3 |
+| :--- | :--- |:-------------------------------------------------------------------------------------------------| :--- |
+| **Type** | Distributed Object Store | Distributed File System                                                                          | Cloud Object Store |
+| **Best For** | Billions of mixed-size files, cloud-native apps, data lakes. | Very large files (hundreds of megabytes and above), streaming data access. | Fully managed cloud storage, web applications, backups. |
+| **API** | S3-compatible, Hadoop FS | Hadoop FS                                                                                        | S3 API |
+| **Deployment**| On-premise, private cloud, Kubernetes | On-premise, private cloud                                                                        | Public Cloud (AWS) |
+| **Namespace** | Multiple volumes | Single rooted filesystem (`/`)                                                                   | Global bucket namespace |
+
+---
+
+### Getting Started: Your First Cluster in 5 Minutes
+
+The fastest way to experience Ozone is with Docker. This single command will set up a complete, multi-node pseudo-cluster on your local machine.
+
+**[➡️ Quick Start with Docker]({{< ref "start/StartFromDockerHub.md" >}})**
+
+This is the recommended path for first-time users. For other deployment options, including Kubernetes and bare-metal, see the full [Getting Started Guide]({{< ref "start/_index.md" >}}).
+
+---
+
+### Common Use Cases
+
+Ozone is versatile. Here are a few ways it's commonly used:
+
+*   **Analytics & Data Lakes:** Store vast amounts of structured and unstructured data and run queries directly with Spark, Hive, or Presto.
+*   **Machine Learning Backend:** Use Ozone as a central repository for training datasets, models, and experiment logs, accessed via S3 APIs from frameworks like TensorFlow or PyTorch.
+*   **Cloud-Native Application Storage:** Provide persistent, scalable storage for stateful applications running on Kubernetes using the Ozone CSI driver.
+
+---
+
+### Core Concepts: Volumes, Buckets, and Keys
+
+Ozone organizes data in a simple three-level hierarchy:
+
+*   **Volumes:** The top-level organizational unit, similar to a user account or a top-level project folder. Volumes are created by administrators.
+*   **Buckets:** Reside within volumes and are similar to directories. A bucket can contain any number of keys.
+*   **Keys:** The actual objects you store, analogous to files.
+
+This structure provides a flexible way to manage data for multiple tenants and use cases within a single cluster.
