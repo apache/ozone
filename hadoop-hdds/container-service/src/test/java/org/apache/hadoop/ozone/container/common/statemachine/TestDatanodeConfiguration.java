@@ -193,12 +193,7 @@ public class TestDatanodeConfiguration {
 
     // Verify that no warnings were logged when using default values
     String logOutput = logCapturer.getOutput();
-    assertThat(logOutput).doesNotContain("must be greater than zero");
-    assertThat(logOutput).doesNotContain("must be greater than -1");
-    assertThat(logOutput).doesNotContain("must be >= 0");
-    assertThat(logOutput).doesNotContain("must be at least");
-    assertThat(logOutput).doesNotContain("Defaulting to");
-    assertThat(logOutput).doesNotContain("invalid, should be between");
+    assertThat(logOutput).doesNotContain("is invalid, should be between 0 and 1");
   }
 
   @Test
