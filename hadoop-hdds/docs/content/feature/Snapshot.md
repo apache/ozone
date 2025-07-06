@@ -25,6 +25,10 @@ summary: Ozone Snapshot
 
 ## Introduction
 
+For a high-level guide on backup and disaster recovery strategies, please refer to the [Backup and Disaster Recovery Strategy Guide]({{< ref "BackupAndDisasterRecovery.md" >}}).
+
+
+
 Snapshot feature for Apache Ozone object store allows users to take point-in-time consistent image of a given bucket. Snapshot feature enables various use cases, including:
  * Backup and Restore: Create hourly, daily, weekly, monthly snapshots for backup and recovery when needed.
  * Archival and Compliance: Take snapshots for compliance purpose and archive them as required.
