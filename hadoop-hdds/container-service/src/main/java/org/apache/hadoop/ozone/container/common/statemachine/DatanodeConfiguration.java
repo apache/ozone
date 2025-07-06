@@ -294,7 +294,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long minFreeSpace = getDefaultFreeSpace();
 
   @Config(key = "hdds.datanode.volume.min.free.space.percent",
-      defaultValue = "0.001", // changed from "-1" to a valid value, which is listed in Datanodes.md
+      defaultValue = "0.001", // match HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT
       type = ConfigType.FLOAT,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
       description = "This determines the free space percent to be used for closing containers" +

@@ -47,6 +47,8 @@ import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test for {@link DatanodeConfiguration}.
@@ -157,6 +159,9 @@ public class TestDatanodeConfiguration {
     // unset over-ridding configuration from ozone-site.xml defined for the test module
     conf.unset(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE); // set in ozone-site.xml
 
+    // Capture logs to verify no warnings are generated
+    LogCapturer logCapturer = LogCapturer.captureLogs(DatanodeConfiguration.class);
+
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
@@ -185,6 +190,15 @@ public class TestDatanodeConfiguration {
     // capacity is large, consider min_free_space_percent, max(min_free_space, min_free_space_percent * capacity)ß
     assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT * oneGB * oneGB,
         subject.getMinFreeSpace(oneGB * oneGB));
+
+    // Verify that no warnings were logged when using default values
+    String logOutput = logCapturer.getOutput();
+    assertThat(logOutput).doesNotContain("must be greater than zero");
+    assertThat(logOutput).doesNotContain("must be greater than -1");
+    assertThat(logOutput).doesNotContain("must be >= 0");
+    assertThat(logOutput).doesNotContain("must be at least");
+    assertThat(logOutput).doesNotContain("Defaulting to");
+    assertThat(logOutput).doesNotContain("invalid, should be between");
   }
 
   @Test
