@@ -26,7 +26,7 @@ summary: Maintenance mode for Datanodes.
 
 Maintenance mode is a feature in Apache Ozone that allows you to temporarily take a DataNode offline for maintenance operations (e.g., hardware upgrades, software updates) without triggering immediate data replication. Unlike decommissioning, which aims to permanently remove a DataNode and its data from the cluster, maintenance mode is designed for temporary outages.
 
-When a DataNode enters maintenance mode, new data will not be written to it. Existing data on the DataNode will remain in place, and replication of its data will only be triggered if the DataNode remains in maintenance mode beyond a configurable timeout period. This allows for planned downtime without unnecessary data movement, reducing network overhead and cluster load.
+While in maintenance mode, a DataNode does not accept new writes but may still serve reads, assuming containers are healthy and online. Existing data on the DataNode will remain in place, and replication of its data will only be triggered if the DataNode remains in maintenance mode beyond a configurable timeout period. This allows for planned downtime without unnecessary data movement, reducing network overhead and cluster load.
 
 The DataNode transitions through the following operational states during maintenance:
 
