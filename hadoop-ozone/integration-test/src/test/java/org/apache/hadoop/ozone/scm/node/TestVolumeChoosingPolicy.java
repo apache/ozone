@@ -82,7 +82,6 @@ public class TestVolumeChoosingPolicy {
   @BeforeEach
   public void setup() throws Exception {
     hddsVolumes = new ArrayList<>();
-    initialiseVolumeSet();
     createVolumes();
     volumeChoosingPolicy = new DefaultVolumeChoosingPolicy();
     executor = Executors.newFixedThreadPool(NUM_THREADS);
@@ -131,12 +130,15 @@ public class TestVolumeChoosingPolicy {
     for (int i = 0; i < NUM_THREADS; i++) {
       executor.submit(() -> {
         try {
-          long threadStart = System.nanoTime();
           int volumeChosen = 0;
           int volumeNotChosen = 0;
           int failures = 0;
 
           for (int j = 0; j < NUM_ITERATIONS; j++) {
+            // Simulate background activity with a 5% probability in each
+            // iteration. This mimics other threads changing volume state
+            // (e.g., reserving space on a destination) while the policy is
+            // being evaluated, testing its behavior in a dynamic environment.
             if (rand.nextDouble() < 0.05 && hddsVolumes.size() >= 2) {
               HddsVolume sourceVolume = hddsVolumes.get(rand.nextInt(hddsVolumes.size()));
 
@@ -156,7 +158,10 @@ public class TestVolumeChoosingPolicy {
             }
 
             try {
+              long threadStart = System.nanoTime();
               Pair<HddsVolume, HddsVolume> pair = policy.chooseVolume(volumeSet, THRESHOLD, deltaSizes);
+              totalTimeNanos.addAndGet(System.nanoTime() - threadStart);
+
               if (pair == null) {
                 volumeNotChosen++;
               } else {
@@ -175,8 +180,6 @@ public class TestVolumeChoosingPolicy {
             }
           }
 
-          long threadEnd = System.nanoTime();
-          totalTimeNanos.addAndGet(threadEnd - threadStart);
           pairChosenCount.addAndGet(volumeChosen);
           pairNotChosenCount.addAndGet(volumeNotChosen);
           failureCount.addAndGet(failures);
@@ -206,7 +209,7 @@ public class TestVolumeChoosingPolicy {
     System.out.println("Operations per second: " + opsPerSec);
   }
 
-  private void initialiseVolumeSet() throws IOException {
+  private void createVolumes() throws IOException {
     // set a dummy path for initialisation, as we will override its internal volumeMap.
     String initialDnDir = baseDir.resolve("initialDnDir").toFile().getAbsolutePath();
     Files.createDirectories(baseDir.resolve("initialDnDir"));
@@ -215,9 +218,7 @@ public class TestVolumeChoosingPolicy {
     StateContext mockContext = mock(StateContext.class);
     volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), CONF,
         mockContext, StorageVolume.VolumeType.DATA_VOLUME, null);
-  }
 
-  private void createVolumes() throws IOException {
     // This map will replace the one inside 'volumeSet'
     Map<String, StorageVolume> newVolumeMap = new ConcurrentHashMap<>();
     Random random = new Random();
@@ -229,7 +230,7 @@ public class TestVolumeChoosingPolicy {
       long capacity = 1L * 1024 * 1024 * 1024 * 1024;
 
       // Distribute available space to create some variation in usage
-      // Between 5% and 75%
+      // Between 5% and 55%
       long usedBytes = (long) (capacity * (0.05 + random.nextDouble() * 0.5));
       long available = capacity - usedBytes;
 
