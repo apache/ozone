@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
@@ -89,21 +89,20 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
     return new KeyValueBlockIterator(containerID,
         getBlockDataTableWithIterator()
             .iterator(getContainerKeyPrefix(containerID)),
-        new MetadataKeyFilters.KeyPrefixFilter().addFilter(
-            getContainerKeyPrefix(containerID) + "#", true));
+        KeyPrefixFilter.newFilter(getContainerKeyPrefix(containerID) + "#", true));
   }
 
   @Override
-  public BlockIterator<BlockData> getBlockIterator(long containerID,
-      MetadataKeyFilters.KeyPrefixFilter filter) throws IOException {
+  public BlockIterator<BlockData> getBlockIterator(long containerID, KeyPrefixFilter filter)
+      throws IOException {
     return new KeyValueBlockIterator(containerID,
         getBlockDataTableWithIterator()
             .iterator(getContainerKeyPrefix(containerID)), filter);
   }
 
   @Override
-  public BlockIterator<Long> getFinalizeBlockIterator(long containerID,
-      MetadataKeyFilters.KeyPrefixFilter filter) throws IOException {
+  public BlockIterator<Long> getFinalizeBlockIterator(long containerID, KeyPrefixFilter filter)
+      throws IOException {
     return new KeyValueBlockLocalIdIterator(containerID,
         getFinalizeBlocksTableWithIterator().iterator(getContainerKeyPrefix(containerID)), filter);
   }

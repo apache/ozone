@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
-import { setupServer } from "msw/node";
-import { rest } from "msw";
+import {setupServer} from "msw/node";
+import {rest} from "msw";
 
 import * as mockResponses from "./pipelineResponseMocks";
 

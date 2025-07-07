@@ -40,6 +40,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
@@ -218,7 +219,7 @@ public class TestContainerDeletionChoosingPolicy {
     when(ozoneContainer.getWriteChannel()).thenReturn(null);
     blockDeletingService = new BlockDeletingService(ozoneContainer,
         SERVICE_INTERVAL_IN_MILLISECONDS, SERVICE_TIMEOUT_IN_MILLISECONDS,
-        TimeUnit.MILLISECONDS, 10, conf);
+        TimeUnit.MILLISECONDS, 10, conf, new ContainerChecksumTreeManager(conf));
     return blockDeletingService;
 
   }

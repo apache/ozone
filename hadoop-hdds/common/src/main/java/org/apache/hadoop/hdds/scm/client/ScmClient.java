@@ -468,4 +468,12 @@ public interface ScmClient extends Closeable {
       String scmId) throws IOException;
 
   String getMetrics(String query) throws IOException;
+
+  /**
+   * Trigger a reconcile command to datanodes for a container ID.
+   *
+   * @param containerID The ID of the container to reconcile.
+   * @throws IOException On error
+   */
+  void reconcileContainer(long containerID) throws IOException;
 }
