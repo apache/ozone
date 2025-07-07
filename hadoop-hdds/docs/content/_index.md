@@ -21,63 +21,99 @@ weight: -10
   limitations under the License.
 -->
 
-# An Introduction to Apache Ozone
+## What is Apache Ozone?
 
-**Apache Ozone is a highly scalable, distributed object store built for big data applications.** It can store billions of objects, both large and small, and is designed to run effectively in on-premise and containerized environments like Kubernetes.
+Apache Ozone is a scalable, distributed object store designed for lakehouse workloads,
+AI/ML, and cloud-native applications.
+Originating from the BigData analytics ecosystem, it handles both small and large files,
+supporting deployments up to billions of objects and exabytes of capacity.
+Ozone provides strong consistency guarantees,
+multiple protocol interfaces (including S3 compatibility), and configurable durability options.
 
-Think of it as a private, on-premise storage platform that speaks the S3 protocol, while also offering native support for the Hadoop ecosystem.
+## What it does?
 
-{{<figure class="ozone-usage" src="/ozone-usage.png" width="60%">}}
+Ozone includes features relevant to large-scale storage requirements:
 
----
+### Scale
 
-### Why Use Ozone?
+Ozone's architecture separates metadata management from data storage. The Ozone Manager (OM) and Storage Container Manager (SCM) handle metadata operations, while Datanodes manage the physical storage of data blocks. This design allows for independent scaling of these components and supports incremental cluster growth.
 
-*   **Massive Scalability:** Ozone's architecture separates namespace management from block management, allowing it to scale to billions of objects without the limitations found in traditional filesystems.
-*   **S3-Compatible:** Use the vast ecosystem of S3 tools, SDKs, and applications you already know. Ozone's S3 Gateway provides a compatible REST interface.
-*   **Hadoop Ecosystem Native:** Applications like Apache Spark, Hive, and YARN can use Ozone as their storage backend without any modifications, making it a powerful replacement or complement to HDFS.
-*   **Cloud-Native Ready:** Ozone is designed to be deployed and managed in containerized environments like Kubernetes, supporting modern, cloud-native data architectures.
+### Flexible Durability
 
----
+Ozone offers configurable data durability options per bucket or per object:
+*   **Replication (RATIS):** Uses 3-way replication via the [Ratis (Raft)](https://ratis.apache.org) consensus protocol for high availability.
+*   **Erasure Coding (EC):** Supports various EC codecs (e.g., Reed-Solomon) to reduce storage overhead compared to replication while maintaining specified durability levels.
 
-### How It Compares
+### Secure
 
-| Feature | Apache Ozone | HDFS (Hadoop Distributed File System)                                                            | Amazon S3 |
-| :--- | :--- |:-------------------------------------------------------------------------------------------------| :--- |
-| **Type** | Distributed Object Store | Distributed File System                                                                          | Cloud Object Store |
-| **Best For** | Billions of mixed-size files, cloud-native apps, data lakes. | Very large files (hundreds of megabytes and above), streaming data access. | Fully managed cloud storage, web applications, backups. |
-| **API** | S3-compatible, Hadoop FS | Hadoop FS                                                                                        | S3 API |
-| **Deployment**| On-premise, private cloud, Kubernetes | On-premise, private cloud                                                                        | Public Cloud (AWS) |
-| **Namespace** | Multiple volumes | Single rooted filesystem (`/`)                                                                   | Global bucket namespace |
+Security features are integrated at multiple layers:
+*   **Authentication:** Supports Kerberos integration for user and service authentication.
+*   **Authorization:** Provides Access Control Lists (ACLs) for managing permissions at the volume, bucket, and key levels. Supports Apache Ranger integration for centralized policy management.
+*   **Encryption:** Supports TLS/SSL for data in transit and Transparent Data Encryption (TDE) for data at rest.
+*   **Tokens:** Uses delegation tokens and block tokens for access control in distributed operations.
 
----
+### Performance
 
-### Getting Started: Your First Cluster in 5 Minutes
+Ozone's design considers performance for different access patterns:
+*   **Throughput:** Intended for streaming reads and writes of large files. Data can be served directly from Datanodes after initial metadata lookup.
+*   **Latency:** Metadata operations are managed by OM and SCM, designed for low-latency access.
+*   **Small File Handling:** Includes mechanisms for managing metadata and storage for large quantities of small files.
 
-The fastest way to experience Ozone is with Docker. This single command will set up a complete, multi-node pseudo-cluster on your local machine.
+### Multiple Protocols
 
-**[➡️ Quick Start with Docker]({{< ref "start/StartFromDockerHub.md" >}})**
+Applications can access data stored in Ozone through several interfaces:
+*   **S3 Protocol:** Provides an S3-compatible REST API, allowing use with S3-native applications and tools.
+*   **Hadoop Compatible File System (OFS):** Offers the `ofs://` scheme for integration with Hadoop ecosystem tools (e.g., Iceberg, Spark, Hive, Flink, MapReduce).
+*   **Native Java Client API:** A client library for Java applications.
+*   **Command Line Interface (CLI):** Provides tools for administrative tasks and data interaction.
 
-This is the recommended path for first-time users. For other deployment options, including Kubernetes and bare-metal, see the full [Getting Started Guide]({{< ref "start/_index.md" >}}).
+### Efficient Storage Use
 
----
+Ozone includes features aimed at optimizing storage utilization:
+*   **Erasure Coding:** Can reduce the physical storage footprint compared to 3x replication.
+*   **Small File Handling:** Manages metadata and block allocation for small files.
+*   **Containerization:** Groups data blocks into larger Storage Containers, which can simplify management and disk I/O.
 
-### Common Use Cases
+### Storage Management
 
-Ozone is versatile. Here are a few ways it's commonly used:
+Ozone uses a hierarchical namespace and provides management tools:
+*   **Namespace:** Organizes data into Volumes (often mapped to tenants) and Buckets (containers for objects), which hold Keys (objects/files).
+*   **Quotas:** Administrators can set storage quotas at the Volume and Bucket levels.
+*   **Snapshots:** Supports point-in-time, read-only snapshots of buckets for data protection and versioning.
 
-*   **Analytics & Data Lakes:** Store vast amounts of structured and unstructured data and run queries directly with Spark, Hive, or Presto.
-*   **Machine Learning Backend:** Use Ozone as a central repository for training datasets, models, and experiment logs, accessed via S3 APIs from frameworks like TensorFlow or PyTorch.
-*   **Cloud-Native Application Storage:** Provide persistent, scalable storage for stateful applications running on Kubernetes using the Ozone CSI driver.
+### Strong Consistency
 
----
+Ozone provides strong consistency for metadata and data operations. Reads reflect the results of the latest successfully completed write operations.
 
-### Core Concepts: Volumes, Buckets, and Keys
+## Key Characteristics
 
-Ozone organizes data in a simple three-level hierarchy:
+The design of Ozone leads to certain characteristics relevant for large-scale data management:
 
-*   **Volumes:** The top-level organizational unit, similar to a user account or a top-level project folder. Volumes are created by administrators.
-*   **Buckets:** Reside within volumes and are similar to directories. A bucket can contain any number of keys.
-*   **Keys:** The actual objects you store, analogous to files.
+### Storage Costs
 
-This structure provides a flexible way to manage data for multiple tenants and use cases within a single cluster.
+Factors influencing storage costs include:
+*   **Storage Efficiency:** Erasure Coding can reduce physical storage requirements.
+*   **Hardware:** Designed to run on commodity hardware.
+*   **Licensing:** Apache Ozone is open-source software under the Apache License 2.0.
+*   **Scalability:** Clusters can be expanded by adding nodes or racks. Data rebalancing mechanisms help manage utilization.
+
+### Operations
+
+Aspects related to storage administration include:
+*   **Unified Storage:** Can potentially serve as a common storage layer for different types of workloads.
+*   **Management Tools:** Includes the Recon web UI for monitoring and CLI tools for administration.
+*   **Maintenance:** Supports features like rolling upgrades, node decommissioning, and data balancing.
+
+### Hybrid Cloud Scenarios
+
+Ozone's S3 compatibility allows applications developed for S3 to run on-premises using Ozone. This can be relevant for hybrid cloud strategies or migrating workloads between on-premises and cloud environments.
+
+## Dive Deeper
+
+To learn more about Ozone, refer to the following sections:
+
+*   **New to Ozone?** Try the **[Quick Start Guide](./02-quick-start/README.mdx)** to set up a cluster.
+*   **Want to understand the internals?** Read about the **[Core Concepts](./03-core-concepts/README.mdx)** (architecture, replication, security).
+*   **Need to use Ozone?** Check the **[User Guide](./04-user-guide/README.mdx)** for client interfaces and integrations.
+*   **Managing a cluster?** Consult the **[Administrator Guide](./05-administrator-guide/README.mdx)** for installation, configuration, and operations.
+*   **Running into issues?** The **[Troubleshooting Guide](./06-troubleshooting/README.mdx)** may provide assistance.
