@@ -92,7 +92,7 @@ When creating a new jira for any kind of new feature, improvement or bug, please
 
 ## New feature development
 
-For large feature development changes, we use a process called "Ozone Enhancement Proposals" (OEP). This process is designed to ensure that major changes to Ozone are well-designed and have community consensus. If you are planning to propose a significant change, please read the [Ozone Enhancement Proposals](https://cwiki.apache.org/confluence/display/OZONE/Ozone+Enhancement+Proposals) documentation and create a design document before you start coding.
+For large feature development changes, we use a process called "Ozone Enhancement Proposals" (OEP). This process is designed to ensure that major changes to Ozone are well-designed and have community consensus. If you are planning to propose a significant change, please read the [Ozone Enhancement Proposals](https://ozone.apache.org/docs/edge/design/ozone-enhancement-proposals.html) documentation and create a design document before you start coding. Please note that we only accept design documents in Markdown format; PDF or Google Docs are no longer accepted.
 
 ## Contribute your modifications
 
