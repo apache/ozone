@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -308,7 +307,7 @@ public class TestSnapshotBackgroundServices {
   }
 
   private static <V> boolean isKeyInTable(String key, Table<String, V> table) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, V>> iterator
+    try (Table.KeyValueIterator<String, V> iterator
              = table.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, V> next = iterator.next();
@@ -429,8 +428,7 @@ public class TestSnapshotBackgroundServices {
   private List<CompactionLogEntry> getCompactionLogEntries(OzoneManager om)
       throws IOException {
     List<CompactionLogEntry> compactionLogEntries = new ArrayList<>();
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, CompactionLogEntry>>
+    try (Table.KeyValueIterator<String, CompactionLogEntry>
              iterator = om.getMetadataManager().getCompactionLogTable()
         .iterator()) {
       iterator.seekToFirst();

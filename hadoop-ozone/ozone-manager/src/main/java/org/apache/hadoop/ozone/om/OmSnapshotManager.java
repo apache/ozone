@@ -758,10 +758,15 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   public static String getSnapshotPath(OzoneConfiguration conf,
-                                       SnapshotInfo snapshotInfo) {
+      SnapshotInfo snapshotInfo) {
+    return getSnapshotPath(conf, snapshotInfo.getCheckpointDirName());
+  }
+
+  public static String getSnapshotPath(OzoneConfiguration conf,
+      String checkpointDirName) {
     return OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
-        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+        OM_DB_NAME + checkpointDirName;
   }
 
   public static boolean isSnapshotKey(String[] keyParts) {
@@ -905,7 +910,15 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   public void decrementInFlightSnapshotCount() {
-    inFlightSnapshotCount.decrementAndGet();
+    // TODO this is a work around for the accounting logic of `inFlightSnapshotCount`.
+    //    - It incorrectly assumes that LeaderReady means that there are no inflight snapshot requests.
+    //    We may consider fixing it by waiting all the pending requests in notifyLeaderReady().
+    //    - Also, it seems to have another bug that the PrepareState could disallow snapshot requests.
+    //    In such case, `inFlightSnapshotCount` won't be decremented.
+    int result = inFlightSnapshotCount.decrementAndGet();
+    if (result < 0) {
+      resetInFlightSnapshotCount();
+    }
   }
 
   public void resetInFlightSnapshotCount() {

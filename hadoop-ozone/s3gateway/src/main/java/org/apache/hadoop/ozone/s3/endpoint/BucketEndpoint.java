@@ -134,8 +134,6 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = null;
 
     try {
-      bucket = getBucket(bucketName);
-      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
         S3BucketAcl result = getAcl(bucketName);
@@ -170,6 +168,9 @@ public class BucketEndpoint extends EndpointBase {
       // delimited by OZONE_URI_DELIMITER
       boolean shallow = listKeysShallowEnabled
           && OZONE_URI_DELIMITER.equals(delimiter);
+
+      bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
 
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
 
@@ -363,6 +364,7 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = getBucket(bucketName);
 
     try {
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       OzoneMultipartUploadList ozoneMultipartUploadList =
           bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
 
@@ -441,8 +443,10 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.DELETE_BUCKET;
 
     try {
-      OzoneBucket bucket = getBucket(bucketName);
-      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
+      if (S3Owner.hasBucketOwnershipVerificationConditions(headers)) {
+        OzoneBucket bucket = getBucket(bucketName);
+        S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
+      }
       deleteS3Bucket(bucketName);
     } catch (OMException ex) {
       AUDIT.logWriteFailure(
@@ -546,6 +550,7 @@ public class BucketEndpoint extends EndpointBase {
     S3BucketAcl result = new S3BucketAcl();
     try {
       OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(headers, bucketName, bucket.getOwner());
       S3Owner owner = S3Owner.of(bucket.getOwner());
       result.setOwner(owner);
 

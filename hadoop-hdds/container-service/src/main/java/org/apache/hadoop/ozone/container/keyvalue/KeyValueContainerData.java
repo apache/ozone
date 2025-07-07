@@ -176,6 +176,7 @@ public class KeyValueContainerData extends ContainerData {
    * Returns container metadata path.
    * @return - Physical path where container file and checksum is stored.
    */
+  @Override
   public String getMetadataPath() {
     return metadataPath;
   }
@@ -270,6 +271,7 @@ public class KeyValueContainerData extends ContainerData {
         .setReplicaIndex(getReplicaIndex())
         .setBlockCommitSequenceId(getBlockCommitSequenceId())
         .setDeleteTransactionId(getDeleteTransactionId())
+        .setDataChecksum(getDataChecksum())
         .build();
   }
 
@@ -428,11 +430,11 @@ public class KeyValueContainerData extends ContainerData {
 
   public KeyPrefixFilter getUnprefixedKeyFilter() {
     String schemaPrefix = containerPrefix();
-    return new KeyPrefixFilter().addFilter(schemaPrefix + "#", true);
+    return KeyPrefixFilter.newFilter(schemaPrefix + "#", true);
   }
 
   public KeyPrefixFilter getDeletingBlockKeyFilter() {
-    return new KeyPrefixFilter().addFilter(getDeletingBlockKeyPrefix());
+    return KeyPrefixFilter.newFilter(getDeletingBlockKeyPrefix());
   }
 
   /**

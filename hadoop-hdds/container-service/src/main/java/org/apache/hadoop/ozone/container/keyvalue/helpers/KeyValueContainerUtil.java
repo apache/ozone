@@ -26,12 +26,15 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -196,17 +199,33 @@ public final class KeyValueContainerUtil {
    * Parse KeyValueContainerData and verify checksum. Set block related
    * metadata like block commit sequence id, block count, bytes used and
    * pending delete block count and delete transaction id.
+   * This method will verify checksum by default.
    * @param kvContainerData
    * @param config
    * @throws IOException
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
       ConfigurationSource config) throws IOException {
+    parseKVContainerData(kvContainerData, config, false);
+  }
+
+  /**
+   * @param kvContainerData
+   * @param config
+   * @param skipVerifyChecksum checksum verification should be skipped if the state
+   * has changed to RECOVERING during container import, false otherwise
+   * @throws IOException
+   */
+  public static void parseKVContainerData(KeyValueContainerData kvContainerData,
+      ConfigurationSource config, boolean skipVerifyChecksum) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
 
     // Verify Checksum
-    ContainerUtils.verifyChecksum(kvContainerData, config);
+    // skip verify checksum if the state has changed to RECOVERING during container import
+    if (!skipVerifyChecksum) {
+      ContainerUtils.verifyContainerFileChecksum(kvContainerData, config);
+    }
 
     if (kvContainerData.getSchemaVersion() == null) {
       // If this container has not specified a schema version, it is in the old
@@ -264,15 +283,25 @@ public final class KeyValueContainerUtil {
       } else if (store != null) {
         // We only stop the store if cacheDB is null, as otherwise we would
         // close the rocksDB handle in the cache and the next reader would fail
-        try {
-          store.stop();
-        } catch (IOException e) {
-          throw e;
-        } catch (Exception e) {
-          throw new RuntimeException("Unexpected exception closing the " +
-              "RocksDB when loading containers", e);
-        }
+        store.stop();
       }
+    }
+  }
+
+  private static void populateContainerDataChecksum(KeyValueContainerData kvContainerData) {
+    if (kvContainerData.isOpen()) {
+      return;
+    }
+
+    try {
+      Optional<ContainerChecksumInfo> optionalContainerChecksumInfo = ContainerChecksumTreeManager
+          .readChecksumInfo(kvContainerData);
+      if (optionalContainerChecksumInfo.isPresent()) {
+        ContainerChecksumInfo containerChecksumInfo = optionalContainerChecksumInfo.get();
+        kvContainerData.setDataChecksum(containerChecksumInfo.getContainerMerkleTree().getDataChecksum());
+      }
+    } catch (IOException ex) {
+      LOG.warn("Failed to read checksum info for container {}", kvContainerData.getContainerID(), ex);
     }
   }
 
@@ -294,10 +323,10 @@ public final class KeyValueContainerUtil {
       LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
       MetadataKeyFilters.KeyPrefixFilter filter =
           kvContainerData.getDeletingBlockKeyFilter();
-      blockPendingDeletion = store.getBlockDataTable()
-              .getSequentialRangeKVs(kvContainerData.startKeyEmpty(),
-                  Integer.MAX_VALUE, kvContainerData.containerPrefix(),
-                  filter).size();
+      blockPendingDeletion = store.getBlockDataTable().getRangeKVs(
+          kvContainerData.startKeyEmpty(), Integer.MAX_VALUE, kvContainerData.containerPrefix(), filter, true)
+          // TODO: add a count() method to avoid creating a list
+          .size();
     }
     // Set delete transaction id.
     Long delTxnId =
@@ -353,6 +382,7 @@ public final class KeyValueContainerUtil {
 
     // Load finalizeBlockLocalIds for container in memory.
     populateContainerFinalizeBlock(kvContainerData, store);
+    populateContainerDataChecksum(kvContainerData);
   }
 
   /**

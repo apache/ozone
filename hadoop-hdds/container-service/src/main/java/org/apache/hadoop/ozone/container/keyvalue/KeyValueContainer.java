@@ -80,6 +80,8 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
+import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -659,7 +661,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
 
     //fill in memory stat counter (keycount, byte usage)
-    KeyValueContainerUtil.parseKVContainerData(containerData, config);
+    KeyValueContainerUtil.parseKVContainerData(containerData, config, true);
 
     // rewriting the yaml file with new checksum calculation
     // restore imported container's state to the original state and flush the yaml file
@@ -862,40 +864,37 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean shouldScanMetadata() {
-    final boolean shouldScan = getContainerState() != UNHEALTHY;
-    if (!shouldScan) {
-      LOG.debug("Healthy container metadata is not scanned: {}", containerData);
-    }
-    return shouldScan;
-  }
-
-  @Override
-  public ScanResult scanMetaData() throws InterruptedException {
-    return new KeyValueContainerCheck(containerData, this, config)
-        .fastCheck();
+  public MetadataScanResult scanMetaData() throws InterruptedException {
+    KeyValueContainerCheck checker =
+        new KeyValueContainerCheck(config, this);
+    return checker.fastCheck();
   }
 
   @Override
   public boolean shouldScanData() {
-    final boolean shouldScan = getContainerState() == CLOSED || getContainerState() == QUASI_CLOSED;
-    if (!shouldScan) {
-      LOG.debug("Healthy container is not scanned: {}", containerData);
+    boolean shouldScan =
+        getContainerState() == CLOSED
+        || getContainerState() == QUASI_CLOSED
+        || getContainerState() == UNHEALTHY;
+    if (!shouldScan && LOG.isDebugEnabled()) {
+      LOG.debug("Container {} in state {} should not have its data scanned.",
+          containerData.getContainerID(), containerData.getState());
     }
 
     return shouldScan;
   }
 
   @Override
-  public ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
+  public DataScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
       throws InterruptedException {
     if (!shouldScanData()) {
       throw new IllegalStateException("The checksum verification can not be" +
           " done for container in state "
           + containerData.getState());
     }
-    return new KeyValueContainerCheck(containerData, this, config)
-        .fullCheck(throttler, canceler);
+
+    KeyValueContainerCheck checker = new KeyValueContainerCheck(config, this);
+    return checker.fullCheck(throttler, canceler);
   }
 
   /**

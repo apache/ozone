@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
@@ -233,7 +234,7 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
     OmMetadataManagerImpl mockedMetadataManager = mock(OmMetadataManagerImpl.class);
     Table<String, SnapshotInfo> mockedSnapshotInfoTable = mock(Table.class);
 
-    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new IOException("Injected fault error."));
+    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new CodecException("Injected fault error."));
     when(mockedMetadataManager.getSnapshotInfoTable()).thenReturn(mockedSnapshotInfoTable);
     when(getOzoneManager().getMetadataManager()).thenReturn(mockedMetadataManager);
 
