@@ -124,7 +124,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @throws IOException if an I/O error occurs while fetching the keys.
    */
   PendingKeysDeletion getPendingDeletionKeys(
-      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count, int ratisByteLimit)
       throws IOException;
 
   /**
@@ -142,7 +142,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   PendingKeysDeletion getPendingDeletionKeys(
       String volume, String bucket, String startKey,
-      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count)
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, int count, int ratisByteLimit)
       throws IOException;
 
   /**

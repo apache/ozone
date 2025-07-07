@@ -710,17 +710,18 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public PendingKeysDeletion getPendingDeletionKeys(
-      final CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, final int count)
-      throws IOException {
-    return getPendingDeletionKeys(null, null, null, filter, count);
+      final CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, final int count,
+      int ratisByteLimit) throws IOException {
+    return getPendingDeletionKeys(null, null, null, filter, count, ratisByteLimit);
   }
 
   @Override
   public PendingKeysDeletion getPendingDeletionKeys(
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
-      int count) throws IOException {
+      int count, int ratisByteLimit) throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
+    long serializedSize = 0;
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
@@ -741,6 +742,7 @@ public class KeyManagerImpl implements KeyManager {
           List<BlockGroup> blockGroupList = Lists.newArrayList();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
+          boolean flag = false;
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
@@ -750,11 +752,22 @@ public class KeyManagerImpl implements KeyManager {
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
                   .addAllBlockIDs(blockIDS).build();
+              serializedSize += keyBlocks.getProto().getSerializedSize();
+              if (serializedSize > ratisByteLimit) {
+                flag = true;
+                LOG.info(
+                    "Total size of cumulative keys in a cycle crossed 90% ratis limit, serialized size: {}",
+                    serializedSize);
+                break;
+              }
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);
             }
+          }
+          if (flag) {
+            break;
           }
 
           List<OmKeyInfo> notReclaimableKeyInfoList = notReclaimableKeyInfo.getOmKeyInfoList();
