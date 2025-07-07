@@ -41,7 +41,7 @@ function hdfs_subcommand_httpfs
   hadoop_add_param HADOOP_OPTS "-Dhttpfs.config.dir" \
     "-Dhttpfs.config.dir=${HTTPFS_CONFIG:-${HADOOP_CONF_DIR}}"
   hadoop_add_param HADOOP_OPTS "-Dhttpfs.log.dir" \
-    "-Dhttpfs.log.dir=${HTTPFS_LOG:-${HADOOP_LOG_DIR}}"
+    "-Dhttpfs.log.dir=${HTTPFS_LOG:-${OZONE_LOG_DIR}}"
 
   local temp_dir=${HTTPFS_TEMP:-${HADOOP_HDFS_HOME}/temp}
   hadoop_add_param HADOOP_OPTS "-Dhttpfs.temp.dir" \

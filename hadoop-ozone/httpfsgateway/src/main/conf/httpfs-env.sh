@@ -24,7 +24,7 @@
 
 # HTTPFS log directory
 #
-# export HTTPFS_LOG=${HADOOP_LOG_DIR}
+# export HTTPFS_LOG=${OZONE_LOG_DIR}
 
 # HTTPFS temporary directory
 #
