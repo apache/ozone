@@ -23,6 +23,7 @@ import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyC
 import static org.apache.ozone.recon.schema.generated.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
 import static org.jooq.impl.DSL.count;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.sql.Connection;
@@ -87,11 +88,11 @@ public class ContainerHealthSchemaManager {
     if (maxContainerId.isPresent() && maxContainerId.get() > 0) {
       containerCondition = UNHEALTHY_CONTAINERS.CONTAINER_ID.lessThan(maxContainerId.get());
       orderField = new OrderField[]{UNHEALTHY_CONTAINERS.CONTAINER_ID.desc(),
-        UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc()};
+          UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc()};
     } else {
       containerCondition = UNHEALTHY_CONTAINERS.CONTAINER_ID.greaterThan(minContainerId);
       orderField = new OrderField[]{UNHEALTHY_CONTAINERS.CONTAINER_ID.asc(),
-        UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc()};
+          UNHEALTHY_CONTAINERS.CONTAINER_STATE.asc()};
     }
     if (state != null) {
       if (state.equals(ALL_REPLICAS_BAD)) {
@@ -101,6 +102,10 @@ public class ContainerHealthSchemaManager {
       } else {
         query.addConditions(containerCondition.and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(state.toString())));
       }
+    } else {
+      // CRITICAL FIX: Apply pagination condition even when state is null
+      // This ensures proper pagination for the "get all unhealthy containers" use case
+      query.addConditions(containerCondition);
     }
 
     query.addOrderBy(orderField);
@@ -164,6 +169,21 @@ public class ContainerHealthSchemaManager {
     } catch (Exception e) {
       LOG.error("Failed to insert records into {} ", UNHEALTHY_CONTAINERS_TABLE_NAME, e);
       throw new RuntimeException("Recon failed to insert " + recs.size() + " unhealthy container records.", e);
+    }
+  }
+
+  /**
+   * Clear all unhealthy container records. This is primarily used for testing
+   * to ensure clean state between tests.
+   */
+  @VisibleForTesting
+  public void clearAllUnhealthyContainerRecords() {
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    try {
+      dslContext.deleteFrom(UNHEALTHY_CONTAINERS).execute();
+      LOG.info("Cleared all unhealthy container records");
+    } catch (Exception e) {
+      LOG.info("Failed to clear unhealthy container records", e);
     }
   }
 
