@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.response;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Iterators;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,7 +62,6 @@ import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
-import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.om.response.util.OMEchoRPCWriteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
@@ -130,23 +132,29 @@ public class TestCleanupTableInfo {
 
     Set<String> tables = omMetadataManager.listTableNames();
     Set<Class<? extends OMClientResponse>> subTypes = responseClasses();
-    // OmKeyResponse is an abstract class that does not need CleanupTable.
-    subTypes.remove(OmKeyResponse.class);
     // OMEchoRPCWriteResponse does not need CleanupTable.
     subTypes.remove(OMEchoRPCWriteResponse.class);
     subTypes.remove(DummyOMClientResponse.class);
     subTypes.forEach(aClass -> {
-      assertTrue(aClass.isAnnotationPresent(CleanupTableInfo.class),
-          aClass + " does not have annotation of" +
-              " CleanupTableInfo");
+      if (Modifier.isAbstract(aClass.getModifiers())) {
+        assertFalse(aClass.isAnnotationPresent(CleanupTableInfo.class),
+            aClass + " is an abstract class and should not contain CleanupTableInfo annotations");
+        return;
+      } else {
+        assertTrue(aClass.isAnnotationPresent(CleanupTableInfo.class),
+            aClass + " does not have annotation of" +
+                " CleanupTableInfo");
+      }
       CleanupTableInfo annotation =
           aClass.getAnnotation(CleanupTableInfo.class);
+      assertNotNull(annotation, "CleanupTableInfo is null for class " + aClass.getSimpleName());
       String[] cleanupTables = annotation.cleanupTables();
       boolean cleanupAll = annotation.cleanupAll();
       if (cleanupTables.length >= 1) {
         assertTrue(
             Arrays.stream(cleanupTables).allMatch(tables::contains)
         );
+
       } else {
         assertTrue(cleanupAll);
       }

@@ -37,5 +37,6 @@ HADOOP_OPTS="-Dhadoop.opts=test"
 HDFS_STORAGECONTAINERMANAGER_OPTS="-Dhdfs.scm.opts=test"
 HDFS_OM_OPTS="-Dhdfs.om.opts=test"
 HDDS_DN_OPTS="-Dhdds.dn.opts=test"
+OZONE_SERVER_OPTS="-Dserver.opt=test"
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1

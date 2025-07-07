@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import { waitFor, screen } from "@testing-library/react";
+import {screen, waitFor} from "@testing-library/react";
 
 export const waitForPipelineTable = async () => {
   return waitFor(() => screen.getByTestId('pipelines-table'));

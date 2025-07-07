@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.math.RoundingMode;
 import java.net.InetAddress;
@@ -151,7 +152,6 @@ public class SCMNodeManager implements NodeManager {
    * Constructs SCM machine Manager.
    */
   public SCMNodeManager(
-
       OzoneConfiguration conf,
       SCMStorageConfig scmStorageConfig,
       EventPublisher eventPublisher,
@@ -1711,6 +1711,15 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("Cannot find node for uuid {}", id);
       return null;
     }
+  }
+
+  @Override
+  @Nullable
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
+    if (datanodeDetails == null) {
+      return null;
+    }
+    return getNode(datanodeDetails.getID());
   }
 
   /**

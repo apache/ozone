@@ -337,6 +337,7 @@ ozone_suppress_shell_log
 ozone_assemble_classpath
 
 ozone_add_client_opts
+ozone_add_server_opts
 
 if [[ ${OZONE_WORKER_MODE} = true ]]; then
   ozone_worker_mode_execute "${OZONE_HOME}/bin/ozone" "${OZONE_USER_PARAMS[@]}"

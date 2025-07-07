@@ -83,6 +83,8 @@ import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerSta
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransactionInfoWrapper;
+import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler;
+import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.EligibilityResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
@@ -357,7 +359,9 @@ public class SCMClientProtocolServer implements
                 .setPlaceOfBirth(r.getOriginDatanodeId().toString())
                 .setKeyCount(r.getKeyCount())
                 .setSequenceID(r.getSequenceId())
-                .setReplicaIndex(r.getReplicaIndex()).build()
+                .setReplicaIndex(r.getReplicaIndex())
+                .setDataChecksum(r.getDataChecksum())
+                .build()
         );
       }
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -1634,6 +1638,44 @@ public class SCMClientProtocolServer implements
     } catch (Exception ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(
           SCMAction.GET_METRICS, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
+  public void reconcileContainer(long longContainerID) throws IOException {
+    ContainerID containerID = ContainerID.valueOf(longContainerID);
+    getScm().checkAdminAccess(getRemoteUser(), false);
+    final UserGroupInformation remoteUser = getRemoteUser();
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("containerID", containerID.toString());
+    auditMap.put("remoteUser", remoteUser.getUserName());
+
+    try {
+      EligibilityResult result = ReconciliationEligibilityHandler.isEligibleForReconciliation(containerID,
+          getScm().getContainerManager());
+      if (!result.isOk()) {
+        switch (result.getResult()) {
+        case OK:
+          break;
+        case CONTAINER_NOT_FOUND:
+          throw new ContainerNotFoundException(result.toString());
+        case INELIGIBLE_CONTAINER_STATE:
+          throw new SCMException(result.toString(), ResultCodes.UNEXPECTED_CONTAINER_STATE);
+        case INELIGIBLE_REPLICA_STATES:
+        case INELIGIBLE_REPLICATION_TYPE:
+        case NOT_ENOUGH_REQUIRED_NODES:
+        case NO_REPLICAS_FOUND:
+          throw new SCMException(result.toString(), ResultCodes.UNSUPPORTED_OPERATION);
+        default:
+          throw new SCMException("Unknown reconciliation eligibility result " + result, ResultCodes.INTERNAL_ERROR);
+        }
+      }
+
+      scm.getEventQueue().fireEvent(SCMEvents.RECONCILE_CONTAINER, containerID);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.RECONCILE_CONTAINER, auditMap));
+    } catch (SCMException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.RECONCILE_CONTAINER, auditMap, ex));
       throw ex;
     }
   }

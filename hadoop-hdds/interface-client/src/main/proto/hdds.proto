@@ -447,6 +447,7 @@ message ContainerReplicaHistoryProto {
     required int64 lastSeenTime = 3;
     required int64 bcsId = 4;
     optional string state = 5;
+    optional int64 dataChecksum = 6;
 }
 
 message SCMContainerReplicaProto {
@@ -458,6 +459,7 @@ message SCMContainerReplicaProto {
     required int64 keyCount = 6;
     required int64 bytesUsed = 7;
     optional int64 replicaIndex = 8;
+    optional int64 dataChecksum = 9;
 }
 
 message KeyContainerIDList {

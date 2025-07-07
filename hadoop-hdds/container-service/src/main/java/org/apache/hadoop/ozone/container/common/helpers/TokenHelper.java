@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.ec.reconstruction;
+package org.apache.hadoop.ozone.container.common.helpers;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.DELETE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
@@ -39,7 +39,7 @@ import org.apache.hadoop.security.token.Token;
 /**
  * Wraps block and container token managers for datanode.
  */
-class TokenHelper {
+public class TokenHelper {
 
   private final OzoneBlockTokenSecretManager blockTokenMgr;
   private final ContainerTokenSecretManager containerTokenMgr;
@@ -47,8 +47,8 @@ class TokenHelper {
   private static final Set<AccessModeProto> MODES =
       EnumSet.of(READ, WRITE, DELETE);
 
-  TokenHelper(SecurityConfig securityConfig,
-      SecretKeySignerClient secretKeyClient) throws IOException {
+  public TokenHelper(SecurityConfig securityConfig,
+                     SecretKeySignerClient secretKeyClient) throws IOException {
 
     boolean blockTokenEnabled = securityConfig.isBlockTokenEnabled();
     boolean containerTokenEnabled = securityConfig.isContainerTokenEnabled();
@@ -82,19 +82,19 @@ class TokenHelper {
     }
   }
 
-  Token<OzoneBlockTokenIdentifier> getBlockToken(BlockID blockID, long length) {
+  public Token<OzoneBlockTokenIdentifier> getBlockToken(BlockID blockID, long length) {
     return blockTokenMgr != null
         ? blockTokenMgr.generateToken(user, blockID, MODES, length)
         : null;
   }
 
-  Token<ContainerTokenIdentifier> getContainerToken(ContainerID containerID) {
+  public Token<ContainerTokenIdentifier> getContainerToken(ContainerID containerID) {
     return containerTokenMgr != null
         ? containerTokenMgr.generateToken(user, containerID)
         : null;
   }
 
-  static String encode(Token<?> token) throws IOException {
+  public static String encode(Token<?> token) throws IOException {
     return token != null ? token.encodeToUrlString() : null;
   }
 

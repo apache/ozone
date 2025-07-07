@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
@@ -72,24 +73,27 @@ public class BlockDeletingService extends BackgroundService {
 
   private final Duration blockDeletingMaxLockHoldingTime;
 
+  private final ContainerChecksumTreeManager checksumTreeManager;
+
   @VisibleForTesting
   public BlockDeletingService(
       OzoneContainer ozoneContainer, long serviceInterval, long serviceTimeout,
-      TimeUnit timeUnit, int workerSize, ConfigurationSource conf
-  ) {
+      TimeUnit timeUnit, int workerSize, ConfigurationSource conf, ContainerChecksumTreeManager checksumTreeManager) {
     this(ozoneContainer, serviceInterval, serviceTimeout, timeUnit, workerSize,
-        conf, "", null);
+        conf, "", checksumTreeManager, null);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
   public BlockDeletingService(
       OzoneContainer ozoneContainer, long serviceInterval, long serviceTimeout,
       TimeUnit timeUnit, int workerSize, ConfigurationSource conf,
-      String threadNamePrefix, ReconfigurationHandler reconfigurationHandler
+      String threadNamePrefix, ContainerChecksumTreeManager checksumTreeManager,
+      ReconfigurationHandler reconfigurationHandler
   ) {
     super("BlockDeletingService", serviceInterval, timeUnit,
         workerSize, serviceTimeout, threadNamePrefix);
     this.ozoneContainer = ozoneContainer;
+    this.checksumTreeManager = checksumTreeManager;
     try {
       containerDeletionPolicy = conf.getClass(
           ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
@@ -180,6 +184,7 @@ public class BlockDeletingService extends BackgroundService {
             new BlockDeletingTaskBuilder();
         builder.setBlockDeletingService(this)
             .setContainerBlockInfo(containerBlockInfo)
+            .setChecksumTreeManager(checksumTreeManager)
             .setPriority(TASK_PRIORITY_DEFAULT);
         containerBlockInfos = builder.build();
         queue.add(containerBlockInfos);
@@ -311,6 +316,7 @@ public class BlockDeletingService extends BackgroundService {
     private BlockDeletingService blockDeletingService;
     private BlockDeletingService.ContainerBlockInfo containerBlockInfo;
     private int priority;
+    private ContainerChecksumTreeManager checksumTreeManager;
 
     public BlockDeletingTaskBuilder setBlockDeletingService(
         BlockDeletingService blockDeletingService) {
@@ -321,6 +327,11 @@ public class BlockDeletingService extends BackgroundService {
     public BlockDeletingTaskBuilder setContainerBlockInfo(
         ContainerBlockInfo containerBlockInfo) {
       this.containerBlockInfo = containerBlockInfo;
+      return this;
+    }
+
+    public BlockDeletingTaskBuilder setChecksumTreeManager(ContainerChecksumTreeManager treeManager) {
+      this.checksumTreeManager = treeManager;
       return this;
     }
 
@@ -335,8 +346,7 @@ public class BlockDeletingService extends BackgroundService {
       if (containerType
           .equals(ContainerProtos.ContainerType.KeyValueContainer)) {
         return
-            new BlockDeletingTask(blockDeletingService, containerBlockInfo,
-                priority);
+            new BlockDeletingTask(blockDeletingService, containerBlockInfo, checksumTreeManager, priority);
       } else {
         // If another ContainerType is available later, implement it
         throw new IllegalArgumentException(

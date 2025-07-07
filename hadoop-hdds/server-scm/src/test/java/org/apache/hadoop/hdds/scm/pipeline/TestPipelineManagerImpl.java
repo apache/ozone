@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
@@ -49,6 +50,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -64,9 +66,11 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -88,10 +92,12 @@ import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -111,6 +117,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 /**
  * Tests for PipelineManagerImpl.
@@ -143,8 +150,9 @@ public class TestPipelineManagerImpl {
         conf.getInt(OZONE_DATANODE_PIPELINE_LIMIT,
             OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) /
         HddsProtos.ReplicationFactor.THREE.getNumber();
-    scmContext = new SCMContext.Builder().setIsInSafeMode(true)
-        .setLeader(true).setIsPreCheckComplete(true)
+    scmContext = new SCMContext.Builder()
+        .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
+        .setLeader(true)
         .setSCM(scm).build();
     serviceManager = new SCMServiceManager();
   }
@@ -610,8 +618,7 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, false));
+    scmContext.updateSafeModeStatus(SafeModeStatus.INITIAL);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     assertThrows(IOException.class,
@@ -631,8 +638,7 @@ public class TestPipelineManagerImpl {
         .contains(pipeline));
 
     // Simulate safemode check exiting.
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     GenericTestUtils.waitFor(() -> !pipelineManager.getPipelines().isEmpty(),
         100, 10000);
     pipelineManager.close();
@@ -647,21 +653,18 @@ public class TestPipelineManagerImpl {
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
 
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, false));
+    scmContext.updateSafeModeStatus(SafeModeStatus.INITIAL);
     assertTrue(pipelineManager.getSafeModeStatus());
     assertFalse(pipelineManager.isPipelineCreationAllowed());
 
     // First pass pre-check as true, but safemode still on
     // Simulate safemode check exiting.
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     assertTrue(pipelineManager.getSafeModeStatus());
     assertTrue(pipelineManager.isPipelineCreationAllowed());
 
     // Then also turn safemode off
-    scmContext.updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(false, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
     assertFalse(pipelineManager.getSafeModeStatus());
     assertTrue(pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();
@@ -931,6 +934,69 @@ public class TestPipelineManagerImpl {
     for (DatanodeDetails dn : pipeline.getNodes())  {
       assertThat(dns).contains(dn);
     }
+  }
+
+  /**
+   * {@link PipelineManager#hasEnoughSpace(Pipeline, long)} should return false if all the
+   * volumes on any Datanode in the pipeline have less than equal to the space required for creating a new container.
+   */
+  @Test
+  public void testHasEnoughSpace() throws IOException {
+    // create a Mock NodeManager, the MockNodeManager class doesn't work for this test
+    NodeManager mockedNodeManager = Mockito.mock(NodeManager.class);
+    PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(conf,
+        SCMHAManagerStub.getInstance(true),
+        mockedNodeManager,
+        SCMDBDefinition.PIPELINES.getTable(dbStore),
+        new EventQueue(),
+        scmContext,
+        serviceManager,
+        testClock);
+
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setNodes(ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails()))
+        .setState(OPEN)
+        .setReplicationConfig(ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, THREE))
+        .build();
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+    assertEquals(3, nodes.size());
+
+    long containerSize = 100L;
+
+    // Case 1: All nodes have enough space.
+    List<DatanodeInfo> datanodeInfoList = new ArrayList<>();
+    for (DatanodeDetails dn : nodes) {
+      // the method being tested needs NodeManager to return DatanodeInfo because DatanodeInfo has storage
+      // information (it extends DatanodeDetails)
+      DatanodeInfo info = new DatanodeInfo(dn, null, null);
+      info.updateStorageReports(HddsTestUtils.createStorageReports(dn.getID(), 200L, 200L, 10L));
+      doReturn(info).when(mockedNodeManager).getDatanodeInfo(dn);
+      datanodeInfoList.add(info);
+    }
+    assertTrue(pipelineManager.hasEnoughSpace(pipeline, containerSize));
+
+    // Case 2: One node does not have enough space.
+    /*
+     Interestingly, SCMCommonPlacementPolicy#hasEnoughSpace returns false if exactly the required amount of space
+      is available. Which means it won't allow creating a pipeline on a node if all volumes have exactly 5 GB
+      available. We follow the same behavior here in the case of a new replica.
+
+      So here, remaining - committed == containerSize, and hasEnoughSpace returns false.
+      TODO should this return true instead?
+     */
+    DatanodeInfo datanodeInfo = datanodeInfoList.get(0);
+    datanodeInfo.updateStorageReports(HddsTestUtils.createStorageReports(datanodeInfo.getID(), 200L, 120L,
+        20L));
+    assertFalse(pipelineManager.hasEnoughSpace(pipeline, containerSize));
+
+    // Case 3: All nodes do not have enough space.
+    for (DatanodeInfo info : datanodeInfoList) {
+      info.updateStorageReports(HddsTestUtils.createStorageReports(info.getID(), 200L, 100L, 20L));
+    }
+    assertFalse(pipelineManager.hasEnoughSpace(pipeline, containerSize));
   }
 
   private Set<ContainerReplica> createContainerReplicasList(

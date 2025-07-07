@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.concurrent.TimeUnit;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
@@ -157,6 +159,9 @@ public class TestDatanodeConfiguration {
     // unset over-ridding configuration from ozone-site.xml defined for the test module
     conf.unset(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE); // set in ozone-site.xml
 
+    // Capture logs to verify no warnings are generated
+    LogCapturer logCapturer = LogCapturer.captureLogs(DatanodeConfiguration.class);
+
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
@@ -185,6 +190,10 @@ public class TestDatanodeConfiguration {
     // capacity is large, consider min_free_space_percent, max(min_free_space, min_free_space_percent * capacity)ß
     assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT * oneGB * oneGB,
         subject.getMinFreeSpace(oneGB * oneGB));
+
+    // Verify that no warnings were logged when using default values
+    String logOutput = logCapturer.getOutput();
+    assertThat(logOutput).doesNotContain("is invalid, should be between 0 and 1");
   }
 
   @Test

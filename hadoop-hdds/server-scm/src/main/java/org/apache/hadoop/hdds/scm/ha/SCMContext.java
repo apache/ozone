@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
@@ -72,7 +72,7 @@ public final class SCMContext {
   private SCMContext(Builder b) {
     isLeader = b.isLeader;
     term = b.term;
-    safeModeStatus = SafeModeStatus.of(b.isInSafeMode, b.isPreCheckComplete);
+    safeModeStatus = b.safeModeStatus;
     finalizationCheckpoint = b.finalizationCheckpoint;
     scm = b.scm;
     threadNamePrefix = b.threadNamePrefix;
@@ -276,8 +276,7 @@ public final class SCMContext {
      */
     private boolean isLeader = false;
     private long term = INVALID_TERM;
-    private boolean isInSafeMode = false;
-    private boolean isPreCheckComplete = true;
+    private SafeModeStatus safeModeStatus = SafeModeStatus.OUT_OF_SAFE_MODE;
     private OzoneStorageContainerManager scm = null;
     private FinalizationCheckpoint finalizationCheckpoint = FinalizationCheckpoint.FINALIZATION_COMPLETE;
     private String threadNamePrefix = "";
@@ -292,13 +291,8 @@ public final class SCMContext {
       return this;
     }
 
-    public Builder setIsInSafeMode(boolean inSafeMode) {
-      this.isInSafeMode = inSafeMode;
-      return this;
-    }
-
-    public Builder setIsPreCheckComplete(boolean preCheckComplete) {
-      this.isPreCheckComplete = preCheckComplete;
+    public Builder setSafeModeStatus(SafeModeStatus status) {
+      this.safeModeStatus = status;
       return this;
     }
 
@@ -320,7 +314,7 @@ public final class SCMContext {
     }
 
     public SCMContext build() {
-      Preconditions.checkNotNull(scm, "scm == null");
+      Objects.requireNonNull(scm, "scm == null");
       return buildMaybeInvalid();
     }
 
