@@ -30,4 +30,25 @@
   <Match>
     <Package name="org.apache.hadoop.ozone.metrics"/>
   </Match>
+  <Match>
+    <Package name="org.apache.hadoop.ozone.metrics.annotation"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.hadoop.ozone.metrics.filter"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.hadoop.ozone.metrics.impl"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.hadoop.ozone.metrics.lib"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.hadoop.ozone.metrics.sink"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.hadoop.ozone.metrics.source"/>
+  </Match>
+  <Match>
+  <Package name="org.apache.hadoop.ozone.metrics.util"/>
+</Match>
 </FindBugsFilter>

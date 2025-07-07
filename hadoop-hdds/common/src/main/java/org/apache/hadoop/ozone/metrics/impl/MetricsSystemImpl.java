@@ -32,7 +32,6 @@ import javax.management.ObjectName;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.sun.tools.javac.util.StringUtils;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -59,6 +58,7 @@ import org.apache.hadoop.ozone.metrics.lib.MetricsSourceBuilder;
 import org.apache.hadoop.ozone.metrics.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.metrics.lib.MutableStat;
 import org.apache.hadoop.ozone.metrics.util.MBeans;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
