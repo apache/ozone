@@ -323,11 +323,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL =
       "ozone.om.security.admin.protocol.acl";
 
-  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
-          "ozone.om.keyname.character.check.enabled";
-  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
-          false;
-
   @Deprecated
   public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =
       OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
@@ -387,12 +382,20 @@ public final class OMConfigKeys {
    */
   public static final String OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED = "ozone.snapshot.deep.cleaning.enabled";
   public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = false;
+  /**
+   * DirectoryDeepCleaning snapshots have been moved from SnapshotDirectoryCleaningService to DirectoryDeletingService.
+   * Configs related to SnapshotDirectoryCleaningService are deprecated as this won't be used anywhere.
+   */
+  @Deprecated
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL =
       "ozone.snapshot.directory.service.interval";
+  @Deprecated
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT
       = "24h";
+  @Deprecated
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT =
       "ozone.snapshot.directory.service.timeout";
+  @Deprecated
   public static final String
       OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT = "300s";
 

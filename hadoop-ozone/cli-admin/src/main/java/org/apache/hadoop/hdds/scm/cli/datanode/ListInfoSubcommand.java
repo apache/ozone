@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.shell.ListLimitOptions;
 import picocli.CommandLine;
 
 /**
@@ -81,6 +82,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
   @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
   private UsageSortingOptions usageSortingOptions;
 
+  @CommandLine.Mixin
+  private ListLimitOptions listLimitOptions;
+
   private List<Pipeline> pipelines;
 
   static class UsageSortingOptions {
@@ -129,6 +133,10 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .compareToIgnoreCase(nodeState) == 0);
     }
 
+    if (!listLimitOptions.isAll()) {
+      allNodes = allNodes.limit(listLimitOptions.getLimit());
+    }
+    
     if (json) {
       List<DatanodeWithAttributes> datanodeList = allNodes.collect(
               Collectors.toList());

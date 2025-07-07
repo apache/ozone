@@ -68,7 +68,8 @@ public enum SCMAction implements AuditAction {
   DECOMMISSION_SCM,
   GET_METRICS,
   QUERY_NODE,
-  GET_PIPELINE;
+  GET_PIPELINE,
+  RECONCILE_CONTAINER;
 
   @Override
   public String getAction() {
