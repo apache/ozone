@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-secure
+#suite:tools
 
 set -u -o pipefail
 

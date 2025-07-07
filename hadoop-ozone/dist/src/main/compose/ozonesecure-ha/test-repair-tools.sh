@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-secure
+#suite:tools
 
 set -u -o pipefail
 
@@ -38,16 +38,10 @@ export OZONE_VOLUME
 rm -rf "${OZONE_VOLUME}"
 mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,dn4,dn5,om1,om2,om3,scm1,scm2,scm3,recon,s3g,kms}
 
-if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
-  current_user=$(whoami)
-  if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
-    chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
-      || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
-  fi
-fi
-
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
+
+fix_data_dir_permissions
 
 start_docker_env
 
