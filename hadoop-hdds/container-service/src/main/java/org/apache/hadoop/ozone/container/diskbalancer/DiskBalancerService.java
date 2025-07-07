@@ -92,7 +92,6 @@ public class DiskBalancerService extends BackgroundService {
   private AtomicLong balancedBytesInLastWindow = new AtomicLong(0L);
   private AtomicLong nextAvailableTime = new AtomicLong(Time.monotonicNow());
 
-  private Set<DiskBalancerTask> inProgressTasks;
   private Set<Long> inProgressContainers;
 
   /**
@@ -151,7 +150,6 @@ public class DiskBalancerService extends BackgroundService {
     Preconditions.checkNotNull(diskBalancerInfoPath);
     diskBalancerInfoFile = new File(diskBalancerInfoPath);
 
-    inProgressTasks = ConcurrentHashMap.newKeySet();
     inProgressContainers = ConcurrentHashMap.newKeySet();
     deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
@@ -377,7 +375,7 @@ public class DiskBalancerService extends BackgroundService {
       return queue;
     }
 
-    int availableTaskCount = parallelThread - inProgressTasks.size();
+    int availableTaskCount = parallelThread - inProgressContainers.size();
     if (availableTaskCount <= 0) {
       LOG.info("No available thread for disk balancer service. " +
           "Current thread count is {}.", parallelThread);
@@ -397,7 +395,6 @@ public class DiskBalancerService extends BackgroundService {
         DiskBalancerTask task = new DiskBalancerTask(toBalanceContainer, sourceVolume,
             destVolume);
         queue.add(task);
-        inProgressTasks.add(task);
         inProgressContainers.add(toBalanceContainer.getContainerID());
         deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
             - toBalanceContainer.getBytesUsed());
@@ -572,7 +569,6 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     private void postCall() {
-      inProgressTasks.remove(this);
       inProgressContainers.remove(containerData.getContainerID());
       deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
           containerData.getBytesUsed());
@@ -644,6 +640,21 @@ public class DiskBalancerService extends BackgroundService {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
+  }
+
+  @VisibleForTesting
+  public void setVolumeChoosingPolicy(VolumeChoosingPolicy volumeChoosingPolicy) {
+    this.volumeChoosingPolicy = volumeChoosingPolicy;
+  }
+
+  @VisibleForTesting
+  public void setContainerChoosingPolicy(ContainerChoosingPolicy containerChoosingPolicy) {
+    this.containerChoosingPolicy = containerChoosingPolicy;
+  }
+
+  @VisibleForTesting
+  public Set<Long> getInProgressContainers() {
+    return inProgressContainers;
   }
 
   /**

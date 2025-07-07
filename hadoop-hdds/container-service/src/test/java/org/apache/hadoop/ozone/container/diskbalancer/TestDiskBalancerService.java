@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,29 +31,38 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -87,6 +97,7 @@ public class TestDiskBalancerService {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     conf.set("hdds.datanode.du.factory.classname",
         "org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory$HalfTera");
+    conf.setTimeDuration("hdds.datanode.disk.balancer.service.interval", 2, TimeUnit.SECONDS);
     datanodeUuid = UUID.randomUUID().toString();
     volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -242,6 +253,55 @@ public class TestDiskBalancerService {
 
     // data precision loss due to double data involved in calculation
     assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeSet)) <= 1);
+  }
+
+  @Test
+  public void testConcurrentTasksNotExceedThreadLimit() throws Exception {
+    LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);
+    int parallelThread = 3;
+
+    ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        }, new ContainerChecksumTreeManager(conf));
+    DiskBalancerServiceTestImpl svc =
+        getDiskBalancerService(containerSet, conf, keyValueHandler, null, parallelThread);
+
+    // Set operational state to RUNNING
+    DiskBalancerInfo info = new DiskBalancerInfo(
+        DiskBalancerOperationalState.RUNNING, 10.0d, 100L, parallelThread,
+        false, DiskBalancerVersion.DEFAULT_VERSION);
+    svc.refresh(info);
+
+    VolumeChoosingPolicy volumePolicy = mock(VolumeChoosingPolicy.class);
+    ContainerChoosingPolicy containerPolicy = mock(ContainerChoosingPolicy.class);
+    svc.setVolumeChoosingPolicy(volumePolicy);
+    svc.setContainerChoosingPolicy(containerPolicy);
+
+    List<StorageVolume> volumes = volumeSet.getVolumesList();
+    HddsVolume source = (HddsVolume) volumes.get(0);
+    HddsVolume dest = (HddsVolume) volumes.get(1);
+    ContainerData containerData = mock(ContainerData.class);
+
+    // Mock unique container IDs to correctly populate the Set
+    when(containerData.getContainerID()).thenAnswer(invocation -> System.nanoTime());
+    when(containerData.getBytesUsed()).thenReturn(100L);
+
+    when(volumePolicy.chooseVolume(any(), anyDouble(), any())).thenReturn(Pair.of(source, dest));
+    when(containerPolicy.chooseContainer(any(), any(), any())).thenReturn(containerData);
+
+    // Test when no tasks are in progress, it should schedule up to the limit
+    BackgroundTaskQueue queue = svc.getTasks();
+    assertEquals(parallelThread, queue.size());
+    assertEquals(parallelThread, svc.getInProgressContainers().size());
+
+    // Test when in-progress tasks are at the limit, no new tasks are scheduled
+    svc.getTasks();
+    GenericTestUtils.waitFor(() -> serviceLog.getOutput().contains("No available thread " +
+            "for disk balancer service. Current thread count is 3."),
+        100, 5000);
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet,
