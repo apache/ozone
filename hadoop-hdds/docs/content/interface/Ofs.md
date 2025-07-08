@@ -327,3 +327,39 @@ The following table lists the supported operations for Ofs.
 
 [5] Snapshots are only supported at the bucket level.
 
+### Unsupported HDFS-Specific Operations
+
+The following operations are specific to HDFS and are not supported by Ofs.
+
+| Operation                 | Description                                         | Support     |
+|---------------------------|-----------------------------------------------------|-------------|
+| `setStoragePolicy`        | Sets a storage policy on a file or directory.       | Unsupported |
+| `getStoragePolicy`        | Gets the storage policy of a file or directory.     | Unsupported |
+| `getErasureCodingPolicy`  | Gets the erasure coding policy of a file or directory.| Unsupported |
+| `setErasureCodingPolicy`  | Sets an erasure coding policy on a directory.       | Unsupported |
+| `unsetErasureCodingPolicy`| Unsets an erasure coding policy on a directory.     | Unsupported |
+| `addCachePool`            | Adds a cache pool.                                  | Unsupported |
+| `modifyCachePool`         | Modifies a cache pool.                              | Unsupported |
+| `removeCachePool`         | Removes a cache pool.                               | Unsupported |
+| `listCachePools`          | Lists all cache pools.                              | Unsupported |
+| `addCacheDirective`       | Adds a cache directive.                             | Unsupported |
+| `modifyCacheDirective`    | Modifies a cache directive.                         | Unsupported |
+| `removeCacheDirective`    | Removes a cache directive.                          | Unsupported |
+| `listCacheDirectives`     | Lists cache directives.                             | Unsupported |
+| `allowSnapshot`           | Allows snapshots to be taken on a directory.        | Unsupported |
+| `disallowSnapshot`        | Disallows snapshots to be taken on a directory.     | Unsupported |
+| `addErasureCodingPolicies`| Adds erasure coding policies.                       | Unsupported |
+| `getErasureCodingPolicies`| Gets the available erasure coding policies.         | Unsupported |
+| `removeErasureCodingPolicy`| Removes an erasure coding policy.                  | Unsupported |
+| `enableErasureCodingPolicy`| Enables an erasure coding policy.                   | Unsupported |
+| `disableErasureCodingPolicy`| Disables an erasure coding policy.                  | Unsupported |
+| `getEZForPath`            | Gets the encryption zone for a path.                | Unsupported |
+| `listErasureCodingPolicies`| Lists all erasure coding policies.                  | Unsupported |
+| `listErasureCodingCodecs` | Lists all erasure coding codecs.                    | Unsupported |
+| `getQuotaUsage`           | Gets the quota usage for a path.                    | Unsupported |
+| `setQuotaByStorageType`   | Sets the quota by storage type for a path.          | Unsupported |
+| `getQuotaByStorageType`   | Gets the quota by storage type for a path.          | Unsupported |
+| `msync`                   | Flushes out the data in client's user buffer.       | Unsupported |
+| `satisfyStoragePolicy`    | Satisfies the storage policy of a file.             | Unsupported |
+
+
