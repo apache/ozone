@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -831,6 +832,21 @@ public class MockNodeManager implements NodeManager {
   public DatanodeDetails getNode(DatanodeID id) {
     Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + id);
     return node == null ? null : (DatanodeDetails)node;
+  }
+
+  @Nullable
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
+    DatanodeDetails node = getNode(datanodeDetails.getID());
+    if (node == null) {
+      return null;
+    }
+
+    DatanodeInfo datanodeInfo = new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy(), null);
+    long capacity = 50L * 1024 * 1024 * 1024;
+    datanodeInfo.updateStorageReports(HddsTestUtils.createStorageReports(datanodeInfo.getID(), capacity, capacity,
+        0L));
+    return datanodeInfo;
   }
 
   @Override

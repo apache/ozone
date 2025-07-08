@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-import java.io.Closeable;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * DB handle abstract class.
  */
-public abstract class DBHandle implements Closeable {
+public abstract class DBHandle implements UncheckedAutoCloseable {
 
   private final DatanodeStore store;
   private final String containerDBPath;

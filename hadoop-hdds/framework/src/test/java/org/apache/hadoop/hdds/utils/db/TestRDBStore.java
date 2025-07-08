@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -181,47 +180,6 @@ public class TestRDBStore {
   }
 
   @Test
-  public void moveKey() throws Exception {
-    byte[] key =
-        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-    byte[] value =
-        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-
-    final Table<byte[], byte[]> firstTable = rdbStore.getTable(families.get(1));
-    firstTable.put(key, value);
-    final Table<byte[], byte[]> secondTable = rdbStore.getTable(families.get(2));
-    rdbStore.move(key, firstTable, secondTable);
-    byte[] newvalue = secondTable.get(key);
-    // Make sure we have value in the second table
-    assertNotNull(newvalue);
-    //and it is same as what we wrote to the FirstTable
-    assertArrayEquals(value, newvalue);
-    // After move this key must not exist in the first table.
-    assertNull(firstTable.get(key));
-  }
-
-  @Test
-  public void moveWithValue() throws Exception {
-    byte[] key =
-        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-    byte[] value =
-        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-
-    byte[] nextValue =
-        RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-    Table<byte[], byte[]> firstTable = rdbStore.getTable(families.get(1));
-    firstTable.put(key, value);
-    Table<byte[], byte[]> secondTable = rdbStore.getTable(families.get(2));
-    rdbStore.move(key, nextValue, firstTable, secondTable);
-    byte[] newvalue = secondTable.get(key);
-    // Make sure we have value in the second table
-    assertNotNull(newvalue);
-    //and it is not same as what we wrote to the FirstTable, and equals
-    // the new value.
-    assertArrayEquals(nextValue, newvalue);
-  }
-
-  @Test
   public void getEstimatedKeyCount() throws Exception {
     assertNotNull(rdbStore, "DB Store cannot be null");
 
@@ -248,7 +206,7 @@ public class TestRDBStore {
 
   @Test
   public void listTables() throws Exception {
-    List<Table> tableList = rdbStore.listTables();
+    final List<Table<?, ?>> tableList = rdbStore.listTables();
     assertNotNull(tableList, "Table list cannot be null");
     Map<String, Table> hashTable = new HashMap<>();
 

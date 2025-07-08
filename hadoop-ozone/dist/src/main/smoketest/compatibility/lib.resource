@@ -14,21 +14,22 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test checksums in case of one datanode is dead
+Library             BuiltIn
 Library             OperatingSystem
 Resource            ../lib/os.robot
-Resource            ozone-debug.robot
-Test Timeout        5 minute
-*** Variables ***
-${PREFIX}           ${EMPTY}
-${VOLUME}           cli-debug-volume${PREFIX}
-${BUCKET}           cli-debug-bucket
-${TESTFILE}         testfile
 
-*** Test Cases ***
-Test ozone debug checksums with one datanode DEAD
-    ${directory} =                 Execute replicas verify checksums CLI tool
-    Set Test Variable    ${DIR}         ${directory}
+*** Keywords ***
+Check server command-line options
+    ${processes} =    List All Processes
+    Should Contain    ${processes}   %{HADOOP_OPTS}
+    Should Contain    ${processes}   %{OZONE_SERVER_OPTS}
+    RETURN    ${processes}
 
-    ${count_files} =               Count Files In Directory    ${directory}
-    Should Be Equal As Integers    ${count_files}     1
+Wait for server command-line options
+    ${processes} =     Wait Until Keyword Succeeds    3min    2sec    Check server command-line options
+    RETURN    ${processes}
+
+Check client command-line options
+    Set Environment Variable    OZONE_SHELL_SCRIPT_DEBUG    true
+    ${output} =    Execute    ozone sh --help
+    Should Not Contain    ${output}    %{OZONE_SERVER_OPTS}
