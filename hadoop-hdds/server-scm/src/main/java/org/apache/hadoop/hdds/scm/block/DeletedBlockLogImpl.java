@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_BLOCKS_PER_DN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_BLOCKS_PER_DN_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
@@ -93,6 +95,7 @@ public class DeletedBlockLogImpl
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
   private long lastProcessedTransactionId = -1;
   private final int logAppenderQueueByteLimit;
+  private int maxDeleteBlocksPerDatanode;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
@@ -123,11 +126,19 @@ public class DeletedBlockLogImpl
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     this.logAppenderQueueByteLimit = (int) (limit * 0.9);
+    this.maxDeleteBlocksPerDatanode = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_BLOCKS_PER_DN,
+        OZONE_SCM_BLOCK_DELETION_MAX_BLOCKS_PER_DN_DEFAULT);
+
   }
 
   @VisibleForTesting
   void setDeletedBlockLogStateManager(DeletedBlockLogStateManager manager) {
     this.deletedBlockLogStateManager = manager;
+  }
+
+  @VisibleForTesting
+  void setMaxDeleteBlocksPerDatanode(int maxDeleteBlocksPerDatanode) {
+    this.maxDeleteBlocksPerDatanode = maxDeleteBlocksPerDatanode;
   }
 
   @Override
@@ -326,9 +337,18 @@ public class DeletedBlockLogImpl
   }
 
   private void getTransaction(DeletedBlocksTransaction tx,
-      DatanodeDeletedBlockTransactions transactions,
-      Set<ContainerReplica> replicas,
-      Map<DatanodeID, Map<Long, CmdStatus>> commandStatus) {
+                                       DatanodeDeletedBlockTransactions transactions,
+                                       Set<ContainerReplica> replicas,
+                                       Map<DatanodeID, Map<Long, CmdStatus>> commandStatus) {
+
+    // Check if all replicas satisfy the maxBlocksPerDatanode condition
+    if (!replicas.stream().allMatch(replica -> {
+      final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
+      return transactions.getNumberOfBlocksForDatanode(datanodeID) < maxDeleteBlocksPerDatanode;
+    })) {
+      return;
+    }
+
     DeletedBlocksTransaction updatedTxn =
         DeletedBlocksTransaction.newBuilder(tx)
             .setCount(transactionStatusManager.getRetryCount(tx.getTxID()))
