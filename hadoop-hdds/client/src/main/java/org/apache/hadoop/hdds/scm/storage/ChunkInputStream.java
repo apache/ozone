@@ -742,4 +742,8 @@ public class ChunkInputStream extends InputStream
   public ByteBuffer[] getCachedBuffers() {
     return BufferUtils.getReadOnlyByteBuffers(buffers);
   }
+
+  public ChunkInfo getChunkInfo() {
+    return chunkInfo;
+  }
 }

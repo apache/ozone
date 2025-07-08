@@ -121,7 +121,6 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.Persisted
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ratis.util.ExitUtils;
-import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -569,7 +568,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         .append(OM_KEY_PREFIX).append(volume);
     // TODO : Throw if the Bucket is null?
     builder.append(OM_KEY_PREFIX).append(bucket);
-    if (StringUtil.isNotBlank(key)) {
+    if (StringUtils.isNotBlank(key)) {
       builder.append(OM_KEY_PREFIX);
       if (!key.equals(OM_KEY_PREFIX)) {
         builder.append(key);
@@ -845,7 +844,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     String startKey;
     boolean skipStartKey = false;
-    if (StringUtil.isNotBlank(startBucket)) {
+    if (StringUtils.isNotBlank(startBucket)) {
       // if the user has specified a start key, we need to seek to that key
       // and avoid that key in the response set.
       startKey = getBucketKey(volumeName, startBucket);
@@ -860,7 +859,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     String seekPrefix;
-    if (StringUtil.isNotBlank(bucketPrefix)) {
+    if (StringUtils.isNotBlank(bucketPrefix)) {
       seekPrefix = getBucketKey(volumeName, bucketPrefix);
     } else {
       seekPrefix = getVolumeKey(volumeName + OM_KEY_PREFIX);
@@ -1012,18 +1011,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     String seekKey;
     boolean skipStartKey = false;
-    if (StringUtil.isNotBlank(startKey)) {
+    if (StringUtils.isNotBlank(startKey)) {
       // Seek to the specified key.
       seekKey = getOzoneKey(volumeName, bucketName, startKey);
       skipStartKey = true;
     } else {
       // This allows us to seek directly to the first key with the right prefix.
       seekKey = getOzoneKey(volumeName, bucketName,
-          StringUtil.isNotBlank(keyPrefix) ? keyPrefix : OM_KEY_PREFIX);
+          StringUtils.isNotBlank(keyPrefix) ? keyPrefix : OM_KEY_PREFIX);
     }
 
     String seekPrefix;
-    if (StringUtil.isNotBlank(keyPrefix)) {
+    if (StringUtils.isNotBlank(keyPrefix)) {
       seekPrefix = getOzoneKey(volumeName, bucketName, keyPrefix);
     } else {
       seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
@@ -1162,20 +1161,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     String prefix;
-    if (StringUtil.isNotBlank(snapshotPrefix)) {
+    if (StringUtils.isNotBlank(snapshotPrefix)) {
       prefix = getOzoneKey(volumeName, bucketName, snapshotPrefix);
     } else {
       prefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
     }
 
     String seek;
-    if (StringUtil.isNotBlank(prevSnapshot)) {
+    if (StringUtils.isNotBlank(prevSnapshot)) {
       // Seek to the specified snapshot.
       seek = getOzoneKey(volumeName, bucketName, prevSnapshot);
     } else {
       // This allows us to seek directly to the first key with the right prefix.
       seek = getOzoneKey(volumeName, bucketName,
-          StringUtil.isNotBlank(snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
+          StringUtils.isNotBlank(snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
     }
 
     List<SnapshotInfo> snapshotInfos =  Lists.newArrayList();
@@ -1208,7 +1207,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
 
-    if (StringUtil.isBlank(userName)) {
+    if (StringUtils.isBlank(userName)) {
       // null userName represents listing all volumes in cluster.
       return listAllVolumes(prefix, startKey, maxKeys);
     }
@@ -1518,9 +1517,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     String prefixKey =
         OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
-    if (StringUtil.isNotBlank(keyMarker)) {
+    if (StringUtils.isNotBlank(keyMarker)) {
       prefix = keyMarker;
-      if (StringUtil.isNotBlank(uploadIdMarker)) {
+      if (StringUtils.isNotBlank(uploadIdMarker)) {
         prefix = prefix + OM_KEY_PREFIX + uploadIdMarker;
       }
     }

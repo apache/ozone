@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
         ChunkInfoList> {
   public static final String DELETED_KEY_PREFIX = "#deleted#";
+  private static final KeyPrefixFilter DELETED_FILTER = KeyPrefixFilter.newFilter(DELETED_KEY_PREFIX);
 
   public SchemaOneDeletedBlocksTable(Table<String, ChunkInfoList> table) {
     super(table);
@@ -99,28 +100,12 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
 
   @Override
   public List<KeyValue<String, ChunkInfoList>> getRangeKVs(
-          String startKey, int count, String prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws RocksDatabaseException, CodecException {
-
+      String startKey, int count, String prefix, KeyPrefixFilter filter, boolean isSequential)
+      throws RocksDatabaseException, CodecException {
     // Deleted blocks will always have the #deleted# key prefix and nothing
     // else in this schema version. Ignore any user passed prefixes that could
     // collide with this and return results that are not deleted blocks.
-    return unprefix(super.getRangeKVs(prefix(startKey), count,
-        prefix, getDeletedFilter()));
-  }
-
-  @Override
-  public List<KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
-          String startKey, int count, String prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws RocksDatabaseException, CodecException {
-
-    // Deleted blocks will always have the #deleted# key prefix and nothing
-    // else in this schema version. Ignore any user passed prefixes that could
-    // collide with this and return results that are not deleted blocks.
-    return unprefix(super.getSequentialRangeKVs(prefix(startKey), count,
-        prefix, getDeletedFilter()));
+    return unprefix(super.getRangeKVs(prefix(startKey), count, prefix, DELETED_FILTER, isSequential));
   }
 
   private static String prefix(String key) {
@@ -147,10 +132,5 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
     return kvs.stream()
         .map(kv -> Table.newKeyValue(unprefix(kv.getKey()), kv.getValue()))
         .collect(Collectors.toList());
-  }
-
-  private static MetadataKeyFilters.KeyPrefixFilter getDeletedFilter() {
-    return (new MetadataKeyFilters.KeyPrefixFilter())
-            .addFilter(DELETED_KEY_PREFIX);
   }
 }

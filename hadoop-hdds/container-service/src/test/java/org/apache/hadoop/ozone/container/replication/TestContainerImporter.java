@@ -21,16 +21,15 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUti
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -65,14 +64,12 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.MockedStatic;
 
 /**
  * Test for {@link ContainerImporter}.
@@ -165,8 +162,8 @@ class TestContainerImporter {
     // create container with mock to return different checksums
     KeyValueContainerData data = spy(new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test"));
-    when(data.getChecksum()).thenReturn("checksum1", "checksum2");
-    doNothing().when(data).setChecksumTo0ByteArray();
+    // mock to return different checksum
+    when(containerData.getContainerFileChecksum()).thenReturn("checksum1", "checksum2");
     // create containerImporter object with mock
     ContainerImporter importer = spy(new ContainerImporter(conf,
         containerSet, controllerMock, volumeSet, volumeChoosingPolicy));
@@ -192,8 +189,7 @@ class TestContainerImporter {
 
   @Test
   public void testImportContainerTriggersOnDemandScanner() throws Exception {
-    try (MockedStatic<OnDemandContainerDataScanner> mockedStatic = mockStatic(OnDemandContainerDataScanner.class)) {
-      // create containerImporter object
+    // create containerImporter object
       HddsVolume targetVolume = mock(HddsVolume.class);
       doNothing().when(targetVolume).incrementUsedSpace(anyLong());
 
@@ -202,10 +198,7 @@ class TestContainerImporter {
       containerImporter.importContainer(containerId, tarFile.toPath(),
           targetVolume, NO_COMPRESSION);
 
-      // verify static method was called
-      mockedStatic.verify(() -> OnDemandContainerDataScanner.scanContainer(container, "Container import"), times(1));
-      assertNotNull(containerSet.getContainer(containerId));
-    }
+    verify(container, atLeastOnce()).scanData(any(), any());
   }
 
   @Test

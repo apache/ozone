@@ -94,6 +94,7 @@ import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -195,7 +196,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.setSilent(true);
     this.reconContext = reconContext;
     this.scmContext = new SCMContext.Builder()
-        .setIsPreCheckComplete(true)
+        .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.OUT_OF_SAFE_MODE)
         .setSCM(this)
         .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
@@ -464,7 +465,6 @@ public class ReconStorageContainerManagerFacade
       LOG.error("SCM Event Queue stop failed", ex);
     }
     IOUtils.cleanupWithLogger(LOG, nodeManager);
-    IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);

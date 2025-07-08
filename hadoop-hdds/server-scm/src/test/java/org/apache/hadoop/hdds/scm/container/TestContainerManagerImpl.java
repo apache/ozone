@@ -22,15 +22,21 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -49,6 +55,7 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -77,6 +84,7 @@ public class TestContainerManagerImpl {
   private SequenceIdGenerator sequenceIdGen;
   private NodeManager nodeManager;
   private ContainerReplicaPendingOps pendingOpsMock;
+  private PipelineManager pipelineManager;
 
   @BeforeAll
   static void init() {
@@ -92,8 +100,7 @@ public class TestContainerManagerImpl {
     nodeManager = new MockNodeManager(true, 10);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    final PipelineManager pipelineManager =
-        new MockPipelineManager(dbStore, scmhaManager, nodeManager);
+    pipelineManager = new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         ReplicationFactor.THREE));
     pendingOpsMock = mock(ContainerReplicaPendingOps.class);
@@ -104,10 +111,6 @@ public class TestContainerManagerImpl {
 
   @AfterEach
   public void cleanup() throws Exception {
-    if (containerManager != null) {
-      containerManager.close();
-    }
-
     if (dbStore != null) {
       dbStore.close();
     }
@@ -123,6 +126,58 @@ public class TestContainerManagerImpl {
     assertEquals(1, containerManager.getContainers().size());
     assertNotNull(containerManager.getContainer(
         container.containerID()));
+  }
+
+  /**
+   * getMatchingContainer allocates a new container in some cases. This test verifies that a container is not
+   * allocated when nodes in that pipeline don't have enough space for a new container.
+   */
+  @Test
+  public void testGetMatchingContainerReturnsNullWhenNotEnoughSpaceInDatanodes() throws IOException {
+    long sizeRequired = 256 * 1024 * 1024; // 256 MB
+    Pipeline pipeline = pipelineManager.getPipelines().iterator().next();
+    // MockPipelineManager#hasEnoughSpace always returns false
+    // the pipeline has no existing containers, so a new container gets allocated in getMatchingContainer
+    ContainerInfo container = containerManager
+        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    assertNull(container);
+
+    // create an EC pipeline to test for EC containers
+    ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
+    pipelineManager.createPipeline(ecReplicationConfig);
+    pipeline = pipelineManager.getPipelines(ecReplicationConfig).iterator().next();
+    container = containerManager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    assertNull(container);
+  }
+
+  @Test
+  public void testGetMatchingContainerReturnsContainerWhenEnoughSpaceInDatanodes() throws IOException {
+    long sizeRequired = 256 * 1024 * 1024; // 256 MB
+
+    // create a spy to mock hasEnoughSpace to always return true
+    PipelineManager spyPipelineManager = spy(pipelineManager);
+    doReturn(true).when(spyPipelineManager)
+        .hasEnoughSpace(any(Pipeline.class), anyLong());
+
+    // create a new ContainerManager using the spy
+    File tempDir = new File(testDir, "tempDir");
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
+    ContainerManager manager = new ContainerManagerImpl(conf,
+        scmhaManager, sequenceIdGen, spyPipelineManager,
+        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
+
+    Pipeline pipeline = spyPipelineManager.getPipelines().iterator().next();
+    // the pipeline has no existing containers, so a new container gets allocated in getMatchingContainer
+    ContainerInfo container = manager
+        .getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    assertNotNull(container);
+
+    // create an EC pipeline to test for EC containers
+    ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
+    spyPipelineManager.createPipeline(ecReplicationConfig);
+    pipeline = spyPipelineManager.getPipelines(ecReplicationConfig).iterator().next();
+    container = manager.getMatchingContainer(sizeRequired, "test", pipeline, Collections.emptySet());
+    assertNotNull(container);
   }
 
   @Test

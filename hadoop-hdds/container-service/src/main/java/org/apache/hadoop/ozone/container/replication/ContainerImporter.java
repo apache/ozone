@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,7 +114,7 @@ public class ContainerImporter {
             packer.unpackContainerDescriptor(input);
         containerData = getKeyValueContainerData(containerDescriptorYaml);
       }
-      ContainerUtils.verifyChecksum(containerData, conf);
+      ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
       // lastDataScanTime should be cleared for an imported container
       containerData.setDataScanTimestamp(null);
@@ -126,7 +125,7 @@ public class ContainerImporter {
         // After container import is successful, increase used space for the volume and schedule an OnDemand scan for it
         targetVolume.incrementUsedSpace(container.getContainerData().getBytesUsed());
         containerSet.addContainerByOverwriteMissingContainer(container);
-        OnDemandContainerDataScanner.scanContainer(container, "Container import");
+        containerSet.scanContainer(containerID);
       }
     } finally {
       importContainerProgress.remove(containerID);
