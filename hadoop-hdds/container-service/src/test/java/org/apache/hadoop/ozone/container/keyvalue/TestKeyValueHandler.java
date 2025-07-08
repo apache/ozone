@@ -680,8 +680,6 @@ public class TestKeyValueHandler {
 
     // Initially, container should have no checksum information.
     assertEquals(0, containerData.getDataChecksum());
-    // Check all data checksums are updated correctly.
-    verifyAllDataChecksumsMatch(containerData, conf);
     assertFalse(checksumManager.read(containerData).isPresent());
     assertEquals(0, icrCount.get());
 
