@@ -81,6 +81,11 @@ export_keytab rm/rm rm
 export_keytab nm/nm nm
 export_keytab jhs/jhs jhs
 
+# for Ranger
+for host in dn httpfs om recon s3g scm; do
+  export_keytab "hdfs/$host" hdfs
+done
+
 chmod 755 /etc/security/keytabs/*.keytab
 chown 1000. /etc/security/keytabs/*.keytab
 
