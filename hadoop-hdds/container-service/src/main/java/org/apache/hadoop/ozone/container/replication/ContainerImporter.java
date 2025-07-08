@@ -117,6 +117,8 @@ public class ContainerImporter {
       }
       ContainerUtils.verifyChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
+      // lastDataScanTime should be cleared for an imported container
+      containerData.setDataScanTimestamp(null);
 
       try (InputStream input = Files.newInputStream(tarFilePath)) {
         Container container = controller.importContainer(

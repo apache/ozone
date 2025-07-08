@@ -40,6 +40,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -65,6 +66,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -100,6 +102,12 @@ class TestContainerImporter {
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
     container = new KeyValueContainer(containerData, conf);
     controllerMock = mock(ContainerController.class);
+    when(controllerMock.importContainer(any(ContainerData.class), any(), any())).thenAnswer(
+        i -> {
+          containerData = i.getArgument(0);
+          container = new KeyValueContainer(containerData, conf);
+          return container;
+        });
     containerSet = newContainerSet(0);
     volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -185,7 +193,6 @@ class TestContainerImporter {
   @Test
   public void testImportContainerTriggersOnDemandScanner() throws Exception {
     try (MockedStatic<OnDemandContainerDataScanner> mockedStatic = mockStatic(OnDemandContainerDataScanner.class)) {
-      when(controllerMock.importContainer(any(), any(), any())).thenReturn(container);
       // create containerImporter object
       HddsVolume targetVolume = mock(HddsVolume.class);
       doNothing().when(targetVolume).incrementUsedSpace(anyLong());
@@ -199,6 +206,22 @@ class TestContainerImporter {
       mockedStatic.verify(() -> OnDemandContainerDataScanner.scanContainer(container, "Container import"), times(1));
       assertNotNull(containerSet.getContainer(containerId));
     }
+  }
+
+  @Test
+  public void testImportContainerResetsLastScanTime() throws Exception {
+    containerData.setDataScanTimestamp(Time.monotonicNow());
+
+    // create containerImporter object
+    HddsVolume targetVolume = mock(HddsVolume.class);
+    doNothing().when(targetVolume).incrementUsedSpace(anyLong());
+
+    // import the container
+    File tarFile = containerTarFile(containerId, containerData);
+    containerImporter.importContainer(containerId, tarFile.toPath(),
+        targetVolume, NO_COMPRESSION);
+
+    assertEquals(Optional.empty(), containerData.lastDataScanTime());
   }
 
   private File containerTarFile(long id, ContainerData data) throws IOException {
