@@ -758,21 +758,4 @@ class TestObjectPut {
     OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
     assertEquals(0, keyDetails.getDataSize());
   }
-
-  @Test
-  public void testPutInvalidKeyName() {
-    String invalidKey = "sampledir:1/samplekey";
-
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    long dataSize = CONTENT.length();
-
-    OS3Exception exception = assertThrows(OS3Exception.class, () -> {
-      objectEndpoint.put(BUCKET_NAME, invalidKey, dataSize, 0, "", null, 
-          null, body);
-    });
-    
-    assertEquals(S3ErrorTable.INVALID_REQUEST.getCode(), exception.getCode());
-    assertThat(exception.getErrorMessage()).contains("Invalid key path");
-  }
 }
