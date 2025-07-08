@@ -83,7 +83,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     String keyPath = keyArgs.getKeyName();
 
     OmUtils.verifyKeyNameWithSnapshotReservedWordForDeletion(keyPath);
-    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+    keyPath = normalizeKeyPath(ozoneManager.getConfig().isKeyNameCharacterCheckEnabled(), 
+        ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
 
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =

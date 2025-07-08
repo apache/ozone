@@ -230,7 +230,6 @@ public class ObjectEndpoint extends EndpointBase {
       @QueryParam("tagging") String taggingMarker,
       @QueryParam("acl") String aclMarker,
       final InputStream body) throws IOException, OS3Exception {
-    isValidKeyPath(keyPath);
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_KEY;
     boolean auditSuccess = true;
@@ -403,22 +402,6 @@ public class ObjectEndpoint extends EndpointBase {
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
             getAuditParameters(), perf));
       }
-    }
-  }
-
-  /**
-   * Validate S3 key path.
-   * disallows names containing "\", "{", "}", "<", ">", "^", "%", "~", "#", "|", "`", "[", "]", ":", Quotation marks
-   * Throws OS3Exception if invalid.
-   */
-  public static void isValidKeyPath(String path) throws OS3Exception {
-    String checkValidKeyPathRegex = "^[^\\\\{}<>^%~#|`\\[\\]\"\\x80-\\xff:]+$";
-
-    if (!path.matches(checkValidKeyPathRegex)) {
-      OS3Exception err = newError(S3ErrorTable.INVALID_REQUEST, path);
-      err.setErrorMessage("Invalid key path: key names cannot include: \\ { } < > ^ % ~ # | ` [ ] : \" " +
-          "or any non-ASCII characters.");
-      throw err;
     }
   }
 
