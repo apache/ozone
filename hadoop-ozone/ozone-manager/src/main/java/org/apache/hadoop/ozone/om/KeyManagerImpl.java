@@ -802,8 +802,8 @@ public class KeyManagerImpl implements KeyManager {
     int currentCount = 0;
     while (tableIterator.hasNext() && currentCount < size) {
       KeyValue<String, V> kv = tableIterator.next();
-      consumedSize += kv.getValueByteSize();
       if (kv != null && filter.apply(kv)) {
+        consumedSize += kv.getValueByteSize();
         entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue()), kv.getValueByteSize()));
         currentCount++;
         if (consumedSize > ratisLimit) {
