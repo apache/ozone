@@ -241,6 +241,44 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.vafer</groupId>
+        <artifactId>jdeb</artifactId>
+        <version>1.14</version> <executions>
+        <execution>
+          <phase>package</phase>
+          <goals>
+            <goal>deb</goal>
+          </goals>
+          <configuration>
+            <controlDir>${basedir}/src/main/package/deb/control</controlDir>
+            <deb>${project.build.directory}/ozone-${project.version}.deb</deb>
+            <skip>false</skip>
+            <skipPOMs>false</skipPOMs>
+            <data>
+              <dataSet>
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}</src>
+                  <includes>
+                    <include>etc/**</include>
+                    <include>libexec/**</include>
+                    <include>log</include>
+                    <include>share/**</include>
+                    <include>bin/**</include>
+                    <include>sbin/**</include>
+                  </includes>
+                  <mapper>
+                    <type>perm</type>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+              </dataSet>
+            </data>
+          </configuration>
+        </execution>
+      </executions>
+      </plugin>
     </plugins>
   </build>
   <profiles>
