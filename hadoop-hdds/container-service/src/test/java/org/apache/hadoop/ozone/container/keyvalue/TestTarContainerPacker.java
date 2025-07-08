@@ -93,13 +93,13 @@ public class TestTarContainerPacker {
   private TarContainerPacker packer;
 
   @TempDir
-  private Path sourceContainerRoot = Paths.get("target/test/data/packer-source-dir");
+  private Path sourceContainerRoot;
 
   @TempDir
-  private Path destContainerRoot = Paths.get("target/test/data/packer-dest-dir");
+  private Path destContainerRoot;
 
   @TempDir
-  private Path tempDir = Paths.get("target/test/data/packer-tmp-dir");
+  private Path tempDir;
 
   private static final AtomicInteger CONTAINER_ID = new AtomicInteger(1);
 
