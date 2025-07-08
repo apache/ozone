@@ -193,7 +193,7 @@ public class TestOmLifeCycleConfiguration {
         .build();
 
     assertFalse(rule.isEnabled());
-    assertDoesNotThrow(rule::valid);
+    assertDoesNotThrow(() -> rule.valid(BucketLayout.DEFAULT));
   }
 
   @Test
@@ -221,7 +221,7 @@ public class TestOmLifeCycleConfiguration {
     assertEquals(1, configFromProto.getRules().size());
     OmLCRule ruleFromProto = configFromProto.getRules().get(0);
     assertEquals(config.getRules().get(0).getId(), ruleFromProto.getId());
-    assertEquals(config.getRules().get(0).getPrefix(), ruleFromProto.getPrefix());
+    assertEquals(config.getRules().get(0).getEffectivePrefix(), ruleFromProto.getEffectivePrefix());
     assertEquals(30, ruleFromProto.getExpiration().getDays());
   }
 

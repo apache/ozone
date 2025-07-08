@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 import jakarta.annotation.Nonnull;
 import java.nio.file.Paths;
@@ -26,6 +27,7 @@ import java.util.UUID;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -123,6 +125,79 @@ public final class OzoneFSUtils {
       }
     }
     return true;
+  }
+
+  /**
+   * Whether the pathname is valid.  Check key names which contain a
+   * ":", ".", "..", "//", "". If it has any of these characters throws
+   * OMException, else return the path.
+   */
+  public static String isValidKeyPath(String path) throws OMException {
+    boolean isValid = true;
+    // If keyName is empty string throw error.
+    if (path.isEmpty()) {
+      return path;
+    } else if (path.startsWith("/")) {
+      isValid = false;
+    } else {
+      // Check for ".." "." ":" "/"
+      String[] components = org.apache.commons.lang3.StringUtils.split(path, '/');
+      for (int i = 0; i < components.length; i++) {
+        String element = components[i];
+        if (element.equals(".") ||
+            (element.contains(":")) ||
+            (element.contains("/") || element.equals(".."))) {
+          isValid = false;
+          break;
+        }
+
+        // The string may end with a /, but not have
+        // "//" in the middle.
+        if (element.isEmpty() && i != components.length - 1) {
+          isValid = false;
+        }
+      }
+    }
+
+    if (isValid) {
+      return path;
+    } else {
+      throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
+    }
+  }
+
+  /**
+   * Normalize the prefix. This method used {@link Path} to normalize the prefix path, keep the trailing slash "/".
+   * @param prefix  prefix for filter, assuming no schema and authority
+   * @return normalized key name.
+   */
+  public static String normalizePrefix(String prefix) {
+    // For empty strings do nothing, just return the same.
+    // Reason to check here is the Paths method fail with NPE.
+    if (!org.apache.commons.lang3.StringUtils.isBlank(prefix)) {
+      String normalizedKeyName;
+      if (prefix.startsWith(OM_KEY_PREFIX)) {
+        // remove duplicate heading slashes
+        prefix = prefix.replaceAll("^/+", "/");
+        normalizedKeyName = new Path(prefix).toUri().getPath();
+        if (normalizedKeyName.equals(OM_KEY_PREFIX)) {
+          return "";
+        }
+      } else {
+        normalizedKeyName = new Path(OM_KEY_PREFIX + prefix)
+            .toUri().getPath();
+      }
+      if (LOG.isDebugEnabled() && !prefix.equals(normalizedKeyName)) {
+        LOG.debug("Normalized key {} to {} ", prefix,
+            normalizedKeyName.substring(1));
+      }
+      if (prefix.endsWith(OZONE_URI_DELIMITER)) {
+        return normalizedKeyName.substring(1) + OZONE_URI_DELIMITER;
+      }
+      return normalizedKeyName.substring(1);
+    }
+
+    return prefix;
   }
 
   /**
