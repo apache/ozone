@@ -773,7 +773,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   public static String extractSnapshotIDFromCheckpointDirName(String snapshotPath) {
     // Find "om.db-" in the path and return whatever comes after
     int index = snapshotPath.lastIndexOf(OM_DB_NAME);
-    if (index == -1 || index + OM_DB_NAME.length() >= snapshotPath.length()) {
+    if (index == -1 || index + OM_DB_NAME.length() + OM_SNAPSHOT_SEPARATOR.length() >= snapshotPath.length()) {
       throw new IllegalArgumentException("Invalid snapshot path " + snapshotPath);
     }
     return snapshotPath.substring(index + OM_DB_NAME.length() + OM_SNAPSHOT_SEPARATOR.length());

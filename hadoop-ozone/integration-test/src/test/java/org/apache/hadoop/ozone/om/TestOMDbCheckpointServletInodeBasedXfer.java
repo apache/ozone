@@ -276,6 +276,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertFalse(hardlinkFilePath.toFile().exists());
   }
 
+  /**
+   * Verifies that a manually added entry to the snapshot's delete table
+   * is persisted and can be retrieved from snapshot db loaded from OM DB checkpoint.
+   */
   @Test
   public void testSnapshotDBConsistency() throws Exception {
     String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
