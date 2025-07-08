@@ -18,12 +18,11 @@ Documentation       Test for OM DB Compaction Repair Tool
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
-Resource            ../ozone-lib/freon.robot
 Test Timeout        10 minutes
 
 *** Variables ***
 ${OM_DB_PATH}       /data/metadata/om.db
-${KEY_COUNT}        150000
+${KEY_COUNT}        200000
 ${THREAD_COUNT}     20
 
 *** Keywords ***
