@@ -356,15 +356,23 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
              ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
                  getOzoneManager(), omSnapshotManager, snapshotChainManager, currentSnapshotInfo,
                  keyManager, lock)) {
-          List<String> renamedTableEntries =
-              keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum).stream()
-                  .map(Table.KeyValue::getKey)
-                  .collect(Collectors.toList());
+          List<Table.KeyValue<String, String>> renameKeyEntries =
+              keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum, ratisLimit);
+
+          List<String> renamedTableEntries = new ArrayList<>(renameKeyEntries.size());
+          int serializedSize = 0;
+
+          for (Table.KeyValue<String, String> kv : renameKeyEntries) {
+            renamedTableEntries.add(kv.getKey());
+            serializedSize += kv.getValueByteSize();
+          }
+
           remainNum -= renamedTableEntries.size();
+          ratisLimit -= serializedSize;
 
           // Get pending keys that can be deleted
           PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null ?
-              keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum, ratisByteLimit) :
+              keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum, ratisLimit) :
               keyManager.getPendingDeletionKeys(volume, bucket, null, reclaimableKeyFilter, remainNum, ratisLimit);
           List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
           //submit purge requests if there are renamed entries to be purged or keys to be purged.

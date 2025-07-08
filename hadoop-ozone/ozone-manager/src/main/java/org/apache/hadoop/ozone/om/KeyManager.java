@@ -156,7 +156,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   List<Table.KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey,
-      CheckedFunction<Table.KeyValue<String, String>, Boolean, IOException> filter, int count)
+      CheckedFunction<Table.KeyValue<String, String>, Boolean, IOException> filter, int count, int ratisLimit)
       throws IOException;
 
 
@@ -190,7 +190,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
       String volume, String bucket, String startKey,
       CheckedFunction<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter,
-      int count) throws IOException;
+      int count, int ratisLimit) throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is
