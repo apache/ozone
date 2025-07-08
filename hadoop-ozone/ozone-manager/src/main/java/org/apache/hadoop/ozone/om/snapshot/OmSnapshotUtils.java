@@ -142,8 +142,13 @@ public final class OmSnapshotUtils {
 
         // Create a link for each line.
         for (String l : lines) {
-          String from = l.split("\t")[1];
-          String to = l.split("\t")[0];
+          String[] parts = l.split("\t");
+          if (parts.length != 2) {
+            LOG.warn("Skipping malformed line in hardlink file: {}", l);
+            return;
+          }
+          String from = parts[1];
+          String to = parts[0];
           Path fullFromPath = Paths.get(dbPath.toString(), from);
           filesToDelete.add(fullFromPath);
           Path fullToPath = Paths.get(dbPath.toString(), to);
