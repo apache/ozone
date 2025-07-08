@@ -157,10 +157,9 @@ public class TestVolumeChoosingPolicy {
               destVolume.incCommittedBytes(containerSize);
             }
 
+            long threadStart = System.nanoTime();
             try {
-              long threadStart = System.nanoTime();
               Pair<HddsVolume, HddsVolume> pair = policy.chooseVolume(volumeSet, THRESHOLD, deltaSizes);
-              totalTimeNanos.addAndGet(System.nanoTime() - threadStart);
 
               if (pair == null) {
                 volumeNotChosen++;
@@ -177,6 +176,8 @@ public class TestVolumeChoosingPolicy {
               }
             } catch (Exception e) {
               failures++;
+            } finally {
+              totalTimeNanos.addAndGet(System.nanoTime() - threadStart);
             }
           }
 
