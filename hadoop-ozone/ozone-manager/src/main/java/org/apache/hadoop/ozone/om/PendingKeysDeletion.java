@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
@@ -28,7 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
  *
  * This class maintains:
  * <ul>
- *   <li>A list of {@link BlockGroup} entries, where each entry contains
+ *   <li>A list of {@link DeletedBlockGroup} entries, where each entry contains
  *       a key name and its associated block IDs</li>
  *   <li>A key-value mapping that requires updating after the remaining
  *       blocks are purged</li>

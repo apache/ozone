@@ -53,7 +53,19 @@ public final class DeletedBlockGroup {
     return kbb.setKey(groupID).build();
   }
 
+  public KeyBlocks getLegacyProto() {
+    KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
+    for (DeletedBlock block : deletedBlocks) {
+      kbb.addBlocks(block.getProtobuf().getBlockId());
+    }
+    return kbb.setKey(groupID).build();
+  }
+
   public static DeletedBlockGroup getFromProto(KeyBlocks proto) {
+    return proto.getDeletedBlocksList().isEmpty() ? getFromLegacyProto(proto) : getFromNewProto(proto);
+  }
+
+  public static DeletedBlockGroup getFromNewProto(KeyBlocks proto) {
     List<DeletedBlock> blocks = new ArrayList<>();
     for (HddsProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();

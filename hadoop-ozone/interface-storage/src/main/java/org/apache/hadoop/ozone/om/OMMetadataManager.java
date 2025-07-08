@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlockGroup;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
@@ -662,9 +662,9 @@ public interface OMMetadataManager extends DBStoreHAManager {
   /**
    * Returns {@code List<BlockGroup>} for a key in the deletedTable.
    * @param deletedKey - key to be purged from the deletedTable
-   * @return {@link BlockGroup}
+   * @return {@link DeletedBlockGroup}
    */
-  List<BlockGroup> getBlocksForKeyDelete(String deletedKey) throws IOException;
+  List<DeletedBlockGroup> getBlocksForKeyDelete(String deletedKey) throws IOException;
 
   /**
    * Given a volume/bucket, check whether it contains incomplete MPUs.

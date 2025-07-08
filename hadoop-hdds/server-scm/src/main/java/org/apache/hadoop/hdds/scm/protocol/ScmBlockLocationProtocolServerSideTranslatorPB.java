@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.common.DeletedBlockGroup;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -231,15 +230,9 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         DeleteScmKeyBlocksResponseProto.newBuilder();
 
     List<DeletedBlockGroup> infoList;
-    if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
-      infoList = req.getKeyBlocksList().stream()
-          .map(DeletedBlockGroup::getFromLegacyProto)
-          .collect(Collectors.toList());
-    } else {
-      infoList = req.getKeyBlocksList().stream()
-          .map(DeletedBlockGroup::getFromProto)
-          .collect(Collectors.toList());
-    }
+    infoList = req.getKeyBlocksList().stream()
+        .map(DeletedBlockGroup::getFromProto)
+        .collect(Collectors.toList());
 
     final List<DeleteBlockGroupResult> results =
         impl.deleteKeyBlocks(infoList);

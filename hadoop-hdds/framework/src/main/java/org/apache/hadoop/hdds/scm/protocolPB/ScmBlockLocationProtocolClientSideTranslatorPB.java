@@ -231,8 +231,9 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
 
-    // Build KeyBlocks (legacy format, no usedBytes)
-    List<KeyBlocks> keyBlocksProto = keyBlocksInfoList.stream()
+    List<KeyBlocks> keyBlocksProto;
+    //TODO handle for old version of SCM
+    keyBlocksProto = keyBlocksInfoList.stream()
         .map(DeletedBlockGroup::getProto)
         .collect(Collectors.toList());
 
