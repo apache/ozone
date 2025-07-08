@@ -47,7 +47,7 @@ abstract class RDBStoreAbstractIterator<RAW>
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
-    this.type = this.prefix == null ? type : type.addKey(); // it has to read key for matching prefix.
+    this.type = type;
   }
 
   Type getType() {

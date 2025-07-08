@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import axios, { AxiosResponse } from 'axios';
-import { Layout, Menu, Spin } from 'antd';
+import React, {useEffect, useRef, useState} from 'react';
+import {AxiosResponse} from 'axios';
+import {Layout, Menu} from 'antd';
 import {
   BarChartOutlined,
   ClusterOutlined,
@@ -31,12 +31,12 @@ import {
   LayoutOutlined,
   PieChartOutlined
 } from '@ant-design/icons';
-import { useLocation, Link } from 'react-router-dom';
+import {Link, useLocation} from 'react-router-dom';
 
 
 import logo from '@/logo.png';
-import { showDataFetchError } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+import {showDataFetchError} from '@/utils/common';
+import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
 
 import './navBar.less';
 

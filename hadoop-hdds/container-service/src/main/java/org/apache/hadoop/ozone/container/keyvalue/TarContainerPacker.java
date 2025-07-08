@@ -105,7 +105,7 @@ public class TarContainerPacker
         KeyValueContainerData untarContainerData =
             (KeyValueContainerData) ContainerDataYaml
                 .readContainer(descriptorFileContent);
-        ContainerUtils.verifyChecksum(untarContainerData, conf);
+        ContainerUtils.verifyContainerFileChecksum(untarContainerData, conf);
       }
 
       // Before the atomic move, the destination dir is empty and doesn't have a metadata directory.

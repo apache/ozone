@@ -111,7 +111,7 @@ public interface PipelineStateManager {
   void removeContainerFromPipeline(PipelineID pipelineID,
                                    ContainerID containerID) throws IOException;
 
-  void close() throws Exception;
+  void close();
 
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws IOException;
