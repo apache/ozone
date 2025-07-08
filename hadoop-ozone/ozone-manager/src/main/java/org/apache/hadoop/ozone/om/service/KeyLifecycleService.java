@@ -79,7 +79,6 @@ public class KeyLifecycleService extends BackgroundService {
   private final OzoneManager ozoneManager;
   //TODO: honor this parameter in next patch
   private int keyLimitPerIterator;
-  private int keyLimitPerRequest;
   private final AtomicBoolean suspended;
   private KeyLifecycleServiceMetrics metrics;
   private boolean isServiceEnabled;
@@ -103,7 +102,6 @@ public class KeyLifecycleService extends BackgroundService {
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT);
     Preconditions.checkArgument(keyLimitPerIterator >= 0,
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE + " cannot be negative.");
-    this.keyLimitPerRequest = 100000;
     this.suspended = new AtomicBoolean(false);
     this.metrics = KeyLifecycleServiceMetrics.create();
     this.isServiceEnabled = conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
@@ -570,7 +568,7 @@ public class KeyLifecycleService extends BackgroundService {
           }
         }
 
-        int batchSize = keyLimitPerRequest;
+        int batchSize = keyLimitPerIterator;
         int startIndex = 0;
         for (int i = 0; i < keysList.size();) {
           DeleteKeyArgs.Builder builder =
