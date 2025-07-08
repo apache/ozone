@@ -47,8 +47,4 @@ start_docker_env
 
 execute_robot_test ${OM} kinit.robot
 
-execute_robot_test ${OM} debug/auditparser.robot
-
-execute_robot_test ${SCM} kinit.robot
-
-source "$COMPOSE_DIR/../common/replicas-test.sh"
+execute_robot_test ${OM} repair/om-compact.robot
