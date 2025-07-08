@@ -269,10 +269,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(inodesFromTarball.containsAll(inodesFromOmDataDir));
 
     // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
-    for (Path old : allPathsInTarball) {
-      assertTrue(old.toFile().delete());
-    }
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
     assertFalse(hardlinkFilePath.toFile().exists());
   }
 
