@@ -273,3 +273,57 @@ This feature wouldn't degrade server performance as the loop is on the client.
 Think it as a client is issuing multiple requests to the server to get all the
 information.
 
+## Supported Operations
+
+The following table lists the supported operations for Ofs.
+
+| Operation              | Description                               | Support        |
+|------------------------|-------------------------------------------|----------------|
+| `create`               | Creates a new file.                       | Supported      |
+| `open`                 | Opens a file for reading.                 | Supported      |
+| `append`               | Appends to an existing file.              | Unsupported    |
+| `rename`               | Renames a file or directory.              | Supported [1]  |
+| `delete`               | Deletes a file or directory.              | Supported [2]  |
+| `listStatus`           | Lists the status of files in a directory. | Supported [3]  |
+| `mkdirs`               | Creates a directory and its parents.      | Supported      |
+| `getFileStatus`        | Gets the status of a file.                | Supported      |
+| `setPermission`        | Sets the permission of a file.            | Unsupported    |
+| `setOwner`             | Sets the owner of a file.                 | Unsupported    |
+| `setTimes`             | Sets the modification and access times.   | Supported      |
+| `setReplication`       | Sets the replication factor of a file.    | Unsupported    |
+| `createSymlink`        | Creates a symbolic link.                  | Unsupported    |
+| `getLinkTarget`        | Gets the target of a symbolic link.       | Supported [4]  |
+| `resolveLink`          | Resolves a symbolic link.                 | Unsupported    |
+| `getFileChecksum`      | Gets the checksum of a file.              | Supported      |
+| `setSafeMode`          | Enters or leaves safe mode.               | Supported      |
+| `recoverLease`         | Recovers a file lease.                    | Supported      |
+| `isFileClosed`         | Checks if a file is closed.               | Supported      |
+| `createSnapshot`       | Creates a snapshot.                       | Supported [5]  |
+| `deleteSnapshot`       | Deletes a snapshot.                       | Supported [5]  |
+| `renameSnapshot`       | Renames a snapshot.                       | Supported [5]  |
+| `getSnapshotDiffReport`| Gets a snapshot diff report.              | Supported [5]  |
+| `setXAttr`             | Sets an extended attribute.               | Unsupported    |
+| `getXAttr`             | Gets an extended attribute.               | Unsupported    |
+| `listXAttrs`           | Lists extended attributes.                | Unsupported    |
+| `removeXAttr`          | Removes an extended attribute.            | Unsupported    |
+| `setAcl`               | Sets an ACL.                              | Unsupported    |
+| `getAclStatus`         | Gets an ACL status.                       | Unsupported    |
+| `modifyAclEntries`     | Modifies ACL entries.                     | Unsupported    |
+| `removeAclEntries`     | Removes ACL entries.                      | Unsupported    |
+| `removeDefaultAcl`     | Removes the default ACL.                  | Unsupported    |
+| `removeAcl`            | Removes an ACL.                           | Unsupported    |
+| `truncate`             | Truncates a file.                         | Unsupported    |
+| `concat`               | Concatenates files.                       | Unsupported    |
+
+**Footnotes:**
+
+[1] Renaming across buckets is not supported. For File System Optimized (FSO) buckets, rename is an atomic metadata operation. For legacy buckets, renaming a directory is non-atomic, as it is implemented by renaming each file and subdirectory individually.
+
+[2] Deleting the root of the filesystem is not allowed. Recursive volume deletion is not supported.
+
+[3] Recursive listing at the root or volume level is not supported.
+
+[4] OFS supports 'linked buckets', where one bucket acts as a link to another. General-purpose symbolic links for files or directories are not supported.
+
+[5] Snapshots are only supported at the bucket level.
+
