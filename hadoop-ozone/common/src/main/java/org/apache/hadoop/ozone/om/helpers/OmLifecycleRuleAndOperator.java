@@ -114,7 +114,7 @@ public final class OmLifecycleRuleAndOperator {
     }
   }
 
-  public boolean verify(OmKeyInfo omKeyInfo, String keyPath) {
+  public boolean match(OmKeyInfo omKeyInfo, String keyPath) {
     if (prefix != null && !keyPath.startsWith(canonicalPrefix)) {
       return false;
     }

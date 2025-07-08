@@ -92,7 +92,7 @@ public final class OmLCRule {
   }
 
   @Nullable
-  public String getPrefix() {
+  public String getEffectivePrefix() {
     return prefix != null ? prefix :
         (filter != null && filter.getPrefix() != null) ? filter.getPrefix() :
         (filter != null && filter.getAndOperator() != null && filter.getAndOperator().getPrefix() != null) ?
@@ -100,7 +100,7 @@ public final class OmLCRule {
   }
 
   @Nullable
-  public String getCanonicalPrefix() {
+  public String getEffectiveCanonicalPrefix() {
     return canonicalPrefix != null ? canonicalPrefix :
         (filter != null && filter.getPrefix() != null) ? filter.getCanonicalPrefix() :
             (filter != null && filter.getAndOperator() != null && filter.getAndOperator().getPrefix() != null) ?
@@ -209,7 +209,7 @@ public final class OmLCRule {
    * @param omKeyInfo detail Key info to evaluate against this rule
    * @return true is this key fits this rule and will trigger the action, otherwise false
    */
-  public boolean verify(OmKeyInfo omKeyInfo) {
+  public boolean match(OmKeyInfo omKeyInfo) {
     boolean matched = false;
     // verify modification time first
     if (getExpiration().isExpired(omKeyInfo.getModificationTime())) {
@@ -218,10 +218,8 @@ public final class OmLCRule {
         if (omKeyInfo.getKeyName().startsWith(canonicalPrefix)) {
           matched = true;
         }
-      } else if (filter != null) {
-        matched = filter.verify(omKeyInfo);
       } else {
-        matched = true;
+        return filter.match(omKeyInfo);
       }
     }
     return matched;
@@ -233,7 +231,7 @@ public final class OmLCRule {
    * @param keyPath path include key name and all its parent, except bucket and volume
    * @return true is this key fits this rule and will trigger the action, otherwise false
    */
-  public boolean verify(OmKeyInfo omKeyInfo, String keyPath) {
+  public boolean match(OmKeyInfo omKeyInfo, String keyPath) {
     boolean matched = false;
     // verify modification time first
     if (getExpiration().isExpired(omKeyInfo.getModificationTime())) {
@@ -242,16 +240,14 @@ public final class OmLCRule {
         if (keyPath.startsWith(canonicalPrefix)) {
           matched = true;
         }
-      } else if (filter != null) {
-        matched = filter.verify(omKeyInfo, keyPath);
       } else {
-        matched = true;
+        return filter.match(omKeyInfo, keyPath);
       }
     }
     return matched;
   }
 
-  public boolean verify(OmDirectoryInfo dirInfo, String keyPath) {
+  public boolean match(OmDirectoryInfo dirInfo, String keyPath) {
     boolean matched = false;
     // verify modification time first
     if (getExpiration().isExpired(dirInfo.getModificationTime())) {
@@ -260,10 +256,8 @@ public final class OmLCRule {
         if (keyPath.startsWith(canonicalPrefix)) {
           matched = true;
         }
-      } else if (filter != null) {
-        matched = filter.verify(dirInfo, keyPath);
       } else {
-        matched = true;
+        return filter.match(dirInfo, keyPath);
       }
     }
     return matched;

@@ -114,25 +114,25 @@ public final class OmLCFilter {
     return null;
   }
 
-  public boolean verify(OmKeyInfo omKeyInfo) {
-    return verify(omKeyInfo, omKeyInfo.getKeyName());
+  public boolean match(OmKeyInfo omKeyInfo) {
+    return match(omKeyInfo, omKeyInfo.getKeyName());
   }
 
-  public boolean verify(OmKeyInfo omKeyInfo, String keyPath) {
+  public boolean match(OmKeyInfo omKeyInfo, String keyPath) {
     if (prefix != null) {
       return keyPath.startsWith(canonicalPrefix);
     } else if (hasTag()) {
       String value = omKeyInfo.getTags().get(tagKey);
       return (value != null && value.equals(tagValue));
     } else if (andOperator != null) {
-      return andOperator.verify(omKeyInfo, keyPath);
+      return andOperator.match(omKeyInfo, keyPath);
     } else {
       // both prefix, tag, and andOperator are null
       return true;
     }
   }
 
-  public boolean verify(OmDirectoryInfo dirInfo, String keyPath) {
+  public boolean match(OmDirectoryInfo dirInfo, String keyPath) {
     if (prefix != null) {
       return keyPath.startsWith(canonicalPrefix);
     } else {

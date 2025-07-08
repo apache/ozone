@@ -67,7 +67,7 @@ public final class OmLCExpiration implements OmLCAction {
     } else {
       ZonedDateTime dateTime =
           ZonedDateTime.ofInstant(Instant.ofEpochMilli(timestamp + daysInMilli), ZoneOffset.UTC);
-      return now.isBefore(dateTime);
+      return now.isAfter(dateTime);
     }
   }
 

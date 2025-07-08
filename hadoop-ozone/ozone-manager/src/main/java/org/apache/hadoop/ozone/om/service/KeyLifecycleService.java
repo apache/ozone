@@ -237,7 +237,6 @@ public class KeyLifecycleService extends BackgroundService {
         List<OmLCRule> ruleList = originRuleList.stream().filter(r -> r.isEnabled()).collect(Collectors.toList());
 
         boolean tagEnabled = ruleList.stream().anyMatch(r -> r.isTagEnable());
-        boolean prefixEnabled = ruleList.stream().anyMatch(r -> r.isPrefixEnable());
         // TODO, set a rule with tag on FSO bucket should fail at creation time.
         if (bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED && tagEnabled) {
           LOG.info("Fail the task as rule with tag is not supported on FSO bucket {}", bucketName);
@@ -283,14 +282,9 @@ public class KeyLifecycleService extends BackgroundService {
           }
           evaluateFSOBucket(volume, bucket, bucketName, keyTable, ruleList,
               expiredKeyNameList, expiredKeyUpdateIDList, expiredDirNameList, expiredDirUpdateIDList);
-        } else if (tagEnabled && !prefixEnabled) {
+        } else {
           // use bucket name as key iterator prefix
           evaluateBucket(bucketName, keyTable, ruleList, expiredKeyNameList, expiredKeyUpdateIDList);
-        } else {
-          // no tag - a prefix filtered bucket key iterator for each rule
-          for (OmLCRule rule : ruleList) {
-            evaluateBucket(bucketName, keyTable, rule, expiredKeyNameList, expiredKeyUpdateIDList);
-          }
         }
 
         if (expiredKeyNameList.isEmpty() && expiredDirNameList.isEmpty()) {
@@ -326,32 +320,6 @@ public class KeyLifecycleService extends BackgroundService {
       return result;
     }
 
-    private void evaluateBucket(String bucketName, Table<String, OmKeyInfo> keyTable,
-        OmLCRule rule, List<String> expiredKeyList, List<Long> expiredKeyUpdateIDList) {
-      // create a prefix filtered bucket key iterator
-      String prefix = bucketName;
-      if (rule.isPrefixEnable()) {
-        prefix = bucketName + OzoneConsts.OM_KEY_PREFIX + rule.getPrefix();
-      }
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-               keyTblItr = keyTable.iterator(prefix)) {
-        while (keyTblItr.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
-          OmKeyInfo key = keyValue.getValue();
-          numKeyIterated++;
-          if (rule.verify(key)) {
-            // add key for pending deletion, check next key
-            expiredKeyList.add(key.getKeyName());
-            expiredKeyUpdateIDList.add(key.getUpdateID());
-            sizeKeyDeleted += key.getReplicatedSize();
-          }
-        }
-      } catch (IOException e) {
-        // log failure and continue the process to delete/move files already identified in this run
-        LOG.warn("Failed to iterate through bucket {}", bucketName, e);
-      }
-    }
-
     @SuppressWarnings("checkstyle:parameternumber")
     private void evaluateFSOBucket(OmVolumeArgs volume, OmBucketInfo bucket, String bucketName,
                                    Table<String, OmKeyInfo> keyTable, List<OmLCRule> ruleList,
@@ -370,7 +338,7 @@ public class KeyLifecycleService extends BackgroundService {
         // find KeyInfo of each directory for prefix
         List<OmDirectoryInfo> dirList;
         try {
-          dirList = getDirList(volume, bucket, rule.getPrefix(), bucketName);
+          dirList = getDirList(volume, bucket, rule.getEffectivePrefix(), bucketName);
         } catch (IOException e) {
           LOG.warn("Skip rule {} as its prefix doesn't have all directory exist", rule);
           // skip this rule if some directory doesn't exist for this rule's prefix
@@ -385,7 +353,7 @@ public class KeyLifecycleService extends BackgroundService {
           for (OmDirectoryInfo dir : dirList) {
             directoryPath.append(dir.getName()).append(OzoneConsts.OM_KEY_PREFIX);
           }
-          if (directoryPath.toString().equals(rule.getCanonicalPrefix() + OzoneConsts.OM_KEY_PREFIX)) {
+          if (directoryPath.toString().equals(rule.getEffectiveCanonicalPrefix() + OzoneConsts.OM_KEY_PREFIX)) {
             expiredDirList.add(directoryPath.toString());
             expiredDirUpdateIDList.add(dirList.get(dirList.size() - 1).getUpdateID());
           }
@@ -400,12 +368,12 @@ public class KeyLifecycleService extends BackgroundService {
 
       for (OmLCRule rule : nonDirectoryStylePrefixRuleList) {
         // find the directory for the prefix, it may not exist
-        OmDirectoryInfo dirInfo = getDirectory(volume, bucket, rule.getPrefix(), bucketName);
+        OmDirectoryInfo dirInfo = getDirectory(volume, bucket, rule.getEffectivePrefix(), bucketName);
         String prefix = OzoneConsts.OM_KEY_PREFIX + volume.getObjectID() +
             OzoneConsts.OM_KEY_PREFIX + bucket.getObjectID() + OzoneConsts.OM_KEY_PREFIX;
         if (dirInfo != null) {
           prefix += dirInfo.getObjectID();
-          if (dirInfo.getName().equals(rule.getCanonicalPrefix())) {
+          if (dirInfo.getName().equals(rule.getEffectiveCanonicalPrefix())) {
             expiredDirList.add(dirInfo.getName());
             expiredDirUpdateIDList.add(dirInfo.getUpdateID());
           }
@@ -427,7 +395,7 @@ public class KeyLifecycleService extends BackgroundService {
             OmKeyInfo key = keyValue.getValue();
             numKeyIterated++;
             for (OmLCRule rule : noPrefixRuleList) {
-              if (rule.verify(key)) {
+              if (rule.match(key)) {
                 // mark key as expired, check next key
                 expiredKeyList.add(key.getKeyName());
                 expiredKeyUpdateIDList.add(key.getUpdateID());
@@ -448,7 +416,7 @@ public class KeyLifecycleService extends BackgroundService {
             OmDirectoryInfo dir = entry.getValue();
             numDirIterated++;
             for (OmLCRule rule : noPrefixRuleList) {
-              if (rule.verify(dir, dir.getPath())) {
+              if (rule.match(dir, dir.getPath())) {
                 // mark key as expired, check next key
                 expiredDirList.add(dir.getPath());
                 expiredDirUpdateIDList.add(dir.getUpdateID());
@@ -472,7 +440,7 @@ public class KeyLifecycleService extends BackgroundService {
           OmKeyInfo key = keyValue.getValue();
           String keyPath = directoryPath + key.getKeyName();
           numKeyIterated++;
-          if (rule.verify(key, keyPath)) {
+          if (rule.match(key, keyPath)) {
             // mark key as expired, check next key
             keyList.add(keyPath);
             keyUpdateIDList.add(key.getUpdateID());
@@ -494,7 +462,7 @@ public class KeyLifecycleService extends BackgroundService {
           OmDirectoryInfo dir = entry.getValue();
           String dirPath = directoryPath + dir.getName();
           numDirIterated++;
-          if (rule.verify(dir, dirPath)) {
+          if (rule.match(dir, dirPath)) {
             // mark dir as expired, check next key
             dirList.add(dirPath);
             dirUpdateIDList.add(dir.getUpdateID());
@@ -517,7 +485,7 @@ public class KeyLifecycleService extends BackgroundService {
           OmKeyInfo key = keyValue.getValue();
           numKeyIterated++;
           for (OmLCRule rule : ruleList) {
-            if (rule.verify(key)) {
+            if (rule.match(key)) {
               // mark key as expired, check next key
               expiredKeyList.add(key.getKeyName());
               expiredKeyUpdateIDList.add(key.getUpdateID());
