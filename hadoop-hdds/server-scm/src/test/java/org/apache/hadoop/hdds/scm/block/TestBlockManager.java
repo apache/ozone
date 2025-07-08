@@ -186,7 +186,7 @@ public class TestBlockManager {
     replicationConfig = RatisReplicationConfig
         .getInstance(ReplicationFactor.THREE);
 
-    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.of(false, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
   }
 
   @AfterEach
@@ -450,8 +450,7 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockFailureInSafeMode() {
-    scm.getScmContext().updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     // Test1: In safe mode expect an SCMException.
     Throwable t = assertThrows(IOException.class, () ->
         blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,

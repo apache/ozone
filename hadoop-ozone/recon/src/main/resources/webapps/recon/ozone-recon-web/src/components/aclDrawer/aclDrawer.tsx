@@ -74,7 +74,10 @@ export class AclPanel extends React.Component<IAclDrawerProps> {
           style={{ position: 'absolute' }}
           onClose={this.onClose}
         >
-          <Table dataSource={acls} rowKey='name' locale={{ filterTitle: "" }}>
+          <Table
+            dataSource={acls}
+            rowKey={(record: IAcl) => `${record.name ?? ''}-${record.type ?? ''}-${record.scope ?? ''}`}
+            locale={{ filterTitle: "" }}>
             <Column
               key='name'
               title='Name'

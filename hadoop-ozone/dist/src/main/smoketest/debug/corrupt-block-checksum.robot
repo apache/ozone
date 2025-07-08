@@ -14,21 +14,23 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test checksums in case of one datanode is dead
+Documentation       Test checksums on a corrupt block replica
 Library             OperatingSystem
 Resource            ../lib/os.robot
-Resource            ozone-debug.robot
+Resource            ozone-debug-keywords.robot
 Test Timeout        5 minute
+
 *** Variables ***
-${PREFIX}           ${EMPTY}
-${VOLUME}           cli-debug-volume${PREFIX}
-${BUCKET}           cli-debug-bucket
-${TESTFILE}         testfile
+${PREFIX}              ${EMPTY}
+${CORRUPT_DATANODE}    ${EMPTY}
+${VOLUME}              cli-debug-volume${PREFIX}
+${BUCKET}              cli-debug-bucket
+${TESTFILE}            testfile
+${CHECK_TYPE}          checksum
+
 
 *** Test Cases ***
-Test ozone debug checksums with one datanode DEAD
-    ${directory} =                 Execute replicas verify checksums CLI tool
-    Set Test Variable    ${DIR}         ${directory}
-
-    ${count_files} =               Count Files In Directory    ${directory}
-    Should Be Equal As Integers    ${count_files}     1
+Test checksums with a corrupt block replica
+    ${output} =         Execute replicas verify checksums debug tool
+    ${json} =           Parse replicas verify JSON output    ${output}
+    Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${CORRUPT_DATANODE}  Checksum mismatched
