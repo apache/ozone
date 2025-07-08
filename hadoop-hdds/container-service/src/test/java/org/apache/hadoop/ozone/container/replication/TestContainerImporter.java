@@ -190,13 +190,13 @@ class TestContainerImporter {
   @Test
   public void testImportContainerTriggersOnDemandScanner() throws Exception {
     // create containerImporter object
-      HddsVolume targetVolume = mock(HddsVolume.class);
-      doNothing().when(targetVolume).incrementUsedSpace(anyLong());
+    HddsVolume targetVolume = mock(HddsVolume.class);
+    doNothing().when(targetVolume).incrementUsedSpace(anyLong());
 
-      // import the container
-      File tarFile = containerTarFile(containerId, containerData);
-      containerImporter.importContainer(containerId, tarFile.toPath(),
-          targetVolume, NO_COMPRESSION);
+    // import the container
+    File tarFile = containerTarFile(containerId, containerData);
+    containerImporter.importContainer(containerId, tarFile.toPath(),
+        targetVolume, NO_COMPRESSION);
 
     verify(container, atLeastOnce()).scanData(any(), any());
   }
