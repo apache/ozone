@@ -102,7 +102,7 @@ public final class ContainerScanHelper {
       log.debug("Container [{}] has been deleted during metadata scan.", containerId);
       return;
     }
-    if (!result.isHealthy()) {
+    if (result.hasErrors()) {
       handleUnhealthyScanResult(containerId, result);
     }
 
