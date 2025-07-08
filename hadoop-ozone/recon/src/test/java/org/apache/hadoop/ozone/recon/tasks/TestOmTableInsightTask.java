@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
@@ -576,6 +577,101 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       assertEquals(5000L, getUnReplicatedSizeForTable(tableName));
       assertEquals(15000L, getReplicatedSizeForTable(tableName));
     }
+  }
+
+  @Test
+  public void testProcessForCommittedKeysTable() {
+    long sizeToBeReturned = 1000L;
+    OmKeyInfo omKeyInfo = mock(OmKeyInfo.class);
+    when(omKeyInfo.getDataSize()).thenReturn(sizeToBeReturned);
+    when(omKeyInfo.getReplicatedSize()).thenReturn(sizeToBeReturned * 3);
+
+    // Test PUT events for KEY_TABLE and FILE_TABLE
+    ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      String table = (i < 5) ? KEY_TABLE : FILE_TABLE;
+      putEvents.add(getOMUpdateEvent("item" + i, omKeyInfo, table, PUT, null));
+    }
+
+    OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents, 0L);
+    omTableInsightTask.process(putEventBatch, Collections.emptyMap());
+
+    for (String tableName : Arrays.asList(KEY_TABLE, FILE_TABLE)) {
+      assertEquals(5L, getCountForTable(tableName));
+      assertEquals(5000L, getUnReplicatedSizeForTable(tableName));
+      assertEquals(15000L, getReplicatedSizeForTable(tableName));
+    }
+  }
+
+  @Test
+  public void testUpdateForCommittedKeysTable() {
+    OmKeyInfo omKeyInfo = mock(OmKeyInfo.class);
+    when(omKeyInfo.getDataSize()).thenReturn(1000L);
+    when(omKeyInfo.getReplicatedSize()).thenReturn(3000L);
+
+    OmKeyInfo updatedKeyInfo = mock(OmKeyInfo.class);
+    when(updatedKeyInfo.getDataSize()).thenReturn(2000L);
+    when(updatedKeyInfo.getReplicatedSize()).thenReturn(6000L);
+
+    // Add 3 PUTs for KEY_TABLE: item0, item1, item2
+    omTableInsightTask.process(
+        new OMUpdateEventBatch(
+            Arrays.asList(
+                getOMUpdateEvent("item0", omKeyInfo, KEY_TABLE, PUT, null),
+                getOMUpdateEvent("item1", omKeyInfo, KEY_TABLE, PUT, null),
+                getOMUpdateEvent("item2", omKeyInfo, KEY_TABLE, PUT, null)
+            ), 0L),
+        Collections.emptyMap());
+
+    assertEquals(3L, getCountForTable(KEY_TABLE));
+    assertEquals(3000L, getUnReplicatedSizeForTable(KEY_TABLE));
+    assertEquals(9000L, getReplicatedSizeForTable(KEY_TABLE));
+
+    // Now UPDATE only item0
+    omTableInsightTask.process(
+        new OMUpdateEventBatch(
+            Collections.singletonList(getOMUpdateEvent("item0", updatedKeyInfo, KEY_TABLE, UPDATE, omKeyInfo)), 0L),
+        Collections.emptyMap());
+
+    assertEquals(3L, getCountForTable(KEY_TABLE));
+    // Calculation: present value (3000) - old value (1000) + new value (2000) = 4000
+    assertEquals(4000L, getUnReplicatedSizeForTable(KEY_TABLE));
+    // Calculation: present value (9000) - old value (3000) + new value (6000) = 12000
+    assertEquals(12000L, getReplicatedSizeForTable(KEY_TABLE));
+  }
+
+  @Test
+  public void testDeleteForCommittedKeysTable() {
+    OmKeyInfo omKeyInfo = mock(OmKeyInfo.class);
+    when(omKeyInfo.getDataSize()).thenReturn(1000L);
+    when(omKeyInfo.getReplicatedSize()).thenReturn(3000L);
+
+    // Add 3 PUTs for KEY_TABLE: item0, item1, item2
+    omTableInsightTask.process(
+        new OMUpdateEventBatch(
+            Arrays.asList(
+                getOMUpdateEvent("item0", omKeyInfo, KEY_TABLE, PUT, null),
+                getOMUpdateEvent("item1", omKeyInfo, KEY_TABLE, PUT, null),
+                getOMUpdateEvent("item2", omKeyInfo, KEY_TABLE, PUT, null)
+            ), 0L),
+        Collections.emptyMap());
+
+    assertEquals(3L, getCountForTable(KEY_TABLE));
+    assertEquals(3000L, getUnReplicatedSizeForTable(KEY_TABLE));
+    assertEquals(9000L, getReplicatedSizeForTable(KEY_TABLE));
+
+    // Now DELETE only item0
+    omTableInsightTask.process(
+        new OMUpdateEventBatch(
+            Collections.singletonList(getOMUpdateEvent("item0", omKeyInfo, KEY_TABLE, DELETE, null)), 0L),
+        Collections.emptyMap());
+
+    // After delete, count should be updated to 2
+    assertEquals(2L, getCountForTable(KEY_TABLE));
+    // Calculation: present value (3000) - old value (1000) = 2000
+    assertEquals(2000L, getUnReplicatedSizeForTable(KEY_TABLE));
+    // Calculation: present value (9000) - old value (3000) = 6000
+    assertEquals(6000L, getReplicatedSizeForTable(KEY_TABLE));
   }
 
   @Test
