@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.dn.scanner;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
-import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumMatches;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -80,7 +80,6 @@ class TestBackgroundContainerDataScannerIntegration
       throws Exception {
     pauseScanner();
 
-    OzoneConfiguration conf = new OzoneConfiguration();
     long containerID = writeDataThenCloseContainer();
     // Container corruption has not yet been introduced.
     Container<?> container = getDnContainer(containerID);
@@ -115,7 +114,7 @@ class TestBackgroundContainerDataScannerIntegration
       ContainerProtos.ContainerChecksumInfo updatedChecksumInfo = readChecksumFile(container.getContainerData());
       assertEquals(newReportedDataChecksum, updatedChecksumInfo.getContainerMerkleTree().getDataChecksum());
       KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
-      verifyAllDataChecksumMatches(containerData, conf);
+      verifyAllDataChecksumsMatch(containerData, getConf());
     }
 
     if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||

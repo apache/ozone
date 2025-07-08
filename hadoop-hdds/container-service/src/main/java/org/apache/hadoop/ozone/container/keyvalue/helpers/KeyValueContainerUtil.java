@@ -26,7 +26,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -308,10 +307,8 @@ public final class KeyValueContainerUtil {
     }
 
     try {
-      Optional<ContainerChecksumInfo> optionalContainerChecksumInfo = ContainerChecksumTreeManager
-          .readChecksumInfo(kvContainerData);
-      if (optionalContainerChecksumInfo.isPresent()) {
-        ContainerChecksumInfo containerChecksumInfo = optionalContainerChecksumInfo.get();
+      ContainerChecksumInfo containerChecksumInfo = ContainerChecksumTreeManager.readChecksumInfo(kvContainerData);
+      if (containerChecksumInfo != null) {
         containerDataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
         kvContainerData.setDataChecksum(containerDataChecksum);
         metadataTable.put(kvContainerData.getContainerDataChecksumKey(), containerDataChecksum);

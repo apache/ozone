@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
-import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumMatches;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -255,7 +255,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     assertEquals(1L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
     assertEquals(20L, containerData.getBytesUsed());
-    verifyAllDataChecksumMatches(containerData, conf);
+    verifyAllDataChecksumsMatch(containerData, conf);
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       long localID = putBlockData.getLocalID();
@@ -279,7 +279,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     assertEquals(1L, containerData.getBlockCount());
     assertEquals(40L, containerData.getBytesUsed());
     assertNotEquals(previousDataChecksum, containerData.getDataChecksum());
-    verifyAllDataChecksumMatches(containerData, conf);
+    verifyAllDataChecksumsMatch(containerData, conf);
 
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       long localID = putBlockData.getLocalID();

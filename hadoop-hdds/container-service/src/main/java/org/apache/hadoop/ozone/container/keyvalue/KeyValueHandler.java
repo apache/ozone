@@ -1444,12 +1444,12 @@ public class KeyValueHandler extends Handler {
       containerData.setDataChecksum(updatedDataChecksum);
       try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
         // This value is only used during the datanode startup. If the update fails, then it's okay as the merkle tree
-        // and in-memory checksum will still be the same. This will be updated when the next time we update the tree.
+        // and in-memory checksum will still be the same. This will be updated the next time we update the tree.
         // Either scanner or reconciliation will update the checksum.
         dbHandle.getStore().getMetadataTable().put(containerData.getContainerDataChecksumKey(), updatedDataChecksum);
       } catch (IOException e) {
         LOG.error("Failed to update container data checksum in RocksDB for container {}. " +
-                "Continuing with original checksum for RocksDB {}.", containerData.getContainerID(),
+                "Leaving the original checksum in RocksDB: {}", containerData.getContainerID(),
             checksumToString(originalDataChecksum), e);
       }
 

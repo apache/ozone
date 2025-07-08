@@ -27,7 +27,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOU
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
-import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumMatches;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -681,7 +681,7 @@ public class TestKeyValueHandler {
     // Initially, container should have no checksum information.
     assertEquals(0, containerData.getDataChecksum());
     // Check all data checksums are updated correctly.
-    verifyAllDataChecksumMatches(containerData, conf);
+    verifyAllDataChecksumsMatch(containerData, conf);
     assertFalse(checksumManager.read(containerData).isPresent());
     assertEquals(0, icrCount.get());
 
@@ -690,7 +690,7 @@ public class TestKeyValueHandler {
     // Check ICR sent. The ICR sender verifies that the expected checksum is present in the report.
     assertEquals(1, icrCount.get());
     // Check all data checksums are updated correctly.
-    verifyAllDataChecksumMatches(containerData, conf);
+    verifyAllDataChecksumsMatch(containerData, conf);
     // Check disk content.
     ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData).get();
     assertTreesSortedAndMatch(treeWriter.toProto(), checksumInfo.getContainerMerkleTree());

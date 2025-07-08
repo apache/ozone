@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
@@ -94,10 +95,8 @@ public class TarContainerPacker
     }
 
     Path dbRoot = getDbPath(containerUntarDir, containerData);
-    Path chunksRoot = getChunkPath(containerUntarDir, containerData);
-    Path containerMetadataPath = Paths.get(container.getContainerData().getMetadataPath());
-    Path tempContainerMetadataPath = Paths.get(containerUntarDir.toString(),
-        containerMetadataPath.getName(containerMetadataPath.getNameCount() - 1).toString());
+    Path chunksRoot = getChunkPath(containerUntarDir);
+    Path tempContainerMetadataPath = getTempContainerMetadataPath(containerUntarDir, containerData);
     byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot, tempContainerMetadataPath);
 
     if (!Files.exists(destContainerDir)) {
@@ -209,9 +208,18 @@ public class TarContainerPacker
     }
   }
 
-  public static Path getChunkPath(Path baseDir,
-      KeyValueContainerData containerData) {
+  public static Path getChunkPath(Path baseDir) {
     return KeyValueContainerLocationUtil.getChunksLocationPath(baseDir.toString()).toPath();
+  }
+
+  private Path getContainerMetadataPath(ContainerData containerData) {
+    return Paths.get(containerData.getMetadataPath());
+  }
+
+  private Path getTempContainerMetadataPath(Path containerUntarDir, ContainerData containerData) {
+    Path containerMetadataPath = getContainerMetadataPath(containerData);
+    return Paths.get(containerUntarDir.toString(),
+        containerMetadataPath.getName(containerMetadataPath.getNameCount() - 1).toString());
   }
 
   InputStream decompress(InputStream input) throws IOException {
@@ -222,7 +230,7 @@ public class TarContainerPacker
     return compression.wrap(output);
   }
 
-  private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot, Path tempContainerMetadataPath)
+  private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot, Path metadataRoot)
       throws IOException {
     byte[] descriptorFileContent = null;
     try (ArchiveInputStream<TarArchiveEntry> archiveInput = untar(decompress(input))) {
@@ -241,8 +249,8 @@ public class TarContainerPacker
           extractEntry(entry, archiveInput, size, chunksRoot,
               destinationPath);
         } else if (name.endsWith(CONTAINER_DATA_CHECKSUM_EXTENSION)) {
-          Path destinationPath = tempContainerMetadataPath.resolve(name);
-          extractEntry(entry, archiveInput, size, tempContainerMetadataPath,
+          Path destinationPath = metadataRoot.resolve(name);
+          extractEntry(entry, archiveInput, size, metadataRoot,
               destinationPath);
         } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a

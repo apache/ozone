@@ -34,7 +34,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -367,13 +366,13 @@ public final class ContainerMerkleTreeTestUtils {
    * @param conf          The Ozone configuration.
    * @throws IOException If an error occurs while reading the checksum info or RocksDB.
    */
-  public static void verifyAllDataChecksumMatches(KeyValueContainerData containerData, OzoneConfiguration conf)
+  public static void verifyAllDataChecksumsMatch(KeyValueContainerData containerData, OzoneConfiguration conf)
       throws IOException {
     assertNotNull(containerData, "Container data should not be null");
-    Optional<ContainerProtos.ContainerChecksumInfo> containerChecksumInfo = ContainerChecksumTreeManager
+    ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerChecksumTreeManager
         .readChecksumInfo(containerData);
-    assertTrue(containerChecksumInfo.isPresent());
-    long dataChecksum = containerChecksumInfo.get().getContainerMerkleTree().getDataChecksum();
+    assertNotNull(containerChecksumInfo);
+    long dataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
     assertEquals(containerData.getDataChecksum(), dataChecksum, "In-memory data checksum should match " +
         "the one in the checksum file.");
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {

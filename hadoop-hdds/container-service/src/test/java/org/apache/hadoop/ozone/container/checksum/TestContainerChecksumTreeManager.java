@@ -98,8 +98,8 @@ class TestContainerChecksumTreeManager {
     container = mock(KeyValueContainerData.class);
     when(container.getContainerID()).thenReturn(CONTAINER_ID);
     when(container.getMetadataPath()).thenReturn(testDir.getAbsolutePath());
-    // .tree is hardcoded here to check if the checksum file extension has changed.
-    // As a change in the extension will result in incompatibility.
+    // File name is hardcoded here to check if the file name has been changed, since this would
+    // need additional compatibility handling.
     checksumFile = new File(testDir, CONTAINER_ID + ".tree");
     checksumManager = new ContainerChecksumTreeManager(new OzoneConfiguration());
     metrics = checksumManager.getMetrics();
