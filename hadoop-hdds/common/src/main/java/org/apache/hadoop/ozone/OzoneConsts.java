@@ -537,7 +537,7 @@ public final class OzoneConsts {
    * A constant string used as a separator in various contexts within
    * the OMDBCheckpoint functions.
    */
-  public static final String SEPARATOR = "-";
+  public static final String OM_SNAPSHOT_SEPARATOR = "-";
 
   private OzoneConsts() {
     // Never Constructed
