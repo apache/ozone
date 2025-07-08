@@ -45,18 +45,19 @@ public class NodeSelectionMixin {
 
   static class Selection {
 
-    @CommandLine.Option(names = "--node-id", description = "Show info by datanode UUID.", defaultValue = "")
+    @CommandLine.Option(names = "--node-id", description = "UUID of the datanode.", defaultValue = "")
     private String nodeId;
 
     @Deprecated
-    @CommandLine.Option(names = "--id", description = "Show info by datanode UUID.", defaultValue = "", hidden = true)
+    @CommandLine.Option(names = "--id", description = "UUID of the datanode.", defaultValue = "", hidden = true)
     private String id;
 
     @Deprecated
-    @CommandLine.Option(names = "--uuid", description = "Show info by datanode UUID.", defaultValue = "", hidden = true)
+    @CommandLine.Option(names = "--uuid", description = "UUID of the datanode.", defaultValue = "", hidden = true)
     private String uuid;
 
-    @CommandLine.Option(names = "--hostname", description = "Hostname of the datanode", defaultValue = "")
+    @CommandLine.Option(names = "--hostname", description = "Hostname of the datanode. " +
+        "Note: not supported for decommission status command", defaultValue = "")
     private String hostname;
 
     @CommandLine.Option(names = "--ip", description = "IP address of the datanode", defaultValue = "")
