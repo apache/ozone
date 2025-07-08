@@ -105,7 +105,7 @@ class TestContainerImporter {
           container = new KeyValueContainer(containerData, conf);
           return container;
         });
-    containerSet = newContainerSet(0);
+    containerSet = spy(newContainerSet(0));
     volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     // create containerImporter object
@@ -163,7 +163,7 @@ class TestContainerImporter {
     KeyValueContainerData data = spy(new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test"));
     // mock to return different checksum
-    when(containerData.getContainerFileChecksum()).thenReturn("checksum1", "checksum2");
+    when(data.getContainerFileChecksum()).thenReturn("checksum1", "checksum2");
     // create containerImporter object with mock
     ContainerImporter importer = spy(new ContainerImporter(conf,
         containerSet, controllerMock, volumeSet, volumeChoosingPolicy));
@@ -198,7 +198,7 @@ class TestContainerImporter {
     containerImporter.importContainer(containerId, tarFile.toPath(),
         targetVolume, NO_COMPRESSION);
 
-    verify(container, atLeastOnce()).scanData(any(), any());
+    verify(containerSet, atLeastOnce()).scanContainer(containerId);
   }
 
   @Test
