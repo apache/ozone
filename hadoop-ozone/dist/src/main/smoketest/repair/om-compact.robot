@@ -30,16 +30,16 @@ Create Test Keys
     Execute    ozone freon ockg -n ${KEY_COUNT} -t ${THREAD_COUNT} -s 0
 
 Delete Test Keys
-    Execute    ozone fs -rm -R -skipTrash ofs://omservice/vol1/bucket1
+    Execute    ozone fs -rm -R -skipTrash ofs://${OM_SERVICE_ID}/vol1/bucket1
 
 Get OM DB SST Files Size
     ${output} =    Execute    find ${OM_DB_PATH} -name '*.sst' -exec du -b {} + | awk '{sum += $1} END {print sum}'
-    ${sst_size} =  Evaluate   int("${output}".strip())
+    ${sst_size} =  Convert To Integer    ${output}
     [Return]      ${sst_size}
 
 Compact OM DB Column Family
     [Arguments]        ${column_family}
-    Execute    ozone repair om compact --cf=${column_family} --service-id omservice --node-id om1
+    Execute    ozone repair om compact --cf=${column_family} --service-id ${OM_SERVICE_ID} --node-id om1
 
 *** Test Cases ***
 Testing OM DB Size Reduction After Compaction
