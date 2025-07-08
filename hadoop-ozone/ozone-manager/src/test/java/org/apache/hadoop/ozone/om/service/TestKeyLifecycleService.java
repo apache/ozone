@@ -823,6 +823,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       createDirectory(volumeName, bucketName, dirName);
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
+      Thread.sleep(SERVICE_INTERVAL);
       assertEquals(dirDepth, getDirCount() - initialDirCount);
       assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
 
