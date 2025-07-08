@@ -603,9 +603,6 @@ public class OzoneDelegationTokenSecretManager
   public void stop() throws IOException {
     super.stop();
     stopThreads();
-    if (this.store != null) {
-      this.store.close();
-    }
   }
 
   @VisibleForTesting

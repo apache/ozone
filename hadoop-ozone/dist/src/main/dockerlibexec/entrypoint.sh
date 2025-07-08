@@ -149,6 +149,10 @@ if [ -n "$BYTEMAN_SCRIPT" ] || [ -n "$BYTEMAN_SCRIPT_URL" ]; then
   AGENT_STRING="-javaagent:/opt/byteman.jar=script:$BYTEMAN_SCRIPT"
   export HADOOP_OPTS="$AGENT_STRING $HADOOP_OPTS"
   echo "Process is instrumented with adding $AGENT_STRING to HADOOP_OPTS"
+elif [[ -n "${BYTEMAN_PORT}" ]]; then
+  # listen only in Ozone server processes
+  AGENT_STRING="-javaagent:/opt/byteman.jar=listener:true,address:0.0.0.0,port:${BYTEMAN_PORT}"
+  export OZONE_SERVER_OPTS="${OZONE_SERVER_OPTS:-} ${AGENT_STRING}"
 fi
 
 if [[ -n "${ASYNC_PROFILER_HOME}" ]]; then
