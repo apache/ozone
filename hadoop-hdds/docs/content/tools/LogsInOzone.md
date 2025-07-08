@@ -97,7 +97,7 @@ After saving the file, the service will start logging more detailed debug inform
 To enable debug logging for Ozone CLI tools (e.g., `ozone sh volume create`), you can set the `OZONE_ROOT_LOGGER` environment variable to `debug`:
 
 ```bash
-export OZONE_ROOT_LOGGER=debug,console
+export OZONE_ROOT_LOGGER=DEBUG,console
 ozone sh volume create /vol1
 ```
 
