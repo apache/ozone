@@ -666,7 +666,7 @@ public class HddsVolume extends StorageVolume {
 
     CachedPendingDeletion(long size, long cacheDurationMillis) {
       this.size = size;
-      this.expiryTimeMillis = System.currentTimeMillis() + TimeUnit.MILLISECONDS.toMillis(cacheDurationMillis);
+      this.expiryTimeMillis = System.currentTimeMillis() + cacheDurationMillis;
     }
 
     public long getSize() {
