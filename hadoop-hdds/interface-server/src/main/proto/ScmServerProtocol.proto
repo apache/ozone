@@ -168,9 +168,6 @@ message AllocateScmBlockRequestProto {
  * multiple number of keys (and their blocks).
  */
 message DeleteScmKeyBlocksRequestProto {
-
-  // Field kept for rolling upgrades.  It contains KeyBlocks without
-  // per-block size information.
   repeated KeyBlocks keyBlocks = 1;
 }
 
