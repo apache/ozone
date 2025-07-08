@@ -28,11 +28,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Manager Snapshot Utilities.
@@ -41,6 +44,8 @@ public final class OmSnapshotUtils {
 
   public static final String DATA_PREFIX = "data";
   public static final String DATA_SUFFIX = "txt";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmSnapshotUtils.class);
 
   private OmSnapshotUtils() { }
 
@@ -124,10 +129,12 @@ public final class OmSnapshotUtils {
    * Create hard links listed in OM_HARDLINK_FILE.
    *
    * @param dbPath Path to db to have links created.
+   * @param deleteSourceFiles - Whether to delete the source files after creating the links.
    */
-  public static void createHardLinks(Path dbPath) throws IOException {
+  public static void createHardLinks(Path dbPath, boolean deleteSourceFiles) throws IOException {
     File hardLinkFile =
         new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
+    List<Path> filesToDelete = new ArrayList<>();
     if (hardLinkFile.exists()) {
       // Read file.
       try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
@@ -138,6 +145,7 @@ public final class OmSnapshotUtils {
           String from = l.split("\t")[1];
           String to = l.split("\t")[0];
           Path fullFromPath = Paths.get(dbPath.toString(), from);
+          filesToDelete.add(fullFromPath);
           Path fullToPath = Paths.get(dbPath.toString(), to);
           // Make parent dir if it doesn't exist.
           Path parent = fullToPath.getParent();
@@ -151,6 +159,15 @@ public final class OmSnapshotUtils {
         }
         if (!hardLinkFile.delete()) {
           throw new IOException("Failed to delete: " + hardLinkFile);
+        }
+      }
+    }
+    if (deleteSourceFiles) {
+      for (Path fileToDelete : filesToDelete) {
+        try {
+          Files.deleteIfExists(fileToDelete);
+        } catch (IOException e) {
+          LOG.error("Couldn't delete source file {} while unpacking the DB", fileToDelete, e);
         }
       }
     }

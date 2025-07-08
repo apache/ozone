@@ -374,7 +374,7 @@ class TestOmSnapshotManager {
     File s1FileLink = new File(followerSnapDir2, "s1.sst");
 
     // Create links on the follower from list.
-    OmSnapshotUtils.createHardLinks(candidateDir.toPath());
+    OmSnapshotUtils.createHardLinks(candidateDir.toPath(), false);
 
     // Confirm expected follower links.
     assertTrue(s1FileLink.exists());
