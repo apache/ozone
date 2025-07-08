@@ -21,9 +21,9 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
-import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +50,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
           (k, count) -> count + 1L);
 
       for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+        OmKeyInfo omKeyInfo = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
         unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
             (k, size) -> size + omKeyInfo.getDataSize());
         replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
@@ -75,7 +75,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
           (k, count) -> count > 0 ? count - 1L : 0L);
 
       for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+        OmKeyInfo omKeyInfo = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
         unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
             (k, size) -> size > omKeyInfo.getDataSize() ?
                 size - omKeyInfo.getDataSize() : 0L);
@@ -109,7 +109,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
 
       // Calculate old sizes
       for (PartKeyInfo partKeyInfo : oldMultipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+        OmKeyInfo omKeyInfo = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
         unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
             (k, size) -> size - omKeyInfo.getDataSize());
         replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
@@ -118,7 +118,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
 
       // Calculate new sizes
       for (PartKeyInfo partKeyInfo : newMultipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+        OmKeyInfo omKeyInfo = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
         unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
             (k, size) -> size + omKeyInfo.getDataSize());
         replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
@@ -148,7 +148,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
         if (kv != null && kv.getValue() != null) {
           OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) kv.getValue();
           for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-            ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+            OmKeyInfo omKeyInfo = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
             unReplicatedSize += omKeyInfo.getDataSize();
             replicatedSize += omKeyInfo.getReplicatedSize();
           }
