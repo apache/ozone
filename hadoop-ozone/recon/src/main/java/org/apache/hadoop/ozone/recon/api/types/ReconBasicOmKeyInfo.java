@@ -31,9 +31,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 /**
  * Lightweight OmKeyInfo class.
  */
-@JsonIgnoreProperties({
-    "metadata", "objectID", "updateID", "parentObjectID", "objectInfo"
-})
+@JsonIgnoreProperties(ignoreUnknown = true)
 public final class ReconBasicOmKeyInfo extends WithParentObjectId {
 
   private final String volumeName;
