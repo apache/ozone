@@ -302,6 +302,27 @@ The following table lists the supported operations for Ofs.
 | `deleteSnapshot`       | Deletes a snapshot.                       | Supported [5]  |
 | `renameSnapshot`       | Renames a snapshot.                       | Supported [5]  |
 | `getSnapshotDiffReport`| Gets a snapshot diff report.              | Supported [5]  |
+| `copyFromLocalFile`    | Copies a file from the local filesystem.  | Supported      |
+| `exists`               | Checks if a path exists.                  | Supported      |
+| `getContentSummary`    | Gets the content summary of a path.       | Supported      |
+| `getDefaultBlockSize`  | Gets the default block size.              | Supported      |
+| `getDefaultReplication`| Gets the default replication factor.      | Supported      |
+| `getDelegationToken`   | Gets a delegation token.                  | Supported      |
+| `getFileBlockLocations`| Gets file block locations.                | Supported      |
+| `getHomeDirectory`     | Gets the user's home directory.           | Supported      |
+| `getServerDefaults`    | Gets the server default values.           | Supported      |
+| `getTrashRoot`         | Gets the trash root for a path.           | Supported      |
+| `getTrashRoots`        | Gets all trash roots.                     | Supported      |
+| `getWorkingDirectory`  | Gets the current working directory.       | Supported      |
+| `globStatus`           | Finds files matching a pattern.           | Supported      |
+| `hasPathCapability`    | Queries for a path capability.            | Supported      |
+| `isDirectory`          | Checks if a path is a directory.          | Supported      |
+| `isFile`               | Checks if a path is a file.               | Supported      |
+| `listFiles`            | Returns a remote iterator for files.      | Supported      |
+| `listLocatedStatus`    | Returns a remote iterator for located file statuses. | Supported |
+| `listStatusIterator`   | Returns a remote iterator for file statuses. | Supported |
+| `setWorkingDirectory`  | Sets the current working directory.       | Supported      |
+| `supportsSymlinks`     | Checks if symbolic links are supported.   | Supported      |
 | `setXAttr`             | Sets an extended attribute.               | Unsupported    |
 | `getXAttr`             | Gets an extended attribute.               | Unsupported    |
 | `listXAttrs`           | Lists extended attributes.                | Unsupported    |
