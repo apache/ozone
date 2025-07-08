@@ -26,6 +26,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 
@@ -76,6 +77,7 @@ public final class ContainerScanHelper {
       }
       if (result.hasErrors()) {
         handleUnhealthyScanResult(containerId, result);
+        triggerVolumeScan(containerData);
       }
       metrics.incNumContainersScanned();
     }
@@ -104,6 +106,18 @@ public final class ContainerScanHelper {
     boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
     if (containerMarkedUnhealthy) {
       metrics.incNumUnHealthyContainers();
+    }
+  }
+
+  public void triggerVolumeScan(ContainerData containerData) {
+    log.info("Triggering a volume scan for volume [{}] as unhealthy container [{}] was on it.",
+        containerData.getVolume().getStorageDir().getPath(), containerData.getContainerID());
+    HddsVolume volume = containerData.getVolume();
+    if (volume != null && !volume.isFailed()) {
+      StorageVolumeUtil.onFailure(volume);
+    } else {
+      log.warn("Cannot trigger volume scan for container {} since its volume is null or has failed.",
+          containerData.getContainerID());
     }
   }
 

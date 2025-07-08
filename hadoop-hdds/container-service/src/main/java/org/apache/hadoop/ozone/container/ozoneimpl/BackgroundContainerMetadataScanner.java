@@ -67,6 +67,7 @@ public class BackgroundContainerMetadataScanner extends
     }
     if (result.hasErrors()) {
       scanHelper.handleUnhealthyScanResult(containerID, result);
+      scanHelper.triggerVolumeScan(container.getContainerData());
     }
 
     // Do not update the scan timestamp after the scan since this was just a
