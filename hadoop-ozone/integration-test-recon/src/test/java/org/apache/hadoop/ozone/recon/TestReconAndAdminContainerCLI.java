@@ -202,7 +202,7 @@ class TestReconAndAdminContainerCLI {
     GenericTestUtils.waitFor(() -> {
       try {
         return scmClient.getReplicationManagerReport()
-                   .getStat(ReplicationManagerReport.HealthState.MISSING) == 2;
+                   .getStat(ReplicationManagerReport.HealthState.MISSING) == 1;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
