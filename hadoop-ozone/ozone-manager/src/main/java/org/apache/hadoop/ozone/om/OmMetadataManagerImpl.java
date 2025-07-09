@@ -82,7 +82,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.DeletedBlockGroup;
+import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -1772,14 +1772,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public List<DeletedBlockGroup> getBlocksForKeyDelete(String deletedKey)
+  public List<BlockGroup> getBlocksForKeyDelete(String deletedKey)
       throws IOException {
     RepeatedOmKeyInfo omKeyInfo = getDeletedTable().get(deletedKey);
     if (omKeyInfo == null) {
       return null;
     }
 
-    List<DeletedBlockGroup> result = new ArrayList<>();
+    List<BlockGroup> result = new ArrayList<>();
     // Add all blocks from all versions of the key to the deletion list
     for (OmKeyInfo info : omKeyInfo.cloneOmKeyInfoList()) {
       for (OmKeyLocationInfoGroup keyLocations :
@@ -1787,7 +1787,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         List<DeletedBlock> item = keyLocations.getLocationList().stream()
             .map(b -> new DeletedBlock(new BlockID(b.getContainerID(), b.getLocalID()), b.getLength()))
             .collect(Collectors.toList());
-        DeletedBlockGroup keyBlocks = DeletedBlockGroup.newBuilder()
+        BlockGroup keyBlocks = BlockGroup.newBuilder()
             .setKeyName(deletedKey)
             .addAllBlocks(item)
             .build();

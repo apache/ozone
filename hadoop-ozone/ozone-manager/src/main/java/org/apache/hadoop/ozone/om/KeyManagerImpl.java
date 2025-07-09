@@ -138,7 +138,7 @@ import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.common.DeletedBlockGroup;
+import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -726,7 +726,7 @@ public class KeyManagerImpl implements KeyManager {
     boolean isLegacy = ozoneManager.getScmInfo().getMetaDataLayoutVersion() <
         HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
 
-    List<DeletedBlockGroup> keyBlocksList = Lists.newArrayList();
+    List<BlockGroup> keyBlocksList = Lists.newArrayList();
 
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
@@ -745,7 +745,7 @@ public class KeyManagerImpl implements KeyManager {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
         if (kv != null) {
-          List<DeletedBlockGroup> blockGroupList = Lists.newArrayList();
+          List<BlockGroup> blockGroupList = Lists.newArrayList();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
@@ -759,7 +759,7 @@ public class KeyManagerImpl implements KeyManager {
                           QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
                       .collect(Collectors.toList());
 
-              DeletedBlockGroup keyBlocks = DeletedBlockGroup.newBuilder()
+              BlockGroup keyBlocks = BlockGroup.newBuilder()
                   .setLegacyFormat(isLegacy)
                   .setKeyName(kv.getKey())
                   .addAllBlocks(blocks).build();

@@ -27,13 +27,13 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyB
 /**
  * A group of blocks relations relevant, e.g belong to a certain object key.
  */
-public final class DeletedBlockGroup {
+public final class BlockGroup {
 
   private String groupID;
   private List<DeletedBlock> deletedBlocks;
   private boolean legacyFormat = false;
 
-  private DeletedBlockGroup(String groupID, List<DeletedBlock> deletedBlocks, boolean legacyFormat) {
+  private BlockGroup(String groupID, List<DeletedBlock> deletedBlocks, boolean legacyFormat) {
     this.groupID = groupID;
     this.deletedBlocks = deletedBlocks;
     this.legacyFormat = legacyFormat;
@@ -63,28 +63,28 @@ public final class DeletedBlockGroup {
     return kbb.setKey(groupID).build();
   }
 
-  public static DeletedBlockGroup getFromProto(KeyBlocks proto) {
+  public static BlockGroup getFromProto(KeyBlocks proto) {
     return proto.getDeletedBlocksList().isEmpty() ? getFromLegacyProto(proto) : getFromNewProto(proto);
   }
 
-  public static DeletedBlockGroup getFromNewProto(KeyBlocks proto) {
+  public static BlockGroup getFromNewProto(KeyBlocks proto) {
     List<DeletedBlock> blocks = new ArrayList<>();
     for (HddsProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
       blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(), containerBlockId.getLocalID()),
           block.getReplicatedSize()));
     }
-    return DeletedBlockGroup.newBuilder().setKeyName(proto.getKey())
+    return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlocks(blocks).build();
   }
 
-  public static DeletedBlockGroup getFromLegacyProto(KeyBlocks proto) {
+  public static BlockGroup getFromLegacyProto(KeyBlocks proto) {
     List<DeletedBlock> blocks = new ArrayList<>();
     for (HddsProtos.BlockID block : proto.getBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getContainerBlockID();
       blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(), containerBlockId.getLocalID()), -1L));
     }
-    return DeletedBlockGroup.newBuilder().setKeyName(proto.getKey())
+    return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlocks(blocks).build();
   }
 
@@ -124,8 +124,8 @@ public final class DeletedBlockGroup {
       return this;
     }
 
-    public DeletedBlockGroup build() {
-      return new DeletedBlockGroup(groupID, blocks, legacyFormat);
+    public BlockGroup build() {
+      return new BlockGroup(groupID, blocks, legacyFormat);
     }
   }
 

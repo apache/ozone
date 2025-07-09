@@ -67,7 +67,7 @@ import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
-import org.apache.hadoop.ozone.common.DeletedBlockGroup;
+import org.apache.hadoop.ozone.common.BlockGroup;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -229,10 +229,10 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
-      List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
+      List<BlockGroup> keyBlocksInfoList) throws IOException {
 
     List<KeyBlocks> keyBlocksProto = keyBlocksInfoList.stream()
-        .map(DeletedBlockGroup::getProto)
+        .map(BlockGroup::getProto)
         .collect(Collectors.toList());
 
     DeleteScmKeyBlocksRequestProto request = DeleteScmKeyBlocksRequestProto

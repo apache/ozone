@@ -71,7 +71,7 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.DeletedBlockGroup;
+import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -405,7 +405,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 1, metadataManager);
       doAnswer(i -> {
         PendingKeysDeletion pendingKeysDeletion = (PendingKeysDeletion) i.callRealMethod();
-        for (DeletedBlockGroup group : pendingKeysDeletion.getKeyBlocksList()) {
+        for (BlockGroup group : pendingKeysDeletion.getKeyBlocksList()) {
           Assertions.assertNotEquals(deletePathKey[0], group.getGroupID());
         }
         return pendingKeysDeletion;
@@ -792,7 +792,7 @@ class TestKeyDeletingService extends OzoneTestBase {
               return OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(purgeRequest.get().getCmdType())
                   .setStatus(OzoneManagerProtocolProtos.Status.TIMEOUT).build();
             });
-        List<DeletedBlockGroup> blockGroups = Collections.singletonList(DeletedBlockGroup
+        List<BlockGroup> blockGroups = Collections.singletonList(BlockGroup
             .newBuilder().setKeyName("key1")
             .addAllBlocks(Collections.singletonList(new DeletedBlock(new BlockID(1, 1), 1)))
             .build());
@@ -1069,7 +1069,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
           .getKeyBlocksList()
           .stream()
-          .map(DeletedBlockGroup::getAllBlocks)
+          .map(BlockGroup::getAllBlocks)
           .mapToLong(Collection::size)
           .sum();
     } catch (IOException e) {

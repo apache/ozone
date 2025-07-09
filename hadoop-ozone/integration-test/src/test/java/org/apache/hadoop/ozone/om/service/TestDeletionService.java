@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.common.DeletedBlockGroup;
+import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -104,7 +104,7 @@ public class TestDeletionService {
       bucket.deleteKey(KEY_NAME);
 
       // Step 5: Verify deleteBlocks call and capture argument
-      ArgumentCaptor<List<DeletedBlockGroup>> captor =
+      ArgumentCaptor<List<BlockGroup>> captor =
           ArgumentCaptor.forClass(List.class);
       verify(spyManager, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
 

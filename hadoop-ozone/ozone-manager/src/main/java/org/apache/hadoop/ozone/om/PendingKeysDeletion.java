@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.ozone.common.DeletedBlockGroup;
+import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 /**
@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
  *
  * This class maintains:
  * <ul>
- *   <li>A list of {@link DeletedBlockGroup} entries, where each entry contains
+ *   <li>A list of {@link BlockGroup} entries, where each entry contains
  *       a key name and its associated block IDs</li>
  *   <li>A key-value mapping that requires updating after the remaining
  *       blocks are purged</li>
@@ -36,9 +36,9 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 public class PendingKeysDeletion {
 
   private Map<String, RepeatedOmKeyInfo> keysToModify;
-  private List<DeletedBlockGroup> keyBlocksList;
+  private List<BlockGroup> keyBlocksList;
 
-  public PendingKeysDeletion(List<DeletedBlockGroup> keyBlocksList,
+  public PendingKeysDeletion(List<BlockGroup> keyBlocksList,
        Map<String, RepeatedOmKeyInfo> keysToModify) {
     this.keysToModify = keysToModify;
     this.keyBlocksList = keyBlocksList;
@@ -48,7 +48,7 @@ public class PendingKeysDeletion {
     return keysToModify;
   }
 
-  public List<DeletedBlockGroup> getKeyBlocksList() {
+  public List<BlockGroup> getKeyBlocksList() {
     return keyBlocksList;
   }
 }

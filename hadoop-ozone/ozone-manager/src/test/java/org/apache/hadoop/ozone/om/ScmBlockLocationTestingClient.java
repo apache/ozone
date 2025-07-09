@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
-import org.apache.hadoop.ozone.common.DeletedBlockGroup;
+import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,11 +146,11 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
 
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
-      List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
+      List<BlockGroup> keyBlocksInfoList) throws IOException {
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     List<DeleteBlockResult> blockResultList = new ArrayList<>();
     Result result;
-    for (DeletedBlockGroup keyBlocks : keyBlocksInfoList) {
+    for (BlockGroup keyBlocks : keyBlocksInfoList) {
       for (DeletedBlock blockKey : keyBlocks.getAllBlocks()) {
         currentCall++;
         switch (this.failCallsFrequency) {

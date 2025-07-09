@@ -79,7 +79,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
-import org.apache.hadoop.ozone.common.DeletedBlockGroup;
+import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -265,9 +265,9 @@ public class SCMBlockProtocolServer implements
    */
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
-      List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
+      List<BlockGroup> keyBlocksInfoList) throws IOException {
     long totalBlocks = 0;
-    for (DeletedBlockGroup bg : keyBlocksInfoList) {
+    for (BlockGroup bg : keyBlocksInfoList) {
       totalBlocks += bg.getAllBlocks().size();
     }
     if (LOG.isDebugEnabled()) {
@@ -310,7 +310,7 @@ public class SCMBlockProtocolServer implements
                 unknownFailure;
       }
     }
-    for (DeletedBlockGroup bg : keyBlocksInfoList) {
+    for (BlockGroup bg : keyBlocksInfoList) {
       List<DeleteBlockResult> blockResult = new ArrayList<>();
       for (DeletedBlock b : bg.getAllBlocks()) {
         blockResult.add(new DeleteBlockResult(b.getBlockID(), resultCode));
