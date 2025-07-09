@@ -44,21 +44,6 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class)
 public class ListInfoSubcommand extends ScmSubcommand {
 
-  @CommandLine.Option(names = {"--ip"},
-      description = "Show info by ip address.",
-      defaultValue = "")
-  private String ipaddress;
-
-  @CommandLine.Option(names = {"--id"},
-      description = "Show info by datanode UUID.",
-      defaultValue = "")
-  private String uuid;
-
-  @CommandLine.Option(names = {"--hostname"},
-      description = "Show info by datanode hostname.",
-      defaultValue = "")
-  private String hostname;
-
   @CommandLine.Option(names = {"--operational-state"},
       description = "Show info by datanode NodeOperationalState(" +
           "IN_SERVICE, " +
@@ -81,13 +66,16 @@ public class ListInfoSubcommand extends ScmSubcommand {
   @CommandLine.Mixin
   private ListLimitOptions listLimitOptions;
 
+  @CommandLine.Mixin
+  private NodeSelectionMixin nodeSelectionMixin;
+
   private List<Pipeline> pipelines;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     pipelines = scmClient.listPipelines();
-    if (!Strings.isNullOrEmpty(uuid)) {
-      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(uuid));
+    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getNodeId())) {
+      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(nodeSelectionMixin.getNodeId()));
       DatanodeWithAttributes dwa = new DatanodeWithAttributes(DatanodeDetails
           .getFromProtoBuf(node.getNodeID()),
           node.getNodeOperationalStates(0),
@@ -102,13 +90,13 @@ public class ListInfoSubcommand extends ScmSubcommand {
       return;
     }
     Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
-    if (!Strings.isNullOrEmpty(ipaddress)) {
+    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getIp())) {
       allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
-          .compareToIgnoreCase(ipaddress) == 0);
+          .compareToIgnoreCase(nodeSelectionMixin.getIp()) == 0);
     }
-    if (!Strings.isNullOrEmpty(hostname)) {
+    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getHostname())) {
       allNodes = allNodes.filter(p -> p.getDatanodeDetails().getHostName()
-          .compareToIgnoreCase(hostname) == 0);
+          .compareToIgnoreCase(nodeSelectionMixin.getHostname()) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeOperationalState)) {
       allNodes = allNodes.filter(p -> p.getOpState().toString()

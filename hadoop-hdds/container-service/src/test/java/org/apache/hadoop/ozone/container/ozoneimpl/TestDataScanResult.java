@@ -39,7 +39,7 @@ class TestDataScanResult {
   void testFromEmptyErrors() {
     // No errors means the scan result is healthy.
     DataScanResult result = DataScanResult.fromErrors(Collections.emptyList(), TREE);
-    assertTrue(result.isHealthy());
+    assertFalse(result.hasErrors());
     assertFalse(result.isDeleted());
     assertTrue(result.getErrors().isEmpty());
     assertTrue(result.toString().contains("0 errors"));
@@ -51,7 +51,7 @@ class TestDataScanResult {
     MetadataScanResult metadataResult =
         MetadataScanResult.fromErrors(Collections.singletonList(getMetadataScanError()));
     DataScanResult result = DataScanResult.unhealthyMetadata(metadataResult);
-    assertFalse(result.isHealthy());
+    assertTrue(result.hasErrors());
     assertFalse(result.isDeleted());
     assertEquals(1, result.getErrors().size());
     assertTrue(result.toString().contains("1 error"));
@@ -62,7 +62,7 @@ class TestDataScanResult {
   @Test
   void testFromErrors() {
     DataScanResult result = DataScanResult.fromErrors(Arrays.asList(getDataScanError(), getDataScanError()), TREE);
-    assertFalse(result.isHealthy());
+    assertTrue(result.hasErrors());
     assertFalse(result.isDeleted());
     assertEquals(2, result.getErrors().size());
     assertTrue(result.toString().contains("2 errors"));
@@ -73,7 +73,7 @@ class TestDataScanResult {
   @Test
   void testDeleted() {
     DataScanResult result = DataScanResult.deleted();
-    assertTrue(result.isHealthy());
+    assertFalse(result.hasErrors());
     assertTrue(result.isDeleted());
     assertTrue(result.getErrors().isEmpty());
     assertTrue(result.toString().contains("deleted"));
