@@ -735,6 +735,7 @@ public class KeyManagerImpl implements KeyManager {
         delKeyIter.seek(startKey);
       }
       int currentCount = 0;
+      boolean maxReqSizeExceeded = false;
       while (delKeyIter.hasNext() && currentCount < count) {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
@@ -742,7 +743,6 @@ public class KeyManagerImpl implements KeyManager {
           List<BlockGroup> blockGroupList = Lists.newArrayList();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
-          boolean flag = false;
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
@@ -752,12 +752,16 @@ public class KeyManagerImpl implements KeyManager {
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
                   .addAllBlockIDs(blockIDS).build();
-              serializedSize += keyBlocks.getProto().getSerializedSize();
+              int keyBlockSerializedSize = keyBlocks.getProto().getSerializedSize();
+              serializedSize += keyBlockSerializedSize;
               if (serializedSize > ratisByteLimit) {
-                flag = true;
-                LOG.info(
-                    "Total size of cumulative keys in a cycle crossed 90% ratis limit, serialized size: {}",
-                    serializedSize);
+                maxReqSizeExceeded = true;
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug(
+                      "Total size of cumulative keys and rename entries in the snapshotRenamedTable in a cycle " +
+                          "crossed 90% ratis limit, serialized size of keys: {}",
+                      serializedSize);
+                }
                 break;
               }
               blockGroupList.add(keyBlocks);
@@ -766,7 +770,7 @@ public class KeyManagerImpl implements KeyManager {
               notReclaimableKeyInfo.addOmKeyInfo(info);
             }
           }
-          if (flag) {
+          if (maxReqSizeExceeded) {
             break;
           }
 

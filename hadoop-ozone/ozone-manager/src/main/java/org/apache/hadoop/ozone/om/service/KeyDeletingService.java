@@ -90,6 +90,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
   private int ratisByteLimit;
+  private static final double RATIS_LIMIT_FACTOR = 0.9;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient, long serviceInterval,
@@ -111,7 +112,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     // always go to 90% of max limit for request as other header will be added
-    this.ratisByteLimit = (int) (limit * 0.9);
+    this.ratisByteLimit = (int) (limit * RATIS_LIMIT_FACTOR);
   }
 
   /**

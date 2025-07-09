@@ -41,9 +41,13 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
   @Override
   public void seekToFirst() {
     this.itr = this.values.entrySet().stream()
-        .filter(e -> prefix == null || e.getKey().startsWith(prefix)).map(
-            e -> Table.newKeyValue(e.getKey(), e.getValue(),
-                e.getValue().toString().getBytes(StandardCharsets.UTF_8).length)).iterator();
+        .filter(e -> prefix == null || e.getKey().startsWith(prefix))
+        .map(e -> {
+          V value = e.getValue();
+          int size = value != null ? value.toString().getBytes(StandardCharsets.UTF_8).length : 0;
+          return Table.newKeyValue(e.getKey(), value, size);
+        })
+        .iterator();
   }
 
   @Override
