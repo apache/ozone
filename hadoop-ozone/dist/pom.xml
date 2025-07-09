@@ -241,38 +241,6 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.vafer</groupId>
-        <artifactId>jdeb</artifactId>
-        <version>1.14</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>jdeb</goal>
-            </goals>
-            <phase>none</phase>
-            <configuration>
-              <controlDir>${basedir}/src/main/package/deb/control</controlDir>
-              <deb>${project.build.directory}/ozone-${project.version}.deb</deb>
-              <skip>false</skip>
-              <skipPOMs>false</skipPOMs>
-              <data>
-                <dataSet>
-                  <data>
-                    <src>${project.build.directory}/ozone-${project.version}.tar.gz</src>
-                    <type>archive</type>
-                    <mapper>
-                      <type>perm</type>
-                      <user>root</user>
-                      <group>root</group>
-                    </mapper>
-                  </data>
-                </dataSet>
-              </data>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
     </plugins>
   </build>
   <profiles>
@@ -464,6 +432,91 @@
                     <argument>${project.build.directory}</argument>
                   </arguments>
                 </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>deb</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.vafer</groupId>
+            <artifactId>jdeb</artifactId>
+            <version>1.14</version>
+            <configuration>
+              <controlDir>${basedir}/src/main/package/deb/control</controlDir>
+              <deb>${project.build.directory}/ozone-${project.version}.deb</deb>
+              <skip>false</skip>
+              <skipPOMs>false</skipPOMs>
+              <dataSet>
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/bin/ozone</src>
+                  <type>file</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/bin</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                    <filemode>755</filemode>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/sbin</src>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/sbin</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/etc</src>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/etc</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/libexec</src>
+                  <dst>/opt/ozone/libexec</dst>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/libexec</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/share</src>
+                  <dst>/opt/ozone/share</dst>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/share</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+              </dataSet>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>jdeb</goal>
+                </goals>
+                <phase>package</phase>
               </execution>
             </executions>
           </plugin>
