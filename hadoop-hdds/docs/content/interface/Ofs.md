@@ -239,7 +239,7 @@ In order to enable trash in Ozone, Please add these configs to core-site.xml
   <name>fs.trash.classname</name>
   <value>org.apache.hadoop.fs.ozone.OzoneTrashPolicy</value>
 </property>
-{{< /highlight >}}
+{{< highlight >}}
                                            
  
 When keys are deleted with trash enabled, they are moved to a trash directory
@@ -273,27 +273,23 @@ This feature wouldn't degrade server performance as the loop is on the client.
 Think it as a client is issuing multiple requests to the server to get all the
 information.
 
-## Supported Operations
+## Operation Support
 
-The following table lists the supported operations for Ofs.
+lists the support status of Ofs operations
+
+### Supported
 
 | Operation              | Description                               | Support        |
 |------------------------|-------------------------------------------|----------------|
 | `create`               | Creates a new file.                       | Supported      |
 | `open`                 | Opens a file for reading.                 | Supported      |
-| `append`               | Appends to an existing file.              | Unsupported    |
 | `rename`               | Renames a file or directory.              | Supported [1]  |
 | `delete`               | Deletes a file or directory.              | Supported [2]  |
 | `listStatus`           | Lists the status of files in a directory. | Supported [3]  |
 | `mkdirs`               | Creates a directory and its parents.      | Supported      |
 | `getFileStatus`        | Gets the status of a file.                | Supported      |
-| `setPermission`        | Sets the permission of a file.            | Unsupported    |
-| `setOwner`             | Sets the owner of a file.                 | Unsupported    |
 | `setTimes`             | Sets the modification and access times.   | Supported      |
-| `setReplication`       | Sets the replication factor of a file.    | Unsupported    |
-| `createSymlink`        | Creates a symbolic link.                  | Unsupported    |
 | `getLinkTarget`        | Gets the target of a symbolic link.       | Supported [4]  |
-| `resolveLink`          | Resolves a symbolic link.                 | Unsupported    |
 | `getFileChecksum`      | Gets the checksum of a file.              | Supported      |
 | `setSafeMode`          | Enters or leaves safe mode.               | Supported      |
 | `recoverLease`         | Recovers a file lease.                    | Supported      |
@@ -323,18 +319,29 @@ The following table lists the supported operations for Ofs.
 | `listStatusIterator`   | Returns a remote iterator for file statuses. | Supported |
 | `setWorkingDirectory`  | Sets the current working directory.       | Supported      |
 | `supportsSymlinks`     | Checks if symbolic links are supported.   | Supported      |
-| `setXAttr`             | Sets an extended attribute.               | Unsupported    |
-| `getXAttr`             | Gets an extended attribute.               | Unsupported    |
-| `listXAttrs`           | Lists extended attributes.                | Unsupported    |
-| `removeXAttr`          | Removes an extended attribute.            | Unsupported    |
-| `setAcl`               | Sets an ACL.                              | Unsupported    |
-| `getAclStatus`         | Gets an ACL status.                       | Unsupported    |
-| `modifyAclEntries`     | Modifies ACL entries.                     | Unsupported    |
-| `removeAclEntries`     | Removes ACL entries.                      | Unsupported    |
-| `removeDefaultAcl`     | Removes the default ACL.                  | Unsupported    |
-| `removeAcl`            | Removes an ACL.                           | Unsupported    |
-| `truncate`             | Truncates a file.                         | Unsupported    |
-| `concat`               | Concatenates files.                       | Unsupported    |
+
+### Unsupported
+
+| Operation              | Description                               |
+|------------------------|-------------------------------------------|
+| `append`               | Appends to an existing file.              |
+| `setPermission`        | Sets the permission of a file.            |
+| `setOwner`             | Sets the owner of a file.                 |
+| `setReplication`       | Sets the replication factor of a file.    |
+| `createSymlink`        | Creates a symbolic link.                  |
+| `resolveLink`          | Resolves a symbolic link.                 |
+| `setXAttr`             | Sets an extended attribute.               |
+| `getXAttr`             | Gets an extended attribute.               |
+| `listXAttrs`           | Lists extended attributes.                |
+| `removeXAttr`          | Removes an extended attribute.            |
+| `setAcl`               | Sets an ACL.                              |
+| `getAclStatus`         | Gets an ACL status.                       |
+| `modifyAclEntries`     | Modifies ACL entries.                     |
+| `removeAclEntries`     | Removes ACL entries.                      |
+| `removeDefaultAcl`     | Removes the default ACL.                  |
+| `removeAcl`            | Removes an ACL.                           |
+| `truncate`             | Truncates a file.                         |
+| `concat`               | Concatenates files.                       |
 
 **Footnotes:**
 
