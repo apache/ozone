@@ -39,7 +39,7 @@ This logical name is called `serviceId` and can be configured in the `ozone-site
 
 Most of the time you need to set only the values of your current cluster:
 
- ```XML
+ ```xml
 <property>
    <name>ozone.scm.service.ids</name>
    <value>cluster1</value>
@@ -48,7 +48,7 @@ Most of the time you need to set only the values of your current cluster:
 
 For each of the defined `serviceId` a logical configuration name should be defined for each of the servers
 
-```XML
+```xml
 <property>
    <name>ozone.scm.nodes.cluster1</name>
    <value>scm1,scm2,scm3</value>
@@ -57,7 +57,7 @@ For each of the defined `serviceId` a logical configuration name should be defin
 
 The defined prefixes can be used to define the address of each of the SCM services:
 
-```XML
+```xml
 <property>
    <name>ozone.scm.address.cluster1.scm1</name>
    <value>host1</value>
@@ -109,10 +109,10 @@ ozone admin scm transfer -id <SCM_SERVICE_ID> -r
 
 ### Example
 
-To transfer leadership to `scm2` in a cluster with service ID `cluster1`:
+To transfer leadership to a specific SCM in a cluster with service ID `cluster1`:
 
 ```bash
-ozone admin scm transfer -id cluster1 -n scm2
+ozone admin scm transfer -id cluster1 -n e6877ce5-56cd-4f0b-ad60-4c8ef9000882
 ```
 
 To transfer leadership to a random follower:
@@ -178,7 +178,7 @@ In some environments (e.g. Kubernetes) we need to have a common, unified way to 
 
 This can be improved: primordial SCM can be configured by setting `ozone.scm.primordial.node.id` in the config to one of the nodes.
 
-```XML
+```xml
 <property>
    <name>ozone.scm.primordial.node.id</name>
    <value>scm1</value>
@@ -215,14 +215,14 @@ Sub-CA on the SCM’s are used to issue signed certificates for OM/DN in the clu
 
 ### How to enable security:
 
-```XML
+```xml
 <property>
-<config>ozone.security.enable</config>
+<name>ozone.security.enable</name>
 <value>true</value>
 </property>
 
 <property>
-<config>hdds.grpc.tls.enabled</config>
+<name>hdds.grpc.tls.enabled</name>
 <value>true</value>
 </property>
 ```
