@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DiskBalancerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -389,6 +390,11 @@ public class HeartbeatEndpointTask
             RefreshVolumeUsageCommand.getFromProtobuf(
             commandResponseProto.getRefreshVolumeUsageCommandProto());
         processCommonCommand(commandResponseProto, refreshVolumeUsageCommand);
+        break;
+      case reconcileContainerCommand:
+        ReconcileContainerCommand reconcileContainerCommand =
+            ReconcileContainerCommand.getFromProtobuf(commandResponseProto.getReconcileContainerCommandProto());
+        processCommonCommand(commandResponseProto, reconcileContainerCommand);
         break;
       case diskBalancerCommand:
         DiskBalancerCommand diskBalancerCommand =

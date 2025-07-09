@@ -85,8 +85,9 @@ message ScmContainerLocationRequest {
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
-  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 49;
-  optional DatanodeDiskBalancerOpRequestProto datanodeDiskBalancerOpRequest = 50;
+  optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
+  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 50;
+  optional DatanodeDiskBalancerOpRequestProto datanodeDiskBalancerOpRequest = 51;
 }
 
 message ScmContainerLocationResponse {
@@ -143,8 +144,9 @@ message ScmContainerLocationResponse {
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
   optional GetMetricsResponseProto getMetricsResponse = 47;
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
-  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 49;
-  optional DatanodeDiskBalancerOpResponseProto datanodeDiskBalancerOpResponse = 50;
+  optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
+  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 50;
+  optional DatanodeDiskBalancerOpResponseProto datanodeDiskBalancerOpResponse = 51;
 
   enum Status {
     OK = 1;
@@ -200,8 +202,9 @@ enum Type {
   GetContainersOnDecomNode = 42;
   GetMetrics = 43;
   GetContainerBalancerStatusInfo = 44;
-  DatanodeDiskBalancerInfo = 45;
-  DatanodeDiskBalancerOp = 46;
+  ReconcileContainer = 45;
+  DatanodeDiskBalancerInfo = 46;
+  DatanodeDiskBalancerOp = 47;
 }
 
 /**
@@ -708,6 +711,13 @@ message GetMetricsRequestProto {
 
 message GetMetricsResponseProto {
   optional string metricsJson = 1;
+}
+
+message ReconcileContainerRequestProto {
+  required int64 containerID = 1;
+}
+
+message ReconcileContainerResponseProto {
 }
 
 /**

@@ -3619,16 +3619,6 @@
       Thresholds for printing slow-operation audit logs.
     </description>
   </property>
-  <property>
-    <name>ozone.om.keyname.character.check.enabled</name>
-    <tag>OZONE, OM</tag>
-    <value>false</value>
-    <description>If true, then enable to check if the key name
-      contains illegal characters when creating/renaming key.
-      For the definition of illegal characters, follow the
-      rules in Amazon S3's object key naming guide.
-    </description>
-  </property>
 
   <property>
     <name>ozone.om.key.path.lock.enabled</name>

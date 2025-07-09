@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import static java.util.Collections.emptyList;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,9 +34,11 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -59,6 +62,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.junit.jupiter.api.BeforeEach;
@@ -124,6 +128,41 @@ public class TestHeartbeatEndpointTask {
     // THEN
     assertEquals(1, context.getCommandQueueSummary()
         .get(reconstructECContainersCommand).intValue());
+  }
+
+  @Test
+  public void testHandlesReconcileContainerCommand() throws Exception {
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+
+    Set<DatanodeDetails> peerDNs = new HashSet<>();
+    peerDNs.add(MockDatanodeDetails.randomDatanodeDetails());
+    peerDNs.add(MockDatanodeDetails.randomDatanodeDetails());
+    ReconcileContainerCommand cmd = new ReconcileContainerCommand(1, peerDNs);
+
+    when(scm.sendHeartbeat(any()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto)invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .addCommands(SCMCommandProto.newBuilder()
+                    .setCommandType(reconcileContainerCommand)
+                    .setReconcileContainerCommandProto(cmd.getProto())
+                    .build())
+                .build());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine, "");
+
+    // WHEN
+    HeartbeatEndpointTask task = getHeartbeatEndpointTask(conf, context, scm);
+    task.call();
+
+    // THEN
+    assertEquals(1, context.getCommandQueueSummary()
+        .get(reconcileContainerCommand).intValue());
   }
 
   @Test

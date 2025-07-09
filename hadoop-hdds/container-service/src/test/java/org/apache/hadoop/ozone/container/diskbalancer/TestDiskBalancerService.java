@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -112,7 +113,7 @@ public class TestDiskBalancerService {
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
             metrics, c -> {
-        });
+        }, new ContainerChecksumTreeManager(conf));
     DiskBalancerServiceTestImpl svc =
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 
@@ -149,7 +150,7 @@ public class TestDiskBalancerService {
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
             metrics, c -> {
-        });
+        }, new ContainerChecksumTreeManager(conf));
     DiskBalancerServiceTestImpl svc =
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 
@@ -231,7 +232,7 @@ public class TestDiskBalancerService {
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
             metrics, c -> {
-        });
+        }, new ContainerChecksumTreeManager(conf));
     DiskBalancerServiceTestImpl svc =
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 

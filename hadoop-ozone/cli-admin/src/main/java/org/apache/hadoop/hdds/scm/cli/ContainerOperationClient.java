@@ -641,4 +641,9 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.updateDiskBalancerConfiguration(
         threshold, bandwidth, parallelThread, stopAfterDiskEven, hosts);
   }
+
+  @Override
+  public void reconcileContainer(long id) throws IOException {
+    storageContainerLocationClient.reconcileContainer(id);
+  }
 }

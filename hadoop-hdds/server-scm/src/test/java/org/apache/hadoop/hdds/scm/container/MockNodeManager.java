@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -425,7 +426,12 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
+  @Nullable
   public DatanodeInfo getDatanodeInfo(DatanodeDetails dd) {
+    if (nodeMetricMap.get(dd) == null) {
+      return null;
+    }
+
     DatanodeInfo di = new DatanodeInfo(dd, NodeStatus.inServiceHealthy(),
         UpgradeUtils.defaultLayoutVersionProto());
     long capacity = nodeMetricMap.get(dd).getCapacity().get();

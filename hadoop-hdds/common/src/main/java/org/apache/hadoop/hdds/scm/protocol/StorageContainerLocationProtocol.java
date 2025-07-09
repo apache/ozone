@@ -528,4 +528,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Optional<Integer> parallelThread,
       Optional<Boolean> stopAfterDiskEven,
       Optional<List<String>> hosts) throws IOException;
+
+  /**
+   * Trigger a reconcile command to datanodes for the current container ID.
+   *
+   * @param containerID The ID of the container to reconcile.
+   * @throws IOException On error
+   */
+  void reconcileContainer(long containerID) throws IOException;
 }

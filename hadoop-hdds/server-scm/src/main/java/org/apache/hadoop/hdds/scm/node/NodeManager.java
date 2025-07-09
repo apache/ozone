@@ -181,6 +181,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param dn the usage of which we want to get
    * @return DatanodeInfo of the specified datanode
    */
+  @Nullable
   DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
 
   /**
