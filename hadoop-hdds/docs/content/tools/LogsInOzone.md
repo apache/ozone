@@ -90,7 +90,7 @@ to:
 rootLogger.level = debug
 ```
 
-After saving the file, the service will start logging more detailed debug information.
+After saving the file and restarting the service, the service will start logging more detailed debug information.
 
 ### Enabling Debug Logs for CLI Tools
 
