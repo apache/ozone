@@ -22,8 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 import java.util.UUID;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -143,6 +145,42 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
     assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
             omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testDeleteKeyWithColonInFSOBucket() throws Exception {
+    BucketLayout bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
+    
+    when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
+    
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, bucketLayout);
+
+    String testKeyName = "foo:dir/";
+    
+    String normalizedKeyName = OmUtils.normalizeKey(testKeyName, false);
+    
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName,
+        normalizedKeyName, replicationConfig).build();
+    
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, normalizedKeyName);
+    
+    omMetadataManager.getKeyTable(bucketLayout).put(ozoneKey, omKeyInfo);
+    
+    assertNotNull(omMetadataManager.getKeyTable(bucketLayout).get(ozoneKey));
+
+    OMRequest modifiedOmRequest = doPreExecute(createDeleteKeyRequest(testKeyName));
+
+    OMKeyDeleteRequest omKeyDeleteRequest =
+        new OMKeyDeleteRequest(modifiedOmRequest, bucketLayout);
+
+    OMClientResponse omClientResponse =
+        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
+    
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+    
+    assertNull(omMetadataManager.getKeyTable(bucketLayout).get(ozoneKey));
   }
 
   /**

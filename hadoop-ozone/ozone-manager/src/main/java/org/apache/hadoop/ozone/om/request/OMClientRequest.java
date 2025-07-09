@@ -521,6 +521,13 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
+  /**
+   * Normalizes the key path based on the bucket layout.
+   * Character validation is performed only if the keyNameCharacterCheckEnabled config is enabled.
+   *
+   * @return normalized (and optionally validated) key path
+   */
+
   public static String normalizeKeyPath(boolean keyNameCharCheckEnabled, boolean enableFileSystemPaths,
       String keyPath, BucketLayout bucketLayout) throws OMException {
     LOG.debug("Bucket Layout: {}", bucketLayout);
