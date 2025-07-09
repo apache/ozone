@@ -254,6 +254,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
+        .setMetaDataLayoutVersion(scmInfo.getMetaDataLayoutVersion())
         .build();
   }
 

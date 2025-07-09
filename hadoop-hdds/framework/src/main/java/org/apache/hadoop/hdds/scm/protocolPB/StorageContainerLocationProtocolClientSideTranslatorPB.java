@@ -775,7 +775,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
         .setScmId(resp.getScmId())
-        .setPeerRoles(resp.getPeerRolesList());
+        .setPeerRoles(resp.getPeerRolesList())
+        .setMetaDataLayoutVersion(resp.getMetaDataLayoutVersion());
     return builder.build();
   }
 

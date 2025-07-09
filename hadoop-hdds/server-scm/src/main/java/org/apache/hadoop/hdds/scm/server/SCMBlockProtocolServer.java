@@ -335,7 +335,8 @@ public class SCMBlockProtocolServer implements
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
-              .setScmId(scm.getScmStorageConfig().getScmId());
+              .setScmId(scm.getScmStorageConfig().getScmId())
+              .setMetaDataLayoutVersion(scm.getLayoutVersionManager().getMetadataLayoutVersion());
       return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
