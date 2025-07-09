@@ -247,6 +247,7 @@
         <version>1.14</version>
         <executions>
           <execution>
+            <phase>none</phase>
             <goals>
               <goal>jdeb</goal>
             </goals>
@@ -259,15 +260,8 @@
               <data>
                 <dataSet>
                   <data>
-                    <src>${project.build.directory}/ozone-${project.version}</src>
-                    <includes>
-                      <include>etc/**</include>
-                      <include>libexec/**</include>
-                      <include>log</include>
-                      <include>share/**</include>
-                      <include>bin/**</include>
-                      <include>sbin/**</include>
-                    </includes>
+                    <src>${project.build.directory}/ozone-${project.version}.tar.gz</src>
+                    <type>archive</type>
                     <mapper>
                       <type>perm</type>
                       <user>root</user>
