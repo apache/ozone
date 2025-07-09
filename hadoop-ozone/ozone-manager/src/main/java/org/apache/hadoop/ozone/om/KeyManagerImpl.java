@@ -125,6 +125,7 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -722,7 +723,11 @@ public class KeyManagerImpl implements KeyManager {
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
       int count) throws IOException {
+    boolean isLegacy = ozoneManager.getScmInfo().getMetaDataLayoutVersion() <
+        HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
+
     List<DeletedBlockGroup> keyBlocksList = Lists.newArrayList();
+
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
@@ -749,12 +754,16 @@ public class KeyManagerImpl implements KeyManager {
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
               List<DeletedBlock> blocks = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                      .map(b -> new DeletedBlock(
+                      .map(b ->  new DeletedBlock(
                           new BlockID(b.getContainerID(), b.getLocalID()),
                           QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
                       .collect(Collectors.toList());
-              DeletedBlockGroup keyBlocks = DeletedBlockGroup.newBuilder().setKeyName(kv.getKey())
+
+              DeletedBlockGroup keyBlocks = DeletedBlockGroup.newBuilder()
+                  .setLegacyFormat(isLegacy)
+                  .setKeyName(kv.getKey())
                   .addAllBlocks(blocks).build();
+
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {

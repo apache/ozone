@@ -31,10 +31,12 @@ public final class DeletedBlockGroup {
 
   private String groupID;
   private List<DeletedBlock> deletedBlocks;
+  private boolean legacyFormat = false;
 
-  private DeletedBlockGroup(String groupID, List<DeletedBlock> deletedBlocks) {
+  private DeletedBlockGroup(String groupID, List<DeletedBlock> deletedBlocks, boolean legacyFormat) {
     this.groupID = groupID;
     this.deletedBlocks = deletedBlocks;
+    this.legacyFormat = legacyFormat;
   }
 
   public List<DeletedBlock> getAllBlocks() {
@@ -45,18 +47,18 @@ public final class DeletedBlockGroup {
     return groupID;
   }
 
+  public boolean isLegacyFormat() {
+    return legacyFormat;
+  }
+
   public KeyBlocks getProto() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
     for (DeletedBlock block : deletedBlocks) {
-      kbb.addDeletedBlocks(block.getProtobuf());
-    }
-    return kbb.setKey(groupID).build();
-  }
-
-  public KeyBlocks getLegacyProto() {
-    KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
-    for (DeletedBlock block : deletedBlocks) {
-      kbb.addBlocks(block.getProtobuf().getBlockId());
+      if (isLegacyFormat()) {
+        kbb.addBlocks(block.getProtobuf().getBlockId());
+      } else {
+        kbb.addDeletedBlocks(block.getProtobuf());
+      }
     }
     return kbb.setKey(groupID).build();
   }
@@ -105,6 +107,7 @@ public final class DeletedBlockGroup {
 
     private String groupID;
     private List<DeletedBlock> blocks;
+    private boolean legacyFormat = false;
 
     public Builder setKeyName(String blockGroupID) {
       this.groupID = blockGroupID;
@@ -116,8 +119,13 @@ public final class DeletedBlockGroup {
       return this;
     }
 
+    public Builder setLegacyFormat(boolean legacyFormat) {
+      this.legacyFormat = legacyFormat;
+      return this;
+    }
+
     public DeletedBlockGroup build() {
-      return new DeletedBlockGroup(groupID, blocks);
+      return new DeletedBlockGroup(groupID, blocks, legacyFormat);
     }
   }
 

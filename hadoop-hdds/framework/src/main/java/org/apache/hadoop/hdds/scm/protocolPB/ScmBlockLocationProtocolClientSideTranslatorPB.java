@@ -62,7 +62,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
@@ -232,16 +231,9 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<DeletedBlockGroup> keyBlocksInfoList) throws IOException {
 
-    List<KeyBlocks> keyBlocksProto;
-    if (getScmInfo().getMetaDataLayoutVersion() >= HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion()) {
-      keyBlocksProto = keyBlocksInfoList.stream()
-          .map(DeletedBlockGroup::getProto)
-          .collect(Collectors.toList());
-    } else {
-      keyBlocksProto = keyBlocksInfoList.stream()
-          .map(DeletedBlockGroup::getLegacyProto)
-          .collect(Collectors.toList());
-    }
+    List<KeyBlocks> keyBlocksProto = keyBlocksInfoList.stream()
+        .map(DeletedBlockGroup::getProto)
+        .collect(Collectors.toList());
 
     DeleteScmKeyBlocksRequestProto request = DeleteScmKeyBlocksRequestProto
         .newBuilder()

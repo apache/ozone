@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
-import static org.apache.hadoop.hdds.utils.HAUtils.getScmInfo;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
@@ -498,6 +497,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private UncheckedAutoCloseableSupplier<IOmMetadataReader> rcOmMetadataReader;
   private OmSnapshotManager omSnapshotManager;
   private volatile DirectoryDeletingService dirDeletingService;
+  private ScmInfo scmInfo;
 
   @SuppressWarnings("methodlength")
   private OzoneManager(OzoneConfiguration conf, StartupOption startupOption)
@@ -615,9 +615,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // For testing purpose only, not hit scm from om as Hadoop UGI can't login
     // two principals in the same JVM.
-    ScmInfo scmInfo;
     if (!testSecureOmFlag) {
-      scmInfo = getScmInfo(configuration);
+      scmInfo = HAUtils.getScmInfo(configuration);
       if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
         logVersionMismatch(conf, scmInfo);
         throw new OMException("SCM version info mismatch.",
@@ -891,7 +890,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return new OzoneManager(conf, startupOption);
   }
 
-  private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
+  private void logVersionMismatch(OzoneConfiguration conf, ScmInfo info) {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
     StringBuilder scmBlockAddressBuilder = new StringBuilder();
     for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
@@ -903,9 +902,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       scmBlockAddress = scmBlockAddress.substring(0,
           scmBlockAddress.lastIndexOf(","));
     }
-    if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
+    if (!info.getClusterId().equals(omStorage.getClusterID())) {
       LOG.error("clusterId from {} is {}, but is {} in {}",
-          scmBlockAddress, scmInfo.getClusterId(),
+          scmBlockAddress, info.getClusterId(),
           omStorage.getClusterID(), omStorage.getVersionFile());
     }
   }
@@ -1024,6 +1023,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public ScmClient getScmClient() {
     return scmClient;
+  }
+
+  /**
+   * Return scmInfo.
+   */
+  public ScmInfo getScmInfo() {
+    return this.scmInfo;
   }
 
   /**
@@ -1504,7 +1510,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     StorageState state = omStorage.getState();
     String scmId;
     try {
-      ScmInfo scmInfo = getScmInfo(conf);
+      ScmInfo scmInfo = HAUtils.getScmInfo(conf);
       scmId = scmInfo.getScmId();
       if (scmId == null || scmId.isEmpty()) {
         throw new IOException("Invalid SCM ID");
