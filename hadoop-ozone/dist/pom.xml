@@ -247,11 +247,10 @@
         <version>1.14</version>
         <executions>
           <execution>
-            <phase>none</phase>
             <goals>
               <goal>jdeb</goal>
             </goals>
-            <phase>package</phase>
+            <phase>none</phase>
             <configuration>
               <controlDir>${basedir}/src/main/package/deb/control</controlDir>
               <deb>${project.build.directory}/ozone-${project.version}.deb</deb>
