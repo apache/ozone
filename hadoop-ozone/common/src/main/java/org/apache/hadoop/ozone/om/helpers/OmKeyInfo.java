@@ -746,12 +746,10 @@ public final class OmKeyInfo extends WithParentObjectId
         .setBucketName(keyInfo.getBucketName())
         .setKeyName(keyInfo.getKeyName())
         .setDataSize(keyInfo.getDataSize())
+        .setOmKeyLocationInfos(omKeyLocationInfos)
         .setReplicationConfig(ReplicationConfig
             .fromProto(keyInfo.getType(), keyInfo.getFactor(),
                 keyInfo.getEcReplicationConfig()));
-    if (includeLargeFields) {
-      builder.setOmKeyLocationInfos(omKeyLocationInfos);
-    }
     builder.setCreationTime(keyInfo.getCreationTime())
         .setModificationTime(keyInfo.getModificationTime());
     if (includeLargeFields) {

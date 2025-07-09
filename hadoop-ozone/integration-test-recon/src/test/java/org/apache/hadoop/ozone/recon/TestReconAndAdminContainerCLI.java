@@ -189,7 +189,7 @@ class TestReconAndAdminContainerCLI {
   void testMissingContainer() throws Exception {
     String keyNameR1 = "key2";
     long containerID = setupRatisKey(recon, keyNameR1,
-        HddsProtos.ReplicationFactor.ONE);
+        HddsProtos.ReplicationFactor.THREE);
 
     Pipeline pipeline =
         scmClient.getContainerWithPipeline(containerID).getPipeline();
