@@ -189,7 +189,7 @@ class TestReconAndAdminContainerCLI {
   void testMissingContainer() throws Exception {
     String keyNameR1 = "key2";
     long containerID = setupRatisKey(recon, keyNameR1,
-        HddsProtos.ReplicationFactor.THREE);
+        HddsProtos.ReplicationFactor.ONE);
 
     Pipeline pipeline =
         scmClient.getContainerWithPipeline(containerID).getPipeline();
@@ -202,7 +202,7 @@ class TestReconAndAdminContainerCLI {
     GenericTestUtils.waitFor(() -> {
       try {
         return scmClient.getReplicationManagerReport()
-                   .getStat(ReplicationManagerReport.HealthState.MISSING) == 1;
+                   .getStat(ReplicationManagerReport.HealthState.MISSING) == 2;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
