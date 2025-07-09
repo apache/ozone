@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -91,6 +92,10 @@ import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.recon.api.types.MultipartKeyInsightInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 
 /**
  * Unit test for OmDBInsightEndPoint.
@@ -2018,5 +2023,142 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     NSSummary summary = new NSSummary();
     summary.setSizeOfFiles(size);
     return summary;
+  }
+
+  // Helper for MPU part creation (sets required proto fields)
+  private PartKeyInfo createPartKeyInfo(String volumeName, String bucketName, String keyName, String uploadID, int partNumber, long dataSize) {
+    return PartKeyInfo.newBuilder()
+        .setPartNumber(partNumber)
+        .setPartName(omMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID))
+        .setPartKeyInfo(KeyInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setDataSize(dataSize)
+            .setCreationTime(System.currentTimeMillis())
+            .setModificationTime(System.currentTimeMillis())
+            .setObjectID(new java.util.Random().nextLong())
+            .setType(HddsProtos.ReplicationType.RATIS)
+            .setFactor(HddsProtos.ReplicationFactor.THREE)
+            .build())
+        .build();
+  }
+
+  @Test
+  public void testGetOpenMPUKeysBasic() throws Exception {
+    // Insert a test MPU key
+    String volume = "vol1";
+    String bucket = "bucket1";
+    String key = "key1";
+    String uploadId = "upload-123";
+    long partSize = 100L;
+    OmMultipartKeyInfo mpu = new OmMultipartKeyInfo.Builder()
+        .setUploadID(uploadId)
+        .setCreationTime(System.currentTimeMillis())
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setObjectID(42L)
+        .setParentID(1L)
+        .build();
+    PartKeyInfo part = createPartKeyInfo(volume, bucket, key, uploadId, 1, partSize);
+    mpu.addPartKeyInfo(part);
+    String dbKey = omMetadataManager.getMultipartKey(volume, bucket, key, uploadId);
+    omMetadataManager.getMultipartInfoTable().put(dbKey, mpu);
+
+    Response resp = omdbInsightEndpoint.getOpenMPUKeys(10, "", "");
+    assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    MultipartKeyInsightInfoResponse out = (MultipartKeyInsightInfoResponse) resp.getEntity();
+    assertEquals(1, out.getMpuKeyInfoList().size());
+    MultipartKeyInsightInfoResponse.MultipartKeyInfoDTO dto = out.getMpuKeyInfoList().get(0);
+    assertEquals(dbKey, dto.dbKey);
+    assertEquals(uploadId, dto.uploadID);
+    assertEquals(1, dto.parts.size());
+    MultipartKeyInsightInfoResponse.PartInfoDTO partDto = dto.parts.get(0);
+    assertEquals(1, partDto.partNumber);
+    assertEquals("part1", partDto.partName); // partName is the dbKey
+    assertEquals(partSize, partDto.partKeyInfo.dataSize);
+    assertEquals(volume, partDto.partKeyInfo.volumeName);
+    assertEquals(bucket, partDto.partKeyInfo.bucketName);
+    assertEquals(key, partDto.partKeyInfo.keyName);
+    assertEquals(ResponseStatus.OK, out.getResponseCode());
+  }
+
+  @Test
+  public void testGetOpenMPUKeysPagination() throws Exception {
+    // Insert 3 MPU keys
+    for (int i = 0; i < 3; i++) {
+      String volume = "vol" + i;
+      String bucket = "bucket" + i;
+      String key = "key" + i;
+      String uploadId = "upload-" + i;
+      OmMultipartKeyInfo mpu = new OmMultipartKeyInfo.Builder()
+          .setUploadID(uploadId)
+          .setCreationTime(System.currentTimeMillis())
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+          .setObjectID(100 + i)
+          .setParentID(10 + i)
+          .build();
+      PartKeyInfo part = createPartKeyInfo(volume, bucket, key, uploadId, 1, 50L);
+      mpu.addPartKeyInfo(part);
+      String dbKey = omMetadataManager.getMultipartKey(volume, bucket, key, uploadId);
+      omMetadataManager.getMultipartInfoTable().put(dbKey, mpu);
+    }
+    // Get first 2
+    Response resp1 = omdbInsightEndpoint.getOpenMPUKeys(2, "", "");
+    MultipartKeyInsightInfoResponse out1 = (MultipartKeyInsightInfoResponse) resp1.getEntity();
+    assertEquals(2, out1.getMpuKeyInfoList().size());
+    String lastKey = out1.getLastKey();
+    // Get next (should be 1 left)
+    Response resp2 = omdbInsightEndpoint.getOpenMPUKeys(2, lastKey, "");
+    MultipartKeyInsightInfoResponse out2 = (MultipartKeyInsightInfoResponse) resp2.getEntity();
+    assertEquals(1, out2.getMpuKeyInfoList().size());
+  }
+
+  @Test
+  public void testGetOpenMPUKeysEmpty() throws Exception {
+    // Clear table
+    try (org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator<String, OmMultipartKeyInfo> iter = omMetadataManager.getMultipartInfoTable().iterator()) {
+      while (iter.hasNext()) {
+        org.apache.hadoop.hdds.utils.db.Table.KeyValue<String, OmMultipartKeyInfo> kv = iter.next();
+        omMetadataManager.getMultipartInfoTable().delete(kv.getKey());
+      }
+    }
+    Response resp = omdbInsightEndpoint.getOpenMPUKeys(10, "", "");
+    if (resp.getStatus() == Response.Status.OK.getStatusCode()) {
+      MultipartKeyInsightInfoResponse out = (MultipartKeyInsightInfoResponse) resp.getEntity();
+      assertEquals(0, out.getMpuKeyInfoList().size());
+      assertEquals(ResponseStatus.PATH_NOT_FOUND, out.getResponseCode());
+    } else if (resp.getStatus() == Response.Status.NO_CONTENT.getStatusCode()) {
+      String msg = (String) resp.getEntity();
+      assertTrue(msg.contains("No keys matched"));
+    } else {
+      fail("Unexpected response status: " + resp.getStatus());
+    }
+  }
+
+  @Test
+  public void testGetOpenMPUKeysAggregates() throws Exception {
+    // Insert 2 MPU keys, each with 2 parts, size 10 and 20, replication 3
+    for (int i = 0; i < 2; i++) {
+      String volume = "volA";
+      String bucket = "bucketA";
+      String key = "keyA" + i;
+      String uploadId = "uploadA-" + i;
+      OmMultipartKeyInfo mpu = new OmMultipartKeyInfo.Builder()
+          .setUploadID(uploadId)
+          .setCreationTime(System.currentTimeMillis())
+          .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+          .setObjectID(200 + i)
+          .setParentID(20 + i)
+          .build();
+      mpu.addPartKeyInfo(createPartKeyInfo(volume, bucket, key, uploadId, 1, 10L));
+      mpu.addPartKeyInfo(createPartKeyInfo(volume, bucket, key, uploadId, 2, 20L));
+      String dbKey = omMetadataManager.getMultipartKey(volume, bucket, key, uploadId);
+      omMetadataManager.getMultipartInfoTable().put(dbKey, mpu);
+    }
+    Response resp = omdbInsightEndpoint.getOpenMPUKeys(10, "", "");
+    MultipartKeyInsightInfoResponse out = (MultipartKeyInsightInfoResponse) resp.getEntity();
+    // Each MPU: (10+20)*3 = 90, so total = 180
+    assertEquals(180, out.getReplicatedDataSize());
+    assertEquals(60, out.getUnreplicatedDataSize());
   }
 }

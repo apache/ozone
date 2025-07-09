@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -83,6 +84,7 @@ import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.recon.api.types.MultipartKeyInsightInfoResponse;
 
 /**
  * Endpoint to get following key level info under OM DB Insight page of Recon.
@@ -1380,5 +1382,92 @@ public class OMDBInsightEndpoint {
   @VisibleForTesting
   public Table<Long, NSSummary> getNsSummaryTable() {
     return this.reconNamespaceSummaryManager.getNSSummaryTable();
+  }
+
+  @GET
+  @Path("/open/mpu")
+  public Response getOpenMPUKeys(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue("") @QueryParam(RECON_QUERY_PREVKEY) String prevKey,
+      @DefaultValue("") @QueryParam(RECON_QUERY_START_PREFIX) String startPrefix) {
+
+    MultipartKeyInsightInfoResponse response = new MultipartKeyInsightInfoResponse();
+    String lastKey = null;
+    boolean keysFound = false;
+    int count = 0;
+    boolean skipPrevKey = prevKey != null && !prevKey.isEmpty();
+    long replicatedTotal = 0;
+    long unreplicatedTotal = 0;
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> iter =
+             omMetadataManager.getMultipartInfoTable().iterator()) {
+      // Seek to startPrefix if provided
+      if (startPrefix != null && !startPrefix.isEmpty()) {
+        iter.seek(startPrefix);
+      }
+      while (iter.hasNext() && (limit == -1 || count < limit)) {
+        Table.KeyValue<String, OmMultipartKeyInfo> entry = iter.next();
+        String key = entry.getKey();
+        if (skipPrevKey) {
+          if (key.equals(prevKey)) {
+            skipPrevKey = false;
+          }
+          continue;
+        }
+        if (startPrefix != null && !startPrefix.isEmpty() && !key.startsWith(startPrefix)) {
+          break;
+        }
+        OmMultipartKeyInfo mpuInfo = entry.getValue();
+        MultipartKeyInsightInfoResponse.MultipartKeyInfoDTO dto = new MultipartKeyInsightInfoResponse.MultipartKeyInfoDTO();
+        dto.dbKey = key;
+        dto.uploadID = mpuInfo.getUploadID();
+        dto.creationTime = mpuInfo.getCreationTime();
+        dto.parentID = mpuInfo.getParentID();
+        dto.objectID = mpuInfo.getObjectID();
+        dto.updateID = mpuInfo.getUpdateID();
+        dto.replicationConfig = mpuInfo.getReplicationConfig() != null ? mpuInfo.getReplicationConfig().toString() : null;
+        dto.parts = new ArrayList<>();
+        for (org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo part : mpuInfo.getPartKeyInfoMap()) {
+          MultipartKeyInsightInfoResponse.PartInfoDTO partDto = new MultipartKeyInsightInfoResponse.PartInfoDTO();
+          partDto.partNumber = part.getPartNumber();
+          partDto.partName = part.getPartName();
+          if (part.hasPartKeyInfo()) {
+            MultipartKeyInsightInfoResponse.PartKeyInfoDTO pkDto = new MultipartKeyInsightInfoResponse.PartKeyInfoDTO();
+            pkDto.volumeName = part.getPartKeyInfo().getVolumeName();
+            pkDto.bucketName = part.getPartKeyInfo().getBucketName();
+            pkDto.keyName = part.getPartKeyInfo().getKeyName();
+            pkDto.dataSize = part.getPartKeyInfo().getDataSize();
+            pkDto.creationTime = part.getPartKeyInfo().getCreationTime();
+            pkDto.modificationTime = part.getPartKeyInfo().getModificationTime();
+            pkDto.objectID = part.getPartKeyInfo().getObjectID();
+            partDto.partKeyInfo = pkDto;
+            unreplicatedTotal += pkDto.dataSize;
+            // Replicated size: if available from replicationConfig, otherwise just add dataSize
+            if (mpuInfo.getReplicationConfig() != null && mpuInfo.getReplicationConfig().getRequiredNodes() > 0) {
+              replicatedTotal += pkDto.dataSize * mpuInfo.getReplicationConfig().getRequiredNodes();
+            } else {
+              replicatedTotal += pkDto.dataSize;
+            }
+          }
+          dto.parts.add(partDto);
+        }
+        response.getMpuKeyInfoList().add(dto);
+        lastKey = key;
+        keysFound = true;
+        count++;
+      }
+    } catch (IOException e) {
+      response.setResponseCode(org.apache.hadoop.ozone.recon.api.types.ResponseStatus.PATH_NOT_FOUND);
+      return createInternalServerErrorResponse("Error reading MPU keys: " + e.getMessage());
+    }
+    if (!keysFound) {
+      response.setResponseCode(org.apache.hadoop.ozone.recon.api.types.ResponseStatus.PATH_NOT_FOUND);
+      return noMatchedKeysResponse(startPrefix);
+    }
+    response.setLastKey(lastKey);
+    response.setReplicatedDataSize(replicatedTotal);
+    response.setUnreplicatedDataSize(unreplicatedTotal);
+    response.setResponseCode(org.apache.hadoop.ozone.recon.api.types.ResponseStatus.OK);
+    return Response.ok(response).build();
   }
 }
