@@ -29,19 +29,14 @@ export OM=om1
 export COMPOSE_FILE=docker-compose.yaml:debug-tools.yaml
 export OZONE_DIR=/opt/hadoop
 
-: "${OZONE_VOLUME_OWNER:=}"
 : "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
 
 export OZONE_VOLUME
 
-# Clean up saved internal state from each container's volume for the next run.
-rm -rf "${OZONE_VOLUME}"
-mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,dn4,dn5,om1,om2,om3,scm1,scm2,scm3,recon,s3g,kms}
-
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
-fix_data_dir_permissions
+create_data_dirs dn{1..5} kms om{1..3} recon s3g scm{1..3}
 
 start_docker_env
 
