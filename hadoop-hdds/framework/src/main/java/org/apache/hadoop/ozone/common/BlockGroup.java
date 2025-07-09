@@ -94,7 +94,7 @@ public final class BlockGroup {
 
   @Override
   public String toString() {
-    return "DeletedBlockGroup[" +
+    return "BlockGroup[" +
         "groupID='" + groupID + '\'' +
         ", deletedBlocks=" + deletedBlocks +
         ']';

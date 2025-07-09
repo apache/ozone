@@ -66,8 +66,8 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -230,10 +230,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-
     List<KeyBlocks> keyBlocksProto = keyBlocksInfoList.stream()
-        .map(BlockGroup::getProto)
-        .collect(Collectors.toList());
+        .map(BlockGroup::getProto).collect(Collectors.toList());
 
     DeleteScmKeyBlocksRequestProto request = DeleteScmKeyBlocksRequestProto
         .newBuilder()
@@ -282,7 +280,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
         .setScmId(resp.getScmId())
-        .setMetaDataLayoutVersion(resp.getMetaDataLayoutVersion());
+        .setMetaDataLayoutVersion(resp.hasMetaDataLayoutVersion() ? resp.getMetaDataLayoutVersion() : 0);
     return builder.build();
   }
 

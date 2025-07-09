@@ -776,7 +776,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .setClusterId(resp.getClusterId())
         .setScmId(resp.getScmId())
         .setPeerRoles(resp.getPeerRolesList())
-        .setMetaDataLayoutVersion(resp.getMetaDataLayoutVersion());
+        .setMetaDataLayoutVersion(resp.hasMetaDataLayoutVersion() ? resp.getMetaDataLayoutVersion() : 0);
     return builder.build();
   }
 
