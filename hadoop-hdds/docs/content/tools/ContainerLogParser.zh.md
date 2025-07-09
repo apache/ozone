@@ -207,7 +207,7 @@ Number of containers listed: 25085
 - 按状态列出具有指定行限制的容器：
 
 `ozone debug log container --db=<path to db> list --lifecycle=<state> --length=<limit>`
-- 按状态列出所有集装箱，覆盖行限制：
+- 按状态列出所有容器，覆盖行限制：
 
 `ozone debug log container --db=<path to db> list --lifecycle=<state> --all`
 
