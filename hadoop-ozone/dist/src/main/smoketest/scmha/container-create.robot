@@ -14,7 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test ozone admin container create command without kinit on a SCM HA cluster
+Documentation       Test ozone admin container create command without kinit on a SCM HA secure cluster
 Library             BuiltIn
 Resource            ../lib/os.robot
 

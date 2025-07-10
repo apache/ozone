@@ -35,7 +35,8 @@ start_docker_env
 
 execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
-execute_robot_test s3g admincli/container-create.robot
+#Run this test before kinit on a SCM HA secure cluster
+execute_robot_test s3g scmha/container-create.robot
 
 execute_robot_test s3g kinit.robot
 
