@@ -466,10 +466,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     final int maxUnFlushedTransactionCount = ozoneManager.getConfiguration()
         .getInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT,
             OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT);
+    final int flushedTransactionGap = ozoneManager.getConfiguration()
+        .getInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT);
     return OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setUpdateLastAppliedIndex(this::updateLastAppliedTermIndex)
         .setMaxUnFlushedTransactionCount(maxUnFlushedTransactionCount)
+        .setMaxFlushedTransactionGap(flushedTransactionGap)
         .setThreadPrefix(threadPrefix)
         .setS3SecretManager(ozoneManager.getS3SecretManager())
         .enableTracing(isTracingEnabled)

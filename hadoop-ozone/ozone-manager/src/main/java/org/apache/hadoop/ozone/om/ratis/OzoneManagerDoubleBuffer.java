@@ -39,8 +39,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -78,6 +80,7 @@ public final class OzoneManagerDoubleBuffer {
    * Limit the number of un-flushed transactions for {@link OzoneManagerStateMachine}.
    */
   private final Semaphore unFlushedTransactions;
+  private final int maxFlushedTransactionGap;
 
   /** To flush the buffers. */
   private final Daemon daemon;
@@ -128,6 +131,7 @@ public final class OzoneManagerDoubleBuffer {
     private Consumer<TermIndex> updateLastAppliedIndex = termIndex -> { };
     private boolean isTracingEnabled = false;
     private int maxUnFlushedTransactionCount = 0;
+    private int maxFlushedTransactionGap = OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT;
     private FlushNotifier flushNotifier;
     private S3SecretManager s3SecretManager;
     private String threadPrefix = "";
@@ -169,6 +173,11 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
+    public Builder setMaxFlushedTransactionGap(int maxFlushedTransactionGap) {
+      this.maxFlushedTransactionGap = maxFlushedTransactionGap;
+      return this;
+    }
+
     public OzoneManagerDoubleBuffer build() {
       Preconditions.assertTrue(maxUnFlushedTransactionCount > 0L,
           () -> "maxUnFlushedTransactionCount = " + maxUnFlushedTransactionCount);
@@ -197,6 +206,7 @@ public final class OzoneManagerDoubleBuffer {
     this.updateLastAppliedIndex = b.updateLastAppliedIndex;
     this.flushNotifier = b.flushNotifier;
     this.unFlushedTransactions = newSemaphore(b.maxUnFlushedTransactionCount);
+    this.maxFlushedTransactionGap = b.maxFlushedTransactionGap;
 
     this.isTracingEnabled = b.isTracingEnabled;
 
@@ -334,9 +344,9 @@ public final class OzoneManagerDoubleBuffer {
 
     try (BatchOperation batchOperation = omMetadataManager.getStore()
         .initBatchOperation()) {
-
       String lastTraceId = addToBatch(buffer, batchOperation);
-
+      omMetadataManager.getFlushedTransactionsTable().deleteRangeWithBatch(batchOperation, 0L,
+          Math.max(lastTransaction.getIndex() - maxFlushedTransactionGap, 0L));
       buffer.iterator().forEachRemaining(
           entry -> addCleanupEntry(entry, cleanupEpochs));
 
@@ -345,6 +355,7 @@ public final class OzoneManagerDoubleBuffer {
           lastTransaction.getIndex(),
           () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
               batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(lastTransaction)));
+
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),
@@ -378,8 +389,11 @@ public final class OzoneManagerDoubleBuffer {
       lastTraceId = omResponse.getTraceID();
 
       try {
-        addToBatchWithTrace(omResponse,
-            () -> response.checkAndUpdateDB(omMetadataManager, batchOperation));
+        addToBatchWithTrace(omResponse, () -> {
+          response.checkAndUpdateDB(omMetadataManager, batchOperation);
+          omMetadataManager.getFlushedTransactionsTable().putWithBatch(batchOperation, entry.termIndex.getIndex(),
+              FlushedTransactionInfo.valueOf(entry.termIndex));
+        });
       } catch (IOException ex) {
         // During Adding to RocksDB batch entry got an exception.
         // We should terminate the OM.
