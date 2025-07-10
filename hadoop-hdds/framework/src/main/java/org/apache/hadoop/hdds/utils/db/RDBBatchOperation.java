@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -142,8 +143,9 @@ public class RDBBatchOperation implements BatchOperation {
        * and the dbValue type is {@link Object}.
        * When dbValue is a byte[]/{@link ByteBuffer}, it represents a put-op.
        * Otherwise, it represents a delete-op (dbValue is {@link Op#DELETE}).
+       * Order of the operations is preserved.
        */
-      private final Map<Bytes, Pair<Op, Object>> ops = new HashMap<>();
+      private final Map<Object, Pair<Op, Object>> ops = new LinkedHashMap<>();
       private boolean isCommit;
 
       private long batchSize;
@@ -161,20 +163,20 @@ public class RDBBatchOperation implements BatchOperation {
       void prepareBatchWrite() throws RocksDatabaseException {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         isCommit = true;
-        for (Map.Entry<Bytes, Pair<Op, Object>> op : ops.entrySet()) {
-          final Bytes key = op.getKey();
+        for (Map.Entry<Object, Pair<Op, Object>> op : ops.entrySet()) {
+          final Object key = op.getKey();
           final Object value = op.getValue().getValue();
           final Op opType = op.getValue().getKey();
           if (opType == Op.PUT && value instanceof byte[]) {
-            family.batchPut(writeBatch, key.array(), (byte[]) value);
+            family.batchPut(writeBatch, ((Bytes) key).array(), (byte[]) value);
           } else if (opType == Op.PUT && value instanceof CodecBuffer) {
-            family.batchPut(writeBatch, key.asReadOnlyByteBuffer(),
+            family.batchPut(writeBatch, ((Bytes) key).asReadOnlyByteBuffer(),
                 ((CodecBuffer) value).asReadOnlyByteBuffer());
           } else if (opType == Op.DELETE) {
-            family.batchDelete(writeBatch, key.array());
+            family.batchDelete(writeBatch, ((Bytes) key).array());
           } else if (opType == Op.DELETE_RANGE) {
-            Pair<byte[], byte[]> valuePair = (Pair<byte[], byte[]>) value;
-            family.batchDeleteRange(writeBatch, valuePair.getKey(), valuePair.getValue());
+            Pair<byte[], byte[]> keyPair = ((Pair<Pair<byte[], byte[]>, Integer>) key).getKey();
+            family.batchDeleteRange(writeBatch, keyPair.getKey(), keyPair.getValue());
           } else {
             throw new IllegalStateException("Unexpected value: " + value
                 + ", class=" + value.getClass().getSimpleName());
@@ -205,32 +207,36 @@ public class RDBBatchOperation implements BatchOperation {
         }
       }
 
-      void putOrDelete(Bytes key, int keyLen, Object val, int valLen, Op opType) {
+      void putOrDelete(Object key, int keyLen, Object val, int valLen, Op opType) {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         batchSize += keyLen + valLen;
-        // remove previous first in order to call release().
-        // DELETE_RANGE operations will not be removed or overwritten because their keys will be unique within a batch.
-        final Pair<Op, Object> previousEntry = ops.remove(key);
-        if (previousEntry != null) {
-          final Object previous = previousEntry.getValue();
-          final boolean isPut = previousEntry.getKey() == Op.PUT;
-          final int preLen;
-          if (!isPut) {
-            preLen = 0;
-          } else if (previous instanceof CodecBuffer) {
-            final CodecBuffer previousValue = (CodecBuffer) previous;
-            preLen = previousValue.readableBytes();
-            previousValue.release(); // key will also be released
-          } else if (previous instanceof byte[]) {
-            preLen = ((byte[]) previous).length;
-          } else {
-            throw new IllegalStateException("Unexpected previous: " + previous
-                + ", class=" + previous.getClass().getSimpleName());
+
+        // No previous operations are overwritten because DELETE_RANGE has unique key.
+        if (opType != Op.DELETE_RANGE) {
+          // Remove previous operation with the same key first and release().
+          // No DELETE_RANGE operations are removed because DELETE_RANGE has unique key.
+          final Pair<Op, Object> previousEntry = ops.remove(key);
+          if (previousEntry != null) {
+            final Object previous = previousEntry.getValue();
+            final boolean isPut = previousEntry.getKey() == Op.PUT;
+            final int preLen;
+            if (!isPut) {
+              preLen = 0;
+            } else if (previous instanceof CodecBuffer) {
+              final CodecBuffer previousValue = (CodecBuffer) previous;
+              preLen = previousValue.readableBytes();
+              previousValue.release(); // key will also be released
+            } else if (previous instanceof byte[]) {
+              preLen = ((byte[]) previous).length;
+            } else {
+              throw new IllegalStateException("Unexpected previous: " + previous
+                  + ", class=" + previous.getClass().getSimpleName());
+            }
+            discardedSize += keyLen + preLen;
+            discardedCount++;
+            debug(() -> String.format("%s overwriting a previous %s", this,
+                isPut ? "put (value: " + byteSize2String(preLen) + ")" : "del"));
           }
-          discardedSize += keyLen + preLen;
-          discardedCount++;
-          debug(() -> String.format("%s overwriting a previous %s", this,
-              isPut ? "put (value: " + byteSize2String(preLen) + ")" : "del"));
         }
         final Object overwritten = ops.put(key, Pair.of(opType, val));
         Preconditions.checkState(overwritten == null);
@@ -261,10 +267,9 @@ public class RDBBatchOperation implements BatchOperation {
       }
 
       void deleteRange(byte[] startKey, byte[] endKey) {
-        delRangeCount++;
-        byte[] sequenceKey = ArrayUtils.addAll(startKey,
-            ByteBuffer.allocate(Integer.BYTES).putInt(delRangeCount).array());
-        putOrDelete(new Bytes(sequenceKey), startKey.length, Pair.of(startKey, endKey), endKey.length, Op.DELETE_RANGE);
+        int sequence = ++delRangeCount;
+        putOrDelete(Pair.of(Pair.of(startKey, endKey), sequence), startKey.length + endKey.length,
+            ArrayUtils.EMPTY_BYTE_ARRAY, 0, Op.DELETE_RANGE);
       }
 
       String putString(int keySize, int valueSize) {
