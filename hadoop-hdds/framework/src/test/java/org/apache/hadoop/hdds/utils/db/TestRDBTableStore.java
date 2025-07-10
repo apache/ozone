@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.InstanceOfAssertFactories.stream;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -300,7 +300,6 @@ public class TestRDBTableStore {
     }
   }
 
-  // Add test here for deleteRange with batch operation.
   @Test
   public void batchDeleteWithRange() throws Exception {
     final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
@@ -335,7 +334,7 @@ public class TestRDBTableStore {
     }
   }
 
-  // Add test to check for order of operations in batch.
+  @Test
   public void orderOfBatchOperations() throws Exception {
     final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
     try (BatchOperation batch = rdbStore.initBatchOperation()) {
@@ -345,12 +344,9 @@ public class TestRDBTableStore {
       byte[] startKey = ("1-" + keyStr).getBytes(StandardCharsets.UTF_8);
       byte[] keyInRange1 = ("2-" + keyStr).getBytes(StandardCharsets.UTF_8);
       byte[] endKey = ("3-" + keyStr).getBytes(StandardCharsets.UTF_8);
-      byte[] value1 =
-          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-      byte[] value2 =
-          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-      byte[] value3 =
-          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      byte[] value1 = ("value1-" + RandomStringUtils.secure().next(10)).getBytes(StandardCharsets.UTF_8);
+      byte[] value2 = ("value2-" + RandomStringUtils.secure().next(10)).getBytes(StandardCharsets.UTF_8);
+      byte[] value3 = ("value3-" + RandomStringUtils.secure().next(10)).getBytes(StandardCharsets.UTF_8);
 
       //when
       testTable.putWithBatch(batch, startKey, value1);
@@ -371,11 +367,9 @@ public class TestRDBTableStore {
       rdbStore.commitBatchOperation(batch);
 
       //then
-      assertNotNull(testTable.get(startKey));
-      assertEquals(value3, testTable.get(startKey));
+      assertEquals(bytes2String(value3), bytes2String(testTable.get(startKey)));
       assertNull(testTable.get(keyInRange1));
-      assertNotNull(testTable.get(endKey));
-      assertEquals(value2, testTable.get(endKey));
+      assertEquals(bytes2String(value2), bytes2String(testTable.get(endKey)));
     }
   }
 
