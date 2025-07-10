@@ -56,7 +56,9 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
@@ -448,7 +450,7 @@ public class DiskBalancerService extends BackgroundService {
     return false;
   }
 
-  private class DiskBalancerTask implements BackgroundTask {
+  protected class DiskBalancerTask implements BackgroundTask {
 
     private HddsVolume sourceVolume;
     private HddsVolume destVolume;
@@ -534,7 +536,8 @@ public class DiskBalancerService extends BackgroundService {
         oldContainer.writeLock();
         try {
           ozoneContainer.getContainerSet().updateContainer(newContainer);
-          oldContainer.delete();
+          KeyValueContainerUtil.removeContainer(
+              (KeyValueContainerData) oldContainer.getContainerData(), conf);
         } finally {
           oldContainer.writeUnlock();
         }
@@ -662,6 +665,15 @@ public class DiskBalancerService extends BackgroundService {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
+  }
+
+  @VisibleForTesting
+  public DiskBalancerTask createDiskBalancerTask(ContainerData containerData, HddsVolume source, HddsVolume dest) {
+    inProgressContainers.add(containerData.getContainerID());
+    deltaSizes.put(source, deltaSizes.getOrDefault(source, 0L)
+        - containerData.getBytesUsed());
+    dest.incCommittedBytes(containerData.getBytesUsed());
+    return new DiskBalancerTask(containerData, source, dest);
   }
 
   @VisibleForTesting
