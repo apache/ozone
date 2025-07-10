@@ -111,10 +111,15 @@ public class TestDeletionService {
       // Step 6: Calculate and assert used bytes
       long totalUsedBytes = captor.getAllValues().get(0).stream()
           .flatMap(group -> group.getAllBlocks().stream())
-          .mapToLong(DeletedBlock::getReplicateSize)
+          .mapToLong(DeletedBlock::getReplicatedSize)
+          .sum();
+      long totalUnreplicatedBytes = captor.getAllValues().get(0).stream()
+          .flatMap(group -> group.getAllBlocks().stream())
+          .mapToLong(DeletedBlock::getUnreplicatedSize)
           .sum();
       assertEquals(QuotaUtil.getReplicatedSize(KEY_SIZE, RatisReplicationConfig.getInstance(
           ReplicationFactor.valueOf(factor).toProto())), totalUsedBytes);
+      assertEquals(KEY_SIZE, totalUnreplicatedBytes);
     } finally {
       if (cluster != null) {
         cluster.shutdown();

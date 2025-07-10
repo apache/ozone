@@ -71,8 +71,10 @@ public final class BlockGroup {
     List<DeletedBlock> blocks = new ArrayList<>();
     for (HddsProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
-      blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(), containerBlockId.getLocalID()),
-          block.getReplicatedSize()));
+      blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
+          containerBlockId.getLocalID()),
+          block.getReplicatedSize(),
+          block.getUnreplicatedSize()));
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlocks(blocks).build();
@@ -82,7 +84,10 @@ public final class BlockGroup {
     List<DeletedBlock> blocks = new ArrayList<>();
     for (HddsProtos.BlockID block : proto.getBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getContainerBlockID();
-      blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(), containerBlockId.getLocalID()), -1L));
+      blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
+          containerBlockId.getLocalID()),
+          -1L,
+          -1L));
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlocks(blocks).build();

@@ -756,8 +756,8 @@ public class KeyManagerImpl implements KeyManager {
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
                       .map(b ->  new DeletedBlock(
                           new BlockID(b.getContainerID(), b.getLocalID()),
-                          QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
-                      .collect(Collectors.toList());
+                          QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()),
+                          b.getLength()))).collect(Collectors.toList());
 
               BlockGroup keyBlocks = BlockGroup.newBuilder()
                   .setLegacyFormat(isLegacy)

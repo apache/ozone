@@ -794,7 +794,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             });
         List<BlockGroup> blockGroups = Collections.singletonList(BlockGroup
             .newBuilder().setKeyName("key1")
-            .addAllBlocks(Collections.singletonList(new DeletedBlock(new BlockID(1, 1), 1)))
+            .addAllBlocks(Collections.singletonList(new DeletedBlock(new BlockID(1, 1), 3, 1)))
             .build());
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
         OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
