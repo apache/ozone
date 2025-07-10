@@ -112,10 +112,9 @@ Delete Tenant Failure Tenant Not Empty
     ${rc}  ${output} =  Run And Return Rc And Output  ozone tenant delete ${TENANT}
                         Should contain   ${output}         TENANT_NOT_EMPTY Tenant '${TENANT}' is not empty. All accessIds associated to this tenant must be revoked before the tenant can be deleted. See `ozone tenant user revoke`
 
-#failing as ${OM_HA_PARAM} is empty thus host is missing
-#Trigger and wait for background Sync to recover Policies and Roles in Authorizer
-#    ${rc}  ${output} =  Run And Return Rc And Output  ozone admin om updateranger ${OM_HA_PARAM}
-#                       Should contain   ${output}         Operation completed successfully
+Trigger and wait for background Sync to recover Policies and Roles in Authorizer
+   ${rc}  ${output} =  Run And Return Rc And Output  ozone admin om updateranger ${OM_HA_PARAM}
+                       Should contain   ${output}         Operation completed successfully
 
 Create Tenant Failure with Regular User
     Run Keyword         Kinit test user     testuser2    testuser2.keytab

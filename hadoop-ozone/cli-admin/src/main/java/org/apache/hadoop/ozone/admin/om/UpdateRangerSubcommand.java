@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.admin.om;
 
 import java.util.concurrent.Callable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
@@ -65,12 +64,6 @@ public class UpdateRangerSubcommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-
-    if (StringUtils.isEmpty(omServiceId) && StringUtils.isEmpty(omHost)) {
-      System.err.println("Error: Please specify -id or -host");
-      return null;
-    }
-
     boolean forceHA = false;
     try (OzoneManagerProtocol client = parent.createOmClient(
         omServiceId, omHost, forceHA)) {
