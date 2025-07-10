@@ -160,7 +160,8 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         });
 
     // Create new controller with custom updater manager
-    ReconTaskController customController = new ReconTaskControllerImpl(new OzoneConfiguration(), new HashSet<>(), customUpdaterManager);
+    ReconTaskController customController =
+        new ReconTaskControllerImpl(new OzoneConfiguration(), new HashSet<>(), customUpdaterManager);
     customController.start();
     customController.registerTask(reconOmTaskMock);
     
