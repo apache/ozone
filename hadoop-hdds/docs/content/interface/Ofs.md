@@ -239,7 +239,7 @@ In order to enable trash in Ozone, Please add these configs to core-site.xml
   <name>fs.trash.classname</name>
   <value>org.apache.hadoop.fs.ozone.OzoneTrashPolicy</value>
 </property>
-{{< highlight >}}
+{{< /highlight >}}
                                            
  
 When keys are deleted with trash enabled, they are moved to a trash directory
