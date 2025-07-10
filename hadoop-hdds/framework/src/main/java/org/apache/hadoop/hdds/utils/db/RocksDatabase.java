@@ -308,7 +308,7 @@ public final class RocksDatabase implements Closeable {
         writeBatch.deleteRange(getHandle(), beginKey, endKey);
       } catch (RocksDBException e) {
         throw toRocksDatabaseException(this, "batchDeleteRange key " + bytes2String(beginKey) + " - " +
-            bytes2String(endKey) , e);
+            bytes2String(endKey), e);
       }
     }
 
