@@ -110,10 +110,10 @@ public final class ContainerScanHelper {
   }
 
   public void triggerVolumeScan(ContainerData containerData) {
-    log.info("Triggering a volume scan for volume [{}] as unhealthy container [{}] was on it.",
-        containerData.getVolume().getStorageDir().getPath(), containerData.getContainerID());
     HddsVolume volume = containerData.getVolume();
     if (volume != null && !volume.isFailed()) {
+      log.info("Triggering a volume scan for volume [{}] as unhealthy container [{}] was on it.",
+          volume.getStorageDir().getPath(), containerData.getContainerID());
       StorageVolumeUtil.onFailure(volume);
     } else {
       log.warn("Cannot trigger volume scan for container {} since its volume is null or has failed.",
