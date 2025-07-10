@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForScm;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -87,7 +89,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
     this.securityConfig = securityConfig;
     this.scm = scm;
     this.exitManager = new ExitManager();
-    this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
+    this.transactionBuffer = new SCMHADBTransactionBufferImpl(scm,
+        ozoneConf.getInt(OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     this.ratisServer = new SCMRatisServerImpl(conf, scm, transactionBuffer);
     this.scmSnapshotProvider = newScmSnapshotProvider(scm);
     this.grpcServer = new InterSCMGrpcProtocolService(conf, scm);

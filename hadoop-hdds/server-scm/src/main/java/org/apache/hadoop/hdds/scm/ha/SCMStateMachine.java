@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.util.Time;
@@ -168,6 +169,7 @@ public class SCMStateMachine extends BaseStateMachine {
         scm.getScmSafeModeManager().refreshAndValidate();
       }
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
+      transactionBuffer.addFlushTransactionInfo(FlushedTransactionInfo.valueOf(appliedTermIndex));
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
       updateLastAppliedTermIndex(appliedTermIndex);
     } catch (Exception ex) {

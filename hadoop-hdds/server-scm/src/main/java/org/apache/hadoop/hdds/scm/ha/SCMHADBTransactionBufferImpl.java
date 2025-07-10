@@ -28,9 +28,12 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.slf4j.Logger;
@@ -46,6 +49,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   private static final Logger LOG = LoggerFactory.getLogger(SCMHADBTransactionBufferImpl.class);
   private final StorageContainerManager scm;
+  private final int flushedTxnGap;
   private SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
@@ -55,9 +59,10 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
-  public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
+  public SCMHADBTransactionBufferImpl(StorageContainerManager scm, int flushedTxnGap)
       throws IOException {
     this.scm = scm;
+    this.flushedTxnGap = flushedTxnGap;
     init();
   }
 
@@ -100,6 +105,18 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public void addFlushTransactionInfo(FlushedTransactionInfo info) throws RocksDatabaseException, CodecException {
+    rwLock.writeLock().lock();
+    try {
+      txFlushPending.getAndIncrement();
+      this.metadataStore.getFlushedTransactionsTable().putWithBatch(getCurrentBatchOperation(),
+          info.getTransactionIndex(), info);
+    } finally {
+      rwLock.writeLock().unlock();
+    }
+  }
+
+  @Override
   public TransactionInfo getLatestTrxInfo() {
     return this.latestTrxInfo;
   }
@@ -130,6 +147,10 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
           = metadataStore.getTransactionInfoTable();
       transactionInfoTable.putWithBatch(currentBatchOperation,
           TRANSACTION_INFO_KEY, latestTrxInfo);
+
+      Table<Long, FlushedTransactionInfo> flushedTransactionsTable = metadataStore.getFlushedTransactionsTable();
+      flushedTransactionsTable.deleteRangeWithBatch(currentBatchOperation, 0L,
+          Math.max(latestTrxInfo.getTransactionIndex() - flushedTxnGap, 0L));
 
       metadataStore.getStore().commitBatchOperation(currentBatchOperation);
       currentBatchOperation.close();

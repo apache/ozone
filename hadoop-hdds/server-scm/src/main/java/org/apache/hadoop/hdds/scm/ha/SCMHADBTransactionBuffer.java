@@ -20,7 +20,10 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 /**
@@ -32,6 +35,8 @@ public interface SCMHADBTransactionBuffer
     extends DBTransactionBuffer {
 
   void updateLatestTrxInfo(TransactionInfo info);
+
+  void addFlushTransactionInfo(FlushedTransactionInfo info) throws RocksDatabaseException, CodecException;
 
   TransactionInfo getLatestTrxInfo();
 

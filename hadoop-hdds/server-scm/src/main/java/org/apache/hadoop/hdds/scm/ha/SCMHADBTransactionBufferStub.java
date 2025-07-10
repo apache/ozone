@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -78,6 +79,11 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
 
   @Override
   public void updateLatestTrxInfo(TransactionInfo info) {
+
+  }
+
+  @Override
+  public void addFlushTransactionInfo(FlushedTransactionInfo info) {
 
   }
 
