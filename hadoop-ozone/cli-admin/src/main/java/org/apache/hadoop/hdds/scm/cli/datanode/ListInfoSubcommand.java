@@ -22,6 +22,7 @@ import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -89,11 +90,11 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
   static class UsageSortingOptions {
     @CommandLine.Option(names = {"--most-used"},
-        description = "Show datanodes sorted by highest usage.")
+        description = "Show datanodes sorted by Utilization (most to least).")
     private boolean mostUsed;
 
     @CommandLine.Option(names = {"--least-used"},
-        description = "Show datanodes sorted by lowest usage.")
+        description = "Show datanodes sorted by Utilization (least to most).")
     private boolean leastUsed;
   }
 
@@ -177,6 +178,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
               return null;
             }
           })
+          .filter(Objects::nonNull)
           .collect(Collectors.toList());
     }
     
@@ -224,8 +226,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
     System.out.println("Related pipelines:\n" + pipelineListInfo);
 
     if (dna.getUsed() != null && dna.getCapacity() != null && dna.getUsed() >= 0 && dna.getCapacity() > 0) {
-      System.out.println("Used: " + dna.getUsed());
       System.out.println("Capacity: " + dna.getCapacity() + "\n");
+      System.out.println("Used: " + dna.getUsed());
+      System.out.printf("Percentage Used : %.2f%%\n\n", dna.getPercentUsed());
     }
   }
 
