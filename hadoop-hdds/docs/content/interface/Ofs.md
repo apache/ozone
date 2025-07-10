@@ -273,3 +273,121 @@ This feature wouldn't degrade server performance as the loop is on the client.
 Think it as a client is issuing multiple requests to the server to get all the
 information.
 
+## Operation Support
+
+lists the support status of Ofs operations
+
+### Supported
+
+| Operation              | Description                               | Support        |
+|------------------------|-------------------------------------------|----------------|
+| `create`               | Creates a new file.                       | Supported      |
+| `open`                 | Opens a file for reading.                 | Supported      |
+| `rename`               | Renames a file or directory.              | Supported [1]  |
+| `delete`               | Deletes a file or directory.              | Supported [2]  |
+| `listStatus`           | Lists the status of files in a directory. | Supported [3]  |
+| `mkdirs`               | Creates a directory and its parents.      | Supported      |
+| `getFileStatus`        | Gets the status of a file.                | Supported      |
+| `setTimes`             | Sets the modification and access times.   | Supported      |
+| `getLinkTarget`        | Gets the target of a symbolic link.       | Supported [4]  |
+| `getFileChecksum`      | Gets the checksum of a file.              | Supported      |
+| `setSafeMode`          | Enters or leaves safe mode.               | Supported      |
+| `recoverLease`         | Recovers a file lease.                    | Supported      |
+| `isFileClosed`         | Checks if a file is closed.               | Supported      |
+| `createSnapshot`       | Creates a snapshot.                       | Supported [5]  |
+| `deleteSnapshot`       | Deletes a snapshot.                       | Supported [5]  |
+| `renameSnapshot`       | Renames a snapshot.                       | Supported [5]  |
+| `getSnapshotDiffReport`| Gets a snapshot diff report.              | Supported [5]  |
+| `copyFromLocalFile`    | Copies a file from the local filesystem.  | Supported      |
+| `exists`               | Checks if a path exists.                  | Supported      |
+| `getContentSummary`    | Gets the content summary of a path.       | Supported      |
+| `getDefaultBlockSize`  | Gets the default block size.              | Supported      |
+| `getDefaultReplication`| Gets the default replication factor.      | Supported      |
+| `getDelegationToken`   | Gets a delegation token.                  | Supported      |
+| `getFileBlockLocations`| Gets file block locations.                | Supported      |
+| `getHomeDirectory`     | Gets the user's home directory.           | Supported      |
+| `getServerDefaults`    | Gets the server default values.           | Supported      |
+| `getTrashRoot`         | Gets the trash root for a path.           | Supported      |
+| `getTrashRoots`        | Gets all trash roots.                     | Supported      |
+| `getWorkingDirectory`  | Gets the current working directory.       | Supported      |
+| `globStatus`           | Finds files matching a pattern.           | Supported      |
+| `hasPathCapability`    | Queries for a path capability.            | Supported      |
+| `isDirectory`          | Checks if a path is a directory.          | Supported      |
+| `isFile`               | Checks if a path is a file.               | Supported      |
+| `listFiles`            | Returns a remote iterator for files.      | Supported      |
+| `listLocatedStatus`    | Returns a remote iterator for located file statuses. | Supported |
+| `listStatusIterator`   | Returns a remote iterator for file statuses. | Supported |
+| `setWorkingDirectory`  | Sets the current working directory.       | Supported      |
+| `supportsSymlinks`     | Checks if symbolic links are supported.   | Supported      |
+
+### Unsupported
+
+| Operation              | Description                               |
+|------------------------|-------------------------------------------|
+| `append`               | Appends to an existing file.              |
+| `setPermission`        | Sets the permission of a file.            |
+| `setOwner`             | Sets the owner of a file.                 |
+| `setReplication`       | Sets the replication factor of a file.    |
+| `createSymlink`        | Creates a symbolic link.                  |
+| `resolveLink`          | Resolves a symbolic link.                 |
+| `setXAttr`             | Sets an extended attribute.               |
+| `getXAttr`             | Gets an extended attribute.               |
+| `listXAttrs`           | Lists extended attributes.                |
+| `removeXAttr`          | Removes an extended attribute.            |
+| `setAcl`               | Sets an ACL.                              |
+| `getAclStatus`         | Gets an ACL status.                       |
+| `modifyAclEntries`     | Modifies ACL entries.                     |
+| `removeAclEntries`     | Removes ACL entries.                      |
+| `removeDefaultAcl`     | Removes the default ACL.                  |
+| `removeAcl`            | Removes an ACL.                           |
+| `truncate`             | Truncates a file.                         |
+| `concat`               | Concatenates files.                       |
+
+**Footnotes:**
+
+[1] Renaming across buckets is not supported. For File System Optimized (FSO) buckets, rename is an atomic metadata operation. For legacy buckets, renaming a directory is non-atomic, as it is implemented by renaming each file and subdirectory individually.
+
+[2] Deleting the root of the filesystem is not allowed. Recursive volume deletion is not supported.
+
+[3] Recursive listing at the root or volume level is not supported.
+
+[4] OFS supports 'linked buckets', where one bucket acts as a link to another. General-purpose symbolic links for files or directories are not supported.
+
+[5] Snapshots are only supported at the bucket level.
+
+### Unsupported HDFS-Specific Operations
+
+The following operations are specific to HDFS and are not supported by Ofs.
+
+| Operation                 | Description                                         | Support     |
+|---------------------------|-----------------------------------------------------|-------------|
+| `setStoragePolicy`        | Sets a storage policy on a file or directory.       | Unsupported |
+| `getStoragePolicy`        | Gets the storage policy of a file or directory.     | Unsupported |
+| `getErasureCodingPolicy`  | Gets the erasure coding policy of a file or directory.| Unsupported |
+| `setErasureCodingPolicy`  | Sets an erasure coding policy on a directory.       | Unsupported |
+| `unsetErasureCodingPolicy`| Unsets an erasure coding policy on a directory.     | Unsupported |
+| `addCachePool`            | Adds a cache pool.                                  | Unsupported |
+| `modifyCachePool`         | Modifies a cache pool.                              | Unsupported |
+| `removeCachePool`         | Removes a cache pool.                               | Unsupported |
+| `listCachePools`          | Lists all cache pools.                              | Unsupported |
+| `addCacheDirective`       | Adds a cache directive.                             | Unsupported |
+| `modifyCacheDirective`    | Modifies a cache directive.                         | Unsupported |
+| `removeCacheDirective`    | Removes a cache directive.                          | Unsupported |
+| `listCacheDirectives`     | Lists cache directives.                             | Unsupported |
+| `allowSnapshot`           | Allows snapshots to be taken on a directory.        | Unsupported |
+| `disallowSnapshot`        | Disallows snapshots to be taken on a directory.     | Unsupported |
+| `addErasureCodingPolicies`| Adds erasure coding policies.                       | Unsupported |
+| `getErasureCodingPolicies`| Gets the available erasure coding policies.         | Unsupported |
+| `removeErasureCodingPolicy`| Removes an erasure coding policy.                  | Unsupported |
+| `enableErasureCodingPolicy`| Enables an erasure coding policy.                   | Unsupported |
+| `disableErasureCodingPolicy`| Disables an erasure coding policy.                  | Unsupported |
+| `getEZForPath`            | Gets the encryption zone for a path.                | Unsupported |
+| `listErasureCodingPolicies`| Lists all erasure coding policies.                  | Unsupported |
+| `listErasureCodingCodecs` | Lists all erasure coding codecs.                    | Unsupported |
+| `getQuotaUsage`           | Gets the quota usage for a path.                    | Unsupported |
+| `setQuotaByStorageType`   | Sets the quota by storage type for a path.          | Unsupported |
+| `getQuotaByStorageType`   | Gets the quota by storage type for a path.          | Unsupported |
+| `msync`                   | Flushes out the data in client's user buffer.       | Unsupported |
+| `satisfyStoragePolicy`    | Satisfies the storage policy of a file.             | Unsupported |
+
+

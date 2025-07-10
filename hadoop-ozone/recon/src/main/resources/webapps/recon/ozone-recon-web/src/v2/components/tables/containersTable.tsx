@@ -18,10 +18,14 @@
 
 import React, {useRef} from 'react';
 import filesize from 'filesize';
-import {AxiosError} from 'axios';
-import {Popover, Table} from 'antd';
-import {ColumnsType, TablePaginationConfig} from 'antd/es/table';
-import {NodeIndexOutlined} from '@ant-design/icons';
+
+import { AxiosError } from 'axios';
+import { Popover, Table } from 'antd';
+import {
+  ColumnsType,
+  TablePaginationConfig
+} from 'antd/es/table';
+import { CheckCircleOutlined, NodeIndexOutlined } from '@ant-design/icons';
 
 import {getFormattedTime} from '@/v2/utils/momentUtils';
 import {showDataFetchError} from '@/utils/common';
@@ -36,6 +40,23 @@ import {
 } from '@/v2/types/container.types';
 
 const size = filesize.partial({ standard: 'iec' });
+
+const getDatanodeWith = (idx: number, host: string) => {
+  return (
+    <div key={idx} className='datanode-container-v2-tr'>
+      <NodeIndexOutlined /> {host}
+    </div>
+  );
+}
+
+const getDataNodeWithChecksum = (idx: number, host: string, checksum: string) => {
+  return (
+    <div key={idx} className='datanode-container-v2-tr'>
+      <span className="datanode-container-v2-td"><NodeIndexOutlined /> {host}</span>
+      <span className="datanode-container-v2-td">/ {checksum}</span>
+    </div>
+  )
+}
 
 export const COLUMNS: ColumnsType<Container> = [
   {
@@ -69,17 +90,26 @@ export const COLUMNS: ColumnsType<Container> = [
     key: 'replicas',
     render: (replicas: ContainerReplica[]) => {
       const renderDatanodes = (replicas: ContainerReplica[]) => {
-        return replicas?.map((replica: any, idx: number) => (
-          <div key={idx} className='datanode-container-v2'>
-            <NodeIndexOutlined /> {replica.datanodeHost}
+        return (
+          <div className="datanode-container-v2-table">
+            {
+              replicas?.map((replica: any, idx: number) => (
+                (replica.dataChecksum)
+                  ? getDataNodeWithChecksum(idx, replica.datanodeHost, replica.dataChecksum)
+                  : getDatanodeWith(idx, replica.datanodeHost)
+              ))}
           </div>
-        ))
+        )
       }
 
       return (
         <Popover
           content={renderDatanodes(replicas)}
-          title='Datanodes'
+          title={
+            replicas.some((replica => replica.hasOwnProperty('dataChecksum')))
+            ? 'Datanodes / Checksum'
+            : 'Datanodes'
+          }
           placement='bottomRight'
           trigger='hover'>
           <strong>{replicas.length}</strong> datanodes
