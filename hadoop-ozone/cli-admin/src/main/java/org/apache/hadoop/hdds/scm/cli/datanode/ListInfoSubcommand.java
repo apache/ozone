@@ -226,9 +226,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
     System.out.println("Related pipelines:\n" + pipelineListInfo);
 
     if (dna.getUsed() != null && dna.getCapacity() != null && dna.getUsed() >= 0 && dna.getCapacity() > 0) {
-      System.out.println("Capacity: " + dna.getCapacity() + "\n");
+      System.out.println("Capacity: " + dna.getCapacity());
       System.out.println("Used: " + dna.getUsed());
-      System.out.printf("Percentage Used : %.2f%%\n\n", dna.getPercentUsed());
+      System.out.printf("Percentage Used : %.2f%%%n%n", dna.getPercentUsed());
     }
   }
 
