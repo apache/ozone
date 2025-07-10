@@ -40,8 +40,7 @@ spec:
         - ozone
         - s3g
         livenessProbe:
-          httpGet:
-            path: /
+          tcpSocket:
             port: 9878
           initialDelaySeconds: 30
         envFrom:
