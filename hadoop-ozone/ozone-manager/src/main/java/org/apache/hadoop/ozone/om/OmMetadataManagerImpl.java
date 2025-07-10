@@ -1608,6 +1608,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return transactionInfoTable;
   }
 
+  @Override
   public TypedTable<Long, FlushedTransactionInfo> getFlushedTransactionsTable() {
     return flushedTransactionsTable;
   }
