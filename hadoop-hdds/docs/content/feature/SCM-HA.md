@@ -145,9 +145,9 @@ ozone admin scm roles
 Example output:
 
 ```
-host1:9876:LEADER:scm1:192.168.1.1
-host2:9876:FOLLOWER:scm2:192.168.1.2
-host3:9876:FOLLOWER:scm3:192.168.1.3
+host1:9876:LEADER:e6877ce5-56cd-4f0b-ad60-4c8ef9000882:192.168.1.1
+host2:9876:FOLLOWER:f2ba1c28-486a-4192-9a5f-b3752fe27d6b:192.168.1.2
+host3:9876:FOLLOWER:9c8d2b3a-e4f5-6789-0123-456789abcdef:192.168.1.3
 ```
 
 To list SCM roles as a table:
@@ -160,13 +160,13 @@ Example table output:
 
 ```
 Storage Container Manager Roles
----------------------------------------------------
-Host Name | Ratis Port | Role     | Node ID | Host Address
----------------------------------------------------
-host1     | 9876       | LEADER   | scm1    | 192.168.1.1
-host2     | 9876       | FOLLOWER | scm2    | 192.168.1.2
-host3     | 9876       | FOLLOWER | scm3    | 192.168.1.3
----------------------------------------------------
+------------------------------------------------------------------------------------
+Host Name | Ratis Port | Role     | Node ID                                  | Host Address
+------------------------------------------------------------------------------------
+host1     | 9876       | LEADER   | e6877ce5-56cd-4f0b-ad60-4c8ef9000882     | 192.168.1.1
+host2     | 9876       | FOLLOWER | f2ba1c28-486a-4192-9a5f-b3752fe27d6b     | 192.168.1.2
+host3     | 9876       | FOLLOWER | 9c8d2b3a-e4f5-6789-0123-456789abcdef     | 192.168.1.3
+------------------------------------------------------------------------------------
 ```
 
 ## Auto-bootstrap
