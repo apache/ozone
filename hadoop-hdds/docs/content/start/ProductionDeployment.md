@@ -24,6 +24,17 @@ menu:
 
 This document provides guidance on the requirements and best practices for a production deployment of Apache Ozone.
 
+## Ozone Components
+
+A typical production Ozone cluster includes the following services:
+
+*   **Ozone Manager (OM)**: Manages the namespace and metadata of the Ozone cluster. A production cluster requires 3 OM instances for high availability.
+*   **Storage Container Manager (SCM)**: Manages the data nodes and pipelines. A production cluster requires 3 SCM instances for high availability.
+*   **DataNode**: Stores the actual data in containers. A production cluster requires at least 3 DataNodes.
+*   **Recon**: A web-based UI for monitoring and managing the Ozone cluster. A Recon server is strongly recommended, though not required.
+*   **S3 Gateway (S3G)**: An S3-compatible gateway for accessing Ozone. Multiple S3 Gateway instances are strongly recommended to load balance S3 traffic.
+*   **HttpFs**: An HDFS-compatible API for accessing Ozone. This is an optional component.
+
 ## Requirements
 
 ### System Requirements
@@ -34,8 +45,10 @@ This document provides guidance on the requirements and best practices for a pro
 
 ### Storage Requirements
 
-*   **Metadata Storage**: Use SAS SSD or NVMe SSD for metadata (RocksDB and Ratis) to ensure optimal performance.
-*   **DataNode Storage**: Hard disks are acceptable for DataNode data storage.
+*   **Ozone Manager (OM) and Storage Container Manager (SCM) Metadata Storage**: Use SAS SSD or NVMe SSD for metadata (RocksDB and Ratis) to ensure optimal performance.
+*   **DataNode Storage**:
+    *   **Ratis Log**: Use SAS SSD or NVMe SSD for the Ratis log directory for low latency writes.
+    *   **Container Data**: Hard disks are acceptable for container data storage.
 *   **Storage Type**: Use direct-attached storage. Do not use Network Attached Storage (NAS) or Storage Area Network (SAN).
 
 ### Network Requirements
