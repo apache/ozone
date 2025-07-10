@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -64,13 +66,14 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
     }
   }
 
-  private WitnessedContainerMetadataStoreImpl(ConfigurationSource config, boolean openReadOnly) throws IOException {
+  private WitnessedContainerMetadataStoreImpl(ConfigurationSource config, boolean openReadOnly)
+      throws RocksDatabaseException, CodecException {
     super(WitnessedContainerDBDefinition.get(), config, openReadOnly);
   }
 
   @Override
   protected DBStore initDBStore(DBStoreBuilder dbStoreBuilder, ManagedDBOptions options, ConfigurationSource config)
-      throws IOException {
+      throws RocksDatabaseException, CodecException {
     previousVersionTables = new PreviousVersionTables();
     previousVersionTables.addTables(dbStoreBuilder);
     final DBStore dbStore = dbStoreBuilder.build();
@@ -98,16 +101,16 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
     private static final String CONTAINER_IDS_STR_VAL_TABLE = "containerIds";
     private Table<ContainerID, ContainerCreateInfo> containerIdsTable;
 
-    public PreviousVersionTables() throws IOException {
+    public PreviousVersionTables() {
     }
 
-    public void addTables(DBStoreBuilder dbStoreBuilder) throws IOException {
+    public void addTables(DBStoreBuilder dbStoreBuilder) {
       if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
         dbStoreBuilder.addTable(CONTAINER_IDS_STR_VAL_TABLE);
       }
     }
 
-    public void init(DBStore dbStore) throws IOException {
+    public void init(DBStore dbStore) throws RocksDatabaseException, CodecException {
       if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
         this.containerIdsTable = dbStore.getTable(CONTAINER_IDS_STR_VAL_TABLE, ContainerID.getCodec(),
             new DelegatedCodec<>(StringCodec.get(),
