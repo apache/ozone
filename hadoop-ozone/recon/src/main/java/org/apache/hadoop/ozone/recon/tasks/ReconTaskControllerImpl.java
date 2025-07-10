@@ -114,15 +114,21 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       
       // If not currently processing, start processing all queued events
       if (taskProcessingInProgress.compareAndSet(false, true)) {
-        taskProcessingExecutor.submit(() -> {
-          try {
-            processAllQueuedEvents(omMetadataManager);
-          } catch (Exception e) {
-            LOG.error("Error processing OM events asynchronously", e);
-          } finally {
+        synchronized (this) {
+          if (taskProcessingExecutor != null) {
+            taskProcessingExecutor.submit(() -> {
+              try {
+                processAllQueuedEvents(omMetadataManager);
+              } catch (Exception e) {
+                LOG.error("Error processing OM events asynchronously", e);
+              } finally {
+                taskProcessingInProgress.set(false);
+              }
+            });
+          } else {
             taskProcessingInProgress.set(false);
           }
-        });
+        }
       }
     }
   }
@@ -231,19 +237,23 @@ public class ReconTaskControllerImpl implements ReconTaskController {
                                              Map<String, ReconOmTask> reconOmTaskMap) {
     // Submit to task processing executor to avoid blocking OM sync
     // Wait for current processing to complete and clear queue for reinitialization
-    taskProcessingExecutor.submit(() -> {
-      try {
-        // Clear event queue since we're doing full reinitialization
-        int clearedEvents = eventQueue.size();
-        eventQueue.clear();
-        if (clearedEvents > 0) {
-          LOG.info("Cleared {} queued events for task reinitialization", clearedEvents);
-        }
-        reInitializeTasksInternal(omMetadataManager, reconOmTaskMap);
-      } catch (Exception e) {
-        LOG.error("Error during task reinitialization", e);
+    synchronized (this) {
+      if (taskProcessingExecutor != null) {
+        taskProcessingExecutor.submit(() -> {
+          try {
+            // Clear event queue since we're doing full reinitialization
+            int clearedEvents = eventQueue.size();
+            eventQueue.clear();
+            if (clearedEvents > 0) {
+              LOG.info("Cleared {} queued events for task reinitialization", clearedEvents);
+            }
+            reInitializeTasksInternal(omMetadataManager, reconOmTaskMap);
+          } catch (Exception e) {
+            LOG.error("Error during task reinitialization", e);
+          }
+        });
       }
-    });
+    }
   }
   
   private void reInitializeTasksInternal(ReconOMMetadataManager omMetadataManager,
