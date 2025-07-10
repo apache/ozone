@@ -361,6 +361,7 @@ public final class HAUtils {
       @Override
       public RetryAction shouldRetry(Exception e, int retries, int failovers, boolean isIdempotent) throws Exception {
         if (containsAccessControlException(e)) {
+          LOG.warn("AccessControlException encountered during getCAList; failing fast without retry.");
           return new RetryAction(RetryAction.RetryDecision.FAIL);
         }
         return defaultPolicy.shouldRetry(e, retries, failovers, isIdempotent);
