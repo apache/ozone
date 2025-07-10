@@ -22,8 +22,8 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.Env;
 import org.rocksdb.OptionsUtil;
@@ -55,11 +55,11 @@ public final class DBConfigFromFile {
 
     // Make testing easy.
     // If there is No Env. defined, let us try to read the JVM property
-    if (StringUtil.isBlank(path)) {
+    if (StringUtils.isBlank(path)) {
       path = System.getProperty(CONFIG_DIR);
     }
 
-    if (StringUtil.isBlank(path)) {
+    if (StringUtils.isBlank(path)) {
       LOG.debug("Unable to find the configuration directory. "
           + "Please make sure that " + CONFIG_DIR + " is setup correctly.");
       return null;
@@ -118,7 +118,7 @@ public final class DBConfigFromFile {
     ManagedDBOptions options = null;
     File configLocation = getConfigLocation();
     if (configLocation != null &&
-        StringUtil.isNotBlank(configLocation.toString())) {
+        StringUtils.isNotBlank(configLocation.toString())) {
       Path optionsFile = Paths.get(configLocation.toString(),
           getOptionsFileNameFromDB(dbFileName));
 

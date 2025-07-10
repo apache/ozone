@@ -41,7 +41,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
@@ -640,9 +640,7 @@ public class TestRDBTableStore {
     assertEquals(2, rangeKVs.size());
 
     // test with a filter
-    MetadataKeyFilters.KeyPrefixFilter filter1 = new MetadataKeyFilters
-        .KeyPrefixFilter()
-        .addFilter(StringUtils.bytes2String(samplePrefix) + "1");
+    final KeyPrefixFilter filter1 = KeyPrefixFilter.newFilter(StringUtils.bytes2String(samplePrefix) + "1");
     startKey = StringUtils.string2Bytes(
         StringUtils.bytes2String(samplePrefix));
     rangeKVs = testTable.getRangeKVs(startKey, blockCount,

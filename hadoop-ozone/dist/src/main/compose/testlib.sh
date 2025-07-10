@@ -28,6 +28,7 @@ source ${_testlib_dir}/compose_v2_compatibility.sh
 source "${_testlib_dir}/../smoketest/testlib.sh"
 
 : ${OZONE_COMPOSE_RUNNING:=false}
+: "${OZONE_VOLUME_OWNER:=}"
 : ${SECURITY_ENABLED:=false}
 : ${SCM:=scm}
 : ${SKIP_APACHE_VERIFY_DOWNLOAD:=${CI:-false}}
@@ -249,7 +250,6 @@ execute_robot_test(){
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
-      -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
       -v SCM:"${SCM}" \
       ${ARGUMENTS[@]} --log NONE --report NONE --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
@@ -528,13 +528,27 @@ run_test_scripts() {
   return ${ret}
 }
 
+## @description Create the directory tree required for persisting data between
+##   compose cluster restarts
+create_data_dirs() {
+  if [[ -z "${OZONE_VOLUME}" ]]; then
+    return 1
+  fi
+
+  rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
+  for d in "$@"; do
+    mkdir -p "${OZONE_VOLUME}"/"${d}"
+  done
+  fix_data_dir_permissions
+}
+
 ## @description Make `OZONE_VOLUME_OWNER` the owner of the `OZONE_VOLUME`
 ##   directory tree (required in Github Actions runner environment)
 fix_data_dir_permissions() {
   if [[ -n "${OZONE_VOLUME}" ]] && [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
     current_user=$(whoami)
     if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
-      chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
+      chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" 2> /dev/null \
         || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
     fi
   fi

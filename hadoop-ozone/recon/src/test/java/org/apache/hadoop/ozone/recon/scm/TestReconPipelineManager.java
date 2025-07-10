@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -148,8 +149,9 @@ public class TestReconPipelineManager {
       StorageContainerManager mock = mock(StorageContainerManager.class);
       when(mock.getScmNodeDetails())
           .thenReturn(mock(SCMNodeDetails.class));
-      scmContext = new SCMContext.Builder().setIsInSafeMode(true)
-              .setLeader(true).setIsPreCheckComplete(true)
+      scmContext = new SCMContext.Builder()
+              .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.PRE_CHECKS_PASSED)
+              .setLeader(true)
               .setSCM(mock).build();
       reconPipelineManager.setScmContext(scmContext);
       reconPipelineManager.addPipeline(validPipeline);
