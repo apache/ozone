@@ -20,9 +20,14 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Striped;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
@@ -49,15 +54,23 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;
   private TransactionInfo latestTrxInfo;
-  private final AtomicReference<SnapshotInfo> latestSnapshot
-      = new AtomicReference<>();
+  private final AtomicReference<SnapshotInfo> latestSnapshot = new AtomicReference<>();
   private final AtomicLong txFlushPending = new AtomicLong(0);
   private long lastSnapshotTimeMs = 0;
-  private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+  private final Map<String, Integer> tableIdxMap;
+  private final ReadWriteLock batchLock;
+  private final Striped<Lock> tableLocks;
 
   public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
       throws IOException {
     this.scm = scm;
+    this.tableIdxMap = new HashMap<>();
+    int idx = 0;
+    for (Table<?, ?> table : scm.getScmMetadataStore().getStore().listTables()) {
+      tableIdxMap.put(table.getName(), idx++);
+    }
+    this.tableLocks = Striped.lock(tableIdxMap.size());
+    this.batchLock = new ReentrantReadWriteLock();
     init();
   }
 
@@ -65,27 +78,33 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     return currentBatchOperation;
   }
 
+  private Lock getLock(Table<?, ?> table) {
+    return tableLocks.getAt(tableIdxMap.getOrDefault(table.getName(), 0));
+  }
+
   @Override
   public <KEY, VALUE> void addToBuffer(
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
-    rwLock.readLock().lock();
+    Lock lock = getLock(table);
+    lock.lock();
     try {
       txFlushPending.getAndIncrement();
       table.putWithBatch(getCurrentBatchOperation(), key, value);
     } finally {
-      rwLock.readLock().unlock();
+      lock.unlock();
     }
   }
 
   @Override
   public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
-    rwLock.readLock().lock();
+    Lock lock = getLock(table);
+    lock.lock();
     try {
       txFlushPending.getAndIncrement();
       table.deleteWithBatch(getCurrentBatchOperation(), key);
     } finally {
-      rwLock.readLock().unlock();
+      lock.unlock();
     }
   }
 
@@ -121,9 +140,25 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     return latestSnapshot;
   }
 
+  private void acquireAllLocks() {
+    batchLock.writeLock().lock();
+    for (int idx = 0; idx < tableLocks.size(); idx++) {
+      Lock lock = tableLocks.getAt(idx);
+      lock.lock();
+    }
+  }
+
+  private void releaseAllLocks() {
+    for (int idx = tableLocks.size() - 1; idx >= 0; idx--) {
+      Lock lock = tableLocks.getAt(idx);
+      lock.unlock();
+    }
+    batchLock.writeLock().unlock();
+  }
+
   @Override
   public void flush() throws IOException {
-    rwLock.writeLock().lock();
+    acquireAllLocks();
     try {
       // write latest trx info into trx table in the same batch
       Table<String, TransactionInfo> transactionInfoTable
@@ -145,7 +180,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     } finally {
       txFlushPending.set(0);
       lastSnapshotTimeMs = scm.getSystemClock().millis();
-      rwLock.writeLock().unlock();
+      releaseAllLocks();
     }
   }
 
@@ -153,7 +188,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   public void init() throws IOException {
     metadataStore = scm.getScmMetadataStore();
 
-    rwLock.writeLock().lock();
+    acquireAllLocks();
     try {
       IOUtils.closeQuietly(currentBatchOperation);
 
@@ -170,18 +205,18 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     } finally {
       txFlushPending.set(0);
       lastSnapshotTimeMs = scm.getSystemClock().millis();
-      rwLock.writeLock().unlock();
+      releaseAllLocks();
     }
   }
   
   @Override
   public boolean shouldFlush(long snapshotWaitTime) {
-    rwLock.readLock().lock();
+    batchLock.readLock().lock();
     try {
       long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
       return txFlushPending.get() > 0 && timeDiff > snapshotWaitTime;
     } finally {
-      rwLock.readLock().unlock();
+      batchLock.readLock().unlock();
     }
   }
 

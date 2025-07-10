@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
@@ -130,7 +131,7 @@ public class RDBBatchOperation implements BatchOperation {
   /** Cache and deduplicate db ops (put/delete). */
   private class OpCache {
     /** A (family name -> {@link FamilyCache}) map. */
-    private final Map<String, FamilyCache> name2cache = new HashMap<>();
+    private final Map<String, FamilyCache> name2cache = new ConcurrentHashMap<>();
 
     /** A cache for a {@link ColumnFamily}. */
     private class FamilyCache {
