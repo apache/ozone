@@ -183,8 +183,8 @@ public class RDBBatchOperation implements BatchOperation {
     private final byte[] key;
 
     private DeleteOperation(byte[] key, Bytes keyBytes) {
-      super(keyBytes);
-      this.key = key;
+      super(Objects.requireNonNull(keyBytes, "keyBytes == null"));
+      this.key = Objects.requireNonNull(key, "key == null");
     }
 
     @Override
@@ -265,9 +265,9 @@ public class RDBBatchOperation implements BatchOperation {
     private final byte[] value;
 
     private ByteArrayPutOperation(byte[] key, byte[] value, Bytes keyBytes) {
-      super(keyBytes);
-      this.key = key;
-      this.value = value;
+      super(Objects.requireNonNull(keyBytes));
+      this.key = Objects.requireNonNull(key, "key == null");
+      this.value = Objects.requireNonNull(value, "value == null");
     }
 
     @Override
@@ -300,8 +300,8 @@ public class RDBBatchOperation implements BatchOperation {
 
     private DeleteRangeOperation(byte[] startKey, byte[] endKey) {
       super(null);
-      this.startKey = startKey;
-      this.endKey = endKey;
+      this.startKey = Objects.requireNonNull(startKey, "startKey == null");
+      this.endKey = Objects.requireNonNull(endKey, "endKey == null");
     }
 
     @Override
