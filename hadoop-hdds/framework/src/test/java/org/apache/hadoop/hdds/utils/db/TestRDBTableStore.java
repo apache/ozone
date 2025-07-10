@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.stream;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -296,6 +297,85 @@ public class TestRDBTableStore {
 
       //then
       assertNull(testTable.get(key));
+    }
+  }
+
+  // Add test here for deleteRange with batch operation.
+  @Test
+  public void batchDeleteWithRange() throws Exception {
+    final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
+    try (BatchOperation batch = rdbStore.initBatchOperation()) {
+
+      //given
+      String keyStr = RandomStringUtils.secure().next(10);
+      byte[] startKey = ("1-" + keyStr).getBytes(StandardCharsets.UTF_8);
+      byte[] keyInRange1 = ("2-" + keyStr).getBytes(StandardCharsets.UTF_8);
+      byte[] keyInRange2 = ("3-" + keyStr).getBytes(StandardCharsets.UTF_8);
+      byte[] endKey = ("4-" + keyStr).getBytes(StandardCharsets.UTF_8);
+      byte[] value =
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      testTable.put(startKey, value);
+      testTable.put(keyInRange1, value);
+      testTable.put(keyInRange2, value);
+      testTable.put(endKey, value);
+      assertNotNull(testTable.get(startKey));
+      assertNotNull(testTable.get(keyInRange1));
+      assertNotNull(testTable.get(keyInRange2));
+      assertNotNull(testTable.get(endKey));
+
+      //when
+      testTable.deleteRangeWithBatch(batch, startKey, endKey);
+      rdbStore.commitBatchOperation(batch);
+
+      //then
+      assertNull(testTable.get(startKey));
+      assertNull(testTable.get(keyInRange1));
+      assertNull(testTable.get(keyInRange2));
+      assertNotNull(testTable.get(endKey));
+    }
+  }
+
+  // Add test to check for order of operations in batch.
+  public void orderOfBatchOperations() throws Exception {
+    final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
+    try (BatchOperation batch = rdbStore.initBatchOperation()) {
+
+      //given
+      String keyStr = RandomStringUtils.secure().next(10);
+      byte[] startKey = ("1-" + keyStr).getBytes(StandardCharsets.UTF_8);
+      byte[] keyInRange1 = ("2-" + keyStr).getBytes(StandardCharsets.UTF_8);
+      byte[] endKey = ("3-" + keyStr).getBytes(StandardCharsets.UTF_8);
+      byte[] value1 =
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      byte[] value2 =
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      byte[] value3 =
+          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+
+      //when
+      testTable.putWithBatch(batch, startKey, value1);
+      testTable.putWithBatch(batch, keyInRange1, value1);
+      testTable.deleteWithBatch(batch, keyInRange1);
+      // ops map key should be <<startKey, endKey>, 1>
+      testTable.deleteRangeWithBatch(batch, startKey, endKey);
+      testTable.putWithBatch(batch, startKey, value2);
+      testTable.putWithBatch(batch, keyInRange1, value2);
+      // ops map key is <<startKey, keyInRange1>, 2>.
+      testTable.deleteRangeWithBatch(batch, startKey, keyInRange1);
+      testTable.putWithBatch(batch, endKey, value1);
+      testTable.putWithBatch(batch, endKey, value2);
+      // ops map key is <<startKey, endKey>, 3>.
+      testTable.deleteRangeWithBatch(batch, startKey, endKey);
+      testTable.putWithBatch(batch, startKey, value3);
+
+      rdbStore.commitBatchOperation(batch);
+
+      //then
+      assertNotNull(testTable.get(startKey));
+      assertEquals(value3, testTable.get(startKey));
+      assertNull(testTable.get(keyInRange1));
+      assertNotNull(testTable.get(endKey));
+      assertEquals(value2, testTable.get(endKey));
     }
   }
 
