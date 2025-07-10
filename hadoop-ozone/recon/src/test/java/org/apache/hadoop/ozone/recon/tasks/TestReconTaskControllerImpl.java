@@ -20,15 +20,21 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.HashSet;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -80,61 +86,116 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
   @Test
   public void testConsumeOMEvents() throws Exception {
+    CountDownLatch latch = new CountDownLatch(1);
     ReconOmTask reconOmTaskMock = getMockTask("MockTask");
     when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
-        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask").setTaskSuccess(true).build());
+        .thenAnswer(invocation -> {
+          latch.countDown(); // Signal completion
+          return new ReconOmTask.TaskResult.Builder().setTaskName("MockTask").setTaskSuccess(true).build();
+        });
     reconTaskController.registerTask(reconOmTaskMock);
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
+
+    // Pre-initialize database record
+    ReconTaskStatus initialRecord = new ReconTaskStatus("MockTask", System.currentTimeMillis(), 0L, 0, 0);
+    reconTaskStatusDao.insert(initialRecord);
 
     long startTime = System.currentTimeMillis();
     reconTaskController.consumeOMEvents(
         omUpdateEventBatchMock,
         mock(OMMetadataManager.class));
 
+    // Wait for async processing to complete
+    assertTrue(latch.await(5, TimeUnit.SECONDS), "Task processing should complete within 5 seconds");
+
     verify(reconOmTaskMock, times(1))
         .process(any(), anyMap());
-    long endTime = System.currentTimeMillis();
 
     ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
     long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
+    
+    long endTime = System.currentTimeMillis();
 
     assertThat(taskTimeStamp).isGreaterThanOrEqualTo(startTime).isLessThanOrEqualTo(endTime);
-    assertEquals(seqNumber, omUpdateEventBatchMock.getLastSequenceNumber());
+    assertEquals(omUpdateEventBatchMock.getLastSequenceNumber(), seqNumber);
   }
 
   @Test
   public void testTaskRecordsFailureOnException() throws Exception {
+    CountDownLatch taskExecutionLatch = new CountDownLatch(1);
+    CountDownLatch dbUpdateLatch = new CountDownLatch(1);
+    
     ReconOmTask reconOmTaskMock = getMockTask("MockTask");
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
 
     // Throw exception when trying to run task
     when(reconOmTaskMock.process(any(OMUpdateEventBatch.class), anyMap()))
-        .thenThrow(new RuntimeException("Mock Failure"));
-    reconTaskController.registerTask(reconOmTaskMock);
+        .thenAnswer(invocation -> {
+          taskExecutionLatch.countDown(); // Signal task execution
+          throw new RuntimeException("Mock Failure");
+        });
+
+    // Create a custom task status updater that signals when DB is updated
+    ReconTaskStatusUpdaterManager customUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
+    when(customUpdaterManager.getTaskStatusUpdater(anyString()))
+        .thenAnswer(i -> {
+          String taskName = i.getArgument(0);
+          ReconTaskStatusUpdater realUpdater = new ReconTaskStatusUpdater(reconTaskStatusDao, taskName);
+          ReconTaskStatusUpdater spyUpdater = spy(realUpdater);
+          
+          // Signal when status is set to -1 (failure)
+          doAnswer(statusInvocation -> {
+            Object result = statusInvocation.callRealMethod();
+            int status = statusInvocation.getArgument(0);
+            if (status == -1) {
+              dbUpdateLatch.countDown(); // Signal DB update for failure
+            }
+            return result;
+          }).when(spyUpdater).setLastTaskRunStatus(anyInt());
+          
+          return spyUpdater;
+        });
+
+    // Create new controller with custom updater manager
+    ReconTaskController customController = new ReconTaskControllerImpl(new OzoneConfiguration(), new HashSet<>(), customUpdaterManager);
+    customController.start();
+    customController.registerTask(reconOmTaskMock);
+    
     when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
 
+    // Pre-initialize database record
+    ReconTaskStatus initialRecord = new ReconTaskStatus("MockTask", System.currentTimeMillis(), 0L, 0, 0);
+    reconTaskStatusDao.insert(initialRecord);
+
     long startTime = System.currentTimeMillis();
-    reconTaskController.consumeOMEvents(
+    customController.consumeOMEvents(
         omUpdateEventBatchMock,
         mock(OMMetadataManager.class));
 
+    // Wait for task execution and DB update
+    assertTrue(taskExecutionLatch.await(5, TimeUnit.SECONDS), "Task execution should complete within 5 seconds");
+    assertTrue(dbUpdateLatch.await(5, TimeUnit.SECONDS), "DB update should complete within 5 seconds");
+
     verify(reconOmTaskMock, times(1))
         .process(any(), anyMap());
-    long endTime = System.currentTimeMillis();
 
     ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
     long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
     int taskStatus = reconTaskStatus.getLastTaskRunStatus();
+    
+    long endTime = System.currentTimeMillis();
 
     assertThat(taskTimeStamp).isGreaterThanOrEqualTo(startTime).isLessThanOrEqualTo(endTime);
     // Task failed so seqNumber should not be updated, and last task status should be -1
-    assertEquals(seqNumber, 0);
-    assertEquals(taskStatus, -1);
+    assertEquals(0L, seqNumber);
+    assertEquals(-1, taskStatus);
+    
+    customController.stop();
   }
 
   @Test
@@ -152,6 +213,10 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
     reconTaskController.consumeOMEvents(omUpdateEventBatchMock,
         mock(OMMetadataManager.class));
+    
+    // Wait for async processing to complete
+    Thread.sleep(2000); // Using sleep here since DummyReconDBTask doesn't allow CountDownLatch modification
+    
     assertThat(reconTaskController.getRegisteredTasks()).isNotEmpty();
     assertEquals(dummyReconDBTask, reconTaskController.getRegisteredTasks()
         .get(dummyReconDBTask.getTaskName()));
@@ -181,6 +246,9 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
       reconTaskController.consumeOMEvents(omUpdateEventBatchMock,
           omMetadataManagerMock);
 
+      // Wait for async processing to complete
+      Thread.sleep(1000);
+
       assertThat(reconTaskController.getRegisteredTasks()).isNotEmpty();
       assertEquals(dummyReconDBTask, reconTaskController.getRegisteredTasks()
           .get(dummyReconDBTask.getTaskName()));
@@ -190,6 +258,10 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     Long startTime = System.currentTimeMillis();
     reconTaskController.consumeOMEvents(omUpdateEventBatchMock,
         omMetadataManagerMock);
+    
+    // Wait for async processing to complete
+    Thread.sleep(2000);
+    
     assertThat(reconTaskController.getRegisteredTasks()).isEmpty();
 
     reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
@@ -202,20 +274,29 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
   @Test
   public void testReInitializeTasks() throws Exception {
-
+    CountDownLatch latch = new CountDownLatch(1);
     ReconOMMetadataManager omMetadataManagerMock = mock(
         ReconOMMetadataManager.class);
     ReconOmTask reconOmTaskMock =
         getMockTask("MockTask2");
     when(reconOmTaskMock.reprocess(omMetadataManagerMock))
-        .thenReturn(new ReconOmTask.TaskResult.Builder().setTaskName("MockTask2").setTaskSuccess(true).build());
+        .thenAnswer(invocation -> {
+          latch.countDown(); // Signal completion
+          return new ReconOmTask.TaskResult.Builder().setTaskName("MockTask2").setTaskSuccess(true).build();
+        });
     when(omMetadataManagerMock.getLastSequenceNumberFromDB()
     ).thenReturn(100L);
+
+    // Pre-initialize database record
+    ReconTaskStatus initialRecord = new ReconTaskStatus("MockTask2", System.currentTimeMillis(), 0L, 0, 0);
+    reconTaskStatusDao.insert(initialRecord);
 
     long startTime = System.currentTimeMillis();
     reconTaskController.registerTask(reconOmTaskMock);
     reconTaskController.reInitializeTasks(omMetadataManagerMock, null);
-    long endTime = System.currentTimeMillis();
+    
+    // Wait for async processing to complete
+    assertTrue(latch.await(5, TimeUnit.SECONDS), "Task reinitialization should complete within 5 seconds");
 
     verify(reconOmTaskMock, times(1))
         .reprocess(omMetadataManagerMock);
@@ -226,10 +307,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask2");
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
     long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
+    
+    long endTime = System.currentTimeMillis();
 
     assertThat(taskTimeStamp).isGreaterThanOrEqualTo(startTime).isLessThanOrEqualTo(endTime);
-    assertEquals(seqNumber,
-        omMetadataManagerMock.getLastSequenceNumberFromDB());
+    assertEquals(omMetadataManagerMock.getLastSequenceNumberFromDB(), seqNumber);
   }
 
   /**
