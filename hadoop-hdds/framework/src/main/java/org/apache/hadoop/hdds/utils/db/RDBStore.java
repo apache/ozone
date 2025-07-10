@@ -37,6 +37,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMetrics;
@@ -278,6 +279,13 @@ public class RDBStore implements DBStore {
       String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType)
       throws RocksDatabaseException, CodecException {
     return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType);
+  }
+
+  @Override
+  public <K, V> TypedTable<K, V> getTable(
+      String name, Codec<K> keyCodec, Codec<V> valueCodec, TableCache.CacheType cacheType,
+      Function<K, Boolean> keyValidator) throws RocksDatabaseException, CodecException {
+    return new TypedTable<>(getTable(name), keyCodec, valueCodec, cacheType, keyValidator);
   }
 
   @Override

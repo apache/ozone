@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FLUSHED_TRANSACTIONS;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
@@ -63,6 +64,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -76,7 +78,11 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -102,6 +108,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -137,7 +144,8 @@ public class TestOmMetadataManager {
       TENANT_STATE_TABLE,
       SNAPSHOT_INFO_TABLE,
       SNAPSHOT_RENAMED_TABLE,
-      COMPACTION_LOG_TABLE
+      COMPACTION_LOG_TABLE,
+      FLUSHED_TRANSACTIONS
   };
 
   private OMMetadataManager omMetadataManager;
@@ -169,6 +177,29 @@ public class TestOmMetadataManager {
 
     assertEquals(3, transactionInfo.getTerm());
     assertEquals(250, transactionInfo.getTransactionIndex());
+  }
+
+  @Test
+  public void testFlushedTransactionTable() throws RocksDatabaseException, CodecException {
+
+    List<FlushedTransactionInfo> flushedTransactionInfos = new ArrayList<>();
+    Assertions.assertThrows(AssertionError.class, () -> {
+      omMetadataManager.getFlushedTransactionsTable().put(-100L, FlushedTransactionInfo.valueOf(-100L, -100L));
+    });
+    for (long i = 10; i >= 0; i--) {
+      FlushedTransactionInfo flushedTransactionInfo = FlushedTransactionInfo.valueOf(i, i);
+      omMetadataManager.getFlushedTransactionsTable().put(i, flushedTransactionInfo);
+      flushedTransactionInfos.add(flushedTransactionInfo);
+    }
+    flushedTransactionInfos.sort(Comparator.comparingLong(FlushedTransactionInfo::getTransactionIndex));
+    List<FlushedTransactionInfo> dbList = new ArrayList<>();
+    try (Table.KeyValueIterator<Long, FlushedTransactionInfo> itr =
+             omMetadataManager.getFlushedTransactionsTable().iterator()) {
+      while (itr.hasNext()) {
+        dbList.add(itr.next().getValue());
+      }
+    }
+    assertEquals(flushedTransactionInfos, dbList);
   }
 
   @Test

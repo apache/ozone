@@ -58,11 +58,13 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -154,6 +156,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private TypedTable<OzoneTokenIdentifier, Long> dTokenTable;
   private TypedTable<String, OmPrefixInfo> prefixTable;
   private TypedTable<String, TransactionInfo> transactionInfoTable;
+  private TypedTable<Long, FlushedTransactionInfo> flushedTransactionsTable;
   private TypedTable<String, String> metaTable;
 
   // Tables required for multi-tenancy
@@ -460,6 +463,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     prefixTable = initializer.get(OMDBDefinition.PREFIX_TABLE_DEF);
 
     transactionInfoTable = initializer.get(OMDBDefinition.TRANSACTION_INFO_TABLE_DEF);
+    flushedTransactionsTable = initializer.get(OMDBDefinition.FLUSHED_TRANSACTIONS_DEF, CacheType.PARTIAL_CACHE,
+        (tid) -> tid >= 0);
 
     metaTable = initializer.get(OMDBDefinition.META_TABLE_DEF);
 
@@ -1603,6 +1608,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return transactionInfoTable;
   }
 
+  public TypedTable<Long, FlushedTransactionInfo> getFlushedTransactionsTable() {
+    return flushedTransactionsTable;
+  }
+
   @Override
   public Table<String, String> getMetaTable() {
     return metaTable;
@@ -1849,6 +1858,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType cacheType)
         throws IOException {
       return get(definition.getTable(store, cacheType));
+    }
+
+    <KEY, VALUE> TypedTable<KEY, VALUE> get(DBColumnFamilyDefinition<KEY, VALUE> definition, CacheType cacheType,
+        Function<KEY, Boolean> keyValidator)
+        throws IOException {
+      return get(definition.getTable(store, cacheType, keyValidator));
     }
 
     private <KEY, VALUE> TypedTable<KEY, VALUE> get(TypedTable<KEY, VALUE> table) {
