@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.nativeio.NativeIO;
@@ -98,6 +99,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   private static final Logger LOG =
           LoggerFactory.getLogger(KeyValueContainer.class);
+
+  private static FaultInjector injector;
 
   // Use a non-fair RW lock for better throughput, we may revisit this decision
   // if this causes fairness issues.
@@ -660,6 +663,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void importContainerData(Path containerPath) throws IOException {
+    injectFault();
+
     writeLock();
     try {
       if (!getContainerFile().exists()) {
@@ -934,6 +939,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void copyContainerData(Path destination) throws IOException {
+    injectFault();
+
     writeLock();
     try {
       // Closed/ Quasi closed containers are considered for replication by
@@ -1051,5 +1058,23 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       LOG.error("Failed when copying container to {}", destination, e);
       throw e;
     }
+  }
+
+  private void injectFault() throws IOException {
+    if (injector != null) {
+      Throwable ex = injector.getException();
+      if (ex != null) {
+        if (ex instanceof IOException) {
+          throw (IOException) ex;
+        } else {
+          throw new IOException("Fault injection", ex);
+        }
+      }
+    }
+  }
+
+  @VisibleForTesting
+  public static void setInjector(FaultInjector instance) {
+    injector = instance;
   }
 }
