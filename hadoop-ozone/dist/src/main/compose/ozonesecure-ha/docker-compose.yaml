@@ -49,7 +49,7 @@ services:
       - ./krb5.conf:/etc/krb5.conf
       - ../../libexec/transformation.py:/opt/transformation.py
     environment:
-      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      OZONE_CONF_DIR: /opt/hadoop/etc/hadoop
     command: ["hadoop", "kms"]
     networks:
       ozone_net:

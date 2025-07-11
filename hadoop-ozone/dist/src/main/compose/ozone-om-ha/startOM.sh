@@ -24,5 +24,5 @@ if [ "$ARG" != "--restart" ]; then
 fi
 
 export OZONE_LOG_DIR=/var/log/hadoop
-export HADOOP_CONF_DIR=/etc/hadoop
+export OZONE_CONF_DIR=/etc/hadoop
 /opt/hadoop/bin/ozone --daemon start om

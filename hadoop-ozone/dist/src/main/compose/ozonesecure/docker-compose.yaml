@@ -32,7 +32,7 @@ services:
     env_file:
     - ./docker-config
     environment:
-      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      OZONE_CONF_DIR: /opt/hadoop/etc/hadoop
     volumes:
       - ../../libexec/transformation.py:/opt/transformation.py
     command: ["hadoop", "kms"]
