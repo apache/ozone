@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
@@ -40,8 +41,10 @@ public abstract class BackgroundService {
   protected static final Logger LOG =
       LoggerFactory.getLogger(BackgroundService.class);
 
-  // Executor to launch child tasks
+  // Executor to launch the runner
   private ScheduledThreadPoolExecutor exec;
+  // Executor to launch all the worker tasks
+  private ThreadPoolExecutor taskExec;
   private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
@@ -78,18 +81,15 @@ public abstract class BackgroundService {
 
   @VisibleForTesting
   public ExecutorService getExecutorService() {
-    return this.exec;
+    return this.taskExec;
   }
 
   public void setPoolSize(int size) {
     if (size <= 0) {
       throw new IllegalArgumentException("Pool size must be positive.");
     }
-
-    // In ScheduledThreadPoolExecutor, maximumPoolSize is Integer.MAX_VALUE
-    // the corePoolSize will always less maximumPoolSize.
-    // So we can directly set the corePoolSize
-    exec.setCorePoolSize(size);
+    taskExec.setCorePoolSize(size);
+    taskExec.setMaximumPoolSize(size);
   }
 
   @VisibleForTesting
@@ -121,6 +121,8 @@ public abstract class BackgroundService {
   }
 
   public abstract BackgroundTaskQueue getTasks();
+
+  protected void execTaskCompletion() { }
 
   /**
    * Run one or more background tasks concurrently.
@@ -163,7 +165,7 @@ public abstract class BackgroundService {
                   serviceName, endTime - startTime, serviceTimeoutInNanos);
             }
           }
-        }, exec).exceptionally(e -> null), (Void1, Void) -> null);
+        }, taskExec).exceptionally(e -> null), (Void1, Void) -> null);
       }
       try {
         future.get();
@@ -172,9 +174,10 @@ public abstract class BackgroundService {
       } finally {
         long endTime = System.nanoTime();
         if (endTime - serviceStartTime > serviceTimeoutInNanos) {
-          LOG.warn("{} Background service execution failed which took {}ns > {}ns(timeout)",
+          LOG.warn("{} Background service execution took {}ns > {}ns(timeout)",
               service, endTime - serviceStartTime, serviceTimeoutInNanos);
         }
+        execTaskCompletion();
       }
     }
   }
@@ -182,18 +185,25 @@ public abstract class BackgroundService {
   // shutdown and make sure all threads are properly released.
   public void shutdown() {
     LOG.info("Shutting down service {}", this.serviceName);
-    exec.shutdown();
-    try {
-      if (!exec.awaitTermination(60, TimeUnit.SECONDS)) {
-        exec.shutdownNow();
-      }
-    } catch (InterruptedException e) {
-      // Re-interrupt the thread while catching InterruptedException
-      Thread.currentThread().interrupt();
-      exec.shutdownNow();
-    }
+    shutdownExecutor(exec);
+    shutdownExecutor(taskExec);
     if (threadGroup.activeCount() == 0 && !threadGroup.isDestroyed()) {
       threadGroup.destroy();
+    }
+  }
+
+  private void shutdownExecutor(ExecutorService executor) {
+    if (executor != null) {
+      executor.shutdown();
+      try {
+        if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+          executor.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
+        executor.shutdownNow();
+      }
     }
   }
 
@@ -204,6 +214,10 @@ public abstract class BackgroundService {
         .setDaemon(true)
         .setNameFormat(threadNamePrefix + serviceName + "#%d")
         .build();
-    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
+    // Use a single thread for the scheduled runner
+    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(1, threadFactory);
+    // Use a separate pool for the worker tasks
+    taskExec = (ThreadPoolExecutor) Executors.newFixedThreadPool(threadPoolSize, threadFactory);
+
   }
 }
