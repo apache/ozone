@@ -19,11 +19,13 @@ package org.apache.hadoop.ozone.freon;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -33,8 +35,12 @@ import picocli.CommandLine.Option;
  * A Freon test that creates a specified number of snapshots for a given bucket.
  * After each snapshot is created, it creates a specific number of empty files and directories.
  */
-@Command(name = "snapshot-generator", mixinStandardHelpOptions = true,
-    description = "Generate snapshots and then create files and directories in the specified bucket")
+@Command(name = "snapshot-generator",
+    description = "Generate snapshots and then create files and directories in the specified bucket",
+    versionProvider = HddsVersionProvider.class,
+    mixinStandardHelpOptions = true,
+    showDefaultValues = true)
+@MetaInfServices(FreonSubcommand.class)
 public class SnapshotGenerator extends BaseFreonGenerator implements Callable<Void> {
   @CommandLine.ParentCommand
   private Freon freon;
@@ -58,6 +64,9 @@ public class SnapshotGenerator extends BaseFreonGenerator implements Callable<Vo
   private int numDirs;
 
   private OzoneConfiguration configuration;
+
+  public SnapshotGenerator() {
+  }
 
   @VisibleForTesting
   SnapshotGenerator(OzoneConfiguration ozoneConfiguration) {
