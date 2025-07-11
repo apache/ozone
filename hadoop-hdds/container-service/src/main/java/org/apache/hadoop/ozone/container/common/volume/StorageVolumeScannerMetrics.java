@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.Collection;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -92,7 +91,7 @@ public class StorageVolumeScannerMetrics {
   }
 
   /**
-   * Return the number of metadata volumes scanned since the last restart
+   * Return the number of metadata volumes scanned since the last restart.
    */
   public long getNumMetadataVolumeScans() {
     return numMetadataVolumeScans.value();
