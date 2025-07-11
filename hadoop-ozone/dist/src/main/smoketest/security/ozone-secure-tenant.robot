@@ -20,6 +20,7 @@ Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
+Resource            ../admincli/lib.resource
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -113,7 +114,8 @@ Delete Tenant Failure Tenant Not Empty
                         Should contain   ${output}         TENANT_NOT_EMPTY Tenant '${TENANT}' is not empty. All accessIds associated to this tenant must be revoked before the tenant can be deleted. See `ozone tenant user revoke`
 
 Trigger and wait for background Sync to recover Policies and Roles in Authorizer
-   ${rc}  ${output} =  Run And Return Rc And Output  ozone admin om updateranger ${OM_HA_PARAM}
+   ${om_param}=        Get OM Service Param
+   ${rc}  ${output} =  Run And Return Rc And Output  ozone admin om updateranger ${om_param}
                        Should contain   ${output}         Operation completed successfully
 
 Create Tenant Failure with Regular User
