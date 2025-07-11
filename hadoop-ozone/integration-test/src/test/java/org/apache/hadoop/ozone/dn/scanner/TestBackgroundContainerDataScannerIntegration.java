@@ -85,7 +85,7 @@ class TestBackgroundContainerDataScannerIntegration
     assertTrue(containerChecksumFileExists(containerID));
 
     waitForScmToSeeReplicaState(containerID, CLOSED);
-    long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    long initialReportedDataChecksum = getContainerReplica(containerID).getChecksums().getDataChecksum();
 
     corruption.applyTo(container);
 
@@ -98,7 +98,7 @@ class TestBackgroundContainerDataScannerIntegration
 
     // Wait for SCM to get a report of the unhealthy replica with a different checksum than before.
     waitForScmToSeeReplicaState(containerID, UNHEALTHY);
-    long newReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    long newReportedDataChecksum = getContainerReplica(containerID).getChecksums().getDataChecksum();
     if (corruption == TestContainerCorruptions.MISSING_METADATA_DIR ||
         corruption == TestContainerCorruptions.MISSING_CONTAINER_DIR) {
       // In these cases, the new tree will not be able to be written since it exists in the metadata directory.

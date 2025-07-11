@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
@@ -1035,12 +1036,12 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", 1234L);
-    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", 1234L);
-    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", 1234L);
-    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", new ContainerChecksums(1234L));
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", new ContainerChecksums(1234L));
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", new ContainerChecksums(1234L));
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN", new ContainerChecksums(1234L));
 
-    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN", new ContainerChecksums(1234L));
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
@@ -1150,13 +1151,13 @@ public class TestContainerEndpoint {
     long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
 
     reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L,
-        "UNHEALTHY", differentChecksum);
+        "UNHEALTHY", new ContainerChecksums(differentChecksum));
     reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L,
-        "UNHEALTHY", differentChecksum);
+        "UNHEALTHY", new ContainerChecksums(differentChecksum));
     reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L,
-        "UNHEALTHY", 1234L);
+        "UNHEALTHY", new ContainerChecksums(1234L));
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
-        "UNHEALTHY", 1234L);
+        "UNHEALTHY", new ContainerChecksums(1234L));
   }
 
   protected ContainerWithPipeline getTestContainer(
