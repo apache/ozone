@@ -39,7 +39,7 @@ This logical name is called `serviceId` and can be configured in the `ozone-site
 
 Most of the time you need to set only the values of your current cluster:
 
- ```XML
+ ```xml
 <property>
    <name>ozone.scm.service.ids</name>
    <value>cluster1</value>
@@ -48,7 +48,7 @@ Most of the time you need to set only the values of your current cluster:
 
 For each of the defined `serviceId` a logical configuration name should be defined for each of the servers
 
-```XML
+```xml
 <property>
    <name>ozone.scm.nodes.cluster1</name>
    <value>scm1,scm2,scm3</value>
@@ -57,7 +57,7 @@ For each of the defined `serviceId` a logical configuration name should be defin
 
 The defined prefixes can be used to define the address of each of the SCM services:
 
-```XML
+```xml
 <property>
    <name>ozone.scm.address.cluster1.scm1</name>
    <value>host1</value>
@@ -90,6 +90,85 @@ ozone scm --bootstrap
 
 Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone --daemon start scm`.
 
+## SCM Leader Transfer
+
+The `ozone admin scm transfer` command allows you to manually transfer the leadership of the Storage Container Manager (SCM) Raft group to a specific SCM node or to a randomly chosen follower.
+
+Be aware of the node's status(eg. Safemode, Operational status), ozone currently has no ability to check the target node's status before transfering the leadership.
+
+### Usage
+
+```bash
+ozone admin scm transfer -id <SCM_SERVICE_ID> -n <NEW_LEADER_ID>
+ozone admin scm transfer -id <SCM_SERVICE_ID> -r
+```
+
+*   `-id, --service-id`: Specifies the SCM Service ID.
+*   `-n, --newLeaderId, --new-leader-id`: The SCM UUID (Raft peer ID) of the SCM to which leadership will be transferred (e.g., `e6877ce5-56cd-4f0b-ad60-4c8ef9000882`).
+*   `-r, --random`: Randomly chooses a follower to transfer leadership to.
+
+### Example
+
+To transfer leadership to a specific SCM in a cluster with service ID `cluster1`:
+
+```bash
+ozone admin scm transfer -id cluster1 -n e6877ce5-56cd-4f0b-ad60-4c8ef9000882
+```
+
+To transfer leadership to a random follower:
+
+```bash
+ozone admin scm transfer -id cluster1 -r
+```
+
+## SCM Service Roles Listing
+
+The `ozone admin scm roles` command lists all Storage Container Managers and their respective Raft server roles (leader, follower, or candidate).
+
+### Usage
+
+```bash
+ozone admin scm roles [--json | --table]
+```
+
+*   `--json`: (Optional) Formats the output as JSON.
+*   `--table`: (Optional) Formats the output as a table.
+
+### Example
+
+To list SCM roles:
+
+```bash
+ozone admin scm roles
+```
+
+Example output:
+
+```
+host1:9876:LEADER:e6877ce5-56cd-4f0b-ad60-4c8ef9000882:192.168.1.1
+host2:9876:FOLLOWER:f2ba1c28-486a-4192-9a5f-b3752fe27d6b:192.168.1.2
+host3:9876:FOLLOWER:9c8d2b3a-e4f5-6789-0123-456789abcdef:192.168.1.3
+```
+
+To list SCM roles as a table:
+
+```bash
+ozone admin scm roles --table
+```
+
+Example table output:
+
+```
+Storage Container Manager Roles
+------------------------------------------------------------------------------------
+Host Name | Ratis Port | Role     | Node ID                                  | Host Address
+------------------------------------------------------------------------------------
+host1     | 9876       | LEADER   | e6877ce5-56cd-4f0b-ad60-4c8ef9000882     | 192.168.1.1
+host2     | 9876       | FOLLOWER | f2ba1c28-486a-4192-9a5f-b3752fe27d6b     | 192.168.1.2
+host3     | 9876       | FOLLOWER | 9c8d2b3a-e4f5-6789-0123-456789abcdef     | 192.168.1.3
+------------------------------------------------------------------------------------
+```
+
 ## Auto-bootstrap
 
 In some environments (e.g. Kubernetes) we need to have a common, unified way to initialize SCM HA quorum. As a reminder, the standard initialization flow is the following:
@@ -99,7 +178,7 @@ In some environments (e.g. Kubernetes) we need to have a common, unified way to 
 
 This can be improved: primordial SCM can be configured by setting `ozone.scm.primordial.node.id` in the config to one of the nodes.
 
-```XML
+```xml
 <property>
    <name>ozone.scm.primordial.node.id</name>
    <value>scm1</value>
@@ -136,14 +215,14 @@ Sub-CA on the SCM’s are used to issue signed certificates for OM/DN in the clu
 
 ### How to enable security:
 
-```XML
+```xml
 <property>
-<config>ozone.security.enable</config>
+<name>ozone.security.enable</name>
 <value>true</value>
 </property>
 
 <property>
-<config>hdds.grpc.tls.enabled</config>
+<name>hdds.grpc.tls.enabled</name>
 <value>true</value>
 </property>
 ```
