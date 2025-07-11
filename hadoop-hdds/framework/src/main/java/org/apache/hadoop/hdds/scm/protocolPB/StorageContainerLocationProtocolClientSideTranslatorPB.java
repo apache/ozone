@@ -133,6 +133,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
@@ -775,7 +776,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
         .setScmId(resp.getScmId())
-        .setPeerRoles(resp.getPeerRolesList());
+        .setPeerRoles(resp.getPeerRolesList())
+        .setMetaDataLayoutVersion(resp.hasMetaDataLayoutVersion() ?
+            resp.getMetaDataLayoutVersion() : HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     return builder.build();
   }
 

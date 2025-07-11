@@ -181,6 +181,7 @@ message DeleteScmKeyBlocksRequestProto {
 message KeyBlocks {
   required string key = 1;
   repeated BlockID blocks = 2;
+  repeated DeletedBlock deletedBlocks = 3;
 }
 
 /**

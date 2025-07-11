@@ -62,11 +62,13 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -791,8 +793,10 @@ class TestKeyDeletingService extends OzoneTestBase {
               return OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(purgeRequest.get().getCmdType())
                   .setStatus(OzoneManagerProtocolProtos.Status.TIMEOUT).build();
             });
-        List<BlockGroup> blockGroups = Collections.singletonList(BlockGroup.newBuilder().setKeyName("key1")
-            .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build());
+        List<BlockGroup> blockGroups = Collections.singletonList(BlockGroup
+            .newBuilder().setKeyName("key1")
+            .addAllBlocks(Collections.singletonList(new DeletedBlock(new BlockID(1, 1), 3, 1)))
+            .build());
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
         OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
             .setBucketName("buck")
@@ -1063,10 +1067,12 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private long countBlocksPendingDeletion() {
     try {
+      boolean isDDEnabled = scmBlockTestingClient.getScmInfo().getMetaDataLayoutVersion() >=
+          HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
       return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
           .getKeyBlocksList()
           .stream()
-          .map(BlockGroup::getBlockIDList)
+          .map(isDDEnabled ? BlockGroup::getAllBlocks : BlockGroup::getBlockIDs)
           .mapToLong(Collection::size)
           .sum();
     } catch (IOException e) {

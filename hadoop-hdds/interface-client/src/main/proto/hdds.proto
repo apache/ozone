@@ -280,6 +280,7 @@ message GetScmInfoResponseProto {
     required string clusterId = 1;
     required string scmId = 2;
     repeated string peerRoles = 3;
+    optional int32 metaDataLayoutVersion = 4;
 }
 
 message AddScmRequestProto {
@@ -406,6 +407,12 @@ message BlockTokenSecretProto {
 message BlockID {
     required ContainerBlockID containerBlockID = 1;
     optional uint64 blockCommitSequenceId = 2 [default = 0];
+}
+
+message DeletedBlock {
+  required BlockID blockId = 1;
+  optional uint64 size = 2 [default = 0];
+  optional uint64 replicatedSize = 3 [default = 0];
 }
 
 message UpgradeFinalizationStatus {

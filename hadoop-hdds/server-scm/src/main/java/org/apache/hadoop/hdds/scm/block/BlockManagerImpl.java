@@ -27,8 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.management.ObjectName;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -225,15 +225,15 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     for (BlockGroup bg : keyBlocksInfoList) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Deleting blocks {}",
-            StringUtils.join(",", bg.getBlockIDList()));
+            StringUtils.join(",", bg.getAllBlocks()));
       }
-      for (BlockID block : bg.getBlockIDList()) {
-        long containerID = block.getContainerID();
+      for (DeletedBlock block : bg.getAllBlocks()) {
+        long containerID = block.getBlockID().getContainerID();
         if (containerBlocks.containsKey(containerID)) {
-          containerBlocks.get(containerID).add(block.getLocalID());
+          containerBlocks.get(containerID).add(block.getBlockID().getLocalID());
         } else {
           List<Long> item = new ArrayList<>();
-          item.add(block.getLocalID());
+          item.add(block.getBlockID().getLocalID());
           containerBlocks.put(containerID, item);
         }
       }

@@ -45,7 +45,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -268,7 +268,7 @@ public class SCMBlockProtocolServer implements
       List<BlockGroup> keyBlocksInfoList) throws IOException {
     long totalBlocks = 0;
     for (BlockGroup bg : keyBlocksInfoList) {
-      totalBlocks += bg.getBlockIDList().size();
+      totalBlocks += bg.getAllBlocks().size();
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
@@ -312,8 +312,8 @@ public class SCMBlockProtocolServer implements
     }
     for (BlockGroup bg : keyBlocksInfoList) {
       List<DeleteBlockResult> blockResult = new ArrayList<>();
-      for (BlockID b : bg.getBlockIDList()) {
-        blockResult.add(new DeleteBlockResult(b, resultCode));
+      for (DeletedBlock b : bg.getAllBlocks()) {
+        blockResult.add(new DeleteBlockResult(b.getBlockID(), resultCode));
       }
       results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
     }
@@ -335,7 +335,8 @@ public class SCMBlockProtocolServer implements
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
-              .setScmId(scm.getScmStorageConfig().getScmId());
+              .setScmId(scm.getScmStorageConfig().getScmId())
+              .setMetaDataLayoutVersion(scm.getLayoutVersionManager().getMetadataLayoutVersion());
       return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
