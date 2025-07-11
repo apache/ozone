@@ -120,7 +120,9 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
   }
 
   private static <A, B> CheckedFunction<A, B, CodecException> unsupportedBackward() {
-    return a -> { throw new UnsupportedOperationException("Unsupported backward conversion"); };
+    return a -> {
+      throw new UnsupportedOperationException("Unsupported backward conversion");
+    };
   }
 
   @Override
