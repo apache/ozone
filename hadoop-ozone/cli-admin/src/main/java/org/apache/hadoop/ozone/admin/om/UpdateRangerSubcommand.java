@@ -65,6 +65,7 @@ public class UpdateRangerSubcommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
+
     if (StringUtils.isEmpty(omServiceId) && StringUtils.isEmpty(omHost)) {
       System.err.println("Error: Please specify -id or -host");
       return null;
