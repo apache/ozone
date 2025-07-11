@@ -30,6 +30,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
@@ -38,6 +40,7 @@ import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,8 +86,13 @@ public class SnapshotChainRepair extends RepairTool {
 
   @Override
   public void execute() throws Exception {
+    ManagedConfigOptions configOptions = new ManagedConfigOptions();
+    ManagedDBOptions dbOptions = new ManagedDBOptions();
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
+
+    // Preserve all the previous DB options
+    OptionsUtil.loadLatestOptions(configOptions, dbPath, dbOptions, cfDescList);
 
     try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle snapshotInfoCfh = RocksDBUtils.getColumnFamilyHandle(SNAPSHOT_INFO_TABLE, cfHandleList);
@@ -153,6 +161,8 @@ public class SnapshotChainRepair extends RepairTool {
           "Make sure that Ozone entity (OM, SCM or DN) is not running for the give dbPath and current host.");
       LOG.error(exception.toString());
     } finally {
+      IOUtils.closeQuietly(configOptions);
+      IOUtils.closeQuietly(dbOptions);
       IOUtils.closeQuietly(cfHandleList);
     }
   }

@@ -29,11 +29,14 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
@@ -65,10 +68,14 @@ public class TransactionInfoRepair extends RepairTool {
 
   @Override
   public void execute() throws Exception {
+    ManagedConfigOptions configOptions = new ManagedConfigOptions();
+    ManagedDBOptions dbOptions = new ManagedDBOptions();
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-    List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(
-        dbPath);
+    List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
     String columnFamilyName = getColumnFamily(serviceToBeOffline()).getName();
+
+    // Preserve all the previous DB options
+    OptionsUtil.loadLatestOptions(configOptions, dbPath, dbOptions, cfDescList);
 
     try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle transactionInfoCfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
@@ -99,6 +106,8 @@ public class TransactionInfoRepair extends RepairTool {
       error("Failed to update the RocksDB for the given path: %s", dbPath);
       throw new IOException("Failed to update RocksDB.", exception);
     } finally {
+      IOUtils.closeQuietly(configOptions);
+      IOUtils.closeQuietly(dbOptions);
       IOUtils.closeQuietly(cfHandleList);
     }
   }
