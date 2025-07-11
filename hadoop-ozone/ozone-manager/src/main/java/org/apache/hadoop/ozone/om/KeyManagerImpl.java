@@ -723,7 +723,7 @@ public class KeyManagerImpl implements KeyManager {
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
       int count) throws IOException {
-    boolean isDataDistributionEnabled = ozoneManager.getScmInfo().getMetaDataLayoutVersion() <
+    boolean isDataDistributionEnabled = ozoneManager.getScmInfo().getMetaDataLayoutVersion() >=
         HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
 
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
@@ -753,7 +753,7 @@ public class KeyManagerImpl implements KeyManager {
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
               BlockGroup keyBlocks;
-              if (isDataDistributionEnabled) {
+              if (!isDataDistributionEnabled) {
                 List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
                     .flatMap(versionLocations -> versionLocations.getLocationList().stream()
                         .map(b -> new BlockID(b.getContainerID(), b.getLocalID())))

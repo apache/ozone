@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -1066,10 +1067,12 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private long countBlocksPendingDeletion() {
     try {
+      boolean isDDEnabled = scmBlockTestingClient.getScmInfo().getMetaDataLayoutVersion() >=
+          HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
       return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
           .getKeyBlocksList()
           .stream()
-          .map(BlockGroup::getAllBlocks)
+          .map(isDDEnabled ? BlockGroup::getAllBlocks : BlockGroup::getBlockIDs)
           .mapToLong(Collection::size)
           .sum();
     } catch (IOException e) {

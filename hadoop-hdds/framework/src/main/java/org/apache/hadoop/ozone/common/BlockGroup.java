@@ -43,7 +43,7 @@ public final class BlockGroup {
   public List<DeletedBlock> getAllBlocks() {
     return deletedBlocks;
   }
-  
+
   public List<BlockID> getBlockIDs() {
     return blockIDs;
   }
@@ -54,11 +54,12 @@ public final class BlockGroup {
 
   public KeyBlocks getProto() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
-    if (!deletedBlocks.isEmpty()) {
+    if (deletedBlocks != null && !deletedBlocks.isEmpty()) {
       for (DeletedBlock block : deletedBlocks) {
         kbb.addDeletedBlocks(block.getProtobuf());
       }
-    } else {
+    }
+    if (blockIDs != null && !blockIDs.isEmpty()) {
       for (BlockID block : blockIDs) {
         kbb.addBlocks(block.getProtobuf());
       }
