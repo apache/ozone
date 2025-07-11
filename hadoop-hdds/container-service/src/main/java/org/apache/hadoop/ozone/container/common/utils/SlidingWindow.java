@@ -17,59 +17,90 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.util.Time;
 
 /**
- * A time-based sliding window implementation that tracks only failed test results within a specified time duration.
- * It determines failure based on a configured tolerance threshold.
- *
- * The queue saves one failure more than the configured tolerance threshold,
- * so that the window can be considered failed.
+ * A time-based sliding window implementation that tracks event timestamps.
  */
 public class SlidingWindow {
-  private final long windowDuration;
-  private final TimeUnit timeUnit;
-  private final int failureTolerance;
-  private final Deque<Long> failureTimestamps;
+  private final Object lock = new Object();
+  private final int windowSize;
+  private final Deque<Long> timestamps;
+  private final long expiryDurationMillis;
+  private final Duration expiryDuration;
 
   /**
-   * @param failureTolerance the number of failures that can be tolerated before the window is considered failed
-   * @param windowDuration   the duration of the sliding window
-   * @param timeUnit         the time unit of the window duration
+   * @param windowSize     the maximum number of events that are tracked
+   * @param expiryDuration the duration after which an entry in the window expires
    */
-  public SlidingWindow(int failureTolerance, long windowDuration, TimeUnit timeUnit) {
-    this.windowDuration = windowDuration;
-    this.timeUnit = timeUnit;
-    this.failureTolerance = failureTolerance;
-    // If the failure tolerance is high, we limit the queue size to 100 as we want to control the memory usage
-    this.failureTimestamps = new ArrayDeque<>(Math.min(failureTolerance + 1, 100));
+  public SlidingWindow(int windowSize, Duration expiryDuration) {
+    if (windowSize <= 0) {
+      throw new IllegalArgumentException("Window size must be greater than 0");
+    }
+    if (expiryDuration.isNegative() || expiryDuration.isZero()) {
+      throw new IllegalArgumentException("Expiry duration must be greater than 0");
+    }
+    this.expiryDuration = expiryDuration;
+    this.expiryDurationMillis = expiryDuration.toMillis();
+    this.windowSize = windowSize;
+    // We limit the initial queue size to 100 to control the memory usage
+    this.timestamps = new ArrayDeque<>(Math.min(windowSize + 1, 100));
   }
 
-  public synchronized void add(boolean result) {
-    if (!result) {
-      if (failureTolerance > 0 && failureTimestamps.size() > failureTolerance) {
-        failureTimestamps.remove();
+  public void add() {
+    synchronized (lock) {
+      removeExpired();
+
+      if (isFull()) {
+        timestamps.remove();
       }
-      long currentTime = System.currentTimeMillis();
-      failureTimestamps.addLast(currentTime);
-    }
 
-    removeExpiredFailures();
+      timestamps.add(getCurrentTime());
+    }
   }
 
-  public synchronized boolean isFailed() {
-    removeExpiredFailures();
-    return failureTimestamps.size() > failureTolerance;
+  /**
+   * Checks if the sliding window has exceeded its maximum size.
+   * This is useful to track if we have encountered more events than the window's defined limit.
+   * @return true if the number of tracked timestamps in the sliding window
+   *         exceeds the specified window size, false otherwise.
+   */
+  public boolean isFull() {
+    synchronized (lock) {
+      removeExpired();
+      return timestamps.size() > windowSize;
+    }
   }
 
-  private void removeExpiredFailures() {
-    long currentTime = System.currentTimeMillis();
-    long expirationThreshold = currentTime - timeUnit.toMillis(windowDuration);
+  private void removeExpired() {
+    synchronized (lock) {
+      long currentTime = getCurrentTime();
+      long expirationThreshold = currentTime - expiryDurationMillis;
 
-    while (!failureTimestamps.isEmpty() && failureTimestamps.peek() < expirationThreshold) {
-      failureTimestamps.remove();
+      while (!timestamps.isEmpty() && timestamps.peek() < expirationThreshold) {
+        timestamps.remove();
+      }
     }
+  }
+
+  public int getWindowSize() {
+    return windowSize;
+  }
+
+  private int size() {
+    synchronized (lock) {
+      return timestamps.size();
+    }
+  }
+
+  public Duration getExpiryDuration() {
+    return expiryDuration;
+  }
+
+  private long getCurrentTime() {
+    return Time.monotonicNow();
   }
 }

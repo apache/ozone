@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.container.common.utils;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,139 +40,78 @@ public class TestSlidingWindow {
 
   @BeforeEach
   public void setup() {
-    slidingWindow = new SlidingWindow(3, 5, TimeUnit.SECONDS);
+    slidingWindow = new SlidingWindow(3, Duration.ofSeconds(5));
   }
 
   @Test
-  public void testAddSuccessfulResult() {
-    for (int i = 0; i < 10; i++) {
-      slidingWindow.add(true);
-      assertFalse(slidingWindow.isFailed());
+  public void testConstructorValidation() {
+    // Test invalid window size
+    assertThrows(IllegalArgumentException.class, () -> 
+        new SlidingWindow(0, Duration.ofMillis(100)));
+    assertThrows(IllegalArgumentException.class, () -> 
+        new SlidingWindow(-1, Duration.ofMillis(100)));
+
+    // Test invalid expiry duration
+    assertThrows(IllegalArgumentException.class, () -> 
+        new SlidingWindow(1, Duration.ofMillis(0)));
+    assertThrows(IllegalArgumentException.class, () -> 
+        new SlidingWindow(1, Duration.ofMillis(-1)));
+  }
+
+  @Test
+  public void testAdd() {
+    for (int i = 0; i < slidingWindow.getWindowSize(); i++) {
+      slidingWindow.add();
+      assertFalse(slidingWindow.isFull());
     }
+
+    slidingWindow.add();
+    assertTrue(slidingWindow.isFull());
   }
 
   @Test
-  public void testAddFailedResult() {
-    for (int i = 0; i < 3; i++) {
-      slidingWindow.add(false);
-      assertFalse(slidingWindow.isFailed());
-    }
+  public void testEventExpiration() throws InterruptedException {
+    slidingWindow = new SlidingWindow(2, Duration.ofMillis(500));
 
-    // Adding one more failed result should mark as failed
-    slidingWindow.add(false);
-    assertTrue(slidingWindow.isFailed());
-  }
+    // Add events to reach threshold
+    slidingWindow.add();
+    slidingWindow.add();
+    slidingWindow.add();
+    assertTrue(slidingWindow.isFull());
 
-  @Test
-  public void testMixedResults() {
-    slidingWindow.add(false);
-    slidingWindow.add(false);
-    slidingWindow.add(false);
-    assertFalse(slidingWindow.isFailed());
-
-    // Add successful result - should not affect failure count
-    slidingWindow.add(true);
-    assertFalse(slidingWindow.isFailed());
-
-    // Add one more failed result - should mark as failed
-    slidingWindow.add(false);
-    assertTrue(slidingWindow.isFailed());
-
-    // Add more successful results - should not affect failure status
-    slidingWindow.add(true);
-    slidingWindow.add(true);
-    assertTrue(slidingWindow.isFailed());
-  }
-
-  @Test
-  public void testFailureExpiration() throws InterruptedException {
-    slidingWindow = new SlidingWindow(2, 500, TimeUnit.MILLISECONDS);
-
-    // Add failed results to reach failure threshold
-    slidingWindow.add(false);
-    slidingWindow.add(false);
-    slidingWindow.add(false);
-    assertTrue(slidingWindow.isFailed());
-
-    // Wait for failures to expire
+    // Wait for events to expire
     Thread.sleep(600);
 
-    assertFalse(slidingWindow.isFailed());
+    assertFalse(slidingWindow.isFull());
 
-    // Add one more failure - should not be enough to mark as failed
-    slidingWindow.add(false);
-    assertFalse(slidingWindow.isFailed());
+    // Add one more event - should not be enough to mark as full
+    slidingWindow.add();
+    assertFalse(slidingWindow.isFull());
   }
 
   @Test
   public void testPartialExpiration() throws InterruptedException {
-    slidingWindow = new SlidingWindow(3, 1, TimeUnit.SECONDS);
+    slidingWindow = new SlidingWindow(3, Duration.ofSeconds(1));
 
-    slidingWindow.add(false);
-    slidingWindow.add(false);
-    slidingWindow.add(false);
-    slidingWindow.add(false);
-    assertTrue(slidingWindow.isFailed());
+    slidingWindow.add();
+    slidingWindow.add();
+    slidingWindow.add();
+    slidingWindow.add();
+    assertTrue(slidingWindow.isFull());
 
     Thread.sleep(600);
-    slidingWindow.add(false); // this will remove the oldest failure as the window is full
+    slidingWindow.add(); // this will remove the oldest event as the window is full
 
-    // Wait for the oldest failures to expire
+    // Wait for the oldest events to expire
     Thread.sleep(500);
-    assertFalse(slidingWindow.isFailed());
-  }
-
-  @Test
-  public void testZeroFailureTolerance() {
-    // Window with zero failure tolerance
-    SlidingWindow zeroToleranceWindow = new SlidingWindow(0, 5, TimeUnit.SECONDS);
-
-    // Any failure should mark as failed
-    zeroToleranceWindow.add(false);
-    assertTrue(zeroToleranceWindow.isFailed());
-  }
-
-  @Test
-  public void testHighFailureTolerance() {
-    SlidingWindow highToleranceWindow = new SlidingWindow(10, 5, TimeUnit.SECONDS);
-
-    // Add failures less than tolerance
-    for (int i = 0; i < 10; i++) {
-      highToleranceWindow.add(false);
-      assertFalse(highToleranceWindow.isFailed());
-    }
-
-    // Add one more to reach tolerance
-    highToleranceWindow.add(false);
-    assertTrue(highToleranceWindow.isFailed());
-  }
-
-  @Test
-  public void testFailureQueueManagement() {
-    SlidingWindow window = new SlidingWindow(3, 5, TimeUnit.SECONDS);
-
-    // Add more failures than the tolerance
-    for (int i = 0; i < 10; i++) {
-      window.add(false);
-    }
-
-    // Should be failed
-    assertTrue(window.isFailed());
-
-    // Add successful results - should not affect failure status
-    for (int i = 0; i < 5; i++) {
-      window.add(true);
-    }
-
-    // Should still be failed
-    assertTrue(window.isFailed());
+    assertFalse(slidingWindow.isFull());
   }
 
   @Test
   @Timeout(value = 10)
   public void testConcurrentAccess() throws InterruptedException {
-    // Create a sliding window with tolerance of 5
-    final SlidingWindow concurrentWindow = new SlidingWindow(5, 5, TimeUnit.SECONDS);
+    // Create a sliding window with size of 5
+    final SlidingWindow concurrentWindow = new SlidingWindow(5, Duration.ofSeconds(5));
     final int threadCount = 10;
     final int operationsPerThread = 100;
     final ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -180,17 +121,14 @@ public class TestSlidingWindow {
 
     // Create and submit tasks
     for (int i = 0; i < threadCount; i++) {
-      final int threadId = i;
       executor.submit(() -> {
         try {
           startLatch.await(); // Wait for all threads to be ready
           for (int j = 0; j < operationsPerThread; j++) {
-            // Alternate between adding success and failure based on thread ID and iteration
-            boolean result = (threadId + j) % 2 == 0;
-            concurrentWindow.add(result);
-            // Check failure status occasionally
+            concurrentWindow.add();
+            // Check window status occasionally
             if (j % 10 == 0) {
-              concurrentWindow.isFailed();
+              concurrentWindow.isFull();
             }
           }
         } catch (Exception e) {
@@ -212,23 +150,8 @@ public class TestSlidingWindow {
 
     // Verify no exceptions occurred
     assertFalse(hasError.get(), "Concurrent operations caused errors");
-  }
 
-  @Test
-  public void testEdgeCases() {
-    // Test with minimum values
-    SlidingWindow minWindow = new SlidingWindow(1, 1, TimeUnit.MILLISECONDS);
-    minWindow.add(false);
-    assertFalse(minWindow.isFailed());
-    minWindow.add(false);
-    assertTrue(minWindow.isFailed());
-
-    // Test with large values
-    SlidingWindow maxWindow = new SlidingWindow(Integer.MAX_VALUE - 1,
-        Long.MAX_VALUE / 1000, TimeUnit.SECONDS);
-    for (int i = 0; i < 100; i++) {
-      maxWindow.add(false);
-      assertFalse(maxWindow.isFailed());
-    }
+    // Window should be full after all those operations
+    assertTrue(concurrentWindow.isFull());
   }
 }
