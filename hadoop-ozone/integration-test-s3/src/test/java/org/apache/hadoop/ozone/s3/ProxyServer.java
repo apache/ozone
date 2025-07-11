@@ -17,22 +17,19 @@
 
 package org.apache.hadoop.ozone.s3;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.InetSocketAddress;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletRequestWrapper;
+import javax.servlet.http.HttpServletResponse;
+import org.eclipse.jetty.proxy.ProxyServlet;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,17 +41,9 @@ public class ProxyServer {
   private static final Logger LOG = LoggerFactory.getLogger(ProxyServer.class);
   private final List<String> s3gEndpoints;
   private final LoadBalanceStrategy loadBalanceStrategy;
-  private final HttpServer server;
+  private final Server server;
   private final String host;
   private final int port;
-  private final ExecutorService executor;
-
-  // Add timeout configurations for better handling of large file operations
-  private static final int CONNECT_TIMEOUT_MS = 60000; // 60 seconds
-  private static final int READ_TIMEOUT_MS = 300000;   // 5 minutes
-
-  private static final int BUFFER_SIZE = 64 * 1024; // 64KB
-  private static final ThreadLocal<byte[]> IO_BUFFER = ThreadLocal.withInitial(() -> new byte[BUFFER_SIZE]);
 
   public ProxyServer(List<String> s3gEndpoints, String host, int proxyPort) throws Exception {
     this(s3gEndpoints, host, proxyPort, new RoundRobinStrategy());
@@ -66,192 +55,156 @@ public class ProxyServer {
     this.loadBalanceStrategy = loadBalanceStrategy;
     this.host = host;
     this.port = proxyPort;
-    server = HttpServer.create(new InetSocketAddress(host, proxyPort), 0);
-    server.createContext("/", new ProxyHandler());
 
-    this.executor = Executors.newCachedThreadPool();
-    server.setExecutor(executor);
+    server = new Server(proxyPort);
+    ServletContextHandler context = new ServletContextHandler();
+    context.setContextPath("/");
+
+    ProxyHandler proxyHandler = new ProxyHandler();
+    ServletHolder proxyHolder = new ServletHolder(proxyHandler);
+
+    proxyHolder.setInitParameter("proxyTo", "");
+
+
+    context.addServlet(proxyHolder, "/*");
+    server.setHandler(context);
 
     LOG.info("ProxyServer initialized with endpoints: {}", s3gEndpoints);
     LOG.info("Load balance strategy: {}", loadBalanceStrategy.getClass().getSimpleName());
-    LOG.info("Timeout settings - Connect: {}ms, Read: {}ms", CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS);
   }
 
-  public void start() {
+  public void start() throws Exception {
     server.start();
     LOG.info("Proxy started on http://{}:{}", host, port);
-
   }
 
-  public void stop() {
-    server.stop(0);
-    executor.shutdownNow();
+  public void stop() throws Exception {
+    server.stop();
     LOG.info("Proxy stopped on http://{}:{}", host, port);
   }
 
-  private class ProxyHandler implements HttpHandler {
-    @Override
-    public void handle(HttpExchange exchange) throws IOException {
-      HttpURLConnection conn = null;
-      try {
-        String target = loadBalanceStrategy.selectEndpoint(s3gEndpoints) + exchange.getRequestURI().toString();
-        conn = createConnection(exchange, target);
-        String requestMethod = conn.getRequestMethod();
-
-        LOG.info("Received request and forwarding request to [{}] {}", requestMethod, target);
-
-        copyRequestHeaders(exchange, conn);
-        addForwardedHeaders(exchange, conn);
-        copyRequestBody(exchange, conn);
-
-        int responseCode = conn.getResponseCode();
-        copyResponseHeaders(exchange, conn);
-
-        if (requestMethod.equals("HEAD") || responseCode == HttpURLConnection.HTTP_NO_CONTENT) {
-          exchange.sendResponseHeaders(responseCode, 0);
-          return;
-        }
-
-        copyResponseBody(exchange, conn, responseCode);
-
-      } catch (Exception e) {
-        LOG.error("Error forwarding request to S3G endpoint", e);
-        sendErrorResponse(exchange, e);
-      } finally {
-        closeResources(conn, exchange);
-      }
-    }
-
-    private void sendErrorResponse(HttpExchange exchange, Exception e) {
-      try {
-        exchange.sendResponseHeaders(502, 0);
-        try (OutputStream os = exchange.getResponseBody()) {
-          os.write(("Proxy error: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
-        }
-      } catch (IOException ioException) {
-        LOG.error("Failed to send error response", ioException);
-      }
-    }
-
-    private void closeResources(HttpURLConnection conn, HttpExchange exchange) {
-      if (conn != null) {
-        conn.disconnect();
-      }
-      exchange.close();
-    }
-
-    private void addForwardedHeaders(HttpExchange exchange, HttpURLConnection conn) {
-      String remoteAddr = exchange.getRemoteAddress().getAddress().getHostAddress();
-      String xff = exchange.getRequestHeaders().getFirst("X-Forwarded-For");
-
-      if (StringUtils.isNotBlank(xff)) {
-        conn.setRequestProperty("X-Forwarded-For", xff + ", " + remoteAddr);
-      } else {
-        conn.setRequestProperty("X-Forwarded-For", remoteAddr);
-      }
-
-      conn.setRequestProperty("X-Forwarded-Proto", "http");
-    }
-
-    private void copyResponseBody(HttpExchange exchange, HttpURLConnection conn, int responseCode) throws IOException {
-      String transferEncoding = conn.getHeaderField("Transfer-Encoding");
-      String contentLengthStr = conn.getHeaderField("Content-Length");
-
-      if (transferEncoding != null && transferEncoding.equalsIgnoreCase("chunked")) {
-        exchange.sendResponseHeaders(responseCode, 0);
-      } else {
-        long contentLength = Optional.ofNullable(contentLengthStr).map(Long::parseLong).orElse(0L);
-        exchange.sendResponseHeaders(responseCode, contentLength);
-      }
-
-      try (InputStream is = responseCode >= 400 ? conn.getErrorStream() : conn.getInputStream();
-           OutputStream os = exchange.getResponseBody()) {
-        if (is != null) {
-          IOUtils.copyLarge(is, os, IO_BUFFER.get());
-          os.flush();
-        }
-      }
-    }
-
-    private HttpURLConnection createConnection(HttpExchange exchange, String target) throws IOException {
-      HttpURLConnection conn = (HttpURLConnection) new URL(target).openConnection();
-      String requestMethod = exchange.getRequestMethod();
-      conn.setRequestMethod(requestMethod);
-      conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
-      conn.setReadTimeout(READ_TIMEOUT_MS);
-      return conn;
-    }
-
-    private void copyRequestBody(HttpExchange exchange, HttpURLConnection conn) throws IOException {
-      String method = exchange.getRequestMethod().toLowerCase();
-      if (method.equals("post") || method.equals("put") || method.equals("patch") || method.equals("delete")) {
-        String contentLength = exchange.getRequestHeaders().getFirst("Content-Length");
-        conn.setDoOutput(true);
-        if (StringUtils.isNotBlank(contentLength)) {
-          conn.setFixedLengthStreamingMode(Long.parseLong(contentLength));
-        } else {
-          conn.setChunkedStreamingMode(0);
-        }
-        try (InputStream reqBody = exchange.getRequestBody();
-             OutputStream os = conn.getOutputStream()) {
-          IOUtils.copy(reqBody, os);
-        }
-      }
-    }
-
-    private void copyRequestHeaders(HttpExchange exchange, HttpURLConnection conn) {
-      for (String headerName : exchange.getRequestHeaders().keySet()) {
-        if (isHopByHopHeader(headerName)) {
-          continue;
-        }
-
-        // Skip Expect header to avoid 100-continue issue
-        if ("Expect".equalsIgnoreCase(headerName)) {
-          continue;
-        }
-
-        List<String> headerValues = exchange.getRequestHeaders().get(headerName);
-        if (headerValues == null || headerValues.isEmpty()) {
-          continue;
-        }
-
-        for (String value : headerValues) {
-          conn.addRequestProperty(headerName, value);
-        }
-      }
-    }
-  }
-
-  private void copyResponseHeaders(HttpExchange exchange, HttpURLConnection conn) {
-    for (String headerName : conn.getHeaderFields().keySet()) {
-      if (headerName == null || isHopByHopHeader(headerName)) {
-        continue;
-      }
-
-      List<String> headerValues = conn.getHeaderFields().get(headerName);
-      if (headerValues == null) {
-        continue;
-      }
-
-      for (String headerValue : headerValues) {
-        exchange.getResponseHeaders().add(headerName, headerValue);
-      }
-    }
-  }
-
   /**
-   * Checks if a header is a hop-by-hop header that should not be forwarded by proxies.
-   * These headers are meaningful only for a single transport-level connection.
-   *
-   * @param header the header name to check (case-insensitive)
-   * @return true if the header should be filtered out, false otherwise
-   * @see <a href="https://datatracker.ietf.org/doc/html/rfc7230#section-6.1">RFC 7230 Section 6.1</a>
+   * ProxyHandler is a subclass of Jetty's ProxyServlet.Transparent.
+   * It implements logic for request rewriting, service handling,
+   * proxy response failure, and rewrite failure handling.
+   * This handler is mainly used to forward requests to different S3G endpoints
+   * based on the load balancing strategy, handle special HTTP headers (such as Expect),
+   * and manage exceptions during the proxy process.
    */
-  private boolean isHopByHopHeader(String header) {
-    String lowerName = header.toLowerCase();
-    return "connection".equals(lowerName) || "keep-alive".equals(lowerName)
-        || "proxy-authenticate".equals(lowerName) || "proxy-authorization".equals(lowerName)
-        || "te".equals(lowerName) || "trailers".equals(lowerName)
-        || "transfer-encoding".equals(lowerName) || "upgrade".equals(lowerName);
+  public class ProxyHandler extends ProxyServlet.Transparent {
+
+    @Override
+    public void init() throws ServletException {
+      super.init();
+
+      LOG.info("MyProxyHandler initialized with {} endpoints",
+          s3gEndpoints != null ? s3gEndpoints.size() : 0);
+      if (s3gEndpoints != null) {
+        LOG.info("Endpoints: {}", s3gEndpoints);
+      }
+      LOG.info("Load balance strategy: {}", loadBalanceStrategy.getClass().getSimpleName());
+    }
+
+    @Override
+    protected String rewriteTarget(HttpServletRequest request) {
+
+      String baseUrl = loadBalanceStrategy.selectEndpoint(s3gEndpoints);
+
+      String requestUri = request.getRequestURI();
+      String queryString = request.getQueryString();
+
+      StringBuilder targetUrl = new StringBuilder(baseUrl);
+      if (requestUri != null) {
+        targetUrl.append(requestUri);
+      }
+      if (queryString != null) {
+        targetUrl.append('?').append(queryString);
+      }
+
+      String finalUrl = targetUrl.toString();
+      LOG.info("Rewriting target URL: [{}] {}", request.getMethod(), finalUrl);
+      return finalUrl;
+    }
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response)
+        throws ServletException, IOException {
+
+      // Remove the Expect header to avoid Jetty's 100-continue handling issue:
+      // In some scenarios (e.g. testPutObjectEmpty), when content-length != 0, Jetty triggers the 100-continue process,
+      // causing the server to wait for a 100 response code. However, Jetty only sends the 100 response
+      // when the InputStream is read, which can lead to request failures.
+      if (request.getHeader("Expect") != null) {
+        LOG.info("Removing Expect header: {}", request.getHeader("Expect"));
+
+        request = new HttpServletRequestWrapper(request) {
+          @Override
+          public String getHeader(String name) {
+            if ("Expect".equalsIgnoreCase(name)) {
+              return null;
+            }
+            return super.getHeader(name);
+          }
+
+          @Override
+          public Enumeration<String> getHeaders(String name) {
+            if ("Expect".equalsIgnoreCase(name)) {
+              return Collections.emptyEnumeration();
+            }
+            return super.getHeaders(name);
+          }
+
+          @Override
+          public Enumeration<String> getHeaderNames() {
+            List<String> headerNames = new ArrayList<>();
+            Enumeration<String> originalHeaders = super.getHeaderNames();
+            while (originalHeaders.hasMoreElements()) {
+              String headerName = originalHeaders.nextElement();
+              if (!"Expect".equalsIgnoreCase(headerName)) {
+                headerNames.add(headerName);
+              }
+            }
+            return Collections.enumeration(headerNames);
+          }
+        };
+      }
+
+      super.service(request, response);
+    }
+
+    @Override
+    protected void onProxyResponseFailure(HttpServletRequest clientRequest,
+                                          HttpServletResponse proxyResponse,
+                                          org.eclipse.jetty.client.api.Response serverResponse,
+                                          Throwable failure) {
+      LOG.error("===  Proxy Response Failure===");
+      LOG.error("Client request: {} {}", clientRequest.getMethod(), clientRequest.getRequestURL());
+      if (serverResponse != null) {
+        LOG.error("Server response status: {}", serverResponse.getStatus());
+      } else {
+        LOG.error("Server response is null - connection failed");
+      }
+
+      LOG.error("Failure details:", failure);
+      super.onProxyResponseFailure(clientRequest, proxyResponse, serverResponse, failure);
+    }
+
+    @Override
+    protected void onProxyRewriteFailed(HttpServletRequest clientRequest,
+                                        HttpServletResponse proxyResponse) {
+      LOG.error("=== Proxy Rewrite Failed ===");
+      LOG.error("Client request: {} {}", clientRequest.getMethod(), clientRequest.getRequestURL());
+      LOG.error("Rewrite target returned null or invalid URL");
+
+      try {
+        proxyResponse.setStatus(HttpServletResponse.SC_BAD_GATEWAY);
+        proxyResponse.setContentType("text/plain");
+        proxyResponse.getWriter().write("Proxy configuration error: Unable to rewrite target URL");
+      } catch (IOException e) {
+        LOG.error("Failed to send rewrite error response", e);
+      }
+
+      super.onProxyRewriteFailed(clientRequest, proxyResponse);
+    }
   }
 }
