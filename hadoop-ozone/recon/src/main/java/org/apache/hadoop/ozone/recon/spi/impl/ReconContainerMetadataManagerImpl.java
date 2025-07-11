@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.KEY_CONTA
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -453,26 +454,45 @@ public class ReconContainerMetadataManagerImpl
   }
 
   private class ContainerMetadataIterator implements SeekableIterator<Long, ContainerMetadata> {
-    private TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerIterator;
-    private KeyValue<ContainerKeyPrefix, Integer> currentKey;
+    private TableIterator<ContainerKeyPrefix, ? extends KeyValue<ContainerKeyPrefix, Integer>> containerMetaIterator;
+    private TableIterator<Long, ? extends KeyValue<Long, Long>> containerIterator;
+    private KeyValue<Long, Long> currentKey;
+    private KeyValue<ContainerKeyPrefix, Integer> currentMetadata;
 
     ContainerMetadataIterator()
             throws IOException {
-      containerIterator = containerKeyTable.iterator();
+      containerMetaIterator = containerKeyTable.iterator();
+      containerIterator = containerKeyCountTable.iterator();
       currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
+      currentMetadata = containerMetaIterator.hasNext() ? containerMetaIterator.next() : null;
     }
 
     @Override
     public void seek(Long containerID) throws IOException {
       ContainerKeyPrefix seekKey = ContainerKeyPrefix.get(containerID);
-      containerIterator.seek(seekKey);
+      containerIterator.seek(containerID);
+      containerMetaIterator.seek(seekKey);
       currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
+      currentMetadata = containerMetaIterator.hasNext() ? containerMetaIterator.next() : null;
+    }
+
+    @Override
+    public Long peekNextKey() {
+      if (currentKey == null) {
+        return null;
+      }
+      try {
+        return currentKey.getKey();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
     }
 
     @Override
     public void close() {
       try {
         containerIterator.close();
+        containerMetaIterator.close();
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }
@@ -489,22 +509,41 @@ public class ReconContainerMetadataManagerImpl
         if (currentKey == null) {
           return null;
         }
+
+        ContainerMetadata containerMetadata = new ContainerMetadata(currentKey.getKey());
+        if (currentMetadata == null || currentKey.getKey() != currentMetadata.getKey().getContainerId()) {
+          if (currentKey.getValue() > 0) {
+            Long containerID = currentMetadata == null ? null : currentMetadata.getKey().getContainerId();
+            LOG.error("ContainerMetaData and containerIDs count do not match for container Id: {}. Container Count " +
+                "Table has {} counts and container Metadata doesn't have container and next containerId is {}",
+                currentKey.getKey(), currentKey.getValue(), containerID);
+          }
+          currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
+          if (currentKey != null) {
+            seek(currentKey.getKey());
+          }
+          return containerMetadata;
+        }
+
         Map<PipelineID, Pipeline> pipelines = new HashMap<>();
-        ContainerMetadata containerMetadata = new ContainerMetadata(currentKey.getKey().getContainerId());
+        int count = 0;
         do {
-          ContainerKeyPrefix containerKeyPrefix = this.currentKey.getKey();
-          containerMetadata.setNumberOfKeys(containerMetadata.getNumberOfKeys() + 1);
+          ContainerKeyPrefix containerKeyPrefix = this.currentMetadata.getKey();
+          count++;
           getPipelines(containerKeyPrefix).forEach(pipeline -> {
             pipelines.putIfAbsent(pipeline.getId(), pipeline);
           });
-          if (containerIterator.hasNext()) {
-            currentKey = containerIterator.next();
-          } else {
-            currentKey = null;
-          }
-        } while (currentKey != null &&
-                currentKey.getKey().getContainerId() == containerMetadata.getContainerID());
+          currentMetadata = containerMetaIterator.hasNext() ? containerMetaIterator.next() : null;
+        } while (currentMetadata != null &&
+                 currentMetadata.getKey().getContainerId() == containerMetadata.getContainerID());
+        containerMetadata.setNumberOfKeys(count);
         containerMetadata.setPipelines(new ArrayList<>(pipelines.values()));
+        if (currentKey.getValue() != count) {
+          LOG.error("ContainerMetaData and containerIDs count do not match for container Id: {}. Container Count " +
+              "Table has {} counts and container Metadata only has {} keys",
+              currentKey.getKey(), currentKey.getValue(), count);
+        }
+        currentKey = containerIterator.hasNext() ? containerIterator.next() : null;
         return containerMetadata;
       } catch (IOException e) {
         throw new UncheckedIOException(e);
@@ -695,5 +734,21 @@ public class ReconContainerMetadataManagerImpl
       LOG.info("It took {} seconds to initialized {} records"
           + " to KEY_CONTAINER table", (double) duration / 1000, count);
     }
+  }
+
+
+  @VisibleForTesting
+  public void deleteContainerKeyRecord(ContainerKeyPrefix containerKeyPrefix) throws IOException {
+    containerKeyTable.delete(containerKeyPrefix);
+  }
+
+  @VisibleForTesting
+  public void deleteKeyContainerRecord(KeyPrefixContainer keyPrefixContainer) throws IOException {
+    keyContainerTable.delete(keyPrefixContainer);
+  }
+
+  @VisibleForTesting
+  public void deleteContainerKeyCountRecord(Long containerID) throws IOException {
+    containerKeyCountTable.delete(containerID);
   }
 }

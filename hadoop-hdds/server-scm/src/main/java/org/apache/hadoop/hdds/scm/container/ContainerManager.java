@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.container;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -72,6 +74,42 @@ public interface ContainerManager extends Closeable {
    */
   List<ContainerInfo> getContainers(ContainerID startID, int count);
 
+<<<<<<< Updated upstream
+=======
+  /**
+   * Returns the containers iterator with startID.
+   *
+   * @param startID start containerID, >=0,
+   * start searching at the head if 0.
+   *
+   * @return an iterator of container.
+   */
+  Iterator<ContainerInfo> getContainerInfoIterator(ContainerID startID);
+
+  /**
+   * Returns the containers iterator with startID and filters the values in iterator.
+   *
+   * @param startID start containerID, >=0,
+   * start searching at the head if 0.
+   * @param filter predicate value
+   *
+   * @return an iterator of container.
+   */
+  Iterator<ContainerInfo> getContainerInfoIterator(ContainerID startID, Predicate<ContainerInfo> filter);
+
+  /**
+   * Returns the containers iterator in a certain state with startID.
+   *
+   * @param state LifeCycleState of the container.
+   * @param startID start containerID, >=0,
+   * start searching at the head if 0.
+   *
+   * @return an iterator of container.
+   */
+  Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID startID);
+
+
+>>>>>>> Stashed changes
   List<ContainerInfo> getContainers(ReplicationType type);
 
   /**

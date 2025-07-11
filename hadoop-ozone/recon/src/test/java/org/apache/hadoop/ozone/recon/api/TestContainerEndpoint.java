@@ -103,6 +103,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
+import org.apache.hadoop.ozone.util.SeekableIterator;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.junit.jupiter.api.BeforeEach;
@@ -1394,6 +1395,9 @@ public class TestContainerEndpoint {
   public void testGetContainerInsightsNonOMContainers()
       throws IOException, TimeoutException {
     putContainerInfos(2);
+
+    // Delete container Id 2 from SCM so that it is missing in SCM
+    // Delete the presence of container Id 2 from th containerKeyTable & keyContainerTable
     List<ContainerKeyPrefix> deletedContainerKeyList =
         reconContainerMetadataManager.getKeyPrefixesForContainer(2).entrySet()
             .stream().map(entry -> entry.getKey()).collect(
@@ -1407,6 +1411,8 @@ public class TestContainerEndpoint {
         LOG.error("Unable to write Container Key Prefix data in Recon DB.", e);
       }
     });
+    // Delete the presence of container Id 2 from the containerKeyCountTable
+    reconContainerMetadataManager.deleteContainerKeyCountRecord(2L);
     Response containerInsights =
         containerEndpoint.getContainerMisMatchInsights(10, 0, "OM");
     Map<String, Object> response =
@@ -1427,6 +1433,87 @@ public class TestContainerEndpoint {
     assertEquals(1, containerDiscrepancyInfoList.size());
     assertEquals("SCM", containerDiscrepancyInfo.getExistsAt());
   }
+
+  @Test
+  public void testMismatchAPIHandlesEmptyContainers() throws Exception {
+    // Create containers with 0 keys - these should be filtered out
+    reconContainerMetadataManager.storeContainerKeyCount(1L, 0L);
+    reconContainerMetadataManager.storeContainerKeyCount(2L, 5L);
+
+    putContainerInfos(1); // Only container 1 exists in SCM
+
+    Response response = containerEndpoint.getContainerMisMatchInsights(10, 0, "SCM");
+    Map<String, Object> responseMap = (Map<String, Object>) response.getEntity();
+    List<ContainerDiscrepancyInfo> containerList =
+        (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
+
+    // Should only return container 2 (has keys > 0), not container 1 (0 keys)
+    assertEquals(1, containerList.size());
+    assertEquals(2L, containerList.get(0).getContainerID());
+  }
+
+  @Test
+  public void testContainerIteratorPeekNextKey() throws Exception {
+    putContainerInfos(3);
+
+    try (SeekableIterator<Long, ContainerMetadata> iterator =
+             reconContainerMetadataManager.getContainersIterator()) {
+
+      // Test peek without consuming
+      Long firstKey = iterator.peekNextKey();
+      assertEquals(1L, firstKey.longValue());
+
+      // Peek again - should return same key
+      Long secondPeek = iterator.peekNextKey();
+      assertEquals(firstKey, secondPeek);
+
+      // Now consume and verify
+      ContainerMetadata first = iterator.next();
+      assertEquals(1L, first.getContainerID());
+
+      // Peek next
+      Long nextKey = iterator.peekNextKey();
+      assertEquals(2L, nextKey.longValue());
+    }
+  }
+
+  // Tweak this test as needed to test out your performance expectations and improvements.
+  @Test
+  public void testMismatchAPIPerformanceWithManyKeys() throws Exception {
+    // Create many containers with many keys each
+    int containerCount = 100;
+    int keysPerContainer = 50;
+
+    for (int i = 1; i <= containerCount; i++) {
+      reconContainerMetadataManager.storeContainerKeyCount((long) i, (long) keysPerContainer);
+
+      // Add some sample key prefixes
+      for (int j = 1; j <= keysPerContainer; j++) {
+        ContainerKeyPrefix prefix = ContainerKeyPrefix.get(i, "key" + j, 0);
+        reconContainerMetadataManager.storeContainerKeyMapping(prefix, 1);
+      }
+    }
+
+    // Only put half the containers in SCM
+    putContainerInfos(containerCount / 2);
+
+    long startTime = System.currentTimeMillis();
+
+    Response response = containerEndpoint.getContainerMisMatchInsights(1000, 0, "SCM");
+
+    long endTime = System.currentTimeMillis();
+    long duration = endTime - startTime;
+
+    // Should complete in reasonable time (adjust threshold as needed)
+    assertTrue(duration < 5000, "API should complete in under 5 seconds");
+
+    Map<String, Object> responseMap = (Map<String, Object>) response.getEntity();
+    List<ContainerDiscrepancyInfo> containerList =
+        (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
+
+    assertEquals(containerCount / 2, containerList.size()); // Missing containers
+  }
+
 
   @Test
   public void testGetContainerInsightsNonOMContainersWithPrevKey()

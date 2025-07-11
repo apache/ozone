@@ -36,6 +36,7 @@ import com.google.common.util.concurrent.Striped;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -44,6 +45,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Predicate;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -273,6 +275,16 @@ public final class ContainerStateManagerImpl
     try (AutoCloseableLock ignored = readLock()) {
       return containers.getContainerInfos(start, count);
     }
+  }
+
+  @Override
+  public Iterator<ContainerInfo> getContainerInfoIterator(ContainerID start, Predicate<ContainerInfo> predicate) {
+    return containers.getContainerInfoIterator(start, predicate);
+  }
+
+  @Override
+  public Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID start) {
+    return containers.getContainerInfoIterator(state, start);
   }
 
   @Override

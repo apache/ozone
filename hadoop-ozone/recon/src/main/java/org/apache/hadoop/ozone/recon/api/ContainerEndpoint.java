@@ -29,7 +29,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -583,29 +583,28 @@ public class ContainerEndpoint {
         new ArrayList<>();
     Long minContainerID = prevKey + 1;
     Iterator<ContainerInfo> scmNonDeletedContainers =
-            containerManager.getContainers().stream()
-                    .filter(containerInfo -> (containerInfo.getContainerID() >= minContainerID))
-                    .filter(containerInfo -> containerInfo.getState() != HddsProtos.LifeCycleState.DELETED)
-                    .sorted(Comparator.comparingLong(ContainerInfo::getContainerID)).iterator();
-    ContainerInfo scmContainerInfo = scmNonDeletedContainers.hasNext() ?
-            scmNonDeletedContainers.next() : null;
+            containerManager.getContainerInfoIterator(ContainerID.valueOf(minContainerID),
+              containerInfo -> containerInfo.getState() != HddsProtos.LifeCycleState.DELETED);
+    ContainerInfo scmContainerInfo = scmNonDeletedContainers.hasNext() ? scmNonDeletedContainers.next() : null;
     DataFilter dataFilter = DataFilter.fromValue(missingIn.toUpperCase());
     try (SeekableIterator<Long, ContainerMetadata> omContainers =
-                 reconContainerMetadataManager.getContainersIterator()) {
+           reconContainerMetadataManager.getContainersIterator()) {
       omContainers.seek(minContainerID);
-      ContainerMetadata containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
+
       switch (dataFilter) {
       case SCM:
         List<ContainerMetadata> notSCMContainers = new ArrayList<>();
-        while (containerMetadata != null && notSCMContainers.size() < limit) {
-          Long omContainerID = containerMetadata.getContainerID();
+        while (omContainers.hasNext() && notSCMContainers.size() < limit) {
+          Long omContainerID = omContainers.peekNextKey();
           Long scmContainerID = scmContainerInfo == null ? null : scmContainerInfo.getContainerID();
           if (omContainerID.equals(scmContainerID)) {
-            containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
+            omContainers.seek(omContainerID + 1);
             scmContainerInfo = scmNonDeletedContainers.hasNext() ? scmNonDeletedContainers.next() : null;
           } else if (scmContainerID == null || omContainerID.compareTo(scmContainerID) < 0) {
-            notSCMContainers.add(containerMetadata);
-            containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
+            ContainerMetadata omContainer = omContainers.next();
+            if (omContainer.getNumberOfKeys() > 0) {
+              notSCMContainers.add(omContainer);
+            }
           } else {
             scmContainerInfo = scmNonDeletedContainers.hasNext() ? scmNonDeletedContainers.next() : null;
           }
@@ -627,39 +626,35 @@ public class ContainerEndpoint {
       case OM:
         List<ContainerInfo> nonOMContainers = new ArrayList<>();
         while (scmContainerInfo != null && nonOMContainers.size() < limit) {
-          Long omContainerID = containerMetadata == null ? null : containerMetadata.getContainerID();
+          Long omContainerID = omContainers.peekNextKey();
           Long scmContainerID = scmContainerInfo.getContainerID();
           if (scmContainerID.equals(omContainerID)) {
             scmContainerInfo = scmNonDeletedContainers.hasNext() ? scmNonDeletedContainers.next() : null;
-            containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
+            omContainers.seek(scmContainerInfo == null ? (omContainerID + 1) : scmContainerInfo.getContainerID());
           } else if (omContainerID == null || scmContainerID.compareTo(omContainerID) < 0) {
             nonOMContainers.add(scmContainerInfo);
             scmContainerInfo = scmNonDeletedContainers.hasNext() ? scmNonDeletedContainers.next() : null;
           } else {
-            //Seeking directly to SCM containerId sequential read is just wasteful here if there are too many values
-            // to be read in b/w omContainerID & scmContainerID since (omContainerId<scmContainerID)
-            omContainers.seek(scmContainerID);
-            containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
+            omContainers.seek(scmContainerInfo.getContainerID());
           }
         }
 
-        List<Pipeline> pipelines = new ArrayList<>();
         nonOMContainers.forEach(containerInfo -> {
           ContainerDiscrepancyInfo containerDiscrepancyInfo = new ContainerDiscrepancyInfo();
           containerDiscrepancyInfo.setContainerID(containerInfo.getContainerID());
           containerDiscrepancyInfo.setNumberOfKeys(0);
-          PipelineID pipelineID = null;
+
+          PipelineID pipelineID = containerInfo.getPipelineID();
           try {
-            pipelineID = containerInfo.getPipelineID();
             if (pipelineID != null) {
-              pipelines.add(pipelineManager.getPipeline(pipelineID));
+              Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
+              containerDiscrepancyInfo.setPipelines(Collections.singletonList(pipeline));
             }
           } catch (PipelineNotFoundException e) {
             LOG.debug(
                 "Pipeline not found for container: {} and pipelineId: {}",
                 containerInfo, pipelineID, e);
           }
-          containerDiscrepancyInfo.setPipelines(pipelines);
           containerDiscrepancyInfo.setExistsAt("SCM");
           containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
         });
@@ -720,30 +715,28 @@ public class ContainerEndpoint {
       limit = Integer.MAX_VALUE;
     }
     long minContainerID = prevKey + 1;
-    Iterator<ContainerInfo> deletedStateSCMContainers = containerManager.getContainers().stream()
-        .filter(containerInfo -> containerInfo.getContainerID() >= minContainerID)
-        .filter(containerInfo -> containerInfo.getState() == HddsProtos.LifeCycleState.DELETED)
-        .sorted(Comparator.comparingLong(ContainerInfo::getContainerID)).iterator();
+    Iterator<ContainerInfo> deletedStateSCMContainers = containerManager.getContainerInfoIterator(
+        HddsProtos.LifeCycleState.DELETED, ContainerID.valueOf(minContainerID));
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList;
     try (SeekableIterator<Long, ContainerMetadata> omContainers =
            reconContainerMetadataManager.getContainersIterator()) {
       ContainerInfo scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
-      ContainerMetadata containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
       List<ContainerMetadata> omContainersDeletedInSCM = new ArrayList<>();
-      while (containerMetadata != null && scmContainerInfo != null
+      while (omContainers.hasNext() && scmContainerInfo != null
         && omContainersDeletedInSCM.size() < limit) {
-        Long omContainerID = containerMetadata.getContainerID();
+        Long omContainerID = omContainers.peekNextKey();
         Long scmContainerID = scmContainerInfo.getContainerID();
         if (scmContainerID.equals(omContainerID)) {
-          omContainersDeletedInSCM.add(containerMetadata);
+          ContainerMetadata containerMetadata = omContainers.next();
+          if (containerMetadata.getNumberOfKeys() > 0) {
+            omContainersDeletedInSCM.add(containerMetadata);
+          }
           scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
-          containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
         } else if (scmContainerID.compareTo(omContainerID) < 0) {
           scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
         } else {
           // Seek directly to scmContainerId iterating sequentially is very wasteful here.
           omContainers.seek(scmContainerID);
-          containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
         }
       }
 

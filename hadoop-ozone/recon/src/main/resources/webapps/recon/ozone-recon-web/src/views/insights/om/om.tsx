@@ -721,7 +721,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     cancelDeletedKeysSignal = controller
     request.then(deletedKeysResponse => {
       let deletedContainerKeys = [];
-      deletedContainerKeys = deletedKeysResponse?.data?.containers ?? [];
+      deletedContainerKeys = deletedKeysResponse?.data?.containerDiscrepancyInfo ?? [];
       this.setState({
         loading: false,
         deletedContainerKeysDataSource: deletedContainerKeys
