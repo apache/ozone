@@ -62,10 +62,9 @@ public final class ReconBasicOmKeyInfo extends WithParentObjectId {
   private long parentId;
 
   public static Codec<ReconBasicOmKeyInfo> getCodec() {
-    return new DelegatedCodec<>(
+    return DelegatedCodec.decodeOnly(
         Proto2Codec.get(OzoneManagerProtocolProtos.KeyInfoProtoLight.getDefaultInstance()),
         ReconBasicOmKeyInfo::getFromProtobuf,
-        ReconBasicOmKeyInfo::toProtobuf,
         ReconBasicOmKeyInfo.class);
   }
 
