@@ -723,7 +723,7 @@ public class KeyManagerImpl implements KeyManager {
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
       int count) throws IOException {
-    boolean isLegacy = ozoneManager.getScmInfo().getMetaDataLayoutVersion() <
+    boolean isDataDistributionEnabled = ozoneManager.getScmInfo().getMetaDataLayoutVersion() <
         HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
 
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
@@ -752,18 +752,27 @@ public class KeyManagerImpl implements KeyManager {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
-              List<DeletedBlock> blocks = info.getKeyLocationVersions().stream()
-                  .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                      .map(b ->  new DeletedBlock(
-                          new BlockID(b.getContainerID(), b.getLocalID()),
-                          QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()),
-                          b.getLength()))).collect(Collectors.toList());
-
-              BlockGroup keyBlocks = BlockGroup.newBuilder()
-                  .setLegacyFormat(isLegacy)
-                  .setKeyName(kv.getKey())
-                  .addAllBlocks(blocks).build();
-
+              BlockGroup keyBlocks;
+              if (isDataDistributionEnabled) {
+                List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
+                    .flatMap(versionLocations -> versionLocations.getLocationList().stream()
+                        .map(b -> new BlockID(b.getContainerID(), b.getLocalID())))
+                    .collect(Collectors.toList());
+                keyBlocks = BlockGroup.newBuilder()
+                    .setKeyName(kv.getKey())
+                    .addAllBlockIDs(blockIDS).build();
+              } else {
+                List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
+                    .flatMap(versionLocations -> versionLocations.getLocationList().stream()
+                        .map(b ->  new DeletedBlock(
+                            new BlockID(b.getContainerID(), b.getLocalID()),
+                            b.getLength(),
+                            QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
+                    .collect(Collectors.toList());
+                keyBlocks = BlockGroup.newBuilder()
+                    .setKeyName(kv.getKey())
+                    .addAllBlocks(deletedBlocks).build();
+              }
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {
@@ -772,7 +781,6 @@ public class KeyManagerImpl implements KeyManager {
           }
 
           List<OmKeyInfo> notReclaimableKeyInfoList = notReclaimableKeyInfo.getOmKeyInfoList();
-
           // If all the versions are not reclaimable, then modify key by just purging the key that can be purged.
           if (!notReclaimableKeyInfoList.isEmpty() &&
               notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList().size()) {

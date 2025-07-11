@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
@@ -280,7 +281,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
         .setScmId(resp.getScmId())
-        .setMetaDataLayoutVersion(resp.hasMetaDataLayoutVersion() ? resp.getMetaDataLayoutVersion() : 0);
+        .setMetaDataLayoutVersion(resp.hasMetaDataLayoutVersion() ?
+            resp.getMetaDataLayoutVersion() : HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     return builder.build();
   }
 

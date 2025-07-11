@@ -145,6 +145,19 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
             request.getAllocateScmBlockRequest(), request.getVersion()));
         break;
       case DeleteScmKeyBlocks:
+        if (scm.getLayoutVersionManager().needsFinalization() &&
+            !scm.getLayoutVersionManager()
+                .isAllowed(HDDSLayoutFeature.DATA_DISTRIBUTION)
+        ) {
+          boolean isRequestHasNewData = request.getDeleteScmKeyBlocksRequest().getKeyBlocksList().stream()
+              .map(BlockGroup::getFromProto).anyMatch(blockGroup -> !blockGroup.getAllBlocks().isEmpty());
+
+          if (isRequestHasNewData) {
+            throw new SCMException("Cluster is not finalized yet, it is"
+                + " not enabled to to handle data distribution feature",
+                SCMException.ResultCodes.INTERNAL_ERROR);
+          }
+        }
         response.setDeleteScmKeyBlocksResponse(
             deleteScmKeyBlocks(request.getDeleteScmKeyBlocksRequest()));
         break;

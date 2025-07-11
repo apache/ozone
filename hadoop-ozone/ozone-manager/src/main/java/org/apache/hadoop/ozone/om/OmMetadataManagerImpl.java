@@ -61,8 +61,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -82,7 +80,6 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -102,7 +99,6 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -1770,34 +1766,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           BUCKET_NOT_FOUND);
     }
     return omBucketInfo.getObjectID();
-  }
-
-  @Override
-  public List<BlockGroup> getBlocksForKeyDelete(String deletedKey)
-      throws IOException {
-    RepeatedOmKeyInfo omKeyInfo = getDeletedTable().get(deletedKey);
-    if (omKeyInfo == null) {
-      return null;
-    }
-
-    List<BlockGroup> result = new ArrayList<>();
-    // Add all blocks from all versions of the key to the deletion list
-    for (OmKeyInfo info : omKeyInfo.cloneOmKeyInfoList()) {
-      for (OmKeyLocationInfoGroup keyLocations :
-          info.getKeyLocationVersions()) {
-        List<DeletedBlock> item = keyLocations.getLocationList().stream()
-            .map(b -> new DeletedBlock(
-                new BlockID(b.getContainerID(), b.getLocalID()),
-                QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()),
-                b.getLength())).collect(Collectors.toList());
-        BlockGroup keyBlocks = BlockGroup.newBuilder()
-            .setKeyName(deletedKey)
-            .addAllBlocks(item)
-            .build();
-        result.add(keyBlocks);
-      }
-    }
-    return result;
   }
 
   @Override

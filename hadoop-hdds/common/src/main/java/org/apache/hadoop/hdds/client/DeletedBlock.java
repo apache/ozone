@@ -27,25 +27,25 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 public class DeletedBlock {
 
   private BlockID blockID;
+  private long size;
   private long replicatedSize;
-  private long unreplicatedSize;
 
-  public DeletedBlock(BlockID blockID, long replicatedSize, long unreplicatedSize) {
+  public DeletedBlock(BlockID blockID, long size, long replicatedSize) {
     this.blockID = blockID;
+    this.size = size;
     this.replicatedSize = replicatedSize;
-    this.unreplicatedSize = unreplicatedSize;
   }
 
   public BlockID getBlockID() {
     return this.blockID;
   }
 
-  public long getReplicatedSize() {
-    return this.replicatedSize;
+  public long getSize() {
+    return this.size;
   }
 
-  public long getUnreplicatedSize() {
-    return this.unreplicatedSize;
+  public long getReplicatedSize() {
+    return this.replicatedSize;
   }
 
   @Override
@@ -58,16 +58,16 @@ public class DeletedBlock {
   public void appendTo(StringBuilder sb) {
     sb.append(" localID: ").append(blockID.getContainerBlockID().getLocalID());
     sb.append(" containerID: ").append(blockID.getContainerBlockID().getContainerID());
+    sb.append(" size: ").append(size);
     sb.append(" replicatedSize: ").append(replicatedSize);
-    sb.append(" unreplicatedSize: ").append(unreplicatedSize);
   }
 
   @JsonIgnore
   public HddsProtos.DeletedBlock getProtobuf() {
     return HddsProtos.DeletedBlock.newBuilder()
         .setBlockId(blockID.getProtobuf())
+        .setSize(size)
         .setReplicatedSize(replicatedSize)
-        .setUnreplicatedSize(unreplicatedSize)
         .build();
   }
 
@@ -75,8 +75,8 @@ public class DeletedBlock {
   public static DeletedBlock getFromProtobuf(HddsProtos.DeletedBlock deletedBlockID) {
     return new DeletedBlock(
         BlockID.getFromProtobuf(deletedBlockID.getBlockId()),
-        deletedBlockID.getReplicatedSize(),
-        deletedBlockID.getUnreplicatedSize());
+        deletedBlockID.getSize(),
+        deletedBlockID.getReplicatedSize());
   }
 
   @Override
@@ -90,12 +90,12 @@ public class DeletedBlock {
     DeletedBlock delBlockID = (DeletedBlock) o;
     return this.getBlockID().equals(delBlockID.getBlockID())
         && this.getReplicatedSize() == delBlockID.getReplicatedSize()
-        && this.getUnreplicatedSize() == delBlockID.getUnreplicatedSize();
+        && this.getSize() == delBlockID.getSize();
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(blockID.getContainerBlockID().getContainerID(), blockID.getContainerBlockID().getLocalID(),
-        replicatedSize, unreplicatedSize);
+        size, replicatedSize);
   }
 }

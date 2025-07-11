@@ -30,34 +30,37 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyB
 public final class BlockGroup {
 
   private String groupID;
+  @Deprecated
+  private List<BlockID> blockIDs;
   private List<DeletedBlock> deletedBlocks;
-  private boolean legacyFormat = false;
 
-  private BlockGroup(String groupID, List<DeletedBlock> deletedBlocks, boolean legacyFormat) {
+  private BlockGroup(String groupID, List<BlockID> blockIDs, List<DeletedBlock> deletedBlocks) {
     this.groupID = groupID;
+    this.blockIDs = blockIDs;
     this.deletedBlocks = deletedBlocks;
-    this.legacyFormat = legacyFormat;
   }
 
   public List<DeletedBlock> getAllBlocks() {
     return deletedBlocks;
+  }
+  
+  public List<BlockID> getBlockIDs() {
+    return blockIDs;
   }
 
   public String getGroupID() {
     return groupID;
   }
 
-  public boolean isLegacyFormat() {
-    return legacyFormat;
-  }
-
   public KeyBlocks getProto() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
-    for (DeletedBlock block : deletedBlocks) {
-      if (isLegacyFormat()) {
-        kbb.addBlocks(block.getProtobuf().getBlockId());
-      } else {
+    if (!deletedBlocks.isEmpty()) {
+      for (DeletedBlock block : deletedBlocks) {
         kbb.addDeletedBlocks(block.getProtobuf());
+      }
+    } else {
+      for (BlockID block : blockIDs) {
+        kbb.addBlocks(block.getProtobuf());
       }
     }
     return kbb.setKey(groupID).build();
@@ -73,24 +76,22 @@ public final class BlockGroup {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
       blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
           containerBlockId.getLocalID()),
-          block.getReplicatedSize(),
-          block.getUnreplicatedSize()));
+          block.getSize(),
+          block.getReplicatedSize()));
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlocks(blocks).build();
   }
 
   public static BlockGroup getFromLegacyProto(KeyBlocks proto) {
-    List<DeletedBlock> blocks = new ArrayList<>();
+    List<BlockID> blocks = new ArrayList<>();
     for (HddsProtos.BlockID block : proto.getBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getContainerBlockID();
-      blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
-          containerBlockId.getLocalID()),
-          -1L,
-          -1L));
+      blocks.add(new BlockID(containerBlockId.getContainerID(),
+          containerBlockId.getLocalID()));
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
-        .addAllBlocks(blocks).build();
+        .addAllBlockIDs(blocks).build();
   }
 
   public static Builder newBuilder() {
@@ -111,11 +112,16 @@ public final class BlockGroup {
   public static class Builder {
 
     private String groupID;
+    private List<BlockID> blocksIDs;
     private List<DeletedBlock> blocks;
-    private boolean legacyFormat = false;
 
     public Builder setKeyName(String blockGroupID) {
       this.groupID = blockGroupID;
+      return this;
+    }
+
+    public Builder addAllBlockIDs(List<BlockID> blockIDs) {
+      this.blocksIDs = blockIDs;
       return this;
     }
 
@@ -124,13 +130,8 @@ public final class BlockGroup {
       return this;
     }
 
-    public Builder setLegacyFormat(boolean legacyFormat) {
-      this.legacyFormat = legacyFormat;
-      return this;
-    }
-
     public BlockGroup build() {
-      return new BlockGroup(groupID, blocks, legacyFormat);
+      return new BlockGroup(groupID, blocksIDs, blocks);
     }
   }
 

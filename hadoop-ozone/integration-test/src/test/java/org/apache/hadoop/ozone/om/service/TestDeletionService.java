@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.DeletedBlock;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -58,11 +59,13 @@ public class TestDeletionService {
   private static final String BUCKET_NAME = "bucket1";
   private static final String KEY_NAME = "testkey";
   private static final int KEY_SIZE = 5 * 1024; // 5 KB
+  private static final int ONEMB = 1024 * 1024;
 
   public static Stream<Arguments> replicaType() {
     return Stream.of(
         arguments("RATIS", "ONE"),
-        arguments("RATIS", "THREE")
+        arguments("RATIS", "THREE"),
+        arguments("EC", "ONE")
     );
   }
 
@@ -107,7 +110,8 @@ public class TestDeletionService {
       ArgumentCaptor<List<BlockGroup>> captor =
           ArgumentCaptor.forClass(List.class);
       verify(spyManager, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
-
+      ECReplicationConfig repConfig = new ECReplicationConfig(3, 2,
+          ECReplicationConfig.EcCodec.RS, ONEMB);
       // Step 6: Calculate and assert used bytes
       long totalUsedBytes = captor.getAllValues().get(0).stream()
           .flatMap(group -> group.getAllBlocks().stream())
@@ -115,9 +119,10 @@ public class TestDeletionService {
           .sum();
       long totalUnreplicatedBytes = captor.getAllValues().get(0).stream()
           .flatMap(group -> group.getAllBlocks().stream())
-          .mapToLong(DeletedBlock::getUnreplicatedSize)
+          .mapToLong(DeletedBlock::getSize)
           .sum();
-      assertEquals(QuotaUtil.getReplicatedSize(KEY_SIZE, RatisReplicationConfig.getInstance(
+      assertEquals(QuotaUtil.getReplicatedSize(KEY_SIZE, type.equals("RC") ?
+          repConfig : RatisReplicationConfig.getInstance(
           ReplicationFactor.valueOf(factor).toProto())), totalUsedBytes);
       assertEquals(KEY_SIZE, totalUnreplicatedBytes);
     } finally {
