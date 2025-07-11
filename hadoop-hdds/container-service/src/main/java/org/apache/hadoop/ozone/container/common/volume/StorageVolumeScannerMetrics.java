@@ -37,16 +37,17 @@ public class StorageVolumeScannerMetrics {
   @Metric("number of volumes scanned in the last iteration")
   private MutableGaugeLong numVolumesScannedInLastIteration;
 
-  @Metric("number of iterations of scanner completed since the restart")
+  @Metric("number of iterations the volume scanner has completed since the last restart")
   private MutableCounterLong numScanIterations;
 
-  @Metric("number of data volume sets scanned")
-  private MutableGaugeLong numDataVolumesScanned;
+  @Metric("number of data volumes scanned since the last restart")
+  private MutableCounterLong numDataVolumeScans;
 
-  @Metric("number of metadata volume sets scanned")
-  private MutableGaugeLong numMetadataVolumesScanned;
+  @Metric("number of metadata volumes scanned since the last restart")
+  private MutableCounterLong numMetadataVolumeScans;
 
-  @Metric("number of checks skipped because the minimum gap since the last check had not elapsed")
+  @Metric("number of volume scanner iterations skipped because the minimum gap " +
+      "since the last iteration had not elapsed")
   private MutableCounterLong numIterationsSkipped;
 
   public StorageVolumeScannerMetrics() {
@@ -58,7 +59,7 @@ public class StorageVolumeScannerMetrics {
   }
 
   /**
-   * Return the number of volumes scanned during current {@link StorageVolumeChecker#checkAllVolumeSets()} iteration.
+   * Return the number of volumes scanned in the last iteration.
    */
   public long getNumVolumesScannedInLastIteration() {
     return numVolumesScannedInLastIteration.value();
@@ -68,12 +69,8 @@ public class StorageVolumeScannerMetrics {
     numVolumesScannedInLastIteration.set(value);
   }
 
-  public void incrNumVolumesScannedInLastIteration(long value) {
-    numVolumesScannedInLastIteration.incr(value);
-  }
-
   /**
-   * Return the number of {@link StorageVolumeChecker#checkAllVolumes(Collection)} invocations.
+   * Return the number of iterations the volume scanner has completed since the last restart.
    */
   public long getNumScanIterations() {
     return numScanIterations.value();
@@ -84,32 +81,30 @@ public class StorageVolumeScannerMetrics {
   }
 
   /**
-   * Return the number of {@link StorageVolumeChecker#checkAllVolumeSets()} invocations
-   * on data volume sets.
+   * Return the number of data volumes scanned since the last restart.
    */
-  public long getNumDataVolumesScanned() {
-    return numDataVolumesScanned.value();
+  public long getNumDataVolumeScans() {
+    return numDataVolumeScans.value();
   }
 
-  public void incNumDataVolumesScanned(long count) {
-    numDataVolumesScanned.incr(count);
+  public void incNumDataVolumeScans(long count) {
+    numDataVolumeScans.incr(count);
   }
 
   /**
-   * Return the number of {@link StorageVolumeChecker#checkAllVolumeSets()} invocations
-   * on metadata volume sets.
+   * Return the number of metadata volumes scanned since the last restart
    */
-  public long getNumMetadataVolumesScanned() {
-    return numMetadataVolumesScanned.value();
+  public long getNumMetadataVolumeScans() {
+    return numMetadataVolumeScans.value();
   }
 
-  public void incNumMetadataVolumesScanned(long count) {
-    numMetadataVolumesScanned.incr(count);
+  public void incNumMetadataVolumeScans(long count) {
+    numMetadataVolumeScans.incr(count);
   }
 
   /**
-   * Return the number of checks skipped because the minimum gap since the
-   * last check had not elapsed.
+   * Return the number of volume scanner iterations skipped because the minimum gap
+   * since the last iteration had not elapsed.
    */
   public long getNumIterationsSkipped() {
     return numIterationsSkipped.value();

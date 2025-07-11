@@ -64,10 +64,10 @@ public class VolumeInfoMetrics implements MetricsSource {
   @Metric("Volume available space is insufficient")
   private MutableGaugeInt availableSpaceInsufficient;
 
-  @Metric("Returns the Number of Volumes Scanned")
+  @Metric("Number of times the volume is scanned")
   private MutableCounterLong numScans;
 
-  @Metric("Returns the Number of Volume Scans Skipped")
+  @Metric("Number of scans skipped for the volume")
   private MutableCounterLong numScansSkipped;
 
   /**

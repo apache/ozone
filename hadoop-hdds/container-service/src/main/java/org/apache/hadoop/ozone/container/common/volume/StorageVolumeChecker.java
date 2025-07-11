@@ -175,17 +175,17 @@ public class StorageVolumeChecker {
     }
 
     try {
-      metrics.setNumVolumesScannedInLastIteration(0);
+      long totalVolumesScanned = 0;
       for (VolumeSet volSet : registeredVolumeSets) {
         long volumeCount = volSet.getVolumesList().size();
         if (volSet instanceof MutableVolumeSet) {
           StorageVolume.VolumeType type = ((MutableVolumeSet) volSet).getVolumeType();
           switch (type) {
           case DATA_VOLUME:
-            metrics.incNumDataVolumesScanned(volumeCount);
+            metrics.incNumDataVolumeScans(volumeCount);
             break;
           case META_VOLUME:
-            metrics.incNumMetadataVolumesScanned(volumeCount);
+            metrics.incNumMetadataVolumeScans(volumeCount);
             break;
           default:
             LOG.warn("Unknown volume type: {}", type);
@@ -193,8 +193,9 @@ public class StorageVolumeChecker {
           }
         }
         volSet.checkAllVolumes(this);
-        metrics.incrNumVolumesScannedInLastIteration(volSet.getVolumesList().size());
+        totalVolumesScanned += volSet.getVolumesList().size();
       }
+      metrics.setNumVolumesScannedInLastIteration(totalVolumesScanned);
       metrics.incNumScanIterations();
       lastAllVolumeSetsCheckComplete = timer.monotonicNow();
     } catch (IOException e) {

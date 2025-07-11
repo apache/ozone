@@ -88,8 +88,8 @@ public class TestPeriodicVolumeChecker {
       volumeChecker.setDelegateChecker(new TestStorageVolumeChecker.DummyChecker());
 
       assertEquals(0, metrics.getNumScanIterations());
-      assertEquals(0, metrics.getNumDataVolumesScanned());
-      assertEquals(0, metrics.getNumMetadataVolumesScanned());
+      assertEquals(0, metrics.getNumDataVolumeScans());
+      assertEquals(0, metrics.getNumMetadataVolumeScans());
       assertEquals(0, metrics.getNumVolumesScannedInLastIteration());
 
       // first round
@@ -97,8 +97,8 @@ public class TestPeriodicVolumeChecker {
       volumeChecker.checkAllVolumeSets();
 
       assertEquals(1, metrics.getNumScanIterations());
-      assertEquals(1, metrics.getNumDataVolumesScanned());
-      assertEquals(1, metrics.getNumMetadataVolumesScanned());
+      assertEquals(1, metrics.getNumDataVolumeScans());
+      assertEquals(1, metrics.getNumMetadataVolumeScans());
       assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
       assertEquals(0, metrics.getNumIterationsSkipped());
 
@@ -108,8 +108,8 @@ public class TestPeriodicVolumeChecker {
 
       // skipped next round
       assertEquals(1, metrics.getNumScanIterations());
-      assertEquals(1, metrics.getNumDataVolumesScanned());
-      assertEquals(1, metrics.getNumMetadataVolumesScanned());
+      assertEquals(1, metrics.getNumDataVolumeScans());
+      assertEquals(1, metrics.getNumMetadataVolumeScans());
       assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
       assertEquals(1, metrics.getNumIterationsSkipped());
 
@@ -118,8 +118,8 @@ public class TestPeriodicVolumeChecker {
       volumeChecker.checkAllVolumeSets();
 
       assertEquals(2, metrics.getNumScanIterations());
-      assertEquals(2, metrics.getNumDataVolumesScanned());
-      assertEquals(2, metrics.getNumMetadataVolumesScanned());
+      assertEquals(2, metrics.getNumDataVolumeScans());
+      assertEquals(2, metrics.getNumMetadataVolumeScans());
       assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
       assertEquals(1, metrics.getNumIterationsSkipped());
     } finally {
