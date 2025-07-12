@@ -521,17 +521,37 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
+  /**
+   * Normalizes the key path based on the bucket layout.
+   *
+   * @return normalized key path
+   */
+
+  public static String normalizeKeyPath(boolean enableFileSystemPaths,
+      String keyPath, BucketLayout bucketLayout) throws OMException {
+    LOG.debug("Bucket Layout: {}", bucketLayout);
+    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
+      keyPath = OmUtils.normalizeKey(keyPath, false);
+      checkKeyName(keyPath);
+    }
+    return keyPath;
+  }
+
+  private static void checkKeyName(String keyPath) throws OMException {
+    if (keyPath.endsWith("/")) {
+      throw new OMException(
+          "Invalid KeyPath, key names with trailing / "
+              + "are not allowed." + keyPath,
+          OMException.ResultCodes.INVALID_KEY_NAME);
+    }
+  }
+  
   public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
       String keyPath, BucketLayout bucketLayout) throws OMException {
     LOG.debug("Bucket Layout: {}", bucketLayout);
     if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
       keyPath = validateAndNormalizeKey(true, keyPath);
-      if (keyPath.endsWith("/")) {
-        throw new OMException(
-                "Invalid KeyPath, key names with trailing / "
-                        + "are not allowed." + keyPath,
-                OMException.ResultCodes.INVALID_KEY_NAME);
-      }
+      checkKeyName(keyPath);
     }
     return keyPath;
   }
