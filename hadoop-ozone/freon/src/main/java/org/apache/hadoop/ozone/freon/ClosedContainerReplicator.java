@@ -197,7 +197,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     WitnessedContainerMetadataStore referenceCountedDS =
         WitnessedContainerMetadataStoreImpl.get(conf);
     this.witnessedContainerMetadataStore = referenceCountedDS;
-    ContainerSet containerSet = ContainerSet.newRwContainerSet(referenceCountedDS.getContainerIdsTable(), 1000);
+    ContainerSet containerSet = ContainerSet.newRwContainerSet(referenceCountedDS, 1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
 
