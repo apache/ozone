@@ -66,16 +66,20 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
   // In this case when availableSpace is 10GB or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE = "hdds.datanode.volume.min.free.space";
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT = "5GB";
+  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT = "20GB";
   // Minimum percent of space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpacePercent is configured as 2%,
   // In this case when availableSpace is 20GB(2% of 1000) or below, volume is assumed as full
   public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
       "hdds.datanode.volume.min.free.space.percent";
-  static final byte MIN_FREE_SPACE_UNSET = -1;
+  public static final float HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT = 0.001f;
 
   public static final String WAIT_ON_ALL_FOLLOWERS = "hdds.datanode.wait.on.all.followers";
   public static final String CONTAINER_SCHEMA_V3_ENABLED = "hdds.datanode.container.schema.v3.enabled";
+  public static final String CONTAINER_CHECKSUM_LOCK_STRIPES_KEY = "hdds.datanode.container.checksum.lock.stripes";
+  public static final String CONTAINER_CLIENT_CACHE_SIZE = "hdds.datanode.container.client.cache.size";
+  public static final String CONTAINER_CLIENT_CACHE_STALE_THRESHOLD =
+      "hdds.datanode.container.client.cache.stale.threshold";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -105,7 +109,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String ROCKSDB_LOG_MAX_FILE_NUM_KEY = "hdds.datanode.rocksdb.log.max-file-num";
   public static final String ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
-  public static final Boolean OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
+  public static final Boolean
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
+  public static final int CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT = 127;
+  public static final int CONTAINER_CLIENT_CACHE_SIZE_DEFAULT = 100;
+  public static final int
+      CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT = 10000;
 
   private static final long AUTO_COMPACTION_SMALL_SST_FILE_INTERVAL_MINUTES_DEFAULT = 120;
   private static final int AUTO_COMPACTION_SMALL_SST_FILE_THREADS_DEFAULT = 1;
@@ -280,23 +289,21 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           " When the difference between volume capacity and used reaches this number," +
           " containers that reside on this volume will be closed and no new containers" +
           " would be allocated on this volume." +
-          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
-          " min.free.space will be used."
+          " Max of min.free.space and min.free.space.percent will be used as final value."
   )
-  private long minFreeSpace = MIN_FREE_SPACE_UNSET;
+  private long minFreeSpace = getDefaultFreeSpace();
 
   @Config(key = "hdds.datanode.volume.min.free.space.percent",
-      defaultValue = "-1",
+      defaultValue = "0.001", // match HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT
       type = ConfigType.FLOAT,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
       description = "This determines the free space percent to be used for closing containers" +
           " When the difference between volume capacity and used reaches (free.space.percent of volume capacity)," +
           " containers that reside on this volume will be closed and no new containers" +
           " would be allocated on this volume." +
-          " Either of min.free.space or min.free.space.percent should be configured, when both are set then" +
-          " min.free.space will be used."
+          " Max of min.free.space or min.free.space.percent will be used as final value."
   )
-  private float minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+  private float minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 
   @Config(key = "periodic.disk.check.interval.minutes",
       defaultValue = "60",
@@ -535,6 +542,39 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private boolean bCheckEmptyContainerDir =
       OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT;
 
+  /**
+   * Whether to check container directory or not to determine
+   * container is empty.
+   */
+  @Config(key = "container.checksum.lock.stripes",
+      type = ConfigType.INT,
+      defaultValue = "127",
+      tags = { DATANODE },
+      description = "The number of lock stripes used to coordinate modifications to container checksum information. " +
+          "This information is only updated after a container is closed and does not affect the data read or write" +
+          " path. Each container in the datanode will be mapped to one lock which will only be held while its " +
+          "checksum information is updated."
+  )
+  private int containerChecksumLockStripes = CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT;
+
+  @Config(key = "container.client.cache.size",
+      type = ConfigType.INT,
+      defaultValue = "100",
+      tags = { DATANODE },
+      description = "The maximum number of clients to be cached by the datanode client manager"
+  )
+  private int containerClientCacheSize = CONTAINER_CLIENT_CACHE_SIZE_DEFAULT;
+
+  @Config(key = "container.client.cache.stale.threshold",
+      type = ConfigType.INT,
+      defaultValue = "10000",
+      tags = { DATANODE },
+      description = "The stale threshold in ms for a client in cache. After this threshold the client " +
+          "is evicted from cache."
+  )
+  private int containerClientCacheStaleThreshold =
+      CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT;
+
   @Config(key = "delete.container.timeout",
       type = ConfigType.TIME,
       defaultValue = "60s",
@@ -545,6 +585,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private long deleteContainerTimeoutMs = Duration.ofSeconds(60).toMillis();
 
+  @SuppressWarnings("checkstyle:MethodLength")
   @PostConstruct
   public void validate() {
     if (containerDeleteThreads < 1) {
@@ -679,43 +720,41 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_DEFAULT;
     }
 
+    if (containerChecksumLockStripes < 1) {
+      LOG.warn("{} must be at least 1. Defaulting to {}", CONTAINER_CHECKSUM_LOCK_STRIPES_KEY,
+          CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT);
+      containerChecksumLockStripes = CONTAINER_CHECKSUM_LOCK_STRIPES_DEFAULT;
+    }
+
+    if (containerClientCacheSize < 1) {
+      LOG.warn("{} must be at least 1. Defaulting to {}", CONTAINER_CLIENT_CACHE_SIZE,
+          CONTAINER_CLIENT_CACHE_SIZE_DEFAULT);
+      containerClientCacheSize = CONTAINER_CLIENT_CACHE_SIZE_DEFAULT;
+    }
+
+    if (containerClientCacheStaleThreshold < 1) {
+      LOG.warn("{} must be at least 1. Defaulting to {}", CONTAINER_CLIENT_CACHE_STALE_THRESHOLD,
+          CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT);
+      containerClientCacheStaleThreshold =
+          CONTAINER_CLIENT_CACHE_STALE_THRESHOLD_MILLISECONDS_DEFAULT;
+    }
+
     validateMinFreeSpace();
   }
 
   /**
-   * If 'hdds.datanode.volume.min.free.space' is defined,
-   * it will be honored first. If it is not defined and
-   * 'hdds.datanode.volume.min.free.space.percent' is defined, it will honor this
-   * else it will fall back to 'hdds.datanode.volume.min.free.space.default'
+   * validate value of 'hdds.datanode.volume.min.free.space' and 'hdds.datanode.volume.min.free.space.percent'
+   * and update with default value if not within range.
    */
   private void validateMinFreeSpace() {
-    if (minFreeSpaceRatio > 1) {
+    if (minFreeSpaceRatio > 1 || minFreeSpaceRatio < 0) {
       LOG.warn("{} = {} is invalid, should be between 0 and 1",
           HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
           minFreeSpaceRatio);
-
-      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+      minFreeSpaceRatio = HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
     }
 
-    final boolean minFreeSpaceConfigured = minFreeSpace >= 0;
-    final boolean minFreeSpaceRatioConfigured = minFreeSpaceRatio >= 0;
-
-    if (minFreeSpaceConfigured && minFreeSpaceRatioConfigured) {
-      // Only one property should be configured.
-      // Since both properties are configured, HDDS_DATANODE_VOLUME_MIN_FREE_SPACE is used to determine minFreeSpace
-      LOG.warn("Only one of {}={} and {}={} should be set. With both set, {} value will be used.",
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
-          minFreeSpace,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
-          minFreeSpaceRatio,
-          HDDS_DATANODE_VOLUME_MIN_FREE_SPACE);
-
-      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
-    }
-
-    if (!minFreeSpaceConfigured && !minFreeSpaceRatioConfigured) {
-      // If both are not configured use defaultFreeSpace
-      minFreeSpaceRatio = MIN_FREE_SPACE_UNSET;
+    if (minFreeSpace < 0) {
       minFreeSpace = getDefaultFreeSpace();
     }
   }
@@ -781,9 +820,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   }
 
   public long getMinFreeSpace(long capacity) {
-    return minFreeSpaceRatio >= 0
-        ? ((long) (capacity * minFreeSpaceRatio))
-        : minFreeSpace;
+    return Math.max((long) (capacity * minFreeSpaceRatio), minFreeSpace);
   }
 
   public long getMinFreeSpace() {
@@ -1001,6 +1038,18 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setAutoCompactionSmallSstFileNum(int num) {
     this.autoCompactionSmallSstFileNum = num;
+  }
+
+  public int getContainerChecksumLockStripes() {
+    return containerChecksumLockStripes;
+  }
+
+  public int getContainerClientCacheSize() {
+    return containerClientCacheSize;
+  }
+
+  public int getContainerClientCacheStaleThreshold() {
+    return containerClientCacheStaleThreshold;
   }
 
   public long getAutoCompactionSmallSstFileIntervalMinutes() {

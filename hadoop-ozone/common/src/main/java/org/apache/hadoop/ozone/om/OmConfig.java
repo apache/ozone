@@ -53,6 +53,17 @@ public class OmConfig extends ReconfigurableConfig {
   private boolean fileSystemPathEnabled;
 
   @Config(
+      key = "ozone.om.keyname.character.check.enabled",
+      defaultValue = "false",
+      description = "If true, then enable to check if the key name " +
+          "contains illegal characters when creating/renaming key. " +
+          "For the definition of illegal characters, follow the " +
+          "rules in Amazon S3's object key naming guide.",
+      tags = { ConfigTag.OM, ConfigTag.OZONE }
+  )
+  private boolean keyNameCharacterCheckEnabled;
+
+  @Config(
       key = "server.list.max.size",
       defaultValue = "1000",
       description = "Configuration property to configure the max server side response size for list calls on om.",
@@ -116,6 +127,14 @@ public class OmConfig extends ReconfigurableConfig {
 
   public void setFileSystemPathEnabled(boolean newValue) {
     fileSystemPathEnabled = newValue;
+  }
+
+  public boolean isKeyNameCharacterCheckEnabled() {
+    return keyNameCharacterCheckEnabled;
+  }
+
+  public void setKeyNameCharacterCheckEnabled(boolean newValue) {
+    this.keyNameCharacterCheckEnabled = newValue;
   }
 
   public long getMaxListSize() {
@@ -183,6 +202,7 @@ public class OmConfig extends ReconfigurableConfig {
 
   public void setFrom(OmConfig other) {
     fileSystemPathEnabled = other.fileSystemPathEnabled;
+    keyNameCharacterCheckEnabled = other.keyNameCharacterCheckEnabled;
     maxListSize = other.maxListSize;
     maxUserVolumeCount = other.maxUserVolumeCount;
     userDefaultRights = other.userDefaultRights;

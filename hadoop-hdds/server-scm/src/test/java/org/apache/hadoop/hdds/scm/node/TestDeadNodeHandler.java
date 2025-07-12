@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -102,8 +103,9 @@ public class TestDeadNodeHandler {
     eventQueue = new EventQueue();
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
-    scmContext = new SCMContext.Builder().setIsInSafeMode(true)
-        .setLeader(true).setIsPreCheckComplete(true)
+    scmContext = new SCMContext.Builder()
+        .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
+        .setLeader(true)
         .setSCM(scm).build();
     pipelineManager =
         (PipelineManagerImpl)scm.getPipelineManager();
@@ -263,7 +265,7 @@ public class TestDeadNodeHandler {
     //deadNodeHandler.onMessage call will not change this
     assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
-    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
+    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getID(), cmd.getType()));
 
     verify(publisher).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
     verify(deletedBlockLog).onDatanodeDead(datanode1.getID());

@@ -89,7 +89,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     this.transactionToDNsCommitMap = new ConcurrentHashMap<>();
     this.transactionToRetryCountMap = new ConcurrentHashMap<>();
     this.scmDeleteBlocksCommandStatusManager =
-        new SCMDeleteBlocksCommandStatusManager();
+        new SCMDeleteBlocksCommandStatusManager(metrics);
   }
 
   /**
@@ -104,8 +104,11 @@ public class SCMDeletedBlockTransactionStatusManager {
     private static final CmdStatus DEFAULT_STATUS = TO_BE_SENT;
     private static final Set<CmdStatus> STATUSES_REQUIRING_TIMEOUT = Collections.singleton(SENT);
 
-    public SCMDeleteBlocksCommandStatusManager() {
+    private ScmBlockDeletingServiceMetrics metrics;
+
+    public SCMDeleteBlocksCommandStatusManager(ScmBlockDeletingServiceMetrics metrics) {
       this.scmCmdStatusRecord = new ConcurrentHashMap<>();
+      this.metrics = metrics;
     }
 
     /**
@@ -314,6 +317,7 @@ public class SCMDeletedBlockTransactionStatusManager {
         if (updateTime != null &&
             Duration.between(updateTime, now).toMillis() > timeoutMs) {
           CmdStatusData state = removeScmCommand(dnId, scmCmdId);
+          metrics.incrDNCommandsTimeout(dnId, 1);
           LOG.warn("SCM BlockDeletionCommand {} for Datanode: {} was removed after {}ms without update",
               state, dnId, timeoutMs);
         }
@@ -451,11 +455,11 @@ public class SCMDeletedBlockTransactionStatusManager {
     for (DeleteBlockTransactionResult transactionResult :
         transactionResults) {
       if (isTransactionFailed(transactionResult)) {
-        metrics.incrBlockDeletionTransactionFailure();
+        metrics.incrBlockDeletionTransactionFailureOnDatanodes();
         continue;
       }
       try {
-        metrics.incrBlockDeletionTransactionSuccess();
+        metrics.incrBlockDeletionTransactionSuccessOnDatanodes();
         long txID = transactionResult.getTxID();
         // set of dns which have successfully committed transaction txId.
         final Set<DatanodeID> dnsWithCommittedTxn = transactionToDNsCommitMap.get(txID);
