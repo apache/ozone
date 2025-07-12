@@ -172,7 +172,10 @@ public class ContainerMerkleTreeWriter {
     public ContainerProtos.BlockMerkleTree toProto() {
       ContainerProtos.BlockMerkleTree.Builder blockTreeBuilder = ContainerProtos.BlockMerkleTree.newBuilder();
       ChecksumByteBuffer checksumImpl = CHECKSUM_BUFFER_SUPPLIER.get();
-      ByteBuffer blockChecksumBuffer = ByteBuffer.allocate(Long.BYTES * offset2Chunk.size());
+      // Allocate space for block ID + all chunk checksums
+      ByteBuffer blockChecksumBuffer = ByteBuffer.allocate(Long.BYTES * (1 + offset2Chunk.size()));
+      // Hash the block ID into the beginning of the block checksum calculation
+      blockChecksumBuffer.putLong(blockID);
 
       for (ChunkMerkleTreeWriter chunkTree: offset2Chunk.values()) {
         // Ordering of checksums within a chunk is assumed to be in the order they are written.
