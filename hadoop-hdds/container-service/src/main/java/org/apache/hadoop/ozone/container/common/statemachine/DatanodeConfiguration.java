@@ -585,6 +585,28 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private long deleteContainerTimeoutMs = Duration.ofSeconds(60).toMillis();
 
+  @Config(key = "container.empty.check.interval",
+      defaultValue = "100ms",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.PERFORMANCE},
+      description = "Time interval between each empty container checking task after " +
+          "datanode startup. This interval helps distribute the workload and avoid " +
+          "performance impact on business operations immediately after startup. " +
+          "Unit could be defined with postfix (ns,ms,s,m,h,d). "
+  )
+  private Duration containerEmptyCheckInterval = Duration.ofMillis(500);
+
+  @Config(
+      key = "container.async.empty.check.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {DATANODE, ConfigTag.PERFORMANCE},
+      description = "Whether to perform empty container checking asynchronously. " +
+          "If enabled, empty check tasks will be executed in a background thread " +
+          "do not block the Datanode startup."
+  )
+  private boolean asyncEmptyContainerCheckEnabled = false;
+
   @SuppressWarnings("checkstyle:MethodLength")
   @PostConstruct
   public void validate() {
@@ -1063,6 +1085,22 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public int getAutoCompactionSmallSstFileThreads() {
     return autoCompactionSmallSstFileThreads;
+  }
+
+  public Duration getContainerEmptyCheckInterval() {
+    return containerEmptyCheckInterval;
+  }
+
+  public void setContainerEmptyCheckInterval(Duration duration) {
+    this.containerEmptyCheckInterval = duration;
+  }
+
+  public boolean isAsyncEmptyContainerCheckEnabled() {
+    return asyncEmptyContainerCheckEnabled;
+  }
+
+  public void setAsyncEmptyContainerCheckEnabled(boolean enabled) {
+    this.asyncEmptyContainerCheckEnabled = enabled;
   }
 
   public void setAutoCompactionSmallSstFileThreads(int autoCompactionSmallSstFileThreads) {
