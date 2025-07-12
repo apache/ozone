@@ -129,7 +129,11 @@ public class NSSummaryTask implements ReconOmTask {
 
     // Process FSO bucket
     Integer bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.FSO.name(), 0);
+    long fsoStartTime = System.currentTimeMillis();
     Pair<Integer, Boolean> bucketResult = nsSummaryTaskWithFSO.processWithFSO(events, bucketSeek);
+    long fsoEndTime = System.currentTimeMillis();
+    LOG.info("NSSummaryTaskWithFSO.processWithFSO execution time: {} ms", fsoEndTime - fsoStartTime);
+    
     updatedSeekPositions.put(BucketType.FSO.name(), bucketResult.getLeft());
     if (!bucketResult.getRight()) {
       LOG.error("processWithFSO failed.");
@@ -138,7 +142,11 @@ public class NSSummaryTask implements ReconOmTask {
 
     // Process Legacy bucket
     bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.LEGACY.name(), 0);
+    long legacyStartTime = System.currentTimeMillis();
     bucketResult = nsSummaryTaskWithLegacy.processWithLegacy(events, bucketSeek);
+    long legacyEndTime = System.currentTimeMillis();
+    LOG.info("NSSummaryTaskWithLegacy.processWithLegacy execution time: {} ms", legacyEndTime - legacyStartTime);
+    
     updatedSeekPositions.put(BucketType.LEGACY.name(), bucketResult.getLeft());
     if (!bucketResult.getRight()) {
       LOG.error("processWithLegacy failed.");
@@ -147,7 +155,11 @@ public class NSSummaryTask implements ReconOmTask {
 
     // Process OBS bucket
     bucketSeek = subTaskSeekPosMap.getOrDefault(BucketType.OBS.name(), 0);
+    long obsStartTime = System.currentTimeMillis();
     bucketResult = nsSummaryTaskWithOBS.processWithOBS(events, bucketSeek);
+    long obsEndTime = System.currentTimeMillis();
+    LOG.info("NSSummaryTaskWithOBS.processWithOBS execution time: {} ms", obsEndTime - obsStartTime);
+    
     updatedSeekPositions.put(BucketType.OBS.name(), bucketResult.getLeft());
     if (!bucketResult.getRight()) {
       LOG.error("processWithOBS failed.");
@@ -178,12 +190,30 @@ public class NSSummaryTask implements ReconOmTask {
       return buildTaskResult(false);
     }
 
-    tasks.add(() -> nsSummaryTaskWithFSO
-        .reprocessWithFSO(omMetadataManager));
-    tasks.add(() -> nsSummaryTaskWithLegacy
-        .reprocessWithLegacy(reconOMMetadataManager));
-    tasks.add(() -> nsSummaryTaskWithOBS
-        .reprocessWithOBS(reconOMMetadataManager));
+    // Add timing for each individual task
+    tasks.add(() -> {
+      long fsoStartTime = System.currentTimeMillis();
+      boolean result = nsSummaryTaskWithFSO.reprocessWithFSO(omMetadataManager);
+      long fsoEndTime = System.currentTimeMillis();
+      LOG.info("NSSummaryTaskWithFSO.reprocessWithFSO execution time: {} ms", fsoEndTime - fsoStartTime);
+      return result;
+    });
+    
+    tasks.add(() -> {
+      long legacyStartTime = System.currentTimeMillis();
+      boolean result = nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
+      long legacyEndTime = System.currentTimeMillis();
+      LOG.info("NSSummaryTaskWithLegacy.reprocessWithLegacy execution time: {} ms", legacyEndTime - legacyStartTime);
+      return result;
+    });
+    
+    tasks.add(() -> {
+      long obsStartTime = System.currentTimeMillis();
+      boolean result = nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
+      long obsEndTime = System.currentTimeMillis();
+      LOG.info("NSSummaryTaskWithOBS.reprocessWithOBS execution time: {} ms", obsEndTime - obsStartTime);
+      return result;
+    });
 
     List<Future<Boolean>> results;
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
