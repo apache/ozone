@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -101,6 +102,7 @@ public class TestReconWithOzoneManagerFSO {
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
             recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
+    
     ReconNamespaceSummaryManager namespaceSummaryManager =
             recon.getReconServer().getReconNamespaceSummaryManager();
     ReconOMMetadataManager omMetadataManagerInstance =
@@ -111,6 +113,17 @@ public class TestReconWithOzoneManagerFSO {
             recon.getReconServer().getReconStorageContainerManager();
     NSSummaryEndpoint endpoint = new NSSummaryEndpoint(namespaceSummaryManager,
             omMetadataManagerInstance, reconSCM);
+    
+    // Wait for async sync to complete and namespace summary to be updated
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");
+        NamespaceSummaryResponse entity = (NamespaceSummaryResponse) basicInfo.getEntity();
+        return entity.getCountStats().getNumTotalKey() > 0;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 20000);
     Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");
     NamespaceSummaryResponse entity =
             (NamespaceSummaryResponse) basicInfo.getEntity();
@@ -131,6 +144,20 @@ public class TestReconWithOzoneManagerFSO {
       assertNotNull(impl.getOMMetadataManagerInstance()
               .getVolumeTable().getSkipCache("/vol" + i));
     }
+
+    // Wait for async sync to complete and namespace summary to be updated with new volumes
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Response rootBasicRes = endpoint.getBasicInfo("/");
+        NamespaceSummaryResponse rootBasicEntity = (NamespaceSummaryResponse) rootBasicRes.getEntity();
+        return rootBasicEntity.getCountStats().getNumVolume() >= 13 &&
+               rootBasicEntity.getCountStats().getNumBucket() >= 12 &&
+               rootBasicEntity.getCountStats().getNumTotalDir() >= 12 &&
+               rootBasicEntity.getCountStats().getNumTotalKey() >= 12;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 30000);
 
     // test root response
     Response rootBasicRes = endpoint.getBasicInfo("/");
