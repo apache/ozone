@@ -45,7 +45,7 @@ public final class DatanodeID implements Comparable<DatanodeID> {
   }
 
   // Mainly used for JSON conversion
-  public String getID() {
+  public String getUuid() {
     return toString();
   }
 
@@ -120,12 +120,5 @@ public final class DatanodeID implements Comparable<DatanodeID> {
         .setMostSigBits(id.getMostSignificantBits())
         .setLeastSigBits(id.getLeastSignificantBits())
         .build();
-  }
-
-  // TODO: Remove this in follow-up Jira. (HDDS-12015)
-  //   Exposing this temporarily to help with refactoring.
-  @Deprecated
-  public UUID getUuid() {
-    return uuid;
   }
 }
