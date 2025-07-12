@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.jupiter.api.AfterAll;
@@ -51,8 +50,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * {@link org.apache.hadoop.hdds.scm.server.TestSCMBlockProtocolServer}
- * sortDatanodes tests for
- * {@link org.apache.hadoop.ozone.om.KeyManagerImpl#sortDatanodes(List, String)}.
+ * sortDatanodes tests for KeyManagerImpl#sortDatanodes().
  */
 public class TestOMSortDatanodes {
 
@@ -61,7 +59,6 @@ public class TestOMSortDatanodes {
   private static OzoneConfiguration config;
   private static StorageContainerManager scm;
   private static NodeManager nodeManager;
-  private static KeyManagerImpl keyManager;
   private static StorageContainerLocationProtocol mockScmContainerClient;
   private static OzoneManager om;
   private static final int NODE_COUNT = 10;
@@ -107,7 +104,6 @@ public class TestOMSortDatanodes {
         mockScmContainerClient);
     om = omTestManagers.getOzoneManager();
     ozoneClient = omTestManagers.getRpcClient();
-    keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
   }
 
   @AfterAll
@@ -128,8 +124,7 @@ public class TestOMSortDatanodes {
   public void sortDatanodesRelativeToDatanode() {
     for (DatanodeDetails dn : nodeManager.getAllNodes()) {
       assertEquals(ROOT_LEVEL + 2, dn.getLevel());
-      List<? extends DatanodeDetails> sorted =
-          keyManager.sortDatanodes(nodeManager.getAllNodes(), nodeAddress(dn));
+      List<? extends DatanodeDetails> sorted = om.sortDatanodes(nodeManager.getAllNodes(), nodeAddress(dn));
       assertEquals(dn, sorted.get(0),
           "Source node should be sorted very first");
       assertRackOrder(dn.getNetworkLocation(), sorted);
@@ -139,8 +134,7 @@ public class TestOMSortDatanodes {
   @Test
   public void sortDatanodesRelativeToNonDatanode() {
     for (Map.Entry<String, String> entry : EDGE_NODES.entrySet()) {
-      assertRackOrder(entry.getValue(),
-          keyManager.sortDatanodes(nodeManager.getAllNodes(), entry.getKey()));
+      assertRackOrder(entry.getValue(), om.sortDatanodes(nodeManager.getAllNodes(), entry.getKey()));
     }
   }
 
@@ -151,18 +145,17 @@ public class TestOMSortDatanodes {
     // sort normal datanodes
     String client;
     client = nodeManager.getAllNodes().get(0).getIpAddress();
-    List<? extends DatanodeDetails> datanodeDetails =
-        keyManager.sortDatanodes(nodes, client);
+    List<? extends DatanodeDetails> datanodeDetails = om.sortDatanodes(nodes, client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 1
     client += "X";
-    datanodeDetails = keyManager.sortDatanodes(nodes, client);
+    datanodeDetails = om.sortDatanodes(nodes, client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 2
     client = "/default-rack";
-    datanodeDetails = keyManager.sortDatanodes(nodes, client);
+    datanodeDetails = om.sortDatanodes(nodes, client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
   }
 
