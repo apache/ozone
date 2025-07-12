@@ -39,16 +39,23 @@ A typical production Ozone cluster includes the following services:
 
 ### System Requirements
 
+*   **Hardware**: Bare metal machines are recommended for optimal performance. Virtual machines or containers are not recommended for production deployments.
 *   **Operating System**: Linux (recommended distributions: Red Hat 8/Rocky 8+, Ubuntu, SUSE; supported architectures: x86/ARM).
 *   **Java Development Kit (JDK)**: Version 8 or higher.
 *   **Time Synchronization**: A time synchronization service such as Chrony or ntpd must be enabled to prevent time drift.
 
+### Memory Requirements
+
+*   **Ozone Manager (OM), Storage Container Manager (SCM), and Recon**: Recommended heap size in large production clusters is 64GB.
+*   **DataNode, S3 Gateway, and HttpFs**: Recommended heap size is 31GB.
+
 ### Storage Requirements
 
-*   **Ozone Manager (OM) and Storage Container Manager (SCM) Metadata Storage**: Use SAS SSD or NVMe SSD for metadata (RocksDB and Ratis) to ensure optimal performance.
+*   **Ozone Manager (OM), Storage Container Manager (SCM), and Recon Metadata Storage**: Use SAS SSD or NVMe SSD for metadata (RocksDB and Ratis) to ensure optimal performance. It is recommended to use RAID 1 (disk mirroring) for the metadata disks to protect against disk failures.
 *   **DataNode Storage**:
     *   **Ratis Log**: Use SAS SSD or NVMe SSD for the Ratis log directory for low latency writes.
     *   **Container Data**: Hard disks are acceptable for container data storage.
+    *   **Disk Configuration**: It is recommended to use a JBOD (Just a Bunch Of Disks) configuration instead of RAID. Ozone is a replicated distributed storage system and handles data redundancy. Using RAID can decrease performance without providing additional data protection benefits.
 *   **Storage Type**: Use direct-attached storage. Do not use Network Attached Storage (NAS) or Storage Area Network (SAN).
 
 ### Network Requirements
@@ -77,6 +84,6 @@ A typical production Ozone cluster includes the following services:
 
 ### Ozone Configuration
 
-*   **Monitoring**: Install Prometheus and Grafana for monitoring the Ozone cluster.
+*   **Monitoring**: Install Prometheus and Grafana for monitoring the Ozone cluster. For audit logs, consider using a log ingestion framework such as the ELK Stack (Elasticsearch, Logstash, and Kibana) with FileBeat, or other similar frameworks. Alternatively, you can use Apache Ranger to manage audit logs.
 *   **Pipeline Limits**: Increase the number of allowed write pipelines to better suit your workload by adjusting `ozone.scm.datanode.pipeline.limit` and `ozone.scm.ec.pipeline.minimum`.
 *   **Heap Sizes**: Configure sufficient heap sizes for Ozone Manager (OM), Storage Container Manager (SCM), Recon, DataNode, S3 Gateway (S3G), and HttpFs services to ensure stability.
