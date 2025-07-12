@@ -90,16 +90,6 @@ public class SlidingWindow {
     return windowSize;
   }
 
-  private int size() {
-    synchronized (lock) {
-      return timestamps.size();
-    }
-  }
-
-  public Duration getExpiryDuration() {
-    return expiryDuration;
-  }
-
   private long getCurrentTime() {
     return Time.monotonicNow();
   }
