@@ -779,6 +779,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.block.deletion.max.blocks.per.dn</name>
+    <value>100000</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      Maximum number of delete blocks SCM can send to each datanode in every interval.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.block.size</name>
     <value>256MB</value>
     <tag>OZONE, SCM</tag>

@@ -881,6 +881,54 @@ public class TestDeletedBlockLog {
   }
 
   @Test
+  public void testGetTransactionsWithMaxBlocksPerDatanode() throws IOException {
+    int maxDeleteBlocksPerDatanode = 10;
+    deletedBlockLog.setMaxDeleteBlocksPerDatanode(maxDeleteBlocksPerDatanode);
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    mockContainerHealthResult(true);
+    int txNum = 10;
+    List<DeletedBlocksTransaction> blocks;
+    DatanodeDetails dnId1 = dnList.get(0), dnId2 = dnList.get(1);
+
+    int count = 0;
+    long containerID;
+
+    // Creates {TXNum} TX in the log.
+    Map<Long, List<Long>> deletedBlocks = generateData(txNum);
+    addTransactions(deletedBlocks, true);
+    for (Map.Entry<Long, List<Long>> entry : deletedBlocks.entrySet()) {
+      count++;
+      containerID = entry.getKey();
+      // let the container replication factor to be ONE
+      if (count % 2 == 0) {
+        mockStandAloneContainerInfo(containerID, dnId1);
+      } else {
+        mockStandAloneContainerInfo(containerID, dnId2);
+      }
+    }
+
+    // For 2 DNs 20 blocks(localid) should return
+    blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
+    assertEquals(2 * maxDeleteBlocksPerDatanode, blocks.stream()
+        .mapToInt(d -> d.getLocalIDList().size())
+        .sum());
+
+    maxDeleteBlocksPerDatanode = 15;
+    // For 2 DNs 30 blocks(localid) should return
+    deletedBlockLog.setMaxDeleteBlocksPerDatanode(maxDeleteBlocksPerDatanode);
+    blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
+    assertEquals(2 * maxDeleteBlocksPerDatanode, blocks.stream()
+        .mapToInt(d -> d.getLocalIDList().size())
+        .sum());
+
+    // Since all blocks are processed it should return empty
+    blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
+    assertEquals(0, blocks.stream()
+        .mapToInt(d -> d.getLocalIDList().size())
+        .sum());
+  }
+
+  @Test
   public void testDeletedBlockTransactionsOfDeletedContainer() throws IOException {
     int txNum = 10;
     List<DeletedBlocksTransaction> blocks;
