@@ -128,7 +128,7 @@ public final class OMRequestTestUtils {
         BucketLayout.DEFAULT);
   }
 
-  public static void addVolumeAndBucketToDB(String volumeName,
+  public static OmBucketInfo addVolumeAndBucketToDB(String volumeName,
       String bucketName, OMMetadataManager omMetadataManager,
       BucketLayout bucketLayout) throws Exception {
 
@@ -136,11 +136,12 @@ public final class OMRequestTestUtils {
             omMetadataManager.getVolumeKey(volumeName))) {
       addVolumeToDB(volumeName, omMetadataManager);
     }
-
-    if (!omMetadataManager.getBucketTable().isExist(
-            omMetadataManager.getBucketKey(volumeName, bucketName))) {
-      addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    if (omBucketInfo != null) {
+      omBucketInfo = addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
     }
+    return omBucketInfo;
   }
 
   public static void addVolumeAndBucketToDB(

@@ -275,12 +275,16 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           long quotaReleased = 0;
           int keyFactor = omMultipartKeyInfo.getReplicationConfig()
               .getRequiredNodes();
+          long totalSize = 0;
           for (PartKeyInfo iterPartKeyInfo : omMultipartKeyInfo.
               getPartKeyInfoMap()) {
             quotaReleased +=
                 iterPartKeyInfo.getPartKeyInfo().getDataSize() * keyFactor;
+            totalSize += sumBlockLengths(iterPartKeyInfo.getPartKeyInfo());
           }
-          omBucketInfo.incrUsedBytes(-quotaReleased);
+          omBucketInfo.decrUsedBytes(quotaReleased, false);
+          omBucketInfo.incrPendingSnapshotDeleteBytes(totalSize);
+          omBucketInfo.incrPendingSnapshotDeleteNamespace(omMultipartKeyInfo.getPartKeyInfoMap().size());
 
           OmMultipartAbortInfo omMultipartAbortInfo =
               new OmMultipartAbortInfo.Builder()

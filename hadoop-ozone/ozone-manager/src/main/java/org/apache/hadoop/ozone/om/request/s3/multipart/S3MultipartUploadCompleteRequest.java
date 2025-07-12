@@ -297,6 +297,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 bucketName, keyName, dbMultipartOpenKey, omMetadataManager,
                 dbOzoneKey, partKeyInfoMap, partLocationInfos, dataSize);
 
+        long totalPendingDeleteBytes = 0;
+        int totalPendingDeleteNameSpace = 0;
         long usedBytesDiff = 0;
         //Find all unused parts.
         List<OmKeyInfo> allKeyInfoToRemove = new ArrayList<>();
@@ -306,6 +308,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
             allKeyInfoToRemove.add(delPartKeyInfo);
             usedBytesDiff -= delPartKeyInfo.getReplicatedSize();
+            totalPendingDeleteBytes += sumBlockLengths(delPartKeyInfo);
+            totalPendingDeleteNameSpace += 1;
           }
         }
 
@@ -321,6 +325,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               keyToDelete, trxnLogIndex);
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
           usedBytesDiff -= keyToDelete.getReplicatedSize();
+          totalPendingDeleteBytes += sumBlockLengths(keyToDelete);
+          totalPendingDeleteNameSpace += 1;
         } else {
           checkBucketQuotaInNamespace(omBucketInfo, 1L);
           omBucketInfo.incrUsedNamespace(1L);
@@ -329,8 +335,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
         String dbBucketKey = omMetadataManager.getBucketKey(
             omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
-        if (usedBytesDiff != 0) {
+        if (usedBytesDiff != 0 || totalPendingDeleteBytes != 0) {
           omBucketInfo.incrUsedBytes(usedBytesDiff);
+          omBucketInfo.incrPendingSnapshotDeleteBytes(totalPendingDeleteBytes);
+          omBucketInfo.incrPendingSnapshotDeleteNamespace(totalPendingDeleteNameSpace);
         } else if (!isNamespaceUpdate) {
           // If no bucket size and Namespace changed, prevent from updating
           // bucket object.
