@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
@@ -347,21 +348,45 @@ public final class HAUtils {
 
   /**
    * Retry forever until CA list matches expected count.
+   * Fails fast on authentication exceptions.
    * @param task - task to get CA list.
    * @return CA list.
    */
   private static List<String> getCAListWithRetry(Callable<List<String>> task,
       long waitDuration) throws IOException {
-    RetryPolicy retryPolicy = RetryPolicies.retryForeverWithFixedSleep(
-        waitDuration, TimeUnit.SECONDS);
-    RetriableTask<List<String>> retriableTask =
-        new RetriableTask<>(retryPolicy, "getCAList", task);
+    RetryPolicy retryPolicy = new RetryPolicy() {
+      private final RetryPolicy defaultPolicy = RetryPolicies.retryForeverWithFixedSleep(
+          waitDuration, TimeUnit.SECONDS);
+
+      @Override
+      public RetryAction shouldRetry(Exception e, int retries, int failovers, boolean isIdempotent) throws Exception {
+        if (containsAccessControlException(e)) {
+          LOG.warn("AccessControlException encountered during getCAList; failing fast without retry.");
+          return new RetryAction(RetryAction.RetryDecision.FAIL);
+        }
+        return defaultPolicy.shouldRetry(e, retries, failovers, isIdempotent);
+      }
+    };
+
+    RetriableTask<List<String>> retriableTask = new RetriableTask<>(retryPolicy, "getCAList", task);
     try {
       return retriableTask.call();
     } catch (Exception ex) {
-      throw new SCMSecurityException("Unable to obtain complete CA " +
-          "list", ex);
+      if (containsAccessControlException(ex)) {
+        throw new AccessControlException();
+      }
+      throw new SCMSecurityException("Unable to obtain complete CA list", ex);
     }
+  }
+
+  private static boolean containsAccessControlException(Throwable e) {
+    while (e != null) {
+      if (e instanceof AccessControlException) {
+        return true;
+      }
+      e = e.getCause();
+    }
+    return false;
   }
 
   private static List<String> waitForCACerts(
