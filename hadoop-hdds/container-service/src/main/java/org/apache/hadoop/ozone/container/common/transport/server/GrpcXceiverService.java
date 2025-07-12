@@ -104,8 +104,12 @@ public class GrpcXceiverService extends
             .build();
 
         try {
-          final ContainerCommandResponseProto resp = dispatcher.dispatch(request, context);
-          responseObserver.onNext(resp);
+          if (request.getCmdType() == Type.ReadBlock) {
+            dispatcher.streamDataReadOnly(request, responseObserver, null);
+          } else {
+            final ContainerCommandResponseProto resp = dispatcher.dispatch(request, context);
+            responseObserver.onNext(resp);
+          }
         } catch (Throwable e) {
           LOG.error("Got exception when processing"
                     + " ContainerCommandRequestProto {}", request, e);
