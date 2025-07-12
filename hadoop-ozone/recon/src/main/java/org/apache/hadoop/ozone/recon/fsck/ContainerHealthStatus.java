@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
@@ -162,7 +163,8 @@ public class ContainerHealthStatus {
 
   public boolean isDataChecksumMismatched() {
     return !replicas.isEmpty() && replicas.stream()
-            .map(ContainerReplica::getDataChecksum)
+            .map(ContainerReplica::getChecksums)
+            .map(ContainerChecksums::getDataChecksum)
             .distinct()
             .count() != 1;
   }

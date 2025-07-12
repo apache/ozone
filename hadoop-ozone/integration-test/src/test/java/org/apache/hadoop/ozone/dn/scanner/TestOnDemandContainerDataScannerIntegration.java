@@ -105,7 +105,7 @@ class TestOnDemandContainerDataScannerIntegration
     assertTrue(containerChecksumFileExists(containerID));
 
     waitForScmToSeeReplicaState(containerID, CLOSED);
-    long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    long initialReportedDataChecksum = getContainerReplica(containerID).getChecksums().getDataChecksum();
 
     // Corrupt the container.
     corruption.applyTo(container);
@@ -121,7 +121,7 @@ class TestOnDemandContainerDataScannerIntegration
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeReplicaState(containerID, UNHEALTHY);
     corruption.assertLogged(containerID, 1, logCapturer);
-    long newReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    long newReportedDataChecksum = getContainerReplica(containerID).getChecksums().getDataChecksum();
 
     if (corruption == TestContainerCorruptions.MISSING_METADATA_DIR ||
         corruption == TestContainerCorruptions.MISSING_CONTAINER_DIR) {

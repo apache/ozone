@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -416,7 +417,7 @@ public class TestContainerHealthStatus {
       replicas.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
-          .setDataChecksum(1234L)
+          .setChecksums(new ContainerChecksums(1234L))
           .setContainerState(s)
           .build());
     }
@@ -432,7 +433,7 @@ public class TestContainerHealthStatus {
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
           .setContainerState(s)
-          .setDataChecksum(checksum)
+          .setChecksums(new ContainerChecksums(checksum))
           .build());
       checksum++;
     }

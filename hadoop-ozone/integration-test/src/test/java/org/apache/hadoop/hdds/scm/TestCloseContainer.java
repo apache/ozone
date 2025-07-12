@@ -159,7 +159,7 @@ public class TestCloseContainer {
     GenericTestUtils.waitFor(() ->
             getContainerReplicas(newContainer).size() == 3, 200, 30000);
     for (ContainerReplica replica : getContainerReplicas(newContainer)) {
-      assertNotEquals(0, replica.getDataChecksum());
+      assertNotEquals(0, replica.getChecksums().getDataChecksum());
     }
   }
 
@@ -201,7 +201,7 @@ public class TestCloseContainer {
     }
 
     for (ContainerReplica replica : getContainerReplicas(container)) {
-      assertNotEquals(0, replica.getDataChecksum());
+      assertNotEquals(0, replica.getChecksums().getDataChecksum());
     }
 
     assertThrows(IOException.class,
@@ -275,10 +275,10 @@ public class TestCloseContainer {
     assertNotEquals(prevExpectedChecksumInfo1.getContainerMerkleTree().getDataChecksum(),
         prevExpectedChecksumInfo2.getContainerMerkleTree().getDataChecksum());
     for (ContainerReplica replica : getContainerReplicas(containerInfo1)) {
-      assertNotEquals(0, replica.getDataChecksum());
+      assertNotEquals(0, replica.getChecksums().getDataChecksum());
     }
     for (ContainerReplica replica : getContainerReplicas(containerInfo2)) {
-      assertNotEquals(0, replica.getDataChecksum());
+      assertNotEquals(0, replica.getChecksums().getDataChecksum());
     }
   }
 
