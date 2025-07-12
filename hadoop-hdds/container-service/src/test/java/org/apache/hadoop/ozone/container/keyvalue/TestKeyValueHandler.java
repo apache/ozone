@@ -98,7 +98,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -818,7 +818,7 @@ public class TestKeyValueHandler {
     // Register the on-demand container scanner with the container set used by the KeyValueHandler.
     ContainerController controller = new ContainerController(containerSet,
         Collections.singletonMap(ContainerType.KeyValueContainer, kvHandler));
-    OnDemandContainerDataScanner onDemandScanner = new OnDemandContainerDataScanner(
+    OnDemandContainerScanner onDemandScanner = new OnDemandContainerScanner(
         conf.getObject(ContainerScannerConfiguration.class), controller);
     containerSet.registerOnDemandScanner(onDemandScanner);
 
