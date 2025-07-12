@@ -104,7 +104,7 @@ public class ScmConfig extends ReconfigurableConfig {
 
   @Config(key = "hdds.scm.block.deletion.per-interval.max",
       type = ConfigType.INT,
-      defaultValue = "100000",
+      defaultValue = "500000",
       reconfigurable = true,
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
       description =
