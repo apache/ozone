@@ -30,7 +30,6 @@ public class SlidingWindow {
   private final int windowSize;
   private final Deque<Long> timestamps;
   private final long expiryDurationMillis;
-  private final Duration expiryDuration;
 
   /**
    * @param windowSize     the maximum number of events that are tracked
@@ -43,7 +42,6 @@ public class SlidingWindow {
     if (expiryDuration.isNegative() || expiryDuration.isZero()) {
       throw new IllegalArgumentException("Expiry duration must be greater than 0");
     }
-    this.expiryDuration = expiryDuration;
     this.expiryDurationMillis = expiryDuration.toMillis();
     this.windowSize = windowSize;
     // We limit the initial queue size to 100 to control the memory usage
