@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETE_TRANSACTION_KEY;
@@ -422,6 +423,10 @@ public class KeyValueContainerData extends ContainerData {
 
   public String getPendingDeleteBlockCountKey() {
     return formatKey(PENDING_DELETE_BLOCK_COUNT);
+  }
+
+  public String getContainerDataChecksumKey() {
+    return formatKey(CONTAINER_DATA_CHECKSUM);
   }
 
   public String getDeletingBlockKeyPrefix() {

@@ -36,6 +36,7 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -43,6 +44,9 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
@@ -345,5 +349,28 @@ public final class ContainerMerkleTreeTestUtils {
           + data.getContainerID(), ex);
     }
     data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
+  }
+
+  /**
+   * This function verifies that the in-memory data checksum matches the one stored in the container data and
+   * the RocksDB.
+   *
+   * @param containerData The container data to verify.
+   * @param conf          The Ozone configuration.
+   * @throws IOException If an error occurs while reading the checksum info or RocksDB.
+   */
+  public static void verifyAllDataChecksumsMatch(KeyValueContainerData containerData, OzoneConfiguration conf)
+      throws IOException {
+    assertNotNull(containerData, "Container data should not be null");
+    ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerChecksumTreeManager
+        .readChecksumInfo(containerData);
+    assertNotNull(containerChecksumInfo);
+    long dataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+    assertEquals(containerData.getDataChecksum(), dataChecksum, "In-memory data checksum should match " +
+        "the one in the checksum file.");
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+      assertEquals(containerData.getDataChecksum(), dbDataChecksum, "DB should have the updated data checksum.");
+    }
   }
 }

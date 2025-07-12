@@ -19,10 +19,12 @@ package org.apache.hadoop.ozone.container.checksum;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM_EXTENSION;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
+import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -333,14 +335,13 @@ public class ContainerChecksumTreeManager {
   /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
-  @VisibleForTesting
   public static File getContainerChecksumFile(ContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+    return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION);
   }
 
   @VisibleForTesting
   public static File getTmpContainerChecksumFile(ContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree.tmp");
+    return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION + ".tmp");
   }
 
   private Lock getLock(long containerID) {
@@ -353,7 +354,8 @@ public class ContainerChecksumTreeManager {
    */
   public Optional<ContainerProtos.ContainerChecksumInfo> read(ContainerData data) throws IOException {
     try {
-      return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () -> readChecksumInfo(data));
+      return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () ->
+          Optional.ofNullable(readChecksumInfo(data)));
     } catch (IOException ex) {
       metrics.incrementMerkleTreeReadFailures();
       throw new IOException(ex);
@@ -421,17 +423,17 @@ public class ContainerChecksumTreeManager {
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(ContainerData data)
+  public static @Nullable ContainerProtos.ContainerChecksumInfo readChecksumInfo(ContainerData data)
       throws IOException {
     long containerID = data.getContainerID();
     File checksumFile = getContainerChecksumFile(data);
     try {
       if (!checksumFile.exists()) {
         LOG.debug("No checksum file currently exists for container {} at the path {}", containerID, checksumFile);
-        return Optional.empty();
+        return null;
       }
       try (InputStream inStream = Files.newInputStream(checksumFile.toPath())) {
-        return Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
+        return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
       }
     } catch (IOException ex) {
       throw new IOException("Error occurred when reading container merkle tree for containerID "
