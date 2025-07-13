@@ -278,8 +278,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             correctedSpace);
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= totalSize;
-        omBucketInfo.incrSnapshotUsedNamespace(totalNamespace);
-        omBucketInfo.incrSnapshotUsedBytes(totalSize);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,

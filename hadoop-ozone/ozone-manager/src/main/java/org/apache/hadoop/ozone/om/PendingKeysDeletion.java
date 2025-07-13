@@ -64,12 +64,14 @@ public class PendingKeysDeletion {
     private final String bucket;
     private final BlockGroup blockGroup;
     private final long purgedBytes;
+    private final boolean isCommittedKey;
 
-    public PurgedKey(String volume, String bucket, BlockGroup group, long purgedBytes) {
+    public PurgedKey(String volume, String bucket, BlockGroup group, long purgedBytes, boolean isCommittedKey) {
       this.volume = volume;
       this.bucket = bucket;
       this.blockGroup = group;
       this.purgedBytes = purgedBytes;
+      this.isCommittedKey = isCommittedKey;
     }
 
     public BlockGroup getBlockGroup() {
@@ -88,6 +90,10 @@ public class PendingKeysDeletion {
       return bucket;
     }
 
+    public boolean isCommittedKey() {
+      return isCommittedKey;
+    }
+
     @Override
     public String toString() {
       return "PurgedKey{" +
@@ -95,6 +101,7 @@ public class PendingKeysDeletion {
           ", volume='" + volume + '\'' +
           ", bucket='" + bucket + '\'' +
           ", purgedBytes=" + purgedBytes +
+          ", isCommittedKey=" + isCommittedKey +
           '}';
     }
   }

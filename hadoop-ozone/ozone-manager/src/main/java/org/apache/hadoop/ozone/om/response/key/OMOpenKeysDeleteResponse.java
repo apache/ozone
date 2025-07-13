@@ -24,13 +24,11 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -44,16 +42,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   private Map<String, OmKeyInfo> keysToDelete;
-  private Collection<OmBucketInfo> bucketInfos;
 
   public OMOpenKeysDeleteResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull Map<String, OmKeyInfo> keysToDelete,
-      @Nonnull Collection<OmBucketInfo> bucketInfos,
       @Nonnull BucketLayout bucketLayout) {
 
     super(omResponse, bucketLayout);
-    this.bucketInfos = bucketInfos;
     this.keysToDelete = keysToDelete;
   }
 
@@ -78,12 +73,7 @@ public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
 
     for (Map.Entry<String, OmKeyInfo> keyInfoPair : keysToDelete.entrySet()) {
       addDeletionToBatch(omMetadataManager, batchOperation, openKeyTable,
-          keyInfoPair.getKey(), keyInfoPair.getValue());
-    }
-    for (OmBucketInfo bucketInfo : bucketInfos) {
-      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-          omMetadataManager.getBucketKey(bucketInfo.getVolumeName(),
-              bucketInfo.getBucketName()), bucketInfo);
+          keyInfoPair.getKey(), keyInfoPair.getValue(), false);
     }
   }
 }

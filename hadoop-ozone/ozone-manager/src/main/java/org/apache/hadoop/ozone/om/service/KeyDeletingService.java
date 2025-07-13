@@ -199,9 +199,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     // this needs to be retried.
     completePurgedKeys = completePurgedKeys.stream()
         .filter(i -> !failedDeletedKeys.contains(i)).collect(Collectors.toSet());
-    // Filter any keys that have failed and sort the purge keys based on volume and bucket.
+    // Filter out any keys that have failed and sort the purge keys based on volume and bucket.
     purgedKeys = purgedKeys.stream()
-        .filter(purgedKey -> failedDeletedKeys.contains(purgedKey.getBlockGroup().getGroupID()))
+        .filter(purgedKey -> !failedDeletedKeys.contains(purgedKey.getBlockGroup().getGroupID()))
         .sorted(Comparator.comparing(PurgedKey::getVolume).thenComparing(PurgedKey::getBucket))
         .collect(Collectors.toList());
 
@@ -239,8 +239,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (completePurgedKeys.contains(deletedKey)) {
         bucketDeleteKeys.addKeys(deletedKey);
       }
-      purgedBytes += purgedKey.getPurgedBytes();
-      purgedNamespace++;
+      if (purgedKey.isCommittedKey()) {
+        purgedBytes += purgedKey.getPurgedBytes();
+        purgedNamespace++;
+      }
     }
     if (bucketDeleteKeys != null) {
       purgeKeysRequest.addDeletedKeys(bucketDeleteKeys

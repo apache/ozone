@@ -83,7 +83,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     TransactionInfo lastAOSTransactionId = metrics.getLastAOSTransactionId();
     TransactionInfo flushedTransactionId = TransactionInfo.readTransactionInfo(
         getOzoneManager().getMetadataManager());
-    if (lastAOSTransactionId.compareTo(flushedTransactionId) > 0) {
+    if (flushedTransactionId != null && lastAOSTransactionId.compareTo(flushedTransactionId) > 0) {
       LOG.info("Skipping AOS processing since changes to deleted space of AOS have not been flushed to disk " +
               "last Purge Transaction: {}, Flushed Disk Transaction: {}", lastAOSTransactionId,
           flushedTransactionId);

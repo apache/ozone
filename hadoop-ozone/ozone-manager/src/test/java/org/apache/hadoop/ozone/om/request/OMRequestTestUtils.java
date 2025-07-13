@@ -138,7 +138,7 @@ public final class OMRequestTestUtils {
     }
     OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName));
-    if (omBucketInfo != null) {
+    if (omBucketInfo == null) {
       omBucketInfo = addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
     }
     return omBucketInfo;

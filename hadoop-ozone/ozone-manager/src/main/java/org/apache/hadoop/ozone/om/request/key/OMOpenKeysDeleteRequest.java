@@ -24,7 +24,6 @@ import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -32,7 +31,6 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -88,17 +86,17 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     Map<String, OmKeyInfo> deletedOpenKeys = new HashMap<>();
-    Map<Pair<String, String>, OmBucketInfo> bucketInfoMap = new HashMap<>();
+
     try {
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBuckets) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
         updateOpenKeyTableCache(ozoneManager, trxnLogIndex,
-            openKeyBucket, deletedOpenKeys, bucketInfoMap);
+            openKeyBucket, deletedOpenKeys);
       }
 
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
-          deletedOpenKeys, bucketInfoMap.values(), getBucketLayout());
+          deletedOpenKeys, getBucketLayout());
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
@@ -141,8 +139,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
   private void updateOpenKeyTableCache(OzoneManager ozoneManager,
       long trxnLogIndex, OpenKeyBucket keysPerBucket,
-      Map<String, OmKeyInfo> deletedOpenKeys,
-      Map<Pair<String, String>, OmBucketInfo> bucketInfoMap) throws IOException {
+      Map<String, OmKeyInfo> deletedOpenKeys) throws IOException {
 
     boolean acquiredLock = false;
     String volumeName = keysPerBucket.getVolumeName();
@@ -153,8 +150,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
-      long totalPendingDeleteBytes = 0;
-      long totalPendingDeleteCount = 0;
+
       for (OpenKey key: keysPerBucket.getKeysList()) {
         String fullKeyName = key.getName();
 
@@ -174,8 +170,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           // Set the UpdateID to current transactionLogIndex
           omKeyInfo.setUpdateID(trxnLogIndex);
           deletedOpenKeys.put(fullKeyName, omKeyInfo);
-          totalPendingDeleteBytes += sumBlockLengths(omKeyInfo);
-          totalPendingDeleteCount += 1;
+
           // Update openKeyTable cache.
           omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
               new CacheKey<>(fullKeyName),
@@ -190,15 +185,6 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
         } else {
           LOG.debug("Key {} was not deleted, as it was not " +
                   "found in the open key table.", fullKeyName);
-        }
-      }
-
-      if (totalPendingDeleteBytes > 0 || totalPendingDeleteCount > 0) {
-        OmBucketInfo bucketInfo = bucketInfoMap.compute(Pair.of(volumeName, bucketName),
-            (k, v) -> getBucketInfo(omMetadataManager, volumeName, bucketName));
-        if (bucketInfo != null) {
-          bucketInfo.incrSnapshotUsedBytes(totalPendingDeleteBytes);
-          bucketInfo.incrSnapshotUsedNamespace(totalPendingDeleteCount);
         }
       }
     } finally {
