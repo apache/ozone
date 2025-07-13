@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -30,28 +31,41 @@ public class SlidingWindow {
   private final int windowSize;
   private final Deque<Long> timestamps;
   private final long expiryDurationMillis;
+  private final Clock clock;
 
   /**
+   * Default constructor that uses system clock.
+   *
    * @param windowSize     the maximum number of events that are tracked
    * @param expiryDuration the duration after which an entry in the window expires
    */
   public SlidingWindow(int windowSize, Duration expiryDuration) {
+    this(windowSize, expiryDuration, new SystemClock());
+  }
+
+  /**
+   * Constructor with custom clock for testing.
+   *
+   * @param windowSize     the maximum number of events that are tracked
+   * @param expiryDuration the duration after which an entry in the window expires
+   * @param clock          the clock to use for time measurements
+   */
+  public SlidingWindow(int windowSize, Duration expiryDuration, Clock clock) {
     if (windowSize <= 0) {
       throw new IllegalArgumentException("Window size must be greater than 0");
     }
     if (expiryDuration.isNegative() || expiryDuration.isZero()) {
       throw new IllegalArgumentException("Expiry duration must be greater than 0");
     }
-    this.expiryDurationMillis = expiryDuration.toMillis();
     this.windowSize = windowSize;
+    this.expiryDurationMillis = expiryDuration.toMillis();
+    this.clock = clock;
     // We limit the initial queue size to 100 to control the memory usage
     this.timestamps = new ArrayDeque<>(Math.min(windowSize + 1, 100));
   }
 
   public void add() {
     synchronized (lock) {
-      removeExpired();
-
       if (isFull()) {
         timestamps.remove();
       }
@@ -89,6 +103,31 @@ public class SlidingWindow {
   }
 
   private long getCurrentTime() {
-    return Time.monotonicNow();
+    return clock.millis();
+  }
+
+  /**
+   * Implementation of Clock that uses Time.monotonicNow() for real usage.
+   */
+  private static final class SystemClock extends Clock {
+    @Override
+    public long millis() {
+      return Time.monotonicNow();
+    }
+
+    @Override
+    public java.time.Instant instant() {
+      return java.time.Instant.ofEpochMilli(millis());
+    }
+
+    @Override
+    public java.time.ZoneId getZone() {
+      return java.time.ZoneOffset.UTC;
+    }
+
+    @Override
+    public Clock withZone(java.time.ZoneId zone) {
+      return this; // Ignore zone for monotonic clock
+    }
   }
 }
