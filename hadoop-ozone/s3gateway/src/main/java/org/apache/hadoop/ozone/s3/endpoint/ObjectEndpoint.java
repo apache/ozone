@@ -344,7 +344,7 @@ public class ObjectEndpoint extends EndpointBase {
       perf.appendSizeBytes(putLength);
       return Response.ok()
           .header(ETAG, wrapInQuotes(eTag))
-
+          .status(HttpStatus.SC_OK)
           .build();
     } catch (OMException ex) {
       auditSuccess = false;

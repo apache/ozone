@@ -102,10 +102,6 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   private @Metric MutableCounterLong putObjectAclSuccess;
   private @Metric MutableCounterLong putObjectAclFailure;
 
-  // STS Endpoint
-  private @Metric MutableCounterLong stsSuccess;
-  private @Metric MutableCounterLong stsFailure;
-
   // S3 Gateway Latency Metrics
   // BucketEndpoint
 
@@ -282,14 +278,6 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
       "in nanoseconds")
   private PerformanceMetrics putObjectAclFailureLatencyNs;
 
-  // STS Endpoint
-
-  @Metric(about = "Latency for successful STS operations in nanoseconds")
-  private PerformanceMetrics stsSuccessLatencyNs;
-
-  @Metric(about = "Latency for failing STS operations in nanoseconds")
-  private PerformanceMetrics stsFailureLatencyNs;
-
   private final Map<String, PerformanceMetrics> performanceMetrics;
 
   /**
@@ -433,12 +421,6 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     deleteObjectTaggingFailureLatencyNs.snapshot(recordBuilder, true);
     putObjectAclSuccess.snapshot(recordBuilder, true);
     putObjectAclFailure.snapshot(recordBuilder, true);
-    
-    // STS Endpoint
-    stsSuccess.snapshot(recordBuilder, true);
-    stsSuccessLatencyNs.snapshot(recordBuilder, true);
-    stsFailure.snapshot(recordBuilder, true);
-    stsFailureLatencyNs.snapshot(recordBuilder, true);
   }
 
   // INC and UPDATE
@@ -698,18 +680,6 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   public void updatePutObjectAclFailureStats(long startNanos) {
     this.putObjectAclFailure.incr();
     this.putObjectAclFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
-  }
-
-  // STS Endpoint
-
-  public void updateSTSSuccessStats(long startNanos) {
-    this.stsSuccess.incr();
-    this.stsSuccessLatencyNs.add(Time.monotonicNowNanos() - startNanos);
-  }
-
-  public void updateSTSFailureStats(long startNanos) {
-    this.stsFailure.incr();
-    this.stsFailureLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 
   // GET
