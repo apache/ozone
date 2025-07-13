@@ -57,7 +57,7 @@ public class ParallelSizeCalculator {
     // Validate parallelism parameter to prevent IllegalArgumentException
     if (parallelism <= 0) {
       int defaultParallelism = Math.max(1, Runtime.getRuntime().availableProcessors());
-      LOG.warn("Invalid parallelism value: {}. Using default of available processors: {}.", 
+      LOG.warn("Invalid parallelism value: {}. Using default of available processors: {}.",
                parallelism, defaultParallelism);
       parallelism = defaultParallelism;
     }
@@ -84,7 +84,7 @@ public class ParallelSizeCalculator {
       long endTime = System.nanoTime();
       
       long durationMs = (endTime - startTime) / 1_000_000;
-      LOG.debug("Parallel size calculation completed in {}ms for objectId: {}, " +
+      LOG.info("Parallel size calculation completed in {}ms for objectId: {}, " +
                 "total RocksDB queries: {}, total tasks: {}", 
                 durationMs, objectId, totalRocksDBQueries.get(), totalTasksExecuted.get());
       
@@ -259,7 +259,7 @@ public class ParallelSizeCalculator {
       long endTime = System.nanoTime();
       
       long durationMs = (endTime - startTime) / 1_000_000;
-      LOG.debug("Batched parallel size calculation completed in {}ms for objectId: {}, " +
+      LOG.info("Batched parallel size calculation completed in {}ms for objectId: {}, " +
                 "total RocksDB queries: {}, total tasks: {}", 
                 durationMs, objectId, totalRocksDBQueries.get(), totalTasksExecuted.get());
       

@@ -519,8 +519,8 @@
       Unique identifiers for each OM Node, delimited by commas. This will be
       used by OzoneManagers in HA setup to determine all the OzoneManagers
       belonging to the same OMservice in the cluster. For example, if you
-      used “omService1” as the OM service ID previously, and you wanted to
-      use “om1”, “om2” and "om3" as the individual IDs of the OzoneManagers,
+      used "omService1" as the OM service ID previously, and you wanted to
+      use "om1", "om2" and "om3" as the individual IDs of the OzoneManagers,
       you would configure a property ozone.om.nodes.omService1, and its value
       "om1,om2,om3".
     </description>
@@ -2664,8 +2664,8 @@
       Unique identifiers for each SCM Node, delimited by commas. This will be
       used by SCMs in HA setup to determine all the SCMs
       belonging to the same SCM in the cluster. For example, if you
-      used “scmService1” as the SCM service ID previously, and you wanted to
-      use “scm1”, “scm2” and "scm3" as the individual IDs of the SCMs,
+      used "scmService1" as the SCM service ID previously, and you wanted to
+      use "scm1", "scm2" and "scm3" as the individual IDs of the SCMs,
       you would configure a property ozone.scm.nodes.scmService1, and its value
       "scm1,scm2,scm3".
     </description>
@@ -4780,6 +4780,45 @@
     <value>10</value>
     <description>When KeyProvider is configured, the max retries allowed to attempt
       warm up edek cache if none of key successful on OM start up.
+    </description>
+  </property>
+
+  <!-- Parallel Size Calculation Configuration -->
+  <property>
+    <name>ozone.recon.size.calc.parallel.enabled</name>
+    <value>true</value>
+    <tag>RECON, PERFORMANCE</tag>
+    <description>
+      Enable parallel size calculation for namespace disk usage in Recon.
+      When enabled, uses ForkJoinPool for parallel processing of namespace 
+      hierarchy during disk usage calculations. This significantly improves 
+      performance for large namespace hierarchies with millions of directories.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.size.calc.parallel.threshold</name>
+    <value>10</value>
+    <tag>RECON, PERFORMANCE</tag>
+    <description>
+      Minimum number of child directories required to trigger parallel processing
+      when calculating namespace disk usage. If a directory has fewer children
+      than this threshold, sequential processing is used instead. Higher values
+      reduce overhead for small directories but may under-utilize CPU cores.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.size.calc.parallel.pool.size</name>
+    <value>-1</value>
+    <tag>RECON, PERFORMANCE</tag>
+    <description>
+      Size of the ForkJoinPool used for parallel size calculation. If set to 0 or
+      negative values, defaults to the number of available CPU cores 
+      (Runtime.getRuntime().availableProcessors()) with a minimum of 1.
+      Higher values can improve performance on systems with high I/O throughput
+      but may increase memory usage. Set to a lower value if experiencing memory
+      pressure or contention with other processes.
     </description>
   </property>
 </configuration>
