@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_AND_VALUE;
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
@@ -238,11 +240,9 @@ public class QuotaRepairTask {
       }
       return;
     }
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-             iterator = metadataManager.getBucketTable().iterator()) {
+    try (TableIterator<String, OmBucketInfo> iterator = metadataManager.getBucketTable().valueIterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
-        OmBucketInfo bucketInfo = entry.getValue();
+        final OmBucketInfo bucketInfo = iterator.next();
         populateBucket(nameBucketInfoMap, idBucketInfoMap, oriBucketInfoMap, metadataManager, bucketInfo);
       }
     }
@@ -350,8 +350,8 @@ public class QuotaRepairTask {
     }
     int count = 0;
     long startTime = Time.monotonicNow();
-    try (TableIterator<String, ? extends Table.KeyValue<String, VALUE>>
-             keyIter = table.iterator()) {
+    try (Table.KeyValueIterator<String, VALUE> keyIter
+        = table.iterator(null, haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
       while (keyIter.hasNext()) {
         count++;
         kvList.add(keyIter.next());

@@ -81,6 +81,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
       HddsProtos.ReplicationFactor factor, String owner)
       throws IOException;
 
+  ContainerWithPipeline allocateContainer(ReplicationConfig replicationConfig, String owner) throws IOException;
+
   /**
    * Ask SCM the location of the container. SCM responds with a group of
    * nodes where this container and its replicas are located.
@@ -489,4 +491,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
       String scmId) throws IOException;
 
   String getMetrics(String query) throws IOException;
+
+  /**
+   * Trigger a reconcile command to datanodes for the current container ID.
+   *
+   * @param containerID The ID of the container to reconcile.
+   * @throws IOException On error
+   */
+  void reconcileContainer(long containerID) throws IOException;
 }

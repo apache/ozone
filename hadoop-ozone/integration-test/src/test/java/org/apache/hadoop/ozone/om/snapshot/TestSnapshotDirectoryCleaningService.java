@@ -38,7 +38,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -238,7 +237,7 @@ public class TestSnapshotDirectoryCleaningService {
         put("snap3", 0L);
       }};
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (Table.KeyValueIterator<String, SnapshotInfo>
         iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
