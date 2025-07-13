@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import com.google.common.net.HttpHeaders;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -83,6 +84,10 @@ public class ProxyServer {
     LOG.info("Proxy stopped on http://{}:{}", host, port);
   }
 
+  public boolean isStarted() {
+    return server.isStarted();
+  }
+
   /**
    * ProxyHandler is a subclass of Jetty's ProxyServlet.Transparent.
    * It implements logic for request rewriting, service handling,
@@ -134,8 +139,8 @@ public class ProxyServer {
       // In some scenarios (e.g. testPutObjectEmpty), when content-length != 0, Jetty triggers the 100-continue process,
       // causing the server to wait for a 100 response code. However, Jetty only sends the 100 response
       // when the InputStream is read, which can lead to request failures.
-      if (request.getHeader("Expect") != null) {
-        LOG.info("Removing Expect header: {}", request.getHeader("Expect"));
+      if (request.getHeader(HttpHeaders.EXPECT) != null) {
+        LOG.info("Removing Expect header: {}", request.getHeader(HttpHeaders.EXPECT));
 
         request = new HttpServletRequestWrapper(request) {
           @Override

@@ -28,9 +28,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.TimeoutException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.ozone.test.GenericTestUtils;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -56,8 +58,9 @@ public class ProxyServerIntegrationTest {
     for (int i = 0; i < NUM_SERVERS; i++) {
       startMockServer("server-" + i);
     }
-    Thread.sleep(1000);
+    waitForMockServersStarted();
     startProxy();
+    waitForProxyReady();
   }
 
   @AfterAll
@@ -91,6 +94,22 @@ public class ProxyServerIntegrationTest {
     proxy = new ProxyServer(ENDPOINTS, hostPort[0], Integer.parseInt(hostPort[1]));
     proxy.start();
     proxyUrl = "http://" + address + SERVICE_PATH;
+  }
+
+  private static void waitForMockServersStarted() throws TimeoutException, InterruptedException {
+    for (Server server : SERVERS) {
+      GenericTestUtils.waitFor(server::isStarted, 100, 3000);
+    }
+  }
+
+  private static void waitForProxyReady() throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return proxy.isStarted();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 50, 3000);
   }
 
   @Test
