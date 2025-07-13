@@ -197,8 +197,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
         OmBucketInfo bucketInfo = bucketInfoMap.compute(Pair.of(volumeName, bucketName),
             (k, v) -> getBucketInfo(omMetadataManager, volumeName, bucketName));
         if (bucketInfo != null) {
-          bucketInfo.incrPendingSnapshotDeleteBytes(totalPendingDeleteBytes);
-          bucketInfo.incrPendingSnapshotDeleteNamespace(totalPendingDeleteCount);
+          bucketInfo.incrSnapshotUsedBytes(totalPendingDeleteBytes);
+          bucketInfo.incrSnapshotUsedNamespace(totalPendingDeleteCount);
         }
       }
     } finally {

@@ -173,8 +173,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         totalPendingDeleteSize += sumBlockLengths(iterPartKeyInfo.getPartKeyInfo());
       }
       omBucketInfo.decrUsedBytes(quotaReleased, false);
-      omBucketInfo.incrPendingSnapshotDeleteBytes(totalPendingDeleteSize);
-      omBucketInfo.incrPendingSnapshotDeleteNamespace(multipartKeyInfo.getPartKeyInfoMap().size());
+      omBucketInfo.incrSnapshotUsedBytes(totalPendingDeleteSize);
+      omBucketInfo.incrSnapshotUsedNamespace(multipartKeyInfo.getPartKeyInfoMap().size());
 
       // Update cache of openKeyTable and multipartInfo table.
       // No need to add the cache entries to delete table, as the entries

@@ -234,8 +234,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           correctedSpace + totalPendingDeleteSpace);
       checkBucketQuotaInNamespace(omBucketInfo, 1);
       omBucketInfo.incrUsedBytes(correctedSpace);
-      omBucketInfo.incrPendingSnapshotDeleteBytes(totalPendingDeleteSpace);
-      omBucketInfo.incrPendingSnapshotDeleteNamespace(pendingDeleteNamespace);
+      omBucketInfo.incrSnapshotUsedBytes(totalPendingDeleteSpace);
+      omBucketInfo.incrSnapshotUsedNamespace(pendingDeleteNamespace);
 
       MultipartCommitUploadPartResponse.Builder commitResponseBuilder = MultipartCommitUploadPartResponse.newBuilder()
           .setPartName(partName);

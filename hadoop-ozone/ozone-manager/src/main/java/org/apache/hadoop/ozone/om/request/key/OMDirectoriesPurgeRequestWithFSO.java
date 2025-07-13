@@ -161,8 +161,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             long totalSize = sumBlockLengths(keyInfo);
             omBucketInfo.decrUsedBytes(totalSize, true);
             omBucketInfo.decrUsedNamespace(1L, true);
-            omBucketInfo.incrPendingSnapshotDeleteBytes(totalSize);
-            omBucketInfo.incrPendingSnapshotDeleteNamespace(1L);
+            omBucketInfo.incrSnapshotUsedBytes(totalSize);
+            omBucketInfo.incrSnapshotUsedNamespace(1L);
             String ozoneDbKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
                 path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
             omMetadataManager.getFileTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
@@ -177,7 +177,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
                 deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName());
             if (omBucketInfo != null) {
-              omBucketInfo.purgePendingDeleteSnapshotNamespace(1);
+              omBucketInfo.purgeSnapshotUsedNamespace(1);
             }
           }
           numDirsDeleted++;

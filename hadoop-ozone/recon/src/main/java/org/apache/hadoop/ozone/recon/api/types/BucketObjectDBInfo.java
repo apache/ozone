@@ -84,7 +84,7 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     this.owner = omBucketInfo.getOwner();
     this.bekInfo = omBucketInfo.getEncryptionKeyInfo();
     this.usedBytes = omBucketInfo.getUsedBytes();
-    this.pendingDeleteSnapshotBytes = omBucketInfo.getPendingSnapshotDeleteBytes();
+    this.pendingDeleteSnapshotBytes = omBucketInfo.getSnapshotUsedBytes();
   }
 
   public String getVolumeName() {

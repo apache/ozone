@@ -101,8 +101,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
           bucketWithDeleteKeys.getVolumeName(), bucketWithDeleteKeys.getBucketName());
       // Check null if bucket has been deleted.
       if (omBucketInfo != null) {
-        omBucketInfo.purgePendingDeleteSnapshotBytes(bucketWithDeleteKeys.getPurgedBytes());
-        omBucketInfo.purgePendingDeleteSnapshotNamespace(bucketWithDeleteKeys.getPurgedNamespace());
+        omBucketInfo.purgeSnapshotUsedBytes(bucketWithDeleteKeys.getPurgedBytes());
+        omBucketInfo.purgeSnapshotUsedNamespace(bucketWithDeleteKeys.getPurgedNamespace());
       }
     }
     DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();

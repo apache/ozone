@@ -98,8 +98,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   private final long quotaInNamespace;
   // Total size of data trapped which is pending to be deleted either because of data trapped in snapshots or
   // background key deleting service is yet to run.
-  private long pendingSnapshotDeleteBytes;
-  private long pendingSnapshotDeleteNamespace;
+  private long snapshotUsedBytes;
+  private long snapshotUsedNamespace;
 
   /**
    * Bucket Layout.
@@ -122,8 +122,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.sourceBucket = b.sourceBucket;
     this.usedBytes = b.usedBytes;
     this.usedNamespace = b.usedNamespace;
-    this.pendingSnapshotDeleteBytes = b.pendingSnapshotDeleteBytes;
-    this.pendingSnapshotDeleteNamespace = b.pendingSnapshotDeleteNamespace;
+    this.snapshotUsedBytes = b.snapshotUsedBytes;
+    this.snapshotUsedNamespace = b.snapshotUsedNamespace;
     this.quotaInBytes = b.quotaInBytes;
     this.quotaInNamespace = b.quotaInNamespace;
     this.bucketLayout = b.bucketLayout;
@@ -256,19 +256,19 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   }
 
   public long getTotalBucketSpace() {
-    return usedBytes + pendingSnapshotDeleteBytes;
+    return usedBytes + snapshotUsedBytes;
   }
 
   public long getTotalBucketNamespace() {
-    return usedNamespace + pendingSnapshotDeleteNamespace;
+    return usedNamespace + snapshotUsedNamespace;
   }
 
-  public long getPendingSnapshotDeleteBytes() {
-    return pendingSnapshotDeleteBytes;
+  public long getSnapshotUsedBytes() {
+    return snapshotUsedBytes;
   }
 
-  public long getPendingSnapshotDeleteNamespace() {
-    return pendingSnapshotDeleteNamespace;
+  public long getSnapshotUsedNamespace() {
+    return snapshotUsedNamespace;
   }
 
   public long getUsedBytes() {
@@ -286,12 +286,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   public void decrUsedBytes(long bytes, boolean increasePendingDeleteBytes) {
     this.usedBytes -= bytes;
     if (increasePendingDeleteBytes) {
-      incrPendingSnapshotDeleteBytes(bytes);
+      incrSnapshotUsedBytes(bytes);
     }
   }
 
-  public void incrPendingSnapshotDeleteBytes(long bytes) {
-    this.pendingSnapshotDeleteBytes += bytes;
+  public void incrSnapshotUsedBytes(long bytes) {
+    this.snapshotUsedBytes += bytes;
   }
 
   public void incrUsedNamespace(long namespaceToUse) {
@@ -301,20 +301,20 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   public void decrUsedNamespace(long namespaceToUse, boolean increasePendingDeleteNamespace) {
     this.usedNamespace -= namespaceToUse;
     if (increasePendingDeleteNamespace) {
-      incrPendingSnapshotDeleteNamespace(namespaceToUse);
+      incrSnapshotUsedNamespace(namespaceToUse);
     }
   }
 
-  public void incrPendingSnapshotDeleteNamespace(long namespaceToUse) {
-    this.pendingSnapshotDeleteNamespace += namespaceToUse;
+  public void incrSnapshotUsedNamespace(long namespaceToUse) {
+    this.snapshotUsedNamespace += namespaceToUse;
   }
 
-  public void purgePendingDeleteSnapshotBytes(long bytes) {
-    this.pendingSnapshotDeleteBytes -= bytes;
+  public void purgeSnapshotUsedBytes(long bytes) {
+    this.snapshotUsedBytes -= bytes;
   }
 
-  public void purgePendingDeleteSnapshotNamespace(long namespaceToUse) {
-    this.pendingSnapshotDeleteNamespace -= namespaceToUse;
+  public void purgeSnapshotUsedNamespace(long namespaceToUse) {
+    this.snapshotUsedNamespace -= namespaceToUse;
   }
 
   public long getQuotaInBytes() {
@@ -376,8 +376,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     auditMap.put(OzoneConsts.USED_BYTES, String.valueOf(this.usedBytes));
     auditMap.put(OzoneConsts.USED_NAMESPACE,
         String.valueOf(this.usedNamespace));
-    auditMap.put(OzoneConsts.PENDING_DELETE_SNAPSHOT_BYTES, String.valueOf(this.pendingSnapshotDeleteBytes));
-    auditMap.put(OzoneConsts.PENDING_DELETE_SNAPSHOT_NAMESPACE, String.valueOf(this.pendingSnapshotDeleteNamespace));
+    auditMap.put(OzoneConsts.PENDING_DELETE_SNAPSHOT_BYTES, String.valueOf(this.snapshotUsedBytes));
+    auditMap.put(OzoneConsts.PENDING_DELETE_SNAPSHOT_NAMESPACE, String.valueOf(this.snapshotUsedNamespace));
     auditMap.put(OzoneConsts.OWNER, this.owner);
     auditMap.put(OzoneConsts.REPLICATION_TYPE,
         (this.defaultReplicationConfig != null) ?
@@ -423,8 +423,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setUsedNamespace(usedNamespace)
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
-        .setPendingSnapshotDeleteBytes(pendingSnapshotDeleteBytes)
-        .setPendingSnapshotDeleteNamespace(pendingSnapshotDeleteNamespace)
+        .setSnapshotUsedBytes(snapshotUsedBytes)
+        .setSnapshotUsedNamespace(snapshotUsedNamespace)
         .setBucketLayout(bucketLayout)
         .setOwner(owner)
         .setDefaultReplicationConfig(defaultReplicationConfig);
@@ -451,8 +451,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private BucketLayout bucketLayout = BucketLayout.DEFAULT;
     private String owner;
     private DefaultReplicationConfig defaultReplicationConfig;
-    private long pendingSnapshotDeleteBytes;
-    private long pendingSnapshotDeleteNamespace;
+    private long snapshotUsedBytes;
+    private long snapshotUsedNamespace;
 
     public Builder() {
     }
@@ -563,15 +563,15 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
-    /** @param pendingSnapshotDeleteBytes - Bucket Quota Usage in bytes. */
-    public Builder setPendingSnapshotDeleteBytes(long pendingSnapshotDeleteBytes) {
-      this.pendingSnapshotDeleteBytes = pendingSnapshotDeleteBytes;
+    /** @param snapshotUsedBytes - Bucket Quota Snapshot Usage in bytes. */
+    public Builder setSnapshotUsedBytes(long snapshotUsedBytes) {
+      this.snapshotUsedBytes = snapshotUsedBytes;
       return this;
     }
 
-    /** @param pendingSnapshotDeleteNamespace - Bucket Quota Usage in bytes. */
-    public Builder setPendingSnapshotDeleteNamespace(long pendingSnapshotDeleteNamespace) {
-      this.pendingSnapshotDeleteNamespace = pendingSnapshotDeleteNamespace;
+    /** @param snapshotUsedNamespace - Bucket Quota Snapshot Usage in counts. */
+    public Builder setSnapshotUsedNamespace(long snapshotUsedNamespace) {
+      this.snapshotUsedNamespace = snapshotUsedNamespace;
       return this;
     }
 
@@ -635,8 +635,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInNamespace(quotaInNamespace)
-        .setPendingSnapshotDeleteBytes(pendingSnapshotDeleteBytes)
-        .setPendingSnapshotDeleteNamespace(pendingSnapshotDeleteNamespace);
+        .setSnapshotUsedBytes(snapshotUsedBytes)
+        .setSnapshotUsedNamespace(snapshotUsedNamespace);
     if (bucketLayout != null) {
       bib.setBucketLayout(bucketLayout.toProto());
     }
@@ -687,8 +687,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setQuotaInBytes(bucketInfo.getQuotaInBytes())
         .setUsedNamespace(bucketInfo.getUsedNamespace())
         .setQuotaInNamespace(bucketInfo.getQuotaInNamespace())
-        .setPendingSnapshotDeleteBytes(bucketInfo.getPendingSnapshotDeleteBytes())
-        .setPendingSnapshotDeleteNamespace(bucketInfo.getPendingSnapshotDeleteNamespace());
+        .setSnapshotUsedBytes(bucketInfo.getSnapshotUsedBytes())
+        .setSnapshotUsedNamespace(bucketInfo.getSnapshotUsedNamespace());
 
     if (buckLayout != null) {
       obib.setBucketLayout(buckLayout);
@@ -768,8 +768,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         getUpdateID() == that.getUpdateID() &&
         usedBytes == that.usedBytes &&
         usedNamespace == that.usedNamespace &&
-        pendingSnapshotDeleteBytes == that.pendingSnapshotDeleteBytes &&
-        pendingSnapshotDeleteNamespace == that.pendingSnapshotDeleteNamespace &&
+        snapshotUsedBytes == that.snapshotUsedBytes &&
+        snapshotUsedNamespace == that.snapshotUsedNamespace &&
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(getMetadata(), that.getMetadata()) &&
@@ -800,8 +800,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         ", metadata=" + getMetadata() +
         ", usedBytes=" + usedBytes +
         ", usedNamespace=" + usedNamespace +
-        ", pendingDeleteSnapshotBytes=" + pendingSnapshotDeleteBytes +
-        ", pendingDeleteSnapshotNamespace=" + pendingSnapshotDeleteNamespace +
+        ", snapshotUsedBytes=" + snapshotUsedBytes +
+        ", snapshotUsedBytes=" + snapshotUsedNamespace +
         ", quotaInBytes=" + quotaInBytes +
         ", quotaInNamespace=" + quotaInNamespace +
         ", bucketLayout=" + bucketLayout +

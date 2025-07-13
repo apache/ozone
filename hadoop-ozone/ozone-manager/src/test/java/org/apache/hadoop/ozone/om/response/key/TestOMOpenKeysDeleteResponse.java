@@ -69,10 +69,10 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     this.bucketLayout = buckLayout;
     OmBucketInfo omBucketInfo = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
-    long count = omBucketInfo.getPendingSnapshotDeleteNamespace();
+    long count = omBucketInfo.getSnapshotUsedNamespace();
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3);
-    omBucketInfo.incrPendingSnapshotDeleteNamespace(3);
+    omBucketInfo.incrSnapshotUsedNamespace(3);
     createAndCommitResponse(keysToDelete, Collections.singleton(omBucketInfo), Status.OK);
 
     for (String key: keysToDelete.keySet()) {
@@ -89,7 +89,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     }
     omBucketInfo = omMetadataManager.getBucketTable().getSkipCache(
         omMetadataManager.getBucketKey(volumeName, bucketName));
-    assertEquals(count + 3, omBucketInfo.getPendingSnapshotDeleteNamespace());
+    assertEquals(count + 3, omBucketInfo.getSnapshotUsedNamespace());
   }
 
   /**
@@ -103,14 +103,14 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     this.bucketLayout = buckLayout;
     OmBucketInfo omBucketInfo = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
-    long count = omBucketInfo.getPendingSnapshotDeleteNamespace();
-    long initialSpace = omBucketInfo.getPendingSnapshotDeleteBytes();
+    long count = omBucketInfo.getSnapshotUsedNamespace();
+    long initialSpace = omBucketInfo.getSnapshotUsedBytes();
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
-    omBucketInfo.incrPendingSnapshotDeleteNamespace(3);
-    omBucketInfo.incrPendingSnapshotDeleteBytes(3 * KEY_LENGTH);
+    omBucketInfo.incrSnapshotUsedNamespace(3);
+    omBucketInfo.incrSnapshotUsedBytes(3 * KEY_LENGTH);
     createAndCommitResponse(keysToDelete, Collections.singleton(omBucketInfo), Status.OK);
 
     for (Map.Entry<String, OmKeyInfo> entry: keysToDelete.entrySet()) {
@@ -135,8 +135,8 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     }
     omBucketInfo = omMetadataManager.getBucketTable().getSkipCache(
         omMetadataManager.getBucketKey(volumeName, bucketName));
-    assertEquals(count + 3, omBucketInfo.getPendingSnapshotDeleteNamespace());
-    assertEquals(initialSpace + 3 * KEY_LENGTH, omBucketInfo.getPendingSnapshotDeleteBytes());
+    assertEquals(count + 3, omBucketInfo.getSnapshotUsedNamespace());
+    assertEquals(initialSpace + 3 * KEY_LENGTH, omBucketInfo.getSnapshotUsedBytes());
   }
 
   /**
@@ -151,9 +151,9 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     this.bucketLayout = buckLayout;
     OmBucketInfo omBucketInfo = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
-    long count = omBucketInfo.getPendingSnapshotDeleteNamespace();
+    long count = omBucketInfo.getSnapshotUsedNamespace();
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
-    omBucketInfo.incrPendingSnapshotDeleteNamespace(3);
+    omBucketInfo.incrSnapshotUsedNamespace(3);
     createAndCommitResponse(keysToDelete, Collections.emptyList(), Status.INTERNAL_ERROR);
 
     for (String key: keysToDelete.keySet()) {
@@ -165,7 +165,7 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
     omBucketInfo = omMetadataManager.getBucketTable().getSkipCache(
         omMetadataManager.getBucketKey(volumeName, bucketName));
     if (omBucketInfo != null) {
-      assertEquals(count, omBucketInfo.getPendingSnapshotDeleteNamespace());
+      assertEquals(count, omBucketInfo.getSnapshotUsedNamespace());
     }
   }
 

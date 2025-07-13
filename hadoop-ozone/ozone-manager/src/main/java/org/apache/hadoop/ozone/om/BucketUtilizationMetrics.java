@@ -84,7 +84,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
           .tag(BucketMetricsInfo.VolumeName, bucketInfo.getVolumeName())
           .tag(BucketMetricsInfo.BucketName, bucketInfo.getBucketName())
           .addGauge(BucketMetricsInfo.BucketUsedBytes, bucketInfo.getUsedBytes())
-          .addGauge(BucketMetricsInfo.BucketPendingSnapshotBytes, bucketInfo.getPendingSnapshotDeleteBytes())
+          .addGauge(BucketMetricsInfo.BucketSnapshotUsedBytes, bucketInfo.getSnapshotUsedBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaBytes, bucketInfo.getQuotaInBytes())
           .addGauge(BucketMetricsInfo.BucketQuotaNamespace, bucketInfo.getQuotaInNamespace())
           .addGauge(BucketMetricsInfo.BucketAvailableBytes, availableSpace);
@@ -101,7 +101,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
     BucketName("Bucket Metrics."),
     BucketUsedBytes("Bytes used by bucket in AOS."),
     BucketQuotaBytes("Bucket quote in bytes"),
-    BucketPendingSnapshotBytes("Bytes pending to be deleted in bucket in Snapshot"),
+    BucketSnapshotUsedBytes("Bucket quota bytes used in Snapshot"),
     BucketQuotaNamespace("Bucket quota in namespace."),
     BucketAvailableBytes("Bucket available space.");
 
