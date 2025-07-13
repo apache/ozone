@@ -118,4 +118,7 @@ public class EndpointBuilder<T extends EndpointBase> {
     return new ObjectEndpointBuilder();
   }
 
+  public static EndpointBuilder<STSEndpoint> newSTSEndpointBuilder() {
+    return new EndpointBuilder<>(STSEndpoint::new);
+  }
 }
