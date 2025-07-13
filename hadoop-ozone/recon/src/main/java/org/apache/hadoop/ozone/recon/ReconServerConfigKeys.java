@@ -188,6 +188,25 @@ public final class  ReconServerConfigKeys {
       OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
 
   /**
+   * Parallel size calculation configuration keys.
+   */
+  public static final String OZONE_RECON_SIZE_CALC_PARALLEL_ENABLED =
+      "ozone.recon.size.calc.parallel.enabled";
+
+  public static final boolean OZONE_RECON_SIZE_CALC_PARALLEL_ENABLED_DEFAULT = true;
+
+  public static final String OZONE_RECON_SIZE_CALC_PARALLEL_THRESHOLD =
+      "ozone.recon.size.calc.parallel.threshold";
+
+  public static final int OZONE_RECON_SIZE_CALC_PARALLEL_THRESHOLD_DEFAULT = 10;
+
+  public static final String OZONE_RECON_SIZE_CALC_PARALLEL_POOL_SIZE =
+      "ozone.recon.size.calc.parallel.pool.size";
+
+  public static final int OZONE_RECON_SIZE_CALC_PARALLEL_POOL_SIZE_DEFAULT = 
+      Math.max(1, Runtime.getRuntime().availableProcessors());
+
+  /**
    * Private constructor for utility class.
    */
   private ReconServerConfigKeys() {

@@ -105,7 +105,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
         taskStatusUpdater.recordRunStart();
         // events passed to process method is no longer filtered
-        tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.process(events, Collections.emptyMap())));
+        tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.reprocess(omMetadataManager)));
       }
       processTasks(tasks, events, failedTasks);
 
@@ -116,8 +116,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         for (ReconOmTask.TaskResult taskResult : failedTasks) {
           ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
           // events passed to process method is no longer filtered
-          tasks.add(new NamedCallableTask<>(task.getTaskName(),
-              () -> task.process(events, taskResult.getSubTaskSeekPositions())));
+          tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.reprocess(omMetadataManager)));
         }
         processTasks(tasks, events, retryFailedTasks);
       }
