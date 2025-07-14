@@ -481,11 +481,7 @@ public class ReconContainerMetadataManagerImpl
       if (currentKey == null) {
         return null;
       }
-      try {
-        return currentKey.getKey();
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
-      }
+      return currentKey.getKey();
     }
 
     @Override
