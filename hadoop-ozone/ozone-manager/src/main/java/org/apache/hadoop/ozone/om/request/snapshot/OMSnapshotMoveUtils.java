@@ -42,8 +42,6 @@ public final class OMSnapshotMoveUtils {
 
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
-    SnapshotChainManager snapshotChainManager =
-        omMetadataManager.getSnapshotChainManager();
 
     // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
     fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(
