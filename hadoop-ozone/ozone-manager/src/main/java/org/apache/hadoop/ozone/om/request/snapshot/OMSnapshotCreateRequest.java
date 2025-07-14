@@ -339,8 +339,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     DefaultReplicationConfig defRC = bucketInfo.getDefaultReplicationConfig();
     final ReplicationConfig rc;
     if (defRC == null) {
-      // Note: A lot of tests are not setting bucket DefaultReplicationConfig,
-      //  sometimes intentionally.
       //  Fall back to config default.
       rc = ReplicationConfig.getDefault(new OzoneConfiguration());
     } else {
