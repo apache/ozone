@@ -77,6 +77,11 @@ public class S3KeyGenerator extends S3EntityGenerator
       defaultValue = "false")
   private boolean multiPart;
 
+  @Option(names = {"--mpu-key-uploads"},
+      description = "User multi part upload for key uploads",
+      defaultValue = "false")
+  private boolean mpuKeyUploads;
+
   @Option(names = {"--parts"},
       description = "Number of parts for multipart upload (final size = "
           + "--size * --parts)",
@@ -102,9 +107,49 @@ public class S3KeyGenerator extends S3EntityGenerator
     timer = getMetrics().timer("key-create");
 
     System.setProperty(DISABLE_PUT_OBJECT_MD5_VALIDATION_PROPERTY, "true");
-    runTests(this::createKey);
+    if (mpuKeyUploads) {
+      runTests(this::createMpuKey);
+    } else {
+      runTests(this::createKey);
+    }
+
 
     return null;
+  }
+
+  private void createMpuKey(long counter) throws Exception {
+    timer.time(() -> {
+      final String keyName = generateObjectName(counter);
+      final InitiateMultipartUploadRequest initiateRequest =
+          new InitiateMultipartUploadRequest(bucketName, keyName);
+
+      final InitiateMultipartUploadResult initiateMultipartUploadResult =
+          getS3().initiateMultipartUpload(initiateRequest);
+      final String uploadId = initiateMultipartUploadResult.getUploadId();
+
+      List<PartETag> parts = new ArrayList<>();
+      for (int i = 1; i <= numberOfParts; i++) {
+
+        final UploadPartRequest uploadPartRequest = new UploadPartRequest()
+            .withBucketName(bucketName)
+            .withKey(keyName)
+            .withPartNumber(i)
+            .withLastPart(i == numberOfParts)
+            .withUploadId(uploadId)
+            .withPartSize(fileSize)
+            .withInputStream(new ByteArrayInputStream(content.getBytes(
+                StandardCharsets.UTF_8)));
+
+        final UploadPartResult uploadPartResult =
+            getS3().uploadPart(uploadPartRequest);
+        parts.add(uploadPartResult.getPartETag());
+      }
+
+      getS3().completeMultipartUpload(
+          new CompleteMultipartUploadRequest(bucketName, keyName, uploadId,
+              parts));
+      return null;
+    });
   }
 
   private void createKey(long counter) throws Exception {
