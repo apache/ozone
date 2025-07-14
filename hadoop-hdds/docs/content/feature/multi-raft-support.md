@@ -105,6 +105,22 @@ Ratis handles concurrent logs per node.
   The Ratis pipelines will be distributed accordingly.
   - Be cautious with very high pipeline counts due to memory/CPU overhead.
 
+## Advanced Ratis Configuration
+
+For more fine-grained control, Ozone allows you to pass Ratis-specific settings directly from your `ozone-site.xml` configuration. This is useful for administrators and applications that need to tune Ratis performance.
+
+Ozone uses the prefix `hdds.ratis.` for all Ratis-related properties. When Ozone encounters a property with this prefix, it forwards the setting to the appropriate Ratis component (server or client) after removing the prefix.
+
+For example, setting `hdds.ratis.raft.grpc.message.size.max` in `ozone-site.xml` configures the Ratis property `raft.grpc.message.size.max`, which controls the maximum allowed gRPC message size.
+
+### Server-Side Configuration
+The Ozone Manager (OM), Storage Container Manager (SCM), and Datanodes automatically load any Ratis server properties defined in `ozone-site.xml` with the `hdds.ratis.` prefix. These are typically properties that do not start with `raft.client`, `raft.client.data-stream`, or `raft.netty.dataStream`.
+
+### Client-Side Configuration
+Similarly, Ozone clients and applications load all Ratis client properties prefixed with `hdds.ratis.`. These are generally properties that begin with `raft.client`, `raft.client.data-stream`, or `raft.netty.dataStream`.
+
+For a complete list of Ratis properties, see the official [Apache Ratis documentation](https://github.com/apache/ratis/blob/master/ratis-docs/src/site/markdown/configurations.md).
+
 ## Limitations
 - Global configuration: cannot set per-node limits
 - Requires restart after changing storage dirs
