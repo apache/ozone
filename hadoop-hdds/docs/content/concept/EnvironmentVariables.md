@@ -47,7 +47,7 @@ Ozone relies on several environment variables to control its behavior. These var
 | `OZONE_STOP_TIMEOUT` | The number of seconds to wait after stopping a daemon. | `5` |
 | `OZONE_PID_DIR` | The directory where pid files are stored. | `/tmp` |
 | `OZONE_ROOT_LOGGER` | The default log4j setting for interactive commands. | `INFO,console` |
-| `OZONE_DAEMON_ROOT_LOGGER` | The default log4j setting for daemons. | `INFO,RFA` |
+| `OZONE_DAEMON_ROOT_LOGGER` | The default log4j setting for daemons started with the `--daemon` option. | `INFO,RFA` |
 | `OZONE_SECURITY_LOGGER` | The default log level and output for security-related messages. | `INFO,NullAppender` |
 | `OZONE_NICENESS` | The process priority level for Ozone daemons. | `0` |
 | `OZONE_POLICYFILE` | The name of the service-level authorization file. | `hadoop-policy.xml` |
