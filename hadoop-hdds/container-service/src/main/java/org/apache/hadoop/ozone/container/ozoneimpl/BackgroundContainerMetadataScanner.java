@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Iterator;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,16 +59,15 @@ public class BackgroundContainerMetadataScanner extends
       return;
     }
 
-    long containerID = container.getContainerData().getContainerID();
+    ContainerData containerData = container.getContainerData();
 
     MetadataScanResult result = container.scanMetaData();
     if (result.isDeleted()) {
-      LOG.debug("Container [{}] has been deleted during the metadata scan.", containerID);
+      LOG.debug("Container [{}] has been deleted during the metadata scan.", containerData.getContainerID());
       return;
     }
     if (result.hasErrors()) {
-      scanHelper.handleUnhealthyScanResult(containerID, result);
-      scanHelper.triggerVolumeScan(container.getContainerData());
+      scanHelper.handleUnhealthyScanResult(containerData, result);
     }
 
     // Do not update the scan timestamp after the scan since this was just a

@@ -32,13 +32,15 @@ import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Optional;
@@ -49,11 +51,9 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
@@ -139,11 +139,19 @@ public class TestBackgroundContainerDataScanner extends
   @Test
   @Override
   public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
-    try (MockedStatic<StorageVolumeUtil> mockedStatic = mockStatic(StorageVolumeUtil.class)) {
-      scanner.runIteration();
-      verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
-      mockedStatic.verify(() -> StorageVolumeUtil.onFailure(corruptData.getContainerData().getVolume()), times(1));
-    }
+    // Replace scanHelper with a spy to verify the unhealthy scan result handling.
+    Field field = BackgroundContainerDataScanner.class.getDeclaredField("scanHelper");
+    field.setAccessible(true);
+    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    modifiersField.setAccessible(true);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    ContainerScanHelper originalScanHelper = (ContainerScanHelper) field.get(scanner);
+    ContainerScanHelper spyScanHelper = spy(originalScanHelper);
+    field.set(scanner, spyScanHelper);
+
+    scanner.runIteration();
+    verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
+    verify(spyScanHelper, atLeastOnce()).triggerVolumeScan(corruptData.getContainerData());
   }
 
   @Test

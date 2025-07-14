@@ -40,6 +40,8 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -206,6 +208,13 @@ public abstract class TestContainerScannersAbstract {
     File volLocation = mock(File.class);
     when(volLocation.getPath()).thenReturn("/temp/volume-testcontainerscanner");
     when(vol.getStorageDir()).thenReturn(volLocation);
+    when(vol.isFailed()).thenReturn(false);
+    try {
+      when(vol.check(any())).thenReturn(VolumeCheckResult.HEALTHY);
+    } catch (Exception e) {
+      // This is a mock, so this should never throw an exception.
+      throw new RuntimeException("Unexpected exception in mock setup " + e, e);
+    }
 
     // healthy container
     ContainerTestUtils.setupMockContainer(healthy,
