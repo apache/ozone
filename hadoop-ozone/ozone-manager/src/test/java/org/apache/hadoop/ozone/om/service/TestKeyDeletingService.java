@@ -269,14 +269,6 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
 
     @Test
-    void checkBucketQuotaWithOpenKey() throws ExecutionException, InterruptedException {
-      final String volumeName = getTestName();
-      final String bucketName1 = uniqueObjectName("bucket");
-      keyDeletingService.suspend();
-
-    }
-
-    @Test
     void checkDeletedTableCleanUpForSnapshot() throws Exception {
       final String volumeName = getTestName();
       final String bucketName1 = uniqueObjectName("bucket");
