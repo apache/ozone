@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -30,7 +29,6 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -41,8 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
 import org.junit.jupiter.api.Test;
@@ -261,38 +257,14 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     assertEquals(dirObjectID, storedDirInfo.getObjectID());
     assertEquals(parentObjectID, storedDirInfo.getParentObjectID());
 
-    OMRequest deleteRequest = doPreExecuteCheck(createDeleteKeyRequest(dirName));
+    OMRequest deleteRequest = doPreExecute(createDeleteKeyRequest(dirName));
 
-    OMKeyDeleteRequest omKeyDeleteRequest = new OMKeyDeleteRequestWithFSO(deleteRequest, getBucketLayout());
+    OMKeyDeleteRequest omKeyDeleteRequest = getOmKeyDeleteRequest(deleteRequest);
 
     OMClientResponse response = omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
 
     assertNull(omMetadataManager.getDirectoryTable().get(dirName));
-  }
-
-  private OMRequest createDeleteKeyRequest(String testKeyName) {
-    KeyArgs keyArgs = KeyArgs.newBuilder().setBucketName(bucketName)
-        .setVolumeName(volumeName).setKeyName(testKeyName).build();
-
-    DeleteKeyRequest deleteKeyRequest =
-        DeleteKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
-
-    return OMRequest.newBuilder().setDeleteKeyRequest(deleteKeyRequest)
-        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
-        .setClientId(UUID.randomUUID().toString()).build();
-  }
-
-  protected OMRequest doPreExecuteCheck(OMRequest originalOmRequest) throws Exception {
-
-    OMKeyDeleteRequest omKeyDeleteRequest =
-        getOmKeyDeleteRequest(originalOmRequest);
-
-    OMRequest modifiedOmRequest = omKeyDeleteRequest.preExecute(ozoneManager);
-
-    assertNotEquals(originalOmRequest, modifiedOmRequest);
-
-    return modifiedOmRequest;
   }
 }
