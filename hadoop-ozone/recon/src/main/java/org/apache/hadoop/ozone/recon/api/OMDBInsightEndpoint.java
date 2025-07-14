@@ -382,7 +382,7 @@ public class OMDBInsightEndpoint {
    *   {
    *    "totalOpenMPUKeys": 2,
    *    "totalReplicatedDataSize": 90000,
-   *    "totalUnreplicatedDataSize": 30000
+   *    "totalDataSize": 30000
    *   }
    */
   @GET

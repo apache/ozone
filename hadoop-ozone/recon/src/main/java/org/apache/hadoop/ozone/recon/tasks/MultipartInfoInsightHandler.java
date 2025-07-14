@@ -77,11 +77,23 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
         OmKeyInfo omKeyInfo = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
         unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> size > omKeyInfo.getDataSize() ?
-                size - omKeyInfo.getDataSize() : 0L);
+            (k, size) -> {
+              long newSize = size > omKeyInfo.getDataSize() ? size - omKeyInfo.getDataSize() : 0L;
+              if (newSize < 0) {
+                LOG.warn("Negative unreplicated size for key: {}. Original: {}, Part: {}",
+                    k, size, omKeyInfo.getDataSize());
+              }
+              return newSize;
+            });
         replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
-            (k, size) -> size > omKeyInfo.getReplicatedSize() ?
-                size - omKeyInfo.getReplicatedSize() : 0L);
+            (k, size) -> {
+              long newSize = size > omKeyInfo.getReplicatedSize() ? size - omKeyInfo.getReplicatedSize() : 0L;
+              if (newSize < 0) {
+                LOG.warn("Negative replicated size for key: {}. Original: {}, Part: {}",
+                    k, size, omKeyInfo.getReplicatedSize());
+              }
+              return newSize;
+            });
       }
     } else {
       LOG.warn("Delete event does not have the Multipart Key Info for {}.", event.getKey());
