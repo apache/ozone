@@ -61,12 +61,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeDirsRequest =
         getOmRequest().getPurgeDirectoriesRequest();
     String fromSnapshot = purgeDirsRequest.hasSnapshotTableKey() ?
         purgeDirsRequest.getSnapshotTableKey() : null;
-
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
     Set<Pair<String, String>> lockSet = new HashSet<>();
@@ -117,9 +117,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
           // or key does not belong to bucket as bucket is recreated
-          if (null != omBucketInfo
-              && omBucketInfo.getObjectID() == path.getBucketId()) {
-            omBucketInfo.incrUsedNamespace(-1L);
+          if (null != omBucketInfo && omBucketInfo.getObjectID() == path.getBucketId()) {
+            omBucketInfo.decrUsedNamespace(1L, true);
             String ozoneDbKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
                 path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
             omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
@@ -127,7 +126,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
         }
-
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getDeletedSubFilesList()) {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
@@ -139,7 +137,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
-
           // If omKeyInfo has hsync metadata, delete its corresponding open key as well
           String dbOpenKey;
           String hsyncClientId = keyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
@@ -153,7 +150,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
               openKeyInfoMap.put(dbOpenKey, openKeyInfo);
             }
           }
-
           omMetrics.decNumKeys();
           numSubFilesMoved++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
@@ -162,8 +158,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           // or key does not belong to bucket as bucket is recreated
           if (null != omBucketInfo
               && omBucketInfo.getObjectID() == path.getBucketId()) {
-            omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
-            omBucketInfo.incrUsedNamespace(-1L);
+            long totalSize = sumBlockLengths(keyInfo);
+            omBucketInfo.decrUsedBytes(totalSize, true);
+            omBucketInfo.decrUsedNamespace(1L, true);
             String ozoneDbKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
                 path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
             omMetadataManager.getFileTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
@@ -172,17 +169,30 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
         }
         if (path.hasDeletedDir()) {
+          // Using deletedDirInfo since there is no reverse mapping for volumeId and bucketId.
+          OmKeyInfo deletedDirInfo = omMetadataManager.getDeletedDirTable().get(path.getDeletedDir());
+          if (deletedDirInfo != null) {
+            OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+                deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName());
+            if (omBucketInfo != null) {
+              omBucketInfo.purgeSnapshotUsedNamespace(1);
+            }
+          }
           numDirsDeleted++;
         }
       }
       deletingServiceMetrics.incrNumSubDirectoriesMoved(numSubDirMoved);
       deletingServiceMetrics.incrNumSubFilesMoved(numSubFilesMoved);
       deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
-
+      TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
       if (fromSnapshotInfo != null) {
-        fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
+        fromSnapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), fromSnapshotInfo));
+      } else {
+        // Update the deletingServiceMetrics with the transaction index to indicate the
+        // last purge transaction when running for AOS
+        deletingServiceMetrics.setLastAOSTransactionId(transactionInfo);
       }
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen
@@ -198,7 +208,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         entry.setValue(entry.getValue().copyObject());
       }
     }
-
     return new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests,
         getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);

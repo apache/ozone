@@ -317,6 +317,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     omBucketInfo = omMetadataManager.getBucketTable().get(
         bucketKey);
     assertEquals(0L * deletedKeyNames.size(), omBucketInfo.getUsedBytes());
+    assertEquals(1000L * deletedKeyNames.size(), omBucketInfo.getSnapshotUsedBytes());
 
     performBatchOperationCommit(omClientResponse);
 
