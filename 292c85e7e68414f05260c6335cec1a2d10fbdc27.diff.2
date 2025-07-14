@@ -1,0 +1,32 @@
+diff --git a/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/utils/BackgroundService.java b/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/utils/BackgroundService.java
+index aa2377075cd5..7c94700940aa 100644
+--- a/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/utils/BackgroundService.java
++++ b/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/utils/BackgroundService.java
+@@ -88,7 +88,7 @@ public void runPeriodicalTaskNow() throws Exception {
+ 
+   // start service
+   public void start() {
+-    exec.scheduleWithFixedDelay(service, 0, interval, unit);
++    exec.scheduleWithFixedDelay(service, interval, interval, unit);
+   }
+ 
+   public abstract BackgroundTaskQueue getTasks();
+diff --git a/hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/WithObjectID.java b/hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/WithObjectID.java
+index 0ea1a1c0e6a7..252209f7dcd8 100644
+--- a/hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/WithObjectID.java
++++ b/hadoop-ozone/common/src/main/java/org/apache/hadoop/ozone/om/helpers/WithObjectID.java
+@@ -104,10 +104,10 @@ public void setUpdateID(long updateId, boolean isRatisEnabled) {
+     // And also because of this same reason we don't do replay checks in non-HA.
+ 
+     if (isRatisEnabled && updateId < this.updateID) {
+-      throw new IllegalArgumentException(String.format(
+-          "Trying to set updateID to %d which is not greater than the " +
+-              "current value of %d for %s", updateId, this.updateID,
+-          getObjectInfo()));
++//      throw new IllegalArgumentException(String.format(
++//          "Trying to set updateID to %d which is not greater than the " +
++//              "current value of %d for %s", updateId, this.updateID,
++//          getObjectInfo()));
+     }
+ 
+     this.updateID = updateId;

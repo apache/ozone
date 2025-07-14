@@ -1,0 +1,507 @@
+diff --git a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientGrpc.java b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientGrpc.java
+index cb2b85ef1e2..293b41d5eb7 100644
+--- a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientGrpc.java
++++ b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientGrpc.java
+@@ -61,6 +61,7 @@
+ import io.opentracing.Scope;
+ import io.opentracing.Span;
+ import io.opentracing.util.GlobalTracer;
++import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
+ import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
+ import org.apache.ratis.thirdparty.io.grpc.Status;
+ import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
+@@ -506,6 +507,13 @@ public XceiverClientReply sendCommandAsync(
+     }
+   }
+ 
++  @Override
++  public XceiverClientReply sendCommandAsync(
++      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
++    // TODO: Is throwing NotImplementedException better?
++    throw new IllegalArgumentException("ReplicationLevel is not applicable to " + getClass().getSimpleName());
++  }
++
+   /**
+    * During data writes the ordering of WriteChunk and PutBlock is not ensured
+    * by any outside logic, therefore in this original implementation, all reads
+diff --git a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientRatis.java b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientRatis.java
+index 58a2153352a..2166ecd5fa5 100644
+--- a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientRatis.java
++++ b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientRatis.java
+@@ -217,29 +217,46 @@ public ConcurrentMap<UUID, Long> getCommitInfoMap() {
+     return commitInfoMap;
+   }
+ 
++  private CompletableFuture<RaftClientReply> sendRequestAsyncInternal(
++      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
++    final ContainerCommandRequestMessage message =
++        ContainerCommandRequestMessage.toMessage(request, TracingUtil.exportCurrentSpan());
++    if (HddsUtils.isReadOnly(request)) {
++      if (LOG.isDebugEnabled()) {
++        LOG.debug("sendCommandAsync ReadOnly {}", message);
++      }
++      return getClient().async().sendReadOnly(message);
++    } else {
++      if (LOG.isDebugEnabled()) {
++        LOG.debug("sendCommandAsync write {} {}", writeReplicationLevel, message);
++      }
++      return getClient().async().send(message, writeReplicationLevel);
++    }
++  }
++
++  /**
++   * Sends request async with ReplicationLevel.ALL_COMMITTED.
++   * @param request ContainerCommandRequestProto
++   * @return CompletableFuture<RaftClientReply>
++   */
+   private CompletableFuture<RaftClientReply> sendRequestAsync(
+       ContainerCommandRequestProto request) {
+-    return TracingUtil.executeInNewSpan(
+-        "XceiverClientRatis." + request.getCmdType().name(),
+-        () -> {
+-          final ContainerCommandRequestMessage message
+-              = ContainerCommandRequestMessage.toMessage(
+-              request, TracingUtil.exportCurrentSpan());
+-          if (HddsUtils.isReadOnly(request)) {
+-            if (LOG.isDebugEnabled()) {
+-              LOG.debug("sendCommandAsync ReadOnly {}", message);
+-            }
+-            return getClient().async().sendReadOnly(message);
+-          } else {
+-            if (LOG.isDebugEnabled()) {
+-              LOG.debug("sendCommandAsync {}", message);
+-            }
+-            return getClient().async().send(message);
+-          }
+-
+-        }
++    final String spanName = "XceiverClientRatis." + request.getCmdType().name();
++    return TracingUtil.executeInNewSpan(spanName,
++        () -> sendRequestAsyncInternal(request, ReplicationLevel.ALL_COMMITTED));
++  }
+ 
+-    );
++  /**
++   * Sends request async with ReplicationLevel.ALL_COMMITTED.
++   * @param request ContainerCommandRequestProto
++   * @param writeReplicationLevel Desired ReplicationLevel for write ops.
++   * @return CompletableFuture<RaftClientReply>
++   */
++  private CompletableFuture<RaftClientReply> sendRequestAsync(
++      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
++    final String spanName = "XceiverClientRatis." + request.getCmdType().name();
++    return TracingUtil.executeInNewSpan(spanName,
++        () -> sendRequestAsyncInternal(request, writeReplicationLevel));
+   }
+ 
+   // gets the minimum log index replicated to all servers
+@@ -293,10 +310,10 @@ public XceiverClientReply watchForCommit(long index)
+       final XceiverClientReply clientReply = newWatchReply(
+           index, ReplicationLevel.MAJORITY_COMMITTED, index);
+       reply.getCommitInfos().stream()
+-          .filter(i -> i.getCommitIndex() < index)
++          .filter(i -> i.getCommitIndex() < index)  // only get the nodes that is lagging behind
+           .forEach(proto -> {
+             UUID address = RatisHelper.toDatanodeId(proto.getServer());
+-            addDatanodetoReply(address, clientReply);
++            addDatanodetoReply(address, clientReply);  // add the dead datanode to XceiverClientReply
+             // since 3 way commit has failed, the updated map from now on  will
+             // only store entries for those datanodes which have had successful
+             // replication.
+@@ -319,22 +336,45 @@ public XceiverClientReply watchForCommit(long index)
+   @Override
+   public XceiverClientReply sendCommandAsync(
+       ContainerCommandRequestProto request) {
++//    return sendCommandAsyncInternal(request, ReplicationLevel.MAJORITY_COMMITTED);
++    return sendCommandAsyncInternal(request, ReplicationLevel.ALL_COMMITTED);
++  }
++
++  /**
++   * Sends a given command to server gets a waitable future back.
++   *
++   * @param request Request
++   * @param writeReplicationLevel Desired ReplicationLevel for write ops.
++   * @return Response to the command
++   */
++  @Override
++  public XceiverClientReply sendCommandAsync(
++      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
++    return sendCommandAsyncInternal(request, writeReplicationLevel);
++  }
++
++  private XceiverClientReply sendCommandAsyncInternal(
++      ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel) {
+     XceiverClientReply asyncReply = new XceiverClientReply(null);
+     long requestTime = System.currentTimeMillis();
+-    CompletableFuture<RaftClientReply> raftClientReply =
+-        sendRequestAsync(request);
++    CompletableFuture<RaftClientReply> raftClientReply = sendRequestAsync(request, writeReplicationLevel);
+     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
+     CompletableFuture<ContainerCommandResponseProto> containerCommandResponse =
+-        raftClientReply.whenComplete((reply, e) -> {
++        raftClientReply.whenComplete((raftClientReply1, e) -> {
+           if (LOG.isDebugEnabled()) {
+-            LOG.debug("received reply {} for request: cmdType={} containerID={}"
+-                    + " pipelineID={} traceID={} exception: {}", reply,
+-                request.getCmdType(), request.getContainerID(),
++            LOG.debug("!!! received reply {} for request: cmdType={} writeReplicationLevel={} containerID={}"
++                    + " pipelineID={} traceID={} exception: {}", raftClientReply1,
++                request.getCmdType(), writeReplicationLevel, request.getContainerID(),
+                 request.getPipelineID(), request.getTraceID(), e);
+           }
+           metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+           metrics.addContainerOpsLatency(request.getCmdType(),
+               System.currentTimeMillis() - requestTime);
++          // Print commitIndex of all nodes
++          raftClientReply1.getCommitInfos().forEach(commitInfoProto -> {
++            UUID address = RatisHelper.toDatanodeId(commitInfoProto.getServer());
++            LOG.info("!!! sendCommandAsync: node {} commitIndex {}", address, commitInfoProto.getCommitIndex());
++          });
+         }).thenApply(reply -> {
+           try {
+             if (!reply.isSuccess()) {
+@@ -363,6 +403,7 @@ public XceiverClientReply sendCommandAsync(
+             }
+             asyncReply.setLogIndex(reply.getLogIndex());
+             addDatanodetoReply(serverId, asyncReply);
++            addDatanodetoReply(serverId, asyncReply);  // add replier node to XceiverClientReply
+             return response;
+           } catch (InvalidProtocolBufferException e) {
+             throw new CompletionException(e);
+diff --git a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/BlockOutputStream.java b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/BlockOutputStream.java
+index f29bf490382..6e0f6991f52 100644
+--- a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/BlockOutputStream.java
++++ b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/BlockOutputStream.java
+@@ -632,6 +632,7 @@ private void handleFlushInternal(boolean close)
+     }
+     waitOnFlushFutures();
+     watchForCommit(false);
++
+     // just check again if the exception is hit while waiting for the
+     // futures to ensure flush has indeed succeeded
+ 
+diff --git a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/CommitWatcher.java b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/CommitWatcher.java
+index aa339409ece..e43a7a5ac0f 100644
+--- a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/CommitWatcher.java
++++ b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/CommitWatcher.java
+@@ -26,6 +26,7 @@
+ 
+ import com.google.common.annotations.VisibleForTesting;
+ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
++import org.apache.hadoop.hdds.scm.XceiverClientReply;
+ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+ import org.apache.hadoop.ozone.common.ChunkBuffer;
+ 
+@@ -52,6 +53,14 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
+     this.bufferPool = bufferPool;
+   }
+ 
++  @Override
++  XceiverClientReply watchForCommit(long commitIndex) {
++    // No need to call actual client.watchForCommit() because Ratis client
++    // send() call alone now would suffice with RATIS-1994
++    adjustBuffers(commitIndex);
++    return null;
++  }
++
+   @Override
+   void releaseBuffers(long index) {
+     long acked = 0;
+diff --git a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/RatisBlockOutputStream.java b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/RatisBlockOutputStream.java
+index b587b1d1317..fbb8f78a755 100644
+--- a/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/RatisBlockOutputStream.java
++++ b/hadoop-hdds/client/src/main/java/org/apache/hadoop/hdds/scm/storage/RatisBlockOutputStream.java
+@@ -137,8 +137,9 @@ public void hsync() throws IOException {
+     if (!isClosed()) {
+       if (getBufferPool() != null && getBufferPool().getSize() > 0) {
+         handleFlush(false);
++      } else {
++        waitForFlushAndCommit(false);
+       }
+-      waitForFlushAndCommit(false);
+     }
+   }
+ }
+diff --git a/hadoop-hdds/client/src/test/java/org/apache/hadoop/hdds/scm/storage/TestBlockOutputStreamCorrectness.java b/hadoop-hdds/client/src/test/java/org/apache/hadoop/hdds/scm/storage/TestBlockOutputStreamCorrectness.java
+index d06c9cf684f..a9ec46b9904 100644
+--- a/hadoop-hdds/client/src/test/java/org/apache/hadoop/hdds/scm/storage/TestBlockOutputStreamCorrectness.java
++++ b/hadoop-hdds/client/src/test/java/org/apache/hadoop/hdds/scm/storage/TestBlockOutputStreamCorrectness.java
+@@ -43,6 +43,7 @@
+ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+ import org.apache.hadoop.ozone.OzoneConsts;
++import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
+ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+ import org.junit.jupiter.params.ParameterizedTest;
+ import org.junit.jupiter.params.provider.ValueSource;
+@@ -67,12 +68,13 @@ class TestBlockOutputStreamCorrectness {
+   @ValueSource(ints = { 1, 1024, 1024 * 1024 })
+   void test(final int writeSize) throws IOException {
+     assertEquals(0, DATA_SIZE % writeSize);
++    final int dataSize = Math.toIntExact(Math.min(DATA_SIZE, writeSize * OzoneConsts.MB));
+ 
+     final BufferPool bufferPool = new BufferPool(4 * 1024 * 1024, 32 / 4);
+ 
+     for (int block = 0; block < 10; block++) {
+       try (BlockOutputStream outputStream = createBlockOutputStream(bufferPool)) {
+-        for (int i = 0; i < DATA_SIZE / writeSize; i++) {
++        for (int i = 0; i < dataSize / writeSize; i++) {
+           if (writeSize > 1) {
+             outputStream.write(DATA, i * writeSize, writeSize);
+           } else {
+@@ -89,8 +91,8 @@ private BlockOutputStream createBlockOutputStream(BufferPool bufferPool)
+     final Pipeline pipeline = MockPipeline.createRatisPipeline();
+ 
+     final XceiverClientManager xcm = mock(XceiverClientManager.class);
+-    when(xcm.acquireClient(any()))
+-        .thenReturn(new MockXceiverClientSpi(pipeline));
++    final MockXceiverClientSpi client = new MockXceiverClientSpi(pipeline);
++    when(xcm.acquireClient(any())).thenReturn(client);
+ 
+     OzoneClientConfig config = new OzoneClientConfig();
+     config.setStreamBufferSize(4 * 1024 * 1024);
+@@ -183,6 +185,13 @@ public XceiverClientReply sendCommandAsync(
+ 
+     }
+ 
++    @Override
++    public XceiverClientReply sendCommandAsync(
++        ContainerCommandRequestProto request,
++        ReplicationLevel writeReplicationLevel) {
++      return sendCommandAsync(request);
++    }
++
+     @Override
+     public ReplicationType getPipelineType() {
+       return null;
+diff --git a/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientSpi.java b/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientSpi.java
+index 71d309dee6b..a787933ea14 100644
+--- a/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientSpi.java
++++ b/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/scm/XceiverClientSpi.java
+@@ -34,6 +34,7 @@
+ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+ 
+ import com.google.common.annotations.VisibleForTesting;
++import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
+ import org.apache.ratis.util.function.CheckedBiConsumer;
+ 
+ /**
+@@ -165,6 +166,9 @@ public static IOException getIOExceptionForSendCommand(
+       sendCommandAsync(ContainerCommandRequestProto request)
+       throws IOException, ExecutionException, InterruptedException;
+ 
++  public abstract XceiverClientReply
++      sendCommandAsync(ContainerCommandRequestProto request, ReplicationLevel writeReplicationLevel);
++
+   /**
+    * Returns pipeline Type.
+    *
+diff --git a/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/scm/storage/ContainerProtocolCalls.java b/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/scm/storage/ContainerProtocolCalls.java
+index 5f94f6d0847..51b902a13f6 100644
+--- a/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/scm/storage/ContainerProtocolCalls.java
++++ b/hadoop-hdds/common/src/main/java/org/apache/hadoop/hdds/scm/storage/ContainerProtocolCalls.java
+@@ -76,6 +76,7 @@
+ import org.apache.hadoop.security.token.Token;
+ 
+ import org.apache.hadoop.security.token.TokenIdentifier;
++import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
+ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+ import org.apache.ratis.util.function.CheckedFunction;
+ import org.slf4j.Logger;
+@@ -291,7 +292,8 @@ public static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
+       throws IOException, InterruptedException, ExecutionException {
+     final ContainerCommandRequestProto request = getPutBlockRequest(
+         xceiverClient.getPipeline(), containerBlockData, eof, tokenString);
+-    return xceiverClient.sendCommandAsync(request);
++//    return xceiverClient.sendCommandAsync(request, ReplicationLevel.MAJORITY_COMMITTED);
++    return xceiverClient.sendCommandAsync(request, ReplicationLevel.ALL_COMMITTED);
+   }
+ 
+   /**
+@@ -470,7 +472,8 @@ public static XceiverClientReply writeChunkAsync(
+       builder.setEncodedToken(tokenString);
+     }
+     ContainerCommandRequestProto request = builder.build();
+-    return xceiverClient.sendCommandAsync(request);
++//    return xceiverClient.sendCommandAsync(request, ReplicationLevel.MAJORITY_COMMITTED);
++    return xceiverClient.sendCommandAsync(request, ReplicationLevel.ALL_COMMITTED);
+   }
+ 
+   /**
+diff --git a/hadoop-ozone/client/src/test/java/org/apache/hadoop/ozone/client/MockXceiverClientSpi.java b/hadoop-ozone/client/src/test/java/org/apache/hadoop/ozone/client/MockXceiverClientSpi.java
+index 0d82f0f8bbb..4074163d380 100644
+--- a/hadoop-ozone/client/src/test/java/org/apache/hadoop/ozone/client/MockXceiverClientSpi.java
++++ b/hadoop-ozone/client/src/test/java/org/apache/hadoop/ozone/client/MockXceiverClientSpi.java
+@@ -39,6 +39,7 @@
+ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
+ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
++import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
+ 
+ import java.io.IOException;
+ import java.util.Map;
+@@ -108,6 +109,13 @@ public XceiverClientReply sendCommandAsync(
+     }
+   }
+ 
++  @Override
++  public XceiverClientReply sendCommandAsync(
++      ContainerCommandRequestProto request,
++      ReplicationLevel writeReplicationLevel) {
++    return sendCommandAsync(request);
++  }
++
+   private ReadChunkResponseProto readChunk(ReadChunkRequestProto readChunk) {
+     return ReadChunkResponseProto.newBuilder()
+         .setChunkData(readChunk.getChunkData())
+diff --git a/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/hdds/scm/storage/TestCommitWatcher.java b/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/hdds/scm/storage/TestCommitWatcher.java
+index c3ea911f193..6e392ea47c7 100644
+--- a/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/hdds/scm/storage/TestCommitWatcher.java
++++ b/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/hdds/scm/storage/TestCommitWatcher.java
+@@ -40,7 +40,6 @@
+ import org.apache.hadoop.hdds.scm.XceiverClientRatis;
+ import org.apache.hadoop.hdds.scm.XceiverClientReply;
+ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+@@ -60,13 +59,7 @@
+ import static org.assertj.core.api.Assertions.assertThat;
+ import static org.junit.jupiter.api.Assertions.assertEquals;
+ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+-import static org.junit.jupiter.api.Assertions.assertThrows;
+-import static org.junit.jupiter.api.Assertions.assertTrue;
+ 
+-import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
+-import org.apache.ratis.protocol.exceptions.NotReplicatedException;
+-import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
+-import org.apache.ratis.protocol.exceptions.TimeoutIOException;
+ import org.junit.jupiter.api.AfterEach;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.Test;
+@@ -307,20 +300,8 @@ public void testReleaseBuffersOnException() throws Exception {
+         // just watch for a higher index so as to ensure, it does an actual
+         // call to Ratis. Otherwise, it may just return in case the
+         // commitInfoMap is updated to the latest index in putBlock response.
+-        IOException ioe =
+-            assertThrows(IOException.class, () -> watcher.watchForCommit(replies.get(1).getLogIndex() + 100));
+-        Throwable t = HddsClientUtils.checkForException(ioe);
+-        // with retry count set to noRetry and a lower watch request
+-        // timeout, watch request will eventually
+-        // fail with TimeoutIOException from ratis client or the client
+-        // can itself get AlreadyClosedException from the Ratis Server
+-        // and the write may fail with RaftRetryFailureException
+-        assertTrue(
+-            t instanceof RaftRetryFailureException ||
+-                t instanceof TimeoutIOException ||
+-                t instanceof AlreadyClosedException ||
+-                t instanceof NotReplicatedException,
+-            "Unexpected exception: " + t.getClass());
++        // Note watchForCommit no longer throws IOException after HDDS-10108, but it does release buffer nonetheless
++        watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
+         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
+             .getLogIndex()) {
+           assertEquals(chunkSize, watcher.getTotalAckDataLength());
+diff --git a/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/ozone/client/rpc/TestFailureHandlingByClient.java b/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/ozone/client/rpc/TestFailureHandlingByClient.java
+index 5c0910ecdc2..a40e302c41b 100644
+--- a/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/ozone/client/rpc/TestFailureHandlingByClient.java
++++ b/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/ozone/client/rpc/TestFailureHandlingByClient.java
+@@ -35,9 +35,11 @@
+ import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
++import org.apache.hadoop.hdds.scm.XceiverClientRatis;
+ import org.apache.hadoop.hdds.scm.container.ContainerID;
+ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
++import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
+ import org.apache.hadoop.hdds.utils.IOUtils;
+ import org.apache.hadoop.net.DNSToSwitchMapping;
+ import org.apache.hadoop.net.NetUtils;
+@@ -71,9 +73,11 @@
+ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+ import static org.junit.jupiter.api.Assertions.assertNotEquals;
+ 
++import org.apache.ozone.test.GenericTestUtils;
+ import org.junit.jupiter.api.AfterEach;
+ import org.junit.jupiter.api.Test;
+ import org.junit.jupiter.api.Timeout;
++import org.slf4j.event.Level;
+ 
+ /**
+  * Tests Exception handling by Ozone Client.
+@@ -81,6 +85,8 @@
+ @Timeout(300)
+ public class TestFailureHandlingByClient {
+ 
++  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(TestFailureHandlingByClient.class);
++
+   private MiniOzoneCluster cluster;
+   private OzoneConfiguration conf;
+   private OzoneClient client;
+@@ -150,6 +156,9 @@ private void init() throws Exception {
+     bucketName = volumeName;
+     objectStore.createVolume(volumeName);
+     objectStore.getVolume(volumeName).createBucket(bucketName);
++
++    GenericTestUtils.setLogLevel(XceiverClientRatis.LOG, Level.DEBUG);
++    GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
+   }
+ 
+   private void startCluster() throws Exception {
+@@ -443,13 +452,17 @@ public void testDatanodeExclusionWithMajorityCommit() throws Exception {
+     // shutdown 1 datanode. This will make sure the 2 way commit happens for
+     // next write ops.
+     cluster.shutdownHddsDatanode(datanodes.get(0));
++    LOG.warn("!!! datanode is shut: {}", datanodes.get(0).getUuid());
+ 
+     key.write(data.getBytes(UTF_8));
+     key.write(data.getBytes(UTF_8));
+     key.flush();
+ 
+-    assertThat(keyOutputStream.getExcludeList().getDatanodes())
+-        .contains(datanodes.get(0));
++    // With HDDS-10108, watchForCommit() no longer sends actual Ratis request and only does adjustBuffer(),
++    //  so as a side effect watchForCommit() won't populate DN exclude list anymore.
++    // TODO: Restore the DN exclude list population elsewhere if needed.
++    // The following commented out assertion is determined to fail:
++    assertThat(keyOutputStream.getExcludeList().getDatanodes()).contains(datanodes.get(0));
+     assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
+     assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
+     // The close will just write to the buffer
+diff --git a/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/ozone/om/TestOmContainerLocationCache.java b/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/ozone/om/TestOmContainerLocationCache.java
+index e773bf7ed7f..3aa66590ea7 100644
+--- a/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/ozone/om/TestOmContainerLocationCache.java
++++ b/hadoop-ozone/integration-test/src/test/java/org/apache/hadoop/ozone/om/TestOmContainerLocationCache.java
+@@ -724,7 +724,7 @@ private void mockGetBlock(XceiverClientGrpc mockDnProtocol,
+     }
+     doAnswer(invocation -> new XceiverClientReply(response))
+         .when(mockDnProtocol)
+-        .sendCommandAsync(argThat(matchCmd(Type.GetBlock)), any());
++        .sendCommandAsync(argThat(matchCmd(Type.GetBlock)), any(DatanodeDetails.class));
+   }
+ 
+   @Nonnull
+@@ -771,7 +771,7 @@ private void mockReadChunk(XceiverClientGrpc mockDnProtocol,
+ 
+     doAnswer(invocation -> new XceiverClientReply(response))
+         .when(mockDnProtocol)
+-        .sendCommandAsync(argThat(matchCmd(Type.ReadChunk)), any());
++        .sendCommandAsync(argThat(matchCmd(Type.ReadChunk)), any(DatanodeDetails.class));
+ 
+   }
+ 
+diff --git a/pom.xml b/pom.xml
+index 90f5667ae2e..c0ac5dac331 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -75,7 +75,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
+     <!-- HDDS Rocks Native dependency version-->
+     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
+     <!-- Apache Ratis version -->
+-    <ratis.version>3.0.1</ratis.version>
++    <ratis.version>3.1.0-5e8ef17-SNAPSHOT</ratis.version>
+ 
+     <!-- Apache Ratis thirdparty version -->
+     <ratis.thirdparty.version>1.0.5</ratis.thirdparty.version>

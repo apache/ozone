@@ -1,0 +1,904 @@
+diff --git a/hadoop-hdds/annotations/pom.xml b/hadoop-hdds/annotations/pom.xml
+index 3a17bbe900..fd2db803e0 100644
+--- a/hadoop-hdds/annotations/pom.xml
++++ b/hadoop-hdds/annotations/pom.xml
+@@ -20,11 +20,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+ 
+   <artifactId>hdds-annotation-processing</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone annotation processing tools for validating custom
+     annotations at compile time.
+   </description>
+diff --git a/hadoop-hdds/client/pom.xml b/hadoop-hdds/client/pom.xml
+index 4eb2748ab6..836902f069 100644
+--- a/hadoop-hdds/client/pom.xml
++++ b/hadoop-hdds/client/pom.xml
+@@ -20,11 +20,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+ 
+   <artifactId>hdds-client</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Client Library</description>
+   <name>Apache Ozone HDDS Client</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-hdds/common/pom.xml b/hadoop-hdds/common/pom.xml
+index 964a24ff2b..d2e9c356bf 100644
+--- a/hadoop-hdds/common/pom.xml
++++ b/hadoop-hdds/common/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-common</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Common</description>
+   <name>Apache Ozone HDDS Common</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-hdds/config/pom.xml b/hadoop-hdds/config/pom.xml
+index c19ecea879..088b6a88ae 100644
+--- a/hadoop-hdds/config/pom.xml
++++ b/hadoop-hdds/config/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-config</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Config Tools</description>
+   <name>Apache Ozone HDDS Config</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-hdds/container-service/pom.xml b/hadoop-hdds/container-service/pom.xml
+index 81484bb9d2..3d3b08873b 100644
+--- a/hadoop-hdds/container-service/pom.xml
++++ b/hadoop-hdds/container-service/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-container-service</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Container Service</description>
+   <name>Apache Ozone HDDS Container Service</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-hdds/crypto-api/pom.xml b/hadoop-hdds/crypto-api/pom.xml
+index ea837f01c2..0bdc118e6c 100644
+--- a/hadoop-hdds/crypto-api/pom.xml
++++ b/hadoop-hdds/crypto-api/pom.xml
+@@ -19,11 +19,11 @@
+     <parent>
+         <groupId>org.apache.ozone</groupId>
+         <artifactId>hdds</artifactId>
+-        <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++        <version>1.3.0.7.3.1.0-185</version>
+     </parent>
+ 
+     <artifactId>hdds-crypto-api</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+     <description>Apache Ozone Distributed Data Store cryptographic functions</description>
+     <name>Apache Ozone HDDS Crypto</name>
+ 
+diff --git a/hadoop-hdds/crypto-default/pom.xml b/hadoop-hdds/crypto-default/pom.xml
+index a40aa9a9b6..d640adecc8 100644
+--- a/hadoop-hdds/crypto-default/pom.xml
++++ b/hadoop-hdds/crypto-default/pom.xml
+@@ -19,11 +19,11 @@
+     <parent>
+         <groupId>org.apache.ozone</groupId>
+         <artifactId>hdds</artifactId>
+-        <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++        <version>1.3.0.7.3.1.0-185</version>
+     </parent>
+ 
+     <artifactId>hdds-crypto-default</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+     <description>Default implementation of Apache Ozone Distributed Data Store's cryptographic functions</description>
+     <name>Apache Ozone HDDS Crypto - Default</name>
+ 
+diff --git a/hadoop-hdds/docs/pom.xml b/hadoop-hdds/docs/pom.xml
+index 26797fec0e..170de44bcd 100644
+--- a/hadoop-hdds/docs/pom.xml
++++ b/hadoop-hdds/docs/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-docs</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone/HDDS Documentation</description>
+   <name>Apache Ozone/HDDS Documentation</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-hdds/erasurecode/pom.xml b/hadoop-hdds/erasurecode/pom.xml
+index 705a5bf8a5..f8c9c1fa23 100644
+--- a/hadoop-hdds/erasurecode/pom.xml
++++ b/hadoop-hdds/erasurecode/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-erasurecode</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Earsurecode utils
+   </description>
+   <name>Apache Ozone HDDS Erasurecode</name>
+diff --git a/hadoop-hdds/framework/pom.xml b/hadoop-hdds/framework/pom.xml
+index cf21df2983..604e0a1cb3 100644
+--- a/hadoop-hdds/framework/pom.xml
++++ b/hadoop-hdds/framework/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-server-framework</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Server Framework
+   </description>
+   <name>Apache Ozone HDDS Server Framework</name>
+diff --git a/hadoop-hdds/hadoop-dependency-client/pom.xml b/hadoop-hdds/hadoop-dependency-client/pom.xml
+index 0c813aa465..17975716e1 100644
+--- a/hadoop-hdds/hadoop-dependency-client/pom.xml
++++ b/hadoop-hdds/hadoop-dependency-client/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-hadoop-dependency-client</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Hadoop client dependencies
+   </description>
+   <name>Apache Ozone HDDS Hadoop Client dependencies</name>
+diff --git a/hadoop-hdds/hadoop-dependency-server/pom.xml b/hadoop-hdds/hadoop-dependency-server/pom.xml
+index 7abeea7ce1..4008ed564f 100644
+--- a/hadoop-hdds/hadoop-dependency-server/pom.xml
++++ b/hadoop-hdds/hadoop-dependency-server/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-hadoop-dependency-server</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Hadoop server dependencies
+   </description>
+   <name>Apache Ozone HDDS Hadoop Server dependencies</name>
+diff --git a/hadoop-hdds/hadoop-dependency-test/pom.xml b/hadoop-hdds/hadoop-dependency-test/pom.xml
+index 0052b25f0a..b64aa58fc6 100644
+--- a/hadoop-hdds/hadoop-dependency-test/pom.xml
++++ b/hadoop-hdds/hadoop-dependency-test/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-hadoop-dependency-test</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Hadoop test dependencies
+   </description>
+   <name>Apache Ozone HDDS Hadoop Test dependencies</name>
+diff --git a/hadoop-hdds/interface-admin/pom.xml b/hadoop-hdds/interface-admin/pom.xml
+index 8d51a06ba0..2c4bf993ad 100644
+--- a/hadoop-hdds/interface-admin/pom.xml
++++ b/hadoop-hdds/interface-admin/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-interface-admin</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Admin interface
+   </description>
+   <name>Apache Ozone HDDS Admin Interface</name>
+diff --git a/hadoop-hdds/interface-client/pom.xml b/hadoop-hdds/interface-client/pom.xml
+index e49f7e1a59..7f151d5a29 100644
+--- a/hadoop-hdds/interface-client/pom.xml
++++ b/hadoop-hdds/interface-client/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-interface-client</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Client interface
+   </description>
+   <name>Apache Ozone HDDS Client Interface</name>
+diff --git a/hadoop-hdds/interface-server/pom.xml b/hadoop-hdds/interface-server/pom.xml
+index 060e3851fb..2d7a735a71 100644
+--- a/hadoop-hdds/interface-server/pom.xml
++++ b/hadoop-hdds/interface-server/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-interface-server</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Server interface
+   </description>
+   <name>Apache Ozone HDDS Server Interface</name>
+diff --git a/hadoop-hdds/managed-rocksdb/pom.xml b/hadoop-hdds/managed-rocksdb/pom.xml
+index bdc500ad62..ab110ae87c 100644
+--- a/hadoop-hdds/managed-rocksdb/pom.xml
++++ b/hadoop-hdds/managed-rocksdb/pom.xml
+@@ -19,10 +19,10 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-managed-rocksdb</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Managed RocksDB library</description>
+   <name>Apache Ozone HDDS Managed RocksDB</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-hdds/pom.xml b/hadoop-hdds/pom.xml
+index d52b545e62..e5b41011ea 100644
+--- a/hadoop-hdds/pom.xml
++++ b/hadoop-hdds/pom.xml
+@@ -20,11 +20,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone-main</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+ 
+   <artifactId>hdds</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Project</description>
+   <name>Apache Ozone HDDS</name>
+   <packaging>pom</packaging>
+diff --git a/hadoop-hdds/rocks-native/pom.xml b/hadoop-hdds/rocks-native/pom.xml
+index 597b9dae5a..f1df8ec6c3 100644
+--- a/hadoop-hdds/rocks-native/pom.xml
++++ b/hadoop-hdds/rocks-native/pom.xml
+@@ -18,7 +18,7 @@
+   <parent>
+     <artifactId>hdds</artifactId>
+     <groupId>org.apache.ozone</groupId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <modelVersion>4.0.0</modelVersion>
+   <name>Apache Ozone HDDS RocksDB Tools</name>
+diff --git a/hadoop-hdds/rocksdb-checkpoint-differ/pom.xml b/hadoop-hdds/rocksdb-checkpoint-differ/pom.xml
+index ef5c1707c0..5611c5f8a0 100644
+--- a/hadoop-hdds/rocksdb-checkpoint-differ/pom.xml
++++ b/hadoop-hdds/rocksdb-checkpoint-differ/pom.xml
+@@ -20,11 +20,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+ 
+   <artifactId>rocksdb-checkpoint-differ</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>RocksDB Checkpoint Differ</description>
+   <name>RocksDB Checkpoint Differ</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-hdds/server-scm/pom.xml b/hadoop-hdds/server-scm/pom.xml
+index 18de8b51ff..43cbe56645 100644
+--- a/hadoop-hdds/server-scm/pom.xml
++++ b/hadoop-hdds/server-scm/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-server-scm</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Storage Container Manager Server</description>
+   <name>Apache Ozone HDDS SCM Server</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-hdds/test-utils/pom.xml b/hadoop-hdds/test-utils/pom.xml
+index b92c07b755..75793b0008 100644
+--- a/hadoop-hdds/test-utils/pom.xml
++++ b/hadoop-hdds/test-utils/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>hdds-test-utils</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Test Utils</description>
+   <name>Apache Ozone HDDS Test Utils</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-hdds/tools/pom.xml b/hadoop-hdds/tools/pom.xml
+index 9eb60a9d72..c1ce3cf8b3 100644
+--- a/hadoop-hdds/tools/pom.xml
++++ b/hadoop-hdds/tools/pom.xml
+@@ -20,11 +20,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>hdds</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+ 
+   <artifactId>hdds-tools</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Distributed Data Store Tools</description>
+   <name>Apache Ozone HDDS Tools</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-ozone/client/pom.xml b/hadoop-ozone/client/pom.xml
+index b636513668..4e154fd05c 100644
+--- a/hadoop-ozone/client/pom.xml
++++ b/hadoop-ozone/client/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-client</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Client</description>
+   <name>Apache Ozone Client</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-ozone/common/pom.xml b/hadoop-ozone/common/pom.xml
+index cedae47a63..608fa8decb 100644
+--- a/hadoop-ozone/common/pom.xml
++++ b/hadoop-ozone/common/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-common</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Common</description>
+   <name>Apache Ozone Common</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-ozone/csi/pom.xml b/hadoop-ozone/csi/pom.xml
+index 9e3466f6ad..f1e15592d0 100644
+--- a/hadoop-ozone/csi/pom.xml
++++ b/hadoop-ozone/csi/pom.xml
+@@ -20,10 +20,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-csi</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone CSI service</description>
+   <name>Apache Ozone CSI service</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-ozone/datanode/pom.xml b/hadoop-ozone/datanode/pom.xml
+index 648c51c2c3..e4633fdc99 100644
+--- a/hadoop-ozone/datanode/pom.xml
++++ b/hadoop-ozone/datanode/pom.xml
+@@ -19,12 +19,12 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-datanode</artifactId>
+   <name>Apache Ozone Datanode</name>
+   <packaging>jar</packaging>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+ 
+   <properties>
+     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+diff --git a/hadoop-ozone/dist/pom.xml b/hadoop-ozone/dist/pom.xml
+index f007ce9123..c9763358a9 100644
+--- a/hadoop-ozone/dist/pom.xml
++++ b/hadoop-ozone/dist/pom.xml
+@@ -19,12 +19,12 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-dist</artifactId>
+   <name>Apache Ozone Distribution</name>
+   <packaging>jar</packaging>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <properties>
+     <file.encoding>UTF-8</file.encoding>
+     <downloadSources>true</downloadSources>
+diff --git a/hadoop-ozone/fault-injection-test/mini-chaos-tests/pom.xml b/hadoop-ozone/fault-injection-test/mini-chaos-tests/pom.xml
+index fa8b04d084..dabe610553 100644
+--- a/hadoop-ozone/fault-injection-test/mini-chaos-tests/pom.xml
++++ b/hadoop-ozone/fault-injection-test/mini-chaos-tests/pom.xml
+@@ -20,9 +20,9 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <artifactId>ozone-fault-injection-test</artifactId>
+     <groupId>org.apache.ozone</groupId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Mini Ozone Chaos Tests</description>
+   <name>Apache Ozone Mini Ozone Chaos Tests</name>
+ 
+diff --git a/hadoop-ozone/fault-injection-test/network-tests/pom.xml b/hadoop-ozone/fault-injection-test/network-tests/pom.xml
+index 682533b1c2..6a5faab1be 100644
+--- a/hadoop-ozone/fault-injection-test/network-tests/pom.xml
++++ b/hadoop-ozone/fault-injection-test/network-tests/pom.xml
+@@ -20,7 +20,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone-fault-injection-test</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-network-tests</artifactId>
+   <description>Apache Ozone Network Tests</description>
+diff --git a/hadoop-ozone/fault-injection-test/pom.xml b/hadoop-ozone/fault-injection-test/pom.xml
+index c738759bc9..36392c3e1a 100644
+--- a/hadoop-ozone/fault-injection-test/pom.xml
++++ b/hadoop-ozone/fault-injection-test/pom.xml
+@@ -20,10 +20,10 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-fault-injection-test</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Fault Injection Tests</description>
+   <name>Apache Ozone Fault Injection Tests</name>
+   <packaging>pom</packaging>
+diff --git a/hadoop-ozone/httpfsgateway/pom.xml b/hadoop-ozone/httpfsgateway/pom.xml
+index 05f6787eb2..c9eb5bc952 100644
+--- a/hadoop-ozone/httpfsgateway/pom.xml
++++ b/hadoop-ozone/httpfsgateway/pom.xml
+@@ -22,10 +22,10 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-httpfsgateway</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <packaging>jar</packaging>
+ 
+   <name>Apache Ozone HttpFS</name>
+diff --git a/hadoop-ozone/insight/pom.xml b/hadoop-ozone/insight/pom.xml
+index 4204dee51f..f90c816ef9 100644
+--- a/hadoop-ozone/insight/pom.xml
++++ b/hadoop-ozone/insight/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-insight</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Insight Tool</description>
+   <name>Apache Ozone Insight Tool</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-ozone/integration-test/pom.xml b/hadoop-ozone/integration-test/pom.xml
+index 6d4d4a8a89..d80ff3e0c2 100644
+--- a/hadoop-ozone/integration-test/pom.xml
++++ b/hadoop-ozone/integration-test/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-integration-test</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Integration Tests</description>
+   <name>Apache Ozone Integration Tests</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-ozone/interface-client/pom.xml b/hadoop-ozone/interface-client/pom.xml
+index f3fd5b9f3c..c3272086e5 100644
+--- a/hadoop-ozone/interface-client/pom.xml
++++ b/hadoop-ozone/interface-client/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-interface-client</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Client interface</description>
+   <name>Apache Ozone Client Interface</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-ozone/interface-storage/pom.xml b/hadoop-ozone/interface-storage/pom.xml
+index 0105201898..e6d92f45f3 100644
+--- a/hadoop-ozone/interface-storage/pom.xml
++++ b/hadoop-ozone/interface-storage/pom.xml
+@@ -20,10 +20,10 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-interface-storage</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Storage Interface</description>
+   <name>Apache Ozone Storage Interface</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-ozone/ozone-manager/pom.xml b/hadoop-ozone/ozone-manager/pom.xml
+index 2c08cd3de9..52584e0fc1 100644
+--- a/hadoop-ozone/ozone-manager/pom.xml
++++ b/hadoop-ozone/ozone-manager/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-manager</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Manager Server</description>
+   <name>Apache Ozone Manager Server</name>
+   <packaging>jar</packaging>
+diff --git a/hadoop-ozone/ozonefs-common/pom.xml b/hadoop-ozone/ozonefs-common/pom.xml
+index c2721ffcc8..941b76ba68 100644
+--- a/hadoop-ozone/ozonefs-common/pom.xml
++++ b/hadoop-ozone/ozonefs-common/pom.xml
+@@ -19,12 +19,12 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-filesystem-common</artifactId>
+   <name>Apache Ozone FileSystem Common</name>
+   <packaging>jar</packaging>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <properties>
+     <file.encoding>UTF-8</file.encoding>
+     <downloadSources>true</downloadSources>
+diff --git a/hadoop-ozone/ozonefs-hadoop2/pom.xml b/hadoop-ozone/ozonefs-hadoop2/pom.xml
+index 3fd4b5f71f..426ea38064 100644
+--- a/hadoop-ozone/ozonefs-hadoop2/pom.xml
++++ b/hadoop-ozone/ozonefs-hadoop2/pom.xml
+@@ -19,12 +19,12 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-filesystem-hadoop2</artifactId>
+   <name>Apache Ozone FS Hadoop 2.x compatibility</name>
+   <packaging>jar</packaging>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <properties>
+     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
+   </properties>
+diff --git a/hadoop-ozone/ozonefs-hadoop3/pom.xml b/hadoop-ozone/ozonefs-hadoop3/pom.xml
+index 1cf0216d84..22bd19446c 100644
+--- a/hadoop-ozone/ozonefs-hadoop3/pom.xml
++++ b/hadoop-ozone/ozonefs-hadoop3/pom.xml
+@@ -19,12 +19,12 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-filesystem-hadoop3</artifactId>
+   <name>Apache Ozone FS Hadoop 3.x compatibility</name>
+   <packaging>jar</packaging>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <properties>
+     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
+diff --git a/hadoop-ozone/ozonefs-shaded/pom.xml b/hadoop-ozone/ozonefs-shaded/pom.xml
+index ba037663c9..1c0fc0b486 100644
+--- a/hadoop-ozone/ozonefs-shaded/pom.xml
++++ b/hadoop-ozone/ozonefs-shaded/pom.xml
+@@ -19,12 +19,12 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-filesystem-shaded</artifactId>
+   <name>Apache Ozone FileSystem Shaded</name>
+   <packaging>jar</packaging>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+ 
+   <properties>
+     <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+diff --git a/hadoop-ozone/ozonefs/pom.xml b/hadoop-ozone/ozonefs/pom.xml
+index d067a788eb..1c010c3b23 100644
+--- a/hadoop-ozone/ozonefs/pom.xml
++++ b/hadoop-ozone/ozonefs/pom.xml
+@@ -19,12 +19,12 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-filesystem</artifactId>
+   <name>Apache Ozone FileSystem</name>
+   <packaging>jar</packaging>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <properties>
+     <file.encoding>UTF-8</file.encoding>
+     <downloadSources>true</downloadSources>
+diff --git a/hadoop-ozone/pom.xml b/hadoop-ozone/pom.xml
+index 7293521e3d..d31f677c1f 100644
+--- a/hadoop-ozone/pom.xml
++++ b/hadoop-ozone/pom.xml
+@@ -16,10 +16,10 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone-main</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Project</description>
+   <name>Apache Ozone</name>
+   <packaging>pom</packaging>
+diff --git a/hadoop-ozone/recon-codegen/pom.xml b/hadoop-ozone/recon-codegen/pom.xml
+index 87165d2760..5a3eab738f 100644
+--- a/hadoop-ozone/recon-codegen/pom.xml
++++ b/hadoop-ozone/recon-codegen/pom.xml
+@@ -18,7 +18,7 @@
+   <parent>
+     <artifactId>ozone</artifactId>
+     <groupId>org.apache.ozone</groupId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <modelVersion>4.0.0</modelVersion>
+   <artifactId>ozone-reconcodegen</artifactId>
+diff --git a/hadoop-ozone/recon/pom.xml b/hadoop-ozone/recon/pom.xml
+index 3a19c8cbae..981c6b220f 100644
+--- a/hadoop-ozone/recon/pom.xml
++++ b/hadoop-ozone/recon/pom.xml
+@@ -11,18 +11,18 @@
+   See the License for the specific language governing permissions and
+   limitations under the License. See accompanying LICENSE file.
+ -->
+-<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
++<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <name>Apache Ozone Recon</name>
+   <modelVersion>4.0.0</modelVersion>
+   <artifactId>ozone-recon</artifactId>
+   <properties>
+     <pnpm.version>8.15.7</pnpm.version>
+-    <solr.version>8.11.2.7.3.1.0-SNAPSHOT</solr.version>
++    <solr.version>8.11.2.7.3.1.0-185</solr.version>
+   </properties>
+   <build>
+     <resources>
+diff --git a/hadoop-ozone/s3-secret-store/pom.xml b/hadoop-ozone/s3-secret-store/pom.xml
+index 04d04e4ec8..32d17988aa 100644
+--- a/hadoop-ozone/s3-secret-store/pom.xml
++++ b/hadoop-ozone/s3-secret-store/pom.xml
+@@ -19,12 +19,12 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-s3-secret-store</artifactId>
+   <name>Apache Ozone S3 Secret Store</name>
+   <packaging>jar</packaging>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <properties>
+     <file.encoding>UTF-8</file.encoding>
+     <downloadSources>true</downloadSources>
+diff --git a/hadoop-ozone/s3gateway/pom.xml b/hadoop-ozone/s3gateway/pom.xml
+index e2790f8dda..40427d034f 100644
+--- a/hadoop-ozone/s3gateway/pom.xml
++++ b/hadoop-ozone/s3gateway/pom.xml
+@@ -19,12 +19,12 @@
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-s3gateway</artifactId>
+   <name>Apache Ozone S3 Gateway</name>
+   <packaging>jar</packaging>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <properties>
+     <file.encoding>UTF-8</file.encoding>
+     <downloadSources>true</downloadSources>
+diff --git a/hadoop-ozone/tools/pom.xml b/hadoop-ozone/tools/pom.xml
+index d324b89caa..c2cc4a6b68 100644
+--- a/hadoop-ozone/tools/pom.xml
++++ b/hadoop-ozone/tools/pom.xml
+@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
+   <parent>
+     <groupId>org.apache.ozone</groupId>
+     <artifactId>ozone</artifactId>
+-    <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++    <version>1.3.0.7.3.1.0-185</version>
+   </parent>
+   <artifactId>ozone-tools</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Tools</description>
+   <name>Apache Ozone Tools</name>
+   <packaging>jar</packaging>
+diff --git a/pom.xml b/pom.xml
+index a80cb76de7..e2d9716205 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -11,11 +11,11 @@
+   See the License for the specific language governing permissions and
+   limitations under the License. See accompanying LICENSE file.
+ -->
+-<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
++<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0">
+   <modelVersion>4.0.0</modelVersion>
+   <groupId>org.apache.ozone</groupId>
+   <artifactId>ozone-main</artifactId>
+-  <version>1.3.0.7.3.1.0-SNAPSHOT</version>
++  <version>1.3.0.7.3.1.0-185</version>
+   <description>Apache Ozone Main</description>
+   <name>Apache Ozone Main</name>
+   <packaging>pom</packaging>
+@@ -60,11 +60,11 @@
+ 
+   <properties>
+     <hadoop2.version>2.10.2</hadoop2.version>
+-    <hadoop.version>3.1.1.7.3.1.0-SNAPSHOT</hadoop.version>
++    <hadoop.version>3.1.1.7.3.1.0-185</hadoop.version>
+ 
+     <!-- version for hdds/ozone components -->
+     <hdds.version>${ozone.version}</hdds.version>
+-    <ozone.version>1.3.0.7.3.1.0-SNAPSHOT</ozone.version>
++    <ozone.version>1.3.0.7.3.1.0-185</ozone.version>
+     <ozone.release>Indiana Dunes</ozone.release>
+     <declared.hdds.version>${hdds.version}</declared.hdds.version>
+     <declared.ozone.version>${ozone.version}</declared.ozone.version>
+@@ -72,13 +72,13 @@
+     <!-- HDDS Rocks Native dependency version-->
+     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
+     <!-- Apache Ratis version -->
+-    <ratis.version>2.4.2.7.3.1.0-SNAPSHOT</ratis.version>
++    <ratis.version>2.4.2.7.3.1.0-185</ratis.version>
+ 
+     <!-- Apache Ratis thirdparty version -->
+-    <ratis.thirdparty.version>1.0.3.7.3.1.0-SNAPSHOT</ratis.thirdparty.version>
++    <ratis.thirdparty.version>1.0.3.7.3.1.0-185</ratis.thirdparty.version>
+ 
+     <!-- Apache Ranger plugin version -->
+-    <ranger.version>2.4.0.7.3.1.0-SNAPSHOT</ranger.version>
++    <ranger.version>2.4.0.7.3.1.0-185</ranger.version>
+ 
+     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
+     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
+@@ -100,7 +100,7 @@
+     <jetty.version>9.4.54.v20240208</jetty.version>
+     <java.dev.jna.version>5.2.0</java.dev.jna.version>
+     <jcip-annotations.version>1.0-1</jcip-annotations.version>
+-    <curator.version>5.4.0.7.3.1.0-SNAPSHOT</curator.version>
++    <curator.version>5.4.0.7.3.1.0-185</curator.version>
+ 
+     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
+     <testsThreadCount>4</testsThreadCount>
+@@ -207,7 +207,7 @@
+     <mockito.version>4.11.0</mockito.version>
+     <hamcrest.version>2.2</hamcrest.version>
+     <junit5.version>5.10.3</junit5.version>
+-    <zookeeper.version>3.8.1.7.3.1.0-SNAPSHOT</zookeeper.version>
++    <zookeeper.version>3.8.1.7.3.1.0-185</zookeeper.version>
+ 
+     <!-- Maven protoc compiler -->
+     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
