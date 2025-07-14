@@ -211,9 +211,6 @@ public abstract class TestContainerScannersAbstract {
       field = BackgroundContainerMetadataScanner.class.getDeclaredField("scanHelper");
     }
     field.setAccessible(true);
-    Field modifiersField = Field.class.getDeclaredField("modifiers");
-    modifiersField.setAccessible(true);
-    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
     ContainerScanHelper originalScanHelper = (ContainerScanHelper) field.get(scanner);
     ContainerScanHelper spyScanHelper = spy(originalScanHelper);
     field.set(scanner, spyScanHelper);
