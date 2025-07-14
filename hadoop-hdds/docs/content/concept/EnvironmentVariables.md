@@ -57,7 +57,7 @@ Ozone relies on several environment variables to control its behavior. These var
 | `OZONE_SECURE_IDENT_PRESERVE` | If set to "true", the `OZONE_IDENT_STRING` is not modified for secure daemons. | `false` |
 | `OZONE_OM_OPTS` | JVM options for the Ozone Manager. These options will be appended to the options specified as OZONE_OPTS, and therefore may override any similar flags set in OZONE_OPTS. | |
 | `OZONE_DATANODE_OPTS` | JVM options for the Ozone DataNode. These options will be appended to the options specified as OZONE_OPTS, and therefore may override any similar flags set in OZONE_OPTS. | |
-| `OZONE_SCM_OPTS` | JVM options for the Storage Container Manager. | |
+| `OZONE_SCM_OPTS` | JVM options for the Storage Container Manager. These options will be appended to the options specified as OZONE_OPTS, and therefore may override any similar flags set in OZONE_OPTS. | |
 | `OZONE_DAEMON_JSVC_EXTRA_OPTS` | Extra options for the `jsvc` command. | |
 | `OZONE_SHELL_SCRIPT_DEBUG` | If set to `true`, enables debug output for shell scripts. | `false` |
 | `OZONE_SERVER_OPTS` | Extra options for the server. | |
