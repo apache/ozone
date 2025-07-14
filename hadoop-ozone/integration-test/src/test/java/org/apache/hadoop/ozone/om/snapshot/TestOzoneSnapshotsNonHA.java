@@ -17,11 +17,16 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-/**
- * OmSnapshot file system tests for Legacy.
- */
-public class TestOmSnapshotFileSystemLegacy extends TestOmSnapshotFileSystem {
-  TestOmSnapshotFileSystemLegacy() throws Exception {
-    super(BUCKET_NAME_LEGACY, false);
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.junit.jupiter.api.TestInstance;
+
+/** Test Ozone Snapshots with non-HA cluster. */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class TestOzoneSnapshotsNonHA extends SnapshotTests {
+
+  @Override
+  protected MiniOzoneCluster createCluster() throws Exception {
+    return newClusterBuilder()
+        .build();
   }
 }
