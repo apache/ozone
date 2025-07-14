@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Iterator;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,24 +54,7 @@ public class BackgroundContainerMetadataScanner extends
   @Override
   public void scanContainer(Container<?> container)
       throws IOException, InterruptedException {
-    if (!scanHelper.shouldScanMetadata(container)) {
-      return;
-    }
-
-    ContainerData containerData = container.getContainerData();
-
-    MetadataScanResult result = container.scanMetaData();
-    if (result.isDeleted()) {
-      LOG.debug("Container [{}] has been deleted during the metadata scan.", containerData.getContainerID());
-      return;
-    }
-    if (result.hasErrors()) {
-      scanHelper.handleUnhealthyScanResult(containerData, result);
-    }
-
-    // Do not update the scan timestamp after the scan since this was just a
-    // metadata scan, not a full data scan.
-    metrics.incNumContainersScanned();
+    scanHelper.scanMetadata(container);
   }
 
   @Override

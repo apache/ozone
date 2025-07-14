@@ -64,7 +64,7 @@ public final class ContainerScanHelper {
     }
     ContainerData containerData = container.getContainerData();
     long containerId = containerData.getContainerID();
-    logScanStart(containerData);
+    logScanStart(containerData, "data");
     DataScanResult result = container.scanData(throttler, canceler);
 
     if (result.isDeleted()) {
@@ -85,6 +85,32 @@ public final class ContainerScanHelper {
     if (!result.isDeleted()) {
       controller.updateDataScanTimestamp(containerId, now);
     }
+    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
+    logScanCompleted(containerData, now);
+  }
+
+  public void scanMetadata(Container<?> container)
+      throws IOException, InterruptedException {
+    if (!shouldScanMetadata(container)) {
+      return;
+    }
+    ContainerData containerData = container.getContainerData();
+    long containerId = containerData.getContainerID();
+    logScanStart(containerData, "only metadata");
+
+    MetadataScanResult result = container.scanMetaData();
+    if (result.isDeleted()) {
+      log.debug("Container [{}] has been deleted during metadata scan.", containerId);
+      return;
+    }
+    if (result.hasErrors()) {
+      handleUnhealthyScanResult(containerData, result);
+    }
+
+    Instant now = Instant.now();
+    // Do not update the scan timestamp after the scan since this was just a
+    // metadata scan, not a full data scan.
+    metrics.incNumContainersScanned();
     // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
     logScanCompleted(containerData, now);
   }
@@ -165,12 +191,12 @@ public final class ContainerScanHelper {
     return recentlyScanned;
   }
 
-  private void logScanStart(ContainerData containerData) {
+  private void logScanStart(ContainerData containerData, String scanType) {
     if (log.isDebugEnabled()) {
       Optional<Instant> scanTimestamp = containerData.lastDataScanTime();
       Object lastScanTime = scanTimestamp.map(ts -> "at " + ts).orElse("never");
-      log.debug("Scanning container {}, last scanned {}",
-          containerData.getContainerID(), lastScanTime);
+      log.debug("Scanning {} of container {}, last scanned {}",
+          scanType, containerData.getContainerID(), lastScanTime);
     }
   }
 
