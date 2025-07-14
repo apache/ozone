@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.management.ObjectName;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -213,8 +214,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @throws IOException if exception happens, non of the blocks is deleted.
    */
   @Override
-  public void deleteBlocks(List<BlockGroup> keyBlocksInfoList)
-      throws IOException {
+  public void deleteBlocks(List<BlockGroup> keyBlocksInfoList) throws IOException {
     if (scm.getScmContext().isInSafeMode()) {
       throw new SCMException("SafeModePrecheck failed for deleteBlocks",
           SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
@@ -223,19 +223,25 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     // TODO: track the block size info so that we can reclaim the container
     // TODO: used space when the block is deleted.
     for (BlockGroup bg : keyBlocksInfoList) {
+      List<DeletedBlock> deletedBlocks = bg.getAllBlocks();
+      List<BlockID> fallbackBlocks = bg.getBlockIDs();
+
+      boolean hasDeletedBlocks = !deletedBlocks.isEmpty();
+
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Deleting blocks {}",
-            StringUtils.join(",", bg.getAllBlocks()));
+        LOG.debug("Deleting blocks {}", StringUtils.join(",",
+            hasDeletedBlocks ? deletedBlocks : fallbackBlocks));
       }
-      for (DeletedBlock block : bg.getAllBlocks()) {
-        long containerID = block.getBlockID().getContainerID();
-        if (containerBlocks.containsKey(containerID)) {
-          containerBlocks.get(containerID).add(block.getBlockID().getLocalID());
-        } else {
-          List<Long> item = new ArrayList<>();
-          item.add(block.getBlockID().getLocalID());
-          containerBlocks.put(containerID, item);
+
+      if (!hasDeletedBlocks) {
+        for (BlockID block : fallbackBlocks) {
+          addToContainerBlockMap(containerBlocks, block.getContainerID(), block.getLocalID());
         }
+      }
+
+      for (DeletedBlock block : deletedBlocks) {
+        BlockID blockID = block.getBlockID();
+        addToContainerBlockMap(containerBlocks, blockID.getContainerID(), blockID.getLocalID());
       }
     }
 
@@ -280,5 +286,9 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   @Override
   public SCMBlockDeletingService getSCMBlockDeletingService() {
     return this.blockDeletingService;
+  }
+
+  private void addToContainerBlockMap(Map<Long, List<Long>> containerBlocks, long containerID, long localID) {
+    containerBlocks.computeIfAbsent(containerID, id -> new ArrayList<>()).add(localID);
   }
 }

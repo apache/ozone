@@ -150,7 +150,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
                 .isAllowed(HDDSLayoutFeature.DATA_DISTRIBUTION)
         ) {
           boolean isRequestHasNewData = request.getDeleteScmKeyBlocksRequest().getKeyBlocksList().stream()
-              .map(BlockGroup::getFromProto).anyMatch(blockGroup -> !blockGroup.getAllBlocks().isEmpty());
+              .anyMatch(keyBlocks -> keyBlocks.getDeletedBlocksCount() > 0);
 
           if (isRequestHasNewData) {
             throw new SCMException("Cluster is not finalized yet, it is"
