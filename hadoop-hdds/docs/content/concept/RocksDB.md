@@ -30,11 +30,27 @@ RocksDB is a log-structured merge-tree (LSM-tree) based key-value store develope
 
 ## 2. How Ozone uses RocksDB
 
-RocksDB is utilized in the following Ozone components:
+RocksDB is utilized in the following Ozone components to store critical metadata:
 
-*   **Ozone Manager (OM):** Stores metadata related to volumes, buckets, keys, and directory structures.
-*   **Storage Container Manager (SCM):** Persists information about containers, datanodes, and pipelines.
-*   **Datanode:** Used for block metadata and other internal state.
+*   **Ozone Manager (OM):** The OM uses RocksDB as its primary metadata store, holding the entire namespace and related information. As defined in `OMDBDefinition.java`, this includes tables for:
+    *   **Namespace:** `volumeTable`, `bucketTable`, `keyTable` (for object store layout), `directoryTable`, and `fileTable` (for file system layout).
+    *   **Security:** `userTable`, `dTokenTable` (delegation tokens), and `s3SecretTable`.
+    *   **State Management:** `transactionInfoTable` for tracking transactions, `deletedTable` for pending key deletions, and `snapshotInfoTable` for managing Ozone snapshots.
+
+*   **Storage Container Manager (SCM):** The SCM persists the state of the storage layer in RocksDB. The structure, defined in `SCMDBDefinition.java`, includes tables for:
+    *   `pipelines`: Manages the state and composition of data pipelines.
+    *   `containers`: Stores information about all storage containers in the cluster.
+    *   `deletedBlocks`: Tracks blocks that are marked for deletion and awaiting garbage collection.
+    *   `move`: Coordinates container movements for data rebalancing.
+
+*   **Datanode:** A Datanode utilizes RocksDB for two main purposes:
+    1.  **Per-Volume Metadata:** It maintains one RocksDB instance per storage volume. Each of these instances manages metadata for the containers and blocks stored on that specific volume. As specified in `DatanodeSchemaThreeDBDefinition.java`, this database is structured with column families for `block_data`, `metadata`, and `delete_txns`. To optimize performance, it uses a fixed-length prefix based on the container ID, enabling efficient lookups with RocksDB's prefix seek feature.
+    2.  **Global Container Tracking:** Additionally, each Datanode has a single, separate RocksDB instance to record the set of all containers it manages. This database, defined in `WitnessedContainerDBDefinition.java`, contains a `containerIds` table that provides a complete index of the containers hosted on that Datanode.
+
+*   **Recon:** Ozone's administration and monitoring tool, Recon, maintains its own RocksDB database to store aggregated and historical data for analysis. The `ReconDBDefinition.java` outlines tables for:
+    *   `containerKeyTable`: Maps containers to the keys they contain.
+    *   `namespaceSummaryTable`: Stores aggregated namespace information for quick reporting.
+    *   `replica_history`: Tracks the historical locations of container replicas, which is essential for auditing and diagnostics.
 
 ## 3. Tunings applicable to RocksDB
 
