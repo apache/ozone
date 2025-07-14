@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,15 +13,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
-package org.apache.hadoop.hdds.utils;
 
-import org.apache.ratis.util.UncheckedAutoCloseable;
+package org.apache.hadoop.hdds.utils;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Set;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * A token to track resource closure.
@@ -32,6 +30,7 @@ import java.util.Set;
 final class LeakTracker extends WeakReference<Object> implements UncheckedAutoCloseable {
   private final Set<LeakTracker> allLeaks;
   private final Runnable leakReporter;
+
   LeakTracker(Object referent, ReferenceQueue<Object> referenceQueue,
       Set<LeakTracker> allLeaks, Runnable leakReporter) {
     super(referent, referenceQueue);

@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,20 +17,19 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests OzoneManagerLock.Resource.KEY_PATH_LOCK.
@@ -41,8 +39,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyPathLock.class);
 
-  private final OzoneManagerLock.Resource resource =
-      OzoneManagerLock.Resource.KEY_PATH_LOCK;
+  private final OzoneManagerLock.LeveledResource resource =
+      OzoneManagerLock.LeveledResource.KEY_PATH_LOCK;
 
   @Test
   void testKeyPathLockMultiThreading() throws Exception {
@@ -226,8 +224,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
 
   @Test
   void testAcquireWriteBucketLockWhileAcquiredWriteKeyPathLock() {
-    OzoneManagerLock.Resource higherResource =
-        OzoneManagerLock.Resource.BUCKET_LOCK;
+    OzoneManagerLock.LeveledResource higherResource =
+        OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -248,8 +246,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
 
   @Test
   void testAcquireWriteBucketLockWhileAcquiredReadKeyPathLock() {
-    OzoneManagerLock.Resource higherResource =
-        OzoneManagerLock.Resource.BUCKET_LOCK;
+    OzoneManagerLock.LeveledResource higherResource =
+        OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -270,8 +268,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
 
   @Test
   void testAcquireReadBucketLockWhileAcquiredReadKeyPathLock() {
-    OzoneManagerLock.Resource higherResource =
-        OzoneManagerLock.Resource.BUCKET_LOCK;
+    OzoneManagerLock.LeveledResource higherResource =
+        OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -292,8 +290,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
 
   @Test
   void testAcquireReadBucketLockWhileAcquiredWriteKeyPathLock() {
-    OzoneManagerLock.Resource higherResource =
-        OzoneManagerLock.Resource.BUCKET_LOCK;
+    OzoneManagerLock.LeveledResource higherResource =
+        OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();

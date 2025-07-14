@@ -1,24 +1,27 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -30,24 +33,14 @@ import org.apache.ratis.util.ReferenceCountedObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * This class is used to get the DataChannel for streaming.
  */
 public class KeyValueStreamDataChannel extends StreamDataChannelBase {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(KeyValueStreamDataChannel.class);
+  static final Logger LOG = LoggerFactory.getLogger(KeyValueStreamDataChannel.class);
 
-  interface WriteMethod {
-    int applyAsInt(ByteBuffer src) throws IOException;
-  }
+  private final Buffers buffers = new Buffers(BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX);
 
-  private final Buffers buffers = new Buffers(
-      BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX);
   private final AtomicBoolean closed = new AtomicBoolean();
 
   KeyValueStreamDataChannel(File file, ContainerData containerData,
@@ -66,6 +59,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
       throws IOException {
     getMetrics().incContainerOpsMetrics(getType());
     assertOpen();
+    assertSpaceAvailability(referenceCounted.get().remaining());
 
     return writeBuffers(referenceCounted, buffers, this::writeFileChannel);
   }
@@ -159,5 +153,9 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
 
     // set index for reading data
     b.writerIndex(protoIndex);
+  }
+
+  interface WriteMethod {
+    int applyAsInt(ByteBuffer src) throws IOException;
   }
 }

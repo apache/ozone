@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +17,6 @@
 
 package org.apache.hadoop.tools.contract;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IOSTATISTICS_LOGGING_LEVEL_INFO;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
@@ -34,7 +32,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -56,7 +53,6 @@ import org.apache.hadoop.tools.SimpleCopyListing;
 import org.apache.hadoop.tools.mapred.CopyMapper;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.util.functional.RemoteIterators;
-
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,15 +101,6 @@ public abstract class AbstractContractDistCpTest
    */
   protected static final int DEFAULT_WIDTH = 2;
 
-  /**
-   * The timeout value is extended over the default so that large updates
-   * are allowed to take time, especially to remote stores.
-   * @return the current test timeout
-   */
-  protected int getTestTimeoutMillis() {
-    return 15  * 60 * 1000;
-  }
-
   private Configuration conf;
   private FileSystem localFS, remoteFS;
   private Path localDir, remoteDir;
@@ -152,9 +139,17 @@ public abstract class AbstractContractDistCpTest
 
   private Path outputFile4;
 
-  private Path outputFile5;
-
   private Path inputDirUnderOutputDir;
+
+  /**
+   * The timeout value is extended over the default so that large updates
+   * are allowed to take time, especially to remote stores.
+   * @return the current test timeout
+   */
+  @Override
+  protected int getTestTimeoutMillis() {
+    return 15  * 60 * 1000;
+  }
 
   @Override
   protected Configuration createConfiguration() {
@@ -192,7 +187,7 @@ public abstract class AbstractContractDistCpTest
   @Override
   public void teardown() throws Exception {
     // if remote FS supports IOStatistics log it.
-    logIOStatisticsAtLevel(LOG, IOSTATISTICS_LOGGING_LEVEL_INFO, getRemoteFS());
+    logIOStatisticsAtLevel(LOG, "info", getRemoteFS());
     super.teardown();
   }
 
@@ -220,7 +215,6 @@ public abstract class AbstractContractDistCpTest
     outputFile3 = new Path(outputSubDir2, "file3");
     outputSubDir4 = new Path(inputDirUnderOutputDir, "subDir4/subDir4");
     outputFile4 = new Path(outputSubDir4, "file4");
-    outputFile5 = new Path(outputSubDir4, "file5");
   }
 
   /**
@@ -404,7 +398,6 @@ public abstract class AbstractContractDistCpTest
     return inputFileNew1;
   }
 
-
   @Test
   public void testTrackDeepDirectoryStructureToRemote() throws Exception {
     describe("copy a deep directory structure from local to remote");
@@ -440,7 +433,7 @@ public abstract class AbstractContractDistCpTest
             .withDirectWrite(shouldUseDirectWrite())
             .withOverwrite(false)));
 
-    lsR("tracked udpate", remoteFS, destDir);
+    lsR("tracked update", remoteFS, destDir);
     // new file went over
     Path outputFileNew1 = new Path(outputSubDir2, "newfile1");
     ContractTestUtils.assertIsFile(remoteFS, outputFileNew1);
@@ -833,6 +826,7 @@ public abstract class AbstractContractDistCpTest
                     Collections.singletonList(srcDir), destDir)
                     .withDirectWrite(true)));
   }
+
   /**
    * Run distcp srcDir destDir.
    * @param srcDir local source directory

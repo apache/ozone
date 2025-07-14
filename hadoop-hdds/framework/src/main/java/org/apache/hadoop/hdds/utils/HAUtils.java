@@ -1,28 +1,50 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Streams;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -37,14 +59,13 @@ import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvide
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
@@ -52,34 +73,11 @@ import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.cert.X509Certificate;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
-import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-
 /**
  * utility class used by SCM and OM for HA.
  */
 public final class HAUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
 
   private HAUtils() {
   }
@@ -250,9 +248,7 @@ public final class HAUtils {
       DBDefinition definition)
       throws IOException {
 
-    try (DBStore dbStore = loadDB(tempConfig, dbDir.toFile(),
-        dbName, definition)) {
-
+    try (DBStore dbStore = DBStoreBuilder.newBuilder(tempConfig, definition, dbName, dbDir).build()) {
       // Get the table name with TransactionInfo as the value. The transaction
       // info table name are different in SCM and SCM.
 
@@ -307,27 +303,6 @@ public final class HAUtils {
     return true;
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName, DBDefinition definition) throws IOException {
-    RocksDBConfiguration rocksDBConfiguration =
-        configuration.getObject(RocksDBConfiguration.class);
-    DBStoreBuilder dbStoreBuilder =
-        DBStoreBuilder.newBuilder(configuration, rocksDBConfiguration)
-            .setName(dbName)
-            .setPath(Paths.get(metaDir.getPath()));
-    // Add column family names and codecs.
-    for (DBColumnFamilyDefinition columnFamily : definition
-        .getColumnFamilies()) {
-
-      dbStoreBuilder.addTable(columnFamily.getName());
-      dbStoreBuilder
-          .addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());
-      dbStoreBuilder
-          .addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
-    }
-    return dbStoreBuilder.build();
-  }
-
   public static File getMetaDir(DBDefinition definition,
       OzoneConfiguration configuration) {
     // Set metadata dirs.
@@ -373,21 +348,45 @@ public final class HAUtils {
 
   /**
    * Retry forever until CA list matches expected count.
+   * Fails fast on authentication exceptions.
    * @param task - task to get CA list.
    * @return CA list.
    */
   private static List<String> getCAListWithRetry(Callable<List<String>> task,
       long waitDuration) throws IOException {
-    RetryPolicy retryPolicy = RetryPolicies.retryForeverWithFixedSleep(
-        waitDuration, TimeUnit.SECONDS);
-    RetriableTask<List<String>> retriableTask =
-        new RetriableTask<>(retryPolicy, "getCAList", task);
+    RetryPolicy retryPolicy = new RetryPolicy() {
+      private final RetryPolicy defaultPolicy = RetryPolicies.retryForeverWithFixedSleep(
+          waitDuration, TimeUnit.SECONDS);
+
+      @Override
+      public RetryAction shouldRetry(Exception e, int retries, int failovers, boolean isIdempotent) throws Exception {
+        if (containsAccessControlException(e)) {
+          LOG.warn("AccessControlException encountered during getCAList; failing fast without retry.");
+          return new RetryAction(RetryAction.RetryDecision.FAIL);
+        }
+        return defaultPolicy.shouldRetry(e, retries, failovers, isIdempotent);
+      }
+    };
+
+    RetriableTask<List<String>> retriableTask = new RetriableTask<>(retryPolicy, "getCAList", task);
     try {
       return retriableTask.call();
     } catch (Exception ex) {
-      throw new SCMSecurityException("Unable to obtain complete CA " +
-          "list", ex);
+      if (containsAccessControlException(ex)) {
+        throw new AccessControlException();
+      }
+      throw new SCMSecurityException("Unable to obtain complete CA list", ex);
     }
+  }
+
+  private static boolean containsAccessControlException(Throwable e) {
+    while (e != null) {
+      if (e instanceof AccessControlException) {
+        return true;
+      }
+      e = e.getCause();
+    }
+    return false;
   }
 
   private static List<String> waitForCACerts(
@@ -419,29 +418,16 @@ public final class HAUtils {
     long waitDuration =
         conf.getTimeDuration(OZONE_SCM_CA_LIST_RETRY_INTERVAL,
             OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT, TimeUnit.SECONDS);
-    Collection<String> scmNodes = SCMHAUtils.getSCMNodeIds(conf);
+    Collection<String> scmNodes = HddsUtils.getSCMNodeIds(conf);
     SCMSecurityProtocolClientSideTranslatorPB scmSecurityProtocolClient =
         HddsServerUtil.getScmSecurityClient(conf);
-    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
-      List<String> caCertPemList = new ArrayList<>();
-      SCMGetCertResponseProto scmGetCertResponseProto =
-          scmSecurityProtocolClient.getCACert();
-      if (scmGetCertResponseProto.hasX509Certificate()) {
-        caCertPemList.add(scmGetCertResponseProto.getX509Certificate());
-      }
-      if (scmGetCertResponseProto.hasX509RootCACertificate()) {
-        caCertPemList.add(scmGetCertResponseProto.getX509RootCACertificate());
-      }
-      return OzoneSecurityUtil.convertToX509(caCertPemList);
+    int expectedCount = scmNodes.size() + 1;
+    if (scmNodes.size() > 1) {
+      return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() -> waitForCACerts(
+          scmSecurityProtocolClient::listCACertificate,
+          expectedCount), waitDuration));
     } else {
-      int expectedCount = scmNodes.size() + 1;
-      if (scmNodes.size() > 1) {
-        return OzoneSecurityUtil.convertToX509(getCAListWithRetry(() -> waitForCACerts(
-            scmSecurityProtocolClient::listCACertificate,
-            expectedCount), waitDuration));
-      } else {
-        return OzoneSecurityUtil.convertToX509(scmSecurityProtocolClient.listCACertificate());
-      }
+      return OzoneSecurityUtil.convertToX509(scmSecurityProtocolClient.listCACertificate());
     }
   }
 

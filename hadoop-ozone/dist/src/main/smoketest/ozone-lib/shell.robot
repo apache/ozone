@@ -19,6 +19,11 @@ Library     String
 
 
 *** Keywords ***
+Ozone Shell Batch
+    [arguments]    @{commands}
+    ${cmd} =    Catenate    SEPARATOR=' --execute '    @{commands}
+    Run Keyword And Return    Execute and checkrc    ozone sh --execute '${cmd}'    0
+
 Bucket Exists
     [arguments]    ${bucket}
     ${rc}    ${output} =      Run And Return Rc And Output             timeout 15 ozone sh bucket info ${bucket}

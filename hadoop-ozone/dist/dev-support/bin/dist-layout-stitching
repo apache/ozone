@@ -124,7 +124,7 @@ run cp -r "${ROOT}/dev-support/byteman" "share/ozone/"
 #Copy docker compose files
 #compose files are preprocessed: properties (eg. project.version) are replaced first by maven.
 run cp -p -R "${ROOT}/hadoop-ozone/dist/target/compose" .
-run cp -p -r "${ROOT}/hadoop-ozone/dist/src/main/smoketest" .
+run cp -p -r "${ROOT}/hadoop-ozone/dist/target/smoketest" .
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/k8s" kubernetes
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 
@@ -135,11 +135,12 @@ for file in $(find "${ROOT}" -path '*/target/classes/*.classpath' | sort); do
   module=$(basename "${file%.classpath}")
   sed -i -e "s;$;:\$HDDS_LIB_JARS_DIR/${module}-${HDDS_VERSION}.jar;" "$file"
 
-  cp -n -p -v "$file" share/ozone/classpath/
+  run cp -p "$file" share/ozone/classpath/
 done
 
 for file in $(find "${ROOT}" -path '*/share/ozone/lib/*jar' | sort); do
-  cp -n -p -v "$file" share/ozone/lib/
+  # copy without printing to output due to large number of files
+  cp -p "$file" share/ozone/lib/
 done
 
 #workaround for https://issues.apache.org/jira/browse/MRESOURCES-236

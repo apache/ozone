@@ -1,28 +1,28 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.repair;
 
-import org.apache.hadoop.hdds.cli.AbstractSubcommand;
-import picocli.CommandLine;
-
+import jakarta.annotation.Nullable;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
+import picocli.CommandLine;
 
 /** Parent class for all actionable repair commands. */
 @CommandLine.Command
@@ -45,45 +45,83 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
   /** Hook method for subclasses for performing actual repair task. */
   protected abstract void execute() throws Exception;
 
-  @Override
-  public final Void call() throws Exception {
-    if (!dryRun) {
-      confirmUser();
-    }
-    execute();
+  /** Which Ozone component should be verified to be offline. */
+  @Nullable
+  protected Component serviceToBeOffline() {
     return null;
   }
 
-  protected boolean checkIfServiceIsRunning(String serviceName) {
-    String runningEnvVar = String.format("OZONE_%s_RUNNING", serviceName);
-    String pidEnvVar = String.format("OZONE_%s_PID", serviceName);
-    String isServiceRunning = System.getenv(runningEnvVar);
-    String servicePid = System.getenv(pidEnvVar);
-    if ("true".equals(isServiceRunning)) {
-      if (!force) {
-        error("Error: %s is currently running on this host with PID %s. " +
-            "Stop the service before running the repair tool.", serviceName, servicePid);
-        return true;
-      } else {
-        info("Warning: --force flag used. Proceeding despite %s being detected as running with PID %s.",
-            serviceName, servicePid);
-      }
-    } else {
-      info("No running %s service detected. Proceeding with repair.", serviceName);
+  @Override
+  public final Void call() throws Exception {
+    final Component service = serviceToBeOffline();
+    if (!dryRun && service != null) { // offline tool
+      confirmUser();
     }
+    if (isServiceStateOK()) {
+      execute();
+    }
+    return null;
+  }
+
+  private boolean isServiceStateOK() {
+    final Component service = serviceToBeOffline();
+
+    if (service == null) {
+      return true; // online tool
+    }
+
+    if (!isServiceRunning(service)) {
+      info("No running %s service detected. Proceeding with repair.", service);
+      return true;
+    }
+
+    String servicePid = getServicePid(service);
+
+    if (force) {
+      info("Warning: --force flag used. Proceeding despite %s being detected as running with PID %s.",
+          service, servicePid);
+      return true;
+    }
+
+    error("Error: %s is currently running on this host with PID %s. " +
+        "Stop the service before running the repair tool.", service, servicePid);
+
     return false;
+  }
+
+  private static String getServicePid(Component service) {
+    return System.getenv(String.format("OZONE_%s_PID", service));
+  }
+
+  private static boolean isServiceRunning(Component service) {
+    return "true".equals(System.getenv(String.format("OZONE_%s_RUNNING", service)));
   }
 
   protected boolean isDryRun() {
     return dryRun;
   }
 
+  /** Print to stdout the formatted from {@code msg} and {@code args}. */
   protected void info(String msg, Object... args) {
     out().println(formatMessage(msg, args));
   }
 
+  /** Print to stderr the formatted from {@code msg} and {@code args}. */
   protected void error(String msg, Object... args) {
     err().println(formatMessage(msg, args));
+  }
+
+  /** Print to stderr the message formatted from {@code msg} and {@code args},
+   * and also print the exception {@code t}. */
+  protected void error(Throwable t, String msg, Object... args) {
+    error(msg, args);
+    rootCommand().printError(t);
+  }
+
+  /** Fail with {@link IllegalStateException} using the message formatted from {@code msg} and {@code args}. */
+  protected void fatal(String msg, Object... args) {
+    String formatted = formatMessage(msg, args);
+    throw new IllegalStateException(formatted);
   }
 
   private String formatMessage(String msg, Object[] args) {
@@ -116,5 +154,12 @@ public abstract class RepairTool extends AbstractSubcommand implements Callable<
     return new Scanner(System.in, StandardCharsets.UTF_8.name())
         .nextLine()
         .trim();
+  }
+
+  /** Ozone component for offline tools. */
+  public enum Component {
+    DATANODE,
+    OM,
+    SCM,
   }
 }

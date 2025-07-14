@@ -1,34 +1,33 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.debug.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Callable;
-
-import java.nio.file.Path;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -37,11 +36,9 @@ import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import picocli.CommandLine;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Tool that parses OM db file for prefix table.
@@ -51,24 +48,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
     description = "Parse prefix contents")
 public class PrefixParser implements Callable<Void> {
 
-  /**
-   * Types to represent the level or path component type.
-   */
-  public enum Types {
-    VOLUME,
-    BUCKET,
-    FILE,
-    DIRECTORY,
-    INTERMEDIATE_DIRECTORY,
-    NON_EXISTENT_DIRECTORY,
-  }
+  @CommandLine.ParentCommand
+  private OMDebug parent;
 
   private final int[] parserStats = new int[Types.values().length];
-
-  @CommandLine.Option(names = {"--db"},
-      required = true,
-      description = "Database File Path")
-  private String dbPath;
 
   @CommandLine.Option(names = {"--path"},
       required = true,
@@ -86,16 +69,12 @@ public class PrefixParser implements Callable<Void> {
   private String volume;
 
   public String getDbPath() {
-    return dbPath;
-  }
-
-  public void setDbPath(String dbPath) {
-    this.dbPath = dbPath;
+    return parent.getDbPath();
   }
 
   @Override
   public Void call() throws Exception {
-    parse(volume, bucket, dbPath, filePath);
+    parse(volume, bucket, getDbPath(), filePath);
     return null;
   }
 
@@ -203,19 +182,15 @@ public class PrefixParser implements Callable<Void> {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
-  private void dumpTableInfo(Types type,
+  private <T extends WithParentObjectId> void dumpTableInfo(Types type,
       org.apache.hadoop.fs.Path effectivePath,
-      Table<String, ? extends WithParentObjectId> table,
+      Table<String, T> table,
       long volumeId, long bucketId, long lastObjectId)
       throws IOException {
-    MetadataKeyFilters.KeyPrefixFilter filter = getPrefixFilter(
-            volumeId, bucketId, lastObjectId);
+    final KeyPrefixFilter filter = getPrefixFilter(volumeId, bucketId, lastObjectId);
+    final List<KeyValue<String, T>> infoList = table.getRangeKVs(null, 1000, null, filter, false);
 
-    List<? extends KeyValue
-        <String, ? extends WithParentObjectId>> infoList =
-        table.getRangeKVs(null, 1000, null, filter);
-
-    for (KeyValue<String, ? extends WithParentObjectId> info :infoList) {
+    for (KeyValue<String, T> info : infoList) {
       Path key = Paths.get(info.getKey());
       dumpInfo(type, getEffectivePath(effectivePath,
           key.getName(1).toString()), info.getValue(), info.getKey());
@@ -239,16 +214,26 @@ public class PrefixParser implements Callable<Void> {
 
   }
 
-  private static MetadataKeyFilters.KeyPrefixFilter getPrefixFilter(
-          long volumeId, long bucketId, long parentId) {
+  private static KeyPrefixFilter getPrefixFilter(long volumeId, long bucketId, long parentId) {
     String key = OM_KEY_PREFIX + volumeId +
             OM_KEY_PREFIX + bucketId +
             OM_KEY_PREFIX + parentId;
-    return (new MetadataKeyFilters.KeyPrefixFilter())
-        .addFilter(key);
+    return KeyPrefixFilter.newFilter(key);
   }
 
   public int getParserStats(Types type) {
     return parserStats[type.ordinal()];
+  }
+
+  /**
+   * Types to represent the level or path component type.
+   */
+  public enum Types {
+    VOLUME,
+    BUCKET,
+    FILE,
+    DIRECTORY,
+    INTERMEDIATE_DIRECTORY,
+    NON_EXISTENT_DIRECTORY,
   }
 }

@@ -1,23 +1,38 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import static org.apache.hadoop.hdds.DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+import static org.apache.ratis.util.Preconditions.assertTrue;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -38,14 +53,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.RatisConfUtils;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -69,13 +83,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
@@ -83,9 +90,6 @@ import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
-import org.apache.ratis.protocol.RaftPeer;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
@@ -95,7 +99,10 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.DataStreamServerRpc;
@@ -111,51 +118,16 @@ import org.apache.ratis.util.TraditionalBinaryPrefix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
-import static org.apache.ratis.util.Preconditions.assertTrue;
-
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
  * Ozone containers.
  */
 public final class XceiverServerRatis implements XceiverServerSpi {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(XceiverServerRatis.class);
-
-  private static class ActivePipelineContext {
-    /** The current datanode is the current leader of the pipeline. */
-    private final boolean isPipelineLeader;
-    /** The heartbeat containing pipeline close action has been triggered. */
-    private final boolean isPendingClose;
-
-    ActivePipelineContext(boolean isPipelineLeader, boolean isPendingClose) {
-      this.isPipelineLeader = isPipelineLeader;
-      this.isPendingClose = isPendingClose;
-    }
-
-    public boolean isPipelineLeader() {
-      return isPipelineLeader;
-    }
-
-    public boolean isPendingClose() {
-      return isPendingClose;
-    }
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(XceiverServerRatis.class);
 
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
   private static final List<Integer> DEFAULT_PRIORITY_LIST =
-      new ArrayList<>(
-          Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
-
-  private static long nextCallId() {
-    return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
-  }
+      new ArrayList<>(Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 
   private int serverPort;
   private int adminPort;
@@ -180,6 +152,30 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final boolean streamEnable;
   private final DatanodeRatisServerConfig ratisServerConfig;
   private final HddsDatanodeService datanodeService;
+
+  private static class ActivePipelineContext {
+    /** The current datanode is the current leader of the pipeline. */
+    private final boolean isPipelineLeader;
+    /** The heartbeat containing pipeline close action has been triggered. */
+    private final boolean isPendingClose;
+
+    ActivePipelineContext(boolean isPipelineLeader, boolean isPendingClose) {
+      this.isPipelineLeader = isPipelineLeader;
+      this.isPendingClose = isPendingClose;
+    }
+
+    public boolean isPipelineLeader() {
+      return isPipelineLeader;
+    }
+
+    public boolean isPendingClose() {
+      return isPendingClose;
+    }
+  }
+
+  private static long nextCallId() {
+    return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
+  }
 
   private XceiverServerRatis(HddsDatanodeService hddsDatanodeService, DatanodeDetails dd,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -390,6 +386,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         leaderElectionMinTimeout.toLong(TimeUnit.MILLISECONDS) + 200;
     RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
         TimeDuration.valueOf(leaderElectionMaxTimeout, TimeUnit.MILLISECONDS));
+    RatisHelper.setFirstElectionTimeoutDuration(
+        conf, properties, HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY);
   }
 
   private void setTimeoutForRetryCache(RaftProperties properties) {
@@ -756,7 +754,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setAction(PipelineAction.Action.CLOSE)
         .build();
     if (context != null) {
-      context.addPipelineActionIfAbsent(action);
+      if (context.addPipelineActionIfAbsent(action)) {
+        LOG.warn("pipeline Action {} on pipeline {}.Reason : {}",
+            action.getAction(), pipelineID,
+            action.getClosePipeline().getDetailedReason());
+      }
       if (!activePipelines.get(groupId).isPendingClose()) {
         // if pipeline close action has not been triggered before, we need trigger pipeline close immediately to
         // prevent SCM to allocate blocks on the failed pipeline
@@ -765,9 +767,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
             (key, value) -> new ActivePipelineContext(value.isPipelineLeader(), true));
       }
     }
-    LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
-            action.getAction(), pipelineID,
-            action.getClosePipeline().getDetailedReason());
   }
 
   @Override
@@ -782,7 +781,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       ContainerData containerData = container.getContainerData();
       if (containerData.getOriginPipelineId()
           .compareTo(pipelineID.getId()) == 0) {
-        bytesWritten += containerData.getWriteBytes();
+        bytesWritten += containerData.getStatistics().getWriteBytes();
       }
     }
     return bytesWritten;
@@ -881,6 +880,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     triggerPipelineClose(groupId, msg,
         ClosePipelineInfo.Reason.STATEMACHINE_TRANSACTION_FAILED);
   }
+
   /**
    * The fact that the snapshot contents cannot be used to actually catch up
    * the follower, it is the reason to initiate close pipeline and

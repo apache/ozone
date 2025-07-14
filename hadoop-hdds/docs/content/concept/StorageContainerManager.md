@@ -87,12 +87,33 @@ The following data is persisted in Storage Container Manager side in a specific 
  * Valid cert
   * Used by the internal Certificate Authority to authorize other Ozone services
 
+## Safe Mode
+
+SCM (Storage Container Manager) enters safe mode on startup. This is a protective state that allows the system to become stable before it becomes fully operational. During safe mode, certain operations like block allocation are restricted.
+
+### How to Exit Safe Mode
+
+There are two ways to exit safe mode:
+
+1.  **Automatic Exit:** SCM will automatically exit safe mode when a set of predefined `SafeModeExitRule`s are satisfied. These rules ensure that the cluster is in a healthy state. The primary rules are:
+    *   **`DataNodeSafeModeRule`**: Checks if a minimum number of DataNodes have registered with the SCM. This is configured by `hdds.scm.safemode.min.datanode` (default: `3`).
+    *   **`RatisContainerSafeModeRule`**: Checks if a certain percentage of containers with at least one replica reported are available. This is configured by `hdds.scm.safemode.threshold.pct` (default: `0.99`).
+    *   **`HealthyPipelineSafeModeRule`**: Checks if a certain percentage of pipelines are healthy. This is configured by `hdds.scm.safemode.healthy.pipeline.pct` (default: `0.10`).
+    *   **`OneReplicaPipelineSafeModeRule`**: Checks if a certain percentage of pipelines have at least one replica reported. This is configured by `hdds.scm.safemode.atleast.one.node.reported.pipeline.pct` (default: `0.90`).
+    *   **`ECContainerSafeModeRule`**: Checks if a certain percentage of erasure coded block groups are healthy. This is also configured by `hdds.scm.safemode.threshold.pct` (default: `0.99`).
+
+2.  **Manual Exit:** You can force SCM to exit safe mode using the `ozone admin safemode --force-exit` command.
+
+### Safe Mode Pre-Check
+
+There's also a "pre-check" phase. SCM will not exit safe mode until all pre-check rules are satisfied. The `DataNodeSafeModeRule` is a pre-check rule. This means that SCM will wait for a minimum number of DataNodes to be available before it even considers the other conditions for exiting safe mode.
+
 ## Notable configurations
 
 key | default | description 
 ----|---------|------------
 ozone.scm.container.size | 5GB | Default container size used by Ozone
 ozone.scm.block.size | 256MB |  The default size of a data block.
-hdds.scm.safemode.min.datanode | 1 | Minimum number of datanodes to start the real work.
+hdds.scm.safemode.min.datanode | 3 | Minimum number of datanodes to start the real work.
 ozone.scm.http-address | 0.0.0.0:9876 | HTTP address of the SCM server
 ozone.metadata.dirs | none | Directory to store persisted data (RocksDB).

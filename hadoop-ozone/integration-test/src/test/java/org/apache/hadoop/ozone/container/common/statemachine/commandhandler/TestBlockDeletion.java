@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +14,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
+
+import static java.lang.Math.max;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -28,7 +46,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -76,6 +93,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
@@ -88,30 +106,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
-import static java.lang.Math.max;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-
 /**
  * Tests for Block deletion.
  */
 public class TestBlockDeletion {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(TestBlockDeletion.class);
 
   private OzoneConfiguration conf = null;
@@ -128,9 +128,9 @@ public class TestBlockDeletion {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(DeletedBlockLogImpl.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(SCMBlockDeletingService.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ReplicationManager.class, Level.DEBUG);
 
     conf.set("ozone.replication.allowed-configs",
         "^(RATIS/THREE)|(EC/2-1-256k)$");
@@ -210,10 +210,9 @@ public class TestBlockDeletion {
   public void testBlockDeletion(ReplicationConfig repConfig) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(DeleteBlocksCommandHandler.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(DeleteBlocksCommandHandler.class);
 
-    String value = RandomStringUtils.random(1024 * 1024);
+    String value = RandomStringUtils.secure().next(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -263,7 +262,7 @@ public class TestBlockDeletion {
     assertTrue(
         e.getMessage().startsWith("expected: <null> but was:"));
 
-    assertEquals(0L, metrics.getNumBlockDeletionTransactionSent());
+    assertEquals(0L, metrics.getNumBlockDeletionTransactionsOnDatanodes());
     // close the containers which hold the blocks for the key
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
@@ -323,9 +322,9 @@ public class TestBlockDeletion {
     assertThat(metrics.getNumBlockDeletionCommandSent())
         .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionCommandSuccess() +
             metrics.getBNumBlockDeletionCommandFailure());
-    assertThat(metrics.getNumBlockDeletionTransactionSent())
-        .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionTransactionFailure() +
-            metrics.getNumBlockDeletionTransactionSuccess());
+    assertThat(metrics.getNumBlockDeletionTransactionsOnDatanodes())
+        .isGreaterThanOrEqualTo(metrics.getNumBlockDeletionTransactionFailureOnDatanodes() +
+            metrics.getNumBlockDeletionTransactionSuccessOnDatanodes());
     LOG.info(metrics.toString());
 
     // Datanode should receive retried requests with continuous retry counts.
@@ -347,7 +346,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(1024 * 1024);
+    String value = RandomStringUtils.secure().next(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -404,6 +403,8 @@ public class TestBlockDeletion {
       });
     });
 
+    LogCapturer logCapturer = LogCapturer.captureLogs(ReplicationManager.class);
+    logCapturer.clearOutput();
     cluster.shutdownHddsDatanode(0);
     replicationManager.processAll();
     ((EventQueue)scm.getEventQueue()).processAll(1000);
@@ -411,8 +412,6 @@ public class TestBlockDeletion {
     containerInfos.stream().forEach(container ->
         assertEquals(HddsProtos.LifeCycleState.DELETING,
             container.getState()));
-    LogCapturer logCapturer = LogCapturer.captureLogs(ReplicationManager.LOG);
-    logCapturer.clearOutput();
 
     Thread.sleep(5000);
     replicationManager.processAll();
@@ -458,7 +457,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(10 * 10);
+    String value = RandomStringUtils.secure().next(10 * 10);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -588,7 +587,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(1024 * 1024);
+    String value = RandomStringUtils.secure().next(1024 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -674,7 +673,7 @@ public class TestBlockDeletion {
         .setEmpty(true)
         .build();
     // Update replica
-    containerStateManager.updateContainerReplica(containerId, replicaOne);
+    containerStateManager.updateContainerReplica(replicaOne);
 
     // Check replica updated with wrong keyCount
     scm.getContainerManager().getContainerReplicas(
@@ -789,7 +788,7 @@ public class TestBlockDeletion {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(64 * 1024);
+    String value = RandomStringUtils.secure().next(64 * 1024);
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -823,7 +822,7 @@ public class TestBlockDeletion {
 
     // Wait for block delete command sent from OM
     OzoneTestUtils.flushAndWaitForDeletedBlockLog(scm);
-    long start = System.currentTimeMillis();
+    long start = Time.monotonicNow();
     // Wait for all blocks been deleted.
     GenericTestUtils.waitFor(() -> {
       try {
@@ -835,7 +834,7 @@ public class TestBlockDeletion {
       }
       return false;
     }, 100, 30000);
-    long end = System.currentTimeMillis();
+    long end = Time.monotonicNow();
     System.out.println("Block deletion costs " + (end - start) + "ms");
   }
 }

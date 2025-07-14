@@ -1,28 +1,30 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.utils;
 
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
+
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 
 /**
  * Utility class defining methods to write to the datanode container log.
@@ -91,10 +93,7 @@ public final class ContainerLogger {
    */
   public static void logUnhealthy(ContainerData containerData,
       ScanResult reason) {
-    String message = reason.getFailureType() + " for file " +
-        reason.getUnhealthyFile() +
-        ". Message: " + reason.getException().getMessage();
-    LOG.error(getMessage(containerData, message));
+    LOG.error(getMessage(containerData, reason.toString()));
   }
 
   /**
@@ -128,7 +127,7 @@ public final class ContainerLogger {
    * @param containerData The container that was imported to this datanode.
    */
   public static void logImported(ContainerData containerData) {
-    LOG.info(getMessage(containerData));
+    LOG.info(getMessage(containerData, "Container imported"));
   }
 
   /**
@@ -137,7 +136,7 @@ public final class ContainerLogger {
    * @param containerData The container that was exported from this datanode.
    */
   public static void logExported(ContainerData containerData) {
-    LOG.info(getMessage(containerData));
+    LOG.info(getMessage(containerData, "Container exported"));
   }
 
   /**
@@ -147,6 +146,35 @@ public final class ContainerLogger {
    */
   public static void logRecovered(ContainerData containerData) {
     LOG.info(getMessage(containerData));
+  }
+
+  /**
+   * Logged when a container's checksum is updated.
+   *
+   * @param containerData The container which has the updated data checksum.
+   * @param oldDataChecksum The old data checksum.
+   */
+  public static void logChecksumUpdated(ContainerData containerData, long oldDataChecksum) {
+    LOG.warn(getMessage(containerData,
+        "Container data checksum updated from " + checksumToString(oldDataChecksum) + " to "
+            + checksumToString(containerData.getDataChecksum())));
+  }
+
+  /**
+   * Logged when a container is reconciled.
+   *
+   * @param containerData The container that was reconciled on this datanode.
+   * @param oldDataChecksum The old data checksum.
+   */
+  public static void logReconciled(ContainerData containerData, long oldDataChecksum, DatanodeDetails peer) {
+    if (containerData.getDataChecksum() == oldDataChecksum) {
+      LOG.info(getMessage(containerData, "Container reconciled with peer " + peer.toString() +
+          ". No change in checksum."));
+    } else {
+      LOG.warn(getMessage(containerData, "Container reconciled with peer " + peer.toString() +
+          ". Checksum updated from " + checksumToString(oldDataChecksum) + " to "
+          + checksumToString(containerData.getDataChecksum())));
+    }
   }
 
   private static String getMessage(ContainerData containerData,
@@ -159,6 +187,8 @@ public final class ContainerLogger {
         "ID=" + containerData.getContainerID(),
         "Index=" + containerData.getReplicaIndex(),
         "BCSID=" + containerData.getBlockCommitSequenceId(),
-        "State=" + containerData.getState());
+        "State=" + containerData.getState(),
+        "Volume=" + containerData.getVolume(),
+        "DataChecksum=" + checksumToString(containerData.getDataChecksum()));
   }
 }

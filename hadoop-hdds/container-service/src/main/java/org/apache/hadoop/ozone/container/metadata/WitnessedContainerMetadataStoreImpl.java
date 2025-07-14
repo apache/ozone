@@ -1,13 +1,10 @@
-package org.apache.hadoop.ozone.container.metadata;
-
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -16,19 +13,22 @@ package org.apache.hadoop.ozone.container.metadata;
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+package org.apache.hadoop.ozone.container.metadata;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 
 /**
  * Class for interacting with database in the master volume of a datanode.
@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentMap;
 public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<WitnessedContainerDBDefinition>
     implements WitnessedContainerMetadataStore {
 
-  private Table<Long, String> containerIdsTable;
+  private Table<ContainerID, String> containerIdsTable;
   private static final ConcurrentMap<String, WitnessedContainerMetadataStore> INSTANCES =
       new ConcurrentHashMap<>();
 
@@ -59,20 +59,21 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
     }
   }
 
-  private WitnessedContainerMetadataStoreImpl(ConfigurationSource config, boolean openReadOnly) throws IOException {
+  private WitnessedContainerMetadataStoreImpl(ConfigurationSource config, boolean openReadOnly)
+      throws RocksDatabaseException, CodecException {
     super(WitnessedContainerDBDefinition.get(), config, openReadOnly);
   }
 
   @Override
   protected DBStore initDBStore(DBStoreBuilder dbStoreBuilder, ManagedDBOptions options, ConfigurationSource config)
-      throws IOException {
-    DBStore dbStore = dbStoreBuilder.build();
+      throws RocksDatabaseException, CodecException {
+    final DBStore dbStore = dbStoreBuilder.build();
     this.containerIdsTable = this.getDbDef().getContainerIdsTable().getTable(dbStore);
     return dbStore;
   }
 
   @Override
-  public Table<Long, String> getContainerIdsTable() {
+  public Table<ContainerID, String> getContainerIdsTable() {
     return containerIdsTable;
   }
 }

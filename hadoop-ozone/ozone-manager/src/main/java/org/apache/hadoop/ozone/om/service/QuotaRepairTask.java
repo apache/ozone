@@ -1,23 +1,26 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om.service;
+
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_AND_VALUE;
+import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ServiceException;
@@ -43,6 +46,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -55,13 +59,10 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Quota repair task.
@@ -76,6 +77,7 @@ public class QuotaRepairTask {
   private static final AtomicLong RUN_CNT = new AtomicLong(0);
   private final OzoneManager om;
   private ExecutorService executor;
+
   public QuotaRepairTask(OzoneManager ozoneManager) {
     this.om = ozoneManager;
   }
@@ -97,6 +99,7 @@ public class QuotaRepairTask {
   public static String getStatus() {
     return REPAIR_STATUS.toString();
   }
+
   private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
     OMMetadataManager activeMetaManager = null;
@@ -237,11 +240,9 @@ public class QuotaRepairTask {
       }
       return;
     }
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-             iterator = metadataManager.getBucketTable().iterator()) {
+    try (TableIterator<String, OmBucketInfo> iterator = metadataManager.getBucketTable().valueIterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
-        OmBucketInfo bucketInfo = entry.getValue();
+        final OmBucketInfo bucketInfo = iterator.next();
         populateBucket(nameBucketInfoMap, idBucketInfoMap, oriBucketInfoMap, metadataManager, bucketInfo);
       }
     }
@@ -348,9 +349,9 @@ public class QuotaRepairTask {
           prefixUsageMap, q, isRunning, haveValue)));
     }
     int count = 0;
-    long startTime = System.currentTimeMillis();
-    try (TableIterator<String, ? extends Table.KeyValue<String, VALUE>>
-             keyIter = table.iterator()) {
+    long startTime = Time.monotonicNow();
+    try (Table.KeyValueIterator<String, VALUE> keyIter
+        = table.iterator(null, haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
       while (keyIter.hasNext()) {
         count++;
         kvList.add(keyIter.next());
@@ -365,7 +366,7 @@ public class QuotaRepairTask {
         f.get();
       }
       LOG.info("Recalculate {} completed, count {} time {}ms", strType,
-          count, (System.currentTimeMillis() - startTime));
+          count, (Time.monotonicNow() - startTime));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     } catch (InterruptedException ex) {
@@ -398,22 +399,18 @@ public class QuotaRepairTask {
       Table.KeyValue<String, VALUE> kv,
       Map<String, CountPair> prefixUsageMap,
       boolean haveValue) {
-    try {
-      String prefix = getVolumeBucketPrefix(kv.getKey());
-      CountPair usage = prefixUsageMap.get(prefix);
-      if (null == usage) {
-        return;
+    String prefix = getVolumeBucketPrefix(kv.getKey());
+    CountPair usage = prefixUsageMap.get(prefix);
+    if (null == usage) {
+      return;
+    }
+    usage.incrNamespace(1L);
+    // avoid decode of value
+    if (haveValue) {
+      VALUE value = kv.getValue();
+      if (value instanceof OmKeyInfo) {
+        usage.incrSpace(((OmKeyInfo) value).getReplicatedSize());
       }
-      usage.incrNamespace(1L);
-      // avoid decode of value
-      if (haveValue) {
-        VALUE value = kv.getValue();
-        if (value instanceof OmKeyInfo) {
-          usage.incrSpace(((OmKeyInfo) value).getReplicatedSize());
-        }
-      }
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
     }
   }
   
@@ -489,7 +486,7 @@ public class QuotaRepairTask {
       status.put("errorMsg", errorMsg);
       status.put("bucketCountDiffMap", bucketCountDiffMap);
       try {
-        return new ObjectMapper().writeValueAsString(status);
+        return JsonUtils.toJsonString(status);
       } catch (IOException e) {
         LOG.error("error in generating status", e);
         return "{}";

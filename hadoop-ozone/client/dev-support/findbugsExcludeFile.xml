@@ -16,9 +16,4 @@
    limitations under the License.
 -->
 <FindBugsFilter>
-  <!-- Test -->
-  <Match>
-    <Class name="org.apache.hadoop.ozone.client.TestHddsClientUtils"/>
-    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
-  </Match>
 </FindBugsFilter>

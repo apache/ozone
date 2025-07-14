@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,10 +17,38 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import static java.time.OffsetDateTime.now;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.util.StringUtils.byteDesc;
+
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -40,43 +67,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.time.Duration;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Queue;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
-
-import static java.time.OffsetDateTime.now;
-import static java.util.Collections.emptyMap;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DEFAULT;
-import static org.apache.hadoop.util.StringUtils.byteDesc;
-
 /**
  * Container balancer task performs move of containers between over- and
  * under-utilized datanodes.
  */
 public class ContainerBalancerTask implements Runnable {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerTask.class);
   public static final long ABSENCE_OF_DURATION = -1L;
 
@@ -181,6 +178,7 @@ public class ContainerBalancerTask implements Runnable {
   /**
    * Run the container balancer task.
    */
+  @Override
   public void run() {
     try {
       if (delayStart) {
@@ -331,9 +329,9 @@ public class ContainerBalancerTask implements Runnable {
                                                                          IterationResult currentIterationResult,
                                                                          long iterationDuration) {
     String currentIterationResultName = currentIterationResult == null ? null : currentIterationResult.name();
-    Map<UUID, Long> sizeEnteringDataToNodes =
+    Map<DatanodeID, Long> sizeEnteringDataToNodes =
         convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
-    Map<UUID, Long> sizeLeavingDataFromNodes =
+    Map<DatanodeID, Long> sizeLeavingDataFromNodes =
         convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
     IterationInfo iterationInfo = new IterationInfo(
         iterationNumber,
@@ -347,8 +345,8 @@ public class ContainerBalancerTask implements Runnable {
     return new ContainerBalancerTaskIterationStatusInfo(iterationInfo, containerMoveInfo, dataMoveInfo);
   }
 
-  private DataMoveInfo getDataMoveInfo(String currentIterationResultName, Map<UUID, Long> sizeEnteringDataToNodes,
-                                       Map<UUID, Long> sizeLeavingDataFromNodes) {
+  private DataMoveInfo getDataMoveInfo(String currentIterationResultName, Map<DatanodeID, Long> sizeEnteringDataToNodes,
+                                       Map<DatanodeID, Long> sizeLeavingDataFromNodes) {
     if (currentIterationResultName == null) {
       // For unfinished iteration
       return new DataMoveInfo(
@@ -368,7 +366,7 @@ public class ContainerBalancerTask implements Runnable {
     }
   }
 
-  private Map<UUID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
+  private Map<DatanodeID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
     return nodeTrafficMap
         .entrySet()
         .stream()
@@ -376,7 +374,7 @@ public class ContainerBalancerTask implements Runnable {
         .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
         .collect(
             Collectors.toMap(
-                entry -> entry.getKey().getUuid(),
+                entry -> entry.getKey().getID(),
                 Map.Entry::getValue
             )
         );
@@ -409,53 +407,6 @@ public class ContainerBalancerTask implements Runnable {
     } else {
       return null;
     }
-  }
-
-  private static ContainerBalancerTaskIterationStatusInfo getEmptyCurrentIterationStatistic(
-      long iterationDuration) {
-    ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(0, 0, 0, 0);
-    DataMoveInfo dataMoveInfo = new DataMoveInfo(
-        0,
-        0,
-        emptyMap(),
-        emptyMap()
-    );
-    IterationInfo iterationInfo = new IterationInfo(
-        0,
-        null,
-        iterationDuration
-    );
-    return new ContainerBalancerTaskIterationStatusInfo(
-        iterationInfo,
-        containerMoveInfo,
-        dataMoveInfo
-    );
-  }
-
-  private ContainerBalancerTaskIterationStatusInfo getFilledCurrentIterationStatistic(int lastIterationNumber,
-                                                                                      long iterationDuration) {
-    Map<UUID, Long> sizeEnteringDataToNodes =
-        convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
-    Map<UUID, Long> sizeLeavingDataFromNodes =
-        convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
-
-    ContainerMoveInfo containerMoveInfo = new ContainerMoveInfo(metrics);
-    DataMoveInfo dataMoveInfo = new DataMoveInfo(
-        getSizeScheduledForMoveInLatestIteration(),
-        sizeActuallyMovedInLatestIteration,
-        sizeEnteringDataToNodes,
-        sizeLeavingDataFromNodes
-    );
-    IterationInfo iterationInfo = new IterationInfo(
-        lastIterationNumber + 1,
-        null,
-        iterationDuration
-    );
-    return new ContainerBalancerTaskIterationStatusInfo(
-        iterationInfo,
-        containerMoveInfo,
-        dataMoveInfo
-    );
   }
 
   private long getCurrentIterationDuration() {
@@ -555,7 +506,7 @@ public class ContainerBalancerTask implements Runnable {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Utilization for node {} with capacity {}B, used {}B, and " +
                 "remaining {}B is {}",
-            datanodeUsageInfo.getDatanodeDetails().getUuidString(),
+            datanodeUsageInfo.getDatanodeDetails(),
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             datanodeUsageInfo.getScmNodeStat().getScmUsed().get(),
             datanodeUsageInfo.getScmNodeStat().getRemaining().get(),
@@ -605,13 +556,13 @@ public class ContainerBalancerTask implements Runnable {
       overUtilizedNodes.forEach(entry -> {
         LOG.debug("Datanode {} {} is Over-Utilized.",
             entry.getDatanodeDetails().getHostName(),
-            entry.getDatanodeDetails().getUuid());
+            entry.getDatanodeDetails().getID());
       });
 
       underUtilizedNodes.forEach(entry -> {
         LOG.debug("Datanode {} {} is Under-Utilized.",
             entry.getDatanodeDetails().getHostName(),
-            entry.getDatanodeDetails().getUuid());
+            entry.getDatanodeDetails().getID());
       });
     }
 
@@ -732,8 +683,8 @@ public class ContainerBalancerTask implements Runnable {
             "{}B from source datanode {} to target datanode {}",
         containerID.toString(),
         containerInfo.getUsedBytes(),
-        source.getUuidString(),
-        moveSelection.getTargetNode().getUuidString());
+        source,
+        moveSelection.getTargetNode());
 
     if (moveContainer(source, moveSelection)) {
       // consider move successful for now, and update selection criteria
@@ -841,9 +792,8 @@ public class ContainerBalancerTask implements Runnable {
       if (!entry.getValue().isDone()) {
         LOG.warn("Container move timed out for container {} from source {}" +
                 " to target {}.", entry.getKey().getContainerID(),
-            containerToSourceMap.get(entry.getKey().getContainerID())
-                                .getUuidString(),
-            entry.getKey().getTargetNode().getUuidString());
+            containerToSourceMap.get(entry.getKey().getContainerID()),
+            entry.getKey().getTargetNode());
 
         entry.getValue().cancel(true);
         numCancelled += 1;
@@ -866,14 +816,14 @@ public class ContainerBalancerTask implements Runnable {
     if (sourceContainerIDSet.isEmpty()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("ContainerBalancer could not find any candidate containers " +
-            "for datanode {}", source.getUuidString());
+            "for datanode {}", source);
       }
       return null;
     }
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("ContainerBalancer is finding suitable target for source " +
-          "datanode {}", source.getUuidString());
+          "datanode {}", source);
     }
 
     ContainerMoveSelection moveSelection = null;
@@ -894,15 +844,12 @@ public class ContainerBalancerTask implements Runnable {
     sourceContainerIDSet.removeAll(toRemoveContainerIds);
 
     if (moveSelection == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("ContainerBalancer could not find a suitable target for " +
-            "source node {}.", source.getUuidString());
-      }
+      LOG.info("ContainerBalancer could not find a suitable target for " +
+          "source node {}.", source);
       return null;
     }
     LOG.info("ContainerBalancer matched source datanode {} with target " +
-            "datanode {} for container move.", source.getUuidString(),
-        moveSelection.getTargetNode().getUuidString());
+            "datanode {} for container move.", source, moveSelection.getTargetNode());
 
     return moveSelection;
   }
@@ -998,24 +945,22 @@ public class ContainerBalancerTask implements Runnable {
         if (ex != null) {
           LOG.info("Container move for container {} from source {} to " +
                   "target {} failed with exceptions.",
-              containerID.toString(),
-              source.getUuidString(),
-              moveSelection.getTargetNode().getUuidString(), ex);
+              containerID, source,
+              moveSelection.getTargetNode(), ex);
           metrics.incrementNumContainerMovesFailedInLatestIteration(1);
         } else {
           if (result == MoveManager.MoveResult.COMPLETED) {
             sizeActuallyMovedInLatestIteration +=
                 containerInfo.getUsedBytes();
             LOG.debug("Container move completed for container {} from " +
-                    "source {} to target {}", containerID,
-                source.getUuidString(),
-                moveSelection.getTargetNode().getUuidString());
+                    "source {} to target {}", containerID, source,
+                moveSelection.getTargetNode());
           } else {
             LOG.warn(
                 "Container move for container {} from source {} to target" +
                     " {} failed: {}",
-                moveSelection.getContainerID(), source.getUuidString(),
-                moveSelection.getTargetNode().getUuidString(), result);
+                moveSelection.getContainerID(), source,
+                moveSelection.getTargetNode(), result);
           }
         }
       });

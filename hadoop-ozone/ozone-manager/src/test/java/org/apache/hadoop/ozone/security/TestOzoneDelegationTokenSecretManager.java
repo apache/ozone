@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +17,24 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,8 +47,6 @@ import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-
-import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
@@ -58,27 +73,14 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
-
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import org.slf4j.event.Level;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.event.Level;
 
 /**
  * Test class for {@link OzoneDelegationTokenSecretManager}.
@@ -233,6 +235,43 @@ public class TestOzoneDelegationTokenSecretManager {
     validateHash(token.getPassword(), token.getIdentifier());
   }
 
+  @Test
+  public void testExpiredSecretKey() throws Exception {
+    SecretKeyClient old = secretKeyClient;
+    secretKeyClient = spy(secretKeyClient);
+    doReturn(null).when(secretKeyClient).getSecretKey(any());
+
+    Text tester = new Text("tester");
+    OzoneTokenIdentifier identifier =
+        new OzoneTokenIdentifier(tester, tester, tester);
+    identifier.setSecretKeyId(UUID.randomUUID().toString());
+    identifier.setOmServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT);
+
+    // case 1: Secret key not found, and delegation token is valid.
+    om.getMetadataManager().getDelegationTokenTable().put(identifier, Long.MAX_VALUE);
+    try {
+      secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+          expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
+      om.getMetadataManager().getDelegationTokenTable().delete(identifier);
+
+      // case 2: Secret key not found, and delegation token is expired.
+      OzoneTokenIdentifier identifier2 =
+          new OzoneTokenIdentifier(tester, tester, tester);
+      identifier2.setSecretKeyId(UUID.randomUUID().toString());
+      identifier2.setOmServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT);
+
+      om.getMetadataManager().getDelegationTokenTable().put(identifier2, Time.now() - 1);
+      secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
+          expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
+      // expired token should be removed from the table.
+      assertFalse(om.getMetadataManager().getDelegationTokenTable().isExist(identifier2),
+          "Expired token " + identifier2 + " should be removed from the table");
+    } finally {
+      verify(secretKeyClient, times(2)).getSecretKey(any());
+      secretKeyClient = old;
+    }
+  }
+
   private void restartSecretManager() throws IOException {
     secretManager.stop();
     secretManager = null;
@@ -382,9 +421,8 @@ public class TestOzoneDelegationTokenSecretManager {
 
   @Test
   public void testVerifyAsymmetricSignatureSuccess() throws Exception {
-    GenericTestUtils.setLogLevel(OzoneDelegationTokenSecretManager.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(OzoneDelegationTokenSecretManager.LOG);
+    GenericTestUtils.setLogLevel(OzoneDelegationTokenSecretManager.class, Level.DEBUG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(OzoneDelegationTokenSecretManager.class);
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
     secretManager.start(certificateClient);

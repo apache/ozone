@@ -1,25 +1,25 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * http://www.apache.org/licenses/LICENSE-2.0
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.server.http;
 
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.management.ManagementFactory;
@@ -33,10 +33,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Joiner;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -162,7 +163,7 @@ public class ProfileServlet extends HttpServlet {
 
     // in case if it is not set correctly used fallback from mxbean which is
     // implementation specific
-    if (pidStr == null || pidStr.trim().isEmpty()) {
+    if (StringUtils.isBlank(pidStr)) {
       String name = ManagementFactory.getRuntimeMXBean().getName();
       if (name != null) {
         int idx = name.indexOf("@");
@@ -217,7 +218,7 @@ public class ProfileServlet extends HttpServlet {
   protected void doGet(final HttpServletRequest req,
       final HttpServletResponse resp) throws IOException {
     // make sure async profiler home is set
-    if (asyncProfilerHome == null || asyncProfilerHome.trim().isEmpty()) {
+    if (StringUtils.isBlank(asyncProfilerHome)) {
       resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
       setResponseHeader(resp);
       resp.getWriter().write("ASYNC_PROFILER_HOME env is not set.");
@@ -272,7 +273,7 @@ public class ProfileServlet extends HttpServlet {
             cmd.add("-e");
             cmd.add(event.getInternalName());
             cmd.add("-d");
-            cmd.add("" + duration);
+            cmd.add(String.valueOf(duration));
             cmd.add("-o");
             cmd.add(output.name().toLowerCase());
             cmd.add("-f");
@@ -394,7 +395,7 @@ public class ProfileServlet extends HttpServlet {
       } else if (safeFileName.endsWith(".tree")) {
         resp.setContentType("text/html");
       }
-      try (InputStream input = new FileInputStream(requestedFile)) {
+      try (InputStream input = Files.newInputStream(requestedFile.toPath())) {
         IOUtils.copy(input, resp.getOutputStream());
       }
     }
@@ -469,7 +470,7 @@ public class ProfileServlet extends HttpServlet {
     String asyncProfilerHome = System.getenv(ASYNC_PROFILER_HOME_ENV);
     // if ENV is not set, see if -Dasync.profiler
     // .home=/path/to/async/profiler/home is set
-    if (asyncProfilerHome == null || asyncProfilerHome.trim().isEmpty()) {
+    if (StringUtils.isBlank(asyncProfilerHome)) {
       asyncProfilerHome =
           System.getProperty(ASYNC_PROFILER_HOME_SYSTEM_PROPERTY);
     }

@@ -25,9 +25,8 @@ export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}":../common/${extra_com
 : ${HADOOP_TEST_IMAGES:=""}
 
 if [[ -z "${HADOOP_TEST_IMAGES}" ]]; then
-  # hadoop2 and flokkr images are only available from Docker Hub
+  # hadoop2 image is only available from Docker Hub
   HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} apache/hadoop:${hadoop2.version}"
-  HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} flokkr/hadoop:3.1.2"
   HADOOP_TEST_IMAGES="${HADOOP_TEST_IMAGES} ${HADOOP_IMAGE}:${hadoop.version}"
 fi
 
@@ -62,7 +61,7 @@ for HADOOP_TEST_IMAGE in $HADOOP_TEST_IMAGES; do
   execute_command_in_container rm hadoop version
 
   if [[ ${SECURITY_ENABLED} == "true" ]]; then
-    execute_robot_test rm kinit-hadoop.robot
+    execute_robot_test rm -v SECURITY_ENABLED:"${SECURITY_ENABLED}" kinit-hadoop.robot
   fi
 
   for scheme in o3fs ofs; do

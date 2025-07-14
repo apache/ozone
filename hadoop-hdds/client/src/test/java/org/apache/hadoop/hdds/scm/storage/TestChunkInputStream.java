@@ -1,22 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.storage;
+
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.EOFException;
 import java.nio.ByteBuffer;
@@ -24,7 +34,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -35,24 +44,12 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
-
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@link ChunkInputStream}'s functionality.
@@ -136,7 +133,8 @@ public class TestChunkInputStream {
   @Test
   public void testFullChunkRead() throws Exception {
     byte[] b = new byte[CHUNK_SIZE];
-    chunkStream.read(b, 0, CHUNK_SIZE);
+    int bytesRead = chunkStream.read(b, 0, CHUNK_SIZE);
+    assertEquals(CHUNK_SIZE, bytesRead, "Expected to read full chunk size");
     matchWithInputData(b, 0, CHUNK_SIZE);
   }
 
@@ -145,7 +143,8 @@ public class TestChunkInputStream {
     int len = CHUNK_SIZE / 2;
     byte[] b = new byte[len];
 
-    chunkStream.read(b, 0, len);
+    int bytesRead = chunkStream.read(b, 0, len);
+    assertEquals(len, bytesRead, "Expected to read half chunk size");
 
     matchWithInputData(b, 0, len);
 
@@ -172,7 +171,8 @@ public class TestChunkInputStream {
     // copying chunk data from index 20 to 59 into the buffers (checksum
     // boundaries).
     byte[] b = new byte[30];
-    chunkStream.read(b, 0, 30);
+    int bytesRead = chunkStream.read(b, 0, 30);
+    assertEquals(30, bytesRead, "Expected to read 30 bytes");
     matchWithInputData(b, 25, 30);
     matchWithInputData(chunkStream.getReadByteBuffers(), 20, 40);
 
@@ -197,7 +197,8 @@ public class TestChunkInputStream {
     // released and hence chunkPosition updated with current position of chunk.
     seekAndVerify(25);
     b = new byte[15];
-    chunkStream.read(b, 0, 15);
+    int bytesRead2 = chunkStream.read(b, 0, 15);
+    assertEquals(15, bytesRead2, "Expected to read 15 bytes");
     matchWithInputData(b, 25, 15);
     assertEquals(40, chunkStream.getChunkPosition());
   }
@@ -207,19 +208,22 @@ public class TestChunkInputStream {
     // Seek to a position and read data
     seekAndVerify(50);
     byte[] b1 = new byte[20];
-    chunkStream.read(b1, 0, 20);
+    int bytesRead1 = chunkStream.read(b1, 0, 20);
+    assertEquals(20, bytesRead1, "Expected to read 20 bytes");
     matchWithInputData(b1, 50, 20);
 
     // Next read should start from the position of the last read + 1 i.e. 70
     byte[] b2 = new byte[20];
-    chunkStream.read(b2, 0, 20);
+    int bytesRead2 = chunkStream.read(b2, 0, 20);
+    assertEquals(20, bytesRead2, "Expected to read 20 bytes");
     matchWithInputData(b2, 70, 20);
   }
 
   @Test
   public void testUnbuffered() throws Exception {
     byte[] b1 = new byte[20];
-    chunkStream.read(b1, 0, 20);
+    int bytesRead = chunkStream.read(b1, 0, 20);
+    assertEquals(20, bytesRead, "Expected to read 20 bytes");
     matchWithInputData(b1, 0, 20);
 
     chunkStream.unbuffer();
@@ -228,7 +232,8 @@ public class TestChunkInputStream {
 
     // Next read should start from the position of the last read + 1 i.e. 20
     byte[] b2 = new byte[20];
-    chunkStream.read(b2, 0, 20);
+    int bytesRead2 = chunkStream.read(b2, 0, 20);
+    assertEquals(20, bytesRead2, "Expected to read 20 bytes");
     matchWithInputData(b2, 20, 20);
   }
 

@@ -1,28 +1,37 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.dn.scanner;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
+import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -30,10 +39,6 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Integration tests for the background container data scanner. This scanner
@@ -69,7 +74,7 @@ class TestBackgroundContainerDataScannerIntegration
   @ParameterizedTest
   // Background container data scanner should be able to detect all errors.
   @EnumSource
-  void testCorruptionDetected(ContainerCorruptions corruption)
+  void testCorruptionDetected(TestContainerCorruptions corruption)
       throws Exception {
     pauseScanner();
 
@@ -77,6 +82,10 @@ class TestBackgroundContainerDataScannerIntegration
     // Container corruption has not yet been introduced.
     Container<?> container = getDnContainer(containerID);
     assertEquals(State.CLOSED, container.getContainerState());
+    assertTrue(containerChecksumFileExists(containerID));
+
+    waitForScmToSeeReplicaState(containerID, CLOSED);
+    long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
 
     corruption.applyTo(container);
 
@@ -87,8 +96,30 @@ class TestBackgroundContainerDataScannerIntegration
         () -> container.getContainerState() == State.UNHEALTHY,
         500, 15_000);
 
-    // Wait for SCM to get a report of the unhealthy replica.
-    waitForScmToSeeUnhealthyReplica(containerID);
-    corruption.assertLogged(logCapturer);
+    // Wait for SCM to get a report of the unhealthy replica with a different checksum than before.
+    waitForScmToSeeReplicaState(containerID, UNHEALTHY);
+    long newReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    if (corruption == TestContainerCorruptions.MISSING_METADATA_DIR ||
+        corruption == TestContainerCorruptions.MISSING_CONTAINER_DIR) {
+      // In these cases, the new tree will not be able to be written since it exists in the metadata directory.
+      // When the tree write fails, the in-memory checksum should remain at its original value.
+      assertEquals(initialReportedDataChecksum, newReportedDataChecksum);
+      assertFalse(containerChecksumFileExists(containerID));
+    } else {
+      assertNotEquals(initialReportedDataChecksum, newReportedDataChecksum);
+      // Test that the scanner wrote updated checksum info to the disk.
+      assertTrue(containerChecksumFileExists(containerID));
+      ContainerProtos.ContainerChecksumInfo updatedChecksumInfo = readChecksumFile(container.getContainerData());
+      assertEquals(newReportedDataChecksum, updatedChecksumInfo.getContainerMerkleTree().getDataChecksum());
+    }
+
+    if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||
+        corruption == TestContainerCorruptions.CORRUPT_BLOCK) {
+      // These errors will affect multiple chunks and result in multiple log messages.
+      corruption.assertLogged(containerID, logCapturer);
+    } else {
+      // Other corruption types will only lead to a single error.
+      corruption.assertLogged(containerID, 1, logCapturer);
+    }
   }
 }

@@ -1,58 +1,56 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.impl;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.protobuf.Message;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
-
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.time.Clock;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
-
+import java.util.function.ToLongFunction;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class that manages Containers created on the datanode.
@@ -67,35 +65,33 @@ public class ContainerSet implements Iterable<Container<?>> {
       new ConcurrentSkipListSet<>();
   private final ConcurrentSkipListMap<Long, Long> recoveringContainerMap =
       new ConcurrentSkipListMap<>();
-  private Clock clock;
+  private final Clock clock;
   private long recoveringTimeout;
-  private final Table<Long, String> containerIdsTable;
+  private final Table<ContainerID, String> containerIdsTable;
+  // Handler that will be invoked when a scan of a container in this set is requested.
+  private OnDemandContainerScanner containerScanner;
 
-  @VisibleForTesting
-  public ContainerSet(long recoveringTimeout) {
-    this(new InMemoryTestTable<>(), recoveringTimeout);
+  public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
+    return new ContainerSet(null, recoveringTimeout);
   }
 
-  public ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout) {
-    this(continerIdsTable, recoveringTimeout, false);
+  public static ContainerSet newRwContainerSet(Table<ContainerID, String> containerIdsTable, long recoveringTimeout) {
+    Objects.requireNonNull(containerIdsTable, "containerIdsTable == null");
+    return new ContainerSet(containerIdsTable, recoveringTimeout);
   }
 
-  public ContainerSet(Table<Long, String> continerIdsTable, long recoveringTimeout, boolean readOnly) {
-    this.clock = Clock.system(ZoneOffset.UTC);
+  private ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout) {
+    this(continerIdsTable, recoveringTimeout, null);
+  }
+
+  ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout, Clock clock) {
+    this.clock = clock != null ? clock : Clock.systemUTC();
     this.containerIdsTable = continerIdsTable;
     this.recoveringTimeout = recoveringTimeout;
-    if (!readOnly && containerIdsTable == null) {
-      throw new IllegalArgumentException("Container table cannot be null when container set is not read only");
-    }
   }
 
   public long getCurrentTime() {
     return clock.millis();
-  }
-
-  @VisibleForTesting
-  public void setClock(Clock clock) {
-    this.clock = clock;
   }
 
   @VisibleForTesting
@@ -133,6 +129,45 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
+   * @param scanner The scanner instance will be invoked when a scan of a container in this set is requested.
+   */
+  public void registerOnDemandScanner(OnDemandContainerScanner scanner) {
+    this.containerScanner = scanner;
+  }
+
+  /**
+   * Triggers a scan of a container in this set. This is a no-op if no scanner is registered or the container does not
+   * exist in the set.
+   * @param containerID The container in this set to scan.
+   */
+  public void scanContainer(long containerID) {
+    if (containerScanner != null) {
+      Container<?> container = getContainer(containerID);
+      if (container != null) {
+        containerScanner.scanContainer(container);
+      } else {
+        LOG.warn("Request to scan container {} which was not found in the container set", containerID);
+      }
+    }
+  }
+
+  /**
+   * Triggers a scan of a container in this set regardless of whether it was recently scanned.
+   * This is a no-op if no scanner is registered or the container does not exist in the set.
+   * @param containerID The container in this set to scan.
+   */
+  public void scanContainerWithoutGap(long containerID) {
+    if (containerScanner != null) {
+      Container<?> container = getContainer(containerID);
+      if (container != null) {
+        containerScanner.scanContainerWithoutGap(container);
+      } else {
+        LOG.warn("Request to scan container {} which was not found in the container set", containerID);
+      }
+    }
+  }
+
+  /**
    * Add Container to container map.
    * @param container container to be added
    * @param overwrite if true should overwrite the container if the container was missing.
@@ -155,14 +190,12 @@ public class ContainerSet implements Iterable<Container<?>> {
       }
       try {
         if (containerIdsTable != null) {
-          containerIdsTable.put(containerId, containerState.toString());
+          containerIdsTable.put(ContainerID.valueOf(containerId), containerState.toString());
         }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
       missingContainerSet.remove(containerId);
-      // wish we could have done this from ContainerData.setState
-      container.getContainerData().commitSpace();
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(
             clock.millis() + recoveringTimeout, containerId);
@@ -239,7 +272,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     if (removeFromDB) {
       try {
         if (containerIdsTable != null) {
-          containerIdsTable.delete(containerId);
+          containerIdsTable.delete(ContainerID.valueOf(containerId));
         }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
@@ -470,7 +503,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     return missingContainerSet;
   }
 
-  public Table<Long, String> getContainerIdsTable() {
+  public Table<ContainerID, String> getContainerIdsTable() {
     return containerIdsTable;
   }
 
@@ -484,10 +517,9 @@ public class ContainerSet implements Iterable<Container<?>> {
    * @param container2BCSIDMap Map of containerId to BCSID persisted in the
    *                           Ratis snapshot
    */
-  public void buildMissingContainerSetAndValidate(
-      Map<Long, Long> container2BCSIDMap) {
+  public <T> void buildMissingContainerSetAndValidate(Map<T, Long> container2BCSIDMap, ToLongFunction<T> getId) {
     container2BCSIDMap.entrySet().parallelStream().forEach((mapEntry) -> {
-      long id = mapEntry.getKey();
+      final long id = getId.applyAsLong(mapEntry.getKey());
       if (!containerMap.containsKey(id)) {
         LOG.warn("Adding container {} to missing container set.", id);
         missingContainerSet.add(id);

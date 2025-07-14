@@ -44,6 +44,7 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - checkstyle: [Runs](../hadoop-ozone/dev-support/checks/checkstyle.sh) 'mvn checkstyle' plugin to confirm Java source abides by Ozone coding conventions
 - docs: [Builds](../hadoop-ozone/dev-support/checks/docs.sh) website with [Hugo](https://gohugo.io/)
 - findbugs: [Runs](../hadoop-ozone/dev-support/checks/findbugs.sh) spotbugs static analysis on bytecode
+- pmd: [Runs](../hadoop-ozone/dev-support/checks/pmd.sh) PMD static analysis on project's source code
 - rat (release audit tool): [Confirms](../hadoop-ozone/dev-support/checks/rat.sh) source files include licenses
 
 

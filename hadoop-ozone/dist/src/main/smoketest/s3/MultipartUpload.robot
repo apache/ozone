@@ -61,6 +61,12 @@ Test Multipart Upload With Adjusted Length
     Perform Multipart Upload    ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
     Verify Multipart Upload     ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
 
+Overwrite Empty File
+    Execute                     touch ${TEMP_DIR}/empty
+    Execute AWSS3Cli            cp ${TEMP_DIR}/empty s3://${BUCKET}/empty_file_${PREFIX}
+    Perform Multipart Upload    ${BUCKET}    empty_file_${PREFIX}    /tmp/part1    /tmp/part2
+    Verify Multipart Upload     ${BUCKET}    empty_file_${PREFIX}    /tmp/part1    /tmp/part2
+
 Test Multipart Upload
     ${uploadID} =       Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey
     ${nextUploadID} =   Initiate MPU    ${BUCKET}    ${PREFIX}/multipartKey
@@ -312,12 +318,90 @@ Test Multipart Upload Put With Copy and range with IfModifiedSince
                         Compare files           /tmp/10mb        /tmp/part-result
 
 Test Multipart Upload list
-    ${uploadID1} =      Initiate MPU    ${BUCKET}    ${PREFIX}/listtest/key1
-    ${uploadID2} =      Initiate MPU    ${BUCKET}    ${PREFIX}/listtest/key2
+    # Create 25 multipart uploads to test pagination
+    ${uploadIDs}=    Create List
+    FOR    ${index}    IN RANGE    25
+        ${key}=    Set Variable    ${PREFIX}/listtest/key-${index}
+        ${uploadID}=    Initiate MPU    ${BUCKET}    ${key}
+        Append To List    ${uploadIDs}    ${uploadID}
+    END
 
-    ${result} =         Execute AWSS3APICli     list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest
-                        Should contain          ${result}    ${uploadID1}
-                        Should contain          ${result}    ${uploadID2}
+    # Test listing with max-items=10 (should get 3 pages: 10, 10, 5)
+    ${result}=    Execute AWSS3APICli    list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest --max-items 10
+    
+    # Verify first page
+    ${count}=    Execute and checkrc    echo '${result}' | jq -r '.Uploads | length'    0
+    Should Be Equal    ${count}    10
+    
+    ${hasNext}=    Execute and checkrc    echo '${result}' | jq -r 'has("NextToken")'    0
+    Should Be Equal    ${hasNext}    true
+    
+    ${nextToken}=    Execute and checkrc    echo '${result}' | jq -r '.NextToken'    0
+    Should Not Be Empty    ${nextToken}
 
-    ${count} =          Execute and checkrc      echo '${result}' | jq -r '.Uploads | length'  0
-                        Should Be Equal          ${count}     2
+    # Get second page
+    ${result}=    Execute AWSS3APICli    list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest --max-items 10 --starting-token ${nextToken}
+    
+    # Verify second page
+    ${count}=    Execute and checkrc    echo '${result}' | jq -r '.Uploads | length'    0
+    Should Be Equal    ${count}    10
+    
+    ${hasNext}=    Execute and checkrc    echo '${result}' | jq -r 'has("NextToken")'    0
+    Should Be Equal    ${hasNext}    true
+    
+    ${nextToken}=    Execute and checkrc    echo '${result}' | jq -r '.NextToken'    0
+    Should Not Be Empty    ${nextToken}
+
+    # Get last page
+    ${result}=    Execute AWSS3APICli    list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest --max-items 10 --starting-token ${nextToken}
+    
+    # Verify last page
+    ${count}=    Execute and checkrc    echo '${result}' | jq -r '.Uploads | length'    0
+    Should Be Equal    ${count}    5
+    
+    ${hasNext}=    Execute and checkrc    echo '${result}' | jq -r 'has("NextToken")'    0
+    Should Be Equal    ${hasNext}    false
+
+    # Test prefix filtering
+    ${result}=    Execute AWSS3APICli    list-multipart-uploads --bucket ${BUCKET} --prefix ${PREFIX}/listtest/key-1
+    ${count}=    Execute and checkrc    echo '${result}' | jq -r '.Uploads | length'    0
+    Should Be Equal    ${count}    11    # Should match key-1, key-10 through key-19
+
+    # Cleanup
+    FOR    ${index}    IN RANGE    25
+        ${key}=    Set Variable    ${PREFIX}/listtest/key-${index}
+        ${uploadID}=    Get From List    ${uploadIDs}    ${index}
+        Abort MPU    ${BUCKET}    ${key}    ${uploadID}    0
+    END
+
+Check Bucket Ownership Verification
+    # 1. InitMultipartUpload
+    ${correct_owner}=    Get bucket owner    ${BUCKET}
+    ${uploadID}=         Execute AWSS3APICli with bucket owner check               create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/key1    ${correct_owner}
+    ${uploadID}=         Execute and checkrc                                       echo '${uploadID}' | jq -r '.UploadId'    0
+
+    # 2. upload-part
+    ${ETag1} =  Execute AWSS3APICli with bucket owner check                        upload-part --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --part-number 1 --body /tmp/part1 --upload-id ${uploadID}  ${correct_owner}
+    ${ETag1} =  Execute and checkrc                                                echo '${ETag1}' | jq -r '.ETag'    0
+
+
+    # 3. upload-part-copy
+    ${result}=    Execute AWSS3APICli                                              put-object --bucket ${BUCKET} --key ${PREFIX}/mpu/source --body /tmp/part2
+    ${ETag2} =  Execute AWSS3APICli with bucket owner check                        upload-part-copy --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/${PREFIX}/mpu/source  ${correct_owner}  ${correct_owner}
+    ${ETag2} =  Execute and checkrc                                                echo '${ETag2}' | jq -r '.CopyPartResult.ETag'    0
+
+    # 4. list-multipart-uploads
+    Execute AWSS3APICli with bucket owner check                                    list-multipart-uploads --bucket ${BUCKET}  ${correct_owner}
+
+    # 5. list-parts
+    Execute AWSS3APICli with bucket owner check                                    list-parts --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID}  ${correct_owner}
+
+    # 6. complete-multipart-upload
+    ${parts}=    Set Variable                                                      {ETag=${ETag1},PartNumber=1},{ETag=${ETag2},PartNumber=2}
+    Execute AWSS3APICli with bucket owner check                                    complete-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/key1 --upload-id ${uploadID} --multipart-upload 'Parts=[${parts}]'  ${correct_owner}
+
+    # create another MPU to test abort-multipart-upload
+    ${uploadID}=    Execute AWSS3APICli using bucket ownership verification        create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/aborttest    ${correct_owner}
+    ${uploadID}=    Execute and checkrc                                            echo '${uploadID}' | jq -r '.UploadId'    0
+
+    Execute AWSS3APICli with bucket owner check                                    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/aborttest --upload-id ${uploadID}  ${correct_owner}

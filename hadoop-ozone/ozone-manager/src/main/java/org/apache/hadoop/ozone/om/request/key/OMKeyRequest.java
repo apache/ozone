@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,21 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.util.Time.monotonicNow;
+
+import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -32,24 +46,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
+import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.ScmClient;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
@@ -65,51 +87,19 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension
-    .EncryptedKeyVersion;
-import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ScmClient;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .VOLUME_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.util.Time.monotonicNow;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Interface for key write requests.
@@ -121,8 +111,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   // bits are set aside for this in ObjectID.
   private static final long MAX_NUM_OF_RECURSIVE_DIRS = 255;
 
-  @VisibleForTesting
-  public static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
+  protected static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
   private BucketLayout bucketLayout = BucketLayout.DEFAULT;
 
@@ -186,80 +175,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         resolvedArgs.getBucketName(), keyArgs.getKeyName(),
         aclType, clientId);
     return resolvedArgs;
-  }
-
-  /**
-   * Define the parameters carried when verifying the Key.
-   */
-  public static class ValidateKeyArgs {
-    private String snapshotReservedWord;
-    private String keyName;
-    private boolean validateSnapshotReserved;
-    private boolean validateKeyName;
-
-    ValidateKeyArgs(String snapshotReservedWord, String keyName,
-        boolean validateSnapshotReserved, boolean validateKeyName) {
-      this.snapshotReservedWord = snapshotReservedWord;
-      this.keyName = keyName;
-      this.validateSnapshotReserved = validateSnapshotReserved;
-      this.validateKeyName = validateKeyName;
-    }
-
-    public String getSnapshotReservedWord() {
-      return snapshotReservedWord;
-    }
-
-    public String getKeyName() {
-      return keyName;
-    }
-
-    public boolean isValidateSnapshotReserved() {
-      return validateSnapshotReserved;
-    }
-
-    public boolean isValidateKeyName() {
-      return validateKeyName;
-    }
-
-    /**
-     * Tools for building {@link ValidateKeyArgs}.
-     */
-    public static class Builder {
-      private String snapshotReservedWord;
-      private String keyName;
-      private boolean validateSnapshotReserved;
-      private boolean validateKeyName;
-
-      public Builder setSnapshotReservedWord(String snapshotReservedWord) {
-        this.snapshotReservedWord = snapshotReservedWord;
-        this.validateSnapshotReserved = true;
-        return this;
-      }
-
-      public Builder setKeyName(String keyName) {
-        this.keyName = keyName;
-        this.validateKeyName = true;
-        return this;
-      }
-
-      public ValidateKeyArgs build() {
-        return new ValidateKeyArgs(snapshotReservedWord, keyName,
-            validateSnapshotReserved, validateKeyName);
-      }
-    }
-  }
-
-  protected void validateKey(OzoneManager ozoneManager, ValidateKeyArgs validateKeyArgs)
-      throws OMException {
-    if (validateKeyArgs.isValidateSnapshotReserved()) {
-      OmUtils.verifyKeyNameWithSnapshotReservedWord(validateKeyArgs.getSnapshotReservedWord());
-    }
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-        .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-            OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (validateKeyArgs.isValidateKeyName() && checkKeyNameEnabled) {
-      OmUtils.validateKeyName(validateKeyArgs.getKeyName());
-    }
   }
 
   /**
@@ -413,7 +328,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   protected List<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
-      PrefixManager prefixManager, OzoneConfiguration config) throws OMException {
+      PrefixManager prefixManager, OmConfig config) throws OMException {
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.addAll(getDefaultAclList(createUGIForApi(), config));
@@ -429,7 +344,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
               keyArgs.getBucketName() + OZONE_URI_DELIMITER +
               keyArgs.getKeyName());
 
-      if (prefixList.size() > 0) {
+      if (!prefixList.isEmpty()) {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
         if (prefixInfo  != null) {
@@ -473,7 +388,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @return Acls which inherited parent DEFAULT and keyArgs ACCESS acls.
    */
   protected List<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
-      OMFileRequest.OMPathInfo omPathInfo, OzoneConfiguration config) throws OMException {
+      OMFileRequest.OMPathInfo omPathInfo, OmConfig config) throws OMException {
     // Acls inherited from parent or bucket will convert to DEFAULT scope
     List<OzoneAcl> acls = new ArrayList<>();
     // add default ACLs
@@ -538,7 +453,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           missingKey);
       OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(missingKey,
           keyArgs, nextObjId, lastKnownParentId, trxnLogIndex,
-          bucketInfo, pathInfo, ozoneManager.getConfiguration());
+          bucketInfo, pathInfo, ozoneManager.getConfig());
       objectCount++;
 
       missingParentInfos.add(dirInfo);
@@ -594,7 +509,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OmKeyInfo parentKeyInfo =
           createDirectoryKeyInfoWithACL(missingKey, keyArgs, nextObjId,
               bucketInfo, omPathInfo, trxnLogIndex,
-              ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfiguration());
+              ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfig());
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
@@ -619,7 +534,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       String dirName, KeyArgs keyArgs, long objectId,
       long parentObjectId, long transactionIndex,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
-      OzoneConfiguration config) throws OMException {
+      OmConfig config) throws OMException {
     return OmDirectoryInfo.newBuilder()
         .setName(dirName)
         .setOwner(keyArgs.getOwnerName())
@@ -650,7 +565,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected OmKeyInfo createDirectoryKeyInfoWithACL(String keyName,
       KeyArgs keyArgs, long objectId, OmBucketInfo bucketInfo,
       OMFileRequest.OMPathInfo omPathInfo, long transactionIndex,
-      ReplicationConfig serverDefaultReplConfig, OzoneConfiguration config) throws OMException {
+      ReplicationConfig serverDefaultReplConfig, OmConfig config) throws OMException {
     return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId,
         serverDefaultReplConfig)
         .setAcls(getAclsForDir(keyArgs, bucketInfo, omPathInfo, config))
@@ -1015,13 +930,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull PrefixManager prefixManager,
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
-          long transactionLogIndex, long objectID, boolean isRatisEnabled,
-          ReplicationConfig replicationConfig, OzoneConfiguration config)
+          long transactionLogIndex, long objectID,
+          ReplicationConfig replicationConfig, OmConfig config)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
             locations, encInfo, prefixManager, omBucketInfo, omPathInfo,
-            transactionLogIndex, objectID, isRatisEnabled, replicationConfig, config);
+            transactionLogIndex, objectID, replicationConfig, config);
   }
 
   /**
@@ -1039,8 +954,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
-          boolean isRatisEnabled, ReplicationConfig replicationConfig,
-          OzoneConfiguration config) throws IOException {
+          ReplicationConfig replicationConfig,
+          OmConfig config) throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartFileInfo(omMetadataManager, keyArgs,
               size, locations, encInfo, prefixManager, omBucketInfo,
@@ -1061,7 +976,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // The modification time is set in preExecute. Use the same
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
-      dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
+      dbKeyInfo.setUpdateID(transactionLogIndex);
       dbKeyInfo.setReplicationConfig(replicationConfig);
 
       // Construct a new metadata map from KeyArgs.
@@ -1105,7 +1020,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfo omPathInfo,
       long transactionLogIndex, long objectID,
-      OzoneConfiguration config) throws OMException {
+      OmConfig config) throws OMException {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
@@ -1153,7 +1068,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
           @Nonnull long transactionLogIndex, long objectID,
-          OzoneConfiguration configuration) throws IOException {
+          OmConfig configuration) throws IOException {
 
     Preconditions.checkArgument(args.getMultipartNumber() > 0,
             "PartNumber Should be greater than zero");
@@ -1219,15 +1134,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
    *
    * @param keyToDelete OmKeyInfo of a key to be in deleteTable
    * @param trxnLogIndex
-   * @param isRatisEnabled
    * @return Old keys eligible for deletion.
    * @throws IOException
    */
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
-      @Nonnull OmKeyInfo keyToDelete, long trxnLogIndex,
-      boolean isRatisEnabled) throws IOException {
-    return OmUtils.prepareKeyForDelete(keyToDelete,
-          trxnLogIndex, isRatisEnabled);
+      @Nonnull OmKeyInfo keyToDelete, long trxnLogIndex) throws IOException {
+    return OmUtils.prepareKeyForDelete(keyToDelete, trxnLogIndex);
   }
 
   protected OzoneLockStrategy getOzoneLockStrategy(OzoneManager ozoneManager) {

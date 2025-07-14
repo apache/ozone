@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,28 +13,23 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.Env;
 import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.toIOException;
 
 /**
  * A Class that controls the standard config options of RocksDB.
@@ -56,16 +50,16 @@ public final class DBConfigFromFile {
   private DBConfigFromFile() {
   }
 
-  public static File getConfigLocation() throws IOException {
+  public static File getConfigLocation() {
     String path = System.getenv(CONFIG_DIR);
 
     // Make testing easy.
     // If there is No Env. defined, let us try to read the JVM property
-    if (StringUtil.isBlank(path)) {
+    if (StringUtils.isBlank(path)) {
       path = System.getProperty(CONFIG_DIR);
     }
 
-    if (StringUtil.isBlank(path)) {
+    if (StringUtils.isBlank(path)) {
       LOG.debug("Unable to find the configuration directory. "
           + "Please make sure that " + CONFIG_DIR + " is setup correctly.");
       return null;
@@ -112,20 +106,19 @@ public final class DBConfigFromFile {
    * @param dbFileName - The DB File Name, for example, OzoneManager.db.
    * @param cfDescs - ColumnFamily Handles.
    * @return DBOptions, Options to be used for opening/creating the DB.
-   * @throws IOException
    */
   public static ManagedDBOptions readFromFile(String dbFileName,
-      List<ColumnFamilyDescriptor> cfDescs) throws IOException {
+      List<ColumnFamilyDescriptor> cfDescs) throws RocksDatabaseException {
     Preconditions.checkNotNull(dbFileName);
     Preconditions.checkNotNull(cfDescs);
-    Preconditions.checkArgument(cfDescs.size() > 0);
+    Preconditions.checkArgument(!cfDescs.isEmpty());
 
     //TODO: Add Documentation on how to support RocksDB Mem Env.
     Env env = Env.getDefault();
     ManagedDBOptions options = null;
     File configLocation = getConfigLocation();
     if (configLocation != null &&
-        StringUtil.isNotBlank(configLocation.toString())) {
+        StringUtils.isNotBlank(configLocation.toString())) {
       Path optionsFile = Paths.get(configLocation.toString(),
           getOptionsFileNameFromDB(dbFileName));
 
@@ -136,7 +129,7 @@ public final class DBConfigFromFile {
               env, options, cfDescs, true);
 
         } catch (RocksDBException rdEx) {
-          throw toIOException("Unable to find/open Options file.", rdEx);
+          throw new RocksDatabaseException("Failed to loadOptionsFromFile " + optionsFile, rdEx);
         }
       }
     }

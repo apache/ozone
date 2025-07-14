@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,17 +14,64 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
+import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.io.File;
+import java.io.IOException;
+import java.net.UnknownHostException;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -96,65 +142,18 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.UnknownHostException;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
-import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
-import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
-
 /**
  * Test class that exercises the StorageContainerManager.
  */
-@Timeout(900)
 public class TestStorageContainerManager {
   private static final int KEY_COUNT = 5;
   private static final String LOCALHOST_IP = "127.0.0.1";
@@ -288,8 +287,8 @@ public class TestStorageContainerManager {
       // Add 2 TXs per container.
       Map<Long, List<Long>> deletedBlocks = new HashMap<>();
       List<Long> blocks = new ArrayList<>();
-      blocks.add(RandomUtils.nextLong());
-      blocks.add(RandomUtils.nextLong());
+      blocks.add(RandomUtils.secure().randomLong());
+      blocks.add(RandomUtils.secure().randomLong());
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);
@@ -297,16 +296,14 @@ public class TestStorageContainerManager {
 
     // Verify a few TX gets created in the TX log.
     assertThat(delLog.getNumOfValidTransactions()).isGreaterThan(0);
-
+    
     // These blocks cannot be found in the container, skip deleting them
     // eventually these TX will success.
     GenericTestUtils.waitFor(() -> {
       try {
-        if (SCMHAUtils.isSCMHAEnabled(cluster.getConf())) {
-          cluster.getStorageContainerManager().getScmHAManager()
-              .asSCMHADBTransactionBuffer().flush();
-        }
-        return delLog.getFailedTransactions(-1, 0).size() == 0;
+        cluster.getStorageContainerManager().getScmHAManager()
+            .asSCMHADBTransactionBuffer().flush();
+        return delLog.getFailedTransactions(-1, 0).isEmpty();
       } catch (IOException e) {
         return false;
       }
@@ -361,14 +358,10 @@ public class TestStorageContainerManager {
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
           endpoint.getState());
     }
-    GenericTestUtils.LogCapturer scmDnHBDispatcherLog =
-        GenericTestUtils.LogCapturer.captureLogs(
-            SCMDatanodeHeartbeatDispatcher.LOG);
+    LogCapturer scmDnHBDispatcherLog = LogCapturer.captureLogs(SCMDatanodeHeartbeatDispatcher.class);
     LogManager.getLogger(HeartbeatEndpointTask.class).setLevel(Level.DEBUG);
-    GenericTestUtils.LogCapturer heartbeatEndpointTaskLog =
-        GenericTestUtils.LogCapturer.captureLogs(HeartbeatEndpointTask.LOG);
-    GenericTestUtils.LogCapturer versionEndPointTaskLog =
-        GenericTestUtils.LogCapturer.captureLogs(VersionEndpointTask.LOG);
+    LogCapturer heartbeatEndpointTaskLog = LogCapturer.captureLogs(HeartbeatEndpointTask.class);
+    LogCapturer versionEndPointTaskLog = LogCapturer.captureLogs(VersionEndpointTask.class);
     // Initially empty
     assertThat(scmDnHBDispatcherLog.getOutput()).isEmpty();
     assertThat(versionEndPointTaskLog.getOutput()).isEmpty();
@@ -457,10 +450,10 @@ public class TestStorageContainerManager {
       GenericTestUtils.waitFor(() -> {
         NodeManager nodeManager = cluster.getStorageContainerManager()
             .getScmNodeManager();
-        List<SCMCommand> commands = nodeManager.processHeartbeat(
+        List<SCMCommand<?>> commands = nodeManager.processHeartbeat(
             nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0));
         if (commands != null) {
-          for (SCMCommand cmd : commands) {
+          for (SCMCommand<?> cmd : commands) {
             if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
               List<DeletedBlocksTransaction> deletedTXs =
                   ((DeleteBlocksCommand) cmd).blocksTobeDeleted();
@@ -638,14 +631,14 @@ public class TestStorageContainerManager {
    */
   private void testScmProcessDatanodeHeartbeat(MiniOzoneCluster cluster) {
     NodeManager nodeManager = cluster.getStorageContainerManager().getScmNodeManager();
-    List<DatanodeDetails> allNodes = nodeManager.getAllNodes();
+    List<? extends DatanodeDetails> allNodes = nodeManager.getAllNodes();
     assertEquals(cluster.getHddsDatanodes().size(), allNodes.size());
 
     for (DatanodeDetails node : allNodes) {
-      DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNodeByUuid(node.getUuid()));
+      DatanodeInfo datanodeInfo = assertInstanceOf(DatanodeInfo.class, nodeManager.getNode(node.getID()));
       assertNotNull(datanodeInfo);
       assertThat(datanodeInfo.getLastHeartbeatTime()).isPositive();
-      assertEquals(datanodeInfo.getUuidString(), datanodeInfo.getNetworkName());
+      assertEquals(datanodeInfo.getID().toString(), datanodeInfo.getNetworkName());
       assertEquals("/rack1", datanodeInfo.getNetworkLocation());
     }
   }
@@ -716,8 +709,8 @@ public class TestStorageContainerManager {
       NodeManager nodeManager = mock(NodeManager.class);
       setInternalState(rm, "nodeManager", nodeManager);
 
-      UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
-          .getDatanodeDetails().getUuid();
+      final DatanodeID dnUuid = cluster.getHddsDatanodes().iterator().next()
+          .getDatanodeDetails().getID();
 
       CloseContainerCommand closeContainerCommand =
           new CloseContainerCommand(selectedContainer.getContainerID(),
@@ -748,7 +741,7 @@ public class TestStorageContainerManager {
       queues.add(new ContainerReportQueue());
     }
     ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
-    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .build();
     ContainerReportFromDatanode dndata
         = new ContainerReportFromDatanode(dn, report);
@@ -820,13 +813,13 @@ public class TestStorageContainerManager {
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
     ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
-    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .build();
     ContainerReportFromDatanode dndata1
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata1);
 
-    dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    dn = DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .build();
     ContainerReportFromDatanode dndata2
         = new ContainerReportFromDatanode(dn, report);
@@ -846,7 +839,7 @@ public class TestStorageContainerManager {
     for (int i = 0; i < 1; ++i) {
       queues.add(new ContainerReportQueue());
     }
-    DatanodeDetails dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
+    DatanodeDetails dn = DatanodeDetails.newBuilder().setID(DatanodeID.randomID())
         .build();
     IncrementalContainerReportProto report
         = IncrementalContainerReportProto.getDefaultInstance();
@@ -888,9 +881,7 @@ public class TestStorageContainerManager {
       Map<Long, List<Long>> containerBlocksMap)
       throws IOException, TimeoutException {
     delLog.addTransactions(containerBlocksMap);
-    if (SCMHAUtils.isSCMHAEnabled(scm.getConfiguration())) {
-      scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
-    }
+    scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
   }
 
   public List<Long> getAllBlocks(MiniOzoneCluster cluster, Set<Long> containerIDs) throws IOException {

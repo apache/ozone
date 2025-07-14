@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,11 +19,10 @@ package org.apache.ozone.compaction.log;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.rocksdb.LiveFileMetaData;
-
-import java.util.Objects;
 
 /**
  * Dao to keep SST file information in the compaction log.
@@ -34,16 +32,26 @@ public final class CompactionFileInfo {
   private final String startKey;
   private final String endKey;
   private final String columnFamily;
+  private boolean pruned;
 
   @VisibleForTesting
   public CompactionFileInfo(String fileName,
                             String startRange,
                             String endRange,
                             String columnFamily) {
+    this(fileName, startRange, endRange, columnFamily, false);
+  }
+
+  public CompactionFileInfo(String fileName,
+                            String startRange,
+                            String endRange,
+                            String columnFamily,
+                            boolean pruned) {
     this.fileName = fileName;
     this.startKey = startRange;
     this.endKey = endRange;
     this.columnFamily = columnFamily;
+    this.pruned = pruned;
   }
 
   public String getFileName() {
@@ -62,10 +70,19 @@ public final class CompactionFileInfo {
     return columnFamily;
   }
 
+  public boolean isPruned() {
+    return pruned;
+  }
+
+  public void setPruned() {
+    this.pruned = true;
+  }
+
   public HddsProtos.CompactionFileInfoProto getProtobuf() {
     HddsProtos.CompactionFileInfoProto.Builder builder =
         HddsProtos.CompactionFileInfoProto.newBuilder()
-            .setFileName(fileName);
+            .setFileName(fileName)
+            .setPruned(pruned);
     if (startKey != null) {
       builder = builder.setStartKey(startKey);
     }
@@ -91,6 +108,9 @@ public final class CompactionFileInfo {
     if (proto.hasColumnFamily()) {
       builder.setColumnFamily(proto.getColumnFamily());
     }
+    if (proto.hasPruned() && proto.getPruned()) {
+      builder.setPruned();
+    }
 
     return builder.build();
   }
@@ -98,7 +118,7 @@ public final class CompactionFileInfo {
   @Override
   public String toString() {
     return String.format("fileName: '%s', startKey: '%s', endKey: '%s'," +
-        " columnFamily: '%s'", fileName, startKey, endKey, columnFamily);
+        " columnFamily: '%s', isPruned: '%b'", fileName, startKey, endKey, columnFamily, pruned);
   }
 
   /**
@@ -109,6 +129,7 @@ public final class CompactionFileInfo {
     private String startRange;
     private String endRange;
     private String columnFamily;
+    private boolean pruned = false;
 
     public Builder(String fileName) {
       Preconditions.checkNotNull(fileName, "FileName is required parameter.");
@@ -140,6 +161,11 @@ public final class CompactionFileInfo {
       return this;
     }
 
+    public Builder setPruned() {
+      this.pruned = true;
+      return this;
+    }
+
     public CompactionFileInfo build() {
       if ((startRange != null || endRange != null || columnFamily != null) &&
           (startRange == null || endRange == null || columnFamily == null)) {
@@ -151,7 +177,7 @@ public final class CompactionFileInfo {
       }
 
       return new CompactionFileInfo(fileName, startRange, endRange,
-          columnFamily);
+          columnFamily, pruned);
     }
   }
 

@@ -1,31 +1,29 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.io.IOException;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileChecksum;
@@ -34,8 +32,8 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -45,7 +43,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.util.Time;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,19 +57,6 @@ public final class OmKeyInfo extends WithParentObjectId
 
   private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
   private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
-
-  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
-    return new DelegatedCodec<>(
-        Proto2Codec.get(KeyInfo.getDefaultInstance()),
-        OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
-        OmKeyInfo.class);
-  }
-
-  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
-    LOG.info("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
-    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
-  }
 
   private final String volumeName;
   private final String bucketName;
@@ -96,7 +80,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * keyName is "a/b/key1" then the fileName stores "key1".
    */
   private String fileName;
-  private String ownerName;
+  private final String ownerName;
 
   /**
    * ACL Information.
@@ -134,6 +118,19 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags;
     this.expectedDataGeneration = b.expectedDataGeneration;
+  }
+
+  private static Codec<OmKeyInfo> newCodec(boolean ignorePipeline) {
+    return new DelegatedCodec<>(
+        Proto2Codec.get(KeyInfo.getDefaultInstance()),
+        OmKeyInfo::getFromProtobuf,
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        OmKeyInfo.class);
+  }
+
+  public static Codec<OmKeyInfo> getCodec(boolean ignorePipeline) {
+    LOG.debug("OmKeyInfo.getCodec ignorePipeline = {}", ignorePipeline);
+    return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
   }
 
   public String getVolumeName() {
@@ -197,7 +194,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
-    return keyLocationVersions.size() == 0 ? null :
+    return keyLocationVersions.isEmpty() ? null :
         keyLocationVersions.get(keyLocationVersions.size() - 1);
   }
 
@@ -337,13 +334,11 @@ public final class OmKeyInfo extends WithParentObjectId
    *
    * @param newLocationList the list of new blocks to be added.
    * @param updateTime if true, will update modification time.
-   * @throws IOException
    */
   public synchronized void appendNewBlocks(
-      List<OmKeyLocationInfo> newLocationList, boolean updateTime)
-      throws IOException {
-    if (keyLocationVersions.size() == 0) {
-      throw new IOException("Appending new block, but no version exist");
+      List<OmKeyLocationInfo> newLocationList, boolean updateTime) {
+    if (keyLocationVersions.isEmpty()) {
+      throw new IllegalStateException("Appending new blocks but keyLocationVersions is empty");
     }
     OmKeyLocationInfoGroup currentLatestVersion =
         keyLocationVersions.get(keyLocationVersions.size() - 1);
@@ -372,7 +367,7 @@ public final class OmKeyInfo extends WithParentObjectId
       keyLocationVersions.clear();
     }
 
-    if (keyLocationVersions.size() == 0) {
+    if (keyLocationVersions.isEmpty()) {
       // no version exist, these blocks are the very first version.
       keyLocationVersions.add(new OmKeyLocationInfoGroup(0, newLocationList));
       latestVersionNum = 0;
@@ -675,7 +670,7 @@ public final class OmKeyInfo extends WithParentObjectId
    */
   private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
                               int clientVersion, boolean latestVersionBlocks) {
-    long latestVersion = keyLocationVersions.size() == 0 ? -1 :
+    long latestVersion = keyLocationVersions.isEmpty() ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
     List<KeyLocationList> keyLocations = new ArrayList<>();
@@ -735,7 +730,7 @@ public final class OmKeyInfo extends WithParentObjectId
     return kb.build();
   }
 
-  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) throws IOException {
+  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
     if (keyInfo == null) {
       return null;
     }
@@ -807,7 +802,6 @@ public final class OmKeyInfo extends WithParentObjectId
         '}';
   }
 
-
   public boolean isKeyInfoSame(OmKeyInfo omKeyInfo, boolean checkPath,
                                boolean checkKeyLocationVersions,
                                boolean checkModificationTime,
@@ -820,6 +814,7 @@ public final class OmKeyInfo extends WithParentObjectId
         replicationConfig.equals(omKeyInfo.replicationConfig) &&
         Objects.equals(getMetadata(), omKeyInfo.getMetadata()) &&
         Objects.equals(acls, omKeyInfo.acls) &&
+        Objects.equals(getTags(), omKeyInfo.getTags()) &&
         getObjectID() == omKeyInfo.getObjectID();
 
     if (isEqual && checkUpdateID) {

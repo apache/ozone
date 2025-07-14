@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,31 +13,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.om.request.snapshot;
-
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-
-import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
-import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.BeforeEach;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,6 +23,26 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
+import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests TestOMSnapshotSetPropertyRequest
@@ -65,8 +62,8 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
 
   @Test
   public void testValidateAndUpdateCache() throws IOException {
-    long initialSnapshotSetPropertyCount = getOmMetrics().getNumSnapshotSetProperties();
-    long initialSnapshotSetPropertyFailCount = getOmMetrics().getNumSnapshotSetPropertyFails();
+    long initialSnapshotSetPropertyCount = getOmSnapshotIntMetrics().getNumSnapshotSetProperties();
+    long initialSnapshotSetPropertyFailCount = getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails();
 
     createSnapshotDataForTest();
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
@@ -94,10 +91,10 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
     }
 
     assertEquals(initialSnapshotSetPropertyCount + snapshotUpdateSizeRequests.size(),
-        getOmMetrics().getNumSnapshotSetProperties());
-    assertEquals(initialSnapshotSetPropertyFailCount, getOmMetrics().getNumSnapshotSetPropertyFails());
+        getOmSnapshotIntMetrics().getNumSnapshotSetProperties());
+    assertEquals(initialSnapshotSetPropertyFailCount, getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails());
     // Check if the exclusive size is set.
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (Table.KeyValueIterator<String, SnapshotInfo>
              iterator = getOmMetadataManager().getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
@@ -115,8 +112,8 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
    */
   @Test
   public void testValidateAndUpdateCacheFailure() throws IOException {
-    long initialSnapshotSetPropertyCount = getOmMetrics().getNumSnapshotSetProperties();
-    long initialSnapshotSetPropertyFailCount = getOmMetrics().getNumSnapshotSetPropertyFails();
+    long initialSnapshotSetPropertyCount = getOmSnapshotIntMetrics().getNumSnapshotSetProperties();
+    long initialSnapshotSetPropertyFailCount = getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails();
 
     createSnapshotDataForTest();
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
@@ -125,7 +122,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
     OmMetadataManagerImpl mockedMetadataManager = mock(OmMetadataManagerImpl.class);
     Table<String, SnapshotInfo> mockedSnapshotInfoTable = mock(Table.class);
 
-    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new IOException("Injected fault error."));
+    when(mockedSnapshotInfoTable.get(anyString())).thenThrow(new CodecException("Injected fault error."));
     when(mockedMetadataManager.getSnapshotInfoTable()).thenReturn(mockedSnapshotInfoTable);
     when(getOzoneManager().getMetadataManager()).thenReturn(mockedMetadataManager);
 
@@ -141,9 +138,9 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
       assertEquals(INTERNAL_ERROR, omSnapshotSetPropertyResponse.getOMResponse().getStatus());
     }
 
-    assertEquals(initialSnapshotSetPropertyCount, getOmMetrics().getNumSnapshotSetProperties());
+    assertEquals(initialSnapshotSetPropertyCount, getOmSnapshotIntMetrics().getNumSnapshotSetProperties());
     assertEquals(initialSnapshotSetPropertyFailCount + snapshotUpdateSizeRequests.size(),
-        getOmMetrics().getNumSnapshotSetPropertyFails());
+        getOmSnapshotIntMetrics().getNumSnapshotSetPropertyFails());
   }
 
   private void assertCacheValues(String dbKey) {
@@ -158,7 +155,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotReq
   private List<OMRequest> createSnapshotUpdateSizeRequest()
       throws IOException {
     List<OMRequest> omRequests = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (Table.KeyValueIterator<String, SnapshotInfo>
              iterator = getOmMetadataManager().getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
         String snapDbKey = iterator.next().getKey();

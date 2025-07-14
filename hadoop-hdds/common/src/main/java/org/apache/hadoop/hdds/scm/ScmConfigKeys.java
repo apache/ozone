@@ -1,28 +1,26 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * This class contains constants for configuration keys used in SCM.
@@ -55,10 +53,6 @@ public final class ScmConfigKeys {
   public static final int
       HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
       = 10;
-  public static final String HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
-      = "hdds.container.ratis.replication.level";
-  public static final ReplicationLevel
-      HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT = ReplicationLevel.MAJORITY;
   public static final String HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
       = "hdds.container.ratis.num.container.op.executors";
   public static final int HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
@@ -226,10 +220,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_SCM_HTTP_BIND_PORT_DEFAULT = 9876;
   public static final int OZONE_SCM_HTTPS_BIND_PORT_DEFAULT = 9877;
-
-  public static final String HDDS_REST_HTTP_ADDRESS_KEY =
-      "hdds.rest.http-address";
-  public static final String HDDS_REST_HTTP_ADDRESS_DEFAULT = "0.0.0.0:9880";
   public static final String HDDS_DATANODE_DIR_KEY = "hdds.datanode.dir";
   public static final String HDDS_DATANODE_DIR_DU_RESERVED =
       "hdds.datanode.dir.du.reserved";
@@ -455,7 +445,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
       "150s";
 
-
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =
       "ozone.scm.pipeline.creation.auto.factor.one";
@@ -480,14 +469,6 @@ public final class ScmConfigKeys {
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
   public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
 
-  // SCM Ratis related
-  public static final String OZONE_SCM_HA_ENABLE_KEY
-      = "ozone.scm.ratis.enable";
-  /** Default Value would be Overriden based on the current state of Ratis.
-   {@link org.apache.hadoop.hdds.conf.DefaultConfigManager}
-   */
-  public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
-      = true;
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT
@@ -514,7 +495,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_CA_LIST_RETRY_INTERVAL =
       "ozone.scm.ca.list.retry.interval";
   public static final long OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT = 10;
-
 
   public static final String OZONE_SCM_EVENT_PREFIX = "ozone.scm.event.";
 
@@ -638,6 +618,16 @@ public final class ScmConfigKeys {
       "ozone.scm.ha.dbtransactionbuffer.flush.interval";
   public static final long
       OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 600 * 1000L;
+
+  public static final String NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY =
+      "net.topology.node.switch.mapping.impl";
+  public static final String HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL
+      = "hdds.container.ratis.statemachine.write.wait.interval";
+  public static final long HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL_NS_DEFAULT = 10 * 60 * 1000_000_000L;
+
+  public static final String OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT
+      = "ozone.scm.ha.raft.server.rpc.first-election.timeout";
+
   /**
    * Never constructed.
    */

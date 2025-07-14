@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,12 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -33,9 +33,6 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
@@ -51,9 +48,13 @@ import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class HddsClientUtils {
+  static final int MAX_BUCKET_NAME_LENGTH_IN_LOG =
+      2 * OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH;
 
-  private HddsClientUtils() {
-  }
+  private static final String VALID_LENGTH_MESSAGE = String.format(
+      "valid length is %d-%d characters",
+      OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH,
+      OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
 
   private static final List<Class<? extends Exception>> EXCEPTION_LIST =
       ImmutableList.<Class<? extends Exception>>builder()
@@ -67,15 +68,34 @@ public final class HddsClientUtils {
           .add(NotReplicatedException.class)
           .build();
 
+  private HddsClientUtils() {
+  }
+
   private static void doNameChecks(String resName, String resType) {
     if (resName == null) {
       throw new IllegalArgumentException(resType + " name is null");
     }
 
-    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
-        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH) {
       throw new IllegalArgumentException(resType +
-          " length is illegal, " + "valid length is 3-63 characters");
+          " name '" + resName + "' is too short, " +
+          VALID_LENGTH_MESSAGE);
+    }
+
+    if (resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+      String nameToReport;
+
+      if (resName.length() > MAX_BUCKET_NAME_LENGTH_IN_LOG) {
+        nameToReport = String.format(
+            "%s...",
+            resName.substring(0, MAX_BUCKET_NAME_LENGTH_IN_LOG));
+      } else {
+        nameToReport = resName;
+      }
+
+      throw new IllegalArgumentException(resType +
+          " name '" + nameToReport + "' is too long, " +
+          VALID_LENGTH_MESSAGE);
     }
 
     if (resName.charAt(0) == '.' || resName.charAt(0) == '-') {
@@ -154,9 +174,6 @@ public final class HddsClientUtils {
    * @throws IllegalArgumentException
    */
   public static void verifyResourceName(String resName, String resType, boolean isStrictS3) {
-
-    doNameChecks(resName, resType);
-
     boolean isIPv4 = true;
     char prev = (char) 0;
 
@@ -173,6 +190,8 @@ public final class HddsClientUtils {
       throw new IllegalArgumentException(resType +
           " name cannot be an IPv4 address or all numeric");
     }
+
+    doNameChecks(resName, resType);
   }
 
   /**
@@ -234,7 +253,6 @@ public final class HddsClientUtils {
         .getObject(RatisClientConfig.RaftConfig.class)
         .getMaxOutstandingRequests();
   }
-
 
   // This will return the underlying exception after unwrapping
   // the exception to see if it matches with expected exception

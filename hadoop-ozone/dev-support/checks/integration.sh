@@ -16,4 +16,16 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=integration
-source "${DIR}/junit.sh" "$@"
+ERROR_PATTERN="\[ERROR\]"
+
+args=""
+if [[ "$@" =~ "-Ptest-flaky" ]]; then
+  args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
+  # tests may pass on re-run, so we cannot rely on output for status
+  ERROR_PATTERN=""
+fi
+if [[ "$@" =~ "-Ptest-" ]] && [[ ! "$@" =~ "-Ptest-filesystem" ]]; then
+  args="$args -DskipShade"
+fi
+
+source "${DIR}/junit.sh" $args "$@"

@@ -18,42 +18,4 @@
   <Match>
     <Package name="org.apache.hadoop.hdds.protocol.proto"/>
   </Match>
-  <!-- Test -->
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.TestHddsServerUtil" />
-    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.TestStorageContainerManagerHttpServer" />
-    <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.block.TestBlockManager" />
-    <Bug pattern="REC_CATCH_EXCEPTION" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.container.MockNodeManager" />
-    <Bug pattern="URF_UNREAD_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.node.TestDatanodeAdminMonitor" />
-    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.node.TestSCMNodeManager" />
-    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.server.TestSCMSecurityProtocolServer" />
-    <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.metadata.TestSCMTransactionInfoCodec"/>
-    <Bug pattern="NP_NULL_PARAM_DEREF_ALL_TARGETS_DANGEROUS" />
-  </Match>
-  <Match>
-    <Class name="org.apache.hadoop.hdds.scm.container.replication.ReplicationManager"/>
-    <Field name="metrics" />
-    <Bug pattern="IS2_INCONSISTENT_SYNC" />
-  </Match>
 </FindBugsFilter>

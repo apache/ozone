@@ -1,32 +1,30 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.base.Preconditions;
-
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Add reference counter to an object instance.
  */
-public class ReferenceCounted<T>
-    implements AutoCloseable {
+class ReferenceCounted<T> {
 
   /**
    * Object that is being reference counted. e.g. OmSnapshot
@@ -53,7 +51,7 @@ public class ReferenceCounted<T>
    */
   private final ReferenceCountedCallback parentWithCallback;
 
-  public ReferenceCounted(T obj, boolean disableCounter,
+  ReferenceCounted(T obj, boolean disableCounter,
       ReferenceCountedCallback parentWithCallback) {
     // A param to allow disabling ref counting to reduce active DB
     //  access penalties due to AtomicLong operations.
@@ -153,12 +151,5 @@ public class ReferenceCounted<T>
 
     long tid = Thread.currentThread().getId();
     return threadMap.getOrDefault(tid, 0L);
-  }
-
-  @Override
-  public void close() {
-    // Decrease ref count by 1 when close() is called on this object
-    // so it is eligible to be used with try-with-resources.
-    decrementRefCount();
   }
 }

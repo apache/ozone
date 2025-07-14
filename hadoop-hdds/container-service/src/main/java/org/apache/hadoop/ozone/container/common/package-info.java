@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,14 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.container.common;
+
 /**
-  Common Container Layer. At this layer the abstractions are:
-
- 1. Containers - Both data and metadata containers.
- 2. Keys - Key/Value pairs that live inside a container.
- 3. Chunks - Keys can be composed of many chunks.
-
- Ozone uses these abstractions to build Volumes, Buckets and Keys.
-
- **/
+ * Common Container Layer. At this layer the abstractions are:
+ *
+ * <ol>
+ * <li>Containers - Both data and metadata containers.
+ * <li>Keys - Key/Value pairs that live inside a container.
+ * <li>Chunks - Keys can be composed of many chunks.
+ * </ol>
+ *
+ * Ozone uses these abstractions to build Volumes, Buckets and Keys.
+ */
+package org.apache.hadoop.ozone.container.common;

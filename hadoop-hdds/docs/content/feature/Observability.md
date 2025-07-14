@@ -56,7 +56,7 @@ scrape_configs:
 
 ## Grafana
 
-Once Prometheus is up and running, Grana can be configured to monitor and visualize Ozone metrics.
+Once Prometheus is up and running, Grafana can be configured to monitor and visualize Ozone metrics.
 
 ### Add Prometheus as a data source
 
@@ -88,7 +88,7 @@ The dashboard is now imported.
 
 ![Overall dashboard](GrafanaOzoneOverall.png)
 
-Repeat the same for [Object Metrics](https://raw.githubusercontent.com/Xushaohong/ozone/master/hadoop-ozone/dist/src/main/compose/common/grafana/dashboards/Ozone%20-%20Object%20Metrics.json) dashboard and [RPC Metrics](https://raw.githubusercontent.com/Xushaohong/ozone/master/hadoop-ozone/dist/src/main/compose/common/grafana/dashboards/Ozone%20-%20RPC%20Metrics.json) dashboard.
+Repeat the same for [Object Metrics](https://raw.githubusercontent.com/apache/ozone/master/hadoop-ozone/dist/src/main/compose/common/grafana/dashboards/Ozone%20-%20Object%20Metrics.json) dashboard and [RPC Metrics](https://raw.githubusercontent.com/apache/ozone/master/hadoop-ozone/dist/src/main/compose/common/grafana/dashboards/Ozone%20-%20RPC%20Metrics.json) dashboard. (For more dashboards, including Create/Read/List/Delete Key, OM Snapshot, OM CommitIndex, OM RocksDB, S3 Object, RPC, JVM and Memory Metrics, see [this folder](https://github.com/apache/ozone/tree/master/hadoop-ozone/dist/src/main/compose/common/grafana/dashboards).)
 
 ![Object dashboard](GrafanaOzoneObjectMetrics.png)
 

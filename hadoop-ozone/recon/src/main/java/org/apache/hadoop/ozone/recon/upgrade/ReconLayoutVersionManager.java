@@ -1,29 +1,21 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.recon.upgrade;
-
-import org.apache.hadoop.ozone.recon.ReconContext;
-import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -32,6 +24,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import javax.sql.DataSource;
+import org.apache.hadoop.ozone.recon.ReconContext;
+import org.apache.hadoop.ozone.recon.ReconSchemaVersionTableManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ReconLayoutVersionManager is responsible for managing the layout version of the Recon service.
@@ -44,16 +41,18 @@ public class ReconLayoutVersionManager {
 
   private final ReconSchemaVersionTableManager schemaVersionTableManager;
   private final ReconContext reconContext;
+  private final DataSource dataSource;
 
   // Metadata Layout Version (MLV) of the Recon Metadata on disk
   private int currentMLV;
 
   public ReconLayoutVersionManager(ReconSchemaVersionTableManager schemaVersionTableManager,
-                                   ReconContext reconContext)
+                                   ReconContext reconContext, DataSource dataSource)
       throws SQLException {
     this.schemaVersionTableManager = schemaVersionTableManager;
     this.currentMLV = determineMLV();
     this.reconContext = reconContext;
+    this.dataSource = dataSource;
     ReconLayoutFeature.registerUpgradeActions();  // Register actions via annotation
   }
 
@@ -80,27 +79,32 @@ public class ReconLayoutVersionManager {
    * Finalizes the layout features that need to be upgraded, by executing the upgrade action for each
    * feature that is registered for finalization.
    */
-  public void finalizeLayoutFeatures(ReconStorageContainerManagerFacade scmFacade) {
+  public void finalizeLayoutFeatures() {
     // Get features that need finalization, sorted by version
     List<ReconLayoutFeature> featuresToFinalize = getRegisteredFeatures();
+    LOG.debug("Starting finalization of {} features.", featuresToFinalize.size());
 
-    try (Connection connection = scmFacade.getDataSource().getConnection()) {
+    try (Connection connection = dataSource.getConnection()) {
       connection.setAutoCommit(false); // Turn off auto-commit for transactional control
 
       for (ReconLayoutFeature feature : featuresToFinalize) {
+        LOG.debug("Processing feature version: {}", feature.getVersion());
         try {
           // Fetch only the FINALIZE action for the feature
           Optional<ReconUpgradeAction> action = feature.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE);
           if (action.isPresent()) {
+            LOG.debug("Finalize action found for feature version: {}", feature.getVersion());
             // Update the schema version in the database
             updateSchemaVersion(feature.getVersion(), connection);
 
             // Execute the upgrade action
-            action.get().execute(scmFacade);
+            action.get().execute(dataSource);
 
             // Commit the transaction only if both operations succeed
             connection.commit();
             LOG.info("Feature versioned {} finalized successfully.", feature.getVersion());
+          } else {
+            LOG.info("No finalize action found for feature version: {}", feature.getVersion());
           }
         } catch (Exception e) {
           // Rollback any pending changes for the current feature due to failure
@@ -118,7 +122,6 @@ public class ReconLayoutVersionManager {
       throw new RuntimeException("Recon failed to finalize layout features. Startup halted.", e);
     }
   }
-
 
   /**
    * Returns a list of ReconLayoutFeature objects that are registered for finalization.

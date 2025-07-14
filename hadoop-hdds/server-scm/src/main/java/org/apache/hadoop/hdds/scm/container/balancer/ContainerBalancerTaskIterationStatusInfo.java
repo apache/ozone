@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,13 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 
 /**
  * Information about balancer task iteration.
@@ -112,7 +110,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * Get a map of the node IDs and the corresponding data sizes moved to each node.
    * @return nodeId to size entering from node map
    */
-  public Map<UUID, Long> getSizeEnteringNodes() {
+  public Map<DatanodeID, Long> getSizeEnteringNodes() {
     return dataMoveInfo.getSizeEnteringNodes();
   }
 
@@ -120,7 +118,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * Get a map of the node IDs and the corresponding data sizes moved from each node.
    * @return nodeId to size leaving from node map
    */
-  public Map<UUID, Long> getSizeLeavingNodes() {
+  public Map<DatanodeID, Long> getSizeLeavingNodes() {
     return dataMoveInfo.getSizeLeavingNodes();
   }
 
@@ -162,7 +160,7 @@ public class ContainerBalancerTaskIterationStatusInfo {
    * @return node transfer info proto representation
    */
   private List<StorageContainerLocationProtocolProtos.NodeTransferInfoProto> mapToProtoNodeTransferInfo(
-      Map<UUID, Long> nodes
+      Map<DatanodeID, Long> nodes
   ) {
     return nodes.entrySet()
         .stream()

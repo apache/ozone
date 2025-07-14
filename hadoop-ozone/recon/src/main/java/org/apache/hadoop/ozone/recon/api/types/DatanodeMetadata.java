@@ -1,31 +1,31 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-
+import java.util.List;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
-import java.util.List;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 
 /**
  * Metadata object that represents a Datanode.
@@ -215,11 +215,6 @@ public final class DatanodeMetadata {
       return this;
     }
 
-    public Builder setOperationalState(NodeOperationalState operationalState) {
-      this.opState = operationalState;
-      return this;
-    }
-
     public Builder setLastHeartbeat(long lastHeartbeat) {
       this.lastHeartbeat = lastHeartbeat;
       return this;
@@ -256,30 +251,21 @@ public final class DatanodeMetadata {
       return this;
     }
 
-    public Builder setVersion(String version) {
-      this.version = version;
+    public Builder setDatanode(DatanodeInfo datanode) {
+      this.uuid = datanode.getUuidString();
+      this.hostname = datanode.getHostName();
+      this.networkLocation = datanode.getNetworkLocation();
+
+      this.opState = datanode.getPersistedOpState();
+
+      this.version = datanode.getVersion();
+      this.revision = datanode.getRevision();
+      this.layoutVersion = datanode.getLastKnownLayoutVersion().getMetadataLayoutVersion();
+
+      this.setupTime = datanode.getSetupTime();
       return this;
     }
 
-    public Builder setSetupTime(long setupTime) {
-      this.setupTime = setupTime;
-      return this;
-    }
-
-    public Builder setRevision(String revision) {
-      this.revision = revision;
-      return this;
-    }
-
-    public Builder setLayoutVersion(int layoutVersion) {
-      this.layoutVersion = layoutVersion;
-      return this;
-    }
-
-    public Builder setNetworkLocation(String networkLocation) {
-      this.networkLocation = networkLocation;
-      return this;
-    }
     /**
      * Constructs DatanodeMetadata.
      *

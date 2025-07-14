@@ -1,37 +1,62 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Map;
-import java.util.stream.Stream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
+import java.util.Map;
+import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -50,7 +75,6 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.http.HttpStatus;
@@ -61,34 +85,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * Test put object.
@@ -131,14 +127,17 @@ class TestObjectPut {
     bucket = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME);
     clientStub.getObjectStore().createS3Bucket(DEST_BUCKET_NAME);
 
-    // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = spy(new ObjectEndpoint());
-    objectEndpoint.setClient(clientStub);
-    objectEndpoint.setOzoneConfiguration(config);
-    objectEndpoint.setRequestIdentifier(new RequestIdentifier());
-
     headers = mock(HttpHeaders.class);
-    objectEndpoint.setHeaders(headers);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+
+    // Create PutObject and setClient to OzoneClientStub
+    objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(clientStub)
+        .setConfig(config)
+        .setHeaders(headers)
+        .build();
+
+    objectEndpoint = spy(objectEndpoint);
 
     String volumeName = config.get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
         OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
@@ -154,7 +153,7 @@ class TestObjectPut {
   @MethodSource("argumentsForPutObject")
   void testPutObject(int length, ReplicationConfig replication) throws IOException, OS3Exception {
     //GIVEN
-    final String content = RandomStringUtils.randomAlphanumeric(length);
+    final String content = RandomStringUtils.secure().nextAlphanumeric(length);
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8));
     bucket.setReplicationConfig(replication);
 
@@ -211,6 +210,7 @@ class TestObjectPut {
   @Test
   public void testPutObjectWithTags() throws IOException, OS3Exception {
     HttpHeaders headersWithTags = Mockito.mock(HttpHeaders.class);
+    when(headersWithTags.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     when(headersWithTags.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
 
     ByteArrayInputStream body =
@@ -235,6 +235,7 @@ class TestObjectPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     HttpHeaders headerWithOnlyTagKey = Mockito.mock(HttpHeaders.class);
+    when(headerWithOnlyTagKey.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     // Try to send with only the key (no value)
     when(headerWithOnlyTagKey.getHeaderString(TAG_HEADER)).thenReturn("tag1");
     objectEndpoint.setHeaders(headerWithOnlyTagKey);
@@ -255,6 +256,7 @@ class TestObjectPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     HttpHeaders headersWithDuplicateTagKey = Mockito.mock(HttpHeaders.class);
+    when(headersWithDuplicateTagKey.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     when(headersWithDuplicateTagKey.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag1=value2");
     objectEndpoint.setHeaders(headersWithDuplicateTagKey);
     try {
@@ -273,6 +275,7 @@ class TestObjectPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     HttpHeaders headersWithLongTagKey = Mockito.mock(HttpHeaders.class);
+    when(headersWithLongTagKey.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     String longTagKey = StringUtils.repeat('k', TAG_KEY_LENGTH_LIMIT + 1);
     when(headersWithLongTagKey.getHeaderString(TAG_HEADER)).thenReturn(longTagKey + "=value1");
     objectEndpoint.setHeaders(headersWithLongTagKey);
@@ -292,6 +295,7 @@ class TestObjectPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     HttpHeaders headersWithLongTagValue = Mockito.mock(HttpHeaders.class);
+    when(headersWithLongTagValue.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     objectEndpoint.setHeaders(headersWithLongTagValue);
     String longTagValue = StringUtils.repeat('v', TAG_VALUE_LENGTH_LIMIT + 1);
     when(headersWithLongTagValue.getHeaderString(TAG_HEADER)).thenReturn("tag1=" + longTagValue);
@@ -311,11 +315,12 @@ class TestObjectPut {
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     HttpHeaders headersWithTooManyTags = Mockito.mock(HttpHeaders.class);
+    when(headersWithTooManyTags.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < TAG_NUM_LIMIT + 1; i++) {
       sb.append(String.format("tag%d=value%d", i, i));
       if (i < TAG_NUM_LIMIT) {
-        sb.append("&");
+        sb.append('&');
       }
     }
     when(headersWithTooManyTags.getHeaderString(TAG_HEADER)).thenReturn(sb.toString());
@@ -372,7 +377,8 @@ class TestObjectPut {
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
-      mocked.when(() -> IOUtils.copy(any(InputStream.class), any(OutputStream.class), anyInt()))
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
+              anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
 
@@ -557,7 +563,8 @@ class TestObjectPut {
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // Add the mocked methods only during the copy request
       when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
-      mocked.when(() -> IOUtils.copy(any(InputStream.class), any(OutputStream.class), anyInt()))
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
+              anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
 
       // Add copy header, and then call put
@@ -580,6 +587,7 @@ class TestObjectPut {
   public void testCopyObjectWithTags() throws IOException, OS3Exception {
     // Put object in to source bucket
     HttpHeaders headersForPut = Mockito.mock(HttpHeaders.class);
+    when(headersForPut.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     when(headersForPut.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
@@ -601,6 +609,7 @@ class TestObjectPut {
     // Copy object without x-amz-tagging-directive (default to COPY)
     String destKey = "key=value/2";
     HttpHeaders headersForCopy = Mockito.mock(HttpHeaders.class);
+    when(headersForCopy.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     when(headersForCopy.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         BUCKET_NAME  + "/" + urlEncode(sourceKeyName));
 
@@ -677,7 +686,7 @@ class TestObjectPut {
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
         BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, null, null, null, body));
-    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getErrorMessage(),
+    assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getErrorMessage(),
         e.getErrorMessage());
     assertEquals("random", e.getResource());
   }
@@ -739,6 +748,7 @@ class TestObjectPut {
   @Test
   public void testPutEmptyObject() throws IOException, OS3Exception {
     HttpHeaders headersWithTags = Mockito.mock(HttpHeaders.class);
+    when(headersWithTags.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     String emptyString = "";
     ByteArrayInputStream body = new ByteArrayInputStream(emptyString.getBytes(UTF_8));
     objectEndpoint.setHeaders(headersWithTags);

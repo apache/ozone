@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,31 +16,6 @@
  */
 
 package org.apache.hadoop.hdds.scm.pipeline;
-
-import com.google.common.collect.ImmutableSet;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
@@ -53,12 +27,36 @@ import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCAT
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test for the ECPipelineProvider.
@@ -72,6 +70,7 @@ public class TestECPipelineProvider {
       mock(PipelineStateManager.class);
   private PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
   private long containerSizeBytes;
+
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException {
     conf = new OzoneConfiguration();
@@ -96,7 +95,6 @@ public class TestECPipelineProvider {
     when(nodeManager.getNodeStatus(any()))
         .thenReturn(NodeStatus.inServiceHealthy());
   }
-
 
   @Test
   public void testSimplePipelineCanBeCreatedWithIndexes() throws IOException {
@@ -139,10 +137,10 @@ public class TestECPipelineProvider {
         .thenReturn(NodeStatus.inServiceDead());
     DatanodeDetails dead2 = iterator.next().getDatanodeDetails();
     when(nodeManager.getNodeStatus(dead2))
-        .thenReturn(new NodeStatus(IN_MAINTENANCE, DEAD));
+        .thenReturn(NodeStatus.valueOf(IN_MAINTENANCE, DEAD));
     DatanodeDetails dead3 = iterator.next().getDatanodeDetails();
     when(nodeManager.getNodeStatus(dead3))
-        .thenReturn(new NodeStatus(DECOMMISSIONED, DEAD));
+        .thenReturn(NodeStatus.valueOf(DECOMMISSIONED, DEAD));
     Set<DatanodeDetails> deadNodes = ImmutableSet.of(dead, dead2, dead3);
 
     Pipeline pipeline = provider.createForRead(ecConf, replicas);
@@ -168,7 +166,7 @@ public class TestECPipelineProvider {
       DatanodeDetails decomNode = MockDatanodeDetails.randomDatanodeDetails();
       replicas.add(replica.toBuilder().setDatanodeDetails(decomNode).build());
       when(nodeManager.getNodeStatus(decomNode))
-          .thenReturn(new NodeStatus(DECOMMISSIONING, HEALTHY));
+          .thenReturn(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
       decomNodes.add(decomNode);
 
       DatanodeDetails staleNode = MockDatanodeDetails.randomDatanodeDetails();
@@ -215,7 +213,7 @@ public class TestECPipelineProvider {
           .setContainerState(StorageContainerDatanodeProtocolProtos
               .ContainerReplicaProto.State.CLOSED)
           .setKeyCount(1)
-          .setOriginNodeId(UUID.randomUUID())
+          .setOriginNodeId(DatanodeID.randomID())
           .setSequenceId(1)
           .setReplicaIndex(i + 1)
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())

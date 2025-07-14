@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,14 +17,10 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
-import org.apache.hadoop.ozone.security.acl.RequestContext;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,15 +28,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 
 /**
  * Helper class for ozone acls operations.
@@ -52,9 +48,6 @@ public final class OzoneAclUtil {
   private OzoneAclUtil() {
   }
 
-  private static ACLType[] userRights;
-  private static ACLType[] groupRights;
-
   /**
    * Helper function to get default access acl list for current user.
    *
@@ -62,19 +55,14 @@ public final class OzoneAclUtil {
    * @param conf current configuration
    * @return list of OzoneAcls
    * */
-  public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OzoneConfiguration conf) {
+  public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OmConfig conf) {
     // Get default acl rights for user and group.
-    if (userRights == null || groupRights == null) {
-      OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-      userRights = aclConfig.getUserDefaultRights();
-      groupRights = aclConfig.getGroupDefaultRights();
-    }
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     // User ACL.
-    listOfAcls.add(new OzoneAcl(USER, ugi.getShortUserName(), ACCESS, userRights));
+    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, conf.getUserDefaultRights()));
     try {
       String groupName = ugi.getPrimaryGroupName();
-      listOfAcls.add(new OzoneAcl(GROUP, groupName, ACCESS, groupRights));
+      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, conf.getGroupDefaultRights()));
     } catch (IOException e) {
       // do nothing, since user has the permission, user can add ACL for selected groups later.
       LOG.warn("Failed to get primary group from user {}", ugi);
@@ -85,10 +73,10 @@ public final class OzoneAclUtil {
   public static List<OzoneAcl> getAclList(UserGroupInformation ugi, ACLType userPrivilege, ACLType groupPrivilege) {
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     // User ACL.
-    listOfAcls.add(new OzoneAcl(USER, ugi.getShortUserName(), ACCESS, userPrivilege));
+    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, userPrivilege));
     try {
       String groupName = ugi.getPrimaryGroupName();
-      listOfAcls.add(new OzoneAcl(GROUP, groupName, ACCESS, groupPrivilege));
+      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, groupPrivilege));
     } catch (IOException e) {
       // do nothing, since user has the permission, user can add ACL for selected groups later.
       LOG.warn("Failed to get primary group from user {}", ugi);

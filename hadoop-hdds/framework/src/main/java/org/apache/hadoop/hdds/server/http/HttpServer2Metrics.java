@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.server.http;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -31,28 +31,8 @@ import org.eclipse.jetty.util.thread.QueuedThreadPool;
  */
 @InterfaceAudience.Private
 public final class HttpServer2Metrics implements MetricsSource {
-  enum HttpServer2MetricsInfo implements MetricsInfo {
-    SERVER_NAME("HttpServer2 Metrics."),
-    HttpServerThreadCount("Number of threads in the pool."),
-    HttpServerIdleThreadCount("Number of idle threads but not reserved."),
-    HttpServerMaxThreadCount("Maximum number of threads in the pool."),
-    HttpServerThreadQueueWaitingTaskCount(
-        "The number of jobs in the queue waiting for a thread");
 
-    private final String desc;
-
-    HttpServer2MetricsInfo(String desc) {
-      this.desc = desc;
-    }
-
-    @Override
-    public String description() {
-      return desc;
-    }
-  }
-
-  public static final String SOURCE_NAME =
-      HttpServer2Metrics.class.getSimpleName();
+  public static final String SOURCE_NAME = HttpServer2Metrics.class.getSimpleName();
 
   public static final String NAME = HttpServer2Metrics.class.getSimpleName();
 
@@ -90,5 +70,25 @@ public final class HttpServer2Metrics implements MetricsSource {
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(NAME);
+  }
+
+  enum HttpServer2MetricsInfo implements MetricsInfo {
+    SERVER_NAME("HttpServer2 Metrics."),
+    HttpServerThreadCount("Number of threads in the pool."),
+    HttpServerIdleThreadCount("Number of idle threads but not reserved."),
+    HttpServerMaxThreadCount("Maximum number of threads in the pool."),
+    HttpServerThreadQueueWaitingTaskCount(
+        "The number of jobs in the queue waiting for a thread");
+
+    private final String desc;
+
+    HttpServer2MetricsInfo(String desc) {
+      this.desc = desc;
+    }
+
+    @Override
+    public String description() {
+      return desc;
+    }
   }
 }

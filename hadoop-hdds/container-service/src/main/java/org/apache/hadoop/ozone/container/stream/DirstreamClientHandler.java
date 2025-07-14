@@ -1,36 +1,35 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.stream;
 
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import static org.apache.hadoop.ozone.container.stream.DirstreamServerHandler.END_MARKER;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ByteProcessor;
 import io.netty.util.ReferenceCountUtil;
-
-import static org.apache.hadoop.ozone.container.stream.DirstreamServerHandler.END_MARKER;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * Protocol definition from streaming binary files.
@@ -47,7 +46,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
 
   private final StreamingDestination destination;
   private boolean headerMode = true;
-  private StringBuilder currentFileName = new StringBuilder();
+  private String currentFileName = "";
   private RandomAccessFile destFile;
 
   private FileChannel destFileChannel;
@@ -77,11 +76,10 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
       if (eolPosition > 0) {
         headerMode = false;
         final ByteBuf name = buffer.readBytes(eolPosition);
-        currentFileName.append(name
-            .toString(StandardCharsets.UTF_8));
+        currentFileName += name.toString(StandardCharsets.UTF_8);
         name.release();
         buffer.skipBytes(1);
-        String[] parts = currentFileName.toString().split(" ", 2);
+        String[] parts = currentFileName.split(" ", 2);
         remaining = Long.parseLong(parts[0]);
         Path destFilePath = destination.mapToDestination(parts[1]);
         final Path destfileParent = destFilePath.getParent();
@@ -95,8 +93,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
         destFileChannel = this.destFile.getChannel();
 
       } else {
-        currentFileName
-            .append(buffer.toString(StandardCharsets.UTF_8));
+        currentFileName += buffer.toString(StandardCharsets.UTF_8);
       }
     }
     if (!headerMode) {
@@ -106,7 +103,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
             buffer.readBytes(destFileChannel, readableBytes);
       } else {
         remaining -= buffer.readBytes(destFileChannel, (int) remaining);
-        currentFileName = new StringBuilder();
+        currentFileName = "";
         headerMode = true;
         destFile.close();
         if (readableBytes > 0) {
@@ -119,6 +116,7 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
   public boolean isAtTheEnd() {
     return getCurrentFileName().equals(END_MARKER);
   }
+
   @Override
   public void channelUnregistered(ChannelHandlerContext ctx) {
     try {
@@ -143,6 +141,6 @@ public class DirstreamClientHandler extends ChannelInboundHandlerAdapter {
   }
 
   public String getCurrentFileName() {
-    return currentFileName.toString();
+    return currentFileName;
   }
 }

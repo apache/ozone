@@ -188,36 +188,36 @@ volumes:
    tmpfs1:
       driver: local
       driver_opts:
-         o: "size=1g,uid=1000"
+         o: "size=2g,uid=1000"
          device: tmpfs
          type: tmpfs
    tmpfs2:
       driver: local
       driver_opts:
-         o: "size=1g,uid=2000"
+         o: "size=2g,uid=2000"
          device: tmpfs
          type: tmpfs
    tmpfs3:
       driver: local
       driver_opts:
-         o: "size=1g,uid=3000"
+         o: "size=2g,uid=3000"
          device: tmpfs
          type: tmpfs
    tmpfs4:
       driver: local
       driver_opts:
-         o: "size=1g,uid=4000"
+         o: "size=2g,uid=4000"
          device: tmpfs
          type: tmpfs
    tmpfs5:
       driver: local
       driver_opts:
-         o: "size=1g,uid=5000"
+         o: "size=2g,uid=5000"
          device: tmpfs
          type: tmpfs
    tmpfs6:
       driver: local
       driver_opts:
-         o: "size=1g,uid=6000"
+         o: "size=2g,uid=6000"
          device: tmpfs
          type: tmpfs

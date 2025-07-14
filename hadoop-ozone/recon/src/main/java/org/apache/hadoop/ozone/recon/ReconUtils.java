@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,16 +17,25 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.jooq.impl.DSL.currentTimestamp;
+import static org.jooq.impl.DSL.select;
+import static org.jooq.impl.DSL.using;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.inject.Singleton;
+import jakarta.annotation.Nonnull;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -45,62 +53,42 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-
-import com.google.common.base.Preconditions;
-import com.google.inject.Singleton;
+import javax.ws.rs.core.Response;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
-import org.apache.hadoop.io.IOUtils;
-
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
-import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.jooq.impl.DSL.currentTimestamp;
-import static org.jooq.impl.DSL.select;
-import static org.jooq.impl.DSL.using;
-
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.ServiceNotReadyException;
-import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
+import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import jakarta.annotation.Nonnull;
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.Time;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.ws.rs.core.Response;
 
 /**
  * Recon Utility class.
@@ -108,15 +96,13 @@ import javax.ws.rs.core.Response;
 @Singleton
 public class ReconUtils {
 
-  private static final int WRITE_BUFFER = 1048576; //1MB
-
-  public ReconUtils() {
-  }
-
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
 
   private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
+
+  public ReconUtils() {
+  }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
@@ -168,59 +154,12 @@ public class ReconUtils {
    *
    * @param sourcePath the path to the directory to be archived.
    * @return tar file
-   * @throws IOException
    */
   public static File createTarFile(Path sourcePath) throws IOException {
-    TarArchiveOutputStream tarOs = null;
-    FileOutputStream fileOutputStream = null;
-    try {
-      String sourceDir = sourcePath.toString();
-      String fileName = sourceDir.concat(".tar");
-      fileOutputStream = new FileOutputStream(fileName);
-      tarOs = new TarArchiveOutputStream(fileOutputStream);
-      tarOs.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-      File folder = new File(sourceDir);
-      File[] filesInDir = folder.listFiles();
-      if (filesInDir != null) {
-        for (File file : filesInDir) {
-          addFilesToArchive(file.getName(), file, tarOs);
-        }
-      }
-      return new File(fileName);
-    } finally {
-      try {
-        org.apache.hadoop.io.IOUtils.closeStream(tarOs);
-        org.apache.hadoop.io.IOUtils.closeStream(fileOutputStream);
-      } catch (Exception e) {
-        log.error("Exception encountered when closing " +
-            "TAR file output stream: " + e);
-      }
-    }
-  }
-
-  private static void addFilesToArchive(String source, File file,
-                                        TarArchiveOutputStream
-                                            tarFileOutputStream)
-      throws IOException {
-    tarFileOutputStream.putArchiveEntry(new TarArchiveEntry(file, source));
-    if (file.isFile()) {
-      try (FileInputStream fileInputStream = new FileInputStream(file)) {
-        BufferedInputStream bufferedInputStream =
-            new BufferedInputStream(fileInputStream);
-        org.apache.commons.compress.utils.IOUtils.copy(bufferedInputStream,
-            tarFileOutputStream);
-        tarFileOutputStream.closeArchiveEntry();
-      }
-    } else if (file.isDirectory()) {
-      tarFileOutputStream.closeArchiveEntry();
-      File[] filesInDir = file.listFiles();
-      if (filesInDir != null) {
-        for (File cFile : filesInDir) {
-          addFilesToArchive(cFile.getAbsolutePath(), cFile,
-              tarFileOutputStream);
-        }
-      }
-    }
+    String source = StringUtils.removeEnd(sourcePath.toString(), "/");
+    File tarFile = new File(source.concat(".tar"));
+    Archiver.create(tarFile, sourcePath);
+    return tarFile;
   }
 
   /**
@@ -232,54 +171,8 @@ public class ReconUtils {
    */
   public void untarCheckpointFile(File tarFile, Path destPath)
       throws IOException {
-
-    FileInputStream fileInputStream = null;
-    try {
-      fileInputStream = new FileInputStream(tarFile);
-
-      //Create Destination directory if it does not exist.
-      if (!destPath.toFile().exists()) {
-        boolean success = destPath.toFile().mkdirs();
-        if (!success) {
-          throw new IOException("Unable to create Destination directory.");
-        }
-      }
-
-      try (TarArchiveInputStream tarInStream =
-               new TarArchiveInputStream(fileInputStream)) {
-        TarArchiveEntry entry;
-
-        while ((entry = (TarArchiveEntry) tarInStream.getNextEntry()) != null) {
-          Path path = Paths.get(destPath.toString(), entry.getName());
-          HddsUtils.validatePath(path, destPath);
-          File f = path.toFile();
-          //If directory, create a directory.
-          if (entry.isDirectory()) {
-            boolean success = f.mkdirs();
-            if (!success) {
-              log.error("Unable to create directory found in tar.");
-            }
-          } else {
-            //Write contents of file in archive to a new file.
-            int count;
-            byte[] data = new byte[WRITE_BUFFER];
-
-            FileOutputStream fos = new FileOutputStream(f);
-            try (BufferedOutputStream dest =
-                     new BufferedOutputStream(fos, WRITE_BUFFER)) {
-              while ((count =
-                  tarInStream.read(data, 0, WRITE_BUFFER)) != -1) {
-                dest.write(data, 0, count);
-              }
-            }
-          }
-        }
-      }
-    } finally {
-      IOUtils.closeStream(fileInputStream);
-    }
+    Archiver.extract(tarFile, destPath);
   }
-
 
   /**
    * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
@@ -332,7 +225,6 @@ public class ReconUtils {
     return fullPath.toString();
   }
 
-
   /**
    * Constructs the prefix path to a key from its key name and parent ID using a bottom-up approach, starting from the
    * leaf node.
@@ -353,10 +245,11 @@ public class ReconUtils {
   public static StringBuilder constructFullPathPrefix(long initialParentId, String volumeName,
       String bucketName, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager) throws IOException {
-    StringBuilder fullPath = new StringBuilder();
+
     long parentId = initialParentId;
     boolean isDirectoryPresent = false;
 
+    List<String> pathSegments = new ArrayList<>();
     while (parentId != 0) {
       NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
       if (nsSummary == null) {
@@ -373,7 +266,7 @@ public class ReconUtils {
       }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
       if (!nsSummary.getDirName().isEmpty()) {
-        fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+        pathSegments.add(nsSummary.getDirName());
       }
 
       // Move to the parent ID of the current directory
@@ -381,8 +274,15 @@ public class ReconUtils {
       isDirectoryPresent = true;
     }
 
-    // Prepend the volume and bucket to the constructed path
-    fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    StringBuilder fullPath = new StringBuilder();
+    fullPath.append(volumeName).append(OM_KEY_PREFIX)
+        .append(bucketName).append(OM_KEY_PREFIX);
+
+    // Build the components in a list, then reverse and join once
+    for (int i = pathSegments.size() - 1; i >= 0; i--) {
+      fullPath.append(pathSegments.get(i)).append(OM_KEY_PREFIX);
+    }
+
     // TODO - why is this needed? It seems lke it should handle double slashes in the path name,
     //        but its not clear how they get there. This normalize call is quite expensive as it
     //        creates several objects (URI, PATH, back to string). There was a bug fixed above
@@ -390,9 +290,11 @@ public class ReconUtils {
     //        bucket name, but with that fixed, it seems like this should not be needed. All tests
     //        pass without it for key listing.
     if (isDirectoryPresent) {
-      String path = fullPath.toString();
-      fullPath.setLength(0);
-      fullPath.append(OmUtils.normalizeKey(path, true));
+      if (fullPath.indexOf("//") >= 0) {
+        String path = fullPath.toString();
+        fullPath.setLength(0);
+        fullPath.append(OmUtils.normalizeKey(path, true));
+      }
     }
     return fullPath;
   }
@@ -500,12 +402,12 @@ public class ReconUtils {
     });
 
     executor.submit(() -> {
-      long startTime = System.currentTimeMillis();
+      long startTime = Time.monotonicNow();
       log.info("Rebuilding NSSummary tree...");
       try {
         reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
       } finally {
-        long endTime = System.currentTimeMillis();
+        long endTime = Time.monotonicNow();
         log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
       }
     });
@@ -540,6 +442,7 @@ public class ReconUtils {
    */
   public File getLastKnownDB(File reconDbDir, String fileNamePrefix) {
     String lastKnownSnapshotFileName = null;
+    File lastKnownSnapshotFile = null;
     long lastKnonwnSnapshotTs = Long.MIN_VALUE;
     if (reconDbDir != null) {
       File[] snapshotFiles = reconDbDir.listFiles((dir, name) ->
@@ -554,11 +457,21 @@ public class ReconUtils {
             }
             long snapshotTimestamp = Long.parseLong(fileNameSplits[1]);
             if (lastKnonwnSnapshotTs < snapshotTimestamp) {
+              if (lastKnownSnapshotFile != null) {
+                try {
+                  FileUtils.forceDelete(lastKnownSnapshotFile);
+                } catch (IOException e) {
+                  log.warn("Error deleting existing om db snapshot directory: {}",
+                      lastKnownSnapshotFile.getAbsolutePath());
+                }
+              }
               lastKnonwnSnapshotTs = snapshotTimestamp;
               lastKnownSnapshotFileName = fileName;
+              lastKnownSnapshotFile = snapshotFile;
             }
           } catch (NumberFormatException nfEx) {
             log.warn("Unknown file found in Recon DB dir : {}", fileName);
+            FileUtils.deleteQuietly(snapshotFile);
           }
         }
       }
@@ -665,7 +578,6 @@ public class ReconUtils {
     int binIndex = getContainerSizeBinIndex(containerSize);
     return (long) Math.pow(2, (29 + binIndex));
   }
-
 
   public static int getFileSizeBinIndex(long fileSize) {
     Preconditions.checkArgument(fileSize >= 0,

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,6 +18,12 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.DUFactory;
@@ -30,11 +35,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.time.OffsetDateTime;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
-
 /**
  * Container balancer is a service in SCM to move containers between over- and
  * under-utilized datanodes.
@@ -43,7 +43,7 @@ public class ContainerBalancer extends StatefulService {
 
   private static final AtomicInteger ID = new AtomicInteger();
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancer.class);
 
   private StorageContainerManager scm;
@@ -197,6 +197,7 @@ public class ContainerBalancer extends StatefulService {
       lock.unlock();
     }
   }
+
   /**
    * Checks if ContainerBalancer is in valid state to call stop.
    *
@@ -459,6 +460,23 @@ public class ContainerBalancer extends StatefulService {
       throw new InvalidContainerBalancerConfigurationException(
           "hdds.container.balancer.move.replication.timeout should " +
           "be less than hdds.container.balancer.move.timeout.");
+    }
+
+    // (move.timeout - move.replication.timeout - event.timeout.datanode.offset)
+    // should be greater than or equal to 9 minutes
+    long datanodeOffset = ozoneConfiguration.getTimeDuration("hdds.scm.replication.event.timeout.datanode.offset",
+        Duration.ofMinutes(6).toMillis(), TimeUnit.MILLISECONDS);
+    if ((conf.getMoveTimeout().toMillis() - conf.getMoveReplicationTimeout().toMillis() - datanodeOffset)
+        < Duration.ofMinutes(9).toMillis()) {
+      String msg = String.format("(hdds.container.balancer.move.timeout (%sms) - " +
+              "hdds.container.balancer.move.replication.timeout (%sms) - " +
+              "hdds.scm.replication.event.timeout.datanode.offset (%sms)) " +
+              "should be greater than or equal to 540000ms or 9 minutes.",
+          conf.getMoveTimeout().toMillis(),
+          conf.getMoveReplicationTimeout().toMillis(),
+          Duration.ofMillis(datanodeOffset).toMillis());
+      LOG.warn(msg);
+      throw new InvalidContainerBalancerConfigurationException(msg);
     }
   }
 

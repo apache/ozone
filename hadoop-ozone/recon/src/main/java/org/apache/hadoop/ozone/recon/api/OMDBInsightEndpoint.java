@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +17,45 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_KEY_SIZE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_NON_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_NON_FSO;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_START_PREFIX;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
+import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
+import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
+import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
+import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
+
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -32,59 +69,19 @@ import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
-import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ParamInfo;
+import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Inject;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_FSO;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_OPEN_KEY_INCLUDE_NON_FSO;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_FSO;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OPEN_KEY_INCLUDE_NON_FSO;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_START_PREFIX;
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_KEY_SIZE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
-import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createBadRequestResponse;
-import static org.apache.hadoop.ozone.recon.ReconResponseUtils.createInternalServerErrorResponse;
-import static org.apache.hadoop.ozone.recon.ReconResponseUtils.noMatchedKeysResponse;
-import static org.apache.hadoop.ozone.recon.api.handlers.BucketHandler.getBucketHandler;
-import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.normalizePath;
-import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequestPath;
-
 
 /**
  * Endpoint to get following key level info under OM DB Insight page of Recon.
@@ -107,7 +104,6 @@ public class OMDBInsightEndpoint {
   private final GlobalStatsDao globalStatsDao;
   private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
-
 
   @Inject
   public OMDBInsightEndpoint(OzoneStorageContainerManager reconSCM,
@@ -562,7 +558,6 @@ public class OMDBInsightEndpoint {
     keysSummary.put("totalUnreplicatedDataSize", unreplicatedSizeDeleted);
   }
 
-
   private void getPendingForDeletionDirInfo(
       int limit, String prevKey,
       KeyInsightInfoResponse pendingForDeletionKeyInfo) {
@@ -996,7 +991,7 @@ public class OMDBInsightEndpoint {
 
 
     // This API supports startPrefix from bucket level.
-    if (startPrefix == null || startPrefix.length() == 0) {
+    if (startPrefix == null || startPrefix.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     String[] names = startPrefix.split(OM_KEY_PREFIX);
@@ -1019,7 +1014,7 @@ public class OMDBInsightEndpoint {
       listKeysResponse = (ListKeysResponse) response.getEntity();
     }
 
-    List<KeyEntityInfoProtoWrapper> keyInfoList = listKeysResponse.getKeys();
+    List<ReconBasicOmKeyInfo> keyInfoList = listKeysResponse.getKeys();
     if (!keyInfoList.isEmpty()) {
       listKeysResponse.setLastKey(keyInfoList.get(keyInfoList.size() - 1).getKey());
     }
@@ -1034,9 +1029,9 @@ public class OMDBInsightEndpoint {
       long replicatedTotal = 0;
       long unreplicatedTotal = 0;
 
-      // Search keys from non-FSO layout.
-      Table<String, KeyEntityInfoProtoWrapper> keyTable =
-          omMetadataManager.getKeyTableLite(BucketLayout.LEGACY);
+      Table<String, ReconBasicOmKeyInfo> keyTable =
+          omMetadataManager.getKeyTableBasic(BucketLayout.LEGACY);
+
       retrieveKeysFromTable(keyTable, paramInfo, listKeysResponse.getKeys());
 
       // Search keys from FSO layout.
@@ -1047,7 +1042,7 @@ public class OMDBInsightEndpoint {
         return ReconResponseUtils.noMatchedKeysResponse(paramInfo.getStartPrefix());
       }
 
-      for (KeyEntityInfoProtoWrapper keyEntityInfo : listKeysResponse.getKeys()) {
+      for (ReconBasicOmKeyInfo keyEntityInfo : listKeysResponse.getKeys()) {
         replicatedTotal += keyEntityInfo.getReplicatedSize();
         unreplicatedTotal += keyEntityInfo.getSize();
       }
@@ -1072,13 +1067,14 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  public void searchKeysInFSO(ParamInfo paramInfo, List<KeyEntityInfoProtoWrapper> results)
+  public void searchKeysInFSO(ParamInfo paramInfo, List<ReconBasicOmKeyInfo> results)
       throws IOException {
     // Convert the search prefix to an object path for FSO buckets
     String startPrefixObjectPath = convertStartPrefixPathToObjectIdPath(paramInfo.getStartPrefix());
     String[] names = parseRequestPath(startPrefixObjectPath);
-    Table<String, KeyEntityInfoProtoWrapper> fileTable =
-        omMetadataManager.getKeyTableLite(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    Table<String, ReconBasicOmKeyInfo> fileTable =
+        omMetadataManager.getKeyTableBasic(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // If names.length > 2, then the search prefix is at the level above bucket level hence
     // no need to find parent or extract id's or find subpaths as the fileTable is
@@ -1115,7 +1111,6 @@ public class OMDBInsightEndpoint {
     // Iterate over for bucket and volume level search
     retrieveKeysFromTable(fileTable, paramInfo, results);
   }
-
 
   /**
    * Converts a startPrefix path into an objectId path for FSO buckets, using IDs.
@@ -1187,16 +1182,16 @@ public class OMDBInsightEndpoint {
    * @throws IOException If there are problems accessing the table.
    */
   private void retrieveKeysFromTable(
-      Table<String, KeyEntityInfoProtoWrapper> table, ParamInfo paramInfo, List<KeyEntityInfoProtoWrapper> results)
+      Table<String, ReconBasicOmKeyInfo> table, ParamInfo paramInfo, List<ReconBasicOmKeyInfo> results)
       throws IOException {
     boolean skipPrevKey = false;
     String seekKey = paramInfo.getPrevKey();
     try (
-        TableIterator<String, ? extends Table.KeyValue<String, KeyEntityInfoProtoWrapper>> keyIter = table.iterator()) {
+        TableIterator<String, ? extends Table.KeyValue<String, ReconBasicOmKeyInfo>> keyIter = table.iterator()) {
 
       if (!paramInfo.isSkipPrevKeyDone() && isNotBlank(seekKey)) {
         skipPrevKey = true;
-        Table.KeyValue<String, KeyEntityInfoProtoWrapper> seekKeyValue =
+        Table.KeyValue<String, ReconBasicOmKeyInfo> seekKeyValue =
             keyIter.seek(seekKey);
 
         // check if RocksDB was able to seek correctly to the given key prefix
@@ -1213,7 +1208,7 @@ public class OMDBInsightEndpoint {
       StringBuilder keyPrefix = null;
       int keyPrefixLength = 0;
       while (keyIter.hasNext()) {
-        Table.KeyValue<String, KeyEntityInfoProtoWrapper> entry = keyIter.next();
+        Table.KeyValue<String, ReconBasicOmKeyInfo> entry = keyIter.next();
         String dbKey = entry.getKey();
         if (!dbKey.startsWith(paramInfo.getStartPrefix())) {
           break; // Exit the loop if the key no longer matches the prefix
@@ -1223,7 +1218,7 @@ public class OMDBInsightEndpoint {
           continue;
         }
         if (applyFilters(entry, paramInfo)) {
-          KeyEntityInfoProtoWrapper keyEntityInfo = entry.getValue();
+          ReconBasicOmKeyInfo keyEntityInfo = entry.getValue();
           keyEntityInfo.setKey(dbKey);
           if (keyEntityInfo.getParentId() == 0) {
             // Legacy bucket keys have a parentID of zero. OBS bucket keys have a parentID of the bucketID.
@@ -1264,7 +1259,7 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  private boolean applyFilters(Table.KeyValue<String, KeyEntityInfoProtoWrapper> entry, ParamInfo paramInfo)
+  private boolean applyFilters(Table.KeyValue<String, ReconBasicOmKeyInfo> entry, ParamInfo paramInfo)
       throws IOException {
 
     LOG.debug("Applying filters on : {}", entry.getKey());
@@ -1331,7 +1326,6 @@ public class OMDBInsightEndpoint {
     return omKeyInfo.getVolumeName() + OM_KEY_PREFIX +
         omKeyInfo.getBucketName() + OM_KEY_PREFIX + omKeyInfo.getKeyName();
   }
-
 
   @VisibleForTesting
   public GlobalStatsDao getDao() {

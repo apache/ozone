@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-import React, { useRef, useState } from 'react';
+import React, {useRef, useState} from 'react';
 import moment from 'moment';
-import axios, { AxiosError } from 'axios';
-import { Table } from 'antd';
+import axios, {AxiosError} from 'axios';
+import {Table} from 'antd';
 
-import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
-import { byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError } from '@/utils/common';
+import {AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper} from '@/utils/axiosRequestHelper';
+import {byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError} from '@/utils/common';
 
-import { Acl } from '@/v2/types/acl.types';
+import {Acl} from '@/v2/types/acl.types';
 
 
 // ------------- Types -------------- //
@@ -137,8 +137,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
      */
     const selectedInfoKeys = [
       'bucketName', 'bucketLayout', 'encInfo', 'fileName', 'keyName',
-      'name', 'owner', 'sourceBucket', 'sourceVolume', 'storageType',
-      'usedNamespace', 'volumeName', 'volume'
+      'name', 'owner', 'storageType', 'usedNamespace', 'volumeName', 'volume'
     ] as const;
     const objectInfo: ObjectInfo = summaryResponse.objectInfo ?? {};
 
@@ -154,6 +153,22 @@ const DUMetadata: React.FC<MetadataProps> = ({
         });
       }
     });
+
+    // Source Volume and Source Bucket are present for linked buckets and volumes.
+    // If it is not linked it will be null and should not be shown
+    if (objectInfo?.sourceBucket !== undefined && objectInfo?.sourceBucket !== null) {
+      data.push({
+        key: 'Source Bucket',
+        value: objectInfo.sourceBucket
+      });
+    }
+
+    if(objectInfo?.sourceVolume !== undefined && objectInfo?.sourceVolume !== null) {
+      data.push({
+        key: 'Source Volume',
+        value: objectInfo.sourceVolume
+      });
+    }
 
     if (objectInfo?.creationTime !== undefined && objectInfo?.creationTime !== -1) {
       data.push({
@@ -186,7 +201,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
     if (objectInfo?.quotaInNamespace !== undefined && objectInfo?.quotaInNamespace !== -1) {
       data.push({
         key: 'Quota In Namespace',
-        value: byteToSize(objectInfo.quotaInNamespace, 3)
+        value: objectInfo.quotaInNamespace
       });
     }
 
@@ -255,7 +270,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
         // If the entity is a Key then fetch the Key metadata only
         if (summaryResponse.type === 'KEY') {
           const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(
-            `/api/v1/namespace/du?path=${path}&replica=true`,
+            `/api/v1/namespace/usage?path=${path}&replica=true`,
             keyMetadataSummarySignal.current
           );
           keyMetadataSummarySignal.current = metadataNewController;

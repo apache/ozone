@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,25 +17,7 @@
 
 package org.apache.ozone.lib.service.hadoop;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.ozone.lib.server.BaseService;
-import org.apache.ozone.lib.server.ServiceException;
-import org.apache.ozone.lib.service.FileSystemAccess;
-import org.apache.ozone.lib.service.FileSystemAccessException;
-import org.apache.ozone.lib.service.Instrumentation;
-import org.apache.ozone.lib.service.Scheduler;
-import org.apache.ozone.lib.util.Check;
-import org.apache.ozone.lib.util.ConfigurationUtils;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.VersionInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,8 +30,26 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
+import org.apache.hadoop.util.VersionInfo;
+import org.apache.ozone.lib.server.BaseService;
+import org.apache.ozone.lib.server.ServiceException;
+import org.apache.ozone.lib.service.FileSystemAccess;
+import org.apache.ozone.lib.service.FileSystemAccessException;
+import org.apache.ozone.lib.service.Instrumentation;
+import org.apache.ozone.lib.service.Scheduler;
+import org.apache.ozone.lib.util.Check;
+import org.apache.ozone.lib.util.ConfigurationUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides authenticated filesystem access.
@@ -81,8 +80,23 @@ public class FileSystemAccessService extends BaseService
   private static final String[] HADOOP_CONF_FILES
       = {"core-site.xml", "hdfs-site.xml"};
 
-  private static final String FILE_SYSTEM_SERVICE_CREATED
+  public static final String FILE_SYSTEM_SERVICE_CREATED
       = "FileSystemAccessService.created";
+
+  private static final String HTTPFS_FS_USER = "httpfs.fs.user";
+
+  private Collection<String> nameNodeWhitelist;
+
+  private Configuration serviceHadoopConf;
+
+  private Configuration fileSystemConf;
+
+  private AtomicInteger unmanagedFileSystems = new AtomicInteger();
+
+  private ConcurrentHashMap<String, CachedFileSystem> fsCache =
+      new ConcurrentHashMap<String, CachedFileSystem>();
+
+  private long purgeTimeout;
 
   private static class CachedFileSystem {
     private FileSystem fs;
@@ -114,7 +128,7 @@ public class FileSystemAccessService extends BaseService
           fs = null;
           lastUse = -1;
         } else {
-          lastUse = System.currentTimeMillis();
+          lastUse = Time.monotonicNow();
         }
       }
     }
@@ -127,7 +141,7 @@ public class FileSystemAccessService extends BaseService
     synchronized boolean purgeIfIdle() throws IOException {
       boolean ret = false;
       if (count == 0 && lastUse != -1 &&
-          (System.currentTimeMillis() - lastUse) > timeout) {
+          (Time.monotonicNow() - lastUse) > timeout) {
         fs.close();
         fs = null;
         lastUse = -1;
@@ -142,21 +156,6 @@ public class FileSystemAccessService extends BaseService
     super(PREFIX);
   }
 
-  private Collection<String> nameNodeWhitelist;
-
-  // Suppressed because serviceHadoopConf only used in this class and in the
-  // tests, which will be removed later.
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  Configuration serviceHadoopConf;
-  private Configuration fileSystemConf;
-
-  private AtomicInteger unmanagedFileSystems = new AtomicInteger();
-
-  private ConcurrentHashMap<String, CachedFileSystem> fsCache =
-      new ConcurrentHashMap<String, CachedFileSystem>();
-
-  private long purgeTimeout;
-
   @Override
   protected void init() throws ServiceException {
     LOG.info("Using FileSystemAccess JARs version [{}]",
@@ -168,13 +167,13 @@ public class FileSystemAccessService extends BaseService
       String keytab = System
           .getProperty("user.home") + "/" + defaultName + ".keytab";
       keytab = getServiceConfig().get(KERBEROS_KEYTAB, keytab).trim();
-      if (keytab.length() == 0) {
+      if (keytab.isEmpty()) {
         throw new ServiceException(FileSystemAccessException.ERROR.H01,
             KERBEROS_KEYTAB);
       }
       String principal = defaultName + "/localhost@LOCALHOST";
       principal = getServiceConfig().get(KERBEROS_PRINCIPAL, principal).trim();
-      if (principal.length() == 0) {
+      if (principal.isEmpty()) {
         throw new ServiceException(FileSystemAccessException.ERROR.H01,
             KERBEROS_PRINCIPAL);
       }
@@ -326,8 +325,6 @@ public class FileSystemAccessService extends BaseService
     conf.set("fs.hdfs.impl.disable.cache", "true");
   }
 
-  private static final String HTTPFS_FS_USER = "httpfs.fs.user";
-
   protected FileSystem createFileSystem(Configuration namenodeConf)
       throws IOException {
     String user = UserGroupInformation.getCurrentUser().getShortUserName();
@@ -349,7 +346,7 @@ public class FileSystemAccessService extends BaseService
 
   protected void validateNamenode(String namenode)
       throws FileSystemAccessException {
-    if (nameNodeWhitelist.size() > 0 && !nameNodeWhitelist.contains("*")) {
+    if (!nameNodeWhitelist.isEmpty() && !nameNodeWhitelist.contains("*")) {
       if (!nameNodeWhitelist.contains(
           StringUtils.toLowerCase(namenode))) {
         throw new FileSystemAccessException(FileSystemAccessException.ERROR.H05,
@@ -375,8 +372,7 @@ public class FileSystemAccessService extends BaseService
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H04);
     }
     if (conf.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) == null ||
-        conf.getTrimmed(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY)
-            .length() == 0) {
+        conf.getTrimmed(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY).isEmpty()) {
       throw new FileSystemAccessException(FileSystemAccessException.ERROR.H06,
                                           CommonConfigurationKeysPublic
                                               .FS_DEFAULT_NAME_KEY);

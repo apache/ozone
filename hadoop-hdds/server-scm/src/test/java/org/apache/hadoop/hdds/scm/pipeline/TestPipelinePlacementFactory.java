@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,15 +17,25 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import java.io.IOException;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.io.File;
 import java.util.List;
-
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -50,19 +59,6 @@ import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
 
 /**
  * Test for PipelinePlacementFactory.
@@ -114,12 +110,12 @@ public class TestPipelinePlacementFactory {
 
       StorageContainerDatanodeProtocolProtos.StorageReportProto storage1 =
           HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
           STORAGE_CAPACITY, 0, 100L, null);
       StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
           metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
-              "/metadata1-" + datanodeInfo.getUuidString(),
+              "/metadata1-" + datanodeInfo.getID(),
               STORAGE_CAPACITY, 0, 100L, null);
       datanodeInfo.updateStorageReports(
           new ArrayList<>(Arrays.asList(storage1)));
@@ -131,7 +127,7 @@ public class TestPipelinePlacementFactory {
         false, 10);
     nodeManager = spy(nodeManagerBase);
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNode(dn.getID()))
           .thenReturn(dn);
     }
 
@@ -147,7 +143,7 @@ public class TestPipelinePlacementFactory {
   }
 
   @Test
-  public void testDefaultPolicy() throws IOException {
+  public void testDefaultPolicy() {
     PlacementPolicy policy = PipelinePlacementPolicyFactory
         .getPolicy(null, null, conf);
     assertSame(PipelinePlacementPolicy.class, policy.getClass());
@@ -318,14 +314,10 @@ public class TestPipelinePlacementFactory {
         policy.chooseDatanodes(usedNodes, excludeNodes, null, nodeNum, 15, 15);
     assertEquals(nodeNum, datanodeDetails.size());
     // policy should not return any of excluded node
-    assertNotSame(datanodeDetails.get(0).getUuid(),
-        excludeNodes.get(0).getUuid());
-    assertNotSame(datanodeDetails.get(0).getUuid(),
-        excludeNodes.get(1).getUuid());
-    assertNotSame(datanodeDetails.get(1).getUuid(),
-        excludeNodes.get(0).getUuid());
-    assertNotSame(datanodeDetails.get(1).getUuid(),
-        excludeNodes.get(1).getUuid());
+    assertNotSame(datanodeDetails.get(0).getID(), excludeNodes.get(0).getID());
+    assertNotSame(datanodeDetails.get(0).getID(), excludeNodes.get(1).getID());
+    assertNotSame(datanodeDetails.get(1).getID(), excludeNodes.get(0).getID());
+    assertNotSame(datanodeDetails.get(1).getID(), excludeNodes.get(1).getID());
     // One of the node should be in same rack as Node0
     assertTrue(cluster.isSameParent(usedNodes.get(0),
         datanodeDetails.get(0)) || cluster.isSameParent(usedNodes.get(0),
@@ -342,10 +334,8 @@ public class TestPipelinePlacementFactory {
         policy.chooseDatanodes(usedNodes, excludeNodes, null, nodeNum, 15, 15);
     assertEquals(nodeNum, datanodeDetails.size());
     // policy should not return any of excluded node
-    assertNotSame(datanodeDetails.get(0).getUuid(),
-        excludeNodes.get(0).getUuid());
-    assertNotSame(datanodeDetails.get(0).getUuid(),
-        excludeNodes.get(1).getUuid());
+    assertNotSame(datanodeDetails.get(0).getID(), excludeNodes.get(0).getID());
+    assertNotSame(datanodeDetails.get(0).getID(), excludeNodes.get(1).getID());
     // Since rack0 has not enough node (node0 is used and node1 is excluded),
     // Anchor will change to node4(rack2) and will return another node
     // from rack2

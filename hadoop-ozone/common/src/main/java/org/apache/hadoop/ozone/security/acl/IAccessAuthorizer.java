@@ -1,27 +1,33 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.security.acl;
 
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-
-import java.util.BitSet;
 
 /**
  * Public API for Ozone ACLs. Security providers providing support for Ozone
@@ -70,6 +76,7 @@ public interface IAccessAuthorizer {
             + " > 16, check the commit of this change and update the code.");
       }
     }
+
     private static ACLType[] vals = ACLType.values();
 
     public static int getNoOfAcls() {
@@ -118,7 +125,6 @@ public interface IAccessAuthorizer {
         throw new IllegalArgumentException("[" + type + "] ACL right is not " +
             "recognized");
       }
-
     }
 
     /**
@@ -159,6 +165,15 @@ public interface IAccessAuthorizer {
         throw new IllegalArgumentException("ACL right is not recognized");
       }
     }
+
+    public static Set<ACLType> parseList(String conf) {
+      String[] array = Objects.requireNonNull(conf, "conf == null")
+          .trim()
+          .split(",");
+      return Collections.unmodifiableSet(Arrays.stream(array)
+          .map(each -> ACLType.valueOf(each.trim()))
+          .collect(Collectors.toCollection(() -> EnumSet.noneOf(ACLType.class))));
+    }
   }
 
   /**
@@ -173,10 +188,6 @@ public interface IAccessAuthorizer {
 
     // TODO: Add support for acl checks based on CLIENT_IP.
 
-    @Override
-    public String toString() {
-      return value;
-    }
     /**
      * String value for this Enum.
      */
@@ -189,6 +200,11 @@ public interface IAccessAuthorizer {
      */
     ACLIdentityType(String val) {
       value = val;
+    }
+
+    @Override
+    public String toString() {
+      return value;
     }
   }
 

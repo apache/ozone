@@ -1,35 +1,32 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .RepeatedKeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RepeatedKeyInfo;
 
 /**
  * Args for deleted keys. This is written to om metadata deletedTable.
@@ -43,6 +40,8 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   private static final Codec<RepeatedOmKeyInfo> CODEC_TRUE = newCodec(true);
   private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false);
 
+  private final List<OmKeyInfo> omKeyInfoList;
+
   private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline) {
     return new DelegatedCodec<>(
         Proto2Codec.get(RepeatedKeyInfo.getDefaultInstance()),
@@ -54,8 +53,6 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   public static Codec<RepeatedOmKeyInfo> getCodec(boolean ignorePipeline) {
     return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
   }
-
-  private final List<OmKeyInfo> omKeyInfoList;
 
   public RepeatedOmKeyInfo() {
     this.omKeyInfoList = new ArrayList<>();
@@ -92,17 +89,15 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
       }
       unreplicatedSize += omKeyInfo.getDataSize();
     }
-    return new ImmutablePair<Long, Long>(unreplicatedSize, replicatedSize);
+    return new ImmutablePair<>(unreplicatedSize, replicatedSize);
   }
-
 
   // HDDS-7041. Return a new ArrayList to avoid ConcurrentModifyException
   public List<OmKeyInfo> cloneOmKeyInfoList() {
     return new ArrayList<>(omKeyInfoList);
   }
 
-  public static RepeatedOmKeyInfo getFromProto(RepeatedKeyInfo
-      repeatedKeyInfo) throws IOException {
+  public static RepeatedOmKeyInfo getFromProto(RepeatedKeyInfo repeatedKeyInfo) {
     List<OmKeyInfo> list = new ArrayList<>();
     for (KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
       list.add(OmKeyInfo.getFromProtobuf(k));

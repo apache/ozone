@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,9 +17,23 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
+import static org.apache.hadoop.util.ExitUtil.terminate;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
+import javax.sql.DataSource;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,14 +42,13 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconSafeModeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
-import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusMetrics;
+import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -49,24 +61,10 @@ import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ozone.recon.schema.ReconSchemaGenerationModule;
 import org.apache.ratis.util.JvmPauseMonitor;
-import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
-import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
-import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
-import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
-import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
-import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
  * Recon server main class that stops and starts recon services.
@@ -148,6 +146,19 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
 
+      LOG.info("Finalizing Layout Features.");
+      // Handle Recon Schema Versioning
+      ReconSchemaVersionTableManager versionTableManager =
+          injector.getInstance(ReconSchemaVersionTableManager.class);
+      DataSource dataSource = injector.getInstance(DataSource.class);
+
+      ReconLayoutVersionManager layoutVersionManager =
+          new ReconLayoutVersionManager(versionTableManager, reconContext, dataSource);
+      // Run the upgrade framework to finalize layout features if needed
+      layoutVersionManager.finalizeLayoutFeatures();
+
+      LOG.info("Recon schema versioning completed.");
+
       this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
       this.reconSafeModeMgr.setInSafeMode(true);
       httpServer = injector.getInstance(ReconHttpServer.class);
@@ -159,17 +170,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
 
-      // Handle Recon Schema Versioning
-      ReconSchemaVersionTableManager versionTableManager =
-          injector.getInstance(ReconSchemaVersionTableManager.class);
-
-      ReconLayoutVersionManager layoutVersionManager =
-          new ReconLayoutVersionManager(versionTableManager, reconContext);
-      // Run the upgrade framework to finalize layout features if needed
-      ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
-          (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
-      layoutVersionManager.finalizeLayoutFeatures(reconStorageContainerManagerFacade);
-
       LOG.info("Initializing support of Recon Features...");
       FeatureProvider.initFeatureSupport(configuration);
 
@@ -179,12 +179,8 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       isStarted = true;
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
-      ReconStorageContainerManagerFacade reconStorageContainerManagerFacade =
-          (ReconStorageContainerManagerFacade) this.getReconStorageContainerManager();
-      ReconContext reconContext = reconStorageContainerManagerFacade.getReconContext();
-      reconContext.updateHealthStatus(new AtomicBoolean(false));
-      reconContext.getErrors().add(ReconContext.ErrorCode.INTERNAL_ERROR);
       LOG.error("Error during initializing Recon server.", e);
+      updateAndLogReconHealthStatus();
     }
 
     ShutdownHookManager.get().addShutdownHook(() -> {
@@ -196,6 +192,45 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       }
     }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
+  }
+
+  private void updateAndLogReconHealthStatus() {
+    ReconContext reconContext = injector.getInstance(ReconContext.class);
+    assert reconContext != null;
+
+    checkComponentAndLog(
+        this.getReconStorageContainerManager(),
+        "ReconStorageContainerManagerFacade is not initialized properly.",
+        reconContext
+    );
+
+    checkComponentAndLog(
+        this.getReconNamespaceSummaryManager(),
+        "ReconNamespaceSummaryManager is not initialized properly.",
+        reconContext
+    );
+
+    checkComponentAndLog(
+        this.getOzoneManagerServiceProvider(),
+        "OzoneManagerServiceProvider is not initialized properly.",
+        reconContext
+    );
+
+    checkComponentAndLog(
+        this.getReconContainerMetadataManager(),
+        "ReconContainerMetadataManager is not initialized properly.",
+        reconContext
+    );
+  }
+
+  private void checkComponentAndLog(Object component, String errorMessage, ReconContext context) {
+    // Updating health status and adding error code in ReconContext will help to expose the information to user
+    // via /recon/health endpoint.
+    if (component == null) {
+      LOG.error("{} Setting health status to false and adding error code.", errorMessage);
+      context.updateHealthStatus(new AtomicBoolean(false));
+      context.getErrors().add(ReconContext.ErrorCode.INTERNAL_ERROR);
+    }
   }
 
   /**

@@ -1,32 +1,45 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.repair.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
+import jakarta.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Objects;
+import java.util.Stack;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -41,15 +54,6 @@ import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Objects;
-import java.util.Stack;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Base Tool to identify and repair disconnected FSO trees across all buckets.
@@ -77,8 +81,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
         "OM should be stopped while this tool is run."
 )
 public class FSORepairTool extends RepairTool {
-  public static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(FSORepairTool.class);
   private static final String REACHABLE_TABLE = "reachable";
+  private static final byte[] EMPTY_BYTE_ARRAY = {};
 
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -93,23 +98,23 @@ public class FSORepairTool extends RepairTool {
       description = "Filter by bucket name")
   private String bucketFilter;
 
-  @CommandLine.Option(names = {"--verbose"},
-      description = "Verbose output. Show all intermediate steps.")
-  private boolean verbose;
+  @Nonnull
+  @Override
+  protected Component serviceToBeOffline() {
+    return Component.OM;
+  }
 
   @Override
   public void execute() throws Exception {
-    if (checkIfServiceIsRunning("OM")) {
-      return;
-    }
     try {
       Impl repairTool = new Impl();
       repairTool.run();
     } catch (Exception ex) {
+      LOG.error("FSO repair failed", ex);
       throw new IllegalArgumentException("FSO repair failed: " + ex.getMessage());
     }
 
-    if (verbose) {
+    if (isVerbose()) {
       info("FSO repair finished.");
     }
   }
@@ -125,6 +130,7 @@ public class FSORepairTool extends RepairTool {
     private final Table<String, RepeatedOmKeyInfo> deletedTable;
     private final Table<String, SnapshotInfo> snapshotInfoTable;
     private DBStore reachableDB;
+    private TypedTable<String, byte[]> reachableTable;
     private final ReportStatistics reachableStats;
     private final ReportStatistics unreachableStats;
     private final ReportStatistics unreferencedStats;
@@ -135,27 +141,13 @@ public class FSORepairTool extends RepairTool {
       this.unreferencedStats = new ReportStatistics(0, 0, 0);
 
       this.store = getStoreFromPath(omDBPath);
-      volumeTable = store.getTable(OmMetadataManagerImpl.VOLUME_TABLE,
-          String.class,
-          OmVolumeArgs.class);
-      bucketTable = store.getTable(OmMetadataManagerImpl.BUCKET_TABLE,
-          String.class,
-          OmBucketInfo.class);
-      directoryTable = store.getTable(OmMetadataManagerImpl.DIRECTORY_TABLE,
-          String.class,
-          OmDirectoryInfo.class);
-      fileTable = store.getTable(OmMetadataManagerImpl.FILE_TABLE,
-          String.class,
-          OmKeyInfo.class);
-      deletedDirectoryTable = store.getTable(OmMetadataManagerImpl.DELETED_DIR_TABLE,
-          String.class,
-          OmKeyInfo.class);
-      deletedTable = store.getTable(OmMetadataManagerImpl.DELETED_TABLE,
-          String.class,
-          RepeatedOmKeyInfo.class);
-      snapshotInfoTable = store.getTable(OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE,
-          String.class,
-          SnapshotInfo.class);
+      this.volumeTable = OMDBDefinition.VOLUME_TABLE_DEF.getTable(store);
+      this.bucketTable = OMDBDefinition.BUCKET_TABLE_DEF.getTable(store);
+      this.directoryTable = OMDBDefinition.DIRECTORY_TABLE_DEF.getTable(store);
+      this.fileTable = OMDBDefinition.FILE_TABLE_DEF.getTable(store);
+      this.deletedDirectoryTable = OMDBDefinition.DELETED_DIR_TABLE_DEF.getTable(store);
+      this.deletedTable = OMDBDefinition.DELETED_TABLE_DEF.getTable(store);
+      this.snapshotInfoTable = OMDBDefinition.SNAPSHOT_INFO_TABLE_DEF.getTable(store);
     }
 
     public Report run() throws Exception {
@@ -397,14 +389,14 @@ public class FSORepairTool extends RepairTool {
 
         RepeatedOmKeyInfo originalRepeatedKeyInfo = deletedTable.get(fileKey);
         RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            fileInfo, fileInfo.getUpdateID(), true);
+            fileInfo, fileInfo.getUpdateID());
         // NOTE: The FSO code seems to write the open key entry with the whole
         // path, using the object's names instead of their ID. This would only
         // be possible when the file is deleted explicitly, and not part of a
         // directory delete. It is also not possible here if the file's parent
         // is gone. The name of the key does not matter so just use IDs.
         deletedTable.putWithBatch(batch, fileKey, updatedRepeatedOmKeyInfo);
-        if (verbose) {
+        if (isVerbose()) {
           info("Added entry " + fileKey + " to open key table: " + updatedRepeatedOmKeyInfo);
         }
         store.commitBatchOperation(batch);
@@ -462,7 +454,7 @@ public class FSORepairTool extends RepairTool {
     private void addReachableEntry(OmVolumeArgs volume, OmBucketInfo bucket, WithObjectID object) throws IOException {
       String reachableKey = buildReachableKey(volume, bucket, object);
       // No value is needed for this table.
-      reachableDB.getTable(REACHABLE_TABLE, String.class, byte[].class).put(reachableKey, new byte[]{});
+      reachableTable.put(reachableKey, EMPTY_BYTE_ARRAY);
     }
 
     /**
@@ -472,7 +464,7 @@ public class FSORepairTool extends RepairTool {
     protected boolean isReachable(String fileOrDirKey) throws IOException {
       String reachableParentKey = buildReachableParentKey(fileOrDirKey);
 
-      return reachableDB.getTable(REACHABLE_TABLE, String.class, byte[].class).get(reachableParentKey) != null;
+      return reachableTable.get(reachableParentKey) != null;
     }
 
     private void openReachableDB() throws IOException {
@@ -489,6 +481,7 @@ public class FSORepairTool extends RepairTool {
           .setPath(reachableDBFile.getParentFile().toPath())
           .addTable(REACHABLE_TABLE)
           .build();
+      reachableTable = reachableDB.getTable(REACHABLE_TABLE, StringCodec.get(), ByteArrayCodec.get());
     }
 
     private void closeReachableDB() throws IOException {
@@ -587,6 +580,7 @@ public class FSORepairTool extends RepairTool {
       return unreferenced;
     }
 
+    @Override
     public String toString() {
       return "Reachable:" + reachable + "\nUnreachable:" + unreachable + "\nUnreferenced:" + unreferenced;
     }
