@@ -351,11 +351,10 @@ public class TestOnDemandContainerScanner extends
   @Test
   @Override
   public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
-    LogCapturer logCapturer = LogCapturer.captureLogs(
-        OnDemandContainerDataScanner.class);
+    LogCapturer logCapturer = LogCapturer.captureLogs(OnDemandContainerScanner.class);
     scanContainer(corruptData);
     verifyContainerMarkedUnhealthy(corruptData, times(1));
-    assertTrue(logCapturer.getOutput().contains("Triggering a volume scan for volume"));
+    assertTrue(logCapturer.getOutput().contains("Triggering scan of volume"));
   }
 
   private void scanContainer(Container<?> container) throws Exception {
