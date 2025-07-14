@@ -36,8 +36,8 @@ public final class BlockGroup {
 
   private BlockGroup(String groupID, List<BlockID> blockIDs, List<DeletedBlock> deletedBlocks) {
     this.groupID = groupID;
-    this.blockIDs = blockIDs;
-    this.deletedBlocks = deletedBlocks;
+    this.blockIDs = blockIDs == null ? new ArrayList<>() : blockIDs;
+    this.deletedBlocks = deletedBlocks == null ? new ArrayList<>() : deletedBlocks;
   }
 
   public List<DeletedBlock> getAllBlocks() {
@@ -54,12 +54,11 @@ public final class BlockGroup {
 
   public KeyBlocks getProto() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
-    if (deletedBlocks != null && !deletedBlocks.isEmpty()) {
+    if (!deletedBlocks.isEmpty()) {
       for (DeletedBlock block : deletedBlocks) {
         kbb.addDeletedBlocks(block.getProtobuf());
       }
-    }
-    if (blockIDs != null && !blockIDs.isEmpty()) {
+    } else {
       for (BlockID block : blockIDs) {
         kbb.addBlocks(block.getProtobuf());
       }
@@ -103,6 +102,7 @@ public final class BlockGroup {
   public String toString() {
     return "BlockGroup[" +
         "groupID='" + groupID + '\'' +
+        ", blockIDs=" + blockIDs + '\'' +
         ", deletedBlocks=" + deletedBlocks +
         ']';
   }
