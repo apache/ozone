@@ -51,7 +51,7 @@ Ozone relies on several environment variables to control its behavior. These var
 | `OZONE_SECURITY_LOGGER` | The default log level and output for security-related messages. | `INFO,NullAppender` |
 | `OZONE_NICENESS` | The process priority level for Ozone daemons. | `0` |
 | `OZONE_POLICYFILE` | The name of the service-level authorization file. | `hadoop-policy.xml` |
-| `JSVC_HOME` | The location of the `jsvc` implementation. | `/usr/bin` |
+| `JSVC_HOME` | The location of the `jsvc` implementation. Required to run secure daemons on privileged ports. | `/usr/bin` |
 | `OZONE_SECURE_PID_DIR` | The directory for secure and privileged process pid files. | `${OZONE_PID_DIR}` |
 | `OZONE_SECURE_LOG` | The directory for secure and privileged process log files. | `${OZONE_LOG_DIR}` |
 | `OZONE_SECURE_IDENT_PRESERVE` | If set to "true", the `OZONE_IDENT_STRING` is not modified for secure daemons. | `false` |
