@@ -56,7 +56,18 @@ RocksDB is utilized in the following Ozone components to store critical metadata
 
 Effective tuning of RocksDB can significantly impact Ozone's performance. Ozone exposes several configuration properties to tune RocksDB behavior. These properties are typically found in `ozone-default.xml` and can be overridden in `ozone-site.xml`.
 
-Key tuning parameters often involve:
+### Ozone Manager (OM)
+
+Key tuning parameters for the OM often involve:
+
+*   **Write Options:**
+    *   `ozone.metastore.rocksdb.writeoption.sync`: Whether to sync RocksDB writes to disk. This is a general metastore setting that also applies to the OM. Default value: `false` (based on common RocksDB usage for performance).
+
+For other settings, such as Write-Ahead Log (WAL) management, the Ozone Manager currently relies on the default RocksDB configurations.
+
+### DataNode
+
+Key tuning parameters for the DataNode often involve:
 
 *   **Memory usage:** Configuring block cache, write buffer manager, and other memory-related settings.
     *   `hdds.datanode.metadata.rocksdb.cache.size`: Configures the block cache size for RocksDB instances on Datanodes. Default value: `1GB`.
@@ -67,12 +78,13 @@ Key tuning parameters often involve:
 *   **Write-ahead log (WAL) settings:** Balancing durability and write performance.
     *   `hdds.datanode.rocksdb.log.max-file-size`: Maximum size of each RocksDB log file. Default value: `32MB`.
     *   `hdds.datanode.rocksdb.log.max-file-num`: Maximum number of RocksDB log files. Default value: `64`.
-    *   `ozone.metastore.rocksdb.writeoption.sync`: Whether to sync RocksDB writes to disk. Default value: `false` (based on common RocksDB usage for performance).
+
+### General Settings
 
 Ozone also manages RocksDB's `DBOptions` and `ColumnFamilyOptions` through `DBProfile`s (e.g., `DatanodeDBProfile`), which can be configured based on storage types (SSD, HDD). This can be configured using the `hdds.db.profile` property.
 
 *   `hdds.db.profile`: Specifies the RocksDB profile to use, which determines the default `DBOptions` and `ColumnFamilyOptions`. Default value: `DISK`.
-    *   Possible values include `SSD`, `DISK`, and `TEST`.
+    *   Possible values include `SSD` and `DISK`.
     *   For example, setting this to `SSD` will apply tunings optimized for SSD storage.
 
 ## 4. Troubleshooting and repair tools relevant to RocksDB
@@ -80,7 +92,9 @@ Ozone also manages RocksDB's `DBOptions` and `ColumnFamilyOptions` through `DBPr
 Troubleshooting RocksDB issues in Ozone often involves:
 
 *   Analyzing RocksDB logs for errors and warnings.
-*   Using RocksDB's built-in tools (e.g., `ldb`, `sst_dump`) for inspecting database files.
+*   Using RocksDB's built-in tools for inspecting database files:
+    *   [**ldb**](https://github.com/facebook/rocksdb/wiki/LDB-Tool): A command-line tool for inspecting and manipulating the contents of a RocksDB database.
+    *   [**sst_dump**](https://github.com/facebook/rocksdb/wiki/SST-Dump): A command-line tool for inspecting the contents of SST (Static Table) files, which are the files that store the data in RocksDB.
 *   Understanding common RocksDB error codes and their implications.
 
 ## 5. Version Compatibility
