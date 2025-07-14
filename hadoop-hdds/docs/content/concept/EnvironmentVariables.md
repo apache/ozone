@@ -66,5 +66,5 @@ Ozone relies on several environment variables to control its behavior. These var
 | `OZONE_DEPRECATION_WARNING` | A boolean to enable or disable deprecation warnings. | `true` |
 | `OZONE_OS_TYPE` | The operating system type. | Output of `uname -s` |
 | `OZONE_ENABLE_BUILD_PATHS` | If set to "true", adds build paths to the classpath. For advanced users only. | `false` |
-| `OZONE_OM_USER` | The user to run the Ozone Manager as. | `ozone` |
+| `OZONE_OM_USER` | The user allowed to execute `ozone om` subcommands. | `ozone` |
 | `OZONE_LIBEXEC_DIR` | The directory where Ozone shell scripts are located. | `${OZONE_HOME}/libexec` |
