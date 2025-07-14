@@ -32,10 +32,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Class for performing on demand scans of containers.
+ * Note: [OPEN] containers are scanned only for metadata,
+ *       [CLOSED, QUASI_CLOSED] containers are scanned for metadata and data.
  */
-public final class OnDemandContainerDataScanner {
+public final class OnDemandContainerScanner {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OnDemandContainerDataScanner.class);
+      LoggerFactory.getLogger(OnDemandContainerScanner.class);
 
   private final ExecutorService scanExecutor;
   private final DataTransferThrottler throttler;
@@ -46,7 +48,7 @@ public final class OnDemandContainerDataScanner {
   private final ContainerScanHelper scannerHelper;
   private final ContainerScanHelper scannerHelperWithoutGap;
 
-  public OnDemandContainerDataScanner(
+  public OnDemandContainerScanner(
       ContainerScannerConfiguration conf, ContainerController controller) {
     throttler = new DataTransferThrottler(
         conf.getOnDemandBandwidthPerVolume());
@@ -77,7 +79,7 @@ public final class OnDemandContainerDataScanner {
   }
 
   private Optional<Future<?>> scanContainer(Container<?> container, ContainerScanHelper helper) {
-    if (!helper.shouldScanData(container)) {
+    if (!helper.shouldScanMetadata(container)) {
       return Optional.empty();
     }
 
@@ -103,7 +105,13 @@ public final class OnDemandContainerDataScanner {
 
   private void performOnDemandScan(Container<?> container, ContainerScanHelper helper) {
     try {
-      helper.scanData(container, throttler, canceler);
+      if (helper.shouldScanData(container)) {
+        helper.scanData(container, throttler, canceler);
+      } else {
+        // for containers that qualify for metadata scan and not data scan,
+        // like OPEN containers, trigger a metadata-only scan
+        helper.scanMetadata(container);
+      }
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + container.getContainerData().getContainerID(), e);

@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +72,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   @Nullable
   private final WitnessedContainerMetadataStore metadataStore;
   // Handler that will be invoked when a scan of a container in this set is requested.
-  private OnDemandContainerDataScanner containerScanner;
+  private OnDemandContainerScanner containerScanner;
 
   public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
     return new ContainerSet(null, recoveringTimeout);
@@ -135,7 +135,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   /**
    * @param scanner The scanner instance will be invoked when a scan of a container in this set is requested.
    */
-  public void registerOnDemandScanner(OnDemandContainerDataScanner scanner) {
+  public void registerOnDemandScanner(OnDemandContainerScanner scanner) {
     this.containerScanner = scanner;
   }
 
