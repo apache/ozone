@@ -33,14 +33,11 @@ import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Optional;
@@ -139,16 +136,7 @@ public class TestBackgroundContainerDataScanner extends
   @Test
   @Override
   public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
-    // Replace scanHelper with a spy to verify the unhealthy scan result handling.
-    Field field = BackgroundContainerDataScanner.class.getDeclaredField("scanHelper");
-    field.setAccessible(true);
-    Field modifiersField = Field.class.getDeclaredField("modifiers");
-    modifiersField.setAccessible(true);
-    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-    ContainerScanHelper originalScanHelper = (ContainerScanHelper) field.get(scanner);
-    ContainerScanHelper spyScanHelper = spy(originalScanHelper);
-    field.set(scanner, spyScanHelper);
-
+    ContainerScanHelper spyScanHelper = replaceScanHelperWithSpy(scanner, true);
     scanner.runIteration();
     verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
     verify(spyScanHelper, atLeastOnce()).triggerVolumeScan(corruptData.getContainerData());

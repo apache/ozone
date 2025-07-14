@@ -28,10 +28,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -40,8 +43,6 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
-
-import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -198,6 +199,27 @@ public abstract class TestContainerScannersAbstract {
     when(controller.getContainers()).thenReturn(this.containers);
   }
 
+  /**
+   * Replace scanHelper with a spy to perform verifications.
+   */
+  protected ContainerScanHelper replaceScanHelperWithSpy(Object scanner, boolean isData)
+      throws NoSuchFieldException, IllegalAccessException {
+    Field field ;
+    if (isData) {
+      field = BackgroundContainerDataScanner.class.getDeclaredField("scanHelper");
+    } else {
+      field = BackgroundContainerMetadataScanner.class.getDeclaredField("scanHelper");
+    }
+    field.setAccessible(true);
+    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    modifiersField.setAccessible(true);
+    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
+    ContainerScanHelper originalScanHelper = (ContainerScanHelper) field.get(scanner);
+    ContainerScanHelper spyScanHelper = spy(originalScanHelper);
+    field.set(scanner, spyScanHelper);
+    return spyScanHelper;
+  }
+
   private ContainerController mockContainerController() {
     DataScanResult healthyData = getHealthyDataScanResult();
     DataScanResult unhealthyData = getUnhealthyDataScanResult();
@@ -208,13 +230,6 @@ public abstract class TestContainerScannersAbstract {
     File volLocation = mock(File.class);
     when(volLocation.getPath()).thenReturn("/temp/volume-testcontainerscanner");
     when(vol.getStorageDir()).thenReturn(volLocation);
-    when(vol.isFailed()).thenReturn(false);
-    try {
-      when(vol.check(any())).thenReturn(VolumeCheckResult.HEALTHY);
-    } catch (Exception e) {
-      // This is a mock, so this should never throw an exception.
-      throw new RuntimeException("Unexpected exception in mock setup " + e, e);
-    }
 
     // healthy container
     ContainerTestUtils.setupMockContainer(healthy,
