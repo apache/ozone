@@ -56,16 +56,30 @@ RocksDB is utilized in the following Ozone components to store critical metadata
 
 Effective tuning of RocksDB can significantly impact Ozone's performance. Ozone exposes several configuration properties to tune RocksDB behavior. These properties are typically found in `ozone-default.xml` and can be overridden in `ozone-site.xml`.
 
-### Ozone Manager (OM)
+### General Settings
 
-Key tuning parameters for the OM often involve:
+Ozone provides a set of general RocksDB configurations that apply to all services (OM, SCM, and Datanodes) unless overridden by more specific settings.
+
+*   `hdds.db.profile`: Specifies the RocksDB profile to use, which determines the default `DBOptions` and `ColumnFamilyOptions`. Default value: `DISK`.
+    *   Possible values include `SSD` and `DISK`.
+    *   For example, setting this to `SSD` will apply tunings optimized for SSD storage.
 
 *   **Write Options:**
-    *   `ozone.metastore.rocksdb.writeoption.sync`: Whether to sync RocksDB writes to disk. This is a general metastore setting that also applies to the OM. Default value: `false` (based on common RocksDB usage for performance).
+    *   `hadoop.hdds.db.rocksdb.writeoption.sync`: If set to `true`, writes are synchronized to persistent storage, ensuring durability at the cost of performance. If `false`, writes are flushed asynchronously. Default: `false`.
 
-For other settings, such as Write-Ahead Log (WAL) management, the Ozone Manager currently relies on the default RocksDB configurations.
+*   **Write-Ahead Log (WAL) Management:**
+    *   `hadoop.hdds.db.rocksdb.WAL_ttl_seconds`: The time-to-live for WAL files in seconds. Default: `1200`.
+    *   `hadoop.hdds.db.rocksdb.WAL_size_limit_MB`: The total size limit for WAL files in megabytes. When this limit is exceeded, the oldest WAL files are deleted. A value of `0` means no limit. Default: `0`.
 
-### DataNode
+*   **Logging:**
+    *   `hadoop.hdds.db.rocksdb.logging.enabled`: Enables or disables RocksDB's own logging. Default: `false`.
+    *   `hadoop.hdds.db.rocksdb.logging.level`: The logging level for RocksDB (INFO, DEBUG, WARN, ERROR, FATAL). Default: `INFO`.
+    *   `hadoop.hdds.db.rocksdb.max.log.file.size`: The maximum size of a single RocksDB log file. Default: `100MB`.
+    *   `hadoop.hdds.db.rocksdb.keep.log.file.num`: The maximum number of RocksDB log files to retain. Default: `10`.
+
+### DataNode-Specific Settings
+
+These settings apply specifically to Datanodes and will override the general settings where applicable.
 
 Key tuning parameters for the DataNode often involve:
 
@@ -75,17 +89,16 @@ Key tuning parameters for the DataNode often involve:
     *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file`: Enables or disables auto-compaction for small SST files. Default value: `true`.
     *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file-size-threshold`: Threshold for small SST file size for auto-compaction. Default value: `1MB`.
     *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file-num-threshold`: Threshold for the number of small SST files for auto-compaction. Default value: `512`.
+    *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file.interval.minutes`: Auto compact small SST files interval in minutes. Default value: `120`.
+    *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file.threads`: Auto compact small SST files threads. Default value: `1`.
 *   **Write-ahead log (WAL) settings:** Balancing durability and write performance.
     *   `hdds.datanode.rocksdb.log.max-file-size`: Maximum size of each RocksDB log file. Default value: `32MB`.
     *   `hdds.datanode.rocksdb.log.max-file-num`: Maximum number of RocksDB log files. Default value: `64`.
-
-### General Settings
-
-Ozone also manages RocksDB's `DBOptions` and `ColumnFamilyOptions` through `DBProfile`s (e.g., `DatanodeDBProfile`), which can be configured based on storage types (SSD, HDD). This can be configured using the `hdds.db.profile` property.
-
-*   `hdds.db.profile`: Specifies the RocksDB profile to use, which determines the default `DBOptions` and `ColumnFamilyOptions`. Default value: `DISK`.
-    *   Possible values include `SSD` and `DISK`.
-    *   For example, setting this to `SSD` will apply tunings optimized for SSD storage.
+*   **Logging:**
+    *   `hdds.datanode.rocksdb.log.level`: The user log level of RocksDB(DEBUG/INFO/WARN/ERROR/FATAL)). Default: `INFO`.
+*   **Other Settings:**
+    *   `hdds.datanode.rocksdb.delete-obsolete-files-period`: Periodicity when obsolete files get deleted. Default is 1h.
+    *   `hdds.datanode.rocksdb.max-open-files`: The total number of files that a RocksDB can open. Default: `1024`.
 
 ## 4. Troubleshooting and repair tools relevant to RocksDB
 
@@ -99,7 +112,7 @@ Troubleshooting RocksDB issues in Ozone often involves:
 
 ## 5. Version Compatibility
 
-This section will detail the specific RocksDB versions that are compatible with different Apache Ozone releases, including any known issues or recommended versions.
+Apache Ozone uses RocksDB version 7.7.3. It is recommended to use this version to ensure compatibility and avoid any potential issues.
 
 ## 6. Monitoring and Metrics
 
