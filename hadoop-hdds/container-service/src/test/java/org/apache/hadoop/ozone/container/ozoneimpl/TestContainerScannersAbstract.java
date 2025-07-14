@@ -204,7 +204,7 @@ public abstract class TestContainerScannersAbstract {
    */
   protected ContainerScanHelper replaceScanHelperWithSpy(Object scanner, boolean isData)
       throws NoSuchFieldException, IllegalAccessException {
-    Field field ;
+    Field field;
     if (isData) {
       field = BackgroundContainerDataScanner.class.getDeclaredField("scanHelper");
     } else {
