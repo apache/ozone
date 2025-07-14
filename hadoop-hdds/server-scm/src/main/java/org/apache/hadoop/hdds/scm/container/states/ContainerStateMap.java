@@ -17,14 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
-<<<<<<< Updated upstream
-=======
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
->>>>>>> Stashed changes
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
@@ -82,8 +80,6 @@ public class ContainerStateMap {
       LoggerFactory.getLogger(ContainerStateMap.class);
 
   /**
-<<<<<<< Updated upstream
-=======
    * Two levels map.
    * Outer container map: {@link ContainerID} -> {@link Entry} (info and replicas)
    * Inner replica map: {@link DatanodeID} -> {@link ContainerReplica}
@@ -128,9 +124,9 @@ public class ContainerStateMap {
     Iterator<ContainerInfo> getInfos(ContainerID start, Predicate<ContainerInfo> predicate) {
       Objects.requireNonNull(start, "start == null");
       return map.tailMap(start).values().stream()
-        .map(Entry::getInfo)
-        .filter(containerInfo -> predicate == null || predicate.test(containerInfo))
-        .iterator();
+          .map(Entry::getInfo)
+          .filter(containerInfo -> predicate == null || predicate.test(containerInfo))
+          .iterator();
     }
 
     List<ContainerInfo> getInfos(ContainerID start, int count) {
@@ -184,7 +180,6 @@ public class ContainerStateMap {
     }
   }
   /**
->>>>>>> Stashed changes
    * Map {@link LifeCycleState} to {@link ContainerInfo}.
    * Note that a {@link ContainerInfo} can only exists in at most one of the {@link LifeCycleState}s.
    */
@@ -204,77 +199,14 @@ public class ContainerStateMap {
   private final ContainerMap containerMap = new ContainerMap();
 
   /**
-   * Two levels map.
-   * Outer container map: {@link ContainerID} -> {@link ContainerEntry} (info and replicas)
-   * Inner replica map: {@link DatanodeID} -> {@link ContainerReplica}
-   */
-  private static class ContainerMap {
-    private final NavigableMap<ContainerID, ContainerEntry> map = new TreeMap<>();
-
-    boolean contains(ContainerID id) {
-      return map.containsKey(id);
-    }
-
-    ContainerInfo getInfo(ContainerID id) {
-      final ContainerEntry entry = map.get(id);
-      return entry == null ? null : entry.getInfo();
-    }
-
-    List<ContainerInfo> getInfos(ContainerID start, int count) {
-      Objects.requireNonNull(start, "start == null");
-      Preconditions.assertTrue(count >= 0, "count < 0");
-      return map.tailMap(start).values().stream()
-          .map(ContainerEntry::getInfo)
-          .limit(count)
-          .collect(Collectors.toList());
-    }
-
-    Set<ContainerReplica> getReplicas(ContainerID id) {
-      Objects.requireNonNull(id, "id == null");
-      final ContainerEntry entry = map.get(id);
-      return entry == null ? null : entry.getReplicas();
-    }
-
-    /**
-     * Add if the given info not already in this map.
-     *
-     * @return true iff the given info is added.
-     */
-    boolean addIfAbsent(ContainerInfo info) {
-      Objects.requireNonNull(info, "info == null");
-      final ContainerID id = info.containerID();
-      if (map.containsKey(id)) {
-        return false; // already exist
-      }
-      final ContainerEntry previous = map.put(id, new ContainerEntry(info));
-      Preconditions.assertNull(previous, "previous");
-      return true;
-    }
-
-    ContainerReplica put(ContainerReplica replica) {
-      Objects.requireNonNull(replica, "replica == null");
-      final ContainerEntry entry = map.get(replica.getContainerID());
-      return entry == null ? null : entry.put(replica);
-    }
-
-    ContainerInfo remove(ContainerID id) {
-      Objects.requireNonNull(id, "id == null");
-      final ContainerEntry removed = map.remove(id);
-      return removed == null ? null : removed.getInfo();
-    }
-
-    ContainerReplica removeReplica(ContainerID containerID, DatanodeID datanodeID) {
-      Objects.requireNonNull(containerID, "containerID == null");
-      Objects.requireNonNull(datanodeID, "datanodeID == null");
-      final ContainerEntry entry = map.get(containerID);
-      return entry == null ? null : entry.removeReplica(datanodeID);
-    }
-  }
-
-  /**
    * Create a ContainerStateMap.
    */
   public ContainerStateMap() {
+  }
+
+  @VisibleForTesting
+  public static Logger getLogger() {
+    return LOG;
   }
 
   /**
@@ -358,7 +290,7 @@ public class ContainerStateMap {
    * @throws SCMException - in case of failure.
    */
   public void updateState(ContainerID containerID, LifeCycleState currentState,
-      LifeCycleState newState) throws SCMException {
+                          LifeCycleState newState) throws SCMException {
     if (currentState == newState) { // state not changed
       return;
     }

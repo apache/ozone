@@ -54,10 +54,10 @@ public interface ContainerManager extends Closeable {
   ContainerInfo getContainer(ContainerID containerID)
       throws ContainerNotFoundException;
 
+
   default List<ContainerInfo> getContainers() {
     return getContainers(ContainerID.valueOf(0), Integer.MAX_VALUE);
   }
-
   /**
    * Returns containers under certain conditions.
    * Search container IDs from start ID(exclusive),
@@ -74,8 +74,6 @@ public interface ContainerManager extends Closeable {
    */
   List<ContainerInfo> getContainers(ContainerID startID, int count);
 
-<<<<<<< Updated upstream
-=======
   /**
    * Returns the containers iterator with startID.
    *
@@ -109,7 +107,6 @@ public interface ContainerManager extends Closeable {
   Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID startID);
 
 
->>>>>>> Stashed changes
   List<ContainerInfo> getContainers(ReplicationType type);
 
   /**
@@ -219,7 +216,7 @@ public interface ContainerManager extends Closeable {
       throws IOException;
 
   default ContainerInfo getMatchingContainer(long size, String owner,
-                                     Pipeline pipeline) {
+                                             Pipeline pipeline) {
     return getMatchingContainer(size, owner, pipeline, Collections.emptySet());
   }
 

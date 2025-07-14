@@ -139,6 +139,7 @@ public class ContainerEndpoint {
     }
   }
 
+
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
                            ContainerHealthSchemaManager containerHealthSchemaManager,
@@ -224,9 +225,9 @@ public class ContainerEndpoint {
   public Response getKeysForContainer(
       @PathParam("id") Long containerID,
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
-          int limit,
+      int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
-          String prevKeyPrefix) {
+      String prevKeyPrefix) {
     Map<String, KeyMetadata> keyMetadataMap = new LinkedHashMap<>();
 
     // Total count of keys in the container.
@@ -583,12 +584,12 @@ public class ContainerEndpoint {
         new ArrayList<>();
     Long minContainerID = prevKey + 1;
     Iterator<ContainerInfo> scmNonDeletedContainers =
-            containerManager.getContainerInfoIterator(ContainerID.valueOf(minContainerID),
-              containerInfo -> containerInfo.getState() != HddsProtos.LifeCycleState.DELETED);
+        containerManager.getContainerInfoIterator(ContainerID.valueOf(minContainerID),
+            containerInfo -> containerInfo.getState() != HddsProtos.LifeCycleState.DELETED);
     ContainerInfo scmContainerInfo = scmNonDeletedContainers.hasNext() ? scmNonDeletedContainers.next() : null;
     DataFilter dataFilter = DataFilter.fromValue(missingIn.toUpperCase());
     try (SeekableIterator<Long, ContainerMetadata> omContainers =
-           reconContainerMetadataManager.getContainersIterator()) {
+             reconContainerMetadataManager.getContainersIterator()) {
       omContainers.seek(minContainerID);
 
       switch (dataFilter) {
@@ -719,11 +720,11 @@ public class ContainerEndpoint {
         HddsProtos.LifeCycleState.DELETED, ContainerID.valueOf(minContainerID));
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList;
     try (SeekableIterator<Long, ContainerMetadata> omContainers =
-           reconContainerMetadataManager.getContainersIterator()) {
+             reconContainerMetadataManager.getContainersIterator()) {
       ContainerInfo scmContainerInfo = deletedStateSCMContainers.hasNext() ? deletedStateSCMContainers.next() : null;
       List<ContainerMetadata> omContainersDeletedInSCM = new ArrayList<>();
       while (omContainers.hasNext() && scmContainerInfo != null
-        && omContainersDeletedInSCM.size() < limit) {
+          && omContainersDeletedInSCM.size() < limit) {
         Long omContainerID = omContainers.peekNextKey();
         Long scmContainerID = scmContainerInfo.getContainerID();
         if (scmContainerID.equals(omContainerID)) {
