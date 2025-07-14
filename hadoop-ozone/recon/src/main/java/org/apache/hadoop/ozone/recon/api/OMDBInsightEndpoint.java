@@ -684,6 +684,7 @@ public class OMDBInsightEndpoint {
         OmKeyInfo omKeyInfo = kv.getValue();
         if (omKeyInfo != null) {
           totalUnreplicatedSize += fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
+          // TODO: Based on HDDS-13180 merge, update totalReplicatedSize calculation using fetchSizeForDeletedDirectory.
           totalReplicatedSize += omKeyInfo.getReplicatedSize();
         }
       }
