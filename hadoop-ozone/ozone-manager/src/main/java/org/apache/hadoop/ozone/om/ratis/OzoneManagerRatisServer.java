@@ -722,6 +722,11 @@ public final class OzoneManagerRatisServer {
         OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP,
         OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT));
 
+    // This avoids writing commit metadata to Raft Log, which can be used to recover the
+    // commit index even if a majority of servers are dead. We don't need this for OzoneManager,
+    // disabling this will avoid the additional disk IO.
+    RaftServerConfigKeys.Log.setLogMetadataEnabled(properties, false);
+
     // Set the number of maximum cached segments
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
   }

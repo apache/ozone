@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
-import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -42,7 +41,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class ReconfigurableBase extends Configured implements Reconfigurable {
   private static final Logger LOG = LoggerFactory.getLogger(ReconfigurableBase.class);
-  private final ReconfigurationUtil reconfigurationUtil = new ReconfigurationUtil();
   private Thread reconfigThread = null;
   private volatile boolean shouldRun = true;
   private final Object reconfigLock = new Object();
@@ -56,12 +54,6 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
   }
 
   protected abstract Configuration getNewConf();
-
-  @VisibleForTesting
-  public Collection<ReconfigurationUtil.PropertyChange> getChangedProperties(Configuration newConf,
-      Configuration oldConf) {
-    return this.reconfigurationUtil.parseChangedProperties(newConf, oldConf);
-  }
 
   public void startReconfigurationTask() throws IOException {
     synchronized (this.reconfigLock) {
@@ -150,7 +142,8 @@ public abstract class ReconfigurableBase extends Configured implements Reconfigu
       LOG.info("Starting reconfiguration task.");
       Configuration oldConf = this.parent.getConf();
       Configuration newConf = this.parent.getNewConf();
-      Collection<ReconfigurationUtil.PropertyChange> changes = this.parent.getChangedProperties(newConf, oldConf);
+      Collection<ReconfigurationUtil.PropertyChange> changes =
+          ReconfigurationUtil.getChangedProperties(newConf, oldConf);
       Map<ReconfigurationUtil.PropertyChange, Optional<String>> results = Maps.newHashMap();
       ConfigRedactor oldRedactor = new ConfigRedactor(oldConf);
       ConfigRedactor newRedactor = new ConfigRedactor(newConf);
