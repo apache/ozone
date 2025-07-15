@@ -134,7 +134,6 @@ public final class OzoneFSUtils {
    */
   public static String isValidKeyPath(String path) throws OMException {
     boolean isValid = true;
-    // If keyName is empty string throw error.
     if (path.isEmpty()) {
       return path;
     } else if (path.startsWith("/")) {

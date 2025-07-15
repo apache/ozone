@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 public final class OmLCFilter {
 
   private final String prefix;
-  private final String canonicalPrefix;
   private final boolean directoryStylePrefix;
   private final String tagKey;
   private final String tagValue;
@@ -49,9 +48,8 @@ public final class OmLCFilter {
 
   private OmLCFilter(Builder builder) {
     this.prefix = builder.prefix;
-    this.canonicalPrefix = builder.canonicalPrefix;
-    if (this.canonicalPrefix != null) {
-      this.directoryStylePrefix = this.canonicalPrefix.contains(OzoneConsts.OM_KEY_PREFIX);
+    if (this.prefix != null) {
+      this.directoryStylePrefix = this.prefix.contains(OzoneConsts.OM_KEY_PREFIX);
     } else {
       this.directoryStylePrefix = false;
     }
@@ -83,7 +81,16 @@ public final class OmLCFilter {
     }
 
     if (hasPrefix && layout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      isValidKeyPath(normalizePrefix(prefix));
+      String normalizedPrefix = normalizePrefix(prefix);
+      if (!normalizedPrefix.equals(prefix)) {
+        throw new OMException("Prefix format is not supported. Please use " + normalizedPrefix +
+            " instead of " + prefix + ".", OMException.ResultCodes.INVALID_REQUEST);
+      }
+      try {
+        isValidKeyPath(normalizedPrefix);
+      } catch (OMException e) {
+        throw new OMException("Prefix is not a valid key path: " + prefix, OMException.ResultCodes.INVALID_REQUEST);
+      }
     }
 
     if (andOperator != null) {
@@ -101,12 +108,6 @@ public final class OmLCFilter {
   }
 
   @Nullable
-  public String getCanonicalPrefix() {
-    return canonicalPrefix;
-  }
-
-
-  @Nullable
   public Pair<String, String> getTag() {
     if (hasTag()) {
       return Pair.of(tagKey, tagValue);
@@ -120,7 +121,7 @@ public final class OmLCFilter {
 
   public boolean match(OmKeyInfo omKeyInfo, String keyPath) {
     if (prefix != null) {
-      return keyPath.startsWith(canonicalPrefix);
+      return keyPath.startsWith(prefix);
     } else if (hasTag()) {
       String value = omKeyInfo.getTags().get(tagKey);
       return (value != null && value.equals(tagValue));
@@ -134,10 +135,10 @@ public final class OmLCFilter {
 
   public boolean match(OmDirectoryInfo dirInfo, String keyPath) {
     if (prefix != null) {
-      return keyPath.startsWith(canonicalPrefix);
+      return keyPath.startsWith(prefix);
     } else {
-      // directory(FSO bucket) doesn't support tag
-      // if prefix, tag, and andOperator are all null, means empty filter which covers all keys under bucket
+      // directory doesn't support tag
+      // if prefix, tag, and andOperator are all null, means empty filter which covers all keys/directory under bucket
       return !(hasTag() || andOperator != null);
     }
   }
@@ -169,15 +170,7 @@ public final class OmLCFilter {
     OmLCFilter.Builder builder = new Builder();
 
     if (lifecycleFilter.hasPrefix()) {
-      String prefix = lifecycleFilter.getPrefix();
-      if (layout == BucketLayout.FILE_SYSTEM_OPTIMIZED && prefix.startsWith(OzoneConsts.OM_KEY_PREFIX)) {
-        String normalizedKeyName = normalizePrefix(prefix);
-        isValidKeyPath(normalizedKeyName);
-        builder.setCanonicalPrefix(normalizedKeyName);
-      } else {
-        builder.setCanonicalPrefix(prefix);
-      }
-      builder.setPrefix(prefix);
+      builder.setPrefix(lifecycleFilter.getPrefix());
     }
     if (lifecycleFilter.hasTag()) {
       builder.setTag(lifecycleFilter.getTag().getKey(), lifecycleFilter.getTag().getValue());
@@ -209,7 +202,6 @@ public final class OmLCFilter {
    */
   public static class Builder {
     private String prefix = null;
-    private String canonicalPrefix = null;
     private String tagKey = null;
     private String tagValue = null;
     private OmLifecycleRuleAndOperator andOperator = null;
@@ -217,11 +209,6 @@ public final class OmLCFilter {
 
     public Builder setPrefix(String lcPrefix) {
       this.prefix = lcPrefix;
-      return this;
-    }
-
-    public Builder setCanonicalPrefix(String canonicalPrefix) {
-      this.canonicalPrefix = canonicalPrefix;
       return this;
     }
 

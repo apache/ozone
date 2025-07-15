@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneTrash;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -65,6 +66,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,17 +129,19 @@ public class KeyLifecycleService extends BackgroundService {
     List<OmLifecycleConfiguration> lifecycleConfigurationList =
         omMetadataManager.listLifecycleConfigurations();
     for (OmLifecycleConfiguration lifecycleConfiguration : lifecycleConfigurationList) {
+      String bucketKey = omMetadataManager.getBucketKey(lifecycleConfiguration.getVolume(),
+          lifecycleConfiguration.getBucket());
       if (lifecycleConfiguration.getRules().stream().anyMatch(r -> r.isEnabled())) {
         LifecycleActionTask task = new LifecycleActionTask(lifecycleConfiguration);
-        if (this.inFlight.putIfAbsent(lifecycleConfiguration.getFormattedKey(), task) == null) {
+        if (this.inFlight.putIfAbsent(bucketKey, task) == null) {
           queue.add(task);
-          LOG.info("LifecycleActionTask of {} is scheduled", lifecycleConfiguration.getFormattedKey());
+          LOG.info("LifecycleActionTask of {} is scheduled", bucketKey);
         } else {
           metrics.incrNumSkippedTask();
-          LOG.info("LifecycleActionTask of {} is already running", lifecycleConfiguration.getFormattedKey());
+          LOG.info("LifecycleActionTask of {} is already running", bucketKey);
         }
       } else {
-        LOG.info("LifecycleConfiguration of {} is not enabled", lifecycleConfiguration.getFormattedKey());
+        LOG.info("LifecycleConfiguration of {} is not enabled", bucketKey);
       }
     }
     LOG.info("{} LifecycleActionTasks scheduled", queue.size());
@@ -208,39 +212,31 @@ public class KeyLifecycleService extends BackgroundService {
     @Override
     public BackgroundTaskResult call() {
       EmptyTaskResult result = EmptyTaskResult.newResult();
-      String bucketName = policy.getFormattedKey();
+      String bucketKey = omMetadataManager.getBucketKey(policy.getVolume(), policy.getBucket());
       // Check if this is the Leader OM. If not leader, no need to execute this task.
       if (shouldRun()) {
-        LOG.info("Running LifecycleActionTask {}", bucketName);
-        taskStartTime = System.currentTimeMillis();
+        LOG.info("Running LifecycleActionTask {}", bucketKey);
+        taskStartTime = Time.monotonicNow();
         OmBucketInfo bucket;
         try {
           if (getInjector(0) != null) {
             getInjector(0).pause();
           }
-          bucket = omMetadataManager.getBucketTable().get(bucketName);
+          bucket = omMetadataManager.getBucketTable().get(bucketKey);
           if (bucket == null) {
-            LOG.warn("Bucket {} cannot be found, might be deleted during this task's execution", bucketName);
-            onFailure(bucketName);
+            LOG.warn("Bucket {} cannot be found, might be deleted during this task's execution", bucketKey);
+            onFailure(bucketKey);
             return result;
           }
         } catch (IOException e) {
-          LOG.warn("Failed to get Bucket {}", bucketName, e);
-          onFailure(bucketName);
+          LOG.warn("Failed to get Bucket {}", bucketKey, e);
+          onFailure(bucketKey);
           return result;
         }
 
         List<OmLCRule> originRuleList = policy.getRules();
         // remove disabled rules
         List<OmLCRule> ruleList = originRuleList.stream().filter(r -> r.isEnabled()).collect(Collectors.toList());
-
-        boolean tagEnabled = ruleList.stream().anyMatch(r -> r.isTagEnable());
-        // TODO, set a rule with tag on FSO bucket should fail at creation time.
-        if (bucket.getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED && tagEnabled) {
-          LOG.info("Fail the task as rule with tag is not supported on FSO bucket {}", bucketName);
-          onFailure(bucketName);
-          return result;
-        }
 
         // scan file or key table for evaluate rules against files or keys
         List<String> expiredKeyNameList = new ArrayList<>();
@@ -252,7 +248,7 @@ public class KeyLifecycleService extends BackgroundService {
         /**
          * Filter treatment.
          * ""  - all objects
-         * "/" - if it's OBS/Legacy, means keys starting with "/"; If it's FSO, means root directory
+         * "/" - if it's OBS/Legacy, means keys starting with "/"; If it's FSO, not supported
          * "/key" - if it's OBS/Legacy, means keys starting with "/key", "/" is literally "/";
          *          If it's FSO, means keys or dirs starting with "key", "/" will be treated as separator mark.
          * "key" - if it's OBS/Legacy, means keys starting with "key";
@@ -270,29 +266,29 @@ public class KeyLifecycleService extends BackgroundService {
             if (volume == null) {
               LOG.warn("Volume {} cannot be found, might be deleted during this task's execution",
                   bucket.getVolumeName());
-              onFailure(bucketName);
+              onFailure(bucketKey);
               return result;
             }
           } catch (IOException e) {
             LOG.warn("Failed to get volume {}", bucket.getVolumeName(), e);
-            onFailure(bucketName);
+            onFailure(bucketKey);
             return result;
           }
-          evaluateFSOBucket(volume, bucket, bucketName, keyTable, ruleList,
+          evaluateFSOBucket(volume, bucket, bucketKey, keyTable, ruleList,
               expiredKeyNameList, expiredKeyUpdateIDList, expiredDirNameList, expiredDirUpdateIDList);
         } else {
           // use bucket name as key iterator prefix
-          evaluateBucket(bucketName, keyTable, ruleList, expiredKeyNameList, expiredKeyUpdateIDList);
+          evaluateBucket(bucketKey, keyTable, ruleList, expiredKeyNameList, expiredKeyUpdateIDList);
         }
 
         if (expiredKeyNameList.isEmpty() && expiredDirNameList.isEmpty()) {
-          LOG.info("No expired keys/dirs found for bucket {}", bucketName);
-          onSuccess(bucketName);
+          LOG.info("No expired keys/dirs found for bucket {}", bucketKey);
+          onSuccess(bucketKey);
           return result;
         }
 
         LOG.info("{} expired keys and {} expired dirs found for bucket {}",
-            expiredKeyNameList.size(), expiredDirNameList.size(), bucketName);
+            expiredKeyNameList.size(), expiredDirNameList.size(), bucketKey);
 
         // If trash is enabled, move files to trash, instead of send delete requests.
         // OBS bucket doesn't support trash.
@@ -311,7 +307,7 @@ public class KeyLifecycleService extends BackgroundService {
                 expiredDirUpdateIDList, true);
           }
         }
-        onSuccess(bucketName);
+        onSuccess(bucketKey);
       }
 
       // By design, no one cares about the results of this call back.
@@ -319,7 +315,7 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     @SuppressWarnings("checkstyle:parameternumber")
-    private void evaluateFSOBucket(OmVolumeArgs volume, OmBucketInfo bucket, String bucketName,
+    private void evaluateFSOBucket(OmVolumeArgs volume, OmBucketInfo bucket, String bucketKey,
                                    Table<String, OmKeyInfo> keyTable, List<OmLCRule> ruleList,
                                    List<String> expiredKeyList, List<Long> expiredKeyUpdateIDList,
                                    List<String> expiredDirList, List<Long> expiredDirUpdateIDList) {
@@ -336,7 +332,7 @@ public class KeyLifecycleService extends BackgroundService {
         // find KeyInfo of each directory for prefix
         List<OmDirectoryInfo> dirList;
         try {
-          dirList = getDirList(volume, bucket, rule.getEffectivePrefix(), bucketName);
+          dirList = getDirList(volume, bucket, rule.getEffectivePrefix(), bucketKey);
         } catch (IOException e) {
           LOG.warn("Skip rule {} as its prefix doesn't have all directory exist", rule);
           // skip this rule if some directory doesn't exist for this rule's prefix
@@ -351,40 +347,40 @@ public class KeyLifecycleService extends BackgroundService {
           for (OmDirectoryInfo dir : dirList) {
             directoryPath.append(dir.getName()).append(OzoneConsts.OM_KEY_PREFIX);
           }
-          if (directoryPath.toString().equals(rule.getEffectiveCanonicalPrefix() + OzoneConsts.OM_KEY_PREFIX)) {
+          if (directoryPath.toString().equals(rule.getEffectivePrefix() + OzoneConsts.OM_KEY_PREFIX)) {
             expiredDirList.add(directoryPath.toString());
             expiredDirUpdateIDList.add(dirList.get(dirList.size() - 1).getUpdateID());
           }
         }
 
-        LOG.info("Prefix {} for {}", prefix, bucketName);
+        LOG.info("Prefix {} for {}", prefix, bucketKey);
         evaluateKeyTable(keyTable, prefix, directoryPath.toString(), rule, expiredKeyList,
-            expiredKeyUpdateIDList, bucketName);
+            expiredKeyUpdateIDList, bucketKey);
         evaluateDirTable(directoryInfoTable, prefix, directoryPath.toString(), rule,
-            expiredDirList, expiredDirUpdateIDList, bucketName);
+            expiredDirList, expiredDirUpdateIDList, bucketKey);
       }
 
       for (OmLCRule rule : nonDirectoryStylePrefixRuleList) {
         // find the directory for the prefix, it may not exist
-        OmDirectoryInfo dirInfo = getDirectory(volume, bucket, rule.getEffectivePrefix(), bucketName);
+        OmDirectoryInfo dirInfo = getDirectory(volume, bucket, rule.getEffectivePrefix(), bucketKey);
         String prefix = OzoneConsts.OM_KEY_PREFIX + volume.getObjectID() +
             OzoneConsts.OM_KEY_PREFIX + bucket.getObjectID() + OzoneConsts.OM_KEY_PREFIX;
         if (dirInfo != null) {
           prefix += dirInfo.getObjectID();
-          if (dirInfo.getName().equals(rule.getEffectiveCanonicalPrefix())) {
+          if (dirInfo.getName().equals(rule.getEffectivePrefix())) {
             expiredDirList.add(dirInfo.getName());
             expiredDirUpdateIDList.add(dirInfo.getUpdateID());
           }
         }
-        LOG.info("Prefix {} for {}", prefix, bucketName);
-        evaluateKeyTable(keyTable, prefix, "", rule, expiredKeyList, expiredKeyUpdateIDList, bucketName);
-        evaluateDirTable(directoryInfoTable, prefix, "", rule, expiredDirList, expiredDirUpdateIDList, bucketName);
+        LOG.info("Prefix {} for {}", prefix, bucketKey);
+        evaluateKeyTable(keyTable, prefix, "", rule, expiredKeyList, expiredKeyUpdateIDList, bucketKey);
+        evaluateDirTable(directoryInfoTable, prefix, "", rule, expiredDirList, expiredDirUpdateIDList, bucketKey);
       }
 
       if (!noPrefixRuleList.isEmpty()) {
         String prefix = OzoneConsts.OM_KEY_PREFIX + volume.getObjectID() +
             OzoneConsts.OM_KEY_PREFIX + bucket.getObjectID() + OzoneConsts.OM_KEY_PREFIX;
-        LOG.info("prefix {} for {}", prefix, bucketName);
+        LOG.info("prefix {} for {}", prefix, bucketKey);
         // use bucket name as key iterator prefix
         try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
                  keyTable.iterator(prefix)) {
@@ -404,7 +400,7 @@ public class KeyLifecycleService extends BackgroundService {
           }
         } catch (IOException e) {
           // log failure and continue the process to delete/move files already identified in this run
-          LOG.warn("Failed to iterate keyTable for bucket {}", bucketName, e);
+          LOG.warn("Failed to iterate keyTable for bucket {}", bucketKey, e);
         }
 
         try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> dirTblItr =
@@ -424,13 +420,13 @@ public class KeyLifecycleService extends BackgroundService {
           }
         } catch (IOException e) {
           // log failure and continue the process to delete/move files already identified in this run
-          LOG.warn("Failed to iterate keyTable for bucket {}", bucketName, e);
+          LOG.warn("Failed to iterate keyTable for bucket {}", bucketKey, e);
         }
       }
     }
 
     private void evaluateKeyTable(Table<String, OmKeyInfo> keyTable, String prefix, String directoryPath,
-        OmLCRule rule, List<String> keyList, List<Long> keyUpdateIDList, String bucketName) {
+        OmLCRule rule, List<String> keyList, List<Long> keyUpdateIDList, String bucketKey) {
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
                keyTable.iterator(prefix)) {
         while (keyTblItr.hasNext()) {
@@ -447,12 +443,12 @@ public class KeyLifecycleService extends BackgroundService {
         }
       } catch (IOException e) {
         // log failure and continue the process to delete/move files already identified in this run
-        LOG.warn("Failed to iterate keyTable for bucket {}", bucketName, e);
+        LOG.warn("Failed to iterate keyTable for bucket {}", bucketKey, e);
       }
     }
 
     private void evaluateDirTable(Table<String, OmDirectoryInfo> directoryInfoTable, String prefix,
-        String directoryPath, OmLCRule rule, List<String> dirList, List<Long> dirUpdateIDList, String bucketName) {
+        String directoryPath, OmLCRule rule, List<String> dirList, List<Long> dirUpdateIDList, String bucketKey) {
       try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> dirTblItr =
                directoryInfoTable.iterator(prefix)) {
         while (dirTblItr.hasNext()) {
@@ -468,16 +464,16 @@ public class KeyLifecycleService extends BackgroundService {
         }
       } catch (IOException e) {
         // log failure and continue the process to delete/move files already identified in this run
-        LOG.warn("Failed to iterate directoryInfoTable for bucket {}", bucketName, e);
+        LOG.warn("Failed to iterate directoryInfoTable for bucket {}", bucketKey, e);
       }
     }
 
-    private void evaluateBucket(String bucketName,
+    private void evaluateBucket(String bucketKey,
         Table<String, OmKeyInfo> keyTable, List<OmLCRule> ruleList,
         List<String> expiredKeyList, List<Long> expiredKeyUpdateIDList) {
       // use bucket name as key iterator prefix
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
-               keyTable.iterator(bucketName)) {
+               keyTable.iterator(bucketKey)) {
         while (keyTblItr.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
           OmKeyInfo key = keyValue.getValue();
@@ -494,22 +490,28 @@ public class KeyLifecycleService extends BackgroundService {
         }
       } catch (IOException e) {
         // log failure and continue the process to delete/move files already identified in this run
-        LOG.warn("Failed to iterate through bucket {}", bucketName, e);
+        LOG.warn("Failed to iterate through bucket {}", bucketKey, e);
       }
     }
 
-    private OmDirectoryInfo getDirectory(OmVolumeArgs volume, OmBucketInfo bucket, String prefix, String bucketName) {
+    private OmDirectoryInfo getDirectory(OmVolumeArgs volume, OmBucketInfo bucket, String prefix, String bucketKey) {
       String dbDirName = omMetadataManager.getOzonePathKey(
           volume.getObjectID(), bucket.getObjectID(), bucket.getObjectID(), prefix);
       try {
         return omMetadataManager.getDirectoryTable().get(dbDirName);
       } catch (IOException e) {
-        LOG.info("Failed to get directory object of {} for bucket {}", dbDirName, bucketName);
+        LOG.info("Failed to get directory object of {} for bucket {}", dbDirName, bucketKey);
         return null;
       }
     }
 
-    private List<OmDirectoryInfo> getDirList(OmVolumeArgs volume, OmBucketInfo bucket, String prefix, String bucketName)
+    /**
+     * If prefix is /dir1/dir2, but dir1 doesn't exist, then it will return exception.
+     * If prefix is /dir1/dir2, but dir2 doesn't exist, then it will return a list with dir1 only.
+     * If prefix is /dir1/dir2, although dir1 exists, but get(dir1) failed with IOException,
+     *   then it will return exception too.
+     */
+    private List<OmDirectoryInfo> getDirList(OmVolumeArgs volume, OmBucketInfo bucket, String prefix, String bucketKey)
         throws IOException {
       // find KeyInfo of each directory for prefix
       java.nio.file.Path keyPath = Paths.get(prefix);
@@ -526,15 +528,16 @@ public class KeyLifecycleService extends BackgroundService {
           // It's OK there is no directory for the last part of prefix, which is probably not a directory
           if (omDirInfo == null) {
             if (elements.hasNext()) {
-              throw new IOException("Failed to get directory object of " + dbDirName + " for bucket " + bucketName);
+              throw new OMException("Directory " + dbDirName + " does not exist for bucket " + bucketKey,
+                  OMException.ResultCodes.DIRECTORY_NOT_FOUND);
             }
           } else {
             dirList.add(omDirInfo);
             lastKnownParentId = omDirInfo.getObjectID();
           }
         } catch (IOException e) {
-          LOG.warn("Failed to get directory object of {} for bucket {}", dbDirName, bucketName);
-          throw new IOException("Failed to get directory object for " + dbDirName + " for bucket " + bucketName);
+          LOG.warn("Failed to get directory {} from bucket {}", dbDirName, bucketKey, e);
+          throw new IOException("Failed to get directory " + dbDirName + " from bucket " + bucketKey);
         }
       }
       return dirList;
@@ -548,7 +551,7 @@ public class KeyLifecycleService extends BackgroundService {
     private void onSuccess(String bucketName) {
       inFlight.remove(bucketName);
       metrics.incrNumSuccessTask();
-      long timeSpent = System.currentTimeMillis() - taskStartTime;
+      long timeSpent = Time.monotonicNow() - taskStartTime;
       metrics.incTaskLatencyMs(timeSpent);
       metrics.incNumKeyIterated(numKeyIterated);
       metrics.incNumDirIterated(numDirIterated);

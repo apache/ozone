@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -205,6 +206,7 @@ public final class OmLCExpiration implements OmLCAction {
     }
   }
 
+  @VisibleForTesting
   public static void setTest(boolean isTest) {
     test = isTest;
   }

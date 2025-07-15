@@ -44,7 +44,6 @@ public final class OmLCRule {
 
   private final String id;
   private final String prefix;
-  private final String canonicalPrefix;
   private final boolean directoryStylePrefix;
   private final boolean enabled;
   // List of actions for this rule
@@ -60,9 +59,8 @@ public final class OmLCRule {
 
   private OmLCRule(Builder builder) {
     this.prefix = builder.prefix;
-    this.canonicalPrefix = builder.canonicalPrefix;
-    if (this.canonicalPrefix != null) {
-      this.directoryStylePrefix = this.canonicalPrefix.contains(OzoneConsts.OM_KEY_PREFIX);
+    if (this.prefix != null) {
+      this.directoryStylePrefix = this.prefix.contains(OzoneConsts.OM_KEY_PREFIX);
     } else {
       this.directoryStylePrefix = false;
     }
@@ -99,14 +97,6 @@ public final class OmLCRule {
             filter.getAndOperator().getPrefix() : null;
   }
 
-  @Nullable
-  public String getEffectiveCanonicalPrefix() {
-    return canonicalPrefix != null ? canonicalPrefix :
-        (filter != null && filter.getPrefix() != null) ? filter.getCanonicalPrefix() :
-            (filter != null && filter.getAndOperator() != null && filter.getAndOperator().getPrefix() != null) ?
-                filter.getAndOperator().getCanonicalPrefix() : null;
-  }
-
   public boolean isEnabled() {
     return enabled;
   }
@@ -139,7 +129,6 @@ public final class OmLCRule {
     return isPrefixEnable;
   }
 
-  @Nullable
   public boolean isDirectoryStylePrefix() {
     return directoryStylePrefix || (filter != null ? filter.isDirectoryStylePrefix() : false);
   }
@@ -196,7 +185,16 @@ public final class OmLCRule {
     }
 
     if (prefix != null && bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      isValidKeyPath(normalizePrefix(prefix));
+      String normalizedPrefix = normalizePrefix(prefix);
+      if (!normalizedPrefix.equals(prefix)) {
+        throw new OMException("Prefix format is not supported. Please use " + normalizedPrefix +
+            " instead of " + prefix + ".", OMException.ResultCodes.INVALID_REQUEST);
+      }
+      try {
+        isValidKeyPath(normalizedPrefix);
+      } catch (OMException e) {
+        throw new OMException("Prefix is not a valid key path: " + prefix, OMException.ResultCodes.INVALID_REQUEST);
+      }
     }
 
     if (filter != null) {
@@ -215,7 +213,7 @@ public final class OmLCRule {
     if (getExpiration().isExpired(omKeyInfo.getModificationTime())) {
       // verify prefix and filter
       if (prefix != null) {
-        if (omKeyInfo.getKeyName().startsWith(canonicalPrefix)) {
+        if (omKeyInfo.getKeyName().startsWith(prefix)) {
           matched = true;
         }
       } else {
@@ -237,7 +235,7 @@ public final class OmLCRule {
     if (getExpiration().isExpired(omKeyInfo.getModificationTime())) {
       // verify prefix and filter
       if (prefix != null) {
-        if (keyPath.startsWith(canonicalPrefix)) {
+        if (keyPath.startsWith(prefix)) {
           matched = true;
         }
       } else {
@@ -253,7 +251,7 @@ public final class OmLCRule {
     if (getExpiration().isExpired(dirInfo.getModificationTime())) {
       // verify prefix and filter
       if (prefix != null) {
-        if (keyPath.startsWith(canonicalPrefix)) {
+        if (keyPath.startsWith(prefix)) {
           matched = true;
         }
       } else {
@@ -291,15 +289,7 @@ public final class OmLCRule {
       builder.setId(lifecycleRule.getId());
     }
     if (lifecycleRule.hasPrefix()) {
-      String prefix = lifecycleRule.getPrefix();
-      builder.setPrefix(prefix);
-      if (layout == BucketLayout.FILE_SYSTEM_OPTIMIZED && prefix.startsWith(OzoneConsts.OM_KEY_PREFIX)) {
-        String normalizedKeyName = normalizePrefix(prefix);
-        isValidKeyPath(normalizedKeyName);
-        builder.setCanonicalPrefix(normalizedKeyName);
-      } else {
-        builder.setCanonicalPrefix(prefix);
-      }
+      builder.setPrefix(lifecycleRule.getPrefix());
     }
     for (LifecycleAction lifecycleAction : lifecycleRule.getActionList()) {
       if (lifecycleAction.hasExpiration()) {
@@ -318,7 +308,6 @@ public final class OmLCRule {
     return "OmLCRule{" +
         "id='" + id + '\'' +
         ", prefix='" + prefix + '\'' +
-        ", canonicalPrefix='" + canonicalPrefix + '\'' +
         ", enabled=" + enabled +
         ", isPrefixEnable=" + isPrefixEnable +
         ", isTagEnable=" + isTagEnable +
@@ -333,7 +322,6 @@ public final class OmLCRule {
   public static class Builder {
     private String id = "";
     private String prefix;
-    private String canonicalPrefix;
     private boolean enabled;
     private List<OmLCAction> actions = new ArrayList<>();
     private OmLCFilter filter;
@@ -346,11 +334,6 @@ public final class OmLCRule {
 
     public Builder setPrefix(String lcPrefix) {
       this.prefix = lcPrefix;
-      return this;
-    }
-
-    public Builder setCanonicalPrefix(String canonicalPrefix) {
-      this.canonicalPrefix = canonicalPrefix;
       return this;
     }
 

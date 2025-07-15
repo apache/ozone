@@ -22,9 +22,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -310,7 +312,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @EnumSource(BucketLayout.class)
     void testAllKeyExpiredWithTag(BucketLayout bucketLayout) throws IOException,
         TimeoutException, InterruptedException {
-      assumeTrue(bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String prefix = "key";
@@ -341,7 +342,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @EnumSource(BucketLayout.class)
     void testOneKeyExpiredWithTag(BucketLayout bucketLayout) throws IOException,
         TimeoutException, InterruptedException {
-      assumeTrue(bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED);
       int keyCount = KEY_COUNT;
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
@@ -379,7 +379,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @EnumSource(BucketLayout.class)
     void testAllKeyExpiredWithAndOperator(BucketLayout bucketLayout) throws IOException,
         TimeoutException, InterruptedException {
-      assumeTrue(bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String prefix = "key";
@@ -410,7 +409,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @EnumSource(BucketLayout.class)
     void testOneKeyExpiredWithAndOperator(BucketLayout bucketLayout) throws IOException,
         TimeoutException, InterruptedException {
-      assumeTrue(bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED);
       int keyCount = KEY_COUNT;
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
@@ -500,8 +498,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     public Stream<Arguments> parameters2() {
       return Stream.of(
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, "/"),
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, "//"),
           arguments(BucketLayout.OBJECT_STORE, "/"),
           arguments(BucketLayout.LEGACY, "/")
       );
@@ -544,6 +540,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @MethodSource("parameters1")
     void testSlashPrefix(BucketLayout bucketLayout, boolean createPrefix)
         throws IOException, TimeoutException, InterruptedException {
+      assumeTrue(bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String keyPrefix = "key";
@@ -768,42 +765,42 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     public Stream<Arguments> parameters3() {
       return Stream.of(
-          arguments("dir1/dir2/dir3", "//dir1//dir2//dir3//", 3, 0, true, false),
-          arguments("dir1/dir2/dir3", "//dir1//dir2//dir3//", 3, 0, false, true),
-          arguments("/dir1/dir2/dir3", "/dir1/dir2/dir3", 3, 1, true, false),
-          arguments("/dir1/dir2/dir3", "/dir1/dir2/dir3", 3, 1, false, true),
-          arguments("/dir1/dir2/dir3/", "/dir1/dir2/dir3/", 3, 0, true, false),
-          arguments("/dir1/dir2/dir3/", "/dir1/dir2/dir3/", 3, 0, false, true),
-          arguments("/dir1//dir2//dir3//", "/dir1/dir2/dir3/", 3, 0, true, false),
-          arguments("/dir1//dir2//dir3//", "/dir1/dir2/dir3/", 3, 0, false, true),
-          arguments("/dir1//dir2/dir3/", "//dir1//dir2//dir", 3, 1, true, false),
-          arguments("/dir1//dir2/dir3/", "//dir1//dir2//dir", 3, 1, false, true),
-          arguments("/dir1//dir2/dir3/", "//dir1//dir2//dir/", 3, 0, true, false),
-          arguments("/dir1//dir2/dir3/", "//dir1//dir2//dir/", 3, 0, false, true),
-          arguments("dir1/dir2", "//dir1//dir2//", 2, 0, true, false),
-          arguments("dir1/dir2", "//dir1//dir2//", 2, 0, false, true),
+          arguments("dir1/dir2/dir3", "dir1/dir2/dir3", 3, 0, true, false),
+          arguments("dir1/dir2/dir3", "dir1/dir2/dir3", 3, 0, false, true),
+          arguments("/dir1/dir2/dir3", "dir1/dir2/dir3", 3, 1, true, false),
+          arguments("/dir1/dir2/dir3", "dir1/dir2/dir3", 3, 1, false, true),
+          arguments("/dir1/dir2/dir3/", "dir1/dir2/dir3/", 3, 0, true, false),
+          arguments("/dir1/dir2/dir3/", "dir1/dir2/dir3/", 3, 0, false, true),
+          arguments("/dir1//dir2//dir3//", "dir1/dir2/dir3/", 3, 0, true, false),
+          arguments("/dir1//dir2//dir3//", "dir1/dir2/dir3/", 3, 0, false, true),
+          arguments("/dir1//dir2/dir3/", "dir1/dir2/dir", 3, 1, true, false),
+          arguments("/dir1//dir2/dir3/", "dir1/dir2/dir", 3, 1, false, true),
+          arguments("/dir1//dir2/dir3/", "dir1/dir2/dir/", 3, 0, true, false),
+          arguments("/dir1//dir2/dir3/", "dir1/dir2/dir/", 3, 0, false, true),
+          arguments("dir1/dir2", "dir1/dir2/", 2, 0, true, false),
+          arguments("dir1/dir2", "dir1/dir2/", 2, 0, false, true),
           arguments("/dir1/dir2", "dir1/dir2", 2, 1, true, false),
           arguments("/dir1/dir2", "dir1/dir2", 2, 1, false, true),
-          arguments("/dir1/dir2/", "/dir1/dir2", 2, 1, true, false),
-          arguments("/dir1/dir2/", "/dir1/dir2", 2, 1, false, true),
-          arguments("/dir1//dir2//", "/dir1/dir2/", 2, 0, true, false),
-          arguments("/dir1//dir2//", "/dir1/dir2/", 2, 0, false, true),
+          arguments("/dir1/dir2/", "dir1/dir2", 2, 1, true, false),
+          arguments("/dir1/dir2/", "dir1/dir2", 2, 1, false, true),
+          arguments("/dir1//dir2//", "dir1/dir2/", 2, 0, true, false),
+          arguments("/dir1//dir2//", "dir1/dir2/", 2, 0, false, true),
           arguments("/dir1//dir2//", "dir1/dir", 2, 1, true, false),
           arguments("/dir1//dir2//", "dir1/dir", 2, 1, false, true),
           arguments("/dir1//dir2//", "dir1/dir/", 2, 0, true, false),
           arguments("/dir1//dir2//", "dir1/dir/", 2, 0, false, true),
-          arguments("dir1", "//dir1//", 1, 0, true, false),
-          arguments("dir1", "//dir1//", 1, 0, false, true),
+          arguments("dir1", "dir1/", 1, 0, true, false),
+          arguments("dir1", "dir1/", 1, 0, false, true),
           arguments("/dir1", "dir1", 1, 1, true, false),
           arguments("/dir1", "dir1", 1, 1, false, true),
-          arguments("/dir1/", "/dir1", 1, 1, true, false),
-          arguments("/dir1/", "/dir1", 1, 1, false, true),
-          arguments("/dir1//", "/dir1/", 1, 0, true, false),
-          arguments("/dir1//", "/dir1/", 1, 0, false, true),
-          arguments("/dir1//", "//dir", 1, 1, true, false),
-          arguments("/dir1//", "//dir", 1, 1, false, true),
-          arguments("/dir1//", "//dir/", 1, 0, true, false),
-          arguments("/dir1//", "//dir/", 1, 0, false, true)
+          arguments("/dir1/", "dir1", 1, 1, true, false),
+          arguments("/dir1/", "dir1", 1, 1, false, true),
+          arguments("/dir1//", "dir1/", 1, 0, true, false),
+          arguments("/dir1//", "dir1/", 1, 0, false, true),
+          arguments("/dir1//", "dir", 1, 1, true, false),
+          arguments("/dir1//", "dir", 1, 1, false, true),
+          arguments("/dir1//", "dir/", 1, 0, true, false),
+          arguments("/dir1//", "dir/", 1, 0, false, true)
       );
     }
 
@@ -1204,19 +1201,19 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     /**
      * These are the operations supported for bucket and volume currently.
-     *  Bucket operation
-     *  a. can change owner
-     *  b. cannot be renamed
-     *  c. key from one bucket cannot be renamed to another bucket
-     *  d. can be deleted through sh
-     *
-     *  Volume
-     *  a. cannot be renamed
-     *  b. can be deleted through sh
-     *  c. can change owner
-     *
-     *  So overall, change owner and delete are allowed for bucket and volume. Since the service runs in background,
-     *  owner change doesn't have impact, only the bucket deletion.
+     * Bucket operation
+     * a. can change owner
+     * b. cannot be renamed
+     * c. key from one bucket cannot be renamed to another bucket
+     * d. can be deleted through sh
+     * <p>
+     * Volume
+     * a. cannot be renamed
+     * b. can be deleted through sh
+     * c. can change owner
+     * <p>
+     * So overall, change owner and delete are allowed for bucket and volume. Since the service runs in background,
+     * owner change doesn't have impact, only the bucket deletion.
      */
     @ParameterizedTest
     @EnumSource(BucketLayout.class)
@@ -1320,6 +1317,54 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(KEY_COUNT, getDeletedKeyCount() - initialDeletedKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
+
+    public Stream<Arguments> parameters2() {
+      return Stream.of(
+          arguments("/", true),
+          arguments("/", false),
+          arguments("//", true),
+          arguments("//", false),
+          arguments("//dir1", true),
+          arguments("//dir1", false),
+          arguments("dir1//", true),
+          arguments("dir1//", false),
+          arguments("dir1/.", true),
+          arguments("dir1/.", false),
+          arguments("dir1/.//", true),
+          arguments("dir1/.//", false),
+          arguments("dir1/..", true),
+          arguments("dir1/..", false),
+          arguments("dir1/..//", true),
+          arguments("dir1/..//", false),
+          arguments(":/dir1", true),
+          arguments(":/dir1", false)
+      );
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters2")
+    void testUnsupportedPrefixForFSO(String prefix, boolean createPrefix) {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      OMException omException;
+      if (createPrefix) {
+        omException = assertThrows(
+            OMException.class,
+            () -> createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+                prefix, null, date.toString(), true));
+      } else {
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
+        omException = assertThrows(
+            OMException.class,
+            () -> createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+                null, filter.build(), date.toString(), true));
+      }
+      assertSame(INVALID_REQUEST, omException.getResult());
+    }
   }
 
   private List<OmKeyArgs> createKeys(String volume, String bucket, BucketLayout bucketLayout,
@@ -1366,6 +1411,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
             .setEnabled(enabled)
             .setPrefix(prefix)
             .setFilter(filter)
+            .setBucketLayout(layout)
             .setAction(new OmLCExpiration.Builder()
                 .setDate(date)
                 .build())

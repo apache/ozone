@@ -40,7 +40,6 @@ public final class OmLifecycleRuleAndOperator {
 
   private final Map<String, String> tags;
   private final String prefix;
-  private final String canonicalPrefix;
   private final boolean directoryStylePrefix;
 
   private OmLifecycleRuleAndOperator() {
@@ -50,9 +49,8 @@ public final class OmLifecycleRuleAndOperator {
   private OmLifecycleRuleAndOperator(Builder builder) {
     this.tags = Collections.unmodifiableMap(new HashMap<>(builder.tags));
     this.prefix = builder.prefix;
-    this.canonicalPrefix = builder.canonicalPrefix;
-    if (this.canonicalPrefix != null) {
-      this.directoryStylePrefix = this.canonicalPrefix.contains(OzoneConsts.OM_KEY_PREFIX);
+    if (this.prefix != null) {
+      this.directoryStylePrefix = this.prefix.contains(OzoneConsts.OM_KEY_PREFIX);
     } else {
       this.directoryStylePrefix = false;
     }
@@ -66,11 +64,6 @@ public final class OmLifecycleRuleAndOperator {
   @Nullable
   public String getPrefix() {
     return prefix;
-  }
-
-  @Nullable
-  public String getCanonicalPrefix() {
-    return canonicalPrefix;
   }
 
   public boolean isDirectoryStylePrefix() {
@@ -110,12 +103,21 @@ public final class OmLifecycleRuleAndOperator {
     }
 
     if (hasPrefix && layout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      isValidKeyPath(normalizePrefix(prefix));
+      String normalizedPrefix = normalizePrefix(prefix);
+      if (!normalizedPrefix.equals(prefix)) {
+        throw new OMException("Prefix format is not supported. Please use " + normalizedPrefix +
+            " instead of " + prefix + ".", OMException.ResultCodes.INVALID_REQUEST);
+      }
+      try {
+        isValidKeyPath(normalizedPrefix);
+      } catch (OMException e) {
+        throw new OMException("Prefix is not a valid key path: " + prefix, OMException.ResultCodes.INVALID_REQUEST);
+      }
     }
   }
 
   public boolean match(OmKeyInfo omKeyInfo, String keyPath) {
-    if (prefix != null && !keyPath.startsWith(canonicalPrefix)) {
+    if (prefix != null && !keyPath.startsWith(prefix)) {
       return false;
     }
 
@@ -136,16 +138,10 @@ public final class OmLifecycleRuleAndOperator {
   public static class Builder {
     private Map<String, String> tags = new HashMap<>();
     private String prefix;
-    private String canonicalPrefix;
     private BucketLayout bucketLayout;
 
     public Builder setPrefix(String lcPrefix) {
       this.prefix = lcPrefix;
-      return this;
-    }
-
-    public Builder setCanonicalPrefix(String canonicalPrefix) {
-      this.canonicalPrefix = canonicalPrefix;
       return this;
     }
 
@@ -197,15 +193,7 @@ public final class OmLifecycleRuleAndOperator {
     OmLifecycleRuleAndOperator.Builder builder = new OmLifecycleRuleAndOperator.Builder();
 
     if (andOperator.hasPrefix()) {
-      String prefix = andOperator.getPrefix();
-      if (layout == BucketLayout.FILE_SYSTEM_OPTIMIZED && prefix.startsWith(OzoneConsts.OM_KEY_PREFIX)) {
-        String normalizedKeyName = normalizePrefix(prefix);
-        isValidKeyPath(normalizedKeyName);
-        builder.setCanonicalPrefix(normalizedKeyName);
-      } else {
-        builder.setCanonicalPrefix(prefix);
-      }
-      builder.setPrefix(prefix);
+      builder.setPrefix(andOperator.getPrefix());
     }
     andOperator.getTagsList().forEach(tag -> {
       builder.addTag(tag.getKey(), tag.getValue());

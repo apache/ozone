@@ -156,15 +156,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
         ", updateID=" + getUpdateID() +
         '}';
   }
-  /**
-   * Returns formatted key to be used as prevKey when listing lifecycle
-   * configurations.
-   *
-   * @return /volume/bucket
-   */
-  public String getFormattedKey() {
-    return OzoneConsts.OM_KEY_PREFIX + volume + OzoneConsts.OM_KEY_PREFIX + bucket;
-  }
 
   @Override
   public Map<String, String> toAuditMap() {

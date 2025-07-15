@@ -184,7 +184,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
               deleteKeys.remove(keyName);
               unDeletedKeys.addKeys(keyName);
               keyToError.put(keyName,
-                  new ErrorInfo(OMException.ResultCodes.METADATA_ERROR.name(), "UpdateID not match or null"));
+                  new ErrorInfo(OMException.ResultCodes.UPDATE_ID_NOT_MATCH.name(), "UpdateID not match or null"));
               continue;
             }
           }
