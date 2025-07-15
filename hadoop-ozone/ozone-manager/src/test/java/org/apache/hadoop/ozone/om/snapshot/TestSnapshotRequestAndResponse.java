@@ -38,10 +38,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -175,12 +175,8 @@ public class TestSnapshotRequestAndResponse {
     bucketName = UUID.randomUUID().toString();
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    when(ozoneManager.getDefaultReplicationConfig()).thenReturn(
-        ReplicationConfig.fromTypeAndFactor(
-            ReplicationType.valueOf(OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT.toUpperCase()),
-            ReplicationFactor.valueOf(OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT.toUpperCase())
-        )
-    );
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     omSnapshotManager = new OmSnapshotManager(ozoneManager);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
   }

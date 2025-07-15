@@ -34,15 +34,12 @@ import java.util.Random;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -206,12 +203,8 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
   @ParameterizedTest
   @CsvSource(value = {"false,false", "false,true", "true,false", "true,true"})
   public void testDirectoryPurge(boolean fromSnapshot, boolean purgeDirectory) throws Exception {
-    when(ozoneManager.getDefaultReplicationConfig()).thenReturn(
-        ReplicationConfig.fromTypeAndFactor(
-            ReplicationType.valueOf(OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT.toUpperCase()),
-            ReplicationFactor.valueOf(OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT.toUpperCase())
-        )
-    );
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     Random random = new Random();
     String bucket = "bucket" + random.nextInt();
     // Add volume, bucket and key entries to OM DB.
@@ -337,12 +330,8 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheSnapshotLastTransactionInfoUpdated() throws Exception {
-    when(ozoneManager.getDefaultReplicationConfig()).thenReturn(
-        ReplicationConfig.fromTypeAndFactor(
-            ReplicationType.valueOf(OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT.toUpperCase()),
-            ReplicationFactor.valueOf(OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_DEFAULT.toUpperCase())
-        )
-    );
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     // Create and Delete keys. The keys should be moved to DeletedKeys table
     List<OmKeyInfo> deletedKeyInfos = createAndDeleteKeys(1, null);
     // The keys should be present in the DeletedKeys table before purging
