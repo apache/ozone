@@ -602,9 +602,8 @@ public class ReconContainerMetadataManagerImpl
         containerCountRecord.getValue();
   }
 
-  @Override
-  public TableIterator getContainerTableIterator() throws IOException {
-    return containerKeyTable.iterator();
+  public Table<ContainerKeyPrefix, Integer> getContainerKeyTableForTesting() {
+    return containerKeyTable;
   }
 
   @Override

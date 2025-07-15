@@ -211,12 +211,6 @@ public interface ReconContainerMetadataManager {
       throws IOException;
 
   /**
-   * Get iterator to the entire container DB.
-   * @return TableIterator
-   */
-  TableIterator getContainerTableIterator() throws IOException;
-
-  /**
    * Get the total count of containers present in the system.
    *
    * @return total count of containers.

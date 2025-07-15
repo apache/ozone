@@ -106,7 +106,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
-  public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
+  public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 50000;
   public static final String OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.key.deleting.limit.per.task";
   public static final int OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT
@@ -322,11 +322,6 @@ public final class OMConfigKeys {
   // hadoop-policy.xml, "*" allows all users/groups to access.
   public static final String OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL =
       "ozone.om.security.admin.protocol.acl";
-
-  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
-          "ozone.om.keyname.character.check.enabled";
-  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
-          false;
 
   @Deprecated
   public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =

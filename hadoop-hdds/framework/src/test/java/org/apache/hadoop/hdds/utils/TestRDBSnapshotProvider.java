@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -118,8 +117,8 @@ public class TestRDBSnapshotProvider {
             .collect(Collectors.toList()));
         try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
           writeDBCheckpointToStream(dbCheckpoint, outputStream,
-              HAUtils.getExistingSstFiles(
-                  rdbSnapshotProvider.getCandidateDir()), new ArrayList<>());
+              new HashSet<>(HAUtils.getExistingSstFiles(
+                  rdbSnapshotProvider.getCandidateDir())));
         }
       }
     };
@@ -222,18 +221,12 @@ public class TestRDBSnapshotProvider {
 
   public void insertRandomData(RDBStore dbStore, int familyIndex)
       throws IOException {
-    try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
-        get(familyIndex))) {
-      assertNotNull(firstTable, "Table cannot be null");
-      for (int x = 0; x < 100; x++) {
-        byte[] key =
-            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-      }
-    } catch (Exception e) {
-      throw new IOException(e);
+    Table<byte[], byte[]> firstTable = dbStore.getTable(families.get(familyIndex));
+    assertNotNull(firstTable, "Table cannot be null");
+    for (int x = 0; x < 100; x++) {
+      byte[] key = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      byte[] value = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      firstTable.put(key, value);
     }
   }
 

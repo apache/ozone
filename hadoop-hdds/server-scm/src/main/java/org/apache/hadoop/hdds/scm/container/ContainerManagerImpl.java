@@ -33,6 +33,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -82,6 +83,8 @@ public class ContainerManagerImpl implements ContainerManager {
   @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
 
+  private final long maxContainerSize;
+
   /**
    *
    */
@@ -110,6 +113,9 @@ public class ContainerManagerImpl implements ContainerManager {
     this.numContainerPerVolume = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
+
+    maxContainerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }
@@ -353,21 +359,31 @@ public class ContainerManagerImpl implements ContainerManager {
 
   @Override
   public ContainerInfo getMatchingContainer(final long size, final String owner,
-                                            final Pipeline pipeline, final Set<ContainerID> excludedContainerIDs) {
+      final Pipeline pipeline, final Set<ContainerID> excludedContainerIDs) {
     NavigableSet<ContainerID> containerIDs;
     ContainerInfo containerInfo;
     try {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
         if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
-          allocateContainer(pipeline, owner);
-          containerIDs = getContainersForOwner(pipeline, owner);
+          if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
+            allocateContainer(pipeline, owner);
+            containerIDs = getContainersForOwner(pipeline, owner);
+          } else {
+            LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
+                pipeline, maxContainerSize);
+          }
         }
         containerIDs.removeAll(excludedContainerIDs);
         containerInfo = containerStateManager.getMatchingContainer(
             size, owner, pipeline.getId(), containerIDs);
         if (containerInfo == null) {
-          containerInfo = allocateContainer(pipeline, owner);
+          if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
+            containerInfo = allocateContainer(pipeline, owner);
+          } else {
+            LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
+                pipeline, maxContainerSize);
+          }
         }
         return containerInfo;
       }
@@ -461,11 +477,6 @@ public class ContainerManagerImpl implements ContainerManager {
       throws ContainerNotFoundException {
     throw new ContainerNotFoundException("Container with id " +
         id + " not found.");
-  }
-
-  @Override
-  public void close() throws IOException {
-    containerStateManager.close();
   }
 
   // Remove this after fixing Recon

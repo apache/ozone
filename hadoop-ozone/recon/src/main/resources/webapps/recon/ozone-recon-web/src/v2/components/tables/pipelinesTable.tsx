@@ -16,18 +16,15 @@
  * limitations under the License.
  */
 
-import React, { HTMLAttributes } from 'react';
+import React, {HTMLAttributes} from 'react';
 
-import Table, {
-  ColumnsType,
-  TablePaginationConfig
-} from 'antd/es/table';
+import Table, {ColumnsType, TablePaginationConfig} from 'antd/es/table';
 import Tooltip from 'antd/es/tooltip';
-import { InfoCircleOutlined } from '@ant-design/icons';
+import {InfoCircleOutlined} from '@ant-design/icons';
 
-import { ReplicationIcon } from '@/utils/themeIcons';
-import { getDurationFromTimestamp, getTimeDiffFromTimestamp } from '@/v2/utils/momentUtils';
-import { Pipeline, PipelinesTableProps, PipelineStatusList } from '@/v2/types/pipelines.types';
+import {ReplicationIcon} from '@/utils/themeIcons';
+import {getDurationFromTimestamp, getTimeDiffFromTimestamp} from '@/v2/utils/momentUtils';
+import {Pipeline, PipelinesTableProps, PipelineStatusList} from '@/v2/types/pipelines.types';
 
 
 // TODO: When Datanodes PR gets merged remove these declarations
