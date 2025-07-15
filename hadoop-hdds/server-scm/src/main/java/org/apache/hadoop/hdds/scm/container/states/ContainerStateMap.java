@@ -179,6 +179,7 @@ public class ContainerStateMap {
       return entry == null ? null : entry.removeReplica(datanodeID);
     }
   }
+
   /**
    * Map {@link LifeCycleState} to {@link ContainerInfo}.
    * Note that a {@link ContainerInfo} can only exists in at most one of the {@link LifeCycleState}s.

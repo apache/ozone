@@ -1544,7 +1544,6 @@ public class TestContainerEndpoint {
     assertEquals(containerCount / 2, containerList.size()); // Missing containers
   }
 
-
   @Test
   public void testGetContainerInsightsNonOMContainersWithPrevKey()
       throws IOException, TimeoutException {

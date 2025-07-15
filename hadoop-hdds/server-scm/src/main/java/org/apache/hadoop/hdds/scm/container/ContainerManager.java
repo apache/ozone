@@ -53,10 +53,10 @@ public interface ContainerManager {
   ContainerInfo getContainer(ContainerID containerID)
       throws ContainerNotFoundException;
 
-
   default List<ContainerInfo> getContainers() {
     return getContainers(ContainerID.valueOf(0), Integer.MAX_VALUE);
   }
+
   /**
    * Returns containers under certain conditions.
    * Search container IDs from start ID(exclusive),
@@ -104,7 +104,6 @@ public interface ContainerManager {
    * @return an iterator of container.
    */
   Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID startID);
-
 
   List<ContainerInfo> getContainers(ReplicationType type);
 

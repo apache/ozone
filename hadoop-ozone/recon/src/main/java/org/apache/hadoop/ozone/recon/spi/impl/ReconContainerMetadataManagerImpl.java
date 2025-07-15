@@ -648,7 +648,7 @@ public class ReconContainerMetadataManagerImpl
       throws IOException {
     this.containerDbStore.commitBatchOperation(rdbBatchOperation);
   }
-    
+
   /**
    * Use the DB's prefix seek iterator to start the scan from the given
    * key prefix and key version.
@@ -730,7 +730,6 @@ public class ReconContainerMetadataManagerImpl
           + " to KEY_CONTAINER table", (double) duration / 1000, count);
     }
   }
-
 
   @VisibleForTesting
   public void deleteContainerKeyRecord(ContainerKeyPrefix containerKeyPrefix) throws IOException {

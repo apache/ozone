@@ -143,7 +143,6 @@ public class ContainerManagerImpl implements ContainerManager {
             id + " not found."));
   }
 
-
   @Override
   public List<ContainerInfo> getContainers(ReplicationType type) {
     return containerStateManager.getContainerInfos(type);
