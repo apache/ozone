@@ -201,14 +201,14 @@
     <proto3.hadooprpc.protobuf.version>3.23.4</proto3.hadooprpc.protobuf.version>
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
-    <ranger.version>2.3.0</ranger.version>
+    <ranger.version>2.5.0</ranger.version>
     <ratis.thirdparty.version>1.0.6</ratis.thirdparty.version>
     <ratis.version>3.1.2</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>2.6.0</restrict-imports.enforcer.version>
-    <rocksdb.version>7.7.3</rocksdb.version>
+    <rocksdb.version>7.10.2</rocksdb.version>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
