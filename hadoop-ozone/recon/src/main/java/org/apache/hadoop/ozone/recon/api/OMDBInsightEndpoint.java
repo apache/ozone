@@ -412,7 +412,7 @@ public class OMDBInsightEndpoint {
     keysSummary.put("totalOpenMPUKeys", openMPUKeyCount);
     // Calculate the total replicated and unreplicated sizes of open MPU keys
     keysSummary.put("totalReplicatedDataSize", replicatedSizeOpenMPUKey);
-    keysSummary.put("totalUnreplicatedDataSize", unreplicatedSizeOpenMPUKey);
+    keysSummary.put("totalDataSize", unreplicatedSizeOpenMPUKey);
   }
 
   /** Retrieves the summary of deleted keys.
