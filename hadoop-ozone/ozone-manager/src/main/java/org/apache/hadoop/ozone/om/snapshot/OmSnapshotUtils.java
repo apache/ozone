@@ -172,7 +172,7 @@ public final class OmSnapshotUtils {
         try {
           Files.deleteIfExists(fileToDelete);
         } catch (IOException e) {
-          LOG.error("Couldn't delete source file {} while unpacking the DB", fileToDelete, e);
+          LOG.warn("Couldn't delete source file {} while unpacking the DB", fileToDelete, e);
         }
       }
     }
