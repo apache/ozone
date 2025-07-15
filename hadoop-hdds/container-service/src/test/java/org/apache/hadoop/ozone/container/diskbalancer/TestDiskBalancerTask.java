@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.jupiter.api.AfterEach;
@@ -90,30 +91,55 @@ public class TestDiskBalancerTask {
   private HddsVolume destVolume;
   private DiskBalancerServiceTestImpl diskBalancerService;
 
-  private final FaultInjector faultInjector = new TestFaultInjector();
+  private final TestFaultInjector kvFaultInjector = new TestFaultInjector();
+  private final TestFaultInjector csFaultInjector = new TestFaultInjector();
+  private final TestFaultInjector kvUtilFaultInjector = new TestFaultInjector();
 
   private static final long CONTAINER_ID = 1L;
   private static final long CONTAINER_SIZE = 1024L * 1024L; // 1 MB
 
   /**
-   * A simple FaultInjector implementation for testing.
+   * A FaultInjector that can be configured to throw an exception on a
+   * specific invocation number. This allows tests to target failure points
+   * that occur after initial checks.
    */
   private static class TestFaultInjector extends FaultInjector {
     private Throwable exception;
+    private int throwOnInvocation = -1; // -1 means never throw
+    private int invocationCount = 0;
+
+    /**
+     * Sets an exception to be thrown on a specific invocation.
+     * @param e The exception to throw.
+     * @param onInvocation The invocation number to throw on (e.g., 1 for the
+     * first call, 2 for the second, etc.).
+     */
+    public void setException(Throwable e, int onInvocation) {
+      this.exception = e;
+      this.throwOnInvocation = onInvocation;
+      this.invocationCount = 0; // Reset count for each new test setup
+    }
 
     @Override
     public void setException(Throwable e) {
-      this.exception = e;
+      // Default to throwing on the first invocation if no number is specified.
+      setException(e, 1);
     }
 
     @Override
     public Throwable getException() {
-      return exception;
+      invocationCount++;
+      if (exception != null && invocationCount == throwOnInvocation) {
+        return exception;
+      }
+      return null;
     }
 
     @Override
     public void reset() {
       this.exception = null;
+      this.throwOnInvocation = -1;
+      this.invocationCount = 0;
     }
   }
 
@@ -153,7 +179,9 @@ public class TestDiskBalancerTask {
     sourceVolume = (HddsVolume) volumes.get(0);
     destVolume = (HddsVolume) volumes.get(1);
 
-    KeyValueContainer.setInjector(faultInjector);
+    KeyValueContainer.setInjector(kvFaultInjector);
+    ContainerSet.setFaultInjector(csFaultInjector);
+    KeyValueContainerUtil.setInjector(kvUtilFaultInjector);
   }
 
   @AfterEach
@@ -170,9 +198,12 @@ public class TestDiskBalancerTask {
       FileUtils.deleteDirectory(testRoot);
     }
 
-    faultInjector.reset();
+    kvFaultInjector.reset();
+    csFaultInjector.reset();
+    kvUtilFaultInjector.reset();
     KeyValueContainer.setInjector(null);
     ContainerSet.setFaultInjector(null);
+    KeyValueContainerUtil.setInjector(null);
   }
 
   @Test
@@ -187,18 +218,16 @@ public class TestDiskBalancerTask {
 
     // Asserts
     Container newContainer = containerSet.getContainer(CONTAINER_ID);
-    assertNotNull(newContainer, "New Container should exist in containerSet");
-    assertNotEquals(container, newContainer, "A new container object should represent the moved container");
-    assertEquals(destVolume, newContainer.getContainerData().getVolume(),
-        "Container should now belong to destination volume");
+    assertNotNull(newContainer);
+    assertNotEquals(container, newContainer);
+    assertEquals(destVolume, newContainer.getContainerData().getVolume());
     assertEquals(initialSourceUsed - CONTAINER_SIZE,
-        sourceVolume.getCurrentUsage().getUsedSpace(), "Source volume usage should decrease");
+        sourceVolume.getCurrentUsage().getUsedSpace());
     assertEquals(initialDestUsed + CONTAINER_SIZE,
-        destVolume.getCurrentUsage().getUsedSpace(), "Dest volume usage should increase");
-    assertFalse(new File(oldContainerPath).exists(), "Old container path should be deleted");
+        destVolume.getCurrentUsage().getUsedSpace());
+    assertFalse(new File(oldContainerPath).exists());
     assertTrue(
-        new File(newContainer.getContainerData().getContainerPath()).exists(),
-        "New container path should exist");
+        new File(newContainer.getContainerData().getContainerPath()).exists());
     assertEquals(1,
         diskBalancerService.getMetrics().getSuccessCount());
     assertEquals(CONTAINER_SIZE,
@@ -212,24 +241,19 @@ public class TestDiskBalancerTask {
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     String oldContainerPath = container.getContainerData().getContainerPath();
 
-    faultInjector.setException(new IOException("Fault injection: copy failed"));
+    kvFaultInjector.setException(new IOException("Fault injection: copy failed"), 1);
 
     DiskBalancerService.DiskBalancerTask task = getTask(container.getContainerData());
     task.call();
 
     Container originalContainer = containerSet.getContainer(CONTAINER_ID);
-    assertNotNull(originalContainer,
-        "Container should still be in containerSet");
-    assertEquals(container, originalContainer, "original container should remain unchanged");
+    assertNotNull(originalContainer);
+    assertEquals(container, originalContainer);
     assertEquals(sourceVolume,
-        originalContainer.getContainerData().getVolume(),
-        "Container should still belong to source volume");
-    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace(),
-        "Source volume usage should be unchanged");
-    assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace(),
-        "Destination volume usage should be unchanged");
-    assertTrue(new File(oldContainerPath).exists(),
-        "Original container path should still exist");
+        originalContainer.getContainerData().getVolume());
+    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
+    assertTrue(new File(oldContainerPath).exists());
     Path tempDir = destVolume.getTmpDir().toPath()
         .resolve(DiskBalancerService.DISK_BALANCER_DIR);
     assertFalse(Files.exists(tempDir),
@@ -245,7 +269,8 @@ public class TestDiskBalancerTask {
     String oldContainerPath = container.getContainerData().getContainerPath();
 
     // Inject a failure that will be thrown just after the atomic move during container import.
-    faultInjector.setException(new IOException("Fault injection: container import failed after atomic move"));
+    kvFaultInjector.setException(new
+        IOException("Fault injection: container import failed after atomic move"), 2);
 
     DiskBalancerService.DiskBalancerTask task = getTask(
         container.getContainerData());
@@ -253,10 +278,8 @@ public class TestDiskBalancerTask {
 
     Container originalContainer = containerSet.getContainer(CONTAINER_ID);
     assertNotNull(originalContainer);
-    assertEquals(container, originalContainer, "original container should remain unchanged");
-    assertEquals(sourceVolume,
-        originalContainer.getContainerData().getVolume(),
-        "Container should still belong to original source volume");
+    assertEquals(container, originalContainer);
+    assertEquals(sourceVolume, originalContainer.getContainerData().getVolume());
     assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
     assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
     assertTrue(new File(oldContainerPath).exists());
@@ -276,8 +299,8 @@ public class TestDiskBalancerTask {
 
     // Use the fault injector to fail the final
     // in-memory update after container import
-    faultInjector.setException(
-        new IOException("Fault Injection: updateContainer failed"));
+    csFaultInjector.setException(
+        new IOException("Fault Injection: updateContainer failed"), 1);
 
     DiskBalancerService.DiskBalancerTask task = getTask(
         container.getContainerData());
@@ -286,18 +309,12 @@ public class TestDiskBalancerTask {
     // Asserts for rollback
     // The move succeeded on disk but should be reverted by the catch block
     Container originalContainer = containerSet.getContainer(CONTAINER_ID);
-    assertNotNull(originalContainer,
-        "Container should remain in containerSet");
-    assertEquals(container, originalContainer, "original container should remain unchanged");
-    assertEquals(sourceVolume,
-        originalContainer.getContainerData().getVolume(),
-        "Container should still belong to original source volume");
-    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace(),
-        "Source volume usage should be unchanged");
-    assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace(),
-        "Dest volume usage should be reverted");
-    assertTrue(new File(oldContainerPath).exists(),
-        "Original container files should not be deleted");
+    assertNotNull(originalContainer);
+    assertEquals(container, originalContainer);
+    assertEquals(sourceVolume, originalContainer.getContainerData().getVolume());
+    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
+    assertTrue(new File(oldContainerPath).exists());
 
     // Verify the partially moved container at destination is cleaned up
     String idDir = container.getContainerData().getOriginNodeId();
@@ -308,6 +325,40 @@ public class TestDiskBalancerTask {
     assertFalse(Files.exists(finalDestPath),
         "Moved container at destination should be cleaned up on failure");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+  }
+
+  @Test
+  public void moveFailsDuringOldContainerRemove() throws IOException {
+    Container container = createContainer(CONTAINER_ID, sourceVolume);
+    long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
+    long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
+
+    // 2. Fault Injection:
+    // Fail the final 'delete' call on the old container instance.
+    // This simulates a failure during the cleanup of the old replica's files.
+    kvUtilFaultInjector.setException(
+        new IOException("Fault Injection: old container delete() failed"), 1);
+
+    DiskBalancerService.DiskBalancerTask task = getTask(
+        container.getContainerData());
+    task.call();
+
+    // Assertions for successful move despite old container cleanup failure
+    assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
+
+    // Verify new container is active on the destination volume
+    Container newContainer = containerSet.getContainer(CONTAINER_ID);
+    assertNotNull(newContainer);
+    assertEquals(destVolume, newContainer.getContainerData().getVolume());
+    assertTrue(new File(newContainer.getContainerData().getContainerPath()).exists());
+
+    // Verify volume usage is updated correctly
+    assertEquals(initialSourceUsed - CONTAINER_SIZE,
+        sourceVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(initialDestUsed + CONTAINER_SIZE,
+        destVolume.getCurrentUsage().getUsedSpace());
   }
 
   private KeyValueContainer createContainer(long containerId, HddsVolume vol)

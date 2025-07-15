@@ -1064,11 +1064,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     if (injector != null) {
       Throwable ex = injector.getException();
       if (ex != null) {
-        if (ex instanceof IOException) {
-          throw (IOException) ex;
-        } else {
-          throw new IOException("Fault injection", ex);
-        }
+        throw new IOException("Fault injection", ex);
       }
     }
   }

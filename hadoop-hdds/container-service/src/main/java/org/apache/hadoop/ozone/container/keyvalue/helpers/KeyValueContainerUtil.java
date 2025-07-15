@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -31,6 +32,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -57,6 +59,8 @@ import org.slf4j.LoggerFactory;
 public final class KeyValueContainerUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(KeyValueContainerUtil.class);
+
+  private static FaultInjector injector;
 
   /* Never constructed. */
   private KeyValueContainerUtil() {
@@ -129,6 +133,15 @@ public final class KeyValueContainerUtil {
       KeyValueContainerData containerData, ConfigurationSource conf)
       throws IOException {
     Preconditions.checkNotNull(containerData);
+
+    //inject fault for testing
+    if (injector != null) {
+      Throwable ex = injector.getException();
+      if (ex != null) {
+        throw new IOException("Fault injection", ex);
+      }
+    }
+
     KeyValueContainerUtil.removeContainerDB(containerData, conf);
     KeyValueContainerUtil.moveToDeletedContainerDir(containerData,
         containerData.getVolume());
@@ -510,5 +523,10 @@ public final class KeyValueContainerUtil {
     Path destinationDirPath = hddsVolume.getDeletedContainerDir().toPath()
         .resolve(Paths.get(containerDirName));
     return destinationDirPath;
+  }
+
+  @VisibleForTesting
+  public static void setInjector(FaultInjector instance) {
+    injector = instance;
   }
 }

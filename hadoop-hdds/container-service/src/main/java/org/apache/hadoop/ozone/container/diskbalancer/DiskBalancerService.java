@@ -471,6 +471,7 @@ public class DiskBalancerService extends BackgroundService {
       boolean destVolumeIncreased = false;
       Path diskBalancerTmpDir = null, diskBalancerDestDir = null;
       long containerSize = containerData.getBytesUsed();
+      String originalContainerChecksum = containerData.getContainerFileChecksum();
       try {
         // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = destVolume.getTmpDir().toPath()
@@ -478,7 +479,7 @@ public class DiskBalancerService extends BackgroundService {
         ozoneContainer.getController().copyContainer(containerData,
             diskBalancerTmpDir);
 
-        // Step 2: Transition to Temp container to Temp C1-RECOVERING
+        // Step 2: verify checksum and Transition Temp container to Temp C1-RECOVERING
         File tempContainerFile = ContainerUtils.getContainerFile(
             diskBalancerTmpDir.toFile());
         if (!tempContainerFile.exists()) {
@@ -488,6 +489,12 @@ public class DiskBalancerService extends BackgroundService {
         }
         ContainerData tempContainerData = ContainerDataYaml
             .readContainerFile(tempContainerFile);
+        String copiedContainerChecksum = tempContainerData.getContainerFileChecksum();
+        if (!originalContainerChecksum.equals(copiedContainerChecksum)) {
+          throw new IOException("Container checksum mismatch for container "
+              + containerId + ". Original: " + originalContainerChecksum
+              + ", Copied: " + copiedContainerChecksum);
+        }
         tempContainerData.setState(ContainerProtos.ContainerDataProto.State.RECOVERING);
 
         // overwrite the .container file with the new state.
@@ -523,7 +530,7 @@ public class DiskBalancerService extends BackgroundService {
             .incrementUsedSpace(containerSize);
         destVolumeIncreased = true;
 
-        // Step 4: New Container state transition, C1-RECOVERING -> C1-CLOSING
+        // Step 4: New Container state transition, C1-RECOVERING -> C1-CLOSED
         newContainer.getContainerData().setState(
             ContainerProtos.ContainerDataProto.State.CLOSED);
         // The 'update' method persists the state change to the .container file.
@@ -535,12 +542,31 @@ public class DiskBalancerService extends BackgroundService {
             .getContainer(containerId);
         oldContainer.writeLock();
         try {
+          // First, update the in-memory set to point to the new replica.
           ozoneContainer.getContainerSet().updateContainer(newContainer);
-          KeyValueContainerUtil.removeContainer(
-              (KeyValueContainerData) oldContainer.getContainerData(), conf);
+
+          // Mark old container as DELETED and persist state.
+          // This ensures it can be cleaned up on restart if deletion fails.
+          oldContainer.getContainerData().setState(
+              ContainerProtos.ContainerDataProto.State.DELETED);
+          oldContainer.update(oldContainer.getContainerData().getMetadata(),
+              true);
+
+          // Remove the old container from the KeyValueContainerUtil.
+          try {
+            KeyValueContainerUtil.removeContainer(
+                (KeyValueContainerData) oldContainer.getContainerData(), conf);
+            oldContainer.delete();
+          } catch (IOException ex) {
+            LOG.warn("Failed to cleanup old container {} after move. It is " +
+                    "marked DELETED and will be handled by background scanners.",
+                containerId, ex);
+          }
         } finally {
           oldContainer.writeUnlock();
         }
+
+        //The move is now successful.
         oldContainer.getContainerData().getVolume()
             .decrementUsedSpace(containerSize);
         balancedBytesInLastWindow.addAndGet(containerSize);

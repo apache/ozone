@@ -225,10 +225,6 @@ public class ContainerSet implements Iterable<Container<?>> {
     if (faultInjector != null) {
       Throwable e = faultInjector.getException();
       if (e != null) {
-        if (e instanceof IOException) {
-          throw new StorageContainerException("Fault Injection",
-              (IOException) e, CONTAINER_INTERNAL_ERROR);
-        }
         throw new StorageContainerException("Fault Injection", e,
             CONTAINER_INTERNAL_ERROR);
       }
