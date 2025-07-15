@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 
@@ -42,8 +41,6 @@ public final class OMSnapshotMoveUtils {
 
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
-    SnapshotChainManager snapshotChainManager =
-        omMetadataManager.getSnapshotChainManager();
 
     // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
     fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(
