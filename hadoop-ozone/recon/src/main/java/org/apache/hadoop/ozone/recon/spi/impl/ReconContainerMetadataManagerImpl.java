@@ -732,16 +732,19 @@ public class ReconContainerMetadataManagerImpl
   }
 
   @VisibleForTesting
+  @Override
   public void deleteContainerKeyRecord(ContainerKeyPrefix containerKeyPrefix) throws IOException {
     containerKeyTable.delete(containerKeyPrefix);
   }
 
   @VisibleForTesting
+  @Override
   public void deleteKeyContainerRecord(KeyPrefixContainer keyPrefixContainer) throws IOException {
     keyContainerTable.delete(keyPrefixContainer);
   }
 
   @VisibleForTesting
+  @Override
   public void deleteContainerKeyCountRecord(Long containerID) throws IOException {
     containerKeyCountTable.delete(containerID);
   }
