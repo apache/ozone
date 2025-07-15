@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import java.io.IOException;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -26,38 +27,36 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 
-import java.io.IOException;
-
 /**
  * Utility class for snapshot move requests.
  */
 public final class OMSnapshotMoveUtils {
 
-    private OMSnapshotMoveUtils() {
+  private OMSnapshotMoveUtils() {
+  }
+
+  public static void updateCache(OzoneManager ozoneManager,
+                                 SnapshotInfo fromSnapshot,
+                                 SnapshotInfo toSnapshot,
+                                 ExecutionContext context) throws IOException {
+
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager =
+        omMetadataManager.getSnapshotChainManager();
+
+    // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
+    fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(
+        context.getTermIndex()).toByteString());
+    omMetadataManager.getSnapshotInfoTable().addCacheEntry(
+        new CacheKey<>(fromSnapshot.getTableKey()),
+        CacheValue.get(context.getIndex(), fromSnapshot));
+    if (toSnapshot != null) {
+      toSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(
+          context.getTermIndex()).toByteString());
+      omMetadataManager.getSnapshotInfoTable().addCacheEntry(
+          new CacheKey<>(toSnapshot.getTableKey()),
+          CacheValue.get(context.getIndex(), toSnapshot));
     }
-
-    public static void updateCache(OzoneManager ozoneManager,
-                                   SnapshotInfo fromSnapshot,
-                                   SnapshotInfo toSnapshot,
-                                   ExecutionContext context) throws IOException {
-
-        OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
-            ozoneManager.getMetadataManager();
-        SnapshotChainManager snapshotChainManager =
-            omMetadataManager.getSnapshotChainManager();
-
-        // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
-        fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(
-            context.getTermIndex()).toByteString());
-        omMetadataManager.getSnapshotInfoTable().addCacheEntry(
-            new CacheKey<>(fromSnapshot.getTableKey()),
-            CacheValue.get(context.getIndex(), fromSnapshot));
-        if (toSnapshot != null) {
-            toSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(
-                context.getTermIndex()).toByteString());
-            omMetadataManager.getSnapshotInfoTable().addCacheEntry(
-                new CacheKey<>(toSnapshot.getTableKey()),
-                CacheValue.get(context.getIndex(), toSnapshot));
-        }
-    }
+  }
 }
