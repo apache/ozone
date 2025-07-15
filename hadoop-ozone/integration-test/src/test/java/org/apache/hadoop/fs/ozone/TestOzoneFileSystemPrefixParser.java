@@ -71,7 +71,7 @@ public class TestOzoneFileSystemPrefixParser {
     // create a volume and a bucket to be used by OzoneFileSystem
     try (OzoneClient client = cluster.newClient()) {
       TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
-          BucketLayout.FILE_SYSTEM_OPTIMIZED, null);
+          BucketLayout.FILE_SYSTEM_OPTIMIZED);
     }
 
     String rootPath = String

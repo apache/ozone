@@ -42,8 +42,10 @@ import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequ
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -684,17 +686,21 @@ public class OMDBInsightEndpoint {
    */
   protected Pair<Long, Long> fetchSizeForDeletedDirectory(long objectId)
       throws IOException {
-    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-    if (nsSummary == null) {
-      return Pair.of(0L, 0L);
-    }
-    long totalSize = nsSummary.getSizeOfFiles();
-    long totalReplicatedSize = nsSummary.getReplicatedSizeOfFiles();
+    long totalSize = 0;
+    long totalReplicatedSize = 0;
+    Deque<Long> stack = new ArrayDeque();
+    stack.push(objectId);
 
-    for (long childId : nsSummary.getChildDir()) {
-      Pair<Long, Long> childSize = fetchSizeForDeletedDirectory(childId);
-      totalSize += childSize.getLeft();
-      totalReplicatedSize += childSize.getRight();
+    while (!stack.isEmpty()) {
+      long currentId = stack.pop();
+      NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(currentId);
+      if (nsSummary != null) {
+        totalSize += nsSummary.getSizeOfFiles();
+        totalReplicatedSize += nsSummary.getReplicatedSizeOfFiles();
+        for (long childId : nsSummary.getChildDir()) {
+          stack.push(childId);
+        }
+      }
     }
     return Pair.of(totalSize, totalReplicatedSize);
   }

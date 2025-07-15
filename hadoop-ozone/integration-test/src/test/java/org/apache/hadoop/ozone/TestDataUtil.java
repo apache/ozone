@@ -62,7 +62,21 @@ public final class TestDataUtil {
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
       String volumeName, String bucketName) throws IOException {
-    return createVolumeAndBucket(client, volumeName, bucketName, getDefaultBucketLayout(client), null);
+    return createVolumeAndBucket(client, volumeName, bucketName, getDefaultBucketLayout(client));
+  }
+
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
+      String volumeName, String bucketName, BucketLayout bucketLayout) throws IOException {
+    BucketArgs omBucketArgs;
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    if (bucketLayout != null) {
+      builder.setBucketLayout(bucketLayout);
+    }
+    omBucketArgs = builder.build();
+
+    return createVolumeAndBucket(client, volumeName, bucketName,
+        omBucketArgs);
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
