@@ -43,7 +43,7 @@ public class UpdateRangerSubcommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Option(
-      names = {"-id", "--service-id"},
+      names = {"-id", "--service-id", "--om-service-id"},
       description = "Ozone Manager Service ID"
   )
   private String omServiceId;
