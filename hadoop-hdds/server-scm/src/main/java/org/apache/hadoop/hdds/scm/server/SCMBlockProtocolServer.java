@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_READ_THREADPOOL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_READ_THREADPOOL_KEY;
@@ -45,7 +46,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -266,15 +266,11 @@ public class SCMBlockProtocolServer implements
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-    long totalBlocks = 0;
-    for (BlockGroup bg : keyBlocksInfoList) {
-      totalBlocks += bg.getAllBlocks().size();
-    }
+    long totalBlocks = calculateTotalBlocks(keyBlocksInfoList);
     if (LOG.isDebugEnabled()) {
       LOG.debug("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
           keyBlocksInfoList.size(), totalBlocks);
     }
-    List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
     Exception e = null;
@@ -310,13 +306,9 @@ public class SCMBlockProtocolServer implements
                 unknownFailure;
       }
     }
-    for (BlockGroup bg : keyBlocksInfoList) {
-      List<DeleteBlockResult> blockResult = new ArrayList<>();
-      for (DeletedBlock b : bg.getAllBlocks()) {
-        blockResult.add(new DeleteBlockResult(b.getBlockID(), resultCode));
-      }
-      results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
-    }
+    List<DeleteBlockGroupResult> results = processBlockGroups(keyBlocksInfoList,
+        resultCode);
+
     auditMap.put("KeyBlockToDelete", keyBlocksInfoList.toString());
     if (e == null) {
       AUDIT.logWriteSuccess(
@@ -326,6 +318,30 @@ public class SCMBlockProtocolServer implements
           buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap, e));
     }
     return results;
+  }
+
+  private long calculateTotalBlocks(List<BlockGroup> keyBlocksInfoList) {
+    return keyBlocksInfoList.stream()
+        .mapToLong(bg -> !bg.getAllBlocks().isEmpty() ?
+            bg.getAllBlocks().size() : bg.getBlockIDs().size())
+        .sum();
+  }
+
+  private List<DeleteBlockGroupResult> processBlockGroups(List<BlockGroup> keyBlocksInfoList, Result resultCode) {
+    return keyBlocksInfoList.stream()
+        .map(bg -> createBlockGroupResult(bg, resultCode))
+        .collect(Collectors.toList());
+  }
+
+  private DeleteBlockGroupResult createBlockGroupResult(BlockGroup bg, Result resultCode) {
+    List<DeleteBlockResult> blockResults = !bg.getAllBlocks().isEmpty() ?
+        bg.getAllBlocks().stream()
+            .map(b -> new DeleteBlockResult(b.getBlockID(), resultCode))
+            .collect(Collectors.toList()) :
+        bg.getBlockIDs().stream()
+            .map(b -> new DeleteBlockResult(b, resultCode))
+            .collect(Collectors.toList());
+    return new DeleteBlockGroupResult(bg.getGroupID(), blockResults);
   }
 
   @Override
