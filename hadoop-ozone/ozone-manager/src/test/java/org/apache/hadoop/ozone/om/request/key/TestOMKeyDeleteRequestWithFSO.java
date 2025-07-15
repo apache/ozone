@@ -235,20 +235,15 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
   @Test
   public void testDeleteDirectoryWithColonInFSOBucket() throws Exception {
-
     when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
-
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
 
     String dirName = "foo:dir/";
-
     String dirKeyPath = addKeyToDirTable(volumeName, bucketName, dirName);
 
     long parentObjectID = 0L;
     long dirObjectID = 12345L;
-
     OmDirectoryInfo omDirectoryInfo = OMRequestTestUtils.createOmDirectoryInfo(dirName, dirObjectID, parentObjectID);
-
     omMetadataManager.getDirectoryTable().put(dirKeyPath, omDirectoryInfo);
 
     OmDirectoryInfo storedDirInfo = omMetadataManager.getDirectoryTable().get(dirKeyPath);
@@ -258,13 +253,10 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     assertEquals(parentObjectID, storedDirInfo.getParentObjectID());
 
     OMRequest deleteRequest = doPreExecute(createDeleteKeyRequest(dirName));
-
     OMKeyDeleteRequest omKeyDeleteRequest = getOmKeyDeleteRequest(deleteRequest);
-
     OMClientResponse response = omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
-
     assertNull(omMetadataManager.getDirectoryTable().get(dirName));
   }
 }
