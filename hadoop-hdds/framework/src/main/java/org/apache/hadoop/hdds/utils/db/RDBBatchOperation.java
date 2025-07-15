@@ -140,7 +140,7 @@ public class RDBBatchOperation implements BatchOperation {
       private final ColumnFamily family;
       /**
        * A (dbKey -> dbValue) map, where the dbKey type is {@link Bytes}
-       * and the dbValue type is {@link Object}.
+       * and the dbValue type is a {@link Pair} of {@link Op} and {@link Object}.
        * When dbValue is a byte[]/{@link ByteBuffer}, it represents a put-op.
        * Otherwise, it represents a delete-op (dbValue is {@link Op#DELETE}).
        * Order of the operations is preserved.
