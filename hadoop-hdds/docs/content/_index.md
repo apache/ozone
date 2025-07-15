@@ -112,7 +112,7 @@ Ozone's S3 compatibility allows applications developed for S3 to run on-premises
 
 To learn more about Ozone, refer to the following sections:
 
-*   **New to Ozone?** Try the **[Quick Start Guide](../start)** to set up a cluster.
-*   **Want to understand the internals?** Read about the **[Core Concepts](../concept)** (architecture, replication, security).
-*   **Need to use Ozone?** Check the **[User Guide](../interface)** for client interfaces and integrations.
-*   **Managing a cluster?** Consult the **[Administrator Guide](../tools)** for installation, configuration, and operations.
+*   **New to Ozone?** Try the **[Quick Start Guide]({{< ref "start" >}})** to set up a cluster.
+*   **Want to understand the internals?** Read about the **[Core Concepts]({{< ref "concept" >}})** (architecture, replication, security).
+*   **Need to use Ozone?** Check the **[User Guide]({{< ref "interface" >}})** for client interfaces and integrations.
+*   **Managing a cluster?** Consult the **[Administrator Guide]({{< ref "tools" >}})** for installation, configuration, and operations.
