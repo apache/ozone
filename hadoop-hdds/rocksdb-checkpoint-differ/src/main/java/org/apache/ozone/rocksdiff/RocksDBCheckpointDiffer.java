@@ -240,7 +240,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     this.pruneSSTFileBatchSize = configuration.getInt(
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT);
-    this.sstFilePruningMetrics = SSTFilePruningMetrics.create();
+    this.sstFilePruningMetrics = SSTFilePruningMetrics.create(activeDBLocationName);
     try {
       if (configuration.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB, OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)
           && ManagedRawSSTFileReader.loadLibrary()) {

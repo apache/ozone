@@ -34,8 +34,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 @Metrics(about = "SST File Pruning Metrics", context = OzoneConsts.OZONE)
 public final class SSTFilePruningMetrics implements MetricsSource {
 
-  public static final String METRICS_SOURCE_NAME = SSTFilePruningMetrics.class.getSimpleName();
-  private MetricsRegistry registry;
+  private static final String METRICS_SOURCE_NAME_PREFIX = SSTFilePruningMetrics.class.getSimpleName();
+  private final String metricSourceName;
+  private final MetricsRegistry registry;
 
   /*
    * Pruning Throughput Metrics.
@@ -45,7 +46,7 @@ public final class SSTFilePruningMetrics implements MetricsSource {
   @Metric("No. of SST files pruned in the last batch")
   private MutableGaugeLong filesPrunedLast;
   @Metric("Total no. of SST files removed")
-  private MutableCounterLong filesRemovedTotal;
+  private MutableCounterLong filesSkippedTotal;
   @Metric("Total no. of compactions processed")
   private MutableCounterLong compactionsProcessed;
   @Metric("No. of pending pruning jobs in queue")
@@ -57,8 +58,9 @@ public final class SSTFilePruningMetrics implements MetricsSource {
   @Metric("No. of pruning job failures")
   private MutableCounterLong pruningFailures;
 
-  private SSTFilePruningMetrics() {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
+  private SSTFilePruningMetrics(String sourceName) {
+    this.metricSourceName = sourceName;
+    this.registry = new MetricsRegistry(metricSourceName);
   }
 
   /**
@@ -66,16 +68,18 @@ public final class SSTFilePruningMetrics implements MetricsSource {
    *
    * @return SSTFilePruningMetrics
    */
-  public static SSTFilePruningMetrics create() {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME, "SST File Pruning Metrics",
-        new SSTFilePruningMetrics());
+  public static SSTFilePruningMetrics create(String dbLocation) {
+    String sourceName = METRICS_SOURCE_NAME_PREFIX +
+        (dbLocation == null || dbLocation.isEmpty() ? "" : "-" + dbLocation.replaceAll("[/\\:\\s]", "_"));
+    return DefaultMetricsSystem.instance().register(sourceName, "SST File Pruning Metrics",
+        new SSTFilePruningMetrics(sourceName));
   }
 
   /**
    * Unregister the metrics instance.
    */
   public void unRegister() {
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+    DefaultMetricsSystem.instance().unregisterSource(metricSourceName);
   }
 
   public void updateQueueSize(long queueSize) {
@@ -85,7 +89,7 @@ public final class SSTFilePruningMetrics implements MetricsSource {
   public void updateBatchLevelMetrics(long filesPruned, long filesSkipped, int compactions, long queueSize) {
     filesPrunedTotal.incr(filesPruned);
     filesPrunedLast.set(filesPruned);
-    filesRemovedTotal.incr(filesSkipped);
+    filesSkippedTotal.incr(filesSkipped);
     compactionsProcessed.incr(compactions);
     updateQueueSize(queueSize);
   }
@@ -103,7 +107,7 @@ public final class SSTFilePruningMetrics implements MetricsSource {
   }
 
   public long getFilesRemovedTotal() {
-    return filesRemovedTotal.value();
+    return filesSkippedTotal.value();
   }
 
   public long getCompactionsProcessed() {
@@ -120,10 +124,10 @@ public final class SSTFilePruningMetrics implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder recordBuilder = collector.addRecord(METRICS_SOURCE_NAME);
+    MetricsRecordBuilder recordBuilder = collector.addRecord(metricSourceName);
     filesPrunedTotal.snapshot(recordBuilder, all);
     filesPrunedLast.snapshot(recordBuilder, all);
-    filesRemovedTotal.snapshot(recordBuilder, all);
+    filesSkippedTotal.snapshot(recordBuilder, all);
     compactionsProcessed.snapshot(recordBuilder, all);
     pruneQueueSize.snapshot(recordBuilder, all);
     pruningFailures.snapshot(recordBuilder, all);
