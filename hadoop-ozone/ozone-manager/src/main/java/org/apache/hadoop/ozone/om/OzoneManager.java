@@ -48,6 +48,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
@@ -190,6 +191,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
@@ -954,7 +956,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         metadataManager.getLock()
     );
     if (secConfig.isSecurityEnabled() || testSecureOmFlag) {
-      delegationTokenMgr = createDelegationTokenSecretManager(configuration);
+      try {
+        delegationTokenMgr = createDelegationTokenSecretManager(configuration);
+      } catch (IllegalArgumentException e) {
+        if (metadataManager != null) {
+          // to avoid the unit test leak report failure
+          try {
+            metadataManager.stop();
+          } catch (Exception ex) {
+            LOG.warn("Failed to stop metadataManager", e);
+          }
+        }
+        throw e;
+      }
     }
 
     prefixManager = new PrefixManagerImpl(this, metadataManager, true);
@@ -1176,17 +1190,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         conf.getTimeDuration(OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
             OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
-    long certificateGracePeriod = Duration.parse(
-        conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
-            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
-    boolean tokenSanityChecksEnabled = conf.getBoolean(
-        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
-        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
-    if (tokenSanityChecksEnabled && tokenMaxLifetime > certificateGracePeriod) {
-      throw new IllegalArgumentException("Certificate grace period " +
-          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
-          " should be greater than maximum delegation token lifetime " +
-          OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY);
+
+    if (versionManager.isAllowed(OMLayoutFeature.DELEGATION_TOKEN_SYMMETRIC_SIGN)) {
+      // verify the configuration dependency between dt and secret key
+      SecretKeyConfig secretKeyConfig = new SecretKeyConfig(conf, SCM_CA_CERT_STORAGE_DIR);
+      long skExpiryDuration = secretKeyConfig.getExpiryDuration().toMillis();
+      long skRotationDuration = secretKeyConfig.getRotateDuration().toMillis();
+      if ((skRotationDuration + tokenMaxLifetime + tokenRemoverScanInterval) > skExpiryDuration) {
+        throw new IllegalArgumentException("Secret key expiry duration " +
+            HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION +
+            " should be greater than value of (" + OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY + " + " +
+            OMConfigKeys.DELEGATION_REMOVER_SCAN_INTERVAL_KEY + " + " +
+            HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION);
+      }
+    } else {
+      long certificateGracePeriod = Duration.parse(
+          conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
+              HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
+      boolean tokenSanityChecksEnabled = conf.getBoolean(
+          HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
+          HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
+      if (tokenSanityChecksEnabled && tokenMaxLifetime > certificateGracePeriod) {
+        throw new IllegalArgumentException("Certificate grace period " +
+            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
+            " should be greater than maximum delegation token lifetime " +
+            OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY);
+      }
     }
 
     return new OzoneDelegationTokenSecretManager.Builder()

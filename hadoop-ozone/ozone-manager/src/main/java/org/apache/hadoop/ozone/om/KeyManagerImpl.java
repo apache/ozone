@@ -712,18 +712,18 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public PendingKeysDeletion getPendingDeletionKeys(
-      final CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, final int count)
-      throws IOException {
-    return getPendingDeletionKeys(null, null, null, filter, count);
+      final CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, final int count,
+      int ratisByteLimit) throws IOException {
+    return getPendingDeletionKeys(null, null, null, filter, count, ratisByteLimit);
   }
 
   @Override
   public PendingKeysDeletion getPendingDeletionKeys(
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
-      int count) throws IOException {
-
+      int count, int ratisByteLimit) throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
+    long serializedSize = 0;
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
@@ -737,6 +737,7 @@ public class KeyManagerImpl implements KeyManager {
         delKeyIter.seek(startKey);
       }
       int currentCount = 0;
+      boolean maxReqSizeExceeded = false;
       while (delKeyIter.hasNext() && currentCount < count) {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
@@ -750,19 +751,29 @@ public class KeyManagerImpl implements KeyManager {
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
               List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                      .map(b ->  new DeletedBlock(
-                          new BlockID(b.getContainerID(), b.getLocalID()),
-                          b.getLength(),
-                          QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
-                  .collect(Collectors.toList());
-              BlockGroup keyBlocks = BlockGroup.newBuilder()
-                  .setKeyName(kv.getKey())
-                  .addAllBlocks(deletedBlocks).build();
+                      .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
+              BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
+                  .addAllBlockIDs(blockIDS).build();
+              int keyBlockSerializedSize = keyBlocks.getProto().getSerializedSize();
+              serializedSize += keyBlockSerializedSize;
+              if (serializedSize > ratisByteLimit) {
+                maxReqSizeExceeded = true;
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug(
+                      "Total size of cumulative keys and rename entries in the snapshotRenamedTable in a cycle " +
+                          "crossed 90% ratis limit, serialized size of keys: {}",
+                      serializedSize);
+                }
+                break;
+              }
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);
             }
+          }
+          if (maxReqSizeExceeded) {
+            break;
           }
 
           List<OmKeyInfo> notReclaimableKeyInfoList = notReclaimableKeyInfo.getOmKeyInfoList();
@@ -783,8 +794,9 @@ public class KeyManagerImpl implements KeyManager {
           TableIterator<String, ? extends KeyValue<String, V>> tableIterator,
           Function<V, R> valueFunction,
           CheckedFunction<KeyValue<String, V>, Boolean, IOException> filter,
-          int size) throws IOException {
+          int size, int ratisLimit) throws IOException {
     List<KeyValue<String, R>> entries = new ArrayList<>();
+    int consumedSize = 0;
     /* Seek to the start key if it's not null. The next key in queue is ensured to start with the bucket
          prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
     */
@@ -797,8 +809,13 @@ public class KeyManagerImpl implements KeyManager {
     while (tableIterator.hasNext() && currentCount < size) {
       KeyValue<String, V> kv = tableIterator.next();
       if (kv != null && filter.apply(kv)) {
-        entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue())));
+        consumedSize += kv.getValueByteSize();
+        entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue()), kv.getValueByteSize()));
         currentCount++;
+        if (consumedSize > ratisLimit) {
+          LOG.info("Serialized size exceeded the ratis limit, current serailized size : {}", consumedSize);
+          break;
+        }
       }
     }
     return entries;
@@ -819,11 +836,12 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey,
-      CheckedFunction<KeyValue<String, String>, Boolean, IOException> filter, int size) throws IOException {
+      CheckedFunction<KeyValue<String, String>, Boolean, IOException> filter, int size, int ratisLimit)
+      throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends KeyValue<String, String>>
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size);
+      return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size, ratisLimit);
     }
   }
 
@@ -869,11 +887,11 @@ public class KeyManagerImpl implements KeyManager {
   public List<KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter,
-      int size) throws IOException {
+      int size, int ratisLimit) throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size);
+      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size, ratisLimit);
     }
   }
 

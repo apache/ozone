@@ -21,6 +21,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
@@ -69,11 +70,11 @@ import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfo;
-import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ParamInfo;
+import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
@@ -367,6 +368,51 @@ public class OMDBInsightEndpoint {
   private Long getValueFromId(GlobalStats record) {
     // If the record is null, return 0
     return record != null ? record.getValue() : 0L;
+  }
+
+  /**
+   * Retrieves the summary of open MPU keys.
+   *
+   * @return The HTTP response body includes a map with the following entries:
+   * - "totalOpenMPUKeys": the total number of open MPU keys
+   * - "totalReplicatedDataSize": the total replicated size for open MPU keys
+   * - "totalUnreplicatedDataSize": the total unreplicated size for open MPU keys
+   *
+   * Example response:
+   *   {
+   *    "totalOpenMPUKeys": 2,
+   *    "totalReplicatedDataSize": 90000,
+   *    "totalDataSize": 30000
+   *   }
+   */
+  @GET
+  @Path("/open/mpu/summary")
+  public Response getOpenMPUKeySummary() {
+    // Create a HashMap for the keysSummary
+    Map<String, Long> keysSummary = new HashMap<>();
+    // Create a keys summary for open MPU keys
+    createKeysSummaryForOpenMPUKey(keysSummary);
+    return Response.ok(keysSummary).build();
+  }
+
+  /**
+   * Creates a keys summary for open MPU keys and updates the provided keysSummary map.
+   * Calculates the total number of open keys, replicated data size, and unreplicated data size.
+   *
+   * @param keysSummary A map to store the keys summary information.
+   */
+  private void createKeysSummaryForOpenMPUKey(Map<String, Long> keysSummary) {
+    Long replicatedSizeOpenMPUKey = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE)));
+    Long unreplicatedSizeOpenMPUKey = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getUnReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE)));
+    Long openMPUKeyCount = getValueFromId(globalStatsDao.findById(
+        OmTableInsightTask.getTableCountKeyFromTable(MULTIPART_INFO_TABLE)));
+    // Calculate the total number of open MPU keys
+    keysSummary.put("totalOpenMPUKeys", openMPUKeyCount);
+    // Calculate the total replicated and unreplicated sizes of open MPU keys
+    keysSummary.put("totalReplicatedDataSize", replicatedSizeOpenMPUKey);
+    keysSummary.put("totalDataSize", unreplicatedSizeOpenMPUKey);
   }
 
   /** Retrieves the summary of deleted keys.
@@ -1014,7 +1060,7 @@ public class OMDBInsightEndpoint {
       listKeysResponse = (ListKeysResponse) response.getEntity();
     }
 
-    List<KeyEntityInfoProtoWrapper> keyInfoList = listKeysResponse.getKeys();
+    List<ReconBasicOmKeyInfo> keyInfoList = listKeysResponse.getKeys();
     if (!keyInfoList.isEmpty()) {
       listKeysResponse.setLastKey(keyInfoList.get(keyInfoList.size() - 1).getKey());
     }
@@ -1029,9 +1075,9 @@ public class OMDBInsightEndpoint {
       long replicatedTotal = 0;
       long unreplicatedTotal = 0;
 
-      // Search keys from non-FSO layout.
-      Table<String, KeyEntityInfoProtoWrapper> keyTable =
-          omMetadataManager.getKeyTableLite(BucketLayout.LEGACY);
+      Table<String, ReconBasicOmKeyInfo> keyTable =
+          omMetadataManager.getKeyTableBasic(BucketLayout.LEGACY);
+
       retrieveKeysFromTable(keyTable, paramInfo, listKeysResponse.getKeys());
 
       // Search keys from FSO layout.
@@ -1042,7 +1088,7 @@ public class OMDBInsightEndpoint {
         return ReconResponseUtils.noMatchedKeysResponse(paramInfo.getStartPrefix());
       }
 
-      for (KeyEntityInfoProtoWrapper keyEntityInfo : listKeysResponse.getKeys()) {
+      for (ReconBasicOmKeyInfo keyEntityInfo : listKeysResponse.getKeys()) {
         replicatedTotal += keyEntityInfo.getReplicatedSize();
         unreplicatedTotal += keyEntityInfo.getSize();
       }
@@ -1067,13 +1113,14 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  public void searchKeysInFSO(ParamInfo paramInfo, List<KeyEntityInfoProtoWrapper> results)
+  public void searchKeysInFSO(ParamInfo paramInfo, List<ReconBasicOmKeyInfo> results)
       throws IOException {
     // Convert the search prefix to an object path for FSO buckets
     String startPrefixObjectPath = convertStartPrefixPathToObjectIdPath(paramInfo.getStartPrefix());
     String[] names = parseRequestPath(startPrefixObjectPath);
-    Table<String, KeyEntityInfoProtoWrapper> fileTable =
-        omMetadataManager.getKeyTableLite(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    Table<String, ReconBasicOmKeyInfo> fileTable =
+        omMetadataManager.getKeyTableBasic(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     // If names.length > 2, then the search prefix is at the level above bucket level hence
     // no need to find parent or extract id's or find subpaths as the fileTable is
@@ -1181,16 +1228,16 @@ public class OMDBInsightEndpoint {
    * @throws IOException If there are problems accessing the table.
    */
   private void retrieveKeysFromTable(
-      Table<String, KeyEntityInfoProtoWrapper> table, ParamInfo paramInfo, List<KeyEntityInfoProtoWrapper> results)
+      Table<String, ReconBasicOmKeyInfo> table, ParamInfo paramInfo, List<ReconBasicOmKeyInfo> results)
       throws IOException {
     boolean skipPrevKey = false;
     String seekKey = paramInfo.getPrevKey();
     try (
-        TableIterator<String, ? extends Table.KeyValue<String, KeyEntityInfoProtoWrapper>> keyIter = table.iterator()) {
+        TableIterator<String, ? extends Table.KeyValue<String, ReconBasicOmKeyInfo>> keyIter = table.iterator()) {
 
       if (!paramInfo.isSkipPrevKeyDone() && isNotBlank(seekKey)) {
         skipPrevKey = true;
-        Table.KeyValue<String, KeyEntityInfoProtoWrapper> seekKeyValue =
+        Table.KeyValue<String, ReconBasicOmKeyInfo> seekKeyValue =
             keyIter.seek(seekKey);
 
         // check if RocksDB was able to seek correctly to the given key prefix
@@ -1207,7 +1254,7 @@ public class OMDBInsightEndpoint {
       StringBuilder keyPrefix = null;
       int keyPrefixLength = 0;
       while (keyIter.hasNext()) {
-        Table.KeyValue<String, KeyEntityInfoProtoWrapper> entry = keyIter.next();
+        Table.KeyValue<String, ReconBasicOmKeyInfo> entry = keyIter.next();
         String dbKey = entry.getKey();
         if (!dbKey.startsWith(paramInfo.getStartPrefix())) {
           break; // Exit the loop if the key no longer matches the prefix
@@ -1217,7 +1264,7 @@ public class OMDBInsightEndpoint {
           continue;
         }
         if (applyFilters(entry, paramInfo)) {
-          KeyEntityInfoProtoWrapper keyEntityInfo = entry.getValue();
+          ReconBasicOmKeyInfo keyEntityInfo = entry.getValue();
           keyEntityInfo.setKey(dbKey);
           if (keyEntityInfo.getParentId() == 0) {
             // Legacy bucket keys have a parentID of zero. OBS bucket keys have a parentID of the bucketID.
@@ -1258,7 +1305,7 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  private boolean applyFilters(Table.KeyValue<String, KeyEntityInfoProtoWrapper> entry, ParamInfo paramInfo)
+  private boolean applyFilters(Table.KeyValue<String, ReconBasicOmKeyInfo> entry, ParamInfo paramInfo)
       throws IOException {
 
     LOG.debug("Applying filters on : {}", entry.getKey());

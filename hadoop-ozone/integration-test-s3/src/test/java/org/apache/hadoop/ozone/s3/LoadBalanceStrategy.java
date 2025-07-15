@@ -15,13 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.s3;
+
+import java.util.List;
 
 /**
- * OmSnapshot file system tests for Legacy.
+ * Interface for load balancing strategies to select endpoints.
  */
-public class TestOmSnapshotFileSystemLegacy extends TestOmSnapshotFileSystem {
-  TestOmSnapshotFileSystemLegacy() throws Exception {
-    super(BUCKET_NAME_LEGACY, false);
-  }
+public interface LoadBalanceStrategy {
+
+  /**
+   * Select the next endpoint from the available endpoints list.
+   *
+   * @param endpoints list of available endpoints
+   * @return the selected endpoint URL
+   */
+  String selectEndpoint(List<String> endpoints);
 }
