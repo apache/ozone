@@ -66,7 +66,7 @@ public class TestReplicationManagerUtil {
   public void setup() {
     replicationManager = mock(ReplicationManager.class);
     ContainerReplicaPendingOps pendingOpsMock = mock(ContainerReplicaPendingOps.class);
-    doReturn(pendingOpsMock).when(replicationManager).getContainerReplicaPendingOps();
+    when(replicationManager.getContainerReplicaPendingOps()).thenReturn(pendingOpsMock);
   }
 
   @Test
@@ -297,12 +297,12 @@ public class TestReplicationManagerUtil {
         clock.millis() - rmConf.getEventTimeout() - 1));
 
     ContainerReplicaPendingOps pendingOpsMock = mock(ContainerReplicaPendingOps.class);
-    doReturn(sizeScheduledMap).when(pendingOpsMock).getContainerSizeScheduled();
-    doReturn(clock).when(pendingOpsMock).getClock();
-    doReturn(pendingOpsMock).when(replicationManager).getContainerReplicaPendingOps();
+    when(pendingOpsMock.getContainerSizeScheduled()).thenReturn(sizeScheduledMap);
+    when(pendingOpsMock.getClock()).thenReturn(clock);
+    when(replicationManager.getContainerReplicaPendingOps()).thenReturn(pendingOpsMock);
 
     NodeManager nodeManagerMock = mock(NodeManager.class);
-    doReturn(nodeManagerMock).when(replicationManager).getNodeManager();
+    when(replicationManager.getNodeManager()).thenReturn(nodeManagerMock);
     doReturn(fullDn).when(nodeManagerMock).getNode(fullDn.getID());
     doReturn(new SCMNodeMetric(50 * oneGb, 20 * oneGb, 30 * oneGb, 5 * oneGb,
         20 * oneGb)).when(nodeManagerMock).getNodeStat(fullDn);

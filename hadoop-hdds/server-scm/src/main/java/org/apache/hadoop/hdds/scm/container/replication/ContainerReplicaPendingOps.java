@@ -75,11 +75,13 @@ public class ContainerReplicaPendingOps {
 
   /**
    * Used as the value of {@link ContainerReplicaPendingOps#containerSizeScheduled} map for tracking the size of
-   * containers with pending ADD ops.
+   * containers with pending ADD ops. Immutable.
    */
   public static class SizeAndTime {
-    private long size;  // number of bytes pending ADD on a target DN
-    private long lastUpdatedTime; // timestamp (milliseconds since epoch) when the latest op was scheduled for this DN
+    // number of bytes pending ADD on a target DN
+    private final long size;
+    // timestamp (milliseconds since epoch) when the latest op was scheduled for this DN
+    private final long lastUpdatedTime;
 
     public SizeAndTime(long size, long lastUpdatedTime) {
       this.size = size;
@@ -92,14 +94,6 @@ public class ContainerReplicaPendingOps {
 
     public long getLastUpdatedTime() {
       return lastUpdatedTime;
-    }
-
-    public void setSize(long size) {
-      this.size = size;
-    }
-
-    public void setLastUpdatedTime(long lastUpdatedTime) {
-      this.lastUpdatedTime = lastUpdatedTime;
     }
 
     @Override
@@ -297,17 +291,17 @@ public class ContainerReplicaPendingOps {
 
   private void releaseScheduledContainerSize(ContainerReplicaOp op) {
     containerSizeScheduled.computeIfPresent(op.getTarget().getID(), (k, v) -> {
-      v.setSize(v.getSize() - op.getContainerSize());
-      boolean isSizeNonPositive = v.getSize() <= 0;
+      long newSize = v.getSize() - op.getContainerSize();
+      boolean isSizeNonPositive = newSize <= 0;
       boolean hasOpExpired = clock.millis() - v.getLastUpdatedTime() > replicationManagerEventTimeout;
       if (isSizeNonPositive || hasOpExpired) {
         /*
-        If the scheduled size is now 0, or if the last op has expired, implying that the ops before
-        it must have completed or expired, then remove this entry from the map
+        If the scheduled size is now less than or equal to 0, or if the last op has expired, implying that the ops
+        before it must have completed or expired, then remove this entry from the map
         */
         return null;
       }
-      return v;
+      return new SizeAndTime(newSize, v.getLastUpdatedTime());
     });
   }
 
@@ -343,9 +337,13 @@ public class ContainerReplicaPendingOps {
           target, replicaIndex, command, deadlineEpochMillis, containerSize));
       DatanodeID id = target.getID();
       if (opType == ADD) {
-        SizeAndTime sizeAndTime = containerSizeScheduled.computeIfAbsent(id, x -> new SizeAndTime(0L, 0L));
-        sizeAndTime.setSize(sizeAndTime.getSize() + containerSize);
-        sizeAndTime.setLastUpdatedTime(scheduledEpochMillis);
+        containerSizeScheduled.compute(id, (k, v) -> {
+          if (v == null) {
+            return new SizeAndTime(containerSize, scheduledEpochMillis);
+          } else {
+            return new SizeAndTime(v.getSize() + containerSize, scheduledEpochMillis);
+          }
+        });
       }
       incrementCounter(opType, replicaIndex);
     } finally {
@@ -374,13 +372,11 @@ public class ContainerReplicaPendingOps {
             iterator.remove();
             if (opType == ADD) {
               containerSizeScheduled.computeIfPresent(target.getID(), (k, v) -> {
-                // if an ADD op completed, subtract the size of the container
-                v.setSize(v.getSize() - op.getContainerSize());
-                if (v.getSize() <= 0) {
-                  // if the size <= 0, then return null here so the entry is removed from the map
+                long newSize = v.getSize() - op.getContainerSize();
+                if (newSize <= 0) {
                   return null;
                 }
-                return v;
+                return new SizeAndTime(newSize, v.getLastUpdatedTime());
               });
             }
             decrementCounter(op.getOpType(), replicaIndex);
