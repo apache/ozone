@@ -53,7 +53,7 @@ import org.mockito.ArgumentCaptor;
 /**
  * DeletionService test to Pass Usage from OM to SCM.
  */
-public class TestDeletionService {
+public class TestBlockDeletionService {
 
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME = "bucket1";
