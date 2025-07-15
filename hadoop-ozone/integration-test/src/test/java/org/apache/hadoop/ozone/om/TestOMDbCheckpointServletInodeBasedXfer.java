@@ -296,7 +296,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     FileUtil.unTar(tempFile, newDbDir);
     Set<Path> allPathsInTarball = getAllPathsInTarball(newDbDir);
     // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), false);
     for (Path old : allPathsInTarball) {
       assertTrue(old.toFile().delete());
     }
