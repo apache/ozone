@@ -60,15 +60,21 @@ repair_and_restart_om() {
   echo "Container '${om_container}' has stopped."
 
   LOG_PATH="$(find "$OZONE_VOLUME/$om_id/metadata/ratis" -type f -name 'log_inprogress_0' 2>/dev/null | head -n 1)"
+  echo "Log path: ${LOG_PATH}"
   newpath=$(echo "${LOG_PATH}" | sed 's|.*/compose/|/opt/hadoop/compose/|')
+  echo "New path: ${newpath}"
 
   execute_command_in_container ${SCM} bash -c "ozone repair om srt -b=/opt/hadoop/compose/ozonesecure-ha/data/$om_id/backup1 --index=3 -s=${newpath}"
+  echo "Repair command executed for ${om_id}."
   docker start "${om_container}"
   echo "Container '${om_container}' started again."
   bucketTable=$(execute_command_in_container ${SCM} bash -c "ozone debug ldb --db=/opt/hadoop/compose/ozonesecure-ha/data/$om_id/metadata/om.db scan --cf=bucketTable")
+  echo "Bucket table for ${om_id}:"
   if echo "$bucketTable" | grep -q "bucket-crash-1"; then
     echo "bucket 'bucket-crash-1' should not have been created, but it is present in the bucketTable of $om_id"
     exit 1
+  else
+    echo "bucket 'bucket-crash-1' is not present in the bucketTable of $om_id as expected."
   fi
 }
 
