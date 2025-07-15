@@ -128,6 +128,7 @@ public class ContainerReplicaPendingOps {
     try {
       pendingOps.clear();
       resetCounters();
+      containerSizeScheduled.clear();
     } finally {
       globalLock.writeLock().unlock();
     }
