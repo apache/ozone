@@ -73,3 +73,8 @@ Freon DFSG
     ${result} =    Execute    ozone freon dfsg -n ${n} --sync ${sync} -s ${size} --path ${path} --buffer ${buffer} --copy-buffer ${copy-buffer} -p ${prefix} -t ${threads} ${args}
                    Should contain   ${result}   Successful executions: ${n}
 
+Freon Snapshot Generator
+    [arguments]    ${args}
+    ${result} =        Execute          ozone freon snapshot-generator ${args}
+                       Should contain   ${result}   Created snapshot:
+
