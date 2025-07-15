@@ -59,7 +59,7 @@ repair_and_restart_om() {
   done
   echo "Container '${om_container}' has stopped."
 
-  LOG_PATH="$(find "$OZONE_VOLUME/$om_id/metadata/ratis" -type f -name 'log_inprogress_0' 2>/dev/null | head -n 1)"
+  LOG_PATH="$(find / -type f -name 'log_inprogress_0' 2>/dev/null | head -n 1)"
   echo "Log path: ${LOG_PATH}"
   newpath=$(echo "${LOG_PATH}" | sed 's|.*/compose/|/opt/hadoop/compose/|')
   echo "New path: ${newpath}"
