@@ -242,11 +242,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
     DeleteScmKeyBlocksResponseProto.Builder resp =
         DeleteScmKeyBlocksResponseProto.newBuilder();
 
-    List<BlockGroup> infoList;
-    infoList = req.getKeyBlocksList().stream()
-        .map(BlockGroup::getFromProto)
-        .collect(Collectors.toList());
-
+    List<BlockGroup> infoList = req.getKeyBlocksList().stream()
+        .map(BlockGroup::getFromProto).collect(Collectors.toList());
     final List<DeleteBlockGroupResult> results =
         impl.deleteKeyBlocks(infoList);
     for (DeleteBlockGroupResult result : results) {

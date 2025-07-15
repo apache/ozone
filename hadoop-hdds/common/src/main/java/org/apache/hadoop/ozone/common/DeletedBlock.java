@@ -15,11 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.client;
+package org.apache.hadoop.ozone.common;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.client.BlockID;
 
 /**
  * DeletedBlock of Ozone (BlockID + usedBytes).
@@ -51,51 +49,10 @@ public class DeletedBlock {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder(64);
-    appendTo(sb);
-    return sb.toString();
-  }
-
-  public void appendTo(StringBuilder sb) {
     sb.append(" localID: ").append(blockID.getContainerBlockID().getLocalID());
     sb.append(" containerID: ").append(blockID.getContainerBlockID().getContainerID());
     sb.append(" size: ").append(size);
     sb.append(" replicatedSize: ").append(replicatedSize);
-  }
-
-  @JsonIgnore
-  public HddsProtos.DeletedBlock getProtobuf() {
-    return HddsProtos.DeletedBlock.newBuilder()
-        .setBlockId(blockID.getProtobuf())
-        .setSize(size)
-        .setReplicatedSize(replicatedSize)
-        .build();
-  }
-
-  @JsonIgnore
-  public static DeletedBlock getFromProtobuf(HddsProtos.DeletedBlock deletedBlockID) {
-    return new DeletedBlock(
-        BlockID.getFromProtobuf(deletedBlockID.getBlockId()),
-        deletedBlockID.getSize(),
-        deletedBlockID.getReplicatedSize());
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
-    }
-    DeletedBlock delBlockID = (DeletedBlock) o;
-    return this.getBlockID().equals(delBlockID.getBlockID())
-        && this.getReplicatedSize() == delBlockID.getReplicatedSize()
-        && this.getSize() == delBlockID.getSize();
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(blockID.getContainerBlockID().getContainerID(), blockID.getContainerBlockID().getLocalID(),
-        size, replicatedSize);
+    return sb.toString();
   }
 }

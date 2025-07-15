@@ -112,7 +112,6 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersi
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -125,7 +124,6 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -139,6 +137,7 @@ import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -723,11 +722,8 @@ public class KeyManagerImpl implements KeyManager {
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
       int count) throws IOException {
-    boolean isDataDistributionEnabled = ozoneManager.getScmInfo().getMetaDataLayoutVersion() >=
-        HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
 
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
-
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
@@ -752,27 +748,16 @@ public class KeyManagerImpl implements KeyManager {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
-              BlockGroup keyBlocks;
-              if (!isDataDistributionEnabled) {
-                List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
-                    .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                        .map(b -> new BlockID(b.getContainerID(), b.getLocalID())))
-                    .collect(Collectors.toList());
-                keyBlocks = BlockGroup.newBuilder()
-                    .setKeyName(kv.getKey())
-                    .addAllBlockIDs(blockIDS).build();
-              } else {
-                List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
-                    .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                        .map(b ->  new DeletedBlock(
-                            new BlockID(b.getContainerID(), b.getLocalID()),
-                            b.getLength(),
-                            QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
-                    .collect(Collectors.toList());
-                keyBlocks = BlockGroup.newBuilder()
-                    .setKeyName(kv.getKey())
-                    .addAllBlocks(deletedBlocks).build();
-              }
+              List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
+                  .flatMap(versionLocations -> versionLocations.getLocationList().stream()
+                      .map(b ->  new DeletedBlock(
+                          new BlockID(b.getContainerID(), b.getLocalID()),
+                          b.getLength(),
+                          QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
+                  .collect(Collectors.toList());
+              BlockGroup keyBlocks = BlockGroup.newBuilder()
+                  .setKeyName(kv.getKey())
+                  .addAllBlocks(deletedBlocks).build();
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {
@@ -781,6 +766,7 @@ public class KeyManagerImpl implements KeyManager {
           }
 
           List<OmKeyInfo> notReclaimableKeyInfoList = notReclaimableKeyInfo.getOmKeyInfoList();
+
           // If all the versions are not reclaimable, then modify key by just purging the key that can be purged.
           if (!notReclaimableKeyInfoList.isEmpty() &&
               notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList().size()) {

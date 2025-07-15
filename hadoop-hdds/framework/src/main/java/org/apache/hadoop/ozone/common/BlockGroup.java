@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.common;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.DeletedBlock;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
 
 /**
@@ -54,26 +54,50 @@ public final class BlockGroup {
 
   public KeyBlocks getProto() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
-    if (!deletedBlocks.isEmpty()) {
-      for (DeletedBlock block : deletedBlocks) {
-        kbb.addDeletedBlocks(block.getProtobuf());
-      }
-    } else {
-      for (BlockID block : blockIDs) {
-        kbb.addBlocks(block.getProtobuf());
-      }
+    for (DeletedBlock block : deletedBlocks) {
+      ScmBlockLocationProtocolProtos.DeletedBlock deletedBlock = ScmBlockLocationProtocolProtos.DeletedBlock
+          .newBuilder()
+          .setBlockId(block.getBlockID().getProtobuf())
+          .setSize(block.getSize())
+          .setReplicatedSize(block.getReplicatedSize())
+          .build();
+      kbb.addDeletedBlocks(deletedBlock);
     }
     return kbb.setKey(groupID).build();
   }
 
-  public static BlockGroup getFromProto(KeyBlocks proto) {
-    return proto.getDeletedBlocksList().isEmpty() ? getFromLegacyProto(proto) : getFromNewProto(proto);
+  public KeyBlocks getDeprecatedProto() {
+    KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
+    for (BlockID block : blockIDs) {
+      kbb.addBlocks(block.getProtobuf());
+    }
+    return kbb.setKey(groupID).build();
   }
 
-  public static BlockGroup getFromNewProto(KeyBlocks proto) {
+  /**
+   * Parses a KeyBlocks proto to a group of blocks.
+   * @param proto KeyBlocks proto.
+   * @return a group of blocks.
+   */
+  public static BlockGroup getFromProto(KeyBlocks proto) {
+    return proto.getDeletedBlocksList().isEmpty() ? getFromProtoV1(proto) : getFromProtoV2(proto);
+  }
+
+  public static BlockGroup getFromProtoV1(KeyBlocks proto) {
+    List<BlockID> blockIDs = new ArrayList<>();
+    for (HddsProtos.BlockID block : proto.getBlocksList()) {
+      blockIDs.add(new BlockID(block.getContainerBlockID().getContainerID(),
+          block.getContainerBlockID().getLocalID()));
+    }
+    return BlockGroup.newBuilder().setKeyName(proto.getKey())
+        .addAllBlockIDs(blockIDs).build();
+  }
+
+  public static BlockGroup getFromProtoV2(KeyBlocks proto) {
     List<DeletedBlock> blocks = new ArrayList<>();
-    for (HddsProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
+    for (ScmBlockLocationProtocolProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
+
       blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
           containerBlockId.getLocalID()),
           block.getSize(),
@@ -81,17 +105,6 @@ public final class BlockGroup {
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlocks(blocks).build();
-  }
-
-  public static BlockGroup getFromLegacyProto(KeyBlocks proto) {
-    List<BlockID> blocks = new ArrayList<>();
-    for (HddsProtos.BlockID block : proto.getBlocksList()) {
-      HddsProtos.ContainerBlockID containerBlockId = block.getContainerBlockID();
-      blocks.add(new BlockID(containerBlockId.getContainerID(),
-          containerBlockId.getLocalID()));
-    }
-    return BlockGroup.newBuilder().setKeyName(proto.getKey())
-        .addAllBlockIDs(blocks).build();
   }
 
   public static Builder newBuilder() {
