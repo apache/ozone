@@ -34,11 +34,8 @@ public final class OMSnapshotMoveUtils {
   private OMSnapshotMoveUtils() {
   }
 
-  public static void updateCache(OzoneManager ozoneManager,
-                                 SnapshotInfo fromSnapshot,
-                                 SnapshotInfo toSnapshot,
-                                 ExecutionContext context) throws IOException {
-
+  public static void updateCache(OzoneManager ozoneManager, SnapshotInfo fromSnapshot, SnapshotInfo toSnapshot,
+      ExecutionContext context) throws IOException {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
 
