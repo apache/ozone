@@ -63,7 +63,7 @@ repair_and_restart_om() {
   # echo "Log path: ${LOG_PATH}"
   # newpath=$(echo "${LOG_PATH}" | sed 's|.*/compose/|/opt/hadoop/compose/|')
   # echo "New path: ${newpath}"
-  logpath=$(execute_command_in_container ${SCM} bash -c find / -type f -path "/*/$om_id/*/log_inprogress_0" 2>/dev/null | head -n 1)
+  logpath=$(execute_command_in_container ${SCM} bash -c "find / -type f -path '/*/$om_id/*/log_inprogress_0' 2>/dev/null | head -n 1")
   echo "logpath: ${logpath}"
 
   execute_command_in_container ${SCM} bash -c "ozone repair om srt -b=/opt/hadoop/compose/ozonesecure-ha/data/$om_id/backup1 --index=3 -s=${logpath}"
