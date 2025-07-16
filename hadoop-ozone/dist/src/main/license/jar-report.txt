@@ -1,3 +1,4 @@
+share/ozone/lib/aircompressor.jar
 share/ozone/lib/animal-sniffer-annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar
@@ -12,6 +13,7 @@ share/ozone/lib/aspectjrt.jar
 share/ozone/lib/aspectjweaver.jar
 share/ozone/lib/aws-java-sdk-core.jar
 share/ozone/lib/aws-java-sdk-kms.jar
+share/ozone/lib/aws-java-sdk-logs.jar
 share/ozone/lib/aws-java-sdk-s3.jar
 share/ozone/lib/bcpkix-jdk18on.jar
 share/ozone/lib/bcprov-jdk18on.jar
@@ -100,6 +102,8 @@ share/ozone/lib/jackson-dataformat-cbor.jar
 share/ozone/lib/jackson-dataformat-xml.jar
 share/ozone/lib/jackson-datatype-jsr310.jar
 share/ozone/lib/jackson-jaxrs.jar
+share/ozone/lib/jackson-jaxrs-base.jar
+share/ozone/lib/jackson-jaxrs-json-provider.jar
 share/ozone/lib/jackson-mapper-asl.jar
 share/ozone/lib/jackson-module-jaxb-annotations.jar
 share/ozone/lib/jaeger-client.jar
@@ -215,6 +219,7 @@ share/ozone/lib/opentracing-noop.jar
 share/ozone/lib/opentracing-tracerresolver.jar
 share/ozone/lib/opentracing-util.jar
 share/ozone/lib/orc-core.jar
+share/ozone/lib/orc-shims.jar
 share/ozone/lib/osgi-resource-locator.jar
 share/ozone/lib/ozone-client.jar
 share/ozone/lib/ozone-cli-shell.jar
