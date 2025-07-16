@@ -86,7 +86,6 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
   private final ScmBlockLocationProtocolPB rpcProxy;
   private SCMBlockLocationFailoverProxyProvider failoverProxyProvider;
-  private ScmInfo scmInfo;
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -232,14 +231,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-    if (scmInfo == null) {
-      getScmInfo();
-    }
-    boolean isDataDistributionEnabled = scmInfo.getMetaDataLayoutVersion() >=
-        HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
     List<KeyBlocks> keyBlocksProto = keyBlocksInfoList.stream()
-        .map(isDataDistributionEnabled ? BlockGroup::getProto : BlockGroup::getDeprecatedProto)
-        .collect(Collectors.toList());
+        .map(BlockGroup::getProto).collect(Collectors.toList());
     DeleteScmKeyBlocksRequestProto request = DeleteScmKeyBlocksRequestProto
         .newBuilder()
         .addAllKeyBlocks(keyBlocksProto)
@@ -289,8 +282,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
         .setScmId(resp.getScmId())
         .setMetaDataLayoutVersion(resp.hasMetaDataLayoutVersion() ?
             resp.getMetaDataLayoutVersion() : HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
-    scmInfo = builder.build();
-    return scmInfo;
+    return builder.build();
   }
 
   /**

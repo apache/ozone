@@ -158,7 +158,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
         }
       } else {
         // Otherwise, use DeletedBlock's BlockID
-        for (DeletedBlock deletedBlock : keyBlocks.getAllBlocks()) {
+        for (DeletedBlock deletedBlock : keyBlocks.getAllDeletedBlocks()) {
           blockResultList.add(processBlock(deletedBlock.getBlockID()));
         }
       }

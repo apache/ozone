@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.management.ObjectName;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -225,16 +226,29 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     for (BlockGroup bg : keyBlocksInfoList) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Deleting blocks {}",
-            StringUtils.join(",", bg.getAllBlocks()));
+            StringUtils.join(",", (!bg.getBlockIDs().isEmpty()) ? bg.getBlockIDs() : bg.getAllDeletedBlocks()));
       }
-      for (DeletedBlock block : bg.getAllBlocks()) {
-        long containerID = block.getBlockID().getContainerID();
-        if (containerBlocks.containsKey(containerID)) {
-          containerBlocks.get(containerID).add(block.getBlockID().getLocalID());
-        } else {
-          List<Long> item = new ArrayList<>();
-          item.add(block.getBlockID().getLocalID());
-          containerBlocks.put(containerID, item);
+      if (!bg.getBlockIDs().isEmpty()) {
+        for (BlockID block : bg.getBlockIDs()) {
+          long containerID = block.getContainerID();
+          if (containerBlocks.containsKey(containerID)) {
+            containerBlocks.get(containerID).add(block.getLocalID());
+          } else {
+            List<Long> item = new ArrayList<>();
+            item.add(block.getLocalID());
+            containerBlocks.put(containerID, item);
+          }
+        }
+      } else {
+        for (DeletedBlock block : bg.getAllDeletedBlocks()) {
+          long containerID = block.getBlockID().getContainerID();
+          if (containerBlocks.containsKey(containerID)) {
+            containerBlocks.get(containerID).add(block.getBlockID().getLocalID());
+          } else {
+            List<Long> item = new ArrayList<>();
+            item.add(block.getBlockID().getLocalID());
+            containerBlocks.put(containerID, item);
+          }
         }
       }
     }

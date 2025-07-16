@@ -31,6 +31,7 @@ import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
@@ -45,6 +46,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -268,7 +270,7 @@ public class SCMBlockProtocolServer implements
       List<BlockGroup> keyBlocksInfoList) throws IOException {
     long totalBlocks = 0;
     for (BlockGroup bg : keyBlocksInfoList) {
-      totalBlocks += bg.getAllBlocks().size();
+      totalBlocks += (!bg.getBlockIDs().isEmpty()) ? bg.getBlockIDs().size() : bg.getAllDeletedBlocks().size();
     }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     if (LOG.isDebugEnabled()) {
@@ -312,8 +314,11 @@ public class SCMBlockProtocolServer implements
     }
     for (BlockGroup bg : keyBlocksInfoList) {
       List<DeleteBlockResult> blockResult = new ArrayList<>();
-      for (DeletedBlock b : bg.getAllBlocks()) {
+      for (DeletedBlock b : bg.getAllDeletedBlocks()) {
         blockResult.add(new DeleteBlockResult(b.getBlockID(), resultCode));
+      }
+      for (BlockID b : bg.getBlockIDs()) {
+        blockResult.add(new DeleteBlockResult(b, resultCode));
       }
       results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
     }
@@ -478,5 +483,10 @@ public class SCMBlockProtocolServer implements
   @Override
   public void close() throws IOException {
     stop();
+  }
+
+  @VisibleForTesting
+  public SCMPerformanceMetrics getMetrics() {
+    return perfMetrics;
   }
 }

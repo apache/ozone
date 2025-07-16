@@ -40,7 +40,7 @@ public final class BlockGroup {
     this.deletedBlocks = deletedBlocks == null ? new ArrayList<>() : deletedBlocks;
   }
 
-  public List<DeletedBlock> getAllBlocks() {
+  public List<DeletedBlock> getAllDeletedBlocks() {
     return deletedBlocks;
   }
 
@@ -53,6 +53,10 @@ public final class BlockGroup {
   }
 
   public KeyBlocks getProto() {
+    return deletedBlocks.isEmpty() ? getProtoForBlockID() : getProtoForDeletedBlock();
+  }
+
+  public KeyBlocks getProtoForDeletedBlock() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
     for (DeletedBlock block : deletedBlocks) {
       ScmBlockLocationProtocolProtos.DeletedBlock deletedBlock = ScmBlockLocationProtocolProtos.DeletedBlock
@@ -66,7 +70,7 @@ public final class BlockGroup {
     return kbb.setKey(groupID).build();
   }
 
-  public KeyBlocks getDeprecatedProto() {
+  public KeyBlocks getProtoForBlockID() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
     for (BlockID block : blockIDs) {
       kbb.addBlocks(block.getProtobuf());
@@ -80,10 +84,10 @@ public final class BlockGroup {
    * @return a group of blocks.
    */
   public static BlockGroup getFromProto(KeyBlocks proto) {
-    return proto.getDeletedBlocksList().isEmpty() ? getFromProtoV1(proto) : getFromProtoV2(proto);
+    return proto.getDeletedBlocksList().isEmpty() ? getFromBlockIDProto(proto) : getFromDeletedBlockProto(proto);
   }
 
-  public static BlockGroup getFromProtoV1(KeyBlocks proto) {
+  public static BlockGroup getFromBlockIDProto(KeyBlocks proto) {
     List<BlockID> blockIDs = new ArrayList<>();
     for (HddsProtos.BlockID block : proto.getBlocksList()) {
       blockIDs.add(new BlockID(block.getContainerBlockID().getContainerID(),
@@ -93,7 +97,7 @@ public final class BlockGroup {
         .addAllBlockIDs(blockIDs).build();
   }
 
-  public static BlockGroup getFromProtoV2(KeyBlocks proto) {
+  public static BlockGroup getFromDeletedBlockProto(KeyBlocks proto) {
     List<DeletedBlock> blocks = new ArrayList<>();
     for (ScmBlockLocationProtocolProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
@@ -104,7 +108,7 @@ public final class BlockGroup {
           block.getReplicatedSize()));
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
-        .addAllBlocks(blocks).build();
+        .addAllDeletedBlocks(blocks).build();
   }
 
   public static Builder newBuilder() {
@@ -139,7 +143,7 @@ public final class BlockGroup {
       return this;
     }
 
-    public Builder addAllBlocks(List<DeletedBlock> keyBlocks) {
+    public Builder addAllDeletedBlocks(List<DeletedBlock> keyBlocks) {
       this.blocks = keyBlocks;
       return this;
     }
