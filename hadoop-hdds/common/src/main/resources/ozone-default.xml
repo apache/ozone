@@ -2184,17 +2184,17 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.ratis.pending.write.byte-limit</name>
-    <value>32MB</value>
+    <name>ozone.om.ratis.server.pending.write.byte-limit</name>
+    <value>64MB</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
-    <description>Raft's Pending writes Byte limit.
+    <description>Maximum byte size of all pending write requests.
     </description>
   </property>
   <property>
-    <name>ozone.om.ratis.pending.write.num-limit</name>
+    <name>ozone.om.ratis.server.pending.write.element-limit</name>
     <value>4096</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
-    <description>Raft's number of pending writes.
+    <description>Maximum number of pending write requests.
     </description>
   </property>
   <property>
