@@ -237,6 +237,14 @@ public final class DeletingServiceMetrics {
     this.reclaimedSizeInInterval.incr(replicatedSizeBytes);
   }
 
+  public long getKeysReclaimedInInterval() {
+    return keysReclaimedInInterval.value();
+  }
+
+  public long getReclaimedSizeInInterval() {
+    return reclaimedSizeInInterval.value();
+  }
+
   public void updateAosLastRunMetrics(long keysReclaimed, long replicatedSizeBytes, long iteratedKeys,
       long notReclaimableKeys) {
     this.aosKeysReclaimedLast.set(keysReclaimed);
@@ -245,12 +253,44 @@ public final class DeletingServiceMetrics {
     this.aosKeysNotReclaimableLast.set(notReclaimableKeys);
   }
 
+  public long getAosKeysReclaimedLast() {
+    return aosKeysReclaimedLast.value();
+  }
+
+  public long getAosReclaimedSizeLast() {
+    return aosReclaimedSizeLast.value();
+  }
+
+  public long getAosKeysIteratedLast() {
+    return aosKeysIteratedLast.value();
+  }
+
+  public long getAosKeysNotReclaimableLast() {
+    return aosKeysNotReclaimableLast.value();
+  }
+
   public void updateSnapLastRunMetrics(long keysReclaimed, long replicatedSizeBytes, long iteratedKeys,
       long notReclaimableKeys) {
     this.snapKeysReclaimedLast.set(keysReclaimed);
     this.snapReclaimedSizeLast.set(replicatedSizeBytes);
     this.snapKeysIteratedLast.set(iteratedKeys);
     this.snapKeysNotReclaimableLast.set(notReclaimableKeys);
+  }
+
+  public long getSnapKeysReclaimedLast() {
+    return snapKeysReclaimedLast.value();
+  }
+
+  public long getSnapReclaimedSizeLast() {
+    return snapReclaimedSizeLast.value();
+  }
+
+  public long getSnapKeysIteratedLast() {
+    return snapKeysIteratedLast.value();
+  }
+
+  public long getSnapKeysNotReclaimableLast() {
+    return snapKeysNotReclaimableLast.value();
   }
 
   @VisibleForTesting
