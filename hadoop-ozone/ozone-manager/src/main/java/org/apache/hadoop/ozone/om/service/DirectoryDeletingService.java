@@ -226,6 +226,15 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   @Override
   public void shutdown() {
+    deletionThreadPool.shutdown();
+    try {
+      if (!deletionThreadPool.awaitTermination(60, TimeUnit.SECONDS)) {
+        deletionThreadPool.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      deletionThreadPool.shutdownNow();
+    }
     super.shutdown();
   }
 
@@ -238,7 +247,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       long remainingBufLimit, KeyManager keyManager,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableDirChecker,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableFileChecker,
-      UUID expectedPreviousSnapshotId, long rnCnt) {
+      UUID expectedPreviousSnapshotId, long rnCnt) throws InterruptedException {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
@@ -434,7 +443,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   private OzoneManagerProtocolProtos.OMResponse submitPurgePaths(List<PurgePathRequest> requests,
-      String snapTableKey, UUID expectedPreviousSnapshotId) {
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws InterruptedException {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -460,7 +469,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     // Submit Purge paths request to OM. Acquire bootstrap lock when processing deletes for snapshots.
     try (BootstrapStateHandler.Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
       return submitRequest(omRequest);
-    } catch (ServiceException | InterruptedException e) {
+    } catch (ServiceException e) {
       LOG.error("PurgePaths request failed. Will retry at next run.", e);
     }
     return null;
@@ -523,6 +532,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             try {
               return processDeletedDirectories(currentSnapshotInfo, keyManager, dirSupplier, remainingBufLimit,
                   expectedPreviousSnapshotId, exclusiveSizeMap, rnCnt);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              return false;
             } catch (Throwable e) {
               return false;
             }
@@ -571,7 +583,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
      */
     private boolean processDeletedDirectories(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
         DeletedDirSupplier dirSupplier, long remainingBufLimit, UUID expectedPreviousSnapshotId,
-        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount) {
+        Map<UUID, Pair<Long, Long>> totalExclusiveSizeMap, long runCount) throws InterruptedException {
       OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
       IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
       String snapshotTableKey = currentSnapshotInfo == null ? null : currentSnapshotInfo.getTableKey();

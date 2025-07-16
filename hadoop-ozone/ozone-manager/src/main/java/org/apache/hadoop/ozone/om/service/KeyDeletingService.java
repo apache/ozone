@@ -118,7 +118,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
   Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
-      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException, InterruptedException {
     long startTime = Time.monotonicNow();
     Pair<Integer, Boolean> purgeResult = Pair.of(0, false);
     if (LOG.isDebugEnabled()) {
@@ -157,7 +157,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    */
   private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
       Map<String, RepeatedOmKeyInfo> keysToModify,  List<String> renameEntriesToBeDeleted,
-      String snapTableKey, UUID expectedPreviousSnapshotId) {
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws InterruptedException {
     List<String> purgeKeys = new ArrayList<>();
 
     // Put all keys to be purged in a list
@@ -243,7 +243,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (omResponse != null) {
         purgeSuccess = purgeSuccess && omResponse.getSuccess();
       }
-    } catch (ServiceException | InterruptedException e) {
+    } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.", e);
       return Pair.of(0, false);
     }
@@ -316,7 +316,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
      * @param keyManager KeyManager of the underlying store.
      */
     private void processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
-        int remainNum) throws IOException {
+        int remainNum) throws IOException, InterruptedException {
       String volume = null, bucket = null, snapshotTableKey = null;
       if (currentSnapshotInfo != null) {
         volume = currentSnapshotInfo.getVolumeName();
@@ -454,6 +454,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } catch (IOException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
               snapInfo, e);
+        } catch (InterruptedException e) {
+          LOG.error("Interruption while running delete files background task for store {}.", snapInfo, e);
+          Thread.currentThread().interrupt();
         }
       }
       // By design, no one cares about the results of this call back.
