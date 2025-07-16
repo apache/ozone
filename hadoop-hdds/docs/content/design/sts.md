@@ -48,12 +48,7 @@ This document covers a basic proposal that describes how Ozone can offer a stand
 
 ### Non functional requirements 
 
-1. Support in the order of 20k credentials  
-   
-
-### Non Goals
-
-1. Support for native ACLs 
+1. Support in the order of 20k credentials
 
 ## API Spec
 
