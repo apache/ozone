@@ -44,7 +44,9 @@ This document covers a basic proposal that describes how Ozone can offer a stand
 5. Validate S3 API calls using the temporary credentials against stored permissions  
 6. Verify all operations against Ranger policies  
 7. Expire the credentials depending on the configured duration   
-8. Should work with external stores such as vault (currently Ozone supports this for S3 credentials)
+8. Should work with Ozone native ACLs when without Ranger  
+   * Ozone native ACLs are not as rich as Ranger policies, so this will be a subset of the functionality
+9. Should work with external stores such as vault (currently Ozone supports this for S3 credentials)
 
 ### Non functional requirements 
 
