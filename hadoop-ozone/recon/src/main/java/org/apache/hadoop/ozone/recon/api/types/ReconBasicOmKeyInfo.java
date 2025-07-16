@@ -247,6 +247,14 @@ public final class ReconBasicOmKeyInfo extends WithParentObjectId {
     return builder.build();
   }
 
+  /**
+   * Converts a KeyInfo protobuf object into a ReconBasicOmKeyInfo instance.
+   * This method extracts only the essential fields required for Recon event handling, avoiding the overhead of
+   * deserializing unused metadata such as KeyLocationList or ACLs.
+   *
+   * @param keyInfoProto required for deserialization.
+   * @return the deserialized lightweight ReconBasicOmKeyInfo object.
+   */
   public static ReconBasicOmKeyInfo getFromProtobuf(OzoneManagerProtocolProtos.KeyInfo keyInfoProto) {
     if (keyInfoProto == null) {
       return null;
