@@ -687,8 +687,12 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 : omSnapshot.get().getKeyManager();
             processDeletedDirsForStore(snapInfo, keyManager, ratisByteLimit, run);
           }
-        } catch (IOException | ExecutionException | InterruptedException e) {
+        } catch (IOException | ExecutionException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
+              snapInfo, e);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          LOG.error("Interruption running delete directory background task for store {}.",
               snapInfo, e);
         }
       }
