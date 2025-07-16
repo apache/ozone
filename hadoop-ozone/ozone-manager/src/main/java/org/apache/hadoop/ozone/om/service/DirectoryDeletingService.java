@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
@@ -171,7 +173,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
-    registerReconfigCallbacks(ozoneManager.getReconfigurationHandler(), configuration);
+    registerReconfigCallbacks(ozoneManager.getReconfigurationHandler());
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.deletedDirsCount = new AtomicLong(0);
@@ -179,10 +181,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.movedFilesCount = new AtomicLong(0);
   }
 
-  public void registerReconfigCallbacks(ReconfigurationHandler handler, OzoneConfiguration conf) {
+  public void registerReconfigCallbacks(ReconfigurationHandler handler) {
     handler.registerCompleteCallback((changedKeys, newConf) -> {
-      if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL)) {
-        updateAndRestart(conf);
+      if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL) ||
+          changedKeys.containsKey(OZONE_THREAD_NUMBER_DIR_DELETION)) {
+        updateAndRestart((OzoneConfiguration) newConf);
       }
     });
   }
@@ -190,10 +193,14 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private synchronized void updateAndRestart(OzoneConfiguration conf) {
     long newInterval = conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
         OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
-    LOG.info("Updating and restarting DirectoryDeletingService with interval: {} {}",
-        newInterval, TimeUnit.SECONDS.name().toLowerCase());
+    int newCorePoolSize = conf.getInt(OZONE_THREAD_NUMBER_DIR_DELETION,
+        OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT);
+    LOG.info("Updating and restarting DirectoryDeletingService with interval {} {}" +
+            " and core pool size {}",
+        newInterval, TimeUnit.SECONDS.name().toLowerCase(), newCorePoolSize);
     shutdown();
     setInterval(newInterval, TimeUnit.SECONDS);
+    setPoolSize(newCorePoolSize);
     start();
   }
 
@@ -265,8 +272,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         break;
       }
     }
-    if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
+    if (purgePathRequestList.isEmpty() ||
+        submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId) == null) {
+      return;
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {

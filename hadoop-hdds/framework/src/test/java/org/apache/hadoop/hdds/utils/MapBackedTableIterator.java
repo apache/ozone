@@ -17,17 +17,16 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 /**
  * Generic Table Iterator implementation that can be used for unit tests to reduce redundant mocking in tests.
  */
-public class MapBackedTableIterator<V> implements TableIterator<String, Table.KeyValue<String, V>> {
+public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String, V> {
 
   private Iterator<Table.KeyValue<String, V>> itr;
   private final String prefix;
@@ -43,7 +42,12 @@ public class MapBackedTableIterator<V> implements TableIterator<String, Table.Ke
   public void seekToFirst() {
     this.itr = this.values.entrySet().stream()
         .filter(e -> prefix == null || e.getKey().startsWith(prefix))
-        .map(e -> Table.newKeyValue(e.getKey(), e.getValue())).iterator();
+        .map(e -> {
+          V value = e.getValue();
+          int size = value != null ? value.toString().getBytes(StandardCharsets.UTF_8).length : 0;
+          return Table.newKeyValue(e.getKey(), value, size);
+        })
+        .iterator();
   }
 
   @Override
@@ -52,22 +56,22 @@ public class MapBackedTableIterator<V> implements TableIterator<String, Table.Ke
   }
 
   @Override
-  public Table.KeyValue<String, V> seek(String s) throws IOException {
+  public Table.KeyValue<String, V> seek(String s) {
     this.itr = this.values.entrySet().stream()
         .filter(e -> prefix == null || e.getKey().startsWith(prefix))
-        .filter(e -> e.getKey().compareTo(s) >= 0)
-        .map(e -> Table.newKeyValue(e.getKey(), e.getValue())).iterator();
+        .filter(e -> e.getKey().compareTo(s) >= 0).map(e -> Table.newKeyValue(e.getKey(), e.getValue(),
+            e.getValue().toString().getBytes(StandardCharsets.UTF_8).length)).iterator();
     Map.Entry<String, V> firstEntry = values.ceilingEntry(s);
     return firstEntry == null ? null : Table.newKeyValue(firstEntry.getKey(), firstEntry.getValue());
   }
 
   @Override
-  public void removeFromDB() throws IOException {
+  public void removeFromDB() {
 
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
 
   }
 
