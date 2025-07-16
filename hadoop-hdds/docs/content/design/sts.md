@@ -1,10 +1,10 @@
 ---
-title: Decommissioning in Ozone
-summary: Formal process to shut down machines in a safe way after the required replications.
-date: 2019-07-31
-jira: HDDS-1881
+title: Security Token Service (STS) for Ozone
+summary: Allows clients to generate temporary S3 credentials using a REST API.
+date: 2025-07-16
+jira: HDDS-13323
 status: implementing
-author: Anu Engineer, Marton Elek, Stephen O'Donnell
+author: Ren Koike
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
