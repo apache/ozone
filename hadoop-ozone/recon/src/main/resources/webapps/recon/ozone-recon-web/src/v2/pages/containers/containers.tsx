@@ -64,6 +64,7 @@ const Containers: React.FC<{}> = () => {
     underReplicatedContainerData: [],
     overReplicatedContainerData: [],
     misReplicatedContainerData: [],
+    mismatchedReplicaContainerData: []
   });
   const [expandedRow, setExpandedRow] = useState<ExpandedRow>({});
 
@@ -100,6 +101,9 @@ const Containers: React.FC<{}> = () => {
       const misReplicatedContainerData: Container[] = containers?.filter(
         container => container.containerState === 'MIS_REPLICATED'
       ) ?? [];
+      const mismatchedReplicaContainerData: Container[] = containers?.filter(
+        container => container.containerState === 'REPLICA_MISMATCH'
+      ) ?? [];
 
       setState({
         ...state,
@@ -107,6 +111,7 @@ const Containers: React.FC<{}> = () => {
         underReplicatedContainerData: underReplicatedContainerData,
         overReplicatedContainerData: overReplicatedContainerData,
         misReplicatedContainerData: misReplicatedContainerData,
+        mismatchedReplicaContainerData: mismatchedReplicaContainerData,
         lastUpdated: Number(moment())
       });
       setLoading(false)
@@ -135,7 +140,7 @@ const Containers: React.FC<{}> = () => {
   const {
     lastUpdated, columnOptions,
     missingContainerData, underReplicatedContainerData,
-    overReplicatedContainerData, misReplicatedContainerData
+    overReplicatedContainerData, misReplicatedContainerData, mismatchedReplicaContainerData
   } = state;
 
   // Mapping the data to the Tab keys for enabling/disabling search
@@ -143,7 +148,8 @@ const Containers: React.FC<{}> = () => {
     1: missingContainerData,
     2: underReplicatedContainerData,
     3: overReplicatedContainerData,
-    4: misReplicatedContainerData
+    4: misReplicatedContainerData,
+    5: mismatchedReplicaContainerData
   }
 
   const highlightData = (
@@ -167,6 +173,10 @@ const Containers: React.FC<{}> = () => {
       <div className='highlight-content'>
         Mis-Replicated <br/>
         <span className='highlight-content-value'>{misReplicatedContainerData?.length ?? 'N/A'}</span>
+      </div>
+      <div className='highlight-content'>
+        Mismatched Replicas <br/>
+        <span className='highlight-content-value'>{mismatchedReplicaContainerData?.length ?? 'N/A'}</span>
       </div>
     </div>
   )
@@ -265,6 +275,19 @@ const Containers: React.FC<{}> = () => {
               tab='Mis-Replicated'>
               <ContainerTable
                 data={misReplicatedContainerData}
+                loading={loading}
+                searchColumn={searchColumn}
+                searchTerm={debouncedSearch}
+                selectedColumns={selectedColumns}
+                expandedRow={expandedRow}
+                expandedRowSetter={setExpandedRow}
+              />
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key='5'
+              tab='Mismatched Replicas'>
+              <ContainerTable
+                data={mismatchedReplicaContainerData}
                 loading={loading}
                 searchColumn={searchColumn}
                 searchTerm={debouncedSearch}

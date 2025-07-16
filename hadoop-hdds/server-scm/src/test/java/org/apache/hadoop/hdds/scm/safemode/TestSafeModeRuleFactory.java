@@ -48,8 +48,9 @@ class TestSafeModeRuleFactory {
 
   @Test
   public void testLoadedSafeModeRules() {
-    initializeSafeModeRuleFactory();
+    SCMSafeModeManager safeModeManager = initializeSafeModeRuleFactory();
     final SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();
+    factory.addSafeModeManager(safeModeManager);
 
     // Currently we assert the total count against hardcoded value
     // as the rules are hardcoded in SafeModeRuleFactory.
@@ -62,8 +63,9 @@ class TestSafeModeRuleFactory {
 
   @Test
   public void testLoadedPreCheckRules() {
-    initializeSafeModeRuleFactory();
+    SCMSafeModeManager safeModeManager = initializeSafeModeRuleFactory();
     final SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();
+    factory.addSafeModeManager(safeModeManager);
 
     // Currently we assert the total count against hardcoded value
     // as the rules are hardcoded in SafeModeRuleFactory.
@@ -74,13 +76,14 @@ class TestSafeModeRuleFactory {
 
   }
 
-  private void initializeSafeModeRuleFactory() {
+  private SCMSafeModeManager initializeSafeModeRuleFactory() {
     final SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
     when(safeModeManager.getSafeModeMetrics()).thenReturn(mock(SafeModeMetrics.class));
     SafeModeRuleFactory.initialize(new OzoneConfiguration(),
-        SCMContext.emptyContext(), new EventQueue(), safeModeManager, mock(
+        SCMContext.emptyContext(), new EventQueue(), mock(
             PipelineManager.class),
         mock(ContainerManager.class), mock(NodeManager.class));
+    return safeModeManager;
   }
 
 }

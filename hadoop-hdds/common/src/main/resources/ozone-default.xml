@@ -467,7 +467,7 @@
   </property>
   <property>
     <name>ozone.key.deleting.limit.per.task</name>
-    <value>20000</value>
+    <value>50000</value>
     <tag>OM, PERFORMANCE</tag>
     <description>
       A maximum number of keys to be scanned by key deleting service
@@ -2773,8 +2773,14 @@
     <name>ozone.manager.delegation.token.max-lifetime</name>
     <value>7d</value>
     <description>
-      Default max time interval after which ozone delegation token will
-      not be renewed.
+      Default max time interval after which ozone delegation token will not be renewed.
+      Delegation Token is signed and verified using secret key which has a max hdds.secret.key.expiry.duration lifetime.
+      To guarantee that the delegation token can be properly loaded, verified, and renewed during its lifetime,
+      (ozone.manager.delegation.token.max-lifetime + hdds.secret.key.rotate.duration + ozone.manager.delegation.remover.scan.interval)
+      must not be greater than hdds.secret.key.expiry.duration.
+      If any of ozone.manager.delegation.token.max-lifetime, hdds.secret.key.expiry.duration, hdds.secret.key.rotate.duration
+      or ozone.manager.delegation.remover.scan.interval value is changed, The above constrain must be checked and
+      values be adjusted accordingly if necessary.
     </description>
   </property>
 
@@ -4558,12 +4564,18 @@
   </property>
   <property>
     <name>hdds.secret.key.expiry.duration</name>
-    <value>7d</value>
+    <value>9d</value>
     <tag>SCM, SECURITY</tag>
     <description>
       The duration for which symmetric secret keys issued by SCM are valid.
-      This default value, in combination with hdds.secret.key.rotate.duration=1d, results in 7 secret keys (for the
-      last 7 days) are kept valid at any point of time.
+      Secret key is used to sign delegation tokens signed by OM, so the secret key must be valid for at least
+      (ozone.manager.delegation.token.max-lifetime + hdds.secret.key.rotate.duration + ozone.manager.delegation.remover.scan.interval)
+      time to guarantee that delegation tokens can be verified by OM. Considering the default value of three properties
+      mentioned and rounding up to days, this property's default value, in combination with hdds.secret.key.rotate.duration=1d,
+      results in 9 secret keys (for the last 9 days) are kept valid at any point of time.
+      If any of ozone.manager.delegation.token.max-lifetime, hdds.secret.key.rotate.duration or
+      ozone.manager.delegation.remover.scan.interval value is changed, this property should be checked, and updated
+      accordingly if necessary.
     </description>
   </property>
   <property>

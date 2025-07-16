@@ -49,6 +49,8 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeMa
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_REMOVER_SCAN_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
@@ -114,6 +116,7 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -344,6 +347,7 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
+  @Flaky("HDDS-13401")
   public void testContainerChecksumWithBlockMissing() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.
@@ -455,6 +459,7 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
+  @Flaky("HDDS-13401")
   public void testDataChecksumReportedAtSCM() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.
@@ -597,9 +602,11 @@ public class TestContainerCommandReconciliation {
 
   private static void setSecretKeysConfig() {
     // Secret key lifecycle configs.
-    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "500s");
-    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "500s");
+    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "1s");
+    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "100s");
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "500s");
+    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, "300s");
+    conf.set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, "1s");
 
     // enable tokens
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);

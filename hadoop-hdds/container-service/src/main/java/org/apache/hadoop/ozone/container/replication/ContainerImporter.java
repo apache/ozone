@@ -116,13 +116,16 @@ public class ContainerImporter {
       }
       ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
+      // lastDataScanTime should be cleared for an imported container
+      containerData.setDataScanTimestamp(null);
 
       try (InputStream input = Files.newInputStream(tarFilePath)) {
         Container container = controller.importContainer(
             containerData, input, packer);
-        // After container import is successful, increase used space for the volume
+        // After container import is successful, increase used space for the volume and schedule an OnDemand scan for it
         targetVolume.incrementUsedSpace(container.getContainerData().getBytesUsed());
         containerSet.addContainerByOverwriteMissingContainer(container);
+        containerSet.scanContainer(containerID);
       }
     } finally {
       importContainerProgress.remove(containerID);

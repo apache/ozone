@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 
 /**
  * Class used to test ContainerSet operations.
@@ -296,7 +296,7 @@ public class TestContainerSet {
     containerSet.scanContainer(FIRST_ID);
 
     AtomicLong invocationCount = new AtomicLong();
-    OnDemandContainerDataScanner mockScanner = mock(OnDemandContainerDataScanner.class);
+    OnDemandContainerScanner mockScanner = mock(OnDemandContainerScanner.class);
     when(mockScanner.scanContainer(any())).then(inv -> {
       KeyValueContainer c = inv.getArgument(0);
       // If the handler was incorrectly triggered for a non-existent container, this assert would fail.
@@ -323,7 +323,7 @@ public class TestContainerSet {
     containerSet.scanContainer(FIRST_ID);
 
     AtomicLong invocationCount = new AtomicLong();
-    OnDemandContainerDataScanner mockScanner = mock(OnDemandContainerDataScanner.class);
+    OnDemandContainerScanner mockScanner = mock(OnDemandContainerScanner.class);
     when(mockScanner.scanContainerWithoutGap(any())).then(inv -> {
       KeyValueContainer c = inv.getArgument(0);
       // If the handler was incorrectly triggered for a non-existent container, this assert would fail.

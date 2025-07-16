@@ -36,7 +36,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.3</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.31.77</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.31.78</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.81</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -80,13 +80,8 @@
     <docker-maven-plugin.version>0.45.1</docker-maven-plugin.version>
     <download-maven-plugin.version>1.9.0</download-maven-plugin.version>
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
-    <!-- The java version enforced by the maven enforcer -->
-    <!-- more complex patterns can be used here, such as
-       [${javac.version})
-    for an open-ended enforcement
-    -->
     <enforced.java.version>[${javac.version},)</enforced.java.version>
-    <enforced.maven.version>[3.3.0,)</enforced.maven.version>
+    <enforced.maven.version>[3.6.3,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
     <excluded-test-groups>unhealthy</excluded-test-groups>
@@ -1397,6 +1392,11 @@
       </dependency>
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-proxy</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-server</artifactId>
         <version>${jetty.version}</version>
         <exclusions>
@@ -1889,10 +1889,10 @@
           <configuration>
             <rules>
               <requireMavenVersion>
-                <version>[3.0.2,)</version>
+                <version>${enforced.maven.version}</version>
               </requireMavenVersion>
               <requireJavaVersion>
-                <version>[1.8,)</version>
+                <version>${enforced.java.version}</version>
               </requireJavaVersion>
             </rules>
           </configuration>

@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-secure
+#suite:tools
 
 set -u -o pipefail
 
@@ -29,25 +29,14 @@ export OM=om1
 export COMPOSE_FILE=docker-compose.yaml:debug-tools.yaml
 export OZONE_DIR=/opt/hadoop
 
-: "${OZONE_VOLUME_OWNER:=}"
 : "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
 
 export OZONE_VOLUME
 
-# Clean up saved internal state from each container's volume for the next run.
-rm -rf "${OZONE_VOLUME}"
-mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,dn4,dn5,om1,om2,om3,scm1,scm2,scm3,recon,s3g,kms}
-
-if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
-  current_user=$(whoami)
-  if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
-    chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
-      || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
-  fi
-fi
-
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
+
+create_data_dirs dn{1..5} kms om{1..3} recon s3g scm{1..3}
 
 start_docker_env
 

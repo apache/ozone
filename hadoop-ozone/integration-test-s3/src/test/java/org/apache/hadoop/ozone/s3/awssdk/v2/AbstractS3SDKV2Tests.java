@@ -63,8 +63,8 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
-import org.apache.hadoop.ozone.s3.S3GatewayService;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
@@ -162,7 +162,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
    * @throws Exception exception thrown when waiting for the cluster to be ready.
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
-    S3GatewayService s3g = new S3GatewayService();
+    MultiS3GatewayService s3g = new MultiS3GatewayService(5);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .addService(s3g)
         .setNumDatanodes(5)

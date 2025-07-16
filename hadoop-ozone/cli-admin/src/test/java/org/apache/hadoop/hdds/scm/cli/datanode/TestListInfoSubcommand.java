@@ -33,6 +33,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -42,6 +43,8 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import picocli.CommandLine;
 
 /**
@@ -210,6 +213,111 @@ public class TestListInfoSubcommand {
     assertEquals("IN_SERVICE", opState, "Expected opState IN_SERVICE but got: " + opState);
     assertEquals(nodes.get(0).getNodeID().getUuid(), uuid,
         "Expected UUID " + nodes.get(0).getNodeID().getUuid() + " but got: " + uuid);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "true, --most-used, descending",
+      "false, --least-used, ascending"
+  })
+  public void testUsedOrderingAndOutput(
+      boolean mostUsed,
+      String cliFlag,
+      String orderDirection) throws Exception {
+
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.DatanodeUsageInfoProto> usageList = new ArrayList<>();
+    List<HddsProtos.Node> nodeList = getNodeDetails();
+
+    for (int i = 0; i < 4; i++) {
+      long remaining = 1000 - (100 * i);
+      usageList.add(HddsProtos.DatanodeUsageInfoProto.newBuilder()
+          .setNode(nodeList.get(i).getNodeID())
+          .setRemaining(remaining)
+          .setCapacity(1000)
+          .build());
+
+      when(scmClient.queryNode(UUID.fromString(nodeList.get(i).getNodeID().getUuid())))
+          .thenReturn(nodeList.get(i));
+    }
+
+    if (mostUsed) {
+      Collections.reverse(usageList); // For most-used only
+    }
+
+    when(scmClient.getDatanodeUsageInfo(mostUsed, Integer.MAX_VALUE)).thenReturn(usageList);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    // ----- JSON output test -----
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs(cliFlag, "--json");
+    cmd.execute(scmClient);
+
+    String jsonOutput = outContent.toString(DEFAULT_ENCODING);
+    JsonNode root = new ObjectMapper().readTree(jsonOutput);
+
+    assertTrue(root.isArray(), "JSON output should be an array");
+    assertEquals(4, root.size(), "Expected 4 nodes in JSON output");
+
+    for (JsonNode node : root) {
+      assertTrue(node.has("used"), "Missing 'used'");
+      assertTrue(node.has("capacity"), "Missing 'capacity'");
+      assertTrue(node.has("percentUsed"), "Missing 'percentUsed'");
+    }
+
+    validateOrdering(root, orderDirection);
+
+    outContent.reset();
+
+    // ----- Text output test -----
+    c = new CommandLine(cmd);
+    c.parseArgs(cliFlag);
+    cmd.execute(scmClient);
+
+    String textOutput = outContent.toString(DEFAULT_ENCODING);
+    validateOrderingFromTextOutput(textOutput, orderDirection);
+  }
+
+  private void validateOrdering(JsonNode root, String orderDirection) {
+    for (int i = 0; i < root.size() - 1; i++) {
+      long usedCurrent = root.get(i).get("used").asLong();
+      long capacityCurrent = root.get(i).get("capacity").asLong();
+      long usedNext = root.get(i + 1).get("used").asLong();
+      long capacityNext = root.get(i + 1).get("capacity").asLong();
+      double ratio1 = (capacityCurrent == 0) ? 0.0 : (double) usedCurrent / capacityCurrent;
+      double ratio2 = (capacityNext == 0) ? 0.0 : (double) usedNext / capacityNext;
+
+      if ("ascending".equals(orderDirection)) {
+        assertTrue(ratio1 <= ratio2, "Expected ascending order, got: " + ratio1 + " > " + ratio2);
+      } else {
+        assertTrue(ratio1 >= ratio2, "Expected descending order, got: " + ratio1 + " < " + ratio2);
+      }
+    }
+  }
+
+  private void validateOrderingFromTextOutput(String output, String orderDirection) {
+    Pattern usedPattern = Pattern.compile("Used: (\\d+)");
+    Pattern capacityPattern = Pattern.compile("Capacity: (\\d+)");
+    Matcher usedMatcher = usedPattern.matcher(output);
+    Matcher capacityMatcher = capacityPattern.matcher(output);
+
+    List<Double> usageRatios = new ArrayList<>();
+    while (usedMatcher.find() && capacityMatcher.find()) {
+      long used = Long.parseLong(usedMatcher.group(1));
+      long capacity = Long.parseLong(capacityMatcher.group(1));
+      double usage = (capacity == 0) ? 0.0 : (double) used / capacity;
+      usageRatios.add(usage);
+    }
+
+    for (int i = 0; i < usageRatios.size() - 1; i++) {
+      double ratio1 = usageRatios.get(i);
+      double ratio2 = usageRatios.get(i + 1);
+      if ("ascending".equals(orderDirection)) {
+        assertTrue(ratio1 <= ratio2, "Expected ascending order, got: " + ratio1 + " > " + ratio2);
+      } else {
+        assertTrue(ratio1 >= ratio2, "Expected descending order, got: " + ratio1 + " < " + ratio2);
+      }
+    }
   }
 
   private List<HddsProtos.Node> getNodeDetails() {

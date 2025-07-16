@@ -100,6 +100,13 @@ public class ReconUtils {
       ReconUtils.class);
 
   private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
+  private static final ExecutorService NSSUMMARY_REBUILD_EXECUTOR =
+      Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r);
+        t.setName("RebuildNSSummaryThread");
+        t.setDaemon(true); // Optional: allows JVM to exit without waiting
+        return t;
+      });
 
   public ReconUtils() {
   }
@@ -395,23 +402,17 @@ public class ReconUtils {
 
   private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                      ReconOMMetadataManager omMetadataManager) {
-    ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
-      Thread t = new Thread(r);
-      t.setName("RebuildNSSummaryThread");
-      return t;
-    });
-
-    executor.submit(() -> {
+    NSSUMMARY_REBUILD_EXECUTOR.submit(() -> {
       long startTime = Time.monotonicNow();
       log.info("Rebuilding NSSummary tree...");
       try {
         reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-      } finally {
         long endTime = Time.monotonicNow();
         log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
+      } catch (Throwable t) {
+        log.error("NSSummary tree rebuild failed.", t);
       }
     });
-    executor.shutdown();
   }
 
   /**

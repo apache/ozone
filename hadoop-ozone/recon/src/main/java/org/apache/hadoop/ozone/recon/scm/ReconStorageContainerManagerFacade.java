@@ -436,6 +436,7 @@ public class ReconStorageContainerManagerFacade
     if (!this.safeModeManager.getInSafeMode()) {
       this.reconScmTasks.forEach(ReconScmTask::start);
     }
+    LOG.info("Successfully started Recon Storage Container Manager.");
   }
 
   /**
@@ -510,6 +511,8 @@ public class ReconStorageContainerManagerFacade
       }
     } catch (IOException e) {
       LOG.error("Exception encountered while getting SCM DB.");
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.INTERNAL_ERROR);
     } finally {
       isSyncDataFromSCMRunning.compareAndSet(true, false);
     }

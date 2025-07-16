@@ -1172,6 +1172,25 @@ message KeyInfo {
     optional uint64 expectedDataGeneration = 22;
 }
 
+// KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
+// selected fields only, while maintaining the same field indices as KeyInfo
+// for compatibility and consistency.
+message KeyInfoProtoLight {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  required string keyName = 3;
+  required uint64 dataSize = 4;
+  required hadoop.hdds.ReplicationType type = 5;
+  optional hadoop.hdds.ReplicationFactor factor = 6;
+  required uint64 creationTime = 8;
+  required uint64 modificationTime = 9;
+  optional uint64 objectID = 14;
+  optional uint64 updateID = 15;
+  optional uint64 parentID = 16;
+  optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
+  optional bool isFile = 19;
+}
+
 message BasicKeyInfo {
     optional string keyName = 1;
     optional uint64 dataSize = 2;

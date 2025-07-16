@@ -15,13 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.s3;
+
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * OmSnapshot file system tests for FSO.
+ * Round Robin load balancing strategy.
+ * Distributes requests evenly across all available endpoints in a circular manner.
  */
-public class TestOmSnapshotFileSystemFsoWithLinkedBuckets extends TestOmSnapshotFileSystem {
-  TestOmSnapshotFileSystemFsoWithLinkedBuckets() throws Exception {
-    super(BUCKET_NAME_FSO, true);
+public class RoundRobinStrategy implements LoadBalanceStrategy {
+
+  private final AtomicInteger counter = new AtomicInteger(0);
+
+  @Override
+  public String selectEndpoint(List<String> endpoints) {
+    if (endpoints == null || endpoints.isEmpty()) {
+      throw new IllegalArgumentException("Endpoints list cannot be null or empty");
+    }
+
+    int idx = counter.getAndUpdate(i -> (i + 1) % endpoints.size());
+    return endpoints.get(idx);
   }
+
 }

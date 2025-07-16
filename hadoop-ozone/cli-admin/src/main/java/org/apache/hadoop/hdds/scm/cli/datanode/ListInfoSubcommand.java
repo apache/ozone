@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -44,21 +46,6 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class)
 public class ListInfoSubcommand extends ScmSubcommand {
 
-  @CommandLine.Option(names = {"--ip"},
-      description = "Show info by ip address.",
-      defaultValue = "")
-  private String ipaddress;
-
-  @CommandLine.Option(names = {"--id"},
-      description = "Show info by datanode UUID.",
-      defaultValue = "")
-  private String uuid;
-
-  @CommandLine.Option(names = {"--hostname"},
-      description = "Show info by datanode hostname.",
-      defaultValue = "")
-  private String hostname;
-
   @CommandLine.Option(names = {"--operational-state"},
       description = "Show info by datanode NodeOperationalState(" +
           "IN_SERVICE, " +
@@ -78,16 +65,32 @@ public class ListInfoSubcommand extends ScmSubcommand {
        defaultValue = "false")
   private boolean json;
 
+  @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
+  private UsageSortingOptions usageSortingOptions;
+
   @CommandLine.Mixin
   private ListLimitOptions listLimitOptions;
 
+  @CommandLine.Mixin
+  private NodeSelectionMixin nodeSelectionMixin;
+
   private List<Pipeline> pipelines;
+
+  static class UsageSortingOptions {
+    @CommandLine.Option(names = {"--most-used"},
+        description = "Show datanodes sorted by Utilization (most to least).")
+    private boolean mostUsed;
+
+    @CommandLine.Option(names = {"--least-used"},
+        description = "Show datanodes sorted by Utilization (least to most).")
+    private boolean leastUsed;
+  }
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     pipelines = scmClient.listPipelines();
-    if (!Strings.isNullOrEmpty(uuid)) {
-      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(uuid));
+    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getNodeId())) {
+      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(nodeSelectionMixin.getNodeId()));
       DatanodeWithAttributes dwa = new DatanodeWithAttributes(DatanodeDetails
           .getFromProtoBuf(node.getNodeID()),
           node.getNodeOperationalStates(0),
@@ -102,13 +105,13 @@ public class ListInfoSubcommand extends ScmSubcommand {
       return;
     }
     Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
-    if (!Strings.isNullOrEmpty(ipaddress)) {
+    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getIp())) {
       allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
-          .compareToIgnoreCase(ipaddress) == 0);
+          .compareToIgnoreCase(nodeSelectionMixin.getIp()) == 0);
     }
-    if (!Strings.isNullOrEmpty(hostname)) {
+    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getHostname())) {
       allNodes = allNodes.filter(p -> p.getDatanodeDetails().getHostName()
-          .compareToIgnoreCase(hostname) == 0);
+          .compareToIgnoreCase(nodeSelectionMixin.getHostname()) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeOperationalState)) {
       allNodes = allNodes.filter(p -> p.getOpState().toString()
@@ -135,6 +138,38 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
   private List<DatanodeWithAttributes> getAllNodes(ScmClient scmClient)
       throws IOException {
+
+    // If sorting is requested
+    if (usageSortingOptions != null && (usageSortingOptions.mostUsed || usageSortingOptions.leastUsed)) {
+      boolean sortByMostUsed = usageSortingOptions.mostUsed;
+      List<HddsProtos.DatanodeUsageInfoProto> usageInfos = scmClient.getDatanodeUsageInfo(sortByMostUsed, 
+          Integer.MAX_VALUE);
+
+      return usageInfos.stream()
+          .map(p -> {
+            String uuidStr = p.getNode().getUuid();
+            UUID parsedUuid = UUID.fromString(uuidStr);
+
+            try {
+              HddsProtos.Node node = scmClient.queryNode(parsedUuid);
+              long capacity = p.getCapacity();
+              long used = capacity - p.getRemaining();
+              double percentUsed = (capacity > 0) ? (used * 100.0) / capacity : 0.0;
+              return new DatanodeWithAttributes(
+                  DatanodeDetails.getFromProtoBuf(node.getNodeID()),
+                  node.getNodeOperationalStates(0),
+                  node.getNodeStates(0),
+                  used,
+                  capacity,
+                  percentUsed);
+            } catch (IOException e) {
+              return null;
+            }
+          })
+          .filter(Objects::nonNull)
+          .collect(Collectors.toList());
+    }
+    
     List<HddsProtos.Node> nodes = scmClient.queryNode(null,
         null, HddsProtos.QueryScope.CLUSTER, "");
 
@@ -177,12 +212,24 @@ public class ListInfoSubcommand extends ScmSubcommand {
     System.out.println("Operational State: " + dna.getOpState());
     System.out.println("Health State: " + dna.getHealthState());
     System.out.println("Related pipelines:\n" + pipelineListInfo);
+
+    if (dna.getUsed() != null && dna.getCapacity() != null && dna.getUsed() >= 0 && dna.getCapacity() > 0) {
+      System.out.println("Capacity: " + dna.getCapacity());
+      System.out.println("Used: " + dna.getUsed());
+      System.out.printf("Percentage Used : %.2f%%%n%n", dna.getPercentUsed());
+    }
   }
 
   private static class DatanodeWithAttributes {
     private DatanodeDetails datanodeDetails;
     private HddsProtos.NodeOperationalState operationalState;
     private HddsProtos.NodeState healthState;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long used = null;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long capacity = null;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Double percentUsed = null;
 
     DatanodeWithAttributes(DatanodeDetails dn,
         HddsProtos.NodeOperationalState opState,
@@ -190,6 +237,20 @@ public class ListInfoSubcommand extends ScmSubcommand {
       this.datanodeDetails = dn;
       this.operationalState = opState;
       this.healthState = healthState;
+    }
+
+    DatanodeWithAttributes(DatanodeDetails dn,
+                           HddsProtos.NodeOperationalState opState,
+                           HddsProtos.NodeState healthState,
+                           long used,
+                           long capacity,
+                           double percentUsed) {
+      this.datanodeDetails = dn;
+      this.operationalState = opState;
+      this.healthState = healthState;
+      this.used = used;
+      this.capacity = capacity;
+      this.percentUsed = percentUsed;
     }
 
     public DatanodeDetails getDatanodeDetails() {
@@ -202,6 +263,18 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
     public HddsProtos.NodeState getHealthState() {
       return healthState;
+    }
+
+    public Long getUsed() {
+      return used;
+    }
+    
+    public Long getCapacity() {
+      return capacity;
+    }
+    
+    public Double getPercentUsed() {
+      return percentUsed;
     }
   }
 }

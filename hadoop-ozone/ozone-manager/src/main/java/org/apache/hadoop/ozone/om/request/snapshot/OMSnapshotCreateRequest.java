@@ -339,14 +339,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     DefaultReplicationConfig defRC = bucketInfo.getDefaultReplicationConfig();
     final ReplicationConfig rc;
     if (defRC == null) {
-      // Note: A lot of tests are not setting bucket DefaultReplicationConfig,
-      //  sometimes intentionally.
-      //  Fall back to config default and print warning level log.
+      //  Fall back to config default.
       rc = ReplicationConfig.getDefault(new OzoneConfiguration());
-      LOG.warn("DefaultReplicationConfig is not correctly set in " +
-          "OmBucketInfo for volume '{}' bucket '{}'. " +
-          "Falling back to config default '{}'",
-          bucketInfo.getVolumeName(), bucketInfo.getBucketName(), rc);
     } else {
       rc = defRC.getReplicationConfig();
     }
