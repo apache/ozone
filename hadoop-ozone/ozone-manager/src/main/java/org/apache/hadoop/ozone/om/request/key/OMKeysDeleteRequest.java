@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.REPLICATION_CONFIG;
 import static org.apache.hadoop.ozone.OzoneConsts.UNDELETED_KEYS_LIST;
 import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
 import static org.apache.hadoop.ozone.audit.OMAction.DELETE_KEYS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
@@ -95,6 +96,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
         deleteKeyRequest.getDeleteKeys();
+    OMResponse.Builder omResponse =
+        OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
     List<String> deleteKeys = new ArrayList<>(deleteKeyArgs.getKeysList());
     List<OmKeyInfo> deleteKeysInfo = new ArrayList<>();
@@ -119,8 +122,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
-    OMResponse.Builder omResponse =
-        OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     boolean acquiredLock = false;
@@ -135,6 +136,16 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     long startNanos = Time.monotonicNowNanos();
     try {
       long startNanosDeleteKeysResolveBucketLatency = Time.monotonicNowNanos();
+
+      List<Long> deleteKeyUpdateIDs = null;
+      if (deleteKeyArgs.getUpdateIDsCount() > 0) {
+        deleteKeyUpdateIDs = new ArrayList<>(deleteKeyArgs.getUpdateIDsList());
+        if (deleteKeyUpdateIDs.size() != deleteKeys.size()) {
+          throw new OMException("updateIDs count doesn't match the keys count",
+              INVALID_REQUEST);
+        }
+      }
+
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
       perfMetrics.setDeleteKeysResolveBucketLatencyNs(
               Time.monotonicNowNanos() - startNanosDeleteKeysResolveBucketLatency);
@@ -164,6 +175,19 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           unDeletedKeys.addKeys(keyName);
           keyToError.put(keyName, new ErrorInfo(OMException.ResultCodes.KEY_NOT_FOUND.name(), "Key does not exist"));
           continue;
+        } else {
+          if (deleteKeyUpdateIDs != null) {
+            Long updateID = deleteKeyUpdateIDs.get(indexFailed);
+            if (updateID == null || updateID != omKeyInfo.getUpdateID()) {
+              deleteStatus = false;
+              LOG.warn("Received a request to delete a Key {} whose updateID not match or null", objectKey);
+              deleteKeys.remove(keyName);
+              unDeletedKeys.addKeys(keyName);
+              keyToError.put(keyName,
+                  new ErrorInfo(OMException.ResultCodes.UPDATE_ID_NOT_MATCH.name(), "UpdateID not match or null"));
+              continue;
+            }
+          }
         }
 
         try {

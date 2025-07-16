@@ -470,6 +470,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, CompactionLogEntry> getCompactionLogTable();
 
   Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable();
+
+  /**
+   * @return list all LifecycleConfigurations.
+   */
+  List<OmLifecycleConfiguration> listLifecycleConfigurations();
+
   /**
    * Gets the OM Meta table.
    * @return meta table reference.

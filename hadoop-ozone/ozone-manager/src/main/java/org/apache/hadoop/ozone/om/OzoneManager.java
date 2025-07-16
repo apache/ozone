@@ -501,6 +501,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // Used in MiniOzoneCluster testing
   private State omState;
   private Thread emptier;
+  private OzoneTrash ozoneTrash;
 
   private static final int MSECS_PER_MINUTE = 60 * 1000;
 
@@ -1763,6 +1764,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omDeletionMetrics;
   }
 
+  public OzoneTrash getOzoneTrash() {
+    return ozoneTrash;
+  }
   /**
    * Start service.
    */
@@ -2265,8 +2269,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       FileSystem fs = SecurityUtil.doAsLoginUser(
           (PrivilegedExceptionAction<FileSystem>)
               () -> new TrashOzoneFileSystem(i));
-      this.emptier = new Thread(new OzoneTrash(fs, conf, this).
-          getEmptier(), threadPrefix + "TrashEmptier");
+      this.ozoneTrash = new OzoneTrash(fs, conf, this);
+      this.emptier = new Thread(ozoneTrash.getEmptier(), threadPrefix + "TrashEmptier");
       this.emptier.setDaemon(true);
       this.emptier.start();
     }

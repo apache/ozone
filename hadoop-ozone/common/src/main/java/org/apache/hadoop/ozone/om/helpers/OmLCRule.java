@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.isValidKeyPath;
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.normalizePrefix;
+
 import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,6 +27,7 @@ import java.util.List;
 import net.jcip.annotations.Immutable;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
@@ -40,6 +44,7 @@ public final class OmLCRule {
 
   private final String id;
   private final String prefix;
+  private final boolean directoryStylePrefix;
   private final boolean enabled;
   // List of actions for this rule
   private final List<OmLCAction> actions;
@@ -54,6 +59,11 @@ public final class OmLCRule {
 
   private OmLCRule(Builder builder) {
     this.prefix = builder.prefix;
+    if (this.prefix != null) {
+      this.directoryStylePrefix = this.prefix.contains(OzoneConsts.OM_KEY_PREFIX);
+    } else {
+      this.directoryStylePrefix = false;
+    }
     this.enabled = builder.enabled;
     this.actions = Collections.unmodifiableList(new ArrayList<>(builder.actions));
     this.filter = builder.filter;
@@ -80,8 +90,11 @@ public final class OmLCRule {
   }
 
   @Nullable
-  public String getPrefix() {
-    return prefix;
+  public String getEffectivePrefix() {
+    return prefix != null ? prefix :
+        (filter != null && filter.getPrefix() != null) ? filter.getPrefix() :
+        (filter != null && filter.getAndOperator() != null && filter.getAndOperator().getPrefix() != null) ?
+            filter.getAndOperator().getPrefix() : null;
   }
 
   public boolean isEnabled() {
@@ -116,6 +129,10 @@ public final class OmLCRule {
     return isPrefixEnable;
   }
 
+  public boolean isDirectoryStylePrefix() {
+    return directoryStylePrefix || (filter != null ? filter.isDirectoryStylePrefix() : false);
+  }
+
   public boolean isTagEnable() {
     return isTagEnable;
   }
@@ -133,7 +150,7 @@ public final class OmLCRule {
    *
    * @throws OMException if the validation fails
    */
-  public void valid() throws OMException {
+  public void valid(BucketLayout bucketLayout) throws OMException {
     if (id.length() > LC_ID_MAX_LENGTH) {
       throw new OMException("ID length should not exceed allowed limit of " + LC_ID_MAX_LENGTH,
           OMException.ResultCodes.INVALID_REQUEST);
@@ -167,9 +184,81 @@ public final class OmLCRule {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
-    if (filter != null) {
-      filter.valid();
+    if (prefix != null && bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      String normalizedPrefix = normalizePrefix(prefix);
+      if (!normalizedPrefix.equals(prefix)) {
+        throw new OMException("Prefix format is not supported. Please use " + normalizedPrefix +
+            " instead of " + prefix + ".", OMException.ResultCodes.INVALID_REQUEST);
+      }
+      try {
+        isValidKeyPath(normalizedPrefix);
+      } catch (OMException e) {
+        throw new OMException("Prefix is not a valid key path: " + prefix, OMException.ResultCodes.INVALID_REQUEST);
+      }
     }
+
+    if (filter != null) {
+      filter.valid(bucketLayout);
+    }
+  }
+
+  /**
+   *
+   * @param omKeyInfo detail Key info to evaluate against this rule
+   * @return true is this key fits this rule and will trigger the action, otherwise false
+   */
+  public boolean match(OmKeyInfo omKeyInfo) {
+    boolean matched = false;
+    // verify modification time first
+    if (getExpiration().isExpired(omKeyInfo.getModificationTime())) {
+      // verify prefix and filter
+      if (prefix != null) {
+        if (omKeyInfo.getKeyName().startsWith(prefix)) {
+          matched = true;
+        }
+      } else {
+        return filter.match(omKeyInfo);
+      }
+    }
+    return matched;
+  }
+
+  /**
+   *
+   * @param omKeyInfo detail Key info to evaluate against this rule
+   * @param keyPath path include key name and all its parent, except bucket and volume
+   * @return true is this key fits this rule and will trigger the action, otherwise false
+   */
+  public boolean match(OmKeyInfo omKeyInfo, String keyPath) {
+    boolean matched = false;
+    // verify modification time first
+    if (getExpiration().isExpired(omKeyInfo.getModificationTime())) {
+      // verify prefix and filter
+      if (prefix != null) {
+        if (keyPath.startsWith(prefix)) {
+          matched = true;
+        }
+      } else {
+        return filter.match(omKeyInfo, keyPath);
+      }
+    }
+    return matched;
+  }
+
+  public boolean match(OmDirectoryInfo dirInfo, String keyPath) {
+    boolean matched = false;
+    // verify modification time first
+    if (getExpiration().isExpired(dirInfo.getModificationTime())) {
+      // verify prefix and filter
+      if (prefix != null) {
+        if (keyPath.startsWith(prefix)) {
+          matched = true;
+        }
+      } else {
+        return filter.match(dirInfo, keyPath);
+      }
+    }
+    return matched;
   }
 
   public LifecycleRule getProtobuf() {
@@ -192,7 +281,7 @@ public final class OmLCRule {
     return builder.build();
   }
 
-  public static OmLCRule getFromProtobuf(LifecycleRule lifecycleRule) throws OMException {
+  public static OmLCRule getFromProtobuf(LifecycleRule lifecycleRule, BucketLayout layout) throws OMException {
     Builder builder = new Builder()
         .setEnabled(lifecycleRule.getEnabled());
 
@@ -208,10 +297,10 @@ public final class OmLCRule {
       }
     }
     if (lifecycleRule.hasFilter()) {
-      builder.setFilter(OmLCFilter.getFromProtobuf(lifecycleRule.getFilter()));
+      builder.setFilter(OmLCFilter.getFromProtobuf(lifecycleRule.getFilter(), layout));
     }
 
-    return builder.build();
+    return builder.setBucketLayout(layout).build();
   }
 
   @Override
@@ -236,6 +325,7 @@ public final class OmLCRule {
     private boolean enabled;
     private List<OmLCAction> actions = new ArrayList<>();
     private OmLCFilter filter;
+    private BucketLayout bucketLayout;
 
     public Builder setId(String lcId) {
       this.id = lcId;
@@ -284,9 +374,14 @@ public final class OmLCRule {
       return filter;
     }
 
+    public Builder setBucketLayout(BucketLayout layout) {
+      this.bucketLayout = layout;
+      return this;
+    }
+
     public OmLCRule build() throws OMException {
       OmLCRule omLCRule = new OmLCRule(this);
-      omLCRule.valid();
+      omLCRule.valid(bucketLayout);
       return omLCRule;
     }
   }

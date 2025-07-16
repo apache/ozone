@@ -743,7 +743,7 @@ public final class OzoneBucketStub extends OzoneBucket {
       }
 
       rules.add(new OzoneLifecycleConfiguration.OzoneLCRule(r.getId(),
-          r.getPrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, f));
+          r.getEffectivePrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, f));
     }
 
     return new OzoneLifecycleConfiguration(
