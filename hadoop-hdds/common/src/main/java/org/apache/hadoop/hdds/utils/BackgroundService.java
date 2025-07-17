@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -168,9 +169,9 @@ public abstract class BackgroundService {
         }, taskExec).exceptionally(e -> null), (Void1, Void) -> null);
       }
       try {
-        future.get();
-      } catch (Throwable e) {
-        LOG.error("Background service execution failed", e);
+        future.join();
+      } catch (RuntimeException e) {
+        LOG.error("Background service execution failed.", e);
       } finally {
         long endTime = System.nanoTime();
         if (endTime - serviceStartTime > serviceTimeoutInNanos) {
