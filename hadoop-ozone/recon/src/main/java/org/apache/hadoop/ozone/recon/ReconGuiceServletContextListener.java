@@ -33,6 +33,10 @@ public class ReconGuiceServletContextListener
     return injector;
   }
 
+  public static Injector getStaticInjector() {
+    return injector;
+  }
+
   static void setInjector(Injector inj) {
     injector = inj;
   }
