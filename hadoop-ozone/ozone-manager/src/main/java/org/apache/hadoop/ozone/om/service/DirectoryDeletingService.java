@@ -38,6 +38,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -152,7 +153,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private int ratisByteLimit;
   private final SnapshotChainManager snapshotChainManager;
   private final boolean deepCleanSnapshots;
-  private final ExecutorService deletionThreadPool;
+  private ExecutorService deletionThreadPool;
   private final int numberOfParallelThreadsPerStore;
   private final AtomicLong deletedDirsCount;
   private final AtomicLong movedDirsCount;
@@ -168,9 +169,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     this.numberOfParallelThreadsPerStore = dirDeletingServiceCorePoolSize;
-    this.deletionThreadPool = new ThreadPoolExecutor(0, numberOfParallelThreadsPerStore, interval, unit,
-        new LinkedBlockingDeque<>(Integer.MAX_VALUE));
-
+    this.deletionThreadPool = new ThreadPoolExecutor(0, numberOfParallelThreadsPerStore,
+        interval, unit, new LinkedBlockingDeque<>(Integer.MAX_VALUE));
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
     registerReconfigCallbacks(ozoneManager.getReconfigurationHandler());
@@ -226,16 +226,31 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   @Override
   public void shutdown() {
-    deletionThreadPool.shutdown();
-    try {
-      if (!deletionThreadPool.awaitTermination(60, TimeUnit.SECONDS)) {
+    if (deletionThreadPool != null) {
+      deletionThreadPool.shutdown();
+      try {
+        if (!deletionThreadPool.awaitTermination(60, TimeUnit.SECONDS)) {
+          deletionThreadPool.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         deletionThreadPool.shutdownNow();
       }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      deletionThreadPool.shutdownNow();
     }
     super.shutdown();
+  }
+
+  @Override
+  public synchronized void start() {
+    if (deletionThreadPool == null || deletionThreadPool.isShutdown() || deletionThreadPool.isTerminated()) {
+      this.deletionThreadPool = new ThreadPoolExecutor(0, numberOfParallelThreadsPerStore,
+          super.getIntervalMillis(), TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>(Integer.MAX_VALUE));
+    }
+    super.start();
+  }
+
+  private boolean isThreadPoolActive(ExecutorService threadPoolExecutor) {
+    return threadPoolExecutor != null && !threadPoolExecutor.isShutdown() && !threadPoolExecutor.isTerminated();
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -539,7 +554,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             } catch (Throwable e) {
               return false;
             }
-          }, deletionThreadPool);
+          }, isThreadPoolActive(deletionThreadPool) ? deletionThreadPool : ForkJoinPool.commonPool());
           processedAllDeletedDirs = future.thenCombine(future, (a, b) -> a && b);
         }
         // If AOS or all directories have been processed for snapshot, update snapshot size delta and deep clean flag

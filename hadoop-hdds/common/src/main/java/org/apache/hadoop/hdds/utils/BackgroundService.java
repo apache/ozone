@@ -125,6 +125,10 @@ public abstract class BackgroundService {
     this.unit = newUnit;
   }
 
+  protected long getIntervalMillis() {
+    return this.unit.toMillis(interval);
+  }
+
   public abstract BackgroundTaskQueue getTasks();
 
   /**
