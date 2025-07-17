@@ -307,20 +307,7 @@ public class KeyManagerImpl implements KeyManager {
     if (snapshotSstFilteringService == null &&
         ozoneManager.isFilesystemSnapshotEnabled()) {
 
-      long serviceInterval = configuration.getTimeDuration(
-          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
-          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      long serviceTimeout = configuration.getTimeDuration(
-          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
-          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      if (isSstFilteringSvcEnabled()) {
-        snapshotSstFilteringService =
-            new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
-                serviceTimeout, ozoneManager, configuration);
-        snapshotSstFilteringService.start();
-      }
+      startSnapshotSstFilteringService(configuration);
     }
 
     if (snapshotDeletingService == null &&
@@ -368,6 +355,37 @@ public class KeyManagerImpl implements KeyManager {
     dnsToSwitchMapping =
         ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
             : new CachedDNSToSwitchMapping(newInstance));
+  }
+
+  /**
+   * Start the snapshot SST filtering service if interval is not set to disabled value.
+   * @param conf
+   */
+  public void startSnapshotSstFilteringService(OzoneConfiguration conf) {
+    long serviceInterval = conf.getTimeDuration(
+        OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+        OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    long serviceTimeout = conf.getTimeDuration(
+        OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
+        OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    if (isSstFilteringSvcEnabled()) {
+      snapshotSstFilteringService =
+          new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
+              serviceTimeout, ozoneManager, conf);
+      snapshotSstFilteringService.start();
+    } else {
+      LOG.debug("Snapshot SST filtering service is disabled.");
+    }
+  }
+
+  public void restartSnapshotSstFilteringService(OzoneConfiguration conf) {
+    if (snapshotSstFilteringService != null) {
+      snapshotSstFilteringService.shutdown();
+      snapshotSstFilteringService = null;
+    }
+    startSnapshotSstFilteringService(conf);
   }
 
   private void startCompactionService(OzoneConfiguration configuration,
