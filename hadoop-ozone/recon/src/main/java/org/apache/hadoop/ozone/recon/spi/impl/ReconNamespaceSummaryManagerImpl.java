@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import static org.apache.hadoop.hdds.utils.db.DBDefinition.LOG;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.NAMESPACE_SUMMARY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
@@ -65,6 +66,7 @@ public class ReconNamespaceSummaryManagerImpl
                                     long objectId, NSSummary nsSummary)
       throws IOException {
     nsSummaryTable.putWithBatch(batch, objectId, nsSummary);
+    LOG.info("put in NSSummaryTable with objectId: {}, nsSummary: {}", objectId, nsSummary);
   }
 
   @Override
