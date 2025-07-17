@@ -739,7 +739,7 @@ public class KeyManagerImpl implements KeyManager {
       }
       int currentCount = 0;
       boolean maxReqSizeExceeded = false;
-      boolean isDataDistributionEnabled = ozoneManager.getScmInfo().getMetaDataLayoutVersion() >=
+      boolean isDataDistributionEnabled =  ozoneManager.getScmInfo().getMetaDataLayoutVersion() >=
           HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
       while (delKeyIter.hasNext() && currentCount < count) {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
@@ -752,22 +752,14 @@ public class KeyManagerImpl implements KeyManager {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
-              BlockGroup.Builder keyBlocksBuilder = BlockGroup.newBuilder().setKeyName(kv.getKey());
-              if (isDataDistributionEnabled) {
-                List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
-                    .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                        .map(b -> new DeletedBlock(new BlockID(b.getContainerID(), b.getLocalID()),
-                            b.getLength(), QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
-                    .collect(Collectors.toList());
-                keyBlocksBuilder.addAllDeletedBlocks(deletedBlocks);
-              } else {
-                List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
-                    .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                        .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
-                keyBlocksBuilder.addAllBlockIDs(blockIDS);
-              }
-              BlockGroup keyBlocks = keyBlocksBuilder.build();
-              int keyBlockSerializedSize = keyBlocks.getProto().getSerializedSize();
+              List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
+                  .flatMap(versionLocations -> versionLocations.getLocationList().stream()
+                      .map(b -> new DeletedBlock(new BlockID(b.getContainerID(), b.getLocalID()),
+                          b.getLength(), QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
+                  .collect(Collectors.toList());
+              BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
+                  .addAllDeletedBlocks(deletedBlocks).build();
+              int keyBlockSerializedSize = keyBlocks.getProto(isDataDistributionEnabled).getSerializedSize();
               serializedSize += keyBlockSerializedSize;
               if (serializedSize > ratisByteLimit) {
                 maxReqSizeExceeded = true;

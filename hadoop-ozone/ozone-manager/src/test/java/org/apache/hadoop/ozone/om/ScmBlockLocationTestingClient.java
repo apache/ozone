@@ -152,15 +152,8 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
     for (BlockGroup keyBlocks : keyBlocksInfoList) {
       List<DeleteBlockResult> blockResultList = new ArrayList<>();
       // Process BlockIDs directly if present
-      if (keyBlocks.getBlockIDs() != null && !keyBlocks.getBlockIDs().isEmpty()) {
-        for (BlockID blockID : keyBlocks.getBlockIDs()) {
-          blockResultList.add(processBlock(blockID));
-        }
-      } else {
-        // Otherwise, use DeletedBlock's BlockID
-        for (DeletedBlock deletedBlock : keyBlocks.getAllDeletedBlocks()) {
-          blockResultList.add(processBlock(deletedBlock.getBlockID()));
-        }
+      for (DeletedBlock deletedBlock : keyBlocks.getAllDeletedBlocks()) {
+        blockResultList.add(processBlock(deletedBlock.getBlockID()));
       }
       results.add(new DeleteBlockGroupResult(keyBlocks.getGroupID(), blockResultList));
     }
