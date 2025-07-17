@@ -687,7 +687,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           compactDB();
           // Close DB (and remove from cache) to avoid concurrent modification
           // while packing it.
-          BlockUtils.removeDB(containerData, config);
+//          BlockUtils.removeDB(containerData, config);
         }
       } finally {
         readLock();
