@@ -72,6 +72,7 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -799,8 +800,10 @@ class TestKeyDeletingService extends OzoneTestBase {
               return OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(purgeRequest.get().getCmdType())
                   .setStatus(OzoneManagerProtocolProtos.Status.TIMEOUT).build();
             });
-        List<BlockGroup> blockGroups = Collections.singletonList(BlockGroup.newBuilder().setKeyName("key1")
-            .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build());
+        List<BlockGroup> blockGroups = Collections.singletonList(BlockGroup
+            .newBuilder().setKeyName("key1")
+            .addAllDeletedBlocks(Collections.singletonList(new DeletedBlock(new BlockID(1, 1), 3, 1)))
+            .build());
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
         OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
             .setBucketName("buck")
@@ -1074,7 +1077,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit)
           .getKeyBlocksList()
           .stream()
-          .map(BlockGroup::getBlockIDList)
+          .map(b -> b.getBlockIDs().isEmpty() ? b.getAllDeletedBlocks() : b.getBlockIDs())
           .mapToLong(Collection::size)
           .sum();
     } catch (IOException e) {

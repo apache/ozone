@@ -31,6 +31,7 @@ import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
@@ -80,6 +81,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -268,13 +270,13 @@ public class SCMBlockProtocolServer implements
       List<BlockGroup> keyBlocksInfoList) throws IOException {
     long totalBlocks = 0;
     for (BlockGroup bg : keyBlocksInfoList) {
-      totalBlocks += bg.getBlockIDList().size();
+      totalBlocks += (!bg.getBlockIDs().isEmpty()) ? bg.getBlockIDs().size() : bg.getAllDeletedBlocks().size();
     }
+    List<DeleteBlockGroupResult> results = new ArrayList<>();
     if (LOG.isDebugEnabled()) {
       LOG.debug("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
           keyBlocksInfoList.size(), totalBlocks);
     }
-    List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
     Exception e = null;
@@ -312,7 +314,10 @@ public class SCMBlockProtocolServer implements
     }
     for (BlockGroup bg : keyBlocksInfoList) {
       List<DeleteBlockResult> blockResult = new ArrayList<>();
-      for (BlockID b : bg.getBlockIDList()) {
+      for (DeletedBlock b : bg.getAllDeletedBlocks()) {
+        blockResult.add(new DeleteBlockResult(b.getBlockID(), resultCode));
+      }
+      for (BlockID b : bg.getBlockIDs()) {
         blockResult.add(new DeleteBlockResult(b, resultCode));
       }
       results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
@@ -335,7 +340,8 @@ public class SCMBlockProtocolServer implements
       ScmInfo.Builder builder =
           new ScmInfo.Builder()
               .setClusterId(scm.getScmStorageConfig().getClusterID())
-              .setScmId(scm.getScmStorageConfig().getScmId());
+              .setScmId(scm.getScmStorageConfig().getScmId())
+              .setMetaDataLayoutVersion(scm.getLayoutVersionManager().getMetadataLayoutVersion());
       return builder.build();
     } catch (Exception ex) {
       auditSuccess = false;
@@ -477,5 +483,10 @@ public class SCMBlockProtocolServer implements
   @Override
   public void close() throws IOException {
     stop();
+  }
+
+  @VisibleForTesting
+  public SCMPerformanceMetrics getMetrics() {
+    return perfMetrics;
   }
 }

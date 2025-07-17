@@ -29,6 +29,7 @@ public final class ScmInfo {
   private final String clusterId;
   private final String scmId;
   private final List<String> peerRoles;
+  private final int metadataLayoutVersion;
 
   /**
    * Builder for ScmInfo.
@@ -37,6 +38,7 @@ public final class ScmInfo {
     private String clusterId;
     private String scmId;
     private final List<String> peerRoles;
+    private int metadataLayoutVersion;
 
     public Builder() {
       peerRoles = new ArrayList<>();
@@ -72,15 +74,21 @@ public final class ScmInfo {
       return this;
     }
 
+    public Builder setMetaDataLayoutVersion(int version) {
+      this.metadataLayoutVersion = version;
+      return this;
+    }
+
     public ScmInfo build() {
-      return new ScmInfo(clusterId, scmId, peerRoles);
+      return new ScmInfo(clusterId, scmId, peerRoles, metadataLayoutVersion);
     }
   }
 
-  private ScmInfo(String clusterId, String scmId, List<String> peerRoles) {
+  private ScmInfo(String clusterId, String scmId, List<String> peerRoles, int metadataLayoutVersion) {
     this.clusterId = clusterId;
     this.scmId = scmId;
     this.peerRoles = Collections.unmodifiableList(peerRoles);
+    this.metadataLayoutVersion = metadataLayoutVersion;
   }
 
   /**
@@ -105,6 +113,10 @@ public final class ScmInfo {
    */
   public List<String> getPeerRoles() {
     return peerRoles;
+  }
+
+  public int getMetaDataLayoutVersion() {
+    return metadataLayoutVersion;
   }
 
 }

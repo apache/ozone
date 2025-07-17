@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -225,16 +226,29 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     for (BlockGroup bg : keyBlocksInfoList) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Deleting blocks {}",
-            StringUtils.join(",", bg.getBlockIDList()));
+            StringUtils.join(",", (!bg.getBlockIDs().isEmpty()) ? bg.getBlockIDs() : bg.getAllDeletedBlocks()));
       }
-      for (BlockID block : bg.getBlockIDList()) {
-        long containerID = block.getContainerID();
-        if (containerBlocks.containsKey(containerID)) {
-          containerBlocks.get(containerID).add(block.getLocalID());
-        } else {
-          List<Long> item = new ArrayList<>();
-          item.add(block.getLocalID());
-          containerBlocks.put(containerID, item);
+      if (!bg.getBlockIDs().isEmpty()) {
+        for (BlockID block : bg.getBlockIDs()) {
+          long containerID = block.getContainerID();
+          if (containerBlocks.containsKey(containerID)) {
+            containerBlocks.get(containerID).add(block.getLocalID());
+          } else {
+            List<Long> item = new ArrayList<>();
+            item.add(block.getLocalID());
+            containerBlocks.put(containerID, item);
+          }
+        }
+      } else {
+        for (DeletedBlock block : bg.getAllDeletedBlocks()) {
+          long containerID = block.getBlockID().getContainerID();
+          if (containerBlocks.containsKey(containerID)) {
+            containerBlocks.get(containerID).add(block.getBlockID().getLocalID());
+          } else {
+            List<Long> item = new ArrayList<>();
+            item.add(block.getBlockID().getLocalID());
+            containerBlocks.put(containerID, item);
+          }
         }
       }
     }
