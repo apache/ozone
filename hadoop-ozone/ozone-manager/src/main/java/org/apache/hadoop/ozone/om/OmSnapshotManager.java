@@ -507,11 +507,15 @@ public final class OmSnapshotManager implements AutoCloseable {
     OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager, snapshotInfo, store);
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
-    // There is no need to take any lock as of now, because transactions are flushed sequentially.
+    // Snapshot create is processed as a single transactions and
+    // transactions are flushed sequentially so, no need to take any lock as of now.
     deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
     // Clean up deletedDirectoryTable as well
     deleteKeysFromDelDirTableInSnapshotScope(omMetadataManager,
+        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
+    // Remove entries from snapshotRenamedTable
+    deleteKeysFromSnapRenamedTableInSnapshotScope(omMetadataManager,
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
 
     if (dbCheckpoint != null && snapshotDirExist) {
@@ -524,6 +528,33 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
 
     return dbCheckpoint;
+  }
+
+  /**
+   * Helper method to delete DB keys in the snapshot scope (bucket)
+   * from active DB's deletedDirectoryTable.
+   * @param omMetadataManager OMMetadataManager instance
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   */
+  private static void deleteKeysFromSnapRenamedTableInSnapshotScope(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName, BatchOperation batchOperation) throws IOException {
+
+    final String dbSnapshotBucketKey = omMetadataManager.getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, String>>
+             iter = omMetadataManager.getSnapshotRenamedTable().iterator(dbSnapshotBucketKey)) {
+
+      performOperationOnKeys(iter,
+          entry -> {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Removing key {} from SnapshotRenamedTable", entry.getKey());
+            }
+            omMetadataManager.getSnapshotRenamedTable().deleteWithBatch(batchOperation, entry.getKey());
+            return null;
+          });
+    }
   }
 
   /**
