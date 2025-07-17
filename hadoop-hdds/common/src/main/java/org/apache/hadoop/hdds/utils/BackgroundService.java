@@ -125,7 +125,7 @@ public abstract class BackgroundService {
     this.unit = newUnit;
   }
 
-  protected long getIntervalMillis() {
+  protected synchronized long getIntervalMillis() {
     return this.unit.toMillis(interval);
   }
 
