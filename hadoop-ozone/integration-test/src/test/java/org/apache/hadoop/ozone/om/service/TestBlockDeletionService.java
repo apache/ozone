@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATA_DISTRIBUTION;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -41,6 +40,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -70,14 +71,27 @@ import org.mockito.ArgumentCaptor;
 /**
  * DeletionService test to Pass Usage from OM to SCM.
  */
-public class TestKeyDeletionService {
+public class TestBlockDeletionService {
   private static final String CLIENT_ID = UUID.randomUUID().toString();
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME = "bucket1";
   private static final int KEY_SIZE = 5 * 1024; // 5 KB
   private static MiniOzoneCluster cluster;
   private static StorageContainerLocationProtocol scmClient;
-  private static OzoneBucket bucket = null;
+  private static OzoneBucket bucket;
+  private static SCMPerformanceMetrics metrics;
+  private static InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> scmFinalizationExecutor;
+
+  public static Stream<Arguments> replicationConfigProvider() {
+    return Stream.of(
+        arguments(RatisReplicationConfig.getInstance(ReplicationFactor.ONE.toProto())),
+        arguments(RatisReplicationConfig.getInstance(ReplicationFactor.THREE.toProto())),
+        arguments(new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 2 * 1024 * 1024)),
+        arguments(new ECReplicationConfig(6, 3, ECReplicationConfig.EcCodec.RS, 2 * 1024 * 1024)),
+        arguments(StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE.toProto())),
+        arguments(StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE.toProto()))
+    );
+  }
 
   @BeforeAll
   public static void init() throws Exception {
@@ -85,11 +99,12 @@ public class TestKeyDeletionService {
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500, TimeUnit.MILLISECONDS);
     conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HBASE_SUPPORT.layoutVersion());
 
-    InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> scmFinalizationExecutor =
-        new InjectedUpgradeFinalizationExecutor<>();
+    scmFinalizationExecutor = new InjectedUpgradeFinalizationExecutor<>();
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setUpgradeFinalizationExecutor(scmFinalizationExecutor);
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(9)
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(9)
         .setSCMConfigurator(configurator)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setLayoutVersion(HBASE_SUPPORT.layoutVersion()).build())
@@ -97,6 +112,8 @@ public class TestKeyDeletionService {
     cluster.waitForClusterToBeReady();
     scmClient = cluster.getStorageContainerLocationClient();
     assertEquals(HBASE_SUPPORT.ordinal(), scmClient.getScmInfo().getMetaDataLayoutVersion());
+    metrics = cluster.getStorageContainerManager().getBlockProtocolServer().getMetrics();
+
     OzoneClient ozoneClient = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
     ozoneClient.getObjectStore().createVolume(VOLUME_NAME);
@@ -111,101 +128,70 @@ public class TestKeyDeletionService {
     }
   }
 
-  public static Stream<Arguments> replicaType() {
-    return Stream.of(
-        arguments("RATIS", "ONE"),
-        arguments("RATIS", "THREE")
-    );
-  }
-
-  public static Stream<Arguments> ecType() {
-    return Stream.of(
-        arguments(ECReplicationConfig.EcCodec.RS, 3, 2, 2 * MB),
-        arguments(ECReplicationConfig.EcCodec.RS, 6, 3, 2 * MB)
-    );
-  }
-
-  @ParameterizedTest
-  @MethodSource("replicaType")
-  public void testDeletedKeyBytesPropagatedToSCM(String type, String factor) throws Exception {
-    String keyName = UUID.randomUUID().toString();
-    ReplicationConfig replicationConfig = RatisReplicationConfig
-        .getInstance(ReplicationFactor.valueOf(factor).toProto());
-    SCMPerformanceMetrics metrics = cluster.getStorageContainerManager().getBlockProtocolServer().getMetrics();
+  @Test
+  public void testDeleteKeyQuotaWithUpgrade() throws Exception {
     long initialSuccessBlocks = metrics.getDeleteKeySuccessBlocks();
     long initialFailedBlocks = metrics.getDeleteKeyFailedBlocks();
+
+    ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE.toProto());
+    // PRE-UPGRADE
     // Step 1: write a key
+    String keyName = UUID.randomUUID().toString();
     createKey(keyName, replicationConfig);
     // Step 2: Spy on BlockManager and inject it into SCM
-    BlockManager spyManager = injectSpyBlockManager(cluster);
+    BlockManager spyManagerBefore = injectSpyBlockManager(cluster);
+    ArgumentCaptor<List<BlockGroup>> captor = ArgumentCaptor.forClass(List.class);
     // Step 3: Delete the key (which triggers deleteBlocks call)
     bucket.deleteKey(keyName);
     // Step 4: Verify deleteBlocks call and capture argument
-    verifyAndAssertQuota(spyManager, replicationConfig);
+    verify(spyManagerBefore, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
+    verifyAndAssertQuota(replicationConfig, captor, false);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeySuccessBlocks() - initialSuccessBlocks == 1, 50, 1000);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
 
-    // Launch finalization from the client. In the current implementation,
-    // this call will block until finalization completes.
-    Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(
-        () -> {
-          try {
-            scmClient.finalizeScmUpgrade(CLIENT_ID);
-          } catch (IOException ex) {
-            fail("finalization client failed", ex);
-          }
-        });
+    // UPGRADE SCM (if specified)
+    // Step 5: wait for finalizing upgrade
+    Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(() -> {
+      try {
+        scmClient.finalizeScmUpgrade(CLIENT_ID);
+      } catch (IOException ex) {
+        fail("finalization client failed", ex);
+      }
+    });
     finalizationFuture.get();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     assertEquals(DATA_DISTRIBUTION.ordinal(), scmClient.getScmInfo().getMetaDataLayoutVersion());
-    // create and delete another key to verify the process after feature is finalized
+
+    // POST-UPGRADE
+    //Step 6: Repeat the same steps in pre-upgrade
     keyName = UUID.randomUUID().toString();
     createKey(keyName, replicationConfig);
+    BlockManager spyManagerAfter = injectSpyBlockManager(cluster);
     bucket.deleteKey(keyName);
-    verifyAndAssertQuota(spyManager, replicationConfig);
+    verify(spyManagerAfter, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
+    verifyAndAssertQuota(replicationConfig, captor, true);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeySuccessBlocks() - initialSuccessBlocks == 2, 50, 1000);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
   }
 
   @ParameterizedTest
-  @MethodSource("ecType")
-  void testGetDefaultShouldCreateECReplicationConfFromConfValues(
-      ECReplicationConfig.EcCodec codec, int data, int parity, long chunkSize) throws Exception {
-    String keyName = UUID.randomUUID().toString();
-    ReplicationConfig replicationConfig = new ECReplicationConfig(data, parity, codec, (int) chunkSize);
-    SCMPerformanceMetrics metrics = cluster.getStorageContainerManager().getBlockProtocolServer().getMetrics();
+  @MethodSource("replicationConfigProvider")
+  public void testDeleteKeyQuotaWithDifferentReplicationTypes(ReplicationConfig replicationConfig) throws Exception {
     long initialSuccessBlocks = metrics.getDeleteKeySuccessBlocks();
     long initialFailedBlocks = metrics.getDeleteKeyFailedBlocks();
+
     // Step 1: write a key
+    String keyName = UUID.randomUUID().toString();
     createKey(keyName, replicationConfig);
     // Step 2: Spy on BlockManager and inject it into SCM
-    BlockManager spyManager = injectSpyBlockManager(cluster);
+    BlockManager spyManagerBefore = injectSpyBlockManager(cluster);
+    ArgumentCaptor<List<BlockGroup>> captor = ArgumentCaptor.forClass(List.class);
     // Step 3: Delete the key (which triggers deleteBlocks call)
     bucket.deleteKey(keyName);
     // Step 4: Verify deleteBlocks call and capture argument
-    verifyAndAssertQuota(spyManager, replicationConfig);
+    verify(spyManagerBefore, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
+    verifyAndAssertQuota(replicationConfig, captor, true);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeySuccessBlocks() - initialSuccessBlocks == 1, 50, 1000);
-    GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
-
-    // Launch finalization from the client. In the current implementation,
-    // this call will block until finalization completes.
-    Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(
-        () -> {
-          try {
-            scmClient.finalizeScmUpgrade(CLIENT_ID);
-          } catch (IOException ex) {
-            fail("finalization client failed", ex);
-          }
-        });
-    finalizationFuture.get();
-    TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
-    assertEquals(DATA_DISTRIBUTION.ordinal(), scmClient.getScmInfo().getMetaDataLayoutVersion());
-    // create and delete another key to verify the process after feature is finalized
-    keyName = UUID.randomUUID().toString();
-    createKey(keyName, replicationConfig);
-    bucket.deleteKey(keyName);
-    verifyAndAssertQuota(spyManager, replicationConfig);
-    GenericTestUtils.waitFor(() -> metrics.getDeleteKeySuccessBlocks() - initialSuccessBlocks == 2, 50, 1000);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
   }
 
@@ -228,28 +214,23 @@ public class TestKeyDeletionService {
     return spyManager;
   }
 
-  private void verifyAndAssertQuota(BlockManager spyManager, ReplicationConfig replicationConfig) throws IOException {
-    ArgumentCaptor<List<BlockGroup>> captor = ArgumentCaptor.forClass(List.class);
-    verify(spyManager, timeout(50000).atLeastOnce()).deleteBlocks(captor.capture());
+  private void verifyAndAssertQuota(ReplicationConfig replicationConfig,
+                                    ArgumentCaptor<List<BlockGroup>> captor,
+                                    boolean isDataDistributionEnabled) throws IOException {
+    int index = captor.getAllValues().size() - 1;
+    List<BlockGroup> blockGroups = captor.getAllValues().get(index);
 
-    if (captor.getAllValues().stream().anyMatch(blockGroups -> blockGroups.stream().anyMatch(
-        group -> group.getAllDeletedBlocks().isEmpty()))) {
-      assertEquals(1, captor.getAllValues().get(0).get(0).getBlockIDs().size());
-      assertEquals(0, captor.getAllValues().get(0).get(0).getAllDeletedBlocks().size());
-      return;
-    }
-
-    long totalUsedBytes = captor.getAllValues().get(0).stream()
+    long totalUsedBytes = blockGroups.stream()
         .flatMap(group -> group.getAllDeletedBlocks().stream())
         .mapToLong(DeletedBlock::getReplicatedSize).sum();
 
-    long totalUnreplicatedBytes = captor.getAllValues().get(0).stream()
+    long totalUnreplicatedBytes = blockGroups.stream()
         .flatMap(group -> group.getAllDeletedBlocks().stream())
         .mapToLong(DeletedBlock::getSize).sum();
 
-    assertEquals(0, captor.getAllValues().get(0).get(0).getBlockIDs().size());
-    assertEquals(1, captor.getAllValues().get(0).get(0).getAllDeletedBlocks().size());
-    assertEquals(QuotaUtil.getReplicatedSize(KEY_SIZE, replicationConfig), totalUsedBytes);
-    assertEquals(KEY_SIZE, totalUnreplicatedBytes);
+    assertEquals(1, blockGroups.get(0).getAllDeletedBlocks().size());
+    assertEquals(isDataDistributionEnabled ?
+        QuotaUtil.getReplicatedSize(KEY_SIZE, replicationConfig) : 0, totalUsedBytes);
+    assertEquals(isDataDistributionEnabled ? KEY_SIZE : 0, totalUnreplicatedBytes);
   }
 }

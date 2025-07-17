@@ -1077,7 +1077,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit)
           .getKeyBlocksList()
           .stream()
-          .map(b -> b.getBlockIDs().isEmpty() ? b.getAllDeletedBlocks() : b.getBlockIDs())
+          .map(BlockGroup::getAllDeletedBlocks)
           .mapToLong(Collection::size)
           .sum();
     } catch (IOException e) {
