@@ -538,11 +538,8 @@ public class TestBucketList {
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e1.getCode());
 
     // maxKeys == 0
-    OS3Exception e2 = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.get("bucket", null, null, null, 0, null,
-            null, null, null, null, null, null, 1000)
-    );
-    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e2.getCode());
+    bucketEndpoint.get("bucket", null, null, null, 0, null,
+        null, null, null, null, null, null, 1000);
   }
 
   @Test

@@ -225,53 +225,55 @@ public class BucketEndpoint extends EndpointBase {
     }
     String lastKey = null;
     int count = 0;
-    while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
-      OzoneKey next = ozoneKeyIterator.next();
-      if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
-          StringUtils.isNotEmpty(prefix) &&
-          !next.getName().startsWith(prefix)) {
-        // prefix has delimiter but key don't have
-        // example prefix: dir1/ key: dir123
-        continue;
-      }
-      if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
-        continue;
-      }
-      String relativeKeyName = next.getName().substring(prefix.length());
+    if (maxKeys > 0 ) {
+      while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
+        OzoneKey next = ozoneKeyIterator.next();
+        if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
+            StringUtils.isNotEmpty(prefix) &&
+            !next.getName().startsWith(prefix)) {
+          // prefix has delimiter but key don't have
+          // example prefix: dir1/ key: dir123
+          continue;
+        }
+        if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
+          continue;
+        }
+        String relativeKeyName = next.getName().substring(prefix.length());
 
-      int depth = StringUtils.countMatches(relativeKeyName, delimiter);
-      if (!StringUtils.isEmpty(delimiter)) {
-        if (depth > 0) {
-          // means key has multiple delimiters in its value.
-          // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
-          String dirName = relativeKeyName.substring(0, relativeKeyName
-              .indexOf(delimiter));
-          if (!dirName.equals(prevDir)) {
-            response.addPrefix(EncodingTypeObject.createNullable(
-                prefix + dirName + delimiter, encodingType));
-            prevDir = dirName;
+        int depth = StringUtils.countMatches(relativeKeyName, delimiter);
+        if (!StringUtils.isEmpty(delimiter)) {
+          if (depth > 0) {
+            // means key has multiple delimiters in its value.
+            // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
+            String dirName = relativeKeyName.substring(0, relativeKeyName
+                .indexOf(delimiter));
+            if (!dirName.equals(prevDir)) {
+              response.addPrefix(EncodingTypeObject.createNullable(
+                  prefix + dirName + delimiter, encodingType));
+              prevDir = dirName;
+              count++;
+            }
+          } else if (relativeKeyName.endsWith(delimiter)) {
+            // means or key is same as prefix with delimiter at end and ends with
+            // delimiter. ex: dir/, where prefix is dir and delimiter is /
+            response.addPrefix(
+                EncodingTypeObject.createNullable(relativeKeyName, encodingType));
+            count++;
+          } else {
+            // means our key is matched with prefix if prefix is given and it
+            // does not have any common prefix.
+            addKey(response, next);
             count++;
           }
-        } else if (relativeKeyName.endsWith(delimiter)) {
-          // means or key is same as prefix with delimiter at end and ends with
-          // delimiter. ex: dir/, where prefix is dir and delimiter is /
-          response.addPrefix(
-              EncodingTypeObject.createNullable(relativeKeyName, encodingType));
-          count++;
         } else {
-          // means our key is matched with prefix if prefix is given and it
-          // does not have any common prefix.
           addKey(response, next);
           count++;
         }
-      } else {
-        addKey(response, next);
-        count++;
-      }
 
-      if (count == maxKeys) {
-        lastKey = next.getName();
-        break;
+        if (count == maxKeys) {
+          lastKey = next.getName();
+          break;
+        }
       }
     }
 
@@ -303,8 +305,8 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   private int validateMaxKeys(int maxKeys) throws OS3Exception {
-    if (maxKeys <= 0) {
-      throw newError(S3ErrorTable.INVALID_ARGUMENT, "maxKeys must be > 0");
+    if (maxKeys < 0) {
+      throw newError(S3ErrorTable.INVALID_ARGUMENT, "maxKeys must be >= 0");
     }
 
     return Math.min(maxKeys, maxKeysLimit);
