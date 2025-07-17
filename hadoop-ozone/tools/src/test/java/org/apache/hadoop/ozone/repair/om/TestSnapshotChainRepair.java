@@ -52,6 +52,7 @@ import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
+import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
@@ -72,6 +73,7 @@ public class TestSnapshotChainRepair {
 
   private MockedStatic<ManagedRocksDB> mockedDB;
   private MockedStatic<RocksDBUtils> mockedUtils;
+  private MockedStatic<OptionsUtil> mockedOptionsUtil;
 
   private GenericTestUtils.PrintStreamCapturer out;
   private GenericTestUtils.PrintStreamCapturer err;
@@ -84,11 +86,12 @@ public class TestSnapshotChainRepair {
     // Initialize static mocks
     mockedDB = mockStatic(ManagedRocksDB.class);
     mockedUtils = mockStatic(RocksDBUtils.class);
+    mockedOptionsUtil = mockStatic(OptionsUtil.class);
   }
 
   @AfterEach
   public void tearDown() {
-    IOUtils.closeQuietly(out, err, mockedDB, mockedUtils);
+    IOUtils.closeQuietly(out, err, mockedDB, mockedUtils, mockedOptionsUtil);
   }
 
   private void setupMockDB(SnapshotInfo snapshotInfo,
