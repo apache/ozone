@@ -236,8 +236,8 @@ public final class KeyValueContainerUtil {
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
         kvContainerData);
     if (!dbFile.exists()) {
-      LOG.error("Container DB file is missing for ContainerID {}. " +
-          "Skipping loading of this container.", containerID);
+      LOG.error("Container DB file is missing at {} for ContainerID {}. " +
+          "Skipping loading of this container.", dbFile, containerID);
       // Don't further process this container, as it is missing db file.
       throw new IOException("Container DB file is missing for containerID "
           + containerID);
