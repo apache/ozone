@@ -17,54 +17,38 @@
 Documentation       Test container state on a UNHEALTHY, DELETED and INVALID container
 Resource            ../ozone-fi/BytemanKeywords.robot
 Resource            ozone-debug-keywords.robot
-Suite Setup         Write Test Keys
 
 *** Variables ***
-${VOLUME}               test-container-vol
-${BUCKET}               test-container-buck
-${TESTFILE}             test-container-key
+${PREFIX}               ${EMPTY}
+${DATANODE}             ${EMPTY}
+${FAULT_INJ_DATANODE}   ${EMPTY}
+${VOLUME}               cli-debug-volume${PREFIX}
+${BUCKET}               cli-debug-bucket
+${TESTFILE}             testfile
 ${CHECK_TYPE}           containerState
-${FAULT_INJ_DATANODE}   datanode1
-${FAULTY_DATANODE}      ozonesecure-ha-datanode1-1.ozonesecure-ha_ozone_net
 
 ${UNHEALTHY_RULE}       /opt/hadoop/share/ozone/byteman/unhealthy-container-state.btm
 ${DELETED_RULE}         /opt/hadoop/share/ozone/byteman/deleted-container-state.btm
 ${INVALID_RULE}         /opt/hadoop/share/ozone/byteman/invalid-container-state.btm
 
 *** Keywords ***
-Write Test Keys
-    Execute             ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME}
-    Execute             ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}
-    Execute             dd if=/dev/urandom of=/tmp/${TESTFILE} bs=100MB count=1
-    Execute             ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} /tmp/${TESTFILE}
+Verify Container State with Rule
+    [Arguments]          ${rule}   ${expected_state}
+    Add Byteman Rule     ${FAULT_INJ_DATANODE}    ${rule}
+    List Byteman Rules   ${FAULT_INJ_DATANODE}
+
+    ${output} =           Execute replicas verify container state debug tool
+    ${json} =             Parse replicas verify JSON output    ${output}
+    Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${DATANODE}  Replica state is ${expected_state}
+
+    Remove Byteman Rule  ${FAULT_INJ_DATANODE}    ${rule}
 
 *** Test Cases ***
 Verify Container State With Unhealthy Container Replica
-    Add Byteman Rule      ${FAULT_INJ_DATANODE}    ${UNHEALTHY_RULE}
-    List Byteman Rules    ${FAULT_INJ_DATANODE}
-
-    ${output} =           Execute replicas verify container state debug tool
-    ${json} =             Parse replicas verify JSON output    ${output}
-    Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${FAULTY_DATANODE}  Replica state is UNHEALTHY
-    
-    Remove Byteman Rule   ${FAULT_INJ_DATANODE}    ${UNHEALTHY_RULE}
+    Verify Container State with Rule      ${UNHEALTHY_RULE}   UNHEALTHY
 
 Verify Container State With Deleted Container Replica
-    Add Byteman Rule      ${FAULT_INJ_DATANODE}    ${DELETED_RULE}
-    List Byteman Rules    ${FAULT_INJ_DATANODE}
-
-    ${output} =           Execute replicas verify container state debug tool
-    ${json} =             Parse replicas verify JSON output    ${output}
-    Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${FAULTY_DATANODE}  Replica state is DELETED
-
-    Remove Byteman Rule   ${FAULT_INJ_DATANODE}    ${DELETED_RULE}
+    Verify Container State with Rule      ${DELETED_RULE}     DELETED
 
 Verify Container State With Invalid Container Replica
-    Add Byteman Rule      ${FAULT_INJ_DATANODE}    ${INVALID_RULE}
-    List Byteman Rules    ${FAULT_INJ_DATANODE}
-
-    ${output} =           Execute replicas verify container state debug tool
-    ${json} =             Parse replicas verify JSON output    ${output}
-    Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${FAULTY_DATANODE}  Replica state is INVALID
-
-    Remove Byteman Rule   ${FAULT_INJ_DATANODE}    ${INVALID_RULE}
+    Verify Container State with Rule      ${INVALID_RULE}     INVALID

@@ -44,8 +44,6 @@ execute_robot_test ${OM} kinit.robot
 
 execute_robot_test ${OM} debug/auditparser.robot
 
-execute_robot_test ${OM} debug/container-state-verifier.robot
-
 execute_robot_test ${SCM} kinit.robot
 
 source "$COMPOSE_DIR/../common/replicas-test.sh"
