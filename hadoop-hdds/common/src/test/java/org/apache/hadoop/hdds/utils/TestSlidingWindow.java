@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -50,10 +51,12 @@ class TestSlidingWindow {
     slidingWindow = new SlidingWindow(3, Duration.ofSeconds(5), testClock);
     for (int i = 0; i < slidingWindow.getWindowSize(); i++) {
       slidingWindow.add();
+      assertEquals(i + 1, slidingWindow.getNumEvents());
       assertFalse(slidingWindow.isFull());
     }
 
     slidingWindow.add();
+    assertEquals(slidingWindow.getWindowSize() + 1, slidingWindow.getNumEvents());
     assertTrue(slidingWindow.isFull());
   }
 
@@ -66,15 +69,18 @@ class TestSlidingWindow {
     slidingWindow.add();
     slidingWindow.add();
     slidingWindow.add();
+    assertEquals(3, slidingWindow.getNumEvents());
     assertTrue(slidingWindow.isFull());
 
     // Fast forward time to expire events
     testClock.fastForward(600);
 
+    assertEquals(0, slidingWindow.getNumEvents());
     assertFalse(slidingWindow.isFull());
 
     // Add one more event - should not be enough to mark as full
     slidingWindow.add();
+    assertEquals(1, slidingWindow.getNumEvents());
     assertFalse(slidingWindow.isFull());
   }
 
@@ -87,13 +93,16 @@ class TestSlidingWindow {
     slidingWindow.add();
     slidingWindow.add();
     slidingWindow.add();
+    assertEquals(4, slidingWindow.getNumEvents());
     assertTrue(slidingWindow.isFull());
 
     testClock.fastForward(600);
     slidingWindow.add(); // this will remove the oldest event as the window is full
+    assertEquals(4, slidingWindow.getNumEvents());
 
     // Fast forward time to expire the oldest events
     testClock.fastForward(500);
+    assertEquals(1, slidingWindow.getNumEvents());
     assertFalse(slidingWindow.isFull());
   }
 }

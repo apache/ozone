@@ -100,6 +100,19 @@ public class SlidingWindow {
     }
   }
 
+  /**
+   * Returns the current number of events that are tracked within the sliding window.
+   * This method ensures that expired events are removed before computing the count.
+   *
+   * @return the number of valid timestamps currently in the sliding window
+   */
+  public int getNumEvents() {
+    synchronized (lock) {
+      removeExpired();
+      return timestamps.size();
+    }
+  }
+
   private void removeExpired() {
     synchronized (lock) {
       long currentTime = getCurrentTime();
