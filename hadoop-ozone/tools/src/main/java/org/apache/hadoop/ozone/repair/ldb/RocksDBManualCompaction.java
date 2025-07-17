@@ -68,7 +68,7 @@ public class RocksDBManualCompaction extends RepairTool {
     // Preserve all the previous DB options
     OptionsUtil.loadLatestOptions(configOptions, dbPath, dbOptions, cfDescList);
 
-    try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
+    try (ManagedRocksDB db = ManagedRocksDB.open(dbOptions, dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle cfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
       if (cfh == null) {
         throw new IllegalArgumentException(columnFamilyName +

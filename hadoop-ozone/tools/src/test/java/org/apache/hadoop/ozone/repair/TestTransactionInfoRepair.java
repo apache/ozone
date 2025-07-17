@@ -43,6 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
@@ -111,7 +112,7 @@ public class TestTransactionInfoRepair {
     final String expectedColumnFamilyName = getColumnFamilyName(component);
     try (MockedStatic<ManagedRocksDB> mocked = mockStatic(ManagedRocksDB.class);
          MockedStatic<RocksDBUtils> mockUtil = mockStatic(RocksDBUtils.class)) {
-      mocked.when(() -> ManagedRocksDB.open(anyString(), anyList(), anyList())).thenReturn(mdb);
+      mocked.when(() -> ManagedRocksDB.open(any(DBOptions.class), anyString(), anyList(), anyList())).thenReturn(mdb);
       mockUtil.when(() -> RocksDBUtils.getColumnFamilyHandle(eq(expectedColumnFamilyName), anyList()))
           .thenReturn(columnFamilyHandle);
 

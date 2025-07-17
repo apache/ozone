@@ -85,16 +85,6 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     );
   }
 
-  public static ManagedRocksDB open(
-      final String path,
-      final List<ColumnFamilyDescriptor> columnFamilyDescriptors,
-      final List<ColumnFamilyHandle> columnFamilyHandles)
-      throws RocksDBException {
-    return new ManagedRocksDB(
-        RocksDB.open(path, columnFamilyDescriptors, columnFamilyHandles)
-    );
-  }
-
   /**
    * Delete liveMetaDataFile from rocks db using RocksDB#deleteFile Api.
    * This function makes the RocksDB#deleteFile Api synchronized by waiting

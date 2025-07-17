@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.repair.om;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -50,6 +51,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.DBOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
@@ -106,7 +108,7 @@ public class TestSnapshotChainRepair {
         .thenReturn(cfDescList);
 
     // Mock DB open
-    mockedDB.when(() -> ManagedRocksDB.open(eq(DB_PATH), eq(cfDescList), eq(new ArrayList<>())))
+    mockedDB.when(() -> ManagedRocksDB.open(any(DBOptions.class), eq(DB_PATH), eq(cfDescList), eq(new ArrayList<>())))
         .thenReturn(managedRocksDB);
 
     // Mock column family handle

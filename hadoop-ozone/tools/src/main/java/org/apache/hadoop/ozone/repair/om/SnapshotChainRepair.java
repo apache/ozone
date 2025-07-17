@@ -94,7 +94,7 @@ public class SnapshotChainRepair extends RepairTool {
     // Preserve all the previous DB options
     OptionsUtil.loadLatestOptions(configOptions, dbPath, dbOptions, cfDescList);
 
-    try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
+    try (ManagedRocksDB db = ManagedRocksDB.open(dbOptions, dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle snapshotInfoCfh = RocksDBUtils.getColumnFamilyHandle(SNAPSHOT_INFO_TABLE, cfHandleList);
       if (snapshotInfoCfh == null) {
         error("%s is not in a column family in DB for the given path.", SNAPSHOT_INFO_TABLE);
