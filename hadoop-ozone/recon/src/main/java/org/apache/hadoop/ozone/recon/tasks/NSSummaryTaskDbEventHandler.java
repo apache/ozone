@@ -74,6 +74,25 @@ public class NSSummaryTaskDbEventHandler {
     }
   }
 
+  protected boolean deleteNSSummariesFromDB(RDBBatchOperation deleteRdbBatchOperation) {
+    try {
+      reconNamespaceSummaryManager.commitBatchOperation(deleteRdbBatchOperation);
+    } catch (IOException e) {
+      LOG.error("Unable to delete Namespace Summary data from Recon DB.", e);
+      // If we fail to delete the NSSummary from the DB, we log the error and retry now
+      try {
+        LOG.info("Unable to delete Namespace Summary data from Recon DB in first try, retrying....");
+        reconNamespaceSummaryManager.commitBatchOperation(deleteRdbBatchOperation);
+      } catch (IOException ex) {
+        LOG.error("Unable to delete Namespace Summary data on retry as well from Recon DB.", ex);
+        return false;
+      }
+      return true;
+    }
+    LOG.debug("Successfully deleted Namespace Summary data from Recon DB.");
+    return true;
+  }
+
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
       NSSummary> nsSummaryMap) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
