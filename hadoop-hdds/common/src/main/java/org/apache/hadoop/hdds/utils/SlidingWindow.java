@@ -15,16 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.common.utils;
+package org.apache.hadoop.hdds.utils;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import org.apache.hadoop.util.Time;
+import java.util.concurrent.TimeUnit;
 
 /**
- * A time-based sliding window implementation that tracks event timestamps.
+ *
+ * A sliding window implementation that combines time-based expiry with a
+ * maximum size constraint. The window tracks event timestamps and maintains two
+ * limits:
+ * <ul>
+ * <li>Time-based: Events older than the specified expiry duration are
+ *     automatically removed
+ * <li>Size-based: The window maintains at most windowSize latest events, removing
+ *     older events when this limit is exceeded
+ * </ul>
+ *
+ * The window is considered full when the number of non-expired events exceeds
+ * the specified window size. Events are automatically pruned based on both
+ * their age and the maximum size constraint.
  */
 public class SlidingWindow {
   private final Object lock = new Object();
@@ -34,17 +47,17 @@ public class SlidingWindow {
   private final Clock clock;
 
   /**
-   * Default constructor that uses system clock.
+   * Default constructor that uses a monotonic clock.
    *
    * @param windowSize     the maximum number of events that are tracked
    * @param expiryDuration the duration after which an entry in the window expires
    */
   public SlidingWindow(int windowSize, Duration expiryDuration) {
-    this(windowSize, expiryDuration, new SystemClock());
+    this(windowSize, expiryDuration, new MonotonicClock());
   }
 
   /**
-   * Constructor with custom clock for testing.
+   * Constructor with a custom clock for testing.
    *
    * @param windowSize     the maximum number of events that are tracked
    * @param expiryDuration the duration after which an entry in the window expires
@@ -107,12 +120,14 @@ public class SlidingWindow {
   }
 
   /**
-   * Implementation of Clock that uses Time.monotonicNow() for real usage.
+   * A custom monotonic clock implementation.
+   * Implementation of Clock that uses System.nanoTime() for real usage.
+   * See {@see org.apache.ozone.test.TestClock}
    */
-  private static final class SystemClock extends Clock {
+  private static final class MonotonicClock extends Clock {
     @Override
     public long millis() {
-      return Time.monotonicNow();
+      return TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
     }
 
     @Override
@@ -127,7 +142,8 @@ public class SlidingWindow {
 
     @Override
     public Clock withZone(java.time.ZoneId zone) {
-      return this; // Ignore zone for monotonic clock
+      // Ignore zone for monotonic clock
+      throw new UnsupportedOperationException("Sliding Window class does not allow changing the timezone");
     }
   }
 }
