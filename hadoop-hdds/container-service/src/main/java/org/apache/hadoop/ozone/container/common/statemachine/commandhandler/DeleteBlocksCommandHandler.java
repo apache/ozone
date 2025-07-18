@@ -333,6 +333,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
         Thread.currentThread().interrupt();
         txResultBuilder.setContainerID(containerId).setSuccess(false);
+      } catch (Exception e) {
+        LOG.error("Unexpected exception while deleting blocks for " +
+                "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
       }
       return new DeleteBlockTransactionExecutionResult(
           txResultBuilder.build(), lockAcquisitionFailed);
