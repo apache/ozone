@@ -128,7 +128,9 @@ import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.HeadObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedHeadObjectRequest;
 import software.amazon.awssdk.transfer.s3.S3TransferManager;
 import software.amazon.awssdk.transfer.s3.model.DownloadFileRequest;
 import software.amazon.awssdk.transfer.s3.model.FileDownload;
@@ -503,6 +505,62 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
               }
             });
         assertEquals(content, bos.toString("UTF-8"));
+      }
+    }
+  }
+
+  @Test
+  public void testPresignedUrlHead() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName),
+        RequestBody.fromString(content));
+
+    try (S3Presigner presigner = S3Presigner.builder()
+        // TODO: Find a way to retrieve the path style configuration from S3Client instead
+        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+        .endpointOverride(s3Client.serviceClientConfiguration().endpointOverride().get())
+        .region(s3Client.serviceClientConfiguration().region())
+        .credentialsProvider(s3Client.serviceClientConfiguration().credentialsProvider()).build()) {
+
+      HeadObjectRequest objectRequest = HeadObjectRequest.builder()
+          .bucket(bucketName)
+          .key(keyName)
+          .build();
+
+      HeadObjectPresignRequest presignRequest = HeadObjectPresignRequest.builder()
+          .signatureDuration(Duration.ofMinutes(10))
+          .headObjectRequest(objectRequest)
+          .build();
+
+      PresignedHeadObjectRequest presignedRequest = presigner.presignHeadObject(presignRequest);
+
+      URL presignedUrl = presignedRequest.url();
+      HttpURLConnection connection = (HttpURLConnection) presignedUrl.openConnection();
+      connection.setRequestMethod("HEAD");
+
+      int responseCode = connection.getResponseCode();
+      assertEquals(200, responseCode, "HeadObject presigned URL should return 200 OK");
+
+      // Use the AWS SDK for Java SdkHttpClient class to test the HEAD request
+      SdkHttpRequest request = SdkHttpRequest.builder()
+          .method(SdkHttpMethod.HEAD)
+          .uri(presignedUrl.toURI())
+          .build();
+
+      HttpExecuteRequest executeRequest = HttpExecuteRequest.builder()
+          .request(request)
+          .build();
+
+      try (SdkHttpClient sdkHttpClient = ApacheHttpClient.create()) {
+        HttpExecuteResponse response = sdkHttpClient.prepareRequest(executeRequest).call();
+        assertEquals(200, response.httpResponse().statusCode(),
+            "HeadObject presigned URL should return 200 OK via SdkHttpClient");
       }
     }
   }
