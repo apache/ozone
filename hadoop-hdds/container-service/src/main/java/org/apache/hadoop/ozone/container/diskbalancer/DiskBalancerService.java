@@ -530,12 +530,10 @@ public class DiskBalancerService extends BackgroundService {
             .incrementUsedSpace(containerSize);
         destVolumeIncreased = true;
 
-        // Step 4: New Container state transition, C1-RECOVERING -> C1-CLOSED
-        newContainer.getContainerData().setState(
-            ContainerProtos.ContainerDataProto.State.CLOSED);
-        // The 'update' method persists the state change to the .container file.
-        newContainer.update(newContainer.getContainerData().getMetadata(),
-            true);
+        // The import process loaded the temporary RECOVERING state from disk.
+        // Now, restore the original state and persist it to the .container file.
+        newContainer.getContainerData().setState(containerData.getState());
+        newContainer.update(newContainer.getContainerData().getMetadata(), true);
 
         // Step 5: Update container for containerID and delete old container.
         Container oldContainer = ozoneContainer.getContainerSet()
@@ -546,7 +544,6 @@ public class DiskBalancerService extends BackgroundService {
           ozoneContainer.getContainerSet().updateContainer(newContainer);
 
           // Mark old container as DELETED and persist state.
-          // This ensures it can be cleaned up on restart if deletion fails.
           oldContainer.getContainerData().setState(
               ContainerProtos.ContainerDataProto.State.DELETED);
           oldContainer.update(oldContainer.getContainerData().getMetadata(),
