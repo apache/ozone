@@ -105,7 +105,7 @@ import org.slf4j.event.Level;
 public class TestOMRatisSnapshots {
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
-  private static final int SNAPSHOTS_TO_CREATE = 20;
+  private static final int SNAPSHOTS_TO_CREATE = 100;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -116,8 +116,8 @@ public class TestOMRatisSnapshots {
   private String volumeName;
   private String bucketName;
 
-  private static final long SNAPSHOT_THRESHOLD = 10;
-  private static final int LOG_PURGE_GAP = 10;
+  private static final long SNAPSHOT_THRESHOLD = 50;
+  private static final int LOG_PURGE_GAP = 50;
   // This test depends on direct RocksDB checks that are easier done with OBS
   // buckets.
   private static final BucketLayout TEST_BUCKET_LAYOUT =
@@ -209,11 +209,11 @@ public class TestOMRatisSnapshots {
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     List<Set<String>> sstSetList = new ArrayList<>();
-//    FaultInjector faultInjector =
-//        new SnapshotMaxSizeInjector(leaderOM,
-//            followerOM.getOmSnapshotProvider().getSnapshotDir(),
-//            sstSetList, tempDir);
-//    followerOM.getOmSnapshotProvider().setInjector(faultInjector);
+    FaultInjector faultInjector =
+        new SnapshotMaxSizeInjector(leaderOM,
+            followerOM.getOmSnapshotProvider().getSnapshotDir(),
+            sstSetList, tempDir);
+    followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Create some snapshots, each with new keys
     int keyIncrement = 10;
@@ -247,7 +247,7 @@ public class TestOMRatisSnapshots {
     GenericTestUtils.waitFor(() -> {
       long index = followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
       return index >= leaderOMSnapshotIndex - 1;
-    }, 100, 60_000);
+    }, 100, 30_000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -305,7 +305,7 @@ public class TestOMRatisSnapshots {
       sstFileUnion.addAll(sstFiles);
     }
     // Confirm that there were multiple tarballs.
-//    assertThat(sstSetList.size()).isGreaterThan(1);
+    assertThat(sstSetList.size()).isGreaterThan(1);
     // Confirm that there was no overlap of sst files
     // between the individual tarballs.
     assertEquals(sstFileUnion.size(), sstFileCount);
