@@ -108,14 +108,16 @@ public abstract class RDBSnapshotProvider implements Closeable {
     LOG.info("Prepare to download the snapshot from leader OM {} and " +
         "reloading state from the snapshot.", leaderNodeID);
     checkLeaderConsistency(leaderNodeID);
+    int numParts = 0;
 
     while (true) {
       String snapshotFileName = getSnapshotFileName(leaderNodeID);
       File targetFile = new File(snapshotDir, snapshotFileName);
       downloadSnapshot(leaderNodeID, targetFile);
       LOG.info(
-          "Successfully download the latest snapshot {} from leader OM: {}",
-          targetFile, leaderNodeID);
+          "Successfully download the latest snapshot {} from leader OM: {}, part : {}" ,
+          targetFile, leaderNodeID, numParts);
+      numParts++;
 
       numDownloaded.incrementAndGet();
       injectPause();

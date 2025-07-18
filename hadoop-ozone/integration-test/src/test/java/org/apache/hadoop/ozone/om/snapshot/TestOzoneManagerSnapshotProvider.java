@@ -124,6 +124,8 @@ public class TestOzoneManagerSnapshotProvider {
   private long getDownloadedSnapshotIndex(DBCheckpoint dbCheckpoint)
       throws Exception {
 
+    OmSnapshotUtils.createHardLinks(dbCheckpoint.getCheckpointLocation(),true);
+
     TransactionInfo trxnInfoFromCheckpoint =
         OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf,
             dbCheckpoint.getCheckpointLocation());
