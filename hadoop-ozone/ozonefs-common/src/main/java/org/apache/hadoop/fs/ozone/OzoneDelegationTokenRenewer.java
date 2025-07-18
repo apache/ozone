@@ -61,6 +61,9 @@ public class OzoneDelegationTokenRenewer extends TokenRenewer {
         (Token<OzoneTokenIdentifier>) token;
     OzoneConfiguration ozoneConf = OzoneConfiguration.of(conf);
     try (OzoneClient ozoneClient = getOzoneClient(ozoneConf, ozoneDt)) {
+      if (ozoneClient == null) {
+        throw new IOException("OzoneClient is null. Cannot renew delegation token.");
+      }
       return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
     }
   }
@@ -72,6 +75,9 @@ public class OzoneDelegationTokenRenewer extends TokenRenewer {
         (Token<OzoneTokenIdentifier>) token;
     OzoneConfiguration ozoneConf = OzoneConfiguration.of(conf);
     try (OzoneClient ozoneClient = getOzoneClient(ozoneConf, ozoneDt)) {
+      if (ozoneClient == null) {
+        throw new IOException("OzoneClient is null. Cannot cancel delegation token.");
+      }
       ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
     }
   }
