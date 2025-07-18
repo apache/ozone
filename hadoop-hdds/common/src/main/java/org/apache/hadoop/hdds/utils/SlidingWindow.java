@@ -64,7 +64,7 @@ public class SlidingWindow {
    * @param clock          the clock to use for time measurements
    */
   public SlidingWindow(int windowSize, Duration expiryDuration, Clock clock) {
-    if (windowSize <= 0) {
+    if (windowSize < 0) {
       throw new IllegalArgumentException("Window size must be greater than 0");
     }
     if (expiryDuration.isNegative() || expiryDuration.isZero()) {
@@ -79,7 +79,7 @@ public class SlidingWindow {
 
   public void add() {
     synchronized (lock) {
-      if (isFull()) {
+      if (isExceeded()) {
         timestamps.remove();
       }
 
@@ -93,7 +93,7 @@ public class SlidingWindow {
    * @return true if the number of tracked timestamps in the sliding window
    *         exceeds the specified window size, false otherwise.
    */
-  public boolean isFull() {
+  public boolean isExceeded() {
     synchronized (lock) {
       removeExpired();
       return timestamps.size() > windowSize;

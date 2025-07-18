@@ -37,7 +37,6 @@ class TestSlidingWindow {
   @Test
   void testConstructorValidation() {
     // Test invalid window size
-    assertThrows(IllegalArgumentException.class, () -> new SlidingWindow(0, Duration.ofMillis(100)));
     assertThrows(IllegalArgumentException.class, () -> new SlidingWindow(-1, Duration.ofMillis(100)));
 
     // Test invalid expiry duration
@@ -52,12 +51,12 @@ class TestSlidingWindow {
     for (int i = 0; i < slidingWindow.getWindowSize(); i++) {
       slidingWindow.add();
       assertEquals(i + 1, slidingWindow.getNumEvents());
-      assertFalse(slidingWindow.isFull());
+      assertFalse(slidingWindow.isExceeded());
     }
 
     slidingWindow.add();
     assertEquals(slidingWindow.getWindowSize() + 1, slidingWindow.getNumEvents());
-    assertTrue(slidingWindow.isFull());
+    assertTrue(slidingWindow.isExceeded());
   }
 
   @Test
@@ -70,18 +69,18 @@ class TestSlidingWindow {
     slidingWindow.add();
     slidingWindow.add();
     assertEquals(3, slidingWindow.getNumEvents());
-    assertTrue(slidingWindow.isFull());
+    assertTrue(slidingWindow.isExceeded());
 
     // Fast forward time to expire events
     testClock.fastForward(600);
 
     assertEquals(0, slidingWindow.getNumEvents());
-    assertFalse(slidingWindow.isFull());
+    assertFalse(slidingWindow.isExceeded());
 
     // Add one more event - should not be enough to mark as full
     slidingWindow.add();
     assertEquals(1, slidingWindow.getNumEvents());
-    assertFalse(slidingWindow.isFull());
+    assertFalse(slidingWindow.isExceeded());
   }
 
   @Test
@@ -94,7 +93,7 @@ class TestSlidingWindow {
     slidingWindow.add();
     slidingWindow.add();
     assertEquals(4, slidingWindow.getNumEvents());
-    assertTrue(slidingWindow.isFull());
+    assertTrue(slidingWindow.isExceeded());
 
     testClock.fastForward(600);
     slidingWindow.add(); // this will remove the oldest event as the window is full
@@ -103,6 +102,39 @@ class TestSlidingWindow {
     // Fast forward time to expire the oldest events
     testClock.fastForward(500);
     assertEquals(1, slidingWindow.getNumEvents());
-    assertFalse(slidingWindow.isFull());
+    assertFalse(slidingWindow.isExceeded());
+  }
+
+  @Test
+  void testZeroWindowSize() {
+    testClock = TestClock.newInstance();
+    slidingWindow = new SlidingWindow(0, Duration.ofSeconds(5), testClock);
+    
+    // Verify initial state
+    assertEquals(0, slidingWindow.getWindowSize());
+    assertEquals(0, slidingWindow.getNumEvents());
+    assertFalse(slidingWindow.isExceeded());
+    
+    // Add an event - with window size 0, any event should cause isExceeded to return true
+    slidingWindow.add();
+    assertEquals(1, slidingWindow.getNumEvents());
+    assertTrue(slidingWindow.isExceeded());
+    
+    // Add another event - should replace the previous one as window is exceeded
+    slidingWindow.add();
+    assertEquals(1, slidingWindow.getNumEvents());
+    assertTrue(slidingWindow.isExceeded());
+    
+    // Test expiration
+    testClock.fastForward(6000); // Move past expiry time
+    assertEquals(0, slidingWindow.getNumEvents());
+    assertFalse(slidingWindow.isExceeded());
+    
+    // Add multiple events in sequence - should always keep only the latest one
+    for (int i = 0; i < 5; i++) {
+      slidingWindow.add();
+      assertEquals(1, slidingWindow.getNumEvents());
+      assertTrue(slidingWindow.isExceeded());
+    }
   }
 }
