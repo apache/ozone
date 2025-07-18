@@ -50,7 +50,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
-import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
 import org.rocksdb.OptionsUtil;
@@ -103,10 +102,6 @@ public class TestSnapshotChainRepair {
     columnFamilyHandle = mock(ColumnFamilyHandle.class);
 
     when(managedRocksDB.get()).thenReturn(rocksDB);
-
-    // Mock column family descriptors
-    List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
-    cfDescList.add(new ColumnFamilyDescriptor(new byte[] {1}));
 
     // Mock DB open
     mockedDB.when(() -> ManagedRocksDB.openWithLatestOptions(any(ManagedConfigOptions.class),
