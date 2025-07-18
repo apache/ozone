@@ -159,7 +159,7 @@ public class TestReplicationManager {
 
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(clock);
+        new ContainerReplicaPendingOps(clock, configuration);
 
     when(containerManager
         .getContainerReplicas(any(ContainerID.class))).thenAnswer(
@@ -226,7 +226,7 @@ public class TestReplicationManager {
   @Test
   public void testPendingOpsClearedWhenStarting() {
     containerReplicaPendingOps.scheduleAddReplica(ContainerID.valueOf(1),
-        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE);
+        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE, 5L, clock.millis());
     containerReplicaPendingOps.scheduleDeleteReplica(ContainerID.valueOf(2),
         MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE);
     assertEquals(1, containerReplicaPendingOps
@@ -618,7 +618,7 @@ public class TestReplicationManager {
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     containerReplicaPendingOps.scheduleAddReplica(container.containerID(),
         MockDatanodeDetails.randomDatanodeDetails(), 5, null,
-        clock.millis() + 10000);
+        clock.millis() + 10000, 5L, clock.millis());
 
     replicationManager.processContainer(
         container, repQueue, repReport);

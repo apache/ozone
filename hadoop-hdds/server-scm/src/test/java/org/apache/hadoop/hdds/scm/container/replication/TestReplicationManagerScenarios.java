@@ -184,7 +184,7 @@ public class TestReplicationManagerScenarios {
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock, configuration);
 
     when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(
         invocation -> {
@@ -250,7 +250,7 @@ public class TestReplicationManagerScenarios {
     for (PendingReplica r : scenario.getPendingReplicas()) {
       if (r.getType() == ContainerReplicaOp.PendingOpType.ADD) {
         containerReplicaPendingOps.scheduleAddReplica(container.containerID(), r.getDatanodeDetails(),
-            r.getReplicaIndex(), null, Long.MAX_VALUE);
+            r.getReplicaIndex(), null, Long.MAX_VALUE, 5L, clock.millis());
       } else if (r.getType() == ContainerReplicaOp.PendingOpType.DELETE) {
         containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(), r.getDatanodeDetails(),
             r.getReplicaIndex(), null, Long.MAX_VALUE);
