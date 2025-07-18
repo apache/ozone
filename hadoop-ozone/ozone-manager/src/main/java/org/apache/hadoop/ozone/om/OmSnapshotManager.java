@@ -217,6 +217,9 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES,
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
     );
+    Preconditions.checkArgument(this.maxOpenSstFilesInSnapshotDb > 0,
+        OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES + " must be positive.");
+
     ColumnFamilyHandle snapDiffJobCf;
     ColumnFamilyHandle snapDiffReportCf;
     ColumnFamilyHandle snapDiffPurgedJobCf;

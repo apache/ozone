@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -42,6 +43,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +52,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.LiveFileMetaData;
 import picocli.CommandLine;
 
 /**
@@ -63,16 +67,11 @@ public class TestLdbRepair {
   private Path tempDir;
   private Path dbPath;
   private RDBStore rdbStore;
-  private ManagedDBOptions options;
 
   @BeforeEach
   public void setUp() throws Exception {
     CodecBuffer.enableLeakDetection();
-
     dbPath = tempDir.resolve("test.db");
-    options = new ManagedDBOptions();
-    options.setCreateIfMissing(true)
-        .setCreateMissingColumnFamilies(true);
     rdbStore = DBStoreBuilder.newBuilder(new OzoneConfiguration())
         .setName(dbPath.toFile().getName())
         .setPath(dbPath.getParent())
@@ -85,16 +84,18 @@ public class TestLdbRepair {
     if (rdbStore != null && !rdbStore.isClosed()) {
       rdbStore.close();
     }
-    if (options != null) {
-      options.close();
-    }
     CodecBuffer.assertNoLeaks();
   }
 
   /**
    * Test manual compaction of RocksDB.
-   * This test creates a large number of keys, deletes them, and then triggers compaction.
-   * The sizes after each step is compared to ensure that compaction reduces the size of the database.
+   * This test creates a large number of keys, deletes them (creating tombstones),
+   * and then runs manual compaction via the CLI tool.
+   * It verifies the following:
+   *    Compaction command executes successfully.
+   *    Tombstones are removed (i.e., numDeletions in SST files is 0).
+   *    Size of the db reduces after compaction.
+   *    The RocksDB options remain unchanged after the compaction.
    */
   @Test
   public void testRocksDBManualCompaction() throws Exception {
@@ -107,7 +108,7 @@ public class TestLdbRepair {
       testTable.put(key.getBytes(StandardCharsets.UTF_8), value.getBytes(StandardCharsets.UTF_8));
     }
     rdbStore.flushDB();
-    long size1 = calculateSstFileSize(dbPath);
+    long sizeAfterKeysCreate = calculateSstFileSize(dbPath);
 
     // Delete all keys
     for (int i = 0; i < NUM_KEYS; i++) {
@@ -115,7 +116,7 @@ public class TestLdbRepair {
       testTable.delete(key.getBytes(StandardCharsets.UTF_8));
     }
     rdbStore.flushDB();
-    long size2 = calculateSstFileSize(dbPath);
+    long sizeAfterKeysDelete = calculateSstFileSize(dbPath);
     rdbStore.close();
 
     DatabaseOptions optionsBeforeCompaction = readDatabaseOptions();
@@ -130,19 +131,30 @@ public class TestLdbRepair {
     int exitCode = withTextFromSystemIn("y")
         .execute(() -> cmd.execute(args));
     assertEquals(0, exitCode, "Compaction command should execute successfully");
-    long size3 = calculateSstFileSize(dbPath);
+    long sizeAfterCompaction = calculateSstFileSize(dbPath);
 
-    System.out.println("Size after adding keys (size1): " + size1);
-    System.out.println("Size after deleting keys (size2): " + size2);
-    System.out.println("Size after compaction (size3): " + size3);
+    System.out.printf("Size after creating keys: %d, after deleting keys: %d, after compaction: %d %n",
+        sizeAfterKeysCreate, sizeAfterKeysDelete, sizeAfterCompaction);
 
-    // size1 < size2 as deletes increase size due to tombstones
-    assertTrue(size1 < size2,
-        String.format("Expected size1 (%d) < size2 (%d), but size1 >= size2", size1, size2));
-
-    // size3 < size1 as compaction should reduce size below original
-    assertTrue(size3 < size1,
-        String.format("Expected size3 (%d) < size1 (%d), but size3 >= size1", size3, size1));
+    // Deletes should increase the size due to tombstones
+    assertTrue(sizeAfterKeysCreate < sizeAfterKeysDelete,
+        String.format("sizeAfterKeysCreate (%d) is not lesser than sizeAfterKeysDelete (%d), ",
+            sizeAfterKeysCreate, sizeAfterKeysDelete));
+    // Compaction should reduce the size below original
+    assertTrue(sizeAfterCompaction < sizeAfterKeysCreate,
+        String.format("sizeAfterCompaction (%d) is not lesser than sizeAfterKeysCreate (%d), ",
+            sizeAfterCompaction, sizeAfterKeysCreate));
+    // check all tombstones were removed
+    List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+    List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath.toString());
+    try (ManagedRocksDB db = ManagedRocksDB.open(dbPath.toString(), cfDescList, cfHandleList)) {
+      List<LiveFileMetaData> liveFileMetaDataList = RdbUtil
+          .getLiveSSTFilesForCFs(db, Collections.singletonList(TEST_CF_NAME));
+      for (LiveFileMetaData liveMetadata : liveFileMetaDataList) {
+        assertEquals(0, liveMetadata.numDeletions(),
+            "Tombstones found in file: " + liveMetadata.fileName());
+      }
+    }
 
     DatabaseOptions optionsAfterCompaction = readDatabaseOptions();
 
@@ -151,7 +163,7 @@ public class TestLdbRepair {
 
   private long calculateSstFileSize(Path db) throws IOException {
     if (!Files.exists(db)) {
-      return 0;
+      throw new IllegalStateException("DB path doesn't exist: " + db);
     }
 
     try (Stream<Path> paths = Files.walk(db)) {
@@ -162,7 +174,7 @@ public class TestLdbRepair {
             try {
               return Files.size(path);
             } catch (IOException e) {
-              return 0;
+              throw new IllegalStateException(e);
             }
           })
           .sum();

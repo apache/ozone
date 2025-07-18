@@ -2184,6 +2184,20 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.ratis.server.pending.write.byte-limit</name>
+    <value>64MB</value>
+    <tag>OZONE, DEBUG, OM, RATIS</tag>
+    <description>Maximum byte size of all pending write requests.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.server.pending.write.element-limit</name>
+    <value>4096</value>
+    <tag>OZONE, DEBUG, OM, RATIS</tag>
+    <description>Maximum number of pending write requests.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.ratis.log.purge.gap</name>
     <value>1000000</value>
     <tag>OZONE, OM, RATIS</tag>
