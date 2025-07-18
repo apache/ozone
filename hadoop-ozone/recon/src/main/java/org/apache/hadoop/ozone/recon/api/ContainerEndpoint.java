@@ -457,9 +457,12 @@ public class ContainerEndpoint {
    * {@link org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata}
    * for all unhealthy containers.
    * @param limit The limit of unhealthy containers to return.
-   * @param prevStartKey startKey of previous batch. If this value is given last N records before this container
-   *                     would be returned.
-   * @param prevLastKey lastKey of previous batch.
+   * @param maxContainerId Upper bound for container IDs to include (exclusive).
+   *                       When specified, returns containers with IDs less than this value
+   *                       in descending order. Use for backward pagination.
+   * @param minContainerId Lower bound for container IDs to include (exclusive).
+   *                       When maxContainerId is not specified, returns containers with IDs
+   *                       greater than this value in ascending order. Use for forward pagination.
    * @return {@link Response}
    */
   @GET
@@ -468,10 +471,10 @@ public class ContainerEndpoint {
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
-      @QueryParam(RECON_QUERY_MAX_CONTAINER_ID) long prevStartKey,
+      @QueryParam(RECON_QUERY_MAX_CONTAINER_ID) long maxContainerId,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
-      @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long prevLastKey) {
-    return getUnhealthyContainers(null, limit, prevStartKey, prevLastKey);
+      @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
+    return getUnhealthyContainers(null, limit, maxContainerId, minContainerId);
   }
 
   /**
