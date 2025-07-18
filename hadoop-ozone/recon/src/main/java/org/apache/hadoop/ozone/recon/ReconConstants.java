@@ -50,8 +50,8 @@ public final class ReconConstants {
   public static final String RECON_QUERY_BATCH_PARAM = "batchNum";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String RECON_QUERY_START_PREFIX = "startPrefix";
-  public static final String RECON_QUERY_PREV_START_KEY = "prevStartKey";
-  public static final String RECON_QUERY_PREV_LAST_KEY = "prevLastKey";
+  public static final String RECON_QUERY_MAX_CONTAINER_ID = "maxContainerId";
+  public static final String RECON_QUERY_MIN_CONTAINER_ID = "minContainerId";
   public static final String RECON_OPEN_KEY_INCLUDE_NON_FSO = "includeNonFso";
   public static final String RECON_OPEN_KEY_INCLUDE_FSO = "includeFso";
   public static final String RECON_OM_INSIGHTS_DEFAULT_START_PREFIX = "/";

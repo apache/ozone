@@ -50,14 +50,16 @@ public class UnhealthyContainersResponse {
   private long misReplicatedCount = 0;
 
   /**
-   * .
+   * The smallest container ID in the current response batch.
+   * Used for pagination to determine the lower bound for the next page.
    */
   @JsonProperty("firstKey")
   private long firstKey = 0;
 
 
   /**
-   * Total count of mis-replicated containers.
+   * The largest container ID in the current response batch.
+   * Used for pagination to determine the upper bound for the next page.
    */
   @JsonProperty("lastKey")
   private long lastKey = 0;
