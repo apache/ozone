@@ -39,10 +39,10 @@ public class StorageVolumeScannerMetrics {
   @Metric("number of iterations the volume scanner has completed since the last restart")
   private MutableCounterLong numScanIterations;
 
-  @Metric("number of data volumes scanned since the last restart")
+  @Metric("number of data volume scans since the last restart")
   private MutableCounterLong numDataVolumeScans;
 
-  @Metric("number of metadata volumes scanned since the last restart")
+  @Metric("number of metadata volume scans since the last restart")
   private MutableCounterLong numMetadataVolumeScans;
 
   @Metric("number of volume scanner iterations skipped because the minimum gap " +
