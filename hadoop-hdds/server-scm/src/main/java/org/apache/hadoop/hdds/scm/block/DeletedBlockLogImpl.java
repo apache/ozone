@@ -338,10 +338,10 @@ public class DeletedBlockLogImpl
   }
 
   private void getTransaction(DeletedBlocksTransaction tx,
-                    DatanodeDeletedBlockTransactions transactions,
-                    Set<ContainerReplica> replicas,
-                    Map<DatanodeID, Map<Long, CmdStatus>> commandStatus,
-                    int maxDeleteBlocksPerDatanode) {
+      DatanodeDeletedBlockTransactions transactions,
+      Set<ContainerReplica> replicas,
+      Map<DatanodeID, Map<Long, CmdStatus>> commandStatus,
+      int maxDeleteBlocksPerDatanode) {
     // Check if all replicas satisfy the maxBlocksPerDatanode condition
     if (!replicas.stream().allMatch(replica -> {
       final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
