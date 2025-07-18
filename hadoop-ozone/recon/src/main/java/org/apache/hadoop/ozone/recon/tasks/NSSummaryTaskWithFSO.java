@@ -118,10 +118,10 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           return new ImmutablePair<>(seekPos, false);
         }
         if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-          deleteNSSummariesFromDB(deleteRdbBatchOperation);
           if (!flushAndCommitNSToDB(nsSummaryMap)) {
             return new ImmutablePair<>(seekPos, false);
           }
+          deleteNSSummariesFromDB(deleteRdbBatchOperation);
           seekPos = eventCounter + 1;
         }
       }
