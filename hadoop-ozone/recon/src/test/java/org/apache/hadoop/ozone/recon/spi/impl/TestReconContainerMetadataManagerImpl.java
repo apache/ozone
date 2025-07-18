@@ -94,11 +94,15 @@ public class TestReconContainerMetadataManagerImpl {
         .batchStoreContainerKeyMapping(rdbBatchOperation, containerKeyPrefix2,
         2);
 
+    reconContainerMetadataManager.storeContainerKeyCount(containerId1, 2L);
+
     ContainerKeyPrefix containerKeyPrefix3 = ContainerKeyPrefix.get(
         containerId2, keyPrefix3, 0);
     reconContainerMetadataManager
         .batchStoreContainerKeyMapping(rdbBatchOperation, containerKeyPrefix3,
-        3);
+            3);
+
+    reconContainerMetadataManager.storeContainerKeyCount(containerId2, 1L);
 
     reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
   }

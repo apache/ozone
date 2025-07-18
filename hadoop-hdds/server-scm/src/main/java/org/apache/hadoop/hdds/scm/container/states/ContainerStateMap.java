@@ -17,11 +17,17 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -94,33 +100,67 @@ public class ContainerStateMap {
 
   /**
    * Two levels map.
-   * Outer container map: {@link ContainerID} -> {@link ContainerEntry} (info and replicas)
+   * Outer container map: {@link ContainerID} -> {@link Entry} (info and replicas)
    * Inner replica map: {@link DatanodeID} -> {@link ContainerReplica}
    */
   private static class ContainerMap {
-    private final NavigableMap<ContainerID, ContainerEntry> map = new TreeMap<>();
+
+    private final NavigableMap<ContainerID, Entry> map = new ConcurrentSkipListMap<>();
+
+    private static class Entry {
+      private final ContainerInfo info;
+      private final Map<DatanodeID, ContainerReplica> replicas = new HashMap<>();
+
+      Entry(ContainerInfo info) {
+        this.info = info;
+      }
+
+      ContainerInfo getInfo() {
+        return info;
+      }
+
+      Set<ContainerReplica> getReplicas() {
+        return new HashSet<>(replicas.values());
+      }
+
+      ContainerReplica put(ContainerReplica r) {
+        return replicas.put(r.getDatanodeDetails().getID(), r);
+      }
+
+      ContainerReplica removeReplica(DatanodeID datanodeID) {
+        return replicas.remove(datanodeID);
+      }
+    }
 
     boolean contains(ContainerID id) {
       return map.containsKey(id);
     }
 
     ContainerInfo getInfo(ContainerID id) {
-      final ContainerEntry entry = map.get(id);
+      final Entry entry = map.get(id);
       return entry == null ? null : entry.getInfo();
+    }
+
+    Iterator<ContainerInfo> getInfos(ContainerID start, Predicate<ContainerInfo> predicate) {
+      Objects.requireNonNull(start, "start == null");
+      return map.tailMap(start).values().stream()
+          .map(Entry::getInfo)
+          .filter(containerInfo -> predicate == null || predicate.test(containerInfo))
+          .iterator();
     }
 
     List<ContainerInfo> getInfos(ContainerID start, int count) {
       Objects.requireNonNull(start, "start == null");
       Preconditions.assertTrue(count >= 0, "count < 0");
       return map.tailMap(start).values().stream()
-          .map(ContainerEntry::getInfo)
+          .map(Entry::getInfo)
           .limit(count)
           .collect(Collectors.toList());
     }
 
     Set<ContainerReplica> getReplicas(ContainerID id) {
       Objects.requireNonNull(id, "id == null");
-      final ContainerEntry entry = map.get(id);
+      final Entry entry = map.get(id);
       return entry == null ? null : entry.getReplicas();
     }
 
@@ -135,27 +175,27 @@ public class ContainerStateMap {
       if (map.containsKey(id)) {
         return false; // already exist
       }
-      final ContainerEntry previous = map.put(id, new ContainerEntry(info));
+      final Entry previous = map.put(id, new Entry(info));
       Preconditions.assertNull(previous, "previous");
       return true;
     }
 
     ContainerReplica put(ContainerReplica replica) {
       Objects.requireNonNull(replica, "replica == null");
-      final ContainerEntry entry = map.get(replica.getContainerID());
+      final Entry entry = map.get(replica.getContainerID());
       return entry == null ? null : entry.put(replica);
     }
 
     ContainerInfo remove(ContainerID id) {
       Objects.requireNonNull(id, "id == null");
-      final ContainerEntry removed = map.remove(id);
+      final Entry removed = map.remove(id);
       return removed == null ? null : removed.getInfo();
     }
 
     ContainerReplica removeReplica(ContainerID containerID, DatanodeID datanodeID) {
       Objects.requireNonNull(containerID, "containerID == null");
       Objects.requireNonNull(datanodeID, "datanodeID == null");
-      final ContainerEntry entry = map.get(containerID);
+      final Entry entry = map.get(containerID);
       return entry == null ? null : entry.removeReplica(datanodeID);
     }
   }
@@ -164,6 +204,11 @@ public class ContainerStateMap {
    * Create a ContainerStateMap.
    */
   public ContainerStateMap() {
+  }
+
+  @VisibleForTesting
+  public static Logger getLogger() {
+    return LOG;
   }
 
   /**
@@ -247,7 +292,7 @@ public class ContainerStateMap {
    * @throws SCMException - in case of failure.
    */
   public void updateState(ContainerID containerID, LifeCycleState currentState,
-      LifeCycleState newState) throws SCMException {
+                          LifeCycleState newState) throws SCMException {
     if (currentState == newState) { // state not changed
       return;
     }
@@ -264,6 +309,10 @@ public class ContainerStateMap {
     return containerMap.getInfos(start, count);
   }
 
+  public Iterator<ContainerInfo> getContainerInfoIterator(ContainerID start, Predicate<ContainerInfo> predicate) {
+    return containerMap.getInfos(start, predicate);
+  }
+
   /**
    *
    * @param state the state of the {@link ContainerInfo}s
@@ -276,6 +325,17 @@ public class ContainerStateMap {
     return lifeCycleStateMap.tailMap(state, start).values().stream()
         .limit(count)
         .collect(Collectors.toList());
+  }
+
+  /**
+   *
+   * @param state the state of the {@link ContainerInfo}s
+   * @param start the start id
+   *
+   * @return an iterator of {@link ContainerInfo}s sorted by {@link ContainerID}
+   */
+  public Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID start) {
+    return lifeCycleStateMap.tailMap(state, start).values().stream().iterator();
   }
 
   public List<ContainerInfo> getContainerInfos(LifeCycleState state) {

@@ -255,4 +255,28 @@ public interface ReconContainerMetadataManager {
    */
   Map<KeyPrefixContainer, Integer> getContainerForKeyPrefixes(
       String prevKeyPrefix, long keyVersion) throws IOException;
+
+  /**
+   * Delete a specific record from the containerKeyTable.
+   *
+   * @param containerKeyPrefix The key of the record to be deleted.
+   * @throws IOException If an error occurs during deletion.
+   */
+  void deleteContainerKeyRecord(ContainerKeyPrefix containerKeyPrefix) throws IOException;
+
+  /**
+   * Delete a specific record from the keyContainerTable.
+   *
+   * @param keyPrefixContainer The key of the record to be deleted.
+   * @throws IOException If an error occurs during deletion.
+   */
+  void deleteKeyContainerRecord(KeyPrefixContainer keyPrefixContainer) throws IOException;
+
+  /**
+   * Delete a specific record from the containerKeyCountTable.
+   *
+   * @param containerID The key of the record to be deleted.
+   * @throws IOException If an error occurs during deletion.
+   */
+  void deleteContainerKeyCountRecord(Long containerID) throws IOException;
 }
