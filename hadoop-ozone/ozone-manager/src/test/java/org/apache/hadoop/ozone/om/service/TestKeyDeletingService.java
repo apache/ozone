@@ -788,7 +788,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
     @Test
     @DisplayName("Should not update keys when purge request times out during key deletion")
-    public void testFailingModifiedKeyPurge() throws IOException {
+    public void testFailingModifiedKeyPurge() throws IOException, InterruptedException {
 
       try (MockedStatic<OzoneManagerRatisUtils> mocked =  mockStatic(OzoneManagerRatisUtils.class,
           CALLS_REAL_METHODS)) {
