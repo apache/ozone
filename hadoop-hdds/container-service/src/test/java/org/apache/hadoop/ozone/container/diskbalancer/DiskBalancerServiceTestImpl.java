@@ -96,7 +96,9 @@ public class DiskBalancerServiceTestImpl extends DiskBalancerService {
 
   @Override
   public void shutdown() {
-    testingThread.interrupt();
+    if (testingThread != null) {
+      testingThread.interrupt();
+    }
     super.shutdown();
   }
 }
