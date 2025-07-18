@@ -120,7 +120,6 @@ public class TestLdbRepair {
     rdbStore.close();
 
     DatabaseOptions optionsBeforeCompaction = readDatabaseOptions();
-    // FIXME: After this a new RocksDB OPTIONS was created
     // Trigger compaction of the table
     RocksDBManualCompaction compactionTool = new RocksDBManualCompaction();
     CommandLine cmd = new CommandLine(compactionTool);
@@ -147,7 +146,7 @@ public class TestLdbRepair {
     // check all tombstones were removed
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath.toString());
-    try (ManagedRocksDB db = ManagedRocksDB.open(dbPath.toString(), cfDescList, cfHandleList)) {
+    try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath.toString(), cfDescList, cfHandleList)) {
       List<LiveFileMetaData> liveFileMetaDataList = RdbUtil
           .getLiveSSTFilesForCFs(db, Collections.singletonList(TEST_CF_NAME));
       for (LiveFileMetaData liveMetadata : liveFileMetaDataList) {
@@ -157,7 +156,6 @@ public class TestLdbRepair {
     }
 
     DatabaseOptions optionsAfterCompaction = readDatabaseOptions();
-
     optionsBeforeCompaction.assertEqualOptions(optionsAfterCompaction);
   }
 
