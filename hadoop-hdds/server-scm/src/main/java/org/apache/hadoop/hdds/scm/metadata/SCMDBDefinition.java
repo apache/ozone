@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.ByteStringCodec;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -74,6 +75,13 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
           "containers",
           ContainerID.getCodec(),
           ContainerInfo.getCodec());
+
+  public static final DBColumnFamilyDefinition<Long, FlushedTransactionInfo>
+      FLUSHEDTRANSACTIONS =
+      new DBColumnFamilyDefinition<>(
+          "scmFlushedTransactions",
+          LongCodec.get(),
+          FlushedTransactionInfo.getCodec());
 
   public static final DBColumnFamilyDefinition<String, TransactionInfo>
       TRANSACTIONINFO =
@@ -123,6 +131,7 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
           PIPELINES,
           SEQUENCE_ID,
           STATEFUL_SERVICE_CONFIG,
+          FLUSHEDTRANSACTIONS,
           TRANSACTIONINFO,
           VALID_CERTS,
           VALID_SCM_CERTS);

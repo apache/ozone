@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.codec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -191,6 +192,11 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           StringCodec.get(),
           TransactionInfo.getCodec());
 
+  /** flushedTransactionTable: TransactionIndex :- TermIndex. */
+  public static final String FLUSHED_TRANSACTIONS = "flushedTransactionsTable";
+  public static final DBColumnFamilyDefinition<Long, FlushedTransactionInfo> FLUSHED_TRANSACTIONS_DEF =
+      new DBColumnFamilyDefinition<>(FLUSHED_TRANSACTIONS, LongCodec.get(), FlushedTransactionInfo.getCodec());
+
   public static final String META_TABLE = "metaTable";
   /** metaTable: metaDataKey :- metaDataValue. */
   public static final DBColumnFamilyDefinition<String, String> META_TABLE_DEF
@@ -339,7 +345,8 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           TENANT_STATE_TABLE_DEF,
           TRANSACTION_INFO_TABLE_DEF,
           USER_TABLE_DEF,
-          VOLUME_TABLE_DEF);
+          VOLUME_TABLE_DEF,
+          FLUSHED_TRANSACTIONS_DEF);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 
