@@ -131,9 +131,9 @@ public final class ContainerScanHelper {
     boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
     if (containerMarkedUnhealthy) {
       metrics.incNumUnHealthyContainers();
+      // triggering a volume scan for the unhealthy container
+      triggerVolumeScan(containerData);
     }
-    // triggering a volume scan for the unhealthy container
-    triggerVolumeScan(containerData);
   }
 
   public void triggerVolumeScan(ContainerData containerData) {

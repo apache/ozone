@@ -28,12 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -198,30 +196,11 @@ public abstract class TestContainerScannersAbstract {
     when(controller.getContainers()).thenReturn(this.containers);
   }
 
-  /**
-   * Replace scanHelper with a spy to perform verifications.
-   */
-  protected ContainerScanHelper replaceScanHelperWithSpy(Object scanner, boolean isData)
-      throws NoSuchFieldException, IllegalAccessException {
-    Field field;
-    if (isData) {
-      field = BackgroundContainerDataScanner.class.getDeclaredField("scanHelper");
-    } else {
-      field = BackgroundContainerMetadataScanner.class.getDeclaredField("scanHelper");
-    }
-    field.setAccessible(true);
-    ContainerScanHelper originalScanHelper = (ContainerScanHelper) field.get(scanner);
-    ContainerScanHelper spyScanHelper = spy(originalScanHelper);
-    field.set(scanner, spyScanHelper);
-    return spyScanHelper;
-  }
-
   private ContainerController mockContainerController() {
     DataScanResult healthyData = getHealthyDataScanResult();
     DataScanResult unhealthyData = getUnhealthyDataScanResult();
     MetadataScanResult healthyMetadata = getHealthyMetadataScanResult();
     MetadataScanResult unhealthyMetadata = getUnhealthyMetadataScanResult();
-
 
     File volLocation = mock(File.class);
     when(volLocation.getPath()).thenReturn("/temp/volume-testcontainerscanner");

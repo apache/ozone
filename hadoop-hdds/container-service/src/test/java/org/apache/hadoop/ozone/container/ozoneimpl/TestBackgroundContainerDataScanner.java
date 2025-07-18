@@ -32,6 +32,7 @@ import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -48,9 +49,12 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
@@ -136,10 +140,12 @@ public class TestBackgroundContainerDataScanner extends
   @Test
   @Override
   public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
-    ContainerScanHelper spyScanHelper = replaceScanHelperWithSpy(scanner, true);
-    scanner.runIteration();
-    verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
-    verify(spyScanHelper, atLeastOnce()).triggerVolumeScan(corruptData.getContainerData());
+    when(controller.markContainerUnhealthy(anyLong(), any(ScanResult.class))).thenReturn(true);
+    try (MockedStatic<StorageVolumeUtil> mockedStatic = mockStatic(StorageVolumeUtil.class)) {
+      scanner.runIteration();
+      verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
+      mockedStatic.verify(() -> StorageVolumeUtil.onFailure(corruptData.getContainerData().getVolume()), times(1));
+    }
   }
 
   @Test

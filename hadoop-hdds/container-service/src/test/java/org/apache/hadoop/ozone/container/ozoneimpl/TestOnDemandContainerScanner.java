@@ -351,6 +351,7 @@ public class TestOnDemandContainerScanner extends
   @Test
   @Override
   public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
+    when(controller.markContainerUnhealthy(anyLong(), any(ScanResult.class))).thenReturn(true);
     LogCapturer logCapturer = LogCapturer.captureLogs(OnDemandContainerScanner.class);
     scanContainer(corruptData);
     verifyContainerMarkedUnhealthy(corruptData, times(1));
