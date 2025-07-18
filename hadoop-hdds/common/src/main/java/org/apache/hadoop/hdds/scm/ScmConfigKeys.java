@@ -456,10 +456,10 @@ public final class ScmConfigKeys {
       "ozone.scm.block.deletion.max.retry";
   public static final int OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT = 4096;
 
-  public static final String OZONE_SCM_BLOCK_DELETION_MAX_BLOCKS_PER_DN =
-      "ozone.scm.block.deletion.max.blocks.per.dn";
+  public static final String OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR =
+      "ozone.scm.block.deletion.per.dn.distribution.factor";
 
-  public static final int OZONE_SCM_BLOCK_DELETION_MAX_BLOCKS_PER_DN_DEFAULT = 100000;
+  public static final int OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT = 8;
 
   public static final String OZONE_SCM_SEQUENCE_ID_BATCH_SIZE =
       "ozone.scm.sequence.id.batch.size";

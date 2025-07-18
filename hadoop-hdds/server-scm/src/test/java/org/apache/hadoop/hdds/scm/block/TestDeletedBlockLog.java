@@ -82,6 +82,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for DeletedBlockLog.
@@ -880,52 +882,39 @@ public class TestDeletedBlockLog {
     assertEquals(2, blocks.size());
   }
 
-  @Test
-  public void testGetTransactionsWithMaxBlocksPerDatanode() throws IOException {
-    int maxDeleteBlocksPerDatanode = 10;
-    deletedBlockLog.setMaxDeleteBlocksPerDatanode(maxDeleteBlocksPerDatanode);
-    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+  @ParameterizedTest
+  @ValueSource(ints = {30, 45})
+  public void testGetTransactionsWithMaxBlocksPerDatanode(int maxAllowedBlockNum) throws IOException {
+    int deleteBlocksFactorPerDatanode = 1;
+    deletedBlockLog.setDeleteBlocksFactorPerDatanode(deleteBlocksFactorPerDatanode);
     mockContainerHealthResult(true);
     int txNum = 10;
-    List<DeletedBlocksTransaction> blocks;
     DatanodeDetails dnId1 = dnList.get(0), dnId2 = dnList.get(1);
-
-    int count = 0;
-    long containerID;
 
     // Creates {TXNum} TX in the log.
     Map<Long, List<Long>> deletedBlocks = generateData(txNum);
     addTransactions(deletedBlocks, true);
-    for (Map.Entry<Long, List<Long>> entry : deletedBlocks.entrySet()) {
-      count++;
-      containerID = entry.getKey();
-      // let the container replication factor to be ONE
-      if (count % 2 == 0) {
-        mockStandAloneContainerInfo(containerID, dnId1);
-      } else {
-        mockStandAloneContainerInfo(containerID, dnId2);
-      }
+    List<Long> containerIds = new ArrayList<>(deletedBlocks.keySet());
+    for (int i = 0; i < containerIds.size(); i++) {
+      DatanodeDetails assignedDn = (i % 2 == 0) ? dnId1 : dnId2;
+      mockStandAloneContainerInfo(containerIds.get(i), assignedDn);
     }
 
-    // For 2 DNs 20 blocks(localid) should return
-    blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
-    assertEquals(2 * maxDeleteBlocksPerDatanode, blocks.stream()
-        .mapToInt(d -> d.getLocalIDList().size())
-        .sum());
+    int blocksPerDataNode = maxAllowedBlockNum / (dnList.size() / deleteBlocksFactorPerDatanode);
+    DatanodeDeletedBlockTransactions transactions =
+        deletedBlockLog.getTransactions(maxAllowedBlockNum, new HashSet<>(dnList));
 
-    maxDeleteBlocksPerDatanode = 15;
-    // For 2 DNs 30 blocks(localid) should return
-    deletedBlockLog.setMaxDeleteBlocksPerDatanode(maxDeleteBlocksPerDatanode);
-    blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
-    assertEquals(2 * maxDeleteBlocksPerDatanode, blocks.stream()
-        .mapToInt(d -> d.getLocalIDList().size())
-        .sum());
-
-    // Since all blocks are processed it should return empty
-    blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
-    assertEquals(0, blocks.stream()
-        .mapToInt(d -> d.getLocalIDList().size())
-        .sum());
+    Map<DatanodeID, Integer> datanodeBlockCountMap =  transactions.getDatanodeTransactionMap()
+        .entrySet()
+        .stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue()
+                .stream()
+                .mapToInt(tx -> tx.getLocalIDList().size())
+                .sum()
+        ));
+    // Transactions should have blocksPerDataNode for both DNs
+    assertEquals(datanodeBlockCountMap.get(dnId1.getID()), blocksPerDataNode);
+    assertEquals(datanodeBlockCountMap.get(dnId2.getID()), blocksPerDataNode);
   }
 
   @Test
