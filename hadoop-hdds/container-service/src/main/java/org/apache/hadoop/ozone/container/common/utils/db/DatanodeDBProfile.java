@@ -150,6 +150,7 @@ public abstract class DatanodeDBProfile {
               StorageUnit.BYTES);
       blockBasedTableConfig.closeAndSetBlockCache(
           new ManagedLRUCache(cacheSize));
+      blockBasedTableConfig.setPartitionFilters(true);
       return blockBasedTableConfig;
     }
   }
