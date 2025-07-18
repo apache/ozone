@@ -18,19 +18,19 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -65,7 +65,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
   // We listen to updates from FSO-enabled FileTable, DirTable, DeletedTable and DeletedDirTable
   public Collection<String> getTaskTables() {
-    return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE, DELETED_TABLE, DELETED_DIR_TABLE);
+    return Arrays.asList(FILE_TABLE, DIRECTORY_TABLE, DELETED_DIR_TABLE);
   }
 
   public Pair<Integer, Boolean> processWithFSO(OMUpdateEventBatch events,
@@ -79,65 +79,56 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     final Collection<String> taskTables = getTaskTables();
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
     int eventCounter = 0;
+    final Collection<Long> objectIdsToBeDeleted = Collections.synchronizedList(new ArrayList<>());
+    while (eventIterator.hasNext()) {
+      OMDBUpdateEvent<String, ? extends
+          WithParentObjectId> omdbUpdateEvent = eventIterator.next();
+      OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
+      eventCounter++;
 
-    try (RDBBatchOperation deleteRdbBatchOperation = new RDBBatchOperation()) {
-      while (eventIterator.hasNext()) {
-        OMDBUpdateEvent<String, ? extends
-            WithParentObjectId> omdbUpdateEvent = eventIterator.next();
-        OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
-        eventCounter++;
-
-        // we process updates on OM's FileTable, DirTable, DeletedTable and DeletedDirTable
-        String table = omdbUpdateEvent.getTable();
-        boolean updateOnFileTable = table.equals(FILE_TABLE);
-        boolean updateOnDeletedTable = table.equals(DELETED_TABLE);
-        boolean updateOnDeletedDirTable = table.equals(DELETED_DIR_TABLE);
-        if (!taskTables.contains(table)) {
-          continue;
-        }
-
-        String updatedKey = omdbUpdateEvent.getKey();
-
-        try {
-          if (updateOnFileTable) {
-            handleUpdateOnFileTable(omdbUpdateEvent, action, nsSummaryMap, updatedKey);
-
-          } else if (updateOnDeletedDirTable) {
-            // Hard delete from deletedDirectoryTable - cleanup memory leak for directories
-            handleUpdateOnDeletedDirTable((OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent, action, nsSummaryMap,
-                deleteRdbBatchOperation);
-
-          } else {
-            // directory update on DirTable
-            handleUpdateOnDirTable(omdbUpdateEvent, action, nsSummaryMap, updatedKey);
-          }
-        } catch (IOException ioEx) {
-          LOG.error("Unable to process Namespace Summary data in Recon DB. ",
-              ioEx);
-          nsSummaryMap.clear();
-          return new ImmutablePair<>(seekPos, false);
-        }
-        if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-          if (!flushAndCommitNSToDB(nsSummaryMap)) {
-            return new ImmutablePair<>(seekPos, false);
-          }
-          deleteNSSummariesFromDB(deleteRdbBatchOperation);
-          seekPos = eventCounter + 1;
-        }
+      // we process updates on OM's FileTable, DirTable, DeletedTable and DeletedDirTable
+      String table = omdbUpdateEvent.getTable();
+      if (!taskTables.contains(table)) {
+        continue;
       }
 
-      // flush and commit left out entries at end
-      if (!flushAndCommitNSToDB(nsSummaryMap)) {
+      try {
+        if (table.equals(FILE_TABLE)) {
+          handleUpdateOnFileTable(omdbUpdateEvent, action, nsSummaryMap);
+
+        } else if (table.equals(DELETED_DIR_TABLE)) {
+          // Hard delete from deletedDirectoryTable - cleanup memory leak for directories
+          handleUpdateOnDeletedDirTable(omdbUpdateEvent, action, nsSummaryMap, objectIdsToBeDeleted);
+        } else {
+          // directory update on DirTable
+          handleUpdateOnDirTable(omdbUpdateEvent, action, nsSummaryMap);
+        }
+      } catch (IOException ioEx) {
+        LOG.error("Unable to process Namespace Summary data in Recon DB. ",
+            ioEx);
+        nsSummaryMap.clear();
         return new ImmutablePair<>(seekPos, false);
       }
-      deleteNSSummariesFromDB(deleteRdbBatchOperation);
+      if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
+        if (!flushAndCommitNSToDB(nsSummaryMap)) {
+          return new ImmutablePair<>(seekPos, false);
+        }
+        seekPos = eventCounter + 1;
+      }
     }
+
+    // flush and commit left out entries at end
+    if (!flushAndCommitNSToDB(nsSummaryMap)) {
+      return new ImmutablePair<>(seekPos, false);
+    }
+    // Delete hard deleted directories from NSSummary table
+    deleteNSSummariesFromDB(objectIdsToBeDeleted);
     LOG.debug("Completed a process run of NSSummaryTaskWithFSO");
     return new ImmutablePair<>(seekPos, true);
   }
 
   private void handleUpdateOnDirTable(OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent,
-                         OMDBUpdateEvent.OMDBUpdateAction action, Map<Long, NSSummary> nsSummaryMap, String updatedKey)
+                         OMDBUpdateEvent.OMDBUpdateAction action, Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
     OMDBUpdateEvent<String, OmDirectoryInfo> dirTableUpdateEvent =
             (OMDBUpdateEvent<String, OmDirectoryInfo>) omdbUpdateEvent;
@@ -158,8 +149,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         // delete first, then put
         handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
       } else {
-        LOG.warn("Update event does not have the old dirInfo for {}.",
-            updatedKey);
+        LOG.warn("Update event does not have the old dirInfo for {}.", oldDirectoryInfo.getName());
       }
       handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
       break;
@@ -170,11 +160,11 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     }
   }
 
-  private void handleUpdateOnDeletedDirTable(OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent,
+  private void handleUpdateOnDeletedDirTable(OMDBUpdateEvent<String, ? extends WithParentObjectId>  omdbUpdateEvent,
                                              OMDBUpdateEvent.OMDBUpdateAction action, Map<Long, NSSummary> nsSummaryMap,
-                                             RDBBatchOperation deleteRdbBatchOperation) {
+                                             Collection<Long> objectIdsToBeDeleted) {
     OMDBUpdateEvent<String, OmKeyInfo> deletedDirTableUpdateEvent =
-        omdbUpdateEvent;
+        (OMDBUpdateEvent<String, OmKeyInfo>) omdbUpdateEvent;
     OmKeyInfo deletedKeyInfo = deletedDirTableUpdateEvent.getValue();
 
     switch (action) {
@@ -183,15 +173,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       if (deletedKeyInfo != null) {
         long objectId = deletedKeyInfo.getObjectID();
         nsSummaryMap.remove(objectId);
-        LOG.info("Removed hard deleted directory with objectId {} from nsSummaryMap", objectId);
-        
-        // Delete the NSSummary entry from the database to prevent memory leak
-        try {
-          getReconNamespaceSummaryManager().batchDeleteNSSummaries(deleteRdbBatchOperation, objectId);
-          LOG.info("Deleted NSSummary entry for objectId {} from database", objectId);
-        } catch (Exception e) {
-          LOG.error("Failed to delete NSSummary entry for objectId {} from database", objectId, e);
-        }
+        LOG.debug("Removed hard deleted directory with objectId {} from nsSummaryMap", objectId);
+        objectIdsToBeDeleted.add(objectId);
       }
       break;
 
@@ -201,7 +184,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   }
 
   private void handleUpdateOnFileTable(OMDBUpdateEvent<String, ? extends WithParentObjectId> omdbUpdateEvent,
-                         OMDBUpdateEvent.OMDBUpdateAction action, Map<Long, NSSummary> nsSummaryMap, String updatedKey)
+                         OMDBUpdateEvent.OMDBUpdateAction action, Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
     // key update on fileTable
     OMDBUpdateEvent<String, OmKeyInfo> keyTableUpdateEvent =
@@ -223,8 +206,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         // delete first, then put
         handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
       } else {
-        LOG.warn("Update event does not have the old keyInfo for {}.",
-            updatedKey);
+        LOG.warn("Update event does not have the old keyInfo for {}.", oldKeyInfo.getKeyName());
       }
       handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
       break;

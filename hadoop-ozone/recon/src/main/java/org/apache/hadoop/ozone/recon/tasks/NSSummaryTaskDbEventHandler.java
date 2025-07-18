@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -62,35 +63,38 @@ public class NSSummaryTaskDbEventHandler {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
-          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
-              entry.getKey(), entry.getValue());
+          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, entry.getKey(), entry.getValue());
         } catch (IOException e) {
-          LOG.error("Unable to write Namespace Summary data in Recon DB.",
-              e);
+          LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
           throw e;
         }
       }
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
     }
+    LOG.debug("Successfully written Namespace Summary data in Recon DB.");
   }
 
-  protected boolean deleteNSSummariesFromDB(RDBBatchOperation deleteRdbBatchOperation) {
+  protected void deleteNSSummariesFromDB(Collection<Long> objectIdsToBeDeleted) {
     try {
-      reconNamespaceSummaryManager.commitBatchOperation(deleteRdbBatchOperation);
+      addAndCommitToDeleteNSSummaries(objectIdsToBeDeleted);
     } catch (IOException e) {
       LOG.error("Unable to delete Namespace Summary data from Recon DB.", e);
-      // If we fail to delete the NSSummary from the DB, we log the error and retry now
-      try {
-        LOG.info("Unable to delete Namespace Summary data from Recon DB in first try, retrying....");
-        reconNamespaceSummaryManager.commitBatchOperation(deleteRdbBatchOperation);
-      } catch (IOException ex) {
-        LOG.error("Unable to delete Namespace Summary data on retry as well from Recon DB.", ex);
-        return false;
-      }
-      return true;
     }
     LOG.debug("Successfully deleted Namespace Summary data from Recon DB.");
-    return true;
+  }
+
+  public void addAndCommitToDeleteNSSummaries(Collection<Long> objectIdsToBeDeleted) throws IOException {
+    try (RDBBatchOperation deleteRdbBatchOperation = new RDBBatchOperation()) {
+      for (Long objectId : objectIdsToBeDeleted) {
+        try {
+          reconNamespaceSummaryManager.batchDeleteNSSummaries(deleteRdbBatchOperation, objectId);
+        } catch (IOException e) {
+          LOG.error("Unable to delete Namespace Summary data from Recon DB.", e);
+          throw e;
+        }
+      }
+      reconNamespaceSummaryManager.commitBatchOperation(deleteRdbBatchOperation);
+    }
   }
 
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,

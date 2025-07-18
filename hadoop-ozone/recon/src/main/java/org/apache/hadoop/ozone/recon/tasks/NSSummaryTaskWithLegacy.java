@@ -18,12 +18,10 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -74,11 +72,6 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 
-  // Listen to Legacy KeyTable and DeletedTable for hard delete cleanup
-  public Collection<String> getTaskTables() {
-    return Arrays.asList(KEY_TABLE, DELETED_TABLE);
-  }
-
   public Pair<Integer, Boolean> processWithLegacy(OMUpdateEventBatch events,
                                                   int seekPos) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
@@ -98,62 +91,39 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
       eventCounter++;
 
-      // we only process updates on OM's KeyTable and DeletedTable
+      // we only process updates on OM's KeyTable
       String table = omdbUpdateEvent.getTable();
-      boolean updateOnKeyTable = table.equals(KEY_TABLE);
-      boolean updateOnDeletedTable = table.equals(DELETED_TABLE);
 
-      if (!updateOnKeyTable && !updateOnDeletedTable) {
+      if (!table.equals(KEY_TABLE)) {
         continue;
       }
 
       String updatedKey = omdbUpdateEvent.getKey();
 
       try {
-        if (updateOnDeletedTable) {
-          // Hard delete from deletedTable - cleanup memory leak
-          OMDBUpdateEvent<String, ?> deletedTableUpdateEvent = omdbUpdateEvent;
-          Object value = deletedTableUpdateEvent.getValue();
-          
-          switch (action) {
-          case DELETE:
-            // When entry is removed from deletedTable, remove from nsSummaryMap to prevent memory leak
-            if (value instanceof OmKeyInfo) {
-              OmKeyInfo deletedKeyInfo = (OmKeyInfo) value;
-              long objectId = deletedKeyInfo.getObjectID();
-              nsSummaryMap.remove(objectId);
-            }
-            break;
-            
-          default:
-            LOG.debug("Skipping DB update event on deletedTable: {}", action);
-          }
+        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+        Object value = keyTableUpdateEvent.getValue();
+        Object oldValue = keyTableUpdateEvent.getOldValue();
+
+        if (!(value instanceof OmKeyInfo)) {
+          LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+              value.getClass().getName(), updatedKey);
+          continue;
+        }
+
+        OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
+
+        if (!isBucketLayoutValid(metadataManager, updatedKeyInfo)) {
+          continue;
+        }
+
+        if (enableFileSystemPaths) {
+          processWithFileSystemLayout(updatedKeyInfo, oldKeyInfo, action,
+              nsSummaryMap);
         } else {
-          // Handle keyTable events
-          OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
-          Object value = keyTableUpdateEvent.getValue();
-          Object oldValue = keyTableUpdateEvent.getOldValue();
-
-          if (!(value instanceof OmKeyInfo)) {
-            LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
-                value.getClass().getName(), updatedKey);
-            continue;
-          }
-
-          OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
-          OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
-
-          if (!isBucketLayoutValid(metadataManager, updatedKeyInfo)) {
-            continue;
-          }
-
-          if (enableFileSystemPaths) {
-            processWithFileSystemLayout(updatedKeyInfo, oldKeyInfo, action,
-                nsSummaryMap);
-          } else {
-            processWithObjectStoreLayout(updatedKeyInfo, oldKeyInfo, action,
-                nsSummaryMap);
-          }
+          processWithObjectStoreLayout(updatedKeyInfo, oldKeyInfo, action,
+              nsSummaryMap);
         }
       } catch (IOException ioEx) {
         LOG.error("Unable to process Namespace Summary data in Recon DB. ",

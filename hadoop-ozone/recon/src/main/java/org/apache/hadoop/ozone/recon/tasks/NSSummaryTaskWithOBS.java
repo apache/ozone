@@ -17,12 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -60,11 +57,6 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
-  }
-
-  // Listen to OBS KeyTable and DeletedTable for hard delete cleanup
-  public Collection<String> getTaskTables() {
-    return Arrays.asList(KEY_TABLE, DELETED_TABLE);
   }
 
   public boolean reprocessWithOBS(OMMetadataManager omMetadataManager) {
@@ -139,91 +131,69 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       OMDBUpdateEvent.OMDBUpdateAction action = omdbUpdateEvent.getAction();
       eventCounter++;
 
-      // We only process updates on OM's KeyTable and DeletedTable
+      // We only process updates on OM's KeyTable
       String table = omdbUpdateEvent.getTable();
       boolean updateOnKeyTable = table.equals(KEY_TABLE);
-      boolean updateOnDeletedTable = table.equals(DELETED_TABLE);
-      if (!updateOnKeyTable && !updateOnDeletedTable) {
+      if (!updateOnKeyTable) {
         continue;
       }
 
       String updatedKey = omdbUpdateEvent.getKey();
 
       try {
-        if (updateOnDeletedTable) {
-          // Hard delete from deletedTable - cleanup memory leak
-          OMDBUpdateEvent<String, ?> deletedTableUpdateEvent = omdbUpdateEvent;
-          Object value = deletedTableUpdateEvent.getValue();
-          
-          switch (action) {
-          case DELETE:
-            // When entry is removed from deletedTable, remove from nsSummaryMap to prevent memory leak
-            if (value instanceof OmKeyInfo) {
-              OmKeyInfo deletedKeyInfo = (OmKeyInfo) value;
-              long objectId = deletedKeyInfo.getObjectID();
-              nsSummaryMap.remove(objectId);
-            }
-            break;
-            
-          default:
-            LOG.debug("Skipping DB update event on deletedTable: {}", action);
-          }
-        } else {
-          // Handle keyTable events
-          OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
-          Object value = keyTableUpdateEvent.getValue();
-          Object oldValue = keyTableUpdateEvent.getOldValue();
-          if (value == null) {
-            LOG.warn("Value is null for key {}. Skipping processing.",
+        OMDBUpdateEvent<String, ?> keyTableUpdateEvent = omdbUpdateEvent;
+        Object value = keyTableUpdateEvent.getValue();
+        Object oldValue = keyTableUpdateEvent.getOldValue();
+        if (value == null) {
+          LOG.warn("Value is null for key {}. Skipping processing.",
+              updatedKey);
+          continue;
+        } else if (!(value instanceof OmKeyInfo)) {
+          LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+              value.getClass().getName(), updatedKey);
+          continue;
+        }
+
+        OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
+
+        // KeyTable entries belong to both OBS and Legacy buckets.
+        // Check bucket layout and if it's anything other than OBS,
+        // continue to the next iteration.
+        String volumeName = updatedKeyInfo.getVolumeName();
+        String bucketName = updatedKeyInfo.getBucketName();
+        String bucketDBKey =
+            getReconOMMetadataManager().getBucketKey(volumeName, bucketName);
+        // Get bucket info from bucket table
+        OmBucketInfo omBucketInfo = getReconOMMetadataManager().getBucketTable()
+            .getSkipCache(bucketDBKey);
+
+        if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
+          continue;
+        }
+
+        setKeyParentID(updatedKeyInfo);
+
+        switch (action) {
+        case PUT:
+          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+          break;
+        case DELETE:
+          handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+          break;
+        case UPDATE:
+          if (oldKeyInfo != null) {
+            // delete first, then put
+            setKeyParentID(oldKeyInfo);
+            handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+          } else {
+            LOG.warn("Update event does not have the old keyInfo for {}.",
                 updatedKey);
-            continue;
-          } else if (!(value instanceof OmKeyInfo)) {
-            LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
-                value.getClass().getName(), updatedKey);
-            continue;
           }
-
-          OmKeyInfo updatedKeyInfo = (OmKeyInfo) value;
-          OmKeyInfo oldKeyInfo = (OmKeyInfo) oldValue;
-
-          // KeyTable entries belong to both OBS and Legacy buckets.
-          // Check bucket layout and if it's anything other than OBS,
-          // continue to the next iteration.
-          String volumeName = updatedKeyInfo.getVolumeName();
-          String bucketName = updatedKeyInfo.getBucketName();
-          String bucketDBKey =
-              getReconOMMetadataManager().getBucketKey(volumeName, bucketName);
-          // Get bucket info from bucket table
-          OmBucketInfo omBucketInfo = getReconOMMetadataManager().getBucketTable()
-              .getSkipCache(bucketDBKey);
-
-          if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
-            continue;
-          }
-
-          setKeyParentID(updatedKeyInfo);
-
-          switch (action) {
-          case PUT:
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-            break;
-          case DELETE:
-            handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
-            break;
-          case UPDATE:
-            if (oldKeyInfo != null) {
-              // delete first, then put
-              setKeyParentID(oldKeyInfo);
-              handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
-            } else {
-              LOG.warn("Update event does not have the old keyInfo for {}.",
-                  updatedKey);
-            }
-            handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
-            break;
-          default:
-            LOG.debug("Skipping DB update event: {}", action);
-          }
+          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+          break;
+        default:
+          LOG.debug("Skipping DB update event: {}", action);
         }
         if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
           if (!flushAndCommitNSToDB(nsSummaryMap)) {
