@@ -26,12 +26,12 @@ import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -689,18 +689,21 @@ public final class ContainerTestHelper {
   public static void corruptFile(File file) {
     try {
       final int length = (int) file.length();
+
       Path path = file.toPath();
-      try (InputStream originalInputStream = Files.newInputStream(path)) {
-        final byte[] original = IOUtils.readFully(originalInputStream, length);
-        final byte[] corruptedBytes = new byte[length];
-        ThreadLocalRandom.current().nextBytes(corruptedBytes);
-        Files.write(path, corruptedBytes, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
-        try (InputStream corruptedInputStream = Files.newInputStream(path)) {
-          assertThat(IOUtils.readFully(corruptedInputStream, length))
-              .isEqualTo(corruptedBytes)
-              .isNotEqualTo(original);
-        }
-      }
+      final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
+
+      // Corrupt the last byte and middle bytes of the block. The scanner should log this as two errors.
+      final byte[] corruptedBytes = Arrays.copyOf(original, length);
+      corruptedBytes[length - 1] = (byte) (original[length - 1] << 1);
+      corruptedBytes[length / 2] = (byte) (original[length / 2] << 1);
+
+      Files.write(path, corruptedBytes,
+          StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+
+      assertThat(IOUtils.readFully(Files.newInputStream(path), length))
+          .isEqualTo(corruptedBytes)
+          .isNotEqualTo(original);
     } catch (IOException ex) {
       // Fail the test.
       throw new UncheckedIOException(ex);
