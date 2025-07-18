@@ -114,8 +114,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
       String snapshotFileName = getSnapshotFileName(leaderNodeID);
       File targetFile = new File(snapshotDir, snapshotFileName);
       downloadSnapshot(leaderNodeID, targetFile);
-      LOG.info(
-          "Successfully download the latest snapshot {} from leader OM: {}, part : {}" ,
+      LOG.info("Successfully download the latest snapshot {} from leader OM: {}, part : {}",
           targetFile, leaderNodeID, numParts);
       numParts++;
 
