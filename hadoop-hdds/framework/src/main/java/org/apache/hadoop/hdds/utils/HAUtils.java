@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURAT
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -331,13 +330,9 @@ public final class HAUtils {
     if (!db.exists()) {
       return sstList;
     }
-
-    int truncateLength = db.toString().length() + 1;
     // Walk the db dir and get all sst files including omSnapshot files.
     try (Stream<Path> files = Files.walk(db.toPath())) {
-      sstList =
-          files.filter(path -> path.toString().endsWith(ROCKSDB_SST_SUFFIX)).
-              map(p -> p.toString().substring(truncateLength)).
+      sstList = files.map(p -> p.getFileName().toString()).
               collect(Collectors.toList());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Scanned SST files {} in {}.", sstList, db.getAbsolutePath());

@@ -245,8 +245,8 @@ public class TestOMRatisSnapshots {
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 10s
     GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
+      long index = followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+      return index >= leaderOMSnapshotIndex - 1;
     }, 100, 30_000);
 
     long followerOMLastAppliedIndex =
@@ -1003,6 +1003,7 @@ public class TestOMRatisSnapshots {
     DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    OmSnapshotUtils.createHardLinks(leaderCheckpointLocation, true);
     TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
 
@@ -1173,8 +1174,7 @@ public class TestOMRatisSnapshots {
     // Get Size of sstfiles in tarball.
     private long getSizeOfSstFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
-      List<Path> sstPaths = Files.walk(tempDir).filter(
-          path -> path.toString().endsWith(".sst")).
+      List<Path> sstPaths = Files.walk(tempDir).
           collect(Collectors.toList());
       long sstSize = 0;
       for (Path sstPath : sstPaths) {
@@ -1199,10 +1199,7 @@ public class TestOMRatisSnapshots {
            new TarArchiveInputStream(Files.newInputStream(tarball.toPath()))) {
         TarArchiveEntry entry;
         while ((entry = tarInput.getNextTarEntry()) != null) {
-          String name = entry.getName();
-          if (name.toLowerCase().endsWith(".sst")) {
-            sstFilenames.add(entry.getName());
-          }
+          sstFilenames.add(entry.getName());
         }
       }
       return sstFilenames;

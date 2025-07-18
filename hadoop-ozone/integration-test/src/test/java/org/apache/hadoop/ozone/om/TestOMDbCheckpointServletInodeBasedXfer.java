@@ -227,7 +227,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .forEachRemaining(snapInfo -> snapshotPaths.add(getSnapshotDBPath(snapInfo.getCheckpointDir())));
     Set<String> inodesFromOmDataDir = new HashSet<>();
     Set<String> inodesFromTarball = new HashSet<>();
-    Set<Path> allPathsInTarball = new HashSet<>();
     try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
       List<Path> files = filesInTarball.collect(Collectors.toList());
       for (Path p : files) {
@@ -237,7 +236,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         }
         String inode = getInode(file.getName());
         inodesFromTarball.add(inode);
-        allPathsInTarball.add(p);
       }
     }
     Map<String, List<String>> hardLinkMapFromOmData = new HashMap<>();
@@ -269,10 +267,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(inodesFromTarball.containsAll(inodesFromOmDataDir));
 
     // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
-    for (Path old : allPathsInTarball) {
-      assertTrue(old.toFile().delete());
-    }
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
     assertFalse(hardlinkFilePath.toFile().exists());
   }
 
@@ -301,7 +296,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     FileUtil.unTar(tempFile, newDbDir);
     Set<Path> allPathsInTarball = getAllPathsInTarball(newDbDir);
     // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), false);
     for (Path old : allPathsInTarball) {
       assertTrue(old.toFile().delete());
     }
