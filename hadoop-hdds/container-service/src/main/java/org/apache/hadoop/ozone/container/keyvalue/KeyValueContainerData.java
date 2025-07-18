@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETE_TRANSACTION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETING_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_BYTES;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
@@ -235,8 +236,8 @@ public class KeyValueContainerData extends ContainerData {
    *
    * @param numBlocks increment number
    */
-  public void incrPendingDeletionBlocks(long numBlocks) {
-    getStatistics().addBlockPendingDeletion(numBlocks);
+  public void incrPendingDeletionBlocks(long numBlocks, long bytes) {
+    getStatistics().addBlockPendingDeletion(numBlocks, bytes);
   }
 
   /**
@@ -244,6 +245,13 @@ public class KeyValueContainerData extends ContainerData {
    */
   public long getNumPendingDeletionBlocks() {
     return getStatistics().getBlockPendingDeletion();
+  }
+
+  /**
+   * Get the total bytes used by pending deletion blocks.
+   */
+  public long getBlockPendingDeletionBytes() {
+    return getStatistics().getBlockPendingDeletionBytes();
   }
 
   /**
@@ -376,6 +384,8 @@ public class KeyValueContainerData extends ContainerData {
     metadataTable.putWithBatch(batchOperation, getBlockCountKey(), b.getCount() - deletedBlockCount);
     metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockCountKey(),
         b.getPendingDeletion() - deletedBlockCount);
+    metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockBytesKey(),
+        getStatistics().getBlockPendingDeletionBytes() - releasedBytes);
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
@@ -386,6 +396,7 @@ public class KeyValueContainerData extends ContainerData {
     // Reset the metadata on disk.
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
     metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
+    metadataTable.put(getPendingDeleteBlockBytesKey(), 0L);
   }
 
   // NOTE: Below are some helper functions to format keys according
@@ -422,6 +433,10 @@ public class KeyValueContainerData extends ContainerData {
 
   public String getPendingDeleteBlockCountKey() {
     return formatKey(PENDING_DELETE_BLOCK_COUNT);
+  }
+
+  public String getPendingDeleteBlockBytesKey() {
+    return formatKey(PENDING_DELETE_BLOCK_BYTES);
   }
 
   public String getDeletingBlockKeyPrefix() {

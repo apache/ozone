@@ -639,9 +639,38 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       // update pending deletion blocks count and delete transaction ID in
       // in-memory container status
+      long pendingBytes = getPendingDeletionBytes(containerData, delTX, containerDB);
       containerData.updateDeleteTransactionId(delTX.getTxID());
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
+      containerData.incrPendingDeletionBlocks(newDeletionBlocks, pendingBytes);
+      metadataTable
+          .putWithBatch(batchOperation,
+              containerData.getPendingDeleteBlockBytesKey(),
+              pendingBytes);
     }
+  }
+
+  //TODO Handle calculation of bytes the total unreplicated size send by SCM
+  private long getPendingDeletionBytes(KeyValueContainerData containerData,
+                                       DeletedBlocksTransaction delTX,
+                                       DBHandle containerDB) throws IOException {
+    Table<String, BlockData> blockDataTable = containerDB.getStore().getBlockDataTable();
+    long bytesPendingDeletion = 0;
+
+    for (Long blockId : delTX.getLocalIDList()) {
+      String blockKey = containerData.getBlockKey(blockId);
+      BlockData blockData = blockDataTable.get(blockKey);
+
+      if (blockData != null) {
+        bytesPendingDeletion += blockData.getSize();
+      } else {
+        // Log a warning if a block expected to be deleted is not found in the block data table.
+        // This might indicate an inconsistency or a block already deleted.
+        LOG.warn("Block data not found for block ID {} in container {}. " +
+                "Cannot increment pending deletion bytes for this block.",
+            blockId, containerData.getContainerID());
+      }
+    }
+    return bytesPendingDeletion;
   }
 
   public static boolean isDuplicateTransaction(long containerId, KeyValueContainerData containerData,

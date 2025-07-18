@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
@@ -110,6 +111,9 @@ public class HddsVolume extends StorageVolume {
   private final int volumeTestFailureTolerance;
   private AtomicInteger volumeTestFailureCount;
   private Queue<Boolean> volumeTestResultQueue;
+
+  private volatile CachedPendingDeletion cachedPendingDeletion = null;
+  private Object cacheLock = new Object();
 
   /**
    * Builder for HddsVolume.
@@ -313,6 +317,40 @@ public class HddsVolume extends StorageVolume {
     }
 
     return checkDbHealth(dbFile);
+  }
+
+  /**
+   * This method can be used to get total bytes pending for deletion
+   * in cached interval of time. This can be utilized by either storage
+   * report or other services.
+   */
+  public long getPendingDeletionBytes() {
+    CachedPendingDeletion currentCache = cachedPendingDeletion;
+    if (currentCache != null && !currentCache.isExpired()) {
+      return currentCache.getSize();
+    }
+
+    synchronized (cacheLock) {
+      currentCache = cachedPendingDeletion;
+      if (currentCache != null && !currentCache.isExpired()) {
+        return currentCache.getSize();
+      }
+      long total = 0L;
+      if (controller != null) {
+        Iterable<Container<?>> containers = controller.getContainers();
+        for (Container<?> container : containers) {
+          total += container.getContainerData()
+              .getStatistics()
+              .getBlockPendingDeletionBytes();
+        }
+        long cacheDurationMillis = getDatanodeConfig()
+            .getBlockDeletionInterval()
+            .multipliedBy(5)
+            .toMillis();
+        cachedPendingDeletion = new CachedPendingDeletion(total, cacheDurationMillis);
+      }
+      return total;
+    }
   }
 
   @VisibleForTesting
@@ -622,6 +660,24 @@ public class HddsVolume extends StorageVolume {
           Time.monotonicNowNanos() - start);
     } catch (Exception e) {
       LOG.warn("compact rocksdb error in {}", dbFilePath, e);
+    }
+  }
+
+  private static class CachedPendingDeletion {
+    private final long size;
+    private final long expiryTimeMillis;
+
+    CachedPendingDeletion(long size, long cacheDurationMillis) {
+      this.size = size;
+      this.expiryTimeMillis = System.currentTimeMillis() + cacheDurationMillis;
+    }
+
+    public long getSize() {
+      return size;
+    }
+
+    public boolean isExpired() {
+      return System.currentTimeMillis() > expiryTimeMillis;
     }
   }
 }
