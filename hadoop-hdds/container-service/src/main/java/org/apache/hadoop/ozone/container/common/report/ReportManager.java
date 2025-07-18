@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.common.report;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.Message;
+import org.apache.hadoop.thirdparty.protobuf.Message;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;

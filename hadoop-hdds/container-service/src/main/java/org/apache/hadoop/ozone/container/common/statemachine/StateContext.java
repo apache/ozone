@@ -26,8 +26,8 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmInitialHeartbeat
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.protobuf.Descriptors.Descriptor;
-import com.google.protobuf.Message;
+import org.apache.hadoop.thirdparty.protobuf.Descriptors.Descriptor;
+import org.apache.hadoop.thirdparty.protobuf.Message;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;

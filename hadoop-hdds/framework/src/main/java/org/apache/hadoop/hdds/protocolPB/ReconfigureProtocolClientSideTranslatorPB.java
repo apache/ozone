@@ -18,8 +18,6 @@
 package org.apache.hadoop.hdds.protocolPB;
 
 import com.google.common.collect.Maps;
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -42,14 +40,16 @@ import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ListRecon
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ListReconfigurePropertiesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.StartReconfigureRequestProto;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.ProtocolMetaInterface;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RpcClientUtil;
+import org.apache.hadoop.ipc.internal.ShadedProtobufHelper;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.thirdparty.protobuf.RpcController;
+import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,7 +141,7 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
           rpcProxy.getServerName(NULL_CONTROLLER, VOID_GET_SERVER_NAME);
       return response.getName();
     } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
+      throw ShadedProtobufHelper.getRemoteException(e);
     }
   }
 
@@ -150,7 +150,7 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
     try {
       rpcProxy.startReconfigure(NULL_CONTROLLER, VOID_START_RECONFIG);
     } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
+      throw ShadedProtobufHelper.getRemoteException(e);
     }
   }
 
@@ -162,7 +162,7 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
           .getReconfigureStatus(NULL_CONTROLLER, VOID_GET_RECONFIG_STATUS);
       return getReconfigureStatus(response);
     } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
+      throw ShadedProtobufHelper.getRemoteException(e);
     }
   }
 
@@ -199,7 +199,7 @@ public class ReconfigureProtocolClientSideTranslatorPB implements
           VOID_LIST_RECONFIGURABLE_PROPERTIES);
       return response.getNameList();
     } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
+      throw ShadedProtobufHelper.getRemoteException(e);
     }
   }
 

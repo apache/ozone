@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.metadata;
 
-import com.google.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.Map;

@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
 import java.math.BigInteger;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.Proto2Utils;
 
 /**
  * Codec for type BigInteger.

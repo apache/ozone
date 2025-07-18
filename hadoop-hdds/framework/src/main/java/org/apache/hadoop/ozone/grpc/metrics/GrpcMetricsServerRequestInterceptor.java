@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.grpc.metrics;
 
-import com.google.protobuf.AbstractMessage;
+import org.apache.hadoop.thirdparty.protobuf.AbstractMessage;
 import io.grpc.ForwardingServerCallListener.SimpleForwardingServerCallListener;
 import io.grpc.Metadata;
 import io.grpc.ServerCall;

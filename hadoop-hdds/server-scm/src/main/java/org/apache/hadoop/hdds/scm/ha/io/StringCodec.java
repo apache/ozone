@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.Proto2Utils;
 
 /**
  * {@link Codec} for {@code String} objects.

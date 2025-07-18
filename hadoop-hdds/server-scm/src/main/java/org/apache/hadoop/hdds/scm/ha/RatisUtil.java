@@ -29,7 +29,7 @@ import static org.apache.ratis.server.RaftServerConfigKeys.Rpc;
 import static org.apache.ratis.server.RaftServerConfigKeys.Snapshot;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.ServiceException;
+import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;

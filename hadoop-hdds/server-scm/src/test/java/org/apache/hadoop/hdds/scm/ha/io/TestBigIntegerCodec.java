@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.google.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
 import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
 

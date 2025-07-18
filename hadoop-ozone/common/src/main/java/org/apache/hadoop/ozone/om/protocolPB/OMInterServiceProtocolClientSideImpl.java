@@ -26,6 +26,7 @@ import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.internal.ShadedProtobufHelper;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
@@ -95,7 +96,7 @@ public class OMInterServiceProtocolClientSideImpl implements
         throwException(ErrorCode.LEADER_NOT_READY,
             leaderNotReadyException.getMessage());
       }
-      throw ProtobufHelper.getRemoteException(e);
+      throw ShadedProtobufHelper.getRemoteException(e);
     }
 
     if (!response.getSuccess()) {

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.google.protobuf;
+package org.apache.hadoop.thirdparty.protobuf;
 
 /** Utilities for protobuf v2. */
 public final class Proto2Utils {
@@ -25,7 +25,7 @@ public final class Proto2Utils {
    * Otherwise, it violates the immutability of {@link ByteString}.
    */
   public static ByteString unsafeByteString(byte[] array) {
-    return array != null && array.length > 0 ? new LiteralByteString(array) : ByteString.EMPTY;
+    return array != null && array.length > 0 ? ByteString.copyFrom(array) : ByteString.EMPTY;
   }
 
   private Proto2Utils() { }

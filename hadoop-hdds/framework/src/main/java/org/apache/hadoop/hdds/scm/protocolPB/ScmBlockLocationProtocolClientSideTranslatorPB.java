@@ -20,8 +20,9 @@ package org.apache.hadoop.hdds.scm.protocolPB;
 import static org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Status.OK;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
+import org.apache.hadoop.ipc.internal.ShadedProtobufHelper;
+import org.apache.hadoop.thirdparty.protobuf.RpcController;
+import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -125,7 +126,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
           rpcProxy.send(NULL_RPC_CONTROLLER, req);
       return response;
     } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
+      throw ShadedProtobufHelper.getRemoteException(e);
     }
   }
 

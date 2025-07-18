@@ -28,7 +28,7 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.Message;
+import org.apache.hadoop.thirdparty.protobuf.Message;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;

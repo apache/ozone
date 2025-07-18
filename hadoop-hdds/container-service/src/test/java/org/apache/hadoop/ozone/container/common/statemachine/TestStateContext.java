@@ -30,8 +30,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.Descriptors.Descriptor;
-import com.google.protobuf.Message;
+import org.apache.hadoop.thirdparty.protobuf.Descriptors.Descriptor;
+import org.apache.hadoop.thirdparty.protobuf.Message;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;

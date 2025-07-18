@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.util;
 
-import com.google.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
 import java.util.Objects;
 import net.jcip.annotations.Immutable;
 

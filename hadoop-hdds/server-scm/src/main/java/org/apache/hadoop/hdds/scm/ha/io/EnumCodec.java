@@ -18,10 +18,10 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.common.primitives.Ints;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Proto2Utils;
-import com.google.protobuf.ProtocolMessageEnum;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.thirdparty.protobuf.Proto2Utils;
+import org.apache.hadoop.thirdparty.protobuf.ProtocolMessageEnum;
 import java.lang.reflect.InvocationTargetException;
 import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 
