@@ -59,14 +59,10 @@ repair_and_restart_om() {
   done
   echo "Container '${om_container}' has stopped."
 
-  # LOG_PATH="$(find / -type f -name 'log_inprogress_0' 2>/dev/null | head -n 1)"
-  # echo "Log path: ${LOG_PATH}"
-  # newpath=$(echo "${LOG_PATH}" | sed 's|.*/compose/|/opt/hadoop/compose/|')
-  # echo "New path: ${newpath}"
   logpath=$(execute_command_in_container ${SCM} bash -c "find / -type f -path '/*/$om_id/*/log_inprogress_0' 2>/dev/null | head -n 1")
-  echo "logpath: ${logpath}"
+  echo "Ratis log segment file path: ${logpath}"
 
-  execute_command_in_container ${SCM} bash -c "ozone repair om srt -b=/opt/hadoop/compose/ozonesecure-ha/data/$om_id/backup1 --index=3 -s=${logpath}"
+  execute_command_in_container ${SCM} bash -c "ozone repair om srt -b=/opt/hadoop/compose/ozonesecure-ha/data/$om_id/backup1 --index=2 -s=${logpath}"
   echo "Repair command executed for ${om_id}."
   docker start "${om_container}"
   echo "Container '${om_container}' started again."
@@ -80,8 +76,9 @@ repair_and_restart_om() {
   fi
 }
 
+# Test for repairing a ratis transaction
 execute_robot_test ${SCM} kinit.robot
-execute_robot_test ${SCM} repair/transaction-repair.robot
+execute_robot_test ${SCM} repair/ratis-transaction-repair.robot
 repair_and_restart_om "ozonesecure-ha-om1-1" "om1"
 repair_and_restart_om "ozonesecure-ha-om2-1" "om2"
 repair_and_restart_om "ozonesecure-ha-om3-1" "om3"
@@ -89,6 +86,7 @@ if ! execute_command_in_container scm1.org timeout 15s ozone sh volume list; the
   echo "Command timed out or failed => OMs are not running as expected. Test for repairing ratis transaction failed."
   exit 1
 fi
+# End of test for repairing a ratis transaction
 
 execute_robot_test ${OM} kinit.robot
 

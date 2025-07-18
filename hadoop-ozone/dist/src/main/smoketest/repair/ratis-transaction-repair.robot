@@ -23,7 +23,6 @@ Resource            ../ozone-fi/BytemanKeywords.robot
 
 *** Variables ***
 ${VOLUME}               test-txn-vol
-${GOOD_BUCKET}          bucket-good-1
 ${BAD_BUCKET}           bucket-crash-1
 ${CRASH_RULE}           /opt/hadoop/share/ozone/byteman/fail-create-bucket.btm
 ${TIMEOUT}              10 seconds
@@ -32,5 +31,4 @@ ${TIMEOUT}              10 seconds
 Verify OM crash at bucket create
     Inject Fault Into OMs Only      ${CRASH_RULE}
     Execute         ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME}
-    Execute         ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/${GOOD_BUCKET}
     Run Process     ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/${BAD_BUCKET}    timeout=${TIMEOUT}    shell=True

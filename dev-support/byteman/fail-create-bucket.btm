@@ -20,9 +20,8 @@
 RULE Crash OM with CreateBucket
 CLASS org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest
 METHOD validateAndUpdateCache
-BIND result = $bucketName
-AT LINE 177
-IF (result.equals("bucket-crash-1"))
+AT ENTRY
+IF TRUE
 DO
   traceln("--> crashing CreateBucket request");
   THROW new RuntimeException("Byteman crashes OM");
