@@ -28,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -39,7 +38,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -59,7 +57,6 @@ import org.apache.ratis.util.JvmPauseMonitor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -75,8 +72,6 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
   private static final String CHUNKS_DIR_NAME = "chunks";
   private static final String BLOCK_FILE_EXTENSION = ".block";
 
-  @TempDir
-  private File tempDir;
   private OzoneDebug ozoneDebugShell;
   private String ozoneAddress;
   private GenericTestUtils.PrintStreamCapturer out;
@@ -194,11 +189,9 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
   @MethodSource("getTestChecksumsArguments")
   @ParameterizedTest(name = "{0}")
   void testReplicas(String description, int expectedExitCode, List<String> parameters) {
-    Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
     parameters = new ArrayList<>(parameters);
     parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
     parameters.add(0, getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY));
-    parameters.add("--output-dir=" + checksumsOutputDir);
     parameters.add(ozoneAddress); // getTestChecksumsArguments is static. We cannot set the ozoneAddress there directly.
 
     int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
@@ -211,7 +204,6 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
 
   @Test
   void testChecksumsWithCorruptedBlockFile() {
-    Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
     Optional<String> key = keyInfoMap.keySet().stream().findAny();
     if (!key.isPresent()) {
       fail("No suitable key is available in the cluster");
@@ -231,7 +223,6 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     parameters.add("verify");
     parameters.add("--checksums");
     parameters.add("--all-results");
-    parameters.add("--output-dir=" + checksumsOutputDir);
     parameters.add(ozoneAddress);
 
     int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
@@ -244,7 +235,6 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
 
   @Test
   void testChecksumsWithEmptyBlockFile() {
-    Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
     Optional<String> key = keyInfoMap.keySet().stream().findAny();
     if (!key.isPresent()) {
       fail("No suitable key is available in the cluster");
@@ -263,7 +253,6 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
     parameters.add("verify");
     parameters.add("--checksums");
     parameters.add("--all-results");
-    parameters.add("--output-dir=" + checksumsOutputDir);
     parameters.add(ozoneAddress);
 
     int exitCode = ozoneDebugShell.execute(parameters.toArray(new String[0]));
