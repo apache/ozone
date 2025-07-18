@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -361,7 +362,7 @@ public class TestNSSummaryMemoryLeak {
       for (int j = 0; j < filesPerDir; j++) {
         Path file = new Path(subDir, "file" + j);
         try (FSDataOutputStream stream = fs.create(file)) {
-          stream.write(("content" + i + j).getBytes());
+          stream.write(("content" + i + j).getBytes(UTF_8));
         }
       }
     }
