@@ -804,7 +804,7 @@ public class TestContainerEndpoint {
 
   @Test
   public void testUnhealthyContainers() throws IOException, TimeoutException {
-    Response response = containerEndpoint.getUnhealthyContainers(1000, 1);
+    Response response = containerEndpoint.getUnhealthyContainers(1000, 0, 0);
 
     UnhealthyContainersResponse responseObject =
         (UnhealthyContainersResponse) response.getEntity();
@@ -823,7 +823,7 @@ public class TestContainerEndpoint {
     uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 1);
 
-    response = containerEndpoint.getUnhealthyContainers(1000, 1);
+    response = containerEndpoint.getUnhealthyContainers(1000, 0, 0);
 
     responseObject = (UnhealthyContainersResponse) response.getEntity();
     assertEquals(5, responseObject.getMissingCount());
@@ -925,7 +925,7 @@ public class TestContainerEndpoint {
 
     // Initial empty response verification
     Response response = containerEndpoint
-        .getUnhealthyContainers(missing, 1000, 1);
+        .getUnhealthyContainers(missing, 1000, 0, 0);
 
     UnhealthyContainersResponse responseObject =
         (UnhealthyContainersResponse) response.getEntity();
@@ -947,7 +947,7 @@ public class TestContainerEndpoint {
     createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
 
     // Check for unhealthy containers
-    response = containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
+    response = containerEndpoint.getUnhealthyContainers(missing, 1000, 0, 0);
 
     responseObject = (UnhealthyContainersResponse) response.getEntity();
 
@@ -972,14 +972,14 @@ public class TestContainerEndpoint {
 
     // Check for empty missing containers, should return zero
     Response filteredEmptyMissingResponse = containerEndpoint
-        .getUnhealthyContainers(emptyMissing, 1000, 1);
+        .getUnhealthyContainers(emptyMissing, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredEmptyMissingResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
 
     // Check for negative size containers, should return zero
     Response filteredNegativeSizeResponse = containerEndpoint
-        .getUnhealthyContainers(negativeSize, 1000, 1);
+        .getUnhealthyContainers(negativeSize, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredNegativeSizeResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
@@ -988,30 +988,43 @@ public class TestContainerEndpoint {
   @Test
   public void testUnhealthyContainersInvalidState() {
     WebApplicationException e = assertThrows(WebApplicationException.class,
-        () -> containerEndpoint.getUnhealthyContainers("invalid", 1000, 1));
+        () -> containerEndpoint.getUnhealthyContainers("invalid", 1000, 0, 0));
     assertEquals("HTTP 400 Bad Request", e.getMessage());
   }
 
   @Test
   public void testUnhealthyContainersPaging()
       throws IOException, TimeoutException {
-    putContainerInfos(6);
+
+    // Clear any existing unhealthy container records from previous tests
+    containerHealthSchemaManager.clearAllUnhealthyContainerRecords();
+    // Create containers for all IDs that will be used in unhealthy records
+    // createUnhealthyRecords(5, 4, 3, 2) will create records for containers 1-14
+    // So we need to create 14 containers instead of just 6
+    putContainerInfos(14);  // Changed from 6 to 14
     uuid1 = newDatanode("host1", "127.0.0.1");
     uuid2 = newDatanode("host2", "127.0.0.2");
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 0);
+
+    // Get first batch with no pagination (prevStartKey=0, prevLastKey=0)
     UnhealthyContainersResponse firstBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
-            3, 1).getEntity();
+            3, 0, 0).getEntity();
     assertTrue(firstBatch.getContainers().stream()
         .flatMap(containerMetadata -> containerMetadata.getReplicas().stream()
             .map(ContainerHistory::getState))
         .allMatch(s -> s.equals("UNHEALTHY")));
 
+    // For pagination, use the last container ID from the first batch as prevLastKey
+    long lastContainerIdFromFirstBatch = firstBatch.getContainers().stream()
+        .map(i -> i.getContainerID()).max(Long::compareTo).get();
+
+    // Get second batch using correct pagination parameters
     UnhealthyContainersResponse secondBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
-            3, 2).getEntity();
+            3, 0, lastContainerIdFromFirstBatch).getEntity();
 
     ArrayList<UnhealthyContainerMetadata> records
         = new ArrayList<>(firstBatch.getContainers());
@@ -1019,7 +1032,6 @@ public class TestContainerEndpoint {
     assertEquals(1L, records.get(0).getContainerID());
     assertEquals(2L, records.get(1).getContainerID());
     assertEquals(3L, records.get(2).getContainerID());
-
     records
         = new ArrayList<>(secondBatch.getContainers());
     assertEquals(3, records.size());
