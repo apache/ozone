@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -106,11 +108,18 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
       LOG.error(err.toString());
     }
 
+    Set<String> volumeNames = keyInfoMap.values().stream()
+        .map(OmKeyInfo::getVolumeName)
+        .collect(Collectors.toSet());
+
     try (OzoneClient client = cluster().newClient()) {
       ObjectStore store = client.getObjectStore();
       for (Iterator<? extends OzoneVolume> volumeIterator
            = store.listVolumes(null); volumeIterator.hasNext();) {
         OzoneVolume ozoneVolume = volumeIterator.next();
+        if (!volumeNames.contains(ozoneVolume.getName())) {
+          continue;
+        }
         for (Iterator<? extends OzoneBucket> bucketIterator
              = store.getVolume(ozoneVolume.getName()).listBuckets(null); bucketIterator.hasNext();) {
           OzoneBucket ozoneBucket = bucketIterator.next();
@@ -184,7 +193,7 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
 
   @MethodSource("getTestChecksumsArguments")
   @ParameterizedTest(name = "{0}")
-  void testReplicas(String description, int expectedExitCode, List<String> parameters) throws IOException {
+  void testReplicas(String description, int expectedExitCode, List<String> parameters) {
     Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
     parameters = new ArrayList<>(parameters);
     parameters.add(0, getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY));
@@ -201,7 +210,7 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
   }
 
   @Test
-  void testChecksumsWithCorruptedBlockFile() throws IOException {
+  void testChecksumsWithCorruptedBlockFile() {
     Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
     Optional<String> key = keyInfoMap.keySet().stream().findAny();
     if (!key.isPresent()) {
@@ -234,7 +243,7 @@ public abstract class TestOzoneDebugReplicasVerify implements NonHATests.TestCas
   }
 
   @Test
-  void testChecksumsWithEmptyBlockFile() throws IOException {
+  void testChecksumsWithEmptyBlockFile() {
     Path checksumsOutputDir = tempDir.toPath().resolve(RandomStringUtils.insecure().nextAlphanumeric(10));
     Optional<String> key = keyInfoMap.keySet().stream().findAny();
     if (!key.isPresent()) {
