@@ -33,7 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TODO: javadoc.
+ * Represents an S3 Access Control List (ACL) that defines permissions for S3 buckets and objects.
  */
 public final class S3Acl {
   private static final Logger LOG = LoggerFactory.getLogger(S3Acl.class);
@@ -90,7 +90,7 @@ public final class S3Acl {
   }
 
   /**
-   * TODO: javadoc.
+   * Represents the different types of identities that can be granted permissions in an S3 ACL.
    */
   enum ACLIdentityType {
     USER("CanonicalUser", true, "id"),

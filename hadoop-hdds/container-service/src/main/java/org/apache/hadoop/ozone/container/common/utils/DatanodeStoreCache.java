@@ -100,11 +100,7 @@ public final class DatanodeStoreCache {
       return;
     }
 
-    try {
-      db.getStore().stop();
-    } catch (Exception e) {
-      LOG.error("Stop DatanodeStore: {} failed", containerDBPath, e);
-    }
+    db.getStore().stop();
     LOG.info("Removed db {} from cache", containerDBPath);
   }
 
@@ -117,12 +113,8 @@ public final class DatanodeStoreCache {
       return;
     }
 
-    for (Map.Entry<String, RawDB> entry : datanodeStoreMap.entrySet()) {
-      try {
-        entry.getValue().getStore().stop();
-      } catch (Exception e) {
-        LOG.warn("Stop DatanodeStore: {} failed", entry.getKey(), e);
-      }
+    for (RawDB db : datanodeStoreMap.values()) {
+      db.getStore().stop();
     }
     datanodeStoreMap.clear();
   }

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -72,20 +71,15 @@ public class ReferenceCountedDB extends DBHandle {
         LOG.debug("Close {} refCnt {}", getContainerDBPath(),
             referenceCount.get());
       }
-      try {
-        getStore().stop();
-        return true;
-      } catch (Exception e) {
-        LOG.error("Error closing DB. Container: " + getContainerDBPath(), e);
-        return false;
-      }
+      getStore().stop();
+      return true;
     } else {
       return false;
     }
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     decrementReference();
   }
 

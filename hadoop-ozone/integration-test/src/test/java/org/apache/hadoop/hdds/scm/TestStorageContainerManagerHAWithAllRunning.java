@@ -145,7 +145,7 @@ public abstract class TestStorageContainerManagerHAWithAllRunning implements HAT
           .setReplicationConfig(replication)
           .setKeyName(keyName)
           .build();
-      final OmKeyInfo keyInfo = cluster().getOzoneManager().lookupKey(keyArgs);
+      final OmKeyInfo keyInfo = cluster().getOMLeader().lookupKey(keyArgs);
       final List<OmKeyLocationInfo> keyLocationInfos =
           keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
       long index = -1;

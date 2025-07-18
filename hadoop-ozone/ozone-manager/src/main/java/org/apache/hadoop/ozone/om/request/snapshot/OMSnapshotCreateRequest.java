@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.SNAPSHOT_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 import java.io.IOException;
@@ -202,6 +202,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
+      ozoneManager.getOmSnapshotManager().decrementInFlightSnapshotCount();
       if (acquiredSnapshotLock) {
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK,
@@ -291,8 +292,6 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         removeSnapshotInfoFromSnapshotChainManager(snapshotChainManager,
             snapshotInfo);
         throw new IOException(exception.getMessage(), exception);
-      } finally {
-        ozoneManager.getOmSnapshotManager().decrementInFlightSnapshotCount();
       }
     }
   }
@@ -340,14 +339,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     DefaultReplicationConfig defRC = bucketInfo.getDefaultReplicationConfig();
     final ReplicationConfig rc;
     if (defRC == null) {
-      // Note: A lot of tests are not setting bucket DefaultReplicationConfig,
-      //  sometimes intentionally.
-      //  Fall back to config default and print warning level log.
+      //  Fall back to config default.
       rc = ReplicationConfig.getDefault(new OzoneConfiguration());
-      LOG.warn("DefaultReplicationConfig is not correctly set in " +
-          "OmBucketInfo for volume '{}' bucket '{}'. " +
-          "Falling back to config default '{}'",
-          bucketInfo.getVolumeName(), bucketInfo.getBucketName(), rc);
     } else {
       rc = defRC.getReplicationConfig();
     }
