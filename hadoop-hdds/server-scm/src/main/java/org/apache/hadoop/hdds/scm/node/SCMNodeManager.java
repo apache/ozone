@@ -933,6 +933,7 @@ public class SCMNodeManager implements NodeManager {
     long remaining = 0L;
     long committed = 0L;
     long freeSpaceToSpare = 0L;
+    long pendingDeletions = 0L;
 
     for (SCMNodeStat stat : getNodeStats().values()) {
       capacity += stat.getCapacity().get();
@@ -940,9 +941,11 @@ public class SCMNodeManager implements NodeManager {
       remaining += stat.getRemaining().get();
       committed += stat.getCommitted().get();
       freeSpaceToSpare += stat.getFreeSpaceToSpare().get();
+      pendingDeletions += stat.getPendingDeletions().get();
+
     }
     return new SCMNodeStat(capacity, used, remaining, committed,
-        freeSpaceToSpare);
+        freeSpaceToSpare, pendingDeletions);
   }
 
   /**
@@ -1049,6 +1052,7 @@ public class SCMNodeManager implements NodeManager {
       long remaining = 0L;
       long committed = 0L;
       long freeSpaceToSpare = 0L;
+      long pendingDeletions = 0L;
 
       final DatanodeInfo datanodeInfo = nodeStateManager
           .getNode(datanodeDetails);
@@ -1060,9 +1064,10 @@ public class SCMNodeManager implements NodeManager {
         remaining += reportProto.getRemaining();
         committed += reportProto.getCommitted();
         freeSpaceToSpare += reportProto.getFreeSpaceToSpare();
+        pendingDeletions += reportProto.getPendingDeletions();
       }
       return new SCMNodeStat(capacity, used, remaining, committed,
-          freeSpaceToSpare);
+          freeSpaceToSpare, pendingDeletions);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.", datanodeDetails);
       return null;

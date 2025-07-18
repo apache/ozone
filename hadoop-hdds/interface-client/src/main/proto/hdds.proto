@@ -215,6 +215,7 @@ message DatanodeUsageInfoProto {
     optional int64 committed = 6;
     optional int64 freeSpaceToSpare = 7;
     optional int64 pipelineCount = 8;
+    optional int64 pendingDeletions = 9;
 }
 
 /**

@@ -220,6 +220,7 @@ public class DatanodeUsageInfo {
       builder.setRemaining(scmNodeStat.getRemaining().get());
       builder.setCommitted(scmNodeStat.getCommitted().get());
       builder.setFreeSpaceToSpare(scmNodeStat.getFreeSpaceToSpare().get());
+      builder.setPendingDeletions(scmNodeStat.getPendingDeletions().get());
     }
 
     builder.setContainerCount(containerCount);

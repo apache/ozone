@@ -182,6 +182,7 @@ message StorageReportProto {
   optional bool failed = 7 [default = false];
   optional uint64 committed = 8 [default = 0];
   optional uint64 freeSpaceToSpare = 9 [default = 0];
+  optional uint64 pendingDeletions = 10 [default = 0];
 }
 
 message MetadataStorageReportProto {

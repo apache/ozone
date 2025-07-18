@@ -36,6 +36,8 @@ public interface StorageLocationReportMXBean {
 
   long getFreeSpaceToSpare();
 
+  long getPendingDeletions();
+
   String getStorageLocation();
 
   String getStorageTypeName();
