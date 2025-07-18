@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import org.apache.ozone.test.TestClock;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -31,9 +32,13 @@ import org.junit.jupiter.api.Test;
  */
 class TestSlidingWindow {
 
-  private SlidingWindow slidingWindow;
   private TestClock testClock;
 
+  @BeforeEach
+  void setup() {
+    testClock = TestClock.newInstance();
+  }
+  
   @Test
   void testConstructorValidation() {
     // Test invalid window size
@@ -46,8 +51,7 @@ class TestSlidingWindow {
 
   @Test
   void testAdd() {
-    testClock = TestClock.newInstance();
-    slidingWindow = new SlidingWindow(3, Duration.ofSeconds(5), testClock);
+    SlidingWindow slidingWindow = new SlidingWindow(3, Duration.ofSeconds(5), testClock);
     for (int i = 0; i < slidingWindow.getWindowSize(); i++) {
       slidingWindow.add();
       assertEquals(i + 1, slidingWindow.getNumEvents());
@@ -61,8 +65,7 @@ class TestSlidingWindow {
 
   @Test
   void testEventExpiration() {
-    testClock = TestClock.newInstance();
-    slidingWindow = new SlidingWindow(2, Duration.ofMillis(500), testClock);
+    SlidingWindow slidingWindow = new SlidingWindow(2, Duration.ofMillis(500), testClock);
 
     // Add events to reach threshold
     slidingWindow.add();
@@ -85,8 +88,7 @@ class TestSlidingWindow {
 
   @Test
   void testPartialExpiration() {
-    testClock = TestClock.newInstance();
-    slidingWindow = new SlidingWindow(3, Duration.ofSeconds(1), testClock);
+    SlidingWindow slidingWindow = new SlidingWindow(3, Duration.ofSeconds(1), testClock);
 
     slidingWindow.add();
     slidingWindow.add();
@@ -107,8 +109,7 @@ class TestSlidingWindow {
 
   @Test
   void testZeroWindowSize() {
-    testClock = TestClock.newInstance();
-    slidingWindow = new SlidingWindow(0, Duration.ofSeconds(5), testClock);
+    SlidingWindow slidingWindow = new SlidingWindow(0, Duration.ofSeconds(5), testClock);
     
     // Verify initial state
     assertEquals(0, slidingWindow.getWindowSize());

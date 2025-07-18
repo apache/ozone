@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayDeque;
@@ -106,6 +107,7 @@ public class SlidingWindow {
    *
    * @return the number of valid timestamps currently in the sliding window
    */
+  @VisibleForTesting
   public int getNumEvents() {
     synchronized (lock) {
       removeExpired();
