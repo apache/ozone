@@ -128,8 +128,10 @@ import software.amazon.awssdk.services.s3.model.UploadPartRequest;
 import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.HeadBucketPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.HeadObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedHeadBucketRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedHeadObjectRequest;
 import software.amazon.awssdk.transfer.s3.S3TransferManager;
 import software.amazon.awssdk.transfer.s3.model.DownloadFileRequest;
@@ -561,6 +563,41 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         HttpExecuteResponse response = sdkHttpClient.prepareRequest(executeRequest).call();
         assertEquals(200, response.httpResponse().statusCode(),
             "HeadObject presigned URL should return 200 OK via SdkHttpClient");
+      }
+
+      // Test HeadBucket presigned URL
+      HeadBucketRequest bucketRequest = HeadBucketRequest.builder()
+          .bucket(bucketName)
+          .build();
+
+      HeadBucketPresignRequest headBucketPresignRequest = HeadBucketPresignRequest.builder()
+          .signatureDuration(Duration.ofMinutes(10))
+          .headBucketRequest(bucketRequest)
+          .build();
+
+      PresignedHeadBucketRequest presignedBucketRequest = presigner.presignHeadBucket(headBucketPresignRequest);
+
+      URL presignedBucketUrl = presignedBucketRequest.url();
+      HttpURLConnection bucketConnection = (HttpURLConnection) presignedBucketUrl.openConnection();
+      bucketConnection.setRequestMethod("HEAD");
+
+      int bucketResponseCode = bucketConnection.getResponseCode();
+      assertEquals(200, bucketResponseCode, "HeadBucket presigned URL should return 200 OK");
+
+      // Use the AWS SDK for Java SdkHttpClient class to test the HEAD request for bucket
+      SdkHttpRequest bucketSdkRequest = SdkHttpRequest.builder()
+          .method(SdkHttpMethod.HEAD)
+          .uri(presignedBucketUrl.toURI())
+          .build();
+
+      HttpExecuteRequest bucketExecuteRequest = HttpExecuteRequest.builder()
+          .request(bucketSdkRequest)
+          .build();
+
+      try (SdkHttpClient sdkHttpClient = ApacheHttpClient.create()) {
+        HttpExecuteResponse response = sdkHttpClient.prepareRequest(bucketExecuteRequest).call();
+        assertEquals(200, response.httpResponse().statusCode(),
+            "HeadBucket presigned URL should return 200 OK via SdkHttpClient");
       }
     }
   }
