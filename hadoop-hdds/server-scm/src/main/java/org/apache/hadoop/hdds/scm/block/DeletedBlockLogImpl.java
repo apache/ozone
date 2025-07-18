@@ -342,7 +342,7 @@ public class DeletedBlockLogImpl
       Set<ContainerReplica> replicas,
       Map<DatanodeID, Map<Long, CmdStatus>> commandStatus,
       int maxDeleteBlocksPerDatanode) {
-    // Check if all replicas satisfy the maxBlocksPerDatanode condition
+    // Ensure all DNs for this transaction are below their max block limit.
     if (!replicas.stream().allMatch(replica -> {
       final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
       return transactions.getNumberOfBlocksForDatanode(datanodeID) < maxDeleteBlocksPerDatanode;
