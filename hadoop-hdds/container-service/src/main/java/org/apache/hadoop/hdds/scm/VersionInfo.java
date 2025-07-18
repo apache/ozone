@@ -26,7 +26,6 @@ public final class VersionInfo {
   private static final VersionInfo[] VERSION_INFOS =
       {new VersionInfo("First version of SCM", 1)};
 
-
   public static final String DESCRIPTION_KEY = "Description";
   private final String description;
   private final int version;

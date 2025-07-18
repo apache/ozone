@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
-import java.io.IOException;
+import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.function.CheckedFunction;
 
 /**
@@ -28,26 +28,12 @@ import org.apache.ratis.util.function.CheckedFunction;
  * @param <DELEGATE> The object type of the {@link #delegate}.
  */
 public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
-  /** How to {@link #copyObject(Object)}? */
-  public enum CopyType {
-    /** Deep copy -- duplicate the underlying fields of the object. */
-    DEEP,
-    /** Shallow copy -- only duplicate the reference of the object. */
-    SHALLOW,
-    /**
-     * Copy is unsupported
-     * due to some reason such as the codec being inconsistent.
-     * <p>
-     * Consistency: deserialize(serialize(original)) equals to original.
-     */
-    UNSUPPORTED
-  }
-
   private final Codec<DELEGATE> delegate;
-  private final CheckedFunction<DELEGATE, T, IOException> forward;
-  private final CheckedFunction<T, DELEGATE, IOException> backward;
+  private final CheckedFunction<DELEGATE, T, CodecException> forward;
+  private final CheckedFunction<T, DELEGATE, CodecException> backward;
   private final Class<T> clazz;
   private final CopyType copyType;
+  private final String name;
 
   /**
    * Construct a {@link Codec} using the given delegate.
@@ -58,20 +44,21 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
    * @param copyType How to {@link #copyObject(Object)}?
    */
   public DelegatedCodec(Codec<DELEGATE> delegate,
-      CheckedFunction<DELEGATE, T, IOException> forward,
-      CheckedFunction<T, DELEGATE, IOException> backward,
+      CheckedFunction<DELEGATE, T, CodecException> forward,
+      CheckedFunction<T, DELEGATE, CodecException> backward,
       Class<T> clazz, CopyType copyType) {
     this.delegate = delegate;
     this.forward = forward;
     this.backward = backward;
     this.clazz = clazz;
     this.copyType = copyType;
+    this.name = JavaUtils.getClassSimpleName(getTypeClass()) + "-delegate: " + delegate;
   }
 
   /** The same as new DelegatedCodec(delegate, forward, backward, DEEP). */
   public DelegatedCodec(Codec<DELEGATE> delegate,
-      CheckedFunction<DELEGATE, T, IOException> forward,
-      CheckedFunction<T, DELEGATE, IOException> backward,
+      CheckedFunction<DELEGATE, T, CodecException> forward,
+      CheckedFunction<T, DELEGATE, CodecException> backward,
       Class<T> clazz) {
     this(delegate, forward, backward, clazz, CopyType.DEEP);
   }
@@ -87,24 +74,22 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
   }
 
   @Override
-  public final CodecBuffer toCodecBuffer(@Nonnull T message,
-      CodecBuffer.Allocator allocator) throws IOException {
+  public final CodecBuffer toCodecBuffer(@Nonnull T message, CodecBuffer.Allocator allocator) throws CodecException {
     return delegate.toCodecBuffer(backward.apply(message), allocator);
   }
 
   @Override
-  public final T fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws IOException {
+  public final T fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
     return forward.apply(delegate.fromCodecBuffer(buffer));
   }
 
   @Override
-  public final byte[] toPersistedFormat(T message) throws IOException {
+  public final byte[] toPersistedFormat(T message) throws CodecException {
     return delegate.toPersistedFormat(backward.apply(message));
   }
 
   @Override
-  public final T fromPersistedFormat(byte[] bytes) throws IOException {
+  public final T fromPersistedFormat(byte[] bytes) throws CodecException {
     return forward.apply(delegate.fromPersistedFormat(bytes));
   }
 
@@ -124,8 +109,39 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
     // Deep copy
     try {
       return forward.apply(delegate.copyObject(backward.apply(message)));
-    } catch (IOException e) {
+    } catch (CodecException e) {
       throw new IllegalStateException("Failed to copyObject", e);
     }
+  }
+
+  public static <T, DELEGATE> DelegatedCodec<T, DELEGATE> decodeOnly(
+      Codec<DELEGATE> delegate, CheckedFunction<DELEGATE, T, CodecException> forward, Class<T> clazz) {
+    return new DelegatedCodec<>(delegate, forward, unsupportedBackward(), clazz, CopyType.DEEP);
+  }
+
+  private static <A, B> CheckedFunction<A, B, CodecException> unsupportedBackward() {
+    return a -> {
+      throw new UnsupportedOperationException("Unsupported backward conversion");
+    };
+  }
+
+  @Override
+  public String toString() {
+    return name;
+  }
+
+  /** How to {@link #copyObject(Object)}? */
+  public enum CopyType {
+    /** Deep copy -- duplicate the underlying fields of the object. */
+    DEEP,
+    /** Shallow copy -- only duplicate the reference of the object. */
+    SHALLOW,
+    /**
+     * Copy is unsupported
+     * due to some reason such as the codec being inconsistent.
+     * <p>
+     * Consistency: deserialize(serialize(original)) equals to original.
+     */
+    UNSUPPORTED
   }
 }

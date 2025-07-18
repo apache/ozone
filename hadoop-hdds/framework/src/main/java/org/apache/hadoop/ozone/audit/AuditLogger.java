@@ -146,8 +146,10 @@ public class AuditLogger {
   /**
    * Utility class for building performance log strings.
    */
+  @SuppressWarnings(value = "PMD.AvoidStringBufferField")
   public static class PerformanceStringBuilder {
     private final StringBuilder builder = new StringBuilder(128).append('{');
+
     /**
      * Appends metadata operation latency in milliseconds.
      * @param nanos Latency in nanoseconds.

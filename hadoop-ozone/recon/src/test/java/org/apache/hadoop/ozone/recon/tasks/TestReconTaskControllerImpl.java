@@ -200,7 +200,6 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertEquals(Long.valueOf(0L), dbRecord.getLastUpdatedSeqNumber());
   }
 
-
   @Test
   public void testReInitializeTasks() throws Exception {
 

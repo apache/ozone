@@ -60,7 +60,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TestNodeStateManager {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(TestNodeStateManager.class);
 
   private NodeStateManager nsm;

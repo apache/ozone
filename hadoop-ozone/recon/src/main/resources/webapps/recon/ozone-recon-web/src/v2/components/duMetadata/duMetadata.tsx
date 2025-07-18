@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-import React, { useRef, useState } from 'react';
+import React, {useRef, useState} from 'react';
 import moment from 'moment';
-import axios, { AxiosError } from 'axios';
-import { Table } from 'antd';
+import axios, {AxiosError} from 'axios';
+import {Table} from 'antd';
 
-import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
-import { byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError } from '@/utils/common';
+import {AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper} from '@/utils/axiosRequestHelper';
+import {byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError} from '@/utils/common';
 
-import { Acl } from '@/v2/types/acl.types';
+import {Acl} from '@/v2/types/acl.types';
 
 
 // ------------- Types -------------- //
@@ -201,7 +201,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
     if (objectInfo?.quotaInNamespace !== undefined && objectInfo?.quotaInNamespace !== -1) {
       data.push({
         key: 'Quota In Namespace',
-        value: byteToSize(objectInfo.quotaInNamespace, 3)
+        value: objectInfo.quotaInNamespace
       });
     }
 
@@ -270,7 +270,7 @@ const DUMetadata: React.FC<MetadataProps> = ({
         // If the entity is a Key then fetch the Key metadata only
         if (summaryResponse.type === 'KEY') {
           const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(
-            `/api/v1/namespace/du?path=${path}&replica=true`,
+            `/api/v1/namespace/usage?path=${path}&replica=true`,
             keyMetadataSummarySignal.current
           );
           keyMetadataSummarySignal.current = metadataNewController;

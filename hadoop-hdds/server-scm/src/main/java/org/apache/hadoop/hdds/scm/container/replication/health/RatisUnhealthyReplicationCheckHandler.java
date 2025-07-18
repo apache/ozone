@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * </p>
  */
 public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       RatisUnhealthyReplicationCheckHandler.class);
 
   @Override

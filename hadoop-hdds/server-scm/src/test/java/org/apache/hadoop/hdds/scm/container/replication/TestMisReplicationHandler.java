@@ -132,6 +132,7 @@ public abstract class TestMisReplicationHandler {
   protected abstract MisReplicationHandler getMisreplicationHandler(
           PlacementPolicy placementPolicy, OzoneConfiguration configuration,
           ReplicationManager rm);
+
   protected void testMisReplication(Set<ContainerReplica> availableReplicas,
                                   List<ContainerReplicaOp> pendingOp,
                                   int maintenanceCnt, int misreplicationCount,

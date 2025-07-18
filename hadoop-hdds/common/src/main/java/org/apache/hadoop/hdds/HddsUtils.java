@@ -99,7 +99,6 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Stable
 public final class HddsUtils {
 
-
   private static final Logger LOG = LoggerFactory.getLogger(HddsUtils.class);
 
   public static final ByteString REDACTED =
@@ -372,7 +371,6 @@ public final class HddsUtils {
       if (dnsInterface == null) {
         // Try the legacy configuration keys.
         dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
-        dnsInterface = conf.get(HDDS_DATANODE_DNS_INTERFACE_KEY);
         nameServer = conf.get(HDDS_DATANODE_DNS_NAMESERVER_KEY);
       } else {
         // If HADOOP_SECURITY_DNS_* is set then also attempt hosts file
@@ -421,6 +419,7 @@ public final class HddsUtils {
     case ListContainer:
     case ListChunk:
     case GetCommittedBlockLength:
+    case GetContainerChecksumInfo:
       return true;
     case CloseContainer:
     case WriteChunk:
@@ -847,7 +846,7 @@ public final class HddsUtils {
     if (elements != null && elements.length > startIndex) {
       final StringBuilder sb = new StringBuilder();
       for (int line = startIndex; line < elements.length; line++) {
-        sb.append(elements[line]).append("\n");
+        sb.append(elements[line]).append('\n');
       }
       return sb.toString();
     }
@@ -860,6 +859,11 @@ public final class HddsUtils {
     return logger.isDebugEnabled()
         ? Thread.currentThread().getStackTrace()
         : null;
+  }
+
+  /** @return Hex string representation of {@code value} */
+  public static String checksumToString(long value) {
+    return Long.toHexString(value);
   }
 
   /**

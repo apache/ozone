@@ -37,15 +37,10 @@ import org.slf4j.LoggerFactory;
  * This class is used to get the DataChannel for streaming.
  */
 public class KeyValueStreamDataChannel extends StreamDataChannelBase {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(KeyValueStreamDataChannel.class);
+  static final Logger LOG = LoggerFactory.getLogger(KeyValueStreamDataChannel.class);
 
-  interface WriteMethod {
-    int applyAsInt(ByteBuffer src) throws IOException;
-  }
+  private final Buffers buffers = new Buffers(BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX);
 
-  private final Buffers buffers = new Buffers(
-      BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX);
   private final AtomicBoolean closed = new AtomicBoolean();
 
   KeyValueStreamDataChannel(File file, ContainerData containerData,
@@ -64,6 +59,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
       throws IOException {
     getMetrics().incContainerOpsMetrics(getType());
     assertOpen();
+    assertSpaceAvailability(referenceCounted.get().remaining());
 
     return writeBuffers(referenceCounted, buffers, this::writeFileChannel);
   }
@@ -157,5 +153,9 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
 
     // set index for reading data
     b.writerIndex(protoIndex);
+  }
+
+  interface WriteMethod {
+    int applyAsInt(ByteBuffer src) throws IOException;
   }
 }

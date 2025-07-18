@@ -19,8 +19,12 @@ package org.apache.hadoop.hdds.utils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -54,10 +58,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -100,7 +104,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ShutdownHookManager;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,16 +112,15 @@ import org.slf4j.LoggerFactory;
  */
 public final class HddsServerUtil {
 
-  private HddsServerUtil() {
-  }
+  private static final Logger LOG = LoggerFactory.getLogger(HddsServerUtil.class);
 
   private static final int SHUTDOWN_HOOK_PRIORITY = 0;
 
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
       "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
-  private static final Logger LOG = LoggerFactory.getLogger(
-      HddsServerUtil.class);
+  private HddsServerUtil() {
+  }
 
   /**
    * Add protobuf-based protocol to the {@link org.apache.hadoop.ipc.RPC.Server}.
@@ -128,7 +130,7 @@ public final class HddsServerUtil {
    * @param server RPC server to which the protocol and implementation is added to
    */
   public static void addPBProtocol(Configuration conf, Class<?> protocol,
-      BlockingService service, RPC.Server server) throws IOException {
+      BlockingService service, RPC.Server server) {
     RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
     server.addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER, protocol, service);
   }
@@ -220,7 +222,6 @@ public final class HddsServerUtil {
                 ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT)));
   }
 
-
   /**
    * Retrieve the socket address that should be used by DataNodes to connect
    * to Recon.
@@ -267,6 +268,18 @@ public final class HddsServerUtil {
   }
 
   /**
+   * Heartbeat Interval - Defines the initial heartbeat frequency from a datanode to
+   * SCM.
+   *
+   * @param conf - Ozone Config
+   * @return - HB interval in milli seconds.
+   */
+  public static long getScmInitialHeartbeatInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(HDDS_INITIAL_HEARTBEAT_INTERVAL,
+        HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
    * Heartbeat Interval - Defines the heartbeat frequency from a datanode to
    * Recon.
    *
@@ -276,6 +289,18 @@ public final class HddsServerUtil {
   public static long getReconHeartbeatInterval(ConfigurationSource conf) {
     return conf.getTimeDuration(HDDS_RECON_HEARTBEAT_INTERVAL,
         HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Heartbeat Interval - Defines the initial heartbeat frequency from a datanode to
+   * Recon.
+   *
+   * @param conf - Ozone Config
+   * @return - HB interval in milli seconds.
+   */
+  public static long getInitialReconHeartbeatInterval(ConfigurationSource conf) {
+    return conf.getTimeDuration(HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL,
+        HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
 
   /**
@@ -592,14 +617,12 @@ public final class HddsServerUtil {
    * @param checkpoint    checkpoint file
    * @param destination   destination output stream.
    * @param toExcludeList the files to be excluded
-   * @param excludedList  the files excluded
    * @throws IOException
    */
   public static void writeDBCheckpointToStream(
       DBCheckpoint checkpoint,
       OutputStream destination,
-      List<String> toExcludeList,
-      List<String> excludedList)
+      Set<String> toExcludeList)
       throws IOException {
     try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination);
         Stream<Path> files =
@@ -611,8 +634,6 @@ public final class HddsServerUtil {
             String fileName = fileNamePath.toString();
             if (!toExcludeList.contains(fileName)) {
               includeFile(path.toFile(), fileName, archiveOutputStream);
-            } else {
-              excludedList.add(fileName);
             }
           }
         }
@@ -639,22 +660,6 @@ public final class HddsServerUtil {
   public static UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
-  }
-
-  /**
-   * Converts RocksDB exception to IOE.
-   * @param msg  - Message to add to exception.
-   * @param e - Original Exception.
-   * @return  IOE.
-   */
-  public static IOException toIOException(String msg, RocksDBException e) {
-    String statusCode = e.getStatus() == null ? "N/A" :
-        e.getStatus().getCodeString();
-    String errMessage = e.getMessage() == null ? "Unknown error" :
-        e.getMessage();
-    String output = msg + "; status : " + statusCode
-        + "; message : " + errMessage;
-    return new IOException(output, e);
   }
 
   /**
@@ -698,7 +703,7 @@ public final class HddsServerUtil {
     StringBuilder b = new StringBuilder(prefix);
     b.append("\n/************************************************************");
     for (String s : msg) {
-      b.append("\n").append(prefix).append(s);
+      b.append('\n').append(prefix).append(s);
     }
     b.append("\n************************************************************/");
     return b.toString();

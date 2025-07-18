@@ -83,12 +83,14 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -96,6 +98,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.security.token.Token;
@@ -121,6 +124,7 @@ public class TestSecureContainerServer {
   private static SecretKeyClient secretKeyClient;
   private static OzoneBlockTokenSecretManager blockTokenSecretManager;
   private static ContainerTokenSecretManager containerTokenSecretManager;
+  private static VolumeChoosingPolicy volumeChoosingPolicy;
 
   @BeforeAll
   public static void setup() throws Exception {
@@ -131,6 +135,7 @@ public class TestSecureContainerServer {
     CONF.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
     caClient = new CertificateClientTestImpl(CONF);
     secretKeyClient = new SecretKeyTestClient();
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(CONF);
 
     long tokenLifetime = TimeUnit.HOURS.toMillis(1);
 
@@ -165,7 +170,7 @@ public class TestSecureContainerServer {
     ContainerSet containerSet = newContainerSet();
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(testDir.toString(), "dfs", "data", "hdds",
-            RandomStringUtils.randomAlphabetic(4)).toString());
+            RandomStringUtils.secure().nextAlphabetic(4)).toString());
     conf.set(OZONE_METADATA_DIRS, testDir.toString());
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -179,8 +184,8 @@ public class TestSecureContainerServer {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(containerType, conf,
               dd.getUuid().toString(),
-              containerSet, volumeSet, metrics,
-              c -> { }));
+              containerSet, volumeSet, volumeChoosingPolicy, metrics,
+              c -> { }, new ContainerChecksumTreeManager(conf)));
     }
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,
@@ -260,7 +265,7 @@ public class TestSecureContainerServer {
 
       Token<OzoneBlockTokenIdentifier> token =
           blockTokenSecretManager.generateToken(blockID,
-              EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
+              EnumSet.allOf(AccessModeProto.class), RandomUtils.secure().randomLong());
       String encodedToken = token.encodeToUrlString();
 
       ContainerCommandRequestProto.Builder writeChunk =

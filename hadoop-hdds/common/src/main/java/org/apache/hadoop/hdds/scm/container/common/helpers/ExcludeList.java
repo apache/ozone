@@ -44,7 +44,6 @@ public class ExcludeList {
   private long expiryTime = 0;
   private final Clock clock;
 
-
   public ExcludeList() {
     clock = Clock.system(ZoneOffset.UTC);
   }

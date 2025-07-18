@@ -281,8 +281,6 @@ public class TestDefaultProfile {
     assertFalse(approver.verfiyExtensions(csr));
   }
 
-
-
   /**
    * Generates an CSR with the extension specified.
    * This function is used to get an Invalid CSR and test that PKI profile

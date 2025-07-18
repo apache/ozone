@@ -66,46 +66,13 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   private final Set<StorageContainerManager> failedScmSet;
   private final Set<DatanodeDetails> failedDnSet;
 
-  // The service on which chaos will be unleashed.
-  enum FailureService {
-    DATANODE,
-    OZONE_MANAGER,
-    STORAGE_CONTAINER_MANAGER;
-
-    @Override
-    public String toString() {
-      switch (this) {
-      case DATANODE:
-        return "Datanode";
-      case OZONE_MANAGER:
-        return "OzoneManager";
-      case STORAGE_CONTAINER_MANAGER:
-        return "StorageContainerManager";
-      default:
-        return "";
-      }
-    }
-
-    public static FailureService of(String serviceName) {
-      if (serviceName.equalsIgnoreCase("Datanode")) {
-        return DATANODE;
-      } else if (serviceName.equalsIgnoreCase("OzoneManager")) {
-        return OZONE_MANAGER;
-      } else if (serviceName.equalsIgnoreCase("StorageContainerManager")) {
-        return STORAGE_CONTAINER_MANAGER;
-      }
-      throw new IllegalArgumentException("Unrecognized value for " +
-          "FailureService enum: " + serviceName);
-    }
-  }
-
   @SuppressWarnings("parameternumber")
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
       OMHAService omService, SCMHAService scmService,
       List<HddsDatanodeService> hddsDatanodes, String clusterPath,
       Set<Class<? extends Failures>> clazzes) {
     super(conf, new SCMConfigurator(), omService, scmService, hddsDatanodes,
-        clusterPath, null);
+        clusterPath, Collections.emptyList());
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = omService.getServices().size();
     this.numStorageContainerManagers = scmService.getServices().size();
@@ -350,12 +317,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     if (failedOmSet.size() >= numOzoneManagers / 2) {
       return false;
     }
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
   // Datanode specific
   private int getNumberOfDnToFail() {
-    return RandomUtils.nextBoolean() ? 1 : 2;
+    return RandomUtils.secure().randomBoolean() ? 1 : 2;
   }
 
   public Set<DatanodeDetails> dnToFail() {
@@ -428,7 +395,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     if (failedScmSet.size() >= numStorageContainerManagers / 2) {
       return false;
     }
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
 }

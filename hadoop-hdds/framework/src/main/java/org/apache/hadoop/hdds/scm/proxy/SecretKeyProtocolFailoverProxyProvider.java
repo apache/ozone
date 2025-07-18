@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public class SecretKeyProtocolFailoverProxyProvider
     <T extends SCMSecretKeyProtocolService.BlockingInterface> extends SCMFailoverProxyProviderBase<T> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SecretKeyProtocolFailoverProxyProvider.class);
 
   /**

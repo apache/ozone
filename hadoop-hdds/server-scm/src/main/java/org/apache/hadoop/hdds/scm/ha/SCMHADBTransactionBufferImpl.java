@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
-  public static final Logger LOG = LoggerFactory.getLogger(SCMHADBTransactionBufferImpl.class);
+  private static final Logger LOG = LoggerFactory.getLogger(SCMHADBTransactionBufferImpl.class);
   private final StorageContainerManager scm;
   private SCMMetadataStore metadataStore;
   private BatchOperation currentBatchOperation;

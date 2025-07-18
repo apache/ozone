@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -40,8 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
-  @VisibleForTesting
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(FinalizationStateManagerImpl.class);
 
   private Table<String, String> finalizationStore;
@@ -230,7 +228,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       throws IOException {
     checkpointLock.writeLock().lock();
     try {
-      this.finalizationStore.close();
       this.finalizationStore = newFinalizationStore;
       initialize();
 

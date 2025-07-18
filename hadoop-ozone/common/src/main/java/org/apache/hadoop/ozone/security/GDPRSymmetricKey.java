@@ -34,6 +34,11 @@ public class GDPRSymmetricKey {
   private static final ThreadLocal<SecureRandom> RANDOM
       = ThreadLocal.withInitial(SecureRandom::new);
 
+  private final SecretKeySpec secretKey;
+  private final Cipher cipher;
+  private final String algorithm;
+  private final String secret;
+
   /** @return a new instance with default parameters. */
   public static GDPRSymmetricKey newDefaultInstance() {
     try {
@@ -49,11 +54,6 @@ public class GDPRSymmetricKey {
         OzoneConsts.GDPR_DEFAULT_RANDOM_SECRET_LENGTH,
         0, 0, true, true, null, secureRandom);
   }
-
-  private final SecretKeySpec secretKey;
-  private final Cipher cipher;
-  private final String algorithm;
-  private final String secret;
 
   public SecretKeySpec getSecretKey() {
     return secretKey;

@@ -45,7 +45,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +52,6 @@ import org.slf4j.LoggerFactory;
  * Test Container calls.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestGetCommittedBlockLengthAndPutKey implements NonHATests.TestCase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGetCommittedBlockLengthAndPutKey.class);
@@ -90,7 +88,7 @@ public abstract class TestGetCommittedBlockLengthAndPutKey implements NonHATests
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.nextInt(1, 1024)).getBytes(UTF_8);
+        RandomStringUtils.secure().next(RandomUtils.secure().randomInt(1, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,
@@ -154,7 +152,7 @@ public abstract class TestGetCommittedBlockLengthAndPutKey implements NonHATests
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.nextInt(1, 1024)).getBytes(UTF_8);
+        RandomStringUtils.secure().next(RandomUtils.secure().randomInt(1, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,

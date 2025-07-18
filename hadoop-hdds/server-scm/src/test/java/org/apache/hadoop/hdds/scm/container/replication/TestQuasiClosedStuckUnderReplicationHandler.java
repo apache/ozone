@@ -31,12 +31,12 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -69,7 +69,6 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
   private PlacementPolicy policy;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private QuasiClosedStuckUnderReplicationHandler handler;
-
 
   @BeforeEach
   void setup(@TempDir File testDir) throws NodeNotFoundException,
@@ -115,7 +114,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
 
   @Test
   public void testReturnsZeroIfNotUnderReplicated() throws IOException {
-    UUID origin = UUID.randomUUID();
+    final DatanodeID origin = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
         Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
@@ -128,7 +127,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
 
   @Test
   public void testNoCommandsScheduledIfPendingOps() throws IOException {
-    UUID origin = UUID.randomUUID();
+    final DatanodeID origin = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
         Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
@@ -143,7 +142,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
 
   @Test
   public void testCommandScheduledForUnderReplicatedContainer() throws IOException {
-    UUID origin = UUID.randomUUID();
+    final DatanodeID origin = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
         Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE));
@@ -155,8 +154,8 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
 
   @Test
   public void testOverloadedExceptionContinuesAndThrows() throws NotLeaderException, CommandTargetOverloadedException {
-    UUID origin1 = UUID.randomUUID();
-    UUID origin2 = UUID.randomUUID();
+    final DatanodeID origin1 = DatanodeID.randomID();
+    final DatanodeID origin2 = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
         Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
@@ -171,8 +170,8 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
 
   @Test
   public void testInsufficientNodesExceptionThrown() {
-    UUID origin1 = UUID.randomUUID();
-    UUID origin2 = UUID.randomUUID();
+    final DatanodeID origin1 = DatanodeID.randomID();
+    final DatanodeID origin2 = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
         Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
@@ -188,7 +187,7 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
 
   @Test
   public void testPartialReplicationExceptionThrown() {
-    UUID origin1 = UUID.randomUUID();
+    final DatanodeID origin1 = DatanodeID.randomID();
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
         StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
         Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE));

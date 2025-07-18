@@ -48,6 +48,7 @@ public abstract class GenericCli implements GenericParentCommand {
   private UserGroupInformation user;
 
   @Option(names = {"--verbose"},
+      scope = CommandLine.ScopeType.INHERIT,
       description = "More verbose output. Show the stack trace of the errors.")
   private boolean verbose;
 
@@ -88,7 +89,8 @@ public abstract class GenericCli implements GenericParentCommand {
     return cmd.execute(argv);
   }
 
-  protected void printError(Throwable error) {
+  @Override
+  public void printError(Throwable error) {
     //message could be null in case of NPE. This is unexpected so we can
     //print out the stack trace.
     if (verbose || Strings.isNullOrEmpty(error.getMessage())) {

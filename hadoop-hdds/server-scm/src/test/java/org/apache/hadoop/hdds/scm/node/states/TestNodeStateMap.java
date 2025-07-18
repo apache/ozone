@@ -47,6 +47,14 @@ public class TestNodeStateMap {
   private final DatanodeDetails dn = generateDatanode();
   private NodeStateMap map;
 
+  void addNode(NodeStatus status) throws NodeAlreadyExistsException {
+    addNode(dn, status);
+  }
+
+  void addNode(DatanodeDetails datanode, NodeStatus status) throws NodeAlreadyExistsException {
+    map.addNode(new DatanodeInfo(datanode, status, null));
+  }
+
   @BeforeEach
   public void setUp() {
     map = new NodeStateMap();
@@ -60,13 +68,13 @@ public class TestNodeStateMap {
   public void testNodeCanBeAddedAndRetrieved()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     NodeStatus status = NodeStatus.inServiceHealthy();
-    map.addNode(dn, status, null);
+    addNode(status);
     assertEquals(dn, map.getNodeInfo(dn.getID()));
     assertEquals(status, map.getNodeStatus(dn.getID()));
   }
 
   private void runTestUpdateHealth(NodeStatus original, NodeState newHealth) throws Exception {
-    map.addNode(dn, original, null);
+    addNode(original);
     final NodeStatus returned = map.updateNodeHealthState(dn.getID(), newHealth);
 
     final NodeStatus expected = NodeStatus.valueOf(
@@ -89,7 +97,7 @@ public class TestNodeStateMap {
   public void testNodeOperationalStateCanBeUpdated()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     NodeStatus status = NodeStatus.inServiceHealthy();
-    map.addNode(dn, status, null);
+    addNode(status);
 
     NodeStatus expectedStatus = DECOMMISSIONING_HEALTHY_999;
     NodeStatus returnedStatus = map.updateNodeOperationalState(
@@ -151,7 +159,7 @@ public class TestNodeStateMap {
     final DatanodeDetails datanodeDetails =
         MockDatanodeDetails.randomDatanodeDetails();
 
-    map.addNode(datanodeDetails, NodeStatus.inServiceHealthy(), null);
+    addNode(datanodeDetails, NodeStatus.inServiceHealthy());
 
     DatanodeID id = datanodeDetails.getID();
 
@@ -191,7 +199,7 @@ public class TestNodeStateMap {
       long opExpiryEpochSeconds) throws NodeAlreadyExistsException {
     DatanodeDetails random = generateDatanode();
     NodeStatus status = NodeStatus.valueOf(opState, health, opExpiryEpochSeconds);
-    map.addNode(random, status, null);
+    addNode(random, status);
   }
 
   private DatanodeDetails generateDatanode() {

@@ -19,13 +19,13 @@
 import React from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
-import { Table, Tooltip, Tabs } from 'antd';
-import { TablePaginationConfig } from 'antd/es/table';
-import { InfoCircleOutlined } from '@ant-design/icons';
+import {Table, Tabs, Tooltip} from 'antd';
+import {TablePaginationConfig} from 'antd/es/table';
+import {InfoCircleOutlined} from '@ant-design/icons';
 
-import { ColumnSearch } from '@/utils/columnSearch';
-import { showDataFetchError, timeFormat } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+import {ColumnSearch} from '@/utils/columnSearch';
+import {showDataFetchError, timeFormat} from '@/utils/common';
+import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
 
 import './missingContainers.less';
 
@@ -73,6 +73,7 @@ interface IKeyResponse {
   Volume: string;
   Bucket: string;
   Key: string;
+  CompletePath: string;
   DataSize: number;
   Versions: number[];
   Blocks: object;
@@ -100,6 +101,12 @@ const KEY_TABLE_COLUMNS = [
     title: 'Key',
     dataIndex: 'Key',
     key: 'Key'
+  },
+  {
+    title: 'Path',
+    dataIndex: 'CompletePath',
+    key: 'CompletePath',
+    width: '270px'
   },
   {
     title: 'Size',

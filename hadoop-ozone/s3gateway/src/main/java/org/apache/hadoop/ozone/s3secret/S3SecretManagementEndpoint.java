@@ -22,11 +22,13 @@ import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 import jakarta.annotation.Nullable;
 import java.io.IOException;
+import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -42,6 +44,11 @@ import org.slf4j.LoggerFactory;
 public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3SecretManagementEndpoint.class);
+
+  @Inject
+  S3SecretManagementEndpoint(OzoneConfiguration conf) {
+    super(conf);
+  }
 
   @PUT
   public Response generate() throws IOException {

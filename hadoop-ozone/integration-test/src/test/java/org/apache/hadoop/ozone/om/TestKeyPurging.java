@@ -28,30 +28,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test OM's {@link KeyDeletingService}.
  */
-@Timeout(300)
 public class TestKeyPurging {
 
   private MiniOzoneCluster cluster;
@@ -61,6 +57,7 @@ public class TestKeyPurging {
   private static final int NUM_KEYS = 10;
   private static final int KEY_SIZE = 100;
   private OzoneClient client;
+  private int ratisLimit;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -79,6 +76,11 @@ public class TestKeyPurging {
     client = OzoneClientFactory.getRpcClient(conf);
     store = client.getObjectStore();
     om = cluster.getOzoneManager();
+    int limit = (int) conf.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    ratisLimit = (int) (limit * 0.9);
   }
 
   @AfterEach
@@ -108,11 +110,7 @@ public class TestKeyPurging {
     for (int i = 1; i <= NUM_KEYS; i++) {
       String keyName = keyBase + "-" + i;
       keys.add(keyName);
-      OzoneOutputStream keyStream = TestHelper.createKey(
-          keyName, ReplicationType.RATIS, ReplicationFactor.ONE,
-          KEY_SIZE, store, volumeName, bucketName);
-      keyStream.write(data);
-      keyStream.close();
+      TestDataUtil.createKey(bucket, keyName, data);
     }
 
     // Delete created keys
@@ -135,7 +133,7 @@ public class TestKeyPurging {
     GenericTestUtils.waitFor(
         () -> {
           try {
-            return keyManager.getPendingDeletionKeys(Integer.MAX_VALUE)
+            return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit)
                 .getKeyBlocksList().isEmpty();
           } catch (IOException e) {
             return false;

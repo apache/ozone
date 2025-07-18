@@ -195,7 +195,7 @@ public abstract class BaseFileChecksumHelper {
           "Unknown combine mode: " + getCombineMode());
     }
     return blockChecksumForDebug;
-  };
+  }
 
   /**
    * Compute block checksums block by block and append the raw bytes of the

@@ -28,10 +28,20 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
  */
 public class RDBMetrics {
 
-  private static final String SOURCE_NAME =
-      RDBMetrics.class.getSimpleName();
+  private static final String SOURCE_NAME = RDBMetrics.class.getSimpleName();
 
   private static RDBMetrics instance;
+
+  private @Metric MutableCounterLong numDBKeyMayExistChecks;
+  private @Metric MutableCounterLong numDBKeyMayExistMisses;
+
+  private @Metric MutableCounterLong numDBKeyGets;
+  private @Metric MutableCounterLong numDBKeyGetIfExistChecks;
+  private @Metric MutableCounterLong numDBKeyGetIfExistMisses;
+  private @Metric MutableCounterLong numDBKeyGetIfExistGets;
+  // WAL Update data size and sequence count
+  private @Metric MutableCounterLong walUpdateDataSize;
+  private @Metric MutableCounterLong walUpdateSequenceCount;
 
   public RDBMetrics() {
   }
@@ -46,17 +56,6 @@ public class RDBMetrics {
         new RDBMetrics());
     return instance;
   }
-
-  private @Metric MutableCounterLong numDBKeyMayExistChecks;
-  private @Metric MutableCounterLong numDBKeyMayExistMisses;
-
-  private @Metric MutableCounterLong numDBKeyGets;
-  private @Metric MutableCounterLong numDBKeyGetIfExistChecks;
-  private @Metric MutableCounterLong numDBKeyGetIfExistMisses;
-  private @Metric MutableCounterLong numDBKeyGetIfExistGets;
-  // WAL Update data size and sequence count
-  private @Metric MutableCounterLong walUpdateDataSize;
-  private @Metric MutableCounterLong walUpdateSequenceCount;
 
   public long getNumDBKeyGets() {
     return numDBKeyGets.value();
@@ -97,7 +96,6 @@ public class RDBMetrics {
   public void incNumDBKeyMayExistMisses() {
     numDBKeyMayExistMisses.incr();
   }
-
 
   @VisibleForTesting
   public long getNumDBKeyMayExistChecks() {

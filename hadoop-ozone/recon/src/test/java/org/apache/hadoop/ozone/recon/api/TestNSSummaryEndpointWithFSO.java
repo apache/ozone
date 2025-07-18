@@ -678,7 +678,6 @@ public class TestNSSummaryEndpointWithFSO {
             invalidResObj.getResponseCode());
   }
 
-
   @Test
   public void testFileSizeDist() throws Exception {
     checkFileSizeDist(ROOT_PATH, 2, 3, 4, 1);
@@ -847,7 +846,6 @@ public class TestNSSummaryEndpointWithFSO {
         "NSSummary tree is currently being rebuilt, returning empty string " +
             "for path construction.", loggedMessage);
   }
-
 
   /**
    * Write directories and keys info into OM DB.

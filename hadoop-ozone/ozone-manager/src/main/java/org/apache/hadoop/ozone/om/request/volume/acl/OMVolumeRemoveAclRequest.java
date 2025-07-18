@@ -50,6 +50,10 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
   private static final VolumeAclOp VOLUME_REMOVE_ACL_OP =
       (acls, volArgs) -> volArgs.removeAcl(acls.get(0));
 
+  private final List<OzoneAcl> ozoneAcls;
+  private final String volumeName;
+  private final OzoneObj obj;
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     long modificationTime = Time.now();
@@ -62,10 +66,6 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
         .setUserInfo(getUserInfo())
         .build();
   }
-
-  private final List<OzoneAcl> ozoneAcls;
-  private final String volumeName;
-  private final OzoneObj obj;
 
   public OMVolumeRemoveAclRequest(OMRequest omRequest) {
     super(omRequest, VOLUME_REMOVE_ACL_OP);

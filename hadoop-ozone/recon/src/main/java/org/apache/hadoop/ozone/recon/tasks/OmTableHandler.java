@@ -96,7 +96,6 @@ public interface OmTableHandler {
       TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
       throws IOException;
 
-
   /**
    * Returns the count key for the given table.
    *

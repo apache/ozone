@@ -32,7 +32,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -59,15 +58,14 @@ import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
@@ -79,7 +77,7 @@ import org.slf4j.LoggerFactory;
  * utility class used by SCM and OM for HA.
  */
 public final class HAUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HAUtils.class);
 
   private HAUtils() {
   }
@@ -250,9 +248,7 @@ public final class HAUtils {
       DBDefinition definition)
       throws IOException {
 
-    try (DBStore dbStore = loadDB(tempConfig, dbDir.toFile(),
-        dbName, definition)) {
-
+    try (DBStore dbStore = DBStoreBuilder.newBuilder(tempConfig, definition, dbName, dbDir).build()) {
       // Get the table name with TransactionInfo as the value. The transaction
       // info table name are different in SCM and SCM.
 
@@ -307,27 +303,6 @@ public final class HAUtils {
     return true;
   }
 
-  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName, DBDefinition definition) throws IOException {
-    RocksDBConfiguration rocksDBConfiguration =
-        configuration.getObject(RocksDBConfiguration.class);
-    DBStoreBuilder dbStoreBuilder =
-        DBStoreBuilder.newBuilder(configuration, rocksDBConfiguration)
-            .setName(dbName)
-            .setPath(Paths.get(metaDir.getPath()));
-    // Add column family names and codecs.
-    for (DBColumnFamilyDefinition columnFamily : definition
-        .getColumnFamilies()) {
-
-      dbStoreBuilder.addTable(columnFamily.getName());
-      dbStoreBuilder
-          .addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());
-      dbStoreBuilder
-          .addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
-    }
-    return dbStoreBuilder.build();
-  }
-
   public static File getMetaDir(DBDefinition definition,
       OzoneConfiguration configuration) {
     // Set metadata dirs.
@@ -373,21 +348,45 @@ public final class HAUtils {
 
   /**
    * Retry forever until CA list matches expected count.
+   * Fails fast on authentication exceptions.
    * @param task - task to get CA list.
    * @return CA list.
    */
   private static List<String> getCAListWithRetry(Callable<List<String>> task,
       long waitDuration) throws IOException {
-    RetryPolicy retryPolicy = RetryPolicies.retryForeverWithFixedSleep(
-        waitDuration, TimeUnit.SECONDS);
-    RetriableTask<List<String>> retriableTask =
-        new RetriableTask<>(retryPolicy, "getCAList", task);
+    RetryPolicy retryPolicy = new RetryPolicy() {
+      private final RetryPolicy defaultPolicy = RetryPolicies.retryForeverWithFixedSleep(
+          waitDuration, TimeUnit.SECONDS);
+
+      @Override
+      public RetryAction shouldRetry(Exception e, int retries, int failovers, boolean isIdempotent) throws Exception {
+        if (containsAccessControlException(e)) {
+          LOG.warn("AccessControlException encountered during getCAList; failing fast without retry.");
+          return new RetryAction(RetryAction.RetryDecision.FAIL);
+        }
+        return defaultPolicy.shouldRetry(e, retries, failovers, isIdempotent);
+      }
+    };
+
+    RetriableTask<List<String>> retriableTask = new RetriableTask<>(retryPolicy, "getCAList", task);
     try {
       return retriableTask.call();
     } catch (Exception ex) {
-      throw new SCMSecurityException("Unable to obtain complete CA " +
-          "list", ex);
+      if (containsAccessControlException(ex)) {
+        throw new AccessControlException();
+      }
+      throw new SCMSecurityException("Unable to obtain complete CA list", ex);
     }
+  }
+
+  private static boolean containsAccessControlException(Throwable e) {
+    while (e != null) {
+      if (e instanceof AccessControlException) {
+        return true;
+      }
+      e = e.getCause();
+    }
+    return false;
   }
 
   private static List<String> waitForCACerts(

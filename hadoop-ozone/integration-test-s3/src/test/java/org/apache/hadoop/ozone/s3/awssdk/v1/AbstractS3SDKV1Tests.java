@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.AmazonServiceException.ErrorType;
+import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.AccessControlList;
@@ -37,6 +38,7 @@ import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
@@ -69,17 +71,22 @@ import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import com.amazonaws.services.s3.transfer.Upload;
 import com.amazonaws.services.s3.transfer.model.UploadResult;
+import com.amazonaws.util.IOUtils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -98,11 +105,15 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
-import org.apache.hadoop.ozone.s3.S3GatewayService;
+import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -183,7 +194,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
    * @throws Exception exception thrown when waiting for the cluster to be ready.
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
-    S3GatewayService s3g = new S3GatewayService();
+    MultiS3GatewayService s3g = new MultiS3GatewayService(5);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .addService(s3g)
         .setNumDatanodes(5)
@@ -247,7 +258,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   @Test
-  public void testListBuckets() {
+  public void testListBuckets() throws IOException {
     List<String> bucketNames = new ArrayList<>();
     for (int i = 0; i <= 5; i++) {
       String bucketName = getBucketName(String.valueOf(i));
@@ -260,6 +271,14 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         .map(Bucket::getName).collect(Collectors.toList());
 
     assertThat(listBucketNames).containsAll(bucketNames);
+
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    String expectOwner = ugi.getShortUserName();
+
+    Owner s3AccountOwner = s3Client.getS3AccountOwner();
+
+    assertThat(s3AccountOwner.getDisplayName()).isEqualTo(expectOwner);
+    assertThat(s3AccountOwner.getId()).isEqualTo(S3Owner.DEFAULT_S3OWNER_ID);
   }
 
   @Test
@@ -293,7 +312,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     // Upload some objects to the bucket
     for (int i = 1; i <= 10; i++) {
-      s3Client.putObject(bucketName, "key-" + i, RandomStringUtils.randomAlphanumeric(1024));
+      s3Client.putObject(bucketName, "key-" + i, RandomStringUtils.secure().nextAlphanumeric(1024));
     }
 
     // Bucket deletion should fail if there are still keys in the bucket
@@ -363,6 +382,31 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
     PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
     assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+  }
+
+  @Test
+  public void testPutDoubleSlashPrefixObject() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = "//dir1";
+    final String content = "bar";
+    // Create a FSO bucket for test
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OmBucketInfo.Builder bucketInfo = new OmBucketInfo.Builder()
+          .setVolumeName(volume.getName())
+          .setBucketName(bucketName)
+          .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      OzoneManagerProtocol ozoneManagerProtocol = store.getClientProxy().getOzoneManagerClient();
+      ozoneManagerProtocol.createBucket(bucketInfo.build());
+    }
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+
+    S3Object object = s3Client.getObject(bucketName, keyName);
+    assertEquals(content.length(), object.getObjectMetadata().getContentLength());
   }
 
   @Test
@@ -473,8 +517,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     String value = "sample value";
     byte[] valueBytes = value.getBytes(StandardCharsets.UTF_8);
 
-    OzoneConfiguration conf = cluster.getConf();
-    try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
       ObjectStore store = ozoneClient.getObjectStore();
 
       OzoneVolume volume = store.getS3Volume();
@@ -503,46 +546,16 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   @Test
-  public void testListObjectsMany() {
-    final String bucketName = getBucketName();
-    s3Client.createBucket(bucketName);
-    final List<String> keyNames = Arrays.asList(
-        getKeyName("1"),
-        getKeyName("2"),
-        getKeyName("3")
-    );
-
-    for (String keyName: keyNames) {
-      s3Client.putObject(bucketName, keyName, RandomStringUtils.randomAlphanumeric(5));
-    }
-
-    ListObjectsRequest listObjectsRequest = new ListObjectsRequest()
-        .withBucketName(bucketName)
-        .withMaxKeys(2);
-    ObjectListing listObjectsResponse = s3Client.listObjects(listObjectsRequest);
-    assertThat(listObjectsResponse.getObjectSummaries()).hasSize(2);
-    assertEquals(bucketName, listObjectsResponse.getBucketName());
-    assertEquals(listObjectsResponse.getObjectSummaries().stream()
-        .map(S3ObjectSummary::getKey).collect(Collectors.toList()),
-        keyNames.subList(0, 2));
-    assertTrue(listObjectsResponse.isTruncated());
-
-
-    listObjectsRequest = new ListObjectsRequest()
-        .withBucketName(bucketName)
-        .withMaxKeys(2)
-        .withMarker(listObjectsResponse.getNextMarker());
-    listObjectsResponse = s3Client.listObjects(listObjectsRequest);
-    assertThat(listObjectsResponse.getObjectSummaries()).hasSize(1);
-    assertEquals(bucketName, listObjectsResponse.getBucketName());
-    assertEquals(listObjectsResponse.getObjectSummaries().stream()
-            .map(S3ObjectSummary::getKey).collect(Collectors.toList()),
-        keyNames.subList(2, keyNames.size()));
-    assertFalse(listObjectsResponse.isTruncated());
+  public void testListObjectsMany() throws Exception {
+    testListObjectsMany(false);
   }
 
   @Test
-  public void testListObjectsManyV2() {
+  public void testListObjectsManyV2() throws Exception {
+    testListObjectsMany(true);
+  }
+
+  private void testListObjectsMany(boolean isListV2) throws Exception {
     final String bucketName = getBucketName();
     s3Client.createBucket(bucketName);
     final List<String> keyNames = Arrays.asList(
@@ -550,34 +563,91 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         getKeyName("2"),
         getKeyName("3")
     );
+    final List<String> keyNamesWithoutETag = Arrays.asList(
+        getKeyName("4"),
+        getKeyName("5")
+    );
 
+    final Map<String, String> keyToEtag = new HashMap<>();
     for (String keyName: keyNames) {
-      s3Client.putObject(bucketName, keyName, RandomStringUtils.randomAlphanumeric(5));
+      PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName,
+          RandomStringUtils.secure().nextAlphanumeric(5));
+      keyToEtag.put(keyName, putObjectResult.getETag());
+    }
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+
+      for (String keyNameWithoutETag : keyNamesWithoutETag) {
+        byte[] valueBytes = RandomStringUtils.secure().nextAlphanumeric(5).getBytes(StandardCharsets.UTF_8);
+        try (OzoneOutputStream out = bucket.createKey(keyNameWithoutETag,
+            valueBytes.length,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+            Collections.emptyMap())) {
+          out.write(valueBytes);
+        }
+      }
     }
 
-    ListObjectsV2Request listObjectsRequest = new ListObjectsV2Request()
-        .withBucketName(bucketName)
-        .withMaxKeys(2);
-    ListObjectsV2Result listObjectsResponse = s3Client.listObjectsV2(listObjectsRequest);
-    assertThat(listObjectsResponse.getObjectSummaries()).hasSize(2);
-    assertEquals(bucketName, listObjectsResponse.getBucketName());
-    assertEquals(listObjectsResponse.getObjectSummaries().stream()
+    List<S3ObjectSummary> objectSummaries;
+    String continuationToken;
+    if (isListV2) {
+      ListObjectsV2Request listObjectsRequest = new ListObjectsV2Request()
+          .withBucketName(bucketName)
+          .withMaxKeys(2);
+      ListObjectsV2Result listObjectsResponse = s3Client.listObjectsV2(listObjectsRequest);
+      objectSummaries = listObjectsResponse.getObjectSummaries();
+      assertEquals(bucketName, listObjectsResponse.getBucketName());
+      assertTrue(listObjectsResponse.isTruncated());
+      continuationToken = listObjectsResponse.getNextContinuationToken();
+    } else {
+      ListObjectsRequest listObjectsRequest = new ListObjectsRequest()
+          .withBucketName(bucketName)
+          .withMaxKeys(2);
+      ObjectListing listObjectsResponse = s3Client.listObjects(listObjectsRequest);
+      objectSummaries = listObjectsResponse.getObjectSummaries();
+      assertEquals(bucketName, listObjectsResponse.getBucketName());
+      assertTrue(listObjectsResponse.isTruncated());
+      continuationToken = listObjectsResponse.getNextMarker();
+    }
+    assertThat(objectSummaries).hasSize(2);
+    assertEquals(objectSummaries.stream()
             .map(S3ObjectSummary::getKey).collect(Collectors.toList()),
         keyNames.subList(0, 2));
-    assertTrue(listObjectsResponse.isTruncated());
+    for (S3ObjectSummary objectSummary : objectSummaries) {
+      assertEquals(keyToEtag.get(objectSummary.getKey()), objectSummary.getETag());
+    }
 
+    // Include both keys with and without ETag
+    if (isListV2) {
+      ListObjectsV2Request listObjectsRequest = new ListObjectsV2Request()
+          .withBucketName(bucketName)
+          .withMaxKeys(5)
+          .withContinuationToken(continuationToken);
+      ListObjectsV2Result listObjectsResponse = s3Client.listObjectsV2(listObjectsRequest);
+      objectSummaries = listObjectsResponse.getObjectSummaries();
+      assertEquals(bucketName, listObjectsResponse.getBucketName());
+      assertFalse(listObjectsResponse.isTruncated());
+    } else {
+      ListObjectsRequest listObjectsRequest = new ListObjectsRequest()
+          .withBucketName(bucketName)
+          .withMaxKeys(5)
+          .withMarker(continuationToken);
+      ObjectListing listObjectsResponse = s3Client.listObjects(listObjectsRequest);
+      objectSummaries = listObjectsResponse.getObjectSummaries();
+      assertEquals(bucketName, listObjectsResponse.getBucketName());
+      assertFalse(listObjectsResponse.isTruncated());
+    }
 
-    listObjectsRequest = new ListObjectsV2Request()
-        .withBucketName(bucketName)
-        .withMaxKeys(2)
-        .withContinuationToken(listObjectsResponse.getNextContinuationToken());
-    listObjectsResponse = s3Client.listObjectsV2(listObjectsRequest);
-    assertThat(listObjectsResponse.getObjectSummaries()).hasSize(1);
-    assertEquals(bucketName, listObjectsResponse.getBucketName());
-    assertEquals(listObjectsResponse.getObjectSummaries().stream()
-            .map(S3ObjectSummary::getKey).collect(Collectors.toList()),
-        keyNames.subList(2, keyNames.size()));
-    assertFalse(listObjectsResponse.isTruncated());
+    assertThat(objectSummaries).hasSize(3);
+    assertEquals(keyNames.get(2), objectSummaries.get(0).getKey());
+    assertEquals(keyNamesWithoutETag.get(0), objectSummaries.get(1).getKey());
+    assertEquals(keyNamesWithoutETag.get(1), objectSummaries.get(2).getKey());
+    for (S3ObjectSummary objectSummary : objectSummaries) {
+      assertEquals(keyToEtag.get(objectSummary.getKey()), objectSummary.getETag());
+    }
   }
 
   @Test
@@ -919,11 +989,103 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     // Upload some objects to the bucket
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
         () -> s3Client.putObject(bucketName, keyName,
-            RandomStringUtils.randomAlphanumeric(1024)));
+            RandomStringUtils.secure().nextAlphanumeric(1024)));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(403, ase.getStatusCode());
     assertEquals("QuotaExceeded", ase.getErrorCode());
+  }
+
+  @Test
+  public void testPresignedUrlGet() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+
+    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+
+    // Set the presigned URL to expire after one hour.
+    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+
+    // Generate the presigned URL
+    GeneratePresignedUrlRequest generatePresignedUrlRequest =
+        new GeneratePresignedUrlRequest(bucketName, keyName)
+            .withMethod(HttpMethod.GET)
+            .withExpiration(expiration);
+    generatePresignedUrlRequest.addRequestParameter("x-custom-parameter", "custom-value");
+    URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+    // Download the object using HttpUrlConnection (since v1.1)
+    // Capture the response body to a byte array.
+    URL presignedUrl = new URL(url.toExternalForm());
+    HttpURLConnection connection = (HttpURLConnection) presignedUrl.openConnection();
+    connection.setRequestMethod("GET");
+    // Download the result of executing the request.
+    try (InputStream s3is = connection.getInputStream();
+         ByteArrayOutputStream bos = new ByteArrayOutputStream(
+             content.getBytes(StandardCharsets.UTF_8).length)) {
+      IOUtils.copy(s3is, bos);
+      assertEquals(content, bos.toString("UTF-8"));
+    }
+  }
+
+  /**
+   * Tests the functionality to create a snapshot of an Ozone bucket and then read files
+   * from the snapshot directory using the S3 SDK.
+   *
+   * <p>The test follows these steps:
+   * <ol>
+   *   <li>Create a bucket and upload a file via the S3 client.</li>
+   *   <li>Create a snapshot on the bucket using the Ozone client.</li>
+   *   <li>Construct the snapshot object key using the ".snapshot" directory format.</li>
+   *   <li>Retrieve the object from the snapshot and verify that its content matches
+   *       the originally uploaded content.</li>
+   * </ol>
+   * </p>
+   *
+   * @throws Exception if the test fails due to any errors during bucket creation, snapshot creation,
+   *         file upload, or retrieval.
+   */
+  @Test
+  public void testReadSnapshotDirectoryUsingS3SDK() throws Exception {
+    final String bucketName = getBucketName("snapshot");
+    final String keyName = getKeyName("snapshotfile");
+    final String content = "snapshot test content";
+    final byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+
+    // Create the bucket and upload an object using S3 SDK.
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(bucketName, keyName,
+        is, new ObjectMetadata());
+
+    String snapshotName = "snap1";
+    // Create a snapshot using the Ozone client.
+    // Snapshots in Ozone are created on the bucket and are exposed via the ".snapshot" directory.
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+
+      store.createSnapshot(volume.getName(), bucketName, snapshotName);
+    }
+
+    // Use the S3 SDK to read the file from the snapshot directory.
+    // The key in the snapshot is constructed using the special ".snapshot" prefix.
+    String snapshotKey = ".snapshot/" + snapshotName + "/" + keyName;
+
+    S3Object s3Object = s3Client.getObject(bucketName, snapshotKey);
+    try (S3ObjectInputStream s3is = s3Object.getObjectContent();
+         ByteArrayOutputStream bos = new ByteArrayOutputStream(contentBytes.length)) {
+      byte[] readBuf = new byte[1024];
+      int readLen = 0;
+      while ((readLen = s3is.read(readBuf)) > 0) {
+        bos.write(readBuf, 0, readLen);
+      }
+      assertEquals(content, bos.toString("UTF-8"));
+    }
   }
 
   private boolean isBucketEmpty(Bucket bucket) {
@@ -932,7 +1094,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   private String getBucketName() {
-    return getBucketName(null);
+    return getBucketName("");
   }
 
   private String getBucketName(String suffix) {
@@ -940,7 +1102,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   private String getKeyName() {
-    return getKeyName(null);
+    return getKeyName("");
   }
 
   private String getKeyName(String suffix) {

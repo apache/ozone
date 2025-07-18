@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,14 +45,12 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * This class tests OzoneManagerDoubleBuffer implementation with
  * dummy response class.
  */
-@Timeout(300)
 public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
   private OMMetadataManager omMetadataManager;

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 
 import com.google.common.base.Preconditions;
@@ -181,7 +181,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
           .setAcls(getAclsForKey(keyArgs, bucketInfo, pathInfoFSO,
-              ozoneManager.getPrefixManager(), ozoneManager.getConfiguration()))
+              ozoneManager.getPrefixManager(), ozoneManager.getConfig()))
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setFileEncryptionInfo(keyArgs.hasFileEncryptionInfo() ?

@@ -226,7 +226,6 @@ public class TestS3GetSecretRequest {
         ).build();
   }
 
-
   @Test
   public void testS3CacheRecordsTransactionIndex() throws IOException {
     // Create secrets for "alice" and "carol".
@@ -544,7 +543,6 @@ public class TestS3GetSecretRequest {
      */
     assertNull(s3GetSecretResponse.getS3SecretValue());
   }
-
 
   private S3Secret processSuccessSecretRequest(
       String userPrincipalId,

@@ -144,7 +144,7 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeToMovePerIteration(50 * STORAGE_UNIT);
     balancerConfiguration.setMaxSizeEnteringTarget(50 * STORAGE_UNIT);
     conf.setFromObject(balancerConfiguration);
-    GenericTestUtils.setLogLevel(ContainerBalancerTask.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ContainerBalancerTask.class, Level.DEBUG);
 
     int[] sizeArray = testInfo.getTestMethod()
             .filter(method -> method.getName().equals("balancerShouldMoveOnlyPositiveSizeContainers"))
@@ -573,7 +573,7 @@ public class TestContainerBalancerTask {
         .setContainerID(containerID)
         .setContainerState(ContainerReplicaProto.State.CLOSED)
         .setDatanodeDetails(datanodeDetails)
-        .setOriginNodeId(datanodeDetails.getUuid())
+        .setOriginNodeId(datanodeDetails.getID())
         .setSequenceId(1000L)
         .setBytesUsed(usedBytes)
         .build();

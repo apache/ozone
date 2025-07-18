@@ -30,6 +30,7 @@ public final class BlockGroup {
 
   private String groupID;
   private List<BlockID> blockIDs;
+
   private BlockGroup(String groupID, List<BlockID> blockIDs) {
     this.groupID = groupID;
     this.blockIDs = blockIDs;

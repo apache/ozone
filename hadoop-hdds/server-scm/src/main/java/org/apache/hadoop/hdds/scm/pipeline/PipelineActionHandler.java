@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 public class PipelineActionHandler
     implements EventHandler<PipelineActionsFromDatanode> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(PipelineActionHandler.class);
 
   private final PipelineManager pipelineManager;
@@ -75,7 +75,7 @@ public class PipelineActionHandler
     final PipelineID pid = PipelineID.getFromProtobuf(info.getPipelineID());
 
     final String logMsg = "Received pipeline action " + action + " for " + pid +
-        " from datanode " + datanode.getUuidString() + "." +
+        " from datanode " + datanode + "." +
         " Reason : " + info.getDetailedReason();
 
     // We can skip processing Pipeline Action if the current SCM is not leader.
@@ -119,7 +119,7 @@ public class PipelineActionHandler
       SCMCommand<?> command = new ClosePipelineCommand(pid);
       command.setTerm(scmContext.getTermOfLeader());
       publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-          new CommandForDatanode<>(datanode.getUuid(), command));
+          new CommandForDatanode<>(datanode, command));
     } catch (NotLeaderException nle) {
       LOG.info("Cannot process Pipeline Action for pipeline {} as " +
           "current SCM is not leader anymore.", pid);

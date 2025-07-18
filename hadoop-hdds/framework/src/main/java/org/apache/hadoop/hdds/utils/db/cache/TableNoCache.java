@@ -38,6 +38,7 @@ public final class TableNoCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   public static final CacheStats EMPTY_STAT = new CacheStats(0, 0, 0);
 
   private static final TableCache<?, ?> NO_CACHE_INSTANCE = new TableNoCache<>();
+
   public static <K, V> TableCache<K, V> instance() {
     return (TableCache<K, V>) NO_CACHE_INSTANCE;
   }

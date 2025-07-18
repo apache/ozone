@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -36,13 +37,13 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
 
   private static String part1 = UUID.randomUUID().toString();
   private static String part2 = UUID.randomUUID().toString();
+
   @Test
   public void fromStreamWithNamespace() throws IOException {
     //GIVEN
     ByteArrayInputStream inputBody =
         new ByteArrayInputStream(
-            ("<CompleteMultipartUpload xmlns=\"http://s3.amazonaws" +
-                ".com/doc/2006-03-01/\">" +
+            ("<CompleteMultipartUpload xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">" +
                 "<Part><ETag>" + part1 + "</ETag><PartNumber>1" +
                 "</PartNumber></Part><Part><ETag>" + part2 +
                 "</ETag><PartNumber>2</PartNumber></Part>" +

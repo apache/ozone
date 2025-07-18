@@ -57,7 +57,6 @@ public final class RatisUtil {
   private RatisUtil() {
   }
 
-
   /**
    * Constructs new Raft Properties instance using {@link ConfigurationSource}.
    *
@@ -138,6 +137,8 @@ public final class RatisUtil {
                             OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT_DEFAULT,
                     TimeUnit.MILLISECONDS),
             TimeUnit.MILLISECONDS));
+    RatisHelper.setFirstElectionTimeoutDuration(
+        ozoneConf, properties, ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT);
   }
 
   /**
@@ -195,6 +196,12 @@ public final class RatisUtil {
             ozoneConf.getInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP,
                     ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
+
+    // This avoids writing commit metadata to Raft Log, which can be used to recover the
+    // commit index even if a majority of servers are dead. We don't need this for StorageContainerManager,
+    // disabling this will avoid the additional disk IO.
+    Log.setLogMetadataEnabled(properties, false);
+
     return logAppenderQueueByteLimit;
   }
 

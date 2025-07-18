@@ -32,7 +32,9 @@ public interface OzoneManagerClientProtocol extends OzoneManagerProtocol {
    * a thread local variable.
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
+
   S3Auth getThreadLocalS3Auth();
+
   void clearThreadLocalS3Auth();
 
   ThreadLocal<S3Auth> getS3CredentialsProvider();

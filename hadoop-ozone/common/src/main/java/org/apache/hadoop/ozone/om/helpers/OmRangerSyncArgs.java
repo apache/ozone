@@ -46,6 +46,7 @@ public class OmRangerSyncArgs {
    */
   public static class Builder {
     private long newServiceVersion;
+
     /**
      * Constructs a builder.
      */

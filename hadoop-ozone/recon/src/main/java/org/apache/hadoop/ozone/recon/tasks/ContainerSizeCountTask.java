@@ -111,7 +111,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
     final long currentSize;
 
     if (usedBytes < 0) {
-      LOG.warn("Negative usedBytes ({}) for container {}, treating it as 0",
+      LOG.debug("Negative usedBytes ({}) for container {}, treating it as 0",
           usedBytes, id);
       currentSize = 0;
     } else {
@@ -199,7 +199,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
       lock.writeLock().unlock();
     }
   }
-
 
   /**
    * Populate DB with the counts of container sizes calculated
@@ -353,7 +352,6 @@ public class ContainerSizeCountTask extends ReconScmTask {
     return new ContainerSizeCountKey(
         ReconUtils.getContainerSizeUpperBound(containerSize));
   }
-
 
   /**
    *  The ContainerSizeCountKey class is a simple key class that has a single

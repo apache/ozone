@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SCMContainerLocationFailoverProxyProvider extends
     SCMFailoverProxyProviderBase<StorageContainerLocationProtocolPB> {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerLocationFailoverProxyProvider.class);
 
   /**

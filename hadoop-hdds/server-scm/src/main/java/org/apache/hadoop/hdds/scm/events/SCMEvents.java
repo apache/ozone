@@ -212,6 +212,17 @@ public final class SCMEvents {
       new TypedEvent<>(CommandStatusReportHandler.DeleteBlockStatus.class,
           "Delete_Block_Status");
 
+  public static final TypedEvent<DatanodeDetails>
+      REPLICATION_MANAGER_NOTIFY =
+      new TypedEvent<>(DatanodeDetails.class, "Replication_Manager_Notify");
+
+  /**
+   * This event will be triggered whenever a datanode needs to reconcile its replica of a container with other
+   * replicas in the cluster.
+   */
+  public static final TypedEvent<ContainerID>
+      RECONCILE_CONTAINER = new TypedEvent<>(ContainerID.class, "Reconcile_Container");
+
   /**
    * Private Ctor. Never Constructed.
    */

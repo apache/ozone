@@ -57,27 +57,35 @@ public final class OmTestManagers {
   public OzoneManager getOzoneManager() {
     return om;
   }
+
   public OzoneManagerProtocol getWriteClient() {
     return writeClient;
   }
+
   public BucketManager getBucketManager() {
     return bucketManager;
   }
+
   public VolumeManager getVolumeManager() {
     return volumeManager;
   }
+
   public PrefixManager getPrefixManager() {
     return prefixManager;
   }
+
   public OMMetadataManager getMetadataManager() {
     return metadataManager;
   }
+
   public KeyManager getKeyManager() {
     return keyManager;
   }
+
   public ScmBlockLocationProtocol getScmBlockClient() {
     return scmBlockClient;
   }
+
   public OzoneClient getRpcClient() {
     return rpcClient;
   }
@@ -122,7 +130,7 @@ public final class OmTestManagers {
         "scmTopologyClient", scmTopologyClient);
 
     om.start();
-    waitFor(() -> om.getOmRatisServer().checkLeaderStatus() == RaftServerStatus.LEADER_AND_READY,
+    waitFor(() -> om.getOmRatisServer().getLeaderStatus() == RaftServerStatus.LEADER_AND_READY,
         10, 10_000);
 
     rpcClient = OzoneClientFactory.getRpcClient(conf);

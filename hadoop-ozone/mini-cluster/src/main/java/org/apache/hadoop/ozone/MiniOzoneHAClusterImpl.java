@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
@@ -41,6 +40,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeRuleFactory;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.CheckedConsumer;
@@ -66,7 +65,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneHAClusterImpl.class);
 
   private final OMHAService omhaService;
@@ -86,8 +85,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       SCMHAService scmhaService,
       List<HddsDatanodeService> hddsDatanodes,
       String clusterPath,
-      ReconServer reconServer) {
-    super(conf, scmConfigurator, hddsDatanodes, reconServer, emptyList());
+      List<Service> services) {
+    super(conf, scmConfigurator, hddsDatanodes, services);
     this.omhaService = omhaService;
     this.scmhaService = scmhaService;
     this.clusterMetaPath = clusterPath;
@@ -420,11 +419,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       initOMRatisConf();
       SCMHAService scmService;
       OMHAService omService;
-      ReconServer reconServer;
       try {
         scmService = createSCMService();
         omService = createOMService();
-        reconServer = createRecon();
       } catch (AuthenticationException ex) {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
@@ -432,8 +429,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes();
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
-          scmConfigurator, omService, scmService, hddsDatanodes, path,
-          reconServer);
+          scmConfigurator, omService, scmService, hddsDatanodes, path, getServices());
+      try {
+        cluster.startServices();
+      } catch (Exception e) {
+        throw new IOException("Unable to start services", e);
+      }
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
@@ -572,8 +573,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             }
             StorageContainerManager scm =
                 HddsTestUtils.getScmSimple(scmConfig, scmConfigurator);
-            HealthyPipelineSafeModeRule rule =
-                scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
+            HealthyPipelineSafeModeRule rule = SafeModeRuleFactory.getInstance()
+                .getSafeModeRule(HealthyPipelineSafeModeRule.class);
             if (rule != null) {
               // Set threshold to wait for safe mode exit -
               // this is needed since a pipeline is marked open only after
@@ -589,7 +590,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
                   scm.getClientRpcAddress());
             } else {
               inactiveSCMs.add(scm);
-              LOG.info("Intialized SCM at {}. This SCM is currently "
+              LOG.info("Initialized SCM at {}. This SCM is currently "
                   + "inactive (not running).", scm.getClientRpcAddress());
             }
           }
@@ -634,7 +635,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         if (i == 1) {
           conf.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, scmNodeId);
         }
-        scmNodesKeyValue.append(",").append(scmNodeId);
+        scmNodesKeyValue.append(',').append(scmNodeId);
 
         String scmAddrKey = ConfUtils.addKeySuffixes(
             ScmConfigKeys.OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);

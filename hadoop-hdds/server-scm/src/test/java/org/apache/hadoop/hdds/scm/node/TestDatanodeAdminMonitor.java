@@ -257,7 +257,7 @@ public class TestDatanodeAdminMonitor {
         ReplicationTestUtil.createContainerReplica(containerID, 0,
             dn1.getPersistedOpState(), State.UNHEALTHY,
             container.getNumberOfKeys(), container.getUsedBytes(), dn1,
-            dn1.getUuid(), container.getSequenceId());
+            dn1.getID(), container.getSequenceId());
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 
@@ -321,7 +321,7 @@ public class TestDatanodeAdminMonitor {
         ReplicationTestUtil.createContainerReplica(containerID, 0,
             dn1.getPersistedOpState(), State.UNHEALTHY,
             container.getNumberOfKeys(), container.getUsedBytes(), dn1,
-            dn1.getUuid(), container.getSequenceId());
+            dn1.getID(), container.getSequenceId());
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 

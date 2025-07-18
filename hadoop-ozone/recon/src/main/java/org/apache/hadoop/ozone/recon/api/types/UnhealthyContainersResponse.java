@@ -50,6 +50,12 @@ public class UnhealthyContainersResponse {
   private long misReplicatedCount = 0;
 
   /**
+   * Total count of containers that have replicas with mismatched data checksums.
+   */
+  @JsonProperty("replicaMismatchCount")
+  private long replicaMismatchCount = 0;
+
+  /**
    * The smallest container ID in the current response batch.
    * Used for pagination to determine the lower bound for the next page.
    */
@@ -93,6 +99,9 @@ public class UnhealthyContainersResponse {
     } else if (state.equals(
         UnHealthyContainerStates.MIS_REPLICATED.toString())) {
       this.misReplicatedCount = count;
+    } else if (state.equals(
+        UnHealthyContainerStates.REPLICA_MISMATCH.toString())) {
+      this.replicaMismatchCount = count;
     }
   }
 
@@ -110,6 +119,10 @@ public class UnhealthyContainersResponse {
 
   public long getMisReplicatedCount() {
     return misReplicatedCount;
+  }
+
+  public long getReplicaMismatchCount() {
+    return replicaMismatchCount;
   }
 
   public Collection<UnhealthyContainerMetadata> getContainers() {

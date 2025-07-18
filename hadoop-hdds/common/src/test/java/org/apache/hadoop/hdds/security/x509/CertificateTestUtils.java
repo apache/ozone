@@ -51,9 +51,9 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
  * Test utilities to create simple certificates/keys for testing.
  */
 public final class CertificateTestUtils {
-  private CertificateTestUtils() { }
-
   private static final String HASH_ALGO = "SHA256WithRSA";
+
+  private CertificateTestUtils() { }
 
   /**
    * Generates a keypair using the HDDSKeyGenerator with the given config.

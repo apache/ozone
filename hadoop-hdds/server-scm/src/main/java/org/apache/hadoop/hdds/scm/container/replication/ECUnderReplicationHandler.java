@@ -61,7 +61,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ECUnderReplicationHandler.class);
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;

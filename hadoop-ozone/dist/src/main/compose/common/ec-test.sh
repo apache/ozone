@@ -30,3 +30,5 @@ docker-compose up -d --no-recreate --scale datanode=3
 execute_robot_test scm -v PREFIX:${prefix} -N read-3-datanodes ec/read.robot
 docker-compose up -d --no-recreate --scale datanode=5
 execute_robot_test scm -v container:1 -v count:5 -N EC-recovery replication/wait.robot
+docker-compose up -d --no-recreate --scale datanode=9
+execute_robot_test scm -N S3-EC-Storage ec/awss3ecstorage.robot

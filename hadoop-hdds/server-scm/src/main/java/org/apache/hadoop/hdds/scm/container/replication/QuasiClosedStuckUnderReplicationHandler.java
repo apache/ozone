@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * Class to correct under replicated QuasiClosed Stuck Ratis containers.
  */
 public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplicationHandler {
-  public static final Logger LOG = LoggerFactory.getLogger(QuasiClosedStuckUnderReplicationHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(QuasiClosedStuckUnderReplicationHandler.class);
 
   private final PlacementPolicy placementPolicy;
   private final ReplicationManager replicationManager;

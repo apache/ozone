@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -95,13 +96,20 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public class ReconUtils {
 
-  public ReconUtils() {
-  }
-
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
 
   private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
+  private static final ExecutorService NSSUMMARY_REBUILD_EXECUTOR =
+      Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r);
+        t.setName("RebuildNSSummaryThread");
+        t.setDaemon(true); // Optional: allows JVM to exit without waiting
+        return t;
+      });
+
+  public ReconUtils() {
+  }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
@@ -173,7 +181,6 @@ public class ReconUtils {
     Archiver.extract(tarFile, destPath);
   }
 
-
   /**
    * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
    *
@@ -225,7 +232,6 @@ public class ReconUtils {
     return fullPath.toString();
   }
 
-
   /**
    * Constructs the prefix path to a key from its key name and parent ID using a bottom-up approach, starting from the
    * leaf node.
@@ -246,10 +252,11 @@ public class ReconUtils {
   public static StringBuilder constructFullPathPrefix(long initialParentId, String volumeName,
       String bucketName, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager) throws IOException {
-    StringBuilder fullPath = new StringBuilder();
+
     long parentId = initialParentId;
     boolean isDirectoryPresent = false;
 
+    List<String> pathSegments = new ArrayList<>();
     while (parentId != 0) {
       NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
       if (nsSummary == null) {
@@ -266,7 +273,7 @@ public class ReconUtils {
       }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
       if (!nsSummary.getDirName().isEmpty()) {
-        fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+        pathSegments.add(nsSummary.getDirName());
       }
 
       // Move to the parent ID of the current directory
@@ -274,8 +281,15 @@ public class ReconUtils {
       isDirectoryPresent = true;
     }
 
-    // Prepend the volume and bucket to the constructed path
-    fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    StringBuilder fullPath = new StringBuilder();
+    fullPath.append(volumeName).append(OM_KEY_PREFIX)
+        .append(bucketName).append(OM_KEY_PREFIX);
+
+    // Build the components in a list, then reverse and join once
+    for (int i = pathSegments.size() - 1; i >= 0; i--) {
+      fullPath.append(pathSegments.get(i)).append(OM_KEY_PREFIX);
+    }
+
     // TODO - why is this needed? It seems lke it should handle double slashes in the path name,
     //        but its not clear how they get there. This normalize call is quite expensive as it
     //        creates several objects (URI, PATH, back to string). There was a bug fixed above
@@ -283,9 +297,11 @@ public class ReconUtils {
     //        bucket name, but with that fixed, it seems like this should not be needed. All tests
     //        pass without it for key listing.
     if (isDirectoryPresent) {
-      String path = fullPath.toString();
-      fullPath.setLength(0);
-      fullPath.append(OmUtils.normalizeKey(path, true));
+      if (fullPath.indexOf("//") >= 0) {
+        String path = fullPath.toString();
+        fullPath.setLength(0);
+        fullPath.append(OmUtils.normalizeKey(path, true));
+      }
     }
     return fullPath;
   }
@@ -386,23 +402,17 @@ public class ReconUtils {
 
   private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                      ReconOMMetadataManager omMetadataManager) {
-    ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
-      Thread t = new Thread(r);
-      t.setName("RebuildNSSummaryThread");
-      return t;
-    });
-
-    executor.submit(() -> {
-      long startTime = System.currentTimeMillis();
+    NSSUMMARY_REBUILD_EXECUTOR.submit(() -> {
+      long startTime = Time.monotonicNow();
       log.info("Rebuilding NSSummary tree...");
       try {
         reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-      } finally {
-        long endTime = System.currentTimeMillis();
+        long endTime = Time.monotonicNow();
         log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
+      } catch (Throwable t) {
+        log.error("NSSummary tree rebuild failed.", t);
       }
     });
-    executor.shutdown();
   }
 
   /**
@@ -433,6 +443,7 @@ public class ReconUtils {
    */
   public File getLastKnownDB(File reconDbDir, String fileNamePrefix) {
     String lastKnownSnapshotFileName = null;
+    File lastKnownSnapshotFile = null;
     long lastKnonwnSnapshotTs = Long.MIN_VALUE;
     if (reconDbDir != null) {
       File[] snapshotFiles = reconDbDir.listFiles((dir, name) ->
@@ -447,8 +458,17 @@ public class ReconUtils {
             }
             long snapshotTimestamp = Long.parseLong(fileNameSplits[1]);
             if (lastKnonwnSnapshotTs < snapshotTimestamp) {
+              if (lastKnownSnapshotFile != null) {
+                try {
+                  FileUtils.forceDelete(lastKnownSnapshotFile);
+                } catch (IOException e) {
+                  log.warn("Error deleting existing om db snapshot directory: {}",
+                      lastKnownSnapshotFile.getAbsolutePath());
+                }
+              }
               lastKnonwnSnapshotTs = snapshotTimestamp;
               lastKnownSnapshotFileName = fileName;
+              lastKnownSnapshotFile = snapshotFile;
             }
           } catch (NumberFormatException nfEx) {
             log.warn("Unknown file found in Recon DB dir : {}", fileName);
@@ -559,7 +579,6 @@ public class ReconUtils {
     int binIndex = getContainerSizeBinIndex(containerSize);
     return (long) Math.pow(2, (29 + binIndex));
   }
-
 
   public static int getFileSizeBinIndex(long fileSize) {
     Preconditions.checkArgument(fileSize >= 0,

@@ -38,15 +38,15 @@ public class ContainerReplicaHistoryList {
       ContainerReplicaHistoryList::toProto,
       ContainerReplicaHistoryList.class);
 
-  public static Codec<ContainerReplicaHistoryList> getCodec() {
-    return CODEC;
-  }
-
   private List<ContainerReplicaHistory> replicaHistories;
 
   public ContainerReplicaHistoryList(
       List<ContainerReplicaHistory> replicaHistories) {
     this.replicaHistories = new ArrayList<>(replicaHistories);
+  }
+
+  public static Codec<ContainerReplicaHistoryList> getCodec() {
+    return CODEC;
   }
 
   public List<ContainerReplicaHistory> asList() {

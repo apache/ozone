@@ -194,7 +194,7 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.ec.reconstruct.stripe.read.pool.limit",
       defaultValue = "30",
-      description = "Thread pool max size for parallelly read" +
+      description = "Thread pool max size for parallel read" +
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   // For the largest recommended EC policy rs-10-4-1024k,
@@ -205,7 +205,7 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.ec.reconstruct.stripe.write.pool.limit",
       defaultValue = "30",
-      description = "Thread pool max size for parallelly write" +
+      description = "Thread pool max size for parallel write" +
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;

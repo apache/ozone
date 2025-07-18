@@ -49,12 +49,14 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -63,6 +65,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.util.function.CheckedBiConsumer;
@@ -72,13 +75,11 @@ import org.apache.ratis.util.function.CheckedFunction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for metrics published by storage containers.
  */
-@Timeout(300)
 public class TestContainerMetrics {
   @TempDir
   private static Path testDir;
@@ -86,6 +87,7 @@ public class TestContainerMetrics {
   private Path tempDir;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static final int DFS_METRICS_PERCENTILES_INTERVALS = 1;
+  private static VolumeChoosingPolicy volumeChoosingPolicy;
 
   @BeforeAll
   public static void setup() {
@@ -94,7 +96,7 @@ public class TestContainerMetrics {
         DFS_METRICS_PERCENTILES_INTERVALS);
     CONF.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     CONF.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
-
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(CONF);
   }
 
   @AfterEach
@@ -143,8 +145,8 @@ public class TestContainerMetrics {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(containerType, CONF,
               context.getParent().getDatanodeDetails().getUuidString(),
-              containerSet, volumeSet, metrics,
-              c -> { }));
+              containerSet, volumeSet, volumeChoosingPolicy, metrics,
+              c -> { }, new ContainerChecksumTreeManager(CONF)));
     }
     HddsDispatcher dispatcher = new HddsDispatcher(CONF, containerSet,
         volumeSet, handlers, context, metrics, null);

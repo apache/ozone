@@ -27,10 +27,6 @@ import java.util.Objects;
  */
 final class ContainerKeyPrefixImpl
     implements ContainerKeyPrefix, KeyPrefixContainer {
-  static ContainerKeyPrefixImpl get(long containerId, String keyPrefix,
-      long keyVersion) {
-    return new ContainerKeyPrefixImpl(containerId, keyPrefix, keyVersion);
-  }
 
   private final long containerId;
   private final String keyPrefix;
@@ -41,6 +37,11 @@ final class ContainerKeyPrefixImpl
     this.containerId = containerId;
     this.keyPrefix = keyPrefix;
     this.keyVersion = keyVersion;
+  }
+
+  static ContainerKeyPrefixImpl get(long containerId, String keyPrefix,
+                                    long keyVersion) {
+    return new ContainerKeyPrefixImpl(containerId, keyPrefix, keyVersion);
   }
 
   @Override

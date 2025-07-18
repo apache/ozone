@@ -55,8 +55,7 @@ public class TestCommandStatusReportHandler implements EventPublisher {
 
   @Test
   public void testCommandStatusReport() {
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(LOG);
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(LOG);
 
     CommandStatusReportFromDatanode report = this.getStatusReport(Collections
         .emptyList());

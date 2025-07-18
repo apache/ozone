@@ -85,7 +85,7 @@ public class TestInitialConstraintUpgradeAction extends AbstractReconSqlDBTest {
   @Test
   public void testUpgradeAppliesConstraintModificationForAllStates() throws SQLException {
     // Run the upgrade action
-    upgradeAction.execute(mockScmFacade);
+    upgradeAction.execute(mockScmFacade.getDataSource());
 
     // Iterate over all valid states and insert records
     for (ContainerSchemaDefinition.UnHealthyContainerStates state :

@@ -222,7 +222,6 @@ EPL 2.0
    jakarta.annotation:jakarta.annotation-api
    jakarta.ws.rs:jakarta.ws.rs-api
    org.aspectj:aspectjrt
-   org.aspectj:aspectjweaver
    org.glassfish.hk2.external:aopalliance-repackaged
    org.glassfish.hk2.external:jakarta.inject
    org.glassfish.hk2.external:javax.inject
@@ -231,7 +230,6 @@ EPL 2.0
    org.glassfish.hk2:hk2-locator
    org.glassfish.hk2:hk2-utils
    org.glassfish.hk2:osgi-resource-locator
-   org.glassfish.jersey.containers:jersey-container-servlet
    org.glassfish.jersey.containers:jersey-container-servlet-core
    org.glassfish.jersey.core:jersey-client
    org.glassfish.jersey.core:jersey-common
@@ -267,6 +265,7 @@ Apache License 2.0
    ch.qos.reload4j:reload4j
    com.amazonaws:aws-java-sdk-core
    com.amazonaws:aws-java-sdk-kms
+   com.amazonaws:aws-java-sdk-logs
    com.amazonaws:aws-java-sdk-s3
    com.amazonaws:jmespath-java
    com.carrotsearch:hppc
@@ -276,6 +275,8 @@ Apache License 2.0
    com.fasterxml.jackson.dataformat:jackson-dataformat-cbor
    com.fasterxml.jackson.dataformat:jackson-dataformat-xml
    com.fasterxml.jackson.datatype:jackson-datatype-jsr310
+   com.fasterxml.jackson.jaxrs:jackson-jaxrs-base
+   com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider
    com.fasterxml.jackson.module:jackson-module-jaxb-annotations
    com.fasterxml.woodstox:woodstox-core
    com.github.jnr:jnr-a64asm
@@ -310,12 +311,12 @@ Apache License 2.0
    commons-httpclient:commons-httpclient
    commons-io:commons-io
    commons-lang:commons-lang
-   commons-logging:commons-logging
    commons-net:commons-net
    commons-validator:commons-validator
    commons-fileupload:commons-fileupload
    info.picocli:picocli
    info.picocli:picocli-shell-jline3
+   io.airlift:aircompressor
    io.dropwizard.metrics:metrics-core
    io.grpc:grpc-api
    io.grpc:grpc-context
@@ -360,6 +361,7 @@ Apache License 2.0
    jakarta.validation:jakarta.validation-api
    javax.enterprise:cdi-api
    javax.inject:javax.inject
+   log4j:apache-log4j-extras
    net.java.dev.jna:jna
    net.java.dev.jna:jna-platform
    org.apache.commons:commons-compress
@@ -398,6 +400,7 @@ Apache License 2.0
    org.apache.logging.log4j:log4j-api
    org.apache.logging.log4j:log4j-core
    org.apache.orc:orc-core
+   org.apache.orc:orc-shims
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
    org.apache.ranger:ranger-plugin-audit
@@ -417,10 +420,6 @@ Apache License 2.0
    org.apache.thrift:libthrift
    org.apache.zookeeper:zookeeper
    org.apache.zookeeper:zookeeper-jute
-   org.codehaus.jackson:jackson-core-asl
-   org.codehaus.jackson:jackson-jaxrs
-   org.codehaus.jackson:jackson-mapper-asl
-   org.codehaus.jackson:jackson-xc
    org.eclipse.jetty:jetty-client
    org.eclipse.jetty:jetty-http
    org.eclipse.jetty:jetty-io
@@ -462,7 +461,7 @@ MIT
    org.bouncycastle:bcutil-jdk18on
    org.checkerframework:checker-qual
    org.codehaus.mojo:animal-sniffer-annotations
-   org.kohsuke.metainf-services:metainf-services
+   org.slf4j:jcl-over-slf4j
    org.slf4j:slf4j-api
    org.slf4j:slf4j-reload4j
 
@@ -478,7 +477,6 @@ BSD 3-Clause
 
    com.github.vlsi.mxgraph:jgraphx
    com.google.protobuf:protobuf-java
-   com.google.protobuf:protobuf-java-util
    com.google.re2j:re2j
    com.jcraft:jsch
    com.thoughtworks.paranamer:paranamer

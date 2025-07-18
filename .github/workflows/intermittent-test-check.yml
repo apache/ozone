@@ -28,6 +28,10 @@ on:
         description: Test Name
         default:  ALL
         required: false
+      submodule:
+        description: Submodule
+        default: 'ozone-integration-test'
+        required: true
       iterations:
         description: Number of Iterations per split
         default: 10
@@ -61,6 +65,9 @@ env:
   RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
   RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
   JAVA_VERSION: ${{ github.event.inputs.java-version }}
+  # Surefire 3.0.0-M4 is used because newer versions do not reliably kill the fork on timeout
+  # SUREFIRE-1722, SUREFIRE-1815
+  SUREFIRE_VERSION: 3.0.0-M4
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}-java{5}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations, inputs.java-version) || '' }}
 jobs:
   prepare-job:
@@ -97,6 +104,8 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -128,6 +137,8 @@ jobs:
             args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
+
+          args="$args -am -pl :${{ github.event.inputs.submodule }}"
 
           hadoop-ozone/dev-support/checks/build.sh $args
       - name: Store Maven repo for tests
@@ -197,6 +208,8 @@ jobs:
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
 
+          args="$args -pl :${{ github.event.inputs.submodule }}"
+
           if [ "$TEST_METHOD" = "ALL" ]; then
             echo "Running all tests from $TEST_CLASS"
             set -x
@@ -227,12 +240,12 @@ jobs:
         uses: actions/download-artifact@v4
       - name: Count failures
         run: |
-          failures=$(find . -name 'summary.txt' | grep -v 'iteration' | xargs grep -v 'exit code: 0' | wc -l)
+          failures=$(find . -name 'summary.txt' | grep --text -v 'iteration' | xargs grep --text -v 'exit code: 0' | wc -l)
           echo "Total failures: $failures"
           if [[ $failures -gt 0 ]]; then
             echo ""
             echo "Failed runs:"
-            grep 'exit code: 1' */summary.txt | grep -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
+            grep --text 'exit code: 1' */summary.txt | grep --text -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
             echo ""
             exit 1
           fi

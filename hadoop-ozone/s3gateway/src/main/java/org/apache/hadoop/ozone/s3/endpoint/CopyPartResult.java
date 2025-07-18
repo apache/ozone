@@ -25,13 +25,14 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Copy object Response.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "CopyPartResult",
-    namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    namespace = S3Consts.S3_XML_NAMESPACE)
 public class CopyPartResult {
 
   @XmlJavaTypeAdapter(IsoDateAdapter.class)

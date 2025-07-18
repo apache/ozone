@@ -47,9 +47,9 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -57,7 +57,6 @@ import org.slf4j.event.Level;
 /**
  * Tests for {@link ContainerBalancer}.
  */
-@Timeout(60)
 public class TestContainerBalancer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerBalancer.class);
@@ -90,7 +89,7 @@ public class TestContainerBalancer {
     // time to verify, and interrupt when stop.
     balancerConfiguration.setTriggerDuEnable(true);
     conf.setFromObject(balancerConfiguration);
-    GenericTestUtils.setLogLevel(ContainerBalancer.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ContainerBalancer.class, Level.DEBUG);
 
     when(scm.getScmNodeManager()).thenReturn(mock(NodeManager.class));
     when(scm.getScmContext()).thenReturn(SCMContext.emptyContext());
@@ -206,6 +205,25 @@ public class TestContainerBalancer {
         () -> containerBalancer.startBalancer(balancerConfiguration),
         "hdds.container.balancer.move.replication.timeout should " +
             "be less than hdds.container.balancer.move.timeout.");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    conf.setTimeDuration("hdds.container.balancer.move.timeout", 60,
+        TimeUnit.MINUTES);
+    conf.setTimeDuration(
+        "hdds.container.balancer.move.replication.timeout", 50,
+        TimeUnit.MINUTES);
+
+    balancerConfiguration =
+        conf.getObject(ContainerBalancerConfiguration.class);
+    InvalidContainerBalancerConfigurationException ex =
+        assertThrowsExactly(
+            InvalidContainerBalancerConfigurationException.class,
+            () -> containerBalancer.startBalancer(balancerConfiguration),
+            "(hdds.container.balancer.move.timeout - hdds.container.balancer.move.replication.timeout " +
+                "- hdds.scm.replication.event.timeout.datanode.offset) should be greater than or equal to 9 minutes.");
+    assertTrue(ex.getMessage().contains("should be greater than or equal to 540000ms or 9 minutes"),
+        "Exception message should contain 'should be greater than or equal to 540000ms or 9 minutes'");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
   }
 
   /**
@@ -236,8 +254,7 @@ public class TestContainerBalancer {
     containerBalancer.notifyStatusChanged();
     assertFalse(containerBalancer.isBalancerRunning());
 
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(ContainerBalancerTask.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(ContainerBalancerTask.class);
     String expectedLog = "ContainerBalancer will sleep for " + delayDuration +
         " seconds before starting balancing.";
     /*

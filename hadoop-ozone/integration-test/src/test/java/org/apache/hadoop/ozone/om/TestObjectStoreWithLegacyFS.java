@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -58,7 +57,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +64,6 @@ import org.slf4j.LoggerFactory;
  * Test verifies object store with OZONE_OM_ENABLE_FILESYSTEM_PATHS enabled.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(200)
 public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase {
 
   private OzoneClient client;
@@ -99,8 +96,8 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
 
   @BeforeEach
   public void init() throws Exception {
-    volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    volumeName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
+    bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
@@ -144,7 +141,7 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
       String dbKey, int expectedCnt, String keyName) {
     int countKeys = 0;
     int matchingKeys = 0;
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+    try (Table.KeyValueIterator<String, OmKeyInfo>
           itr = keyTable.iterator()) {
       itr.seek(dbKey);
       while (itr.hasNext()) {
@@ -215,7 +212,7 @@ public abstract class TestObjectStoreWithLegacyFS implements NonHATests.TestCase
     String uploadID = omMultipartInfo.getUploadID();
 
     // upload part 1.
-    byte[] data = generateData(128, (byte) RandomUtils.nextLong());
+    byte[] data = generateData(128, (byte) RandomUtils.secure().randomLong());
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);

@@ -101,7 +101,7 @@ public class TestRatisOverReplicationHandler {
     ReplicationTestUtil.mockRMSendThrottledDeleteCommand(replicationManager,
         commandsSent);
 
-    GenericTestUtils.setLogLevel(RatisOverReplicationHandler.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(RatisOverReplicationHandler.class, Level.DEBUG);
   }
 
   /**
@@ -414,6 +414,7 @@ public class TestRatisOverReplicationHandler {
 
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
   }
+
   @Test
   public void testOverReplicationOfQuasiClosedReplicaWithWrongSequenceID()
       throws IOException {

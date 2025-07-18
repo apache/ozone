@@ -40,7 +40,7 @@ public interface ServiceRuntimeInfo {
    */
   default String getNamespace() {
     return "";
-  };
+  }
 
   /**
    * Gets the version of Hadoop.

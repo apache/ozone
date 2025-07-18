@@ -41,7 +41,7 @@ public class TestOzoneShellHAWithFSO extends TestOzoneShellHA {
     conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    // startKMS();
+    startKMS();
     startCluster(conf);
   }
 }

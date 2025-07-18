@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SimpleContainerDownloader implements ContainerDownloader {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SimpleContainerDownloader.class);
 
   private final SecurityConfig securityConfig;

@@ -41,12 +41,12 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -992,23 +992,23 @@ public class TestRatisReplicationCheckHandler {
     replicas.add(createContainerReplica(container.containerID(), 0,
         IN_SERVICE, State.QUASI_CLOSED, 1, 1,
         MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        DatanodeID.randomID(),
         sequenceID - 1));
     replicas.add(createContainerReplica(container.containerID(), 0,
         IN_SERVICE, State.QUASI_CLOSED, 1, 1,
         MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        DatanodeID.randomID(),
         sequenceID - 1));
     replicas.add(createContainerReplica(container.containerID(), 0,
         IN_SERVICE, State.QUASI_CLOSED, 1, 1,
         MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        DatanodeID.randomID(),
         sequenceID - 1));
 
     replicas.add(createContainerReplica(container.containerID(), 0,
         IN_SERVICE, State.UNHEALTHY, 1, 1,
         MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        DatanodeID.randomID(),
         sequenceID));
 
     requestBuilder.setContainerReplicas(replicas)
@@ -1030,17 +1030,17 @@ public class TestRatisReplicationCheckHandler {
         repConfig, 1, HddsProtos.LifeCycleState.QUASI_CLOSED,
         sequenceID);
 
-    UUID origin = UUID.randomUUID();
+    final DatanodeID origin = DatanodeID.randomID();
     final Set<ContainerReplica> replicas = new HashSet<>(2);
     replicas.add(createContainerReplica(container.containerID(), 0,
         IN_SERVICE, State.QUASI_CLOSED, 1, 1,
         MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        DatanodeID.randomID(),
         sequenceID - 1));
     replicas.add(createContainerReplica(container.containerID(), 0,
         IN_SERVICE, State.QUASI_CLOSED, 1, 1,
         MockDatanodeDetails.randomDatanodeDetails(),
-        MockDatanodeDetails.randomDatanodeDetails().getUuid(),
+        DatanodeID.randomID(),
         sequenceID - 1));
     replicas.add(createContainerReplica(container.containerID(), 0,
         IN_SERVICE, State.QUASI_CLOSED, 1, 1,

@@ -187,7 +187,6 @@ public interface ReconContainerMetadataManager {
   Map<Long, ContainerMetadata> getContainers(int limit, long prevContainer)
       throws IOException;
 
-
   SeekableIterator<Long, ContainerMetadata> getContainersIterator() throws IOException;
 
   /**
@@ -210,12 +209,6 @@ public interface ReconContainerMetadataManager {
   void batchDeleteContainerMapping(BatchOperation batch,
                                    ContainerKeyPrefix containerKeyPrefix)
       throws IOException;
-
-  /**
-   * Get iterator to the entire container DB.
-   * @return TableIterator
-   */
-  TableIterator getContainerTableIterator() throws IOException;
 
   /**
    * Get the total count of containers present in the system.

@@ -97,10 +97,6 @@
       <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>jakarta.xml.bind</groupId>
-      <artifactId>jakarta.xml.bind-api</artifactId>
-    </dependency>
-    <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
@@ -111,6 +107,18 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-auth</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdfs-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.kerby</groupId>
@@ -132,10 +140,6 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-config</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-server</artifactId>
-    </dependency>
     <!-- hdds.proto and generated files are required from there -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -156,10 +160,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-server-framework</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -206,6 +206,11 @@
         <exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-bundle</artifactId>
+        </exclusion>
+        <exclusion>
+          <!-- depend on jcl-over-slf4j instead -->
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
         </exclusion>
         <exclusion>
           <groupId>net.minidev</groupId>
@@ -278,41 +283,6 @@
       <artifactId>aspectjrt</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.aspectj</groupId>
-      <artifactId>aspectjweaver</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk18on</artifactId>
-    </dependency>
-    <!-- Override ranger-intg jackson version -->
-    <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-core-asl</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-jaxrs</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>jackson-core-asl</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.codehaus.jackson</groupId>
-          <artifactId>jackson-mapper-asl</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.codehaus.jackson</groupId>
-      <artifactId>jackson-mapper-asl</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-util</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-webapp</artifactId>
     </dependency>
@@ -329,6 +299,10 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-docs</artifactId>
       <scope>provided</scope>
@@ -343,6 +317,11 @@
     <dependency>
       <groupId>com.google.testing.compile</groupId>
       <artifactId>compile-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.xml.bind</groupId>
+      <artifactId>jakarta.xml.bind-api</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -364,6 +343,12 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-framework</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-server-scm</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -372,6 +357,11 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
       <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-client</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -403,7 +393,8 @@
           </annotationProcessorPaths>
           <annotationProcessors>
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
-            <annotationProcessor>org.apache.ozone.annotations.RequestFeatureValidatorProcessor</annotationProcessor>
+            <annotationProcessor>org.apache.ozone.annotations.OmRequestFeatureValidatorProcessor</annotationProcessor>
+            <annotationProcessor>org.apache.ozone.annotations.RegisterValidatorProcessor</annotationProcessor>
           </annotationProcessors>
         </configuration>
       </plugin>

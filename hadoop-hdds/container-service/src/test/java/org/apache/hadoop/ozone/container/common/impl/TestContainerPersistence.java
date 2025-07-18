@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -96,7 +97,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +106,6 @@ import org.slf4j.LoggerFactory;
  * these tests are specific to {@link KeyValueContainer}. If a new {@link
  * ContainerProtos.ContainerType} is added, the tests need to be modified.
  */
-@Timeout(300)
 public class TestContainerPersistence {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String SCM_ID = UUID.randomUUID().toString();
@@ -204,10 +203,11 @@ public class TestContainerPersistence {
     data.addMetadata("VOLUME", "shire");
     data.addMetadata("owner)", "bilbo");
     KeyValueContainer container = new KeyValueContainer(data, conf);
+    commitBytesBefore = StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()).get(0).getCommittedBytes();
+
     container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
-    commitBytesBefore = container.getContainerData()
-        .getVolume().getCommittedBytes();
     cSet.addContainer(container);
+
     commitBytesAfter = container.getContainerData()
         .getVolume().getCommittedBytes();
     commitIncrement = commitBytesAfter - commitBytesBefore;
@@ -311,7 +311,7 @@ public class TestContainerPersistence {
 
     KeyValueHandler kvHandler = new KeyValueHandler(conf,
         datanodeId, containerSet, volumeSet, metrics,
-        c -> icrReceived.incrementAndGet());
+        c -> icrReceived.incrementAndGet(), new ContainerChecksumTreeManager(conf));
 
     Exception exception = assertThrows(
         StorageContainerException.class,
@@ -627,12 +627,159 @@ public class TestContainerPersistence {
   }
 
   /**
-   * Writes many chunks of the same block into different chunk files and
-   * verifies that we have that data in many files.
+   * Tests that committed space is correctly decremented when a write fits entirely within the available space under
+   * max container size. It should be decremented by the number of bytes written.
    *
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
+   * Before write: Container size is less than max size
+   * After write: Container size is still less than max size
    */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDecrementsCommittedWhenWriteFits(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    long writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // did we decrement commit bytes by the amount of data we wrote?
+    assertEquals(writeBytes, commitDecrement);
+  }
+
+  /**
+   * Tests the scenario where a write operation causes the container usage to exceed max container size.
+   * The committed space should only be decremented by the amount of the write that fit within the max limit.
+   *
+   * Before Write: Container size is within max size
+   * After Write: Container size exceeds max size
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDecrementsCommittedCorrectlyWhenWriteExceedsMax(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    // fill the container close to the max size first
+    long writeBytes = container.getContainerData().getMaxSize() - 100;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+
+    // the next write will make the container size exceed max size
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // did we decrement commit bytes by the amount that was remaining, ie, 100 bytes?
+    assertEquals(100, commitDecrement);
+  }
+
+  /**
+   * Tests that committed space is not decremented if the container was already
+   * full (or overfull) before the write operation.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDoesNotDecrementCommittedWhenContainerFull(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    // fill the container completely first
+    long writeBytes = container.getContainerData().getMaxSize();
+    container.getContainerData().updateWriteStats(writeBytes, false);
+
+    // the next write will make the container size exceed max size
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // decrement should be 0, as the container was already full before the write
+    assertEquals(0, commitDecrement);
+  }
+
+  /**
+   * In this test, the write fills the container exactly to max size. Committed space should be decremented by the
+   * amount of bytes written.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDecrementsCommittedCorrectlyWhenWrittenToBrim(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    // fill the container completely first
+    long writeBytes = container.getContainerData().getMaxSize() - 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+
+    // the next write will make the container size exactly equal to max size
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // decrement should be writeBytes, as the write does not exceed max size
+    assertEquals(writeBytes, commitDecrement);
+  }
+
+  /**
+   * Commited space should not change when committedSpace is set to false.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testIncrWriteBytesDoesNotChangeCommittedSpaceWhenItsDisabled(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
+    BlockID blockID = ContainerTestHelper.
+        getTestBlockID(getTestContainerID());
+    long testContainerID = blockID.getContainerID();
+    Container container = containerSet.getContainer(testContainerID);
+    if (container == null) {
+      container = addContainer(containerSet, testContainerID);
+    }
+
+    // For setup, we need to set committedSpace to false first
+    container.getContainerData().setCommittedSpace(false);
+    long commitBytesBefore = container.getContainerData().getVolume().getCommittedBytes();
+    long writeBytes = 256 * OzoneConsts.MB;
+    container.getContainerData().updateWriteStats(writeBytes, false);
+    long commitBytesAfter = container.getContainerData().getVolume().getCommittedBytes();
+    long commitDecrement = commitBytesBefore - commitBytesAfter;
+    // decrement should be 0, as commit space is disabled for this container
+    assertEquals(0, commitDecrement);
+  }
+
+  /**
+     * Writes many chunks of the same block into different chunk files and
+     * verifies that we have that data in many files.
+     *
+     * @throws IOException
+     * @throws NoSuchAlgorithmException
+     */
   @ContainerTestVersionInfo.ContainerTest
   public void testWritReadManyChunks(ContainerTestVersionInfo versionInfo)
       throws IOException {
@@ -704,11 +851,9 @@ public class TestContainerPersistence {
     info.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
     chunkManager.writeChunk(container, blockID, info, data,
         DispatcherContext.getHandleWriteChunk());
-    long bytesUsed = container.getContainerData().getBytesUsed();
-    assertEquals(datalen, bytesUsed);
-
-    long bytesWrite = container.getContainerData().getWriteBytes();
-    assertEquals(datalen * 3, bytesWrite);
+    final ContainerData.Statistics statistics = container.getContainerData().getStatistics();
+    statistics.assertWrite(datalen * 3, 3);
+    statistics.assertBlock(datalen, 0, 0);
   }
 
   /**
@@ -845,14 +990,10 @@ public class TestContainerPersistence {
       chunkList.add(info);
     }
 
-    long bytesUsed = container.getContainerData().getBytesUsed();
-    assertEquals(totalSize, bytesUsed);
-    long writeBytes = container.getContainerData().getWriteBytes();
-    assertEquals(chunkCount * datalen, writeBytes);
-    long readCount = container.getContainerData().getReadCount();
-    assertEquals(0, readCount);
-    long writeCount = container.getContainerData().getWriteCount();
-    assertEquals(chunkCount, writeCount);
+    final ContainerData.Statistics statistics = container.getContainerData().getStatistics();
+    statistics.assertRead(0, 0);
+    statistics.assertWrite(chunkCount * datalen, chunkCount);
+    statistics.assertBlock(totalSize, 0, 0);
 
     BlockData blockData = new BlockData(blockID);
     List<ContainerProtos.ChunkInfo> chunkProtoList = new LinkedList<>();
@@ -927,13 +1068,10 @@ public class TestContainerPersistence {
     // Test force update flag.
     // Close the container and then try to update without force update flag.
     container.close();
-    try {
-      container.update(newMetadata, false);
-    } catch (StorageContainerException ex) {
-      assertEquals("Updating a closed container without " +
-          "force option is not allowed. ContainerID: " +
-          testContainerID, ex.getMessage());
-    }
+    StorageContainerException exception = assertThrows(StorageContainerException.class,
+        () -> container.update(newMetadata, false));
+    assertThat(exception).hasMessageContaining(container.getContainerData().toString());
+
 
     // Update with force flag, it should be success.
     newMetadata.put("VOLUME", "shire_new_1");

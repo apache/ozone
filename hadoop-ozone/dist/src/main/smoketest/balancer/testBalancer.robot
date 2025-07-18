@@ -21,10 +21,11 @@ Library             Collections
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
 
+Suite Setup         Get Security Enabled From Config
+
 Test Timeout        20 minutes
 
 *** Variables ***
-${SECURITY_ENABLED}                 false
 ${HOST}                             datanode1
 ${VOLUME}                           volume1
 ${BUCKET}                           bucket1
@@ -98,13 +99,13 @@ Run Balancer Status
                      Should Contain                  ${result}             ContainerBalancer is Running.
 
 Run Balancer Verbose Status
-    ${result} =      Execute                         ozone admin containerbalancer status -v
+    ${result} =      Execute                         ozone admin containerbalancer status --verbose
                      Verify Balancer Iteration       ${result}             1
                      Should Contain                  ${result}             Iteration result -    collapse_spaces=True
 
 
 Run Balancer Verbose History Status
-    ${result} =    Execute                         ozone admin containerbalancer status -v --history
+    ${result} =    Execute                         ozone admin containerbalancer status --verbose --history
                    Verify Balancer Iteration            ${result}             1
                    Verify Balancer Iteration History    ${result}
 

@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -66,6 +67,26 @@ public final class OmSnapshotUtils {
   }
 
   /**
+   * Returns a string combining the inode (fileKey) and the last modification time (mtime) of the given file.
+   * <p>
+   * The returned string is formatted as "{inode}-{mtime}", where:
+   * <ul>
+   *   <li>{@code inode} is the unique file key obtained from the file system, typically representing
+   *   the inode on POSIX systems</li>
+   *   <li>{@code mtime} is the last modified time of the file in milliseconds since the epoch</li>
+   * </ul>
+   *
+   * @param file the {@link Path} to the file whose inode and modification time are to be retrieved
+   * @return a string in the format "{inode}-{mtime}"
+   * @throws IOException if an I/O error occurs
+   */
+  public static String getFileInodeAndLastModifiedTimeString(Path file) throws IOException {
+    Object inode = Files.readAttributes(file, BasicFileAttributes.class).fileKey();
+    FileTime mTime = Files.getLastModifiedTime(file);
+    return String.format("%s-%s", inode, mTime.toMillis());
+  }
+
+  /**
    * Create file of links to add to tarball.
    * Format of entries are either:
    * dir1/fileTo fileFrom
@@ -92,8 +113,8 @@ public final class OmSnapshotUtils {
           fixedFile = f.toString();
         }
       }
-      sb.append(truncateFileName(truncateLength, entry.getKey())).append("\t")
-          .append(fixedFile).append("\n");
+      sb.append(truncateFileName(truncateLength, entry.getKey())).append('\t')
+          .append(fixedFile).append('\n');
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
     return data;

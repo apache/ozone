@@ -231,7 +231,7 @@ public class TestEmptyContainerHandler {
         ReplicationTestUtil.createContainerReplica(containerInfo.containerID(),
             5, HddsProtos.NodeOperationalState.IN_SERVICE,
             ContainerReplicaProto.State.CLOSED, 1L, 100L, mockDn,
-            mockDn.getUuid()));
+            mockDn.getID()));
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())

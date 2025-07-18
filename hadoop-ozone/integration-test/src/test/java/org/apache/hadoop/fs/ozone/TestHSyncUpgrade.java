@@ -28,7 +28,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
@@ -60,6 +59,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -72,13 +72,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 /**
  * Test HSync upgrade.
  */
-@Timeout(value = 300)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestHSyncUpgrade {
   private MiniOzoneCluster cluster;
@@ -119,7 +117,7 @@ public class TestHSyncUpgrade {
     conf.setTimeDuration(OZONE_OM_LEASE_HARD_LIMIT,
         EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
-    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.MULTITENANCY_SCHEMA.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, OMLayoutFeature.MULTITENANCY_SCHEMA.layoutVersion());
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
@@ -141,13 +139,13 @@ public class TestHSyncUpgrade {
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);
 
     // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(BlockManagerImpl.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(AbstractDatanodeStore.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(KeyValueHandler.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockManagerImpl.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(AbstractDatanodeStore.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockOutputStream.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockInputStream.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(KeyValueHandler.class, Level.DEBUG);
 
-    GenericTestUtils.setLogLevel(BufferPool.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BufferPool.class, Level.DEBUG);
 
     OpenKeyCleanupService openKeyCleanupService =
         (OpenKeyCleanupService) cluster.getOzoneManager().getKeyManager()

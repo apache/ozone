@@ -1828,6 +1828,31 @@
             ]
           },
           {
+            "name": "StorageTypeProto",
+            "enum_fields": [
+              {
+                "name": "DISK",
+                "integer": 1
+              },
+              {
+                "name": "SSD",
+                "integer": 2
+              },
+              {
+                "name": "ARCHIVE",
+                "integer": 3
+              },
+              {
+                "name": "RAM_DISK",
+                "integer": 4
+              },
+              {
+                "name": "PROVIDED",
+                "integer": 5
+              }
+            ]
+          },
+          {
             "name": "NodeType",
             "enum_fields": [
               {

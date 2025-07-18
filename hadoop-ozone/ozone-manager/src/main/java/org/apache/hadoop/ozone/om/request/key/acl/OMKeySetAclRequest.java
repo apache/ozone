@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -43,6 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Lists;
@@ -58,6 +58,10 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeySetAclRequest.class);
 
+  private String path;
+  private List<OzoneAcl> ozoneAcls;
+  private OzoneObj obj;
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     long modificationTime = Time.now();
@@ -70,10 +74,6 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
         .setUserInfo(getUserInfo())
         .build();
   }
-
-  private String path;
-  private List<OzoneAcl> ozoneAcls;
-  private OzoneObj obj;
 
   public OMKeySetAclRequest(OMRequest omRequest, OzoneManager ozoneManager) {
     super(omRequest);
