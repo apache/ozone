@@ -148,7 +148,7 @@ public class TestLdbRepair {
 
   private long calculateSstFileSize(Path db) throws IOException {
     if (!Files.exists(db)) {
-      return 0;
+      throw new IllegalStateException("DB path doesn't exist: " + db);
     }
 
     try (Stream<Path> paths = Files.walk(db)) {
