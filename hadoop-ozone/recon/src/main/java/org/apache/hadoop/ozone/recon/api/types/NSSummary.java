@@ -35,6 +35,8 @@ public class NSSummary {
   private Set<Long> childDir;
   private String dirName;
   private long parentId = 0;
+  private long totalSize = -1;
+  private long totalCount = -1;
 
   public NSSummary() {
     this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
@@ -115,6 +117,22 @@ public class NSSummary {
 
   public void setParentId(long parentId) {
     this.parentId = parentId;
+  }
+
+  public long getTotalSize() {
+    return totalSize;
+  }
+
+  public void setTotalSize(long totalSize) {
+    this.totalSize = totalSize;
+  }
+
+  public long getTotalCount() {
+    return totalCount;
+  }
+
+  public void setTotalCount(long totalCount) {
+    this.totalCount = totalCount;
   }
 
   @Override

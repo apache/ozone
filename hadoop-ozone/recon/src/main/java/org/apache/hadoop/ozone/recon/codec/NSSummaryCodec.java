@@ -67,7 +67,8 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
         + (numOfChildDirs + 1) * Long.BYTES // 1 long field for parentId + list size
         + Short.BYTES // 2 dummy shorts to track length
         + dirName.length // directory name length
-        + Long.BYTES; // Added space for parentId serialization
+        + Long.BYTES // Added space for parentId serialization
+        + 2 * Long.BYTES; // Added space for totalSize and totalCount
 
     ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
     out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
@@ -85,6 +86,8 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     out.write(integerCodec.toPersistedFormat(dirName.length));
     out.write(dirName);
     out.write(longCodec.toPersistedFormat(object.getParentId()));
+    out.write(longCodec.toPersistedFormat(object.getTotalSize()));
+    out.write(longCodec.toPersistedFormat(object.getTotalCount()));
 
     return out.toByteArray();
   }
@@ -111,14 +114,15 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     res.setChildDir(childDir);
 
     int strLen = in.readInt();
-    if (strLen == 0) {
-      return res;
+    // Only read directory name if strLen > 0, but don't return early
+    if (strLen > 0) {
+      byte[] buffer = new byte[strLen];
+      int bytesRead = in.read(buffer);
+      assert (bytesRead == strLen);
+      String dirName = stringCodec.fromPersistedFormat(buffer);
+      res.setDirName(dirName);
     }
-    byte[] buffer = new byte[strLen];
-    int bytesRead = in.read(buffer);
-    assert (bytesRead == strLen);
-    String dirName = stringCodec.fromPersistedFormat(buffer);
-    res.setDirName(dirName);
+    // Continue reading remaining fields regardless of dirName length
 
     // Check if there is enough data available to read the parentId
     if (in.available() >= Long.BYTES) {
@@ -127,6 +131,24 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     } else {
       // Set default parentId to -1 indicating it's from old format
       res.setParentId(-1);
+    }
+
+    // Check if there is enough data available to read the totalSize
+    if (in.available() >= Long.BYTES) {
+      long totalSize = in.readLong();
+      res.setTotalSize(totalSize);
+    } else {
+      // Set default totalSize to -1 indicating it's from old format
+      res.setTotalSize(-1);
+    }
+
+    // Check if there is enough data available to read the totalCount
+    if (in.available() >= Long.BYTES) {
+      long totalCount = in.readLong();
+      res.setTotalCount(totalCount);
+    } else {
+      // Set default totalCount to -1 indicating it's from old format
+      res.setTotalCount(-1);
     }
     return res;
   }
@@ -140,6 +162,8 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     copy.setChildDir(object.getChildDir());
     copy.setDirName(object.getDirName());
     copy.setParentId(object.getParentId());
+    copy.setTotalSize(object.getTotalSize());
+    copy.setTotalCount(object.getTotalCount());
     return copy;
   }
 }

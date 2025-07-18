@@ -96,6 +96,9 @@ public class NSSummaryTaskDbEventHandler {
     ++fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
+
+    // Propagate totalSize and totalCount changes upwards (only during live processing, not reprocessing)
+    propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), 1, nsSummaryMap);
   }
 
   protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
@@ -165,27 +168,80 @@ public class NSSummaryTaskDbEventHandler {
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
+
+    // Propagate totalSize and totalCount decreases upwards (only during live processing, not reprocessing)
+    propagateSizeUpwards(parentObjectId, -keyInfo.getDataSize(), -1, nsSummaryMap);
   }
 
   protected void handleDeleteDirEvent(OmDirectoryInfo directoryInfo,
                                       Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
+    // Fetch the current directory's nssummary.
+    long currentObjectId = directoryInfo.getObjectID();
+    NSSummary curNSSummary = nsSummaryMap.get(currentObjectId);
+    if (curNSSummary == null) {
+      // If we don't have it in this batch we try to get it from the DB
+      curNSSummary = reconNamespaceSummaryManager.getNSSummary(currentObjectId);
+    }
+
+    // Fetch the parent directory's nssummary.
     long parentObjectId = directoryInfo.getParentObjectID();
     // Try to get the NSSummary from our local map that maps NSSummaries to IDs
-    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
-    if (nsSummary == null) {
+    NSSummary parentNsSummary = nsSummaryMap.get(parentObjectId);
+    if (parentNsSummary == null) {
       // If we don't have it in this batch we try to get it from the DB
-      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+      parentNsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
 
     // Just in case the OmDirectoryInfo isn't correctly written.
-    if (nsSummary == null) {
+    if (parentNsSummary == null) {
       LOG.error("The namespace table is not correctly populated.");
       return;
     }
 
-    nsSummary.removeChildDir(directoryInfo.getObjectID());
-    nsSummaryMap.put(parentObjectId, nsSummary);
+    // Set the parentID of the current directory to 0
+    curNSSummary.setParentId(0);
+    nsSummaryMap.put(currentObjectId, curNSSummary);
+
+    // Remove the refrence of the current directory from the parent directory's NSSummary
+    parentNsSummary.removeChildDir(directoryInfo.getObjectID());
+    parentNsSummary.setTotalSize(parentNsSummary.getTotalSize() - curNSSummary.getSizeOfFiles());
+    nsSummaryMap.put(parentObjectId, parentNsSummary);
+  }
+
+  protected void propagateSizeUpwards(long objectId, long sizeChange, 
+                                       long countChange, Map<Long, NSSummary> nsSummaryMap) 
+                                       throws IOException {
+    // Get the current directory's NSSummary
+    NSSummary nsSummary = nsSummaryMap.get(objectId);
+    if (nsSummary == null) {
+      nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    }
+    if (nsSummary == null) {
+      return; // No more parents to update
+    }
+
+    // Update totalSize and totalCount for this directory
+    long currentTotalSize = nsSummary.getTotalSize();
+    long currentTotalCount = nsSummary.getTotalCount();
+    
+    // Initialize if unset (-1)
+    if (currentTotalSize == -1) {
+      currentTotalSize = nsSummary.getSizeOfFiles();
+    }
+    if (currentTotalCount == -1) {
+      currentTotalCount = nsSummary.getNumOfFiles();
+    }
+    
+    nsSummary.setTotalSize(currentTotalSize + sizeChange);
+    nsSummary.setTotalCount(currentTotalCount + countChange);
+    nsSummaryMap.put(objectId, nsSummary);
+
+    // Continue propagating to parent
+    long parentId = nsSummary.getParentId();
+    if (parentId != 0) {
+      propagateSizeUpwards(parentId, sizeChange, countChange, nsSummaryMap);
+    }
   }
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {

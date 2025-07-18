@@ -185,6 +185,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     try {
       Table<String, OmDirectoryInfo> dirTable =
           omMetadataManager.getDirectoryTable();
+      long fsoDirsStartTime = System.currentTimeMillis();
+      int processedDirsCount = 0;
       try (TableIterator<String,
               ? extends Table.KeyValue<String, OmDirectoryInfo>>
                 dirTableIter = dirTable.iterator()) {
@@ -192,6 +194,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           Table.KeyValue<String, OmDirectoryInfo> kv = dirTableIter.next();
           OmDirectoryInfo directoryInfo = kv.getValue();
           handlePutDirEvent(directoryInfo, nsSummaryMap);
+          processedDirsCount++;
           if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
               return false;
@@ -199,17 +202,23 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           }
         }
       }
+      long fsoDirsEndTime = System.currentTimeMillis();
+      LOG.info("NSSummaryTaskWithFSO processed {} FSO directories in {} ms", 
+               processedDirsCount, fsoDirsEndTime - fsoDirsStartTime);
 
       // Get fileTable used by FSO
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getFileTable();
 
+      long fsoKeysStartTime = System.currentTimeMillis();
+      int processedKeysCount = 0;
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
               keyTableIter = keyTable.iterator()) {
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
           OmKeyInfo keyInfo = kv.getValue();
           handlePutKeyEvent(keyInfo, nsSummaryMap);
+          processedKeysCount++;
           if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
               return false;
@@ -217,6 +226,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           }
         }
       }
+      long fsoKeysEndTime = System.currentTimeMillis();
+      LOG.info("NSSummaryTaskWithFSO processed {} FSO keys in {} ms", 
+               processedKeysCount, fsoKeysEndTime - fsoKeysStartTime);
 
     } catch (IOException ioEx) {
       LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
