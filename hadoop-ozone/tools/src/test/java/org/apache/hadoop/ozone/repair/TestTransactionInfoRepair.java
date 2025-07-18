@@ -32,6 +32,7 @@ import static org.mockito.Mockito.mockStatic;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -114,7 +115,8 @@ public class TestTransactionInfoRepair {
     try (MockedStatic<ManagedRocksDB> mocked = mockStatic(ManagedRocksDB.class);
          MockedStatic<RocksDBUtils> mockUtil = mockStatic(RocksDBUtils.class);
          MockedStatic<OptionsUtil> mockOptionsUtil = mockStatic(OptionsUtil.class)) {
-      mocked.when(() -> ManagedRocksDB.open(any(DBOptions.class), anyString(), anyList(), anyList())).thenReturn(mdb);
+      mocked.when(() -> ManagedRocksDB.openWithLatestOptions(any(ManagedConfigOptions.class), any(DBOptions.class),
+          anyString(), anyList(), anyList())).thenReturn(mdb);
       mockUtil.when(() -> RocksDBUtils.getColumnFamilyHandle(eq(expectedColumnFamilyName), anyList()))
           .thenReturn(columnFamilyHandle);
 

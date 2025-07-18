@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.hadoop.util.Time;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
@@ -65,10 +64,8 @@ public class RocksDBManualCompaction extends RepairTool {
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
     List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
 
-    // Preserve all the previous DB options
-    OptionsUtil.loadLatestOptions(configOptions, dbPath, dbOptions, cfDescList);
-
-    try (ManagedRocksDB db = ManagedRocksDB.open(dbOptions, dbPath, cfDescList, cfHandleList)) {
+    try (ManagedRocksDB db = ManagedRocksDB.openWithLatestOptions(
+        configOptions, dbOptions, dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle cfh = RocksDBUtils.getColumnFamilyHandle(columnFamilyName, cfHandleList);
       if (cfh == null) {
         throw new IllegalArgumentException(columnFamilyName +

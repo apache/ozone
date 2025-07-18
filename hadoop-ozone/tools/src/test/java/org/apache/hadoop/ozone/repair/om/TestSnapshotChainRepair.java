@@ -38,6 +38,7 @@ import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -107,11 +108,9 @@ public class TestSnapshotChainRepair {
     List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
     cfDescList.add(new ColumnFamilyDescriptor(new byte[] {1}));
 
-    mockedUtils.when(() -> RocksDBUtils.getColumnFamilyDescriptors(eq(DB_PATH)))
-        .thenReturn(cfDescList);
-
     // Mock DB open
-    mockedDB.when(() -> ManagedRocksDB.open(any(DBOptions.class), eq(DB_PATH), eq(cfDescList), eq(new ArrayList<>())))
+    mockedDB.when(() -> ManagedRocksDB.openWithLatestOptions(any(ManagedConfigOptions.class),
+            any(DBOptions.class), eq(DB_PATH), eq(new ArrayList<>()), eq(new ArrayList<>())))
         .thenReturn(managedRocksDB);
 
     // Mock column family handle

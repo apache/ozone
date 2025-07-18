@@ -49,7 +49,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
-import org.rocksdb.OptionsUtil;
 import picocli.CommandLine;
 
 /**
@@ -181,8 +180,8 @@ public class TestLdbRepair {
     List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
 
     try {
-      OptionsUtil.loadLatestOptions(configOptions, dbPath.toString(), dbOptions, cfDescList);
-      try (ManagedRocksDB db = ManagedRocksDB.open(dbOptions, dbPath.toString(), cfDescList, cfHandleList)) {
+      try (ManagedRocksDB db = ManagedRocksDB.openWithLatestOptions(
+          configOptions, dbOptions, dbPath.toString(), cfDescList, cfHandleList)) {
         DatabaseOptions.Builder builder = new DatabaseOptions.Builder();
         builder.setMaxBackgroundCompactions(dbOptions.maxBackgroundCompactions())
             .setMaxBackgroundFlushes(dbOptions.maxBackgroundFlushes())

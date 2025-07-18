@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.repair.RepairTool;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,12 +88,10 @@ public class SnapshotChainRepair extends RepairTool {
     ManagedConfigOptions configOptions = new ManagedConfigOptions();
     ManagedDBOptions dbOptions = new ManagedDBOptions();
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-    List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
+    List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
 
-    // Preserve all the previous DB options
-    OptionsUtil.loadLatestOptions(configOptions, dbPath, dbOptions, cfDescList);
-
-    try (ManagedRocksDB db = ManagedRocksDB.open(dbOptions, dbPath, cfDescList, cfHandleList)) {
+    try (ManagedRocksDB db = ManagedRocksDB.openWithLatestOptions(
+        configOptions, dbOptions, dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle snapshotInfoCfh = RocksDBUtils.getColumnFamilyHandle(SNAPSHOT_INFO_TABLE, cfHandleList);
       if (snapshotInfoCfh == null) {
         error("%s is not in a column family in DB for the given path.", SNAPSHOT_INFO_TABLE);
