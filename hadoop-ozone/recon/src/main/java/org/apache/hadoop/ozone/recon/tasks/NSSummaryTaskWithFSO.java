@@ -110,19 +110,23 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         return new ImmutablePair<>(seekPos, false);
       }
       if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-        if (!flushAndCommitNSToDB(nsSummaryMap)) {
+        // Deleting hard deleted directories also along with this flush operation from NSSummary table
+        // Same list of objectIdsToBeDeleted is used for follow up flush operation as well and done intentionally
+        // to make sure that after final flush all objectIds are deleted from NSSummary table.
+        if (!flushAndCommitUpdatedNSToDB(nsSummaryMap, objectIdsToBeDeleted)) {
           return new ImmutablePair<>(seekPos, false);
         }
         seekPos = eventCounter + 1;
       }
     }
-
-    // flush and commit left out entries at end
-    if (!flushAndCommitNSToDB(nsSummaryMap)) {
+    // flush and commit left out entries at end.
+    // Deleting hard deleted directories also along with this flush operation from NSSummary table
+    // Same list of objectIdsToBeDeleted is used this final flush operation as well and done intentionally
+    // to make sure that after final flush all objectIds are deleted from NSSummary table.
+    if (!flushAndCommitUpdatedNSToDB(nsSummaryMap, objectIdsToBeDeleted)) {
       return new ImmutablePair<>(seekPos, false);
     }
-    // Delete hard deleted directories from NSSummary table
-    deleteNSSummariesFromDB(objectIdsToBeDeleted);
+
     LOG.debug("Completed a process run of NSSummaryTaskWithFSO");
     return new ImmutablePair<>(seekPos, true);
   }
@@ -149,7 +153,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         // delete first, then put
         handleDeleteDirEvent(oldDirectoryInfo, nsSummaryMap);
       } else {
-        LOG.warn("Update event does not have the old dirInfo for {}.", oldDirectoryInfo.getName());
+        LOG.warn("Update event does not have the old dirInfo for {}.", dirTableUpdateEvent.getKey());
       }
       handlePutDirEvent(updatedDirectoryInfo, nsSummaryMap);
       break;
@@ -179,7 +183,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       break;
 
     default:
-      LOG.info("Skipping DB update event on deletedDirTable: {}", action);
+      LOG.debug("Skipping DB update event on deletedDirTable: {}", action);
     }
   }
 
@@ -206,7 +210,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         // delete first, then put
         handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
       } else {
-        LOG.warn("Update event does not have the old keyInfo for {}.", oldKeyInfo.getKeyName());
+        LOG.warn("Update event does not have the old keyInfo for {}.", omdbUpdateEvent.getKey());
       }
       handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
       break;
