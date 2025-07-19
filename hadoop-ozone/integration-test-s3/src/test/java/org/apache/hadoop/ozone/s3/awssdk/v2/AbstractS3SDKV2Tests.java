@@ -543,26 +543,33 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       PresignedHeadObjectRequest presignedRequest = presigner.presignHeadObject(presignRequest);
 
       URL presignedUrl = presignedRequest.url();
-      HttpURLConnection connection = (HttpURLConnection) presignedUrl.openConnection();
-      connection.setRequestMethod("HEAD");
+      HttpURLConnection connection = null;
+      try {
+        connection = (HttpURLConnection) presignedUrl.openConnection();
+        connection.setRequestMethod("HEAD");
 
-      int responseCode = connection.getResponseCode();
-      assertEquals(200, responseCode, "HeadObject presigned URL should return 200 OK");
+        int responseCode = connection.getResponseCode();
+        assertEquals(200, responseCode, "HeadObject presigned URL should return 200 OK");
 
-      // Use the AWS SDK for Java SdkHttpClient class to test the HEAD request
-      SdkHttpRequest request = SdkHttpRequest.builder()
-          .method(SdkHttpMethod.HEAD)
-          .uri(presignedUrl.toURI())
-          .build();
+        // Use the AWS SDK for Java SdkHttpClient class to test the HEAD request
+        SdkHttpRequest request = SdkHttpRequest.builder()
+            .method(SdkHttpMethod.HEAD)
+            .uri(presignedUrl.toURI())
+            .build();
 
-      HttpExecuteRequest executeRequest = HttpExecuteRequest.builder()
-          .request(request)
-          .build();
+        HttpExecuteRequest executeRequest = HttpExecuteRequest.builder()
+            .request(request)
+            .build();
 
-      try (SdkHttpClient sdkHttpClient = ApacheHttpClient.create()) {
-        HttpExecuteResponse response = sdkHttpClient.prepareRequest(executeRequest).call();
-        assertEquals(200, response.httpResponse().statusCode(),
-            "HeadObject presigned URL should return 200 OK via SdkHttpClient");
+        try (SdkHttpClient sdkHttpClient = ApacheHttpClient.create()) {
+          HttpExecuteResponse response = sdkHttpClient.prepareRequest(executeRequest).call();
+          assertEquals(200, response.httpResponse().statusCode(),
+              "HeadObject presigned URL should return 200 OK via SdkHttpClient");
+        }
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
       }
 
       // Test HeadBucket presigned URL
@@ -578,26 +585,33 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       PresignedHeadBucketRequest presignedBucketRequest = presigner.presignHeadBucket(headBucketPresignRequest);
 
       URL presignedBucketUrl = presignedBucketRequest.url();
-      HttpURLConnection bucketConnection = (HttpURLConnection) presignedBucketUrl.openConnection();
-      bucketConnection.setRequestMethod("HEAD");
+      HttpURLConnection bucketConnection = null;
+      try {
+        bucketConnection = (HttpURLConnection) presignedBucketUrl.openConnection();
+        bucketConnection.setRequestMethod("HEAD");
 
-      int bucketResponseCode = bucketConnection.getResponseCode();
-      assertEquals(200, bucketResponseCode, "HeadBucket presigned URL should return 200 OK");
+        int bucketResponseCode = bucketConnection.getResponseCode();
+        assertEquals(200, bucketResponseCode, "HeadBucket presigned URL should return 200 OK");
 
-      // Use the AWS SDK for Java SdkHttpClient class to test the HEAD request for bucket
-      SdkHttpRequest bucketSdkRequest = SdkHttpRequest.builder()
-          .method(SdkHttpMethod.HEAD)
-          .uri(presignedBucketUrl.toURI())
-          .build();
+        // Use the AWS SDK for Java SdkHttpClient class to test the HEAD request for bucket
+        SdkHttpRequest bucketSdkRequest = SdkHttpRequest.builder()
+            .method(SdkHttpMethod.HEAD)
+            .uri(presignedBucketUrl.toURI())
+            .build();
 
-      HttpExecuteRequest bucketExecuteRequest = HttpExecuteRequest.builder()
-          .request(bucketSdkRequest)
-          .build();
+        HttpExecuteRequest bucketExecuteRequest = HttpExecuteRequest.builder()
+            .request(bucketSdkRequest)
+            .build();
 
-      try (SdkHttpClient sdkHttpClient = ApacheHttpClient.create()) {
-        HttpExecuteResponse response = sdkHttpClient.prepareRequest(bucketExecuteRequest).call();
-        assertEquals(200, response.httpResponse().statusCode(),
-            "HeadBucket presigned URL should return 200 OK via SdkHttpClient");
+        try (SdkHttpClient sdkHttpClient = ApacheHttpClient.create()) {
+          HttpExecuteResponse response = sdkHttpClient.prepareRequest(bucketExecuteRequest).call();
+          assertEquals(200, response.httpResponse().statusCode(),
+              "HeadBucket presigned URL should return 200 OK via SdkHttpClient");
+        }
+      } finally {
+        if (bucketConnection != null) {
+          bucketConnection.disconnect();
+        }
       }
     }
   }
