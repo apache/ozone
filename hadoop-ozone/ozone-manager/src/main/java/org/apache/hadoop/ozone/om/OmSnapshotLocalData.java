@@ -17,15 +17,15 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.yaml.snakeyaml.Yaml;
 
@@ -35,7 +35,8 @@ import org.yaml.snakeyaml.Yaml;
  */
 public abstract class OmSnapshotLocalData {
 
-  // Version of the snapshot local data. A valid version shall be greater than 0.
+  // Version of the snapshot local data. 0 indicates uncompacted snapshot.
+  // compacted snapshots will have version > 0.
   private int version;
 
   // Checksum of the YAML representation
@@ -45,7 +46,7 @@ public abstract class OmSnapshotLocalData {
   private boolean isSSTFiltered;
 
   // Map of Table to uncompacted SST file list on snapshot create
-  private Map<String, List<String>> uncompactedSSTFileList;
+  private Map<String, Set<String>> uncompactedSSTFileList;
 
   // Time of last compaction, in epoch milliseconds
   private long lastCompactionTime;
@@ -55,7 +56,7 @@ public abstract class OmSnapshotLocalData {
 
   // Map of version to compacted SST file list
   // Map<version, Map<Table, sstFileList>>
-  private Map<Integer, Map<String, List<String>>> compactedSSTFileList;
+  private Map<Integer, Map<String, Set<String>>> compactedSSTFileList;
 
   public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
   private static final String DUMMY_CHECKSUM = new String(new byte[64], CHARSET_ENCODING);
@@ -63,9 +64,9 @@ public abstract class OmSnapshotLocalData {
   /**
    * Creates a OmSnapshotLocalData object with default values.
    */
-  public OmSnapshotLocalData() {
+  public OmSnapshotLocalData(Map<String, Set<String>> uncompactedSSTFileList) {
     this.isSSTFiltered = false;
-    this.uncompactedSSTFileList = new HashMap<>();
+    this.uncompactedSSTFileList = uncompactedSSTFileList;
     this.lastCompactionTime = 0L;
     this.needsCompaction = false;
     this.compactedSSTFileList = new HashMap<>();
@@ -87,24 +88,24 @@ public abstract class OmSnapshotLocalData {
 
     // Deep copy for uncompactedSSTFileList
     this.uncompactedSSTFileList = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry :
+    for (Map.Entry<String, Set<String>> entry :
         source.uncompactedSSTFileList.entrySet()) {
       this.uncompactedSSTFileList.put(
           entry.getKey(),
-          Lists.newArrayList(entry.getValue()));
+          new HashSet<>(entry.getValue()));
     }
 
     // Deep copy for compactedSSTFileList
     this.compactedSSTFileList = new HashMap<>();
-    for (Map.Entry<Integer, Map<String, List<String>>> versionEntry :
+    for (Map.Entry<Integer, Map<String, Set<String>>> versionEntry :
         source.compactedSSTFileList.entrySet()) {
-      Map<String, List<String>> tableMap = new HashMap<>();
+      Map<String, Set<String>> tableMap = new HashMap<>();
 
-      for (Map.Entry<String, List<String>> tableEntry :
+      for (Map.Entry<String, Set<String>> tableEntry :
           versionEntry.getValue().entrySet()) {
         tableMap.put(
             tableEntry.getKey(),
-            Lists.newArrayList(tableEntry.getValue()));
+            new HashSet<>(tableEntry.getValue()));
       }
 
       this.compactedSSTFileList.put(versionEntry.getKey(), tableMap);
@@ -131,7 +132,7 @@ public abstract class OmSnapshotLocalData {
    * Returns the uncompacted SST file list.
    * @return Map of Table to uncompacted SST file list
    */
-  public Map<String, List<String>> getUncompactedSSTFileList() {
+  public Map<String, Set<String>> getUncompactedSSTFileList() {
     return Collections.unmodifiableMap(this.uncompactedSSTFileList);
   }
 
@@ -140,7 +141,7 @@ public abstract class OmSnapshotLocalData {
    * @param uncompactedSSTFileList Map of Table to uncompacted SST file list
    */
   public void setUncompactedSSTFileList(
-      Map<String, List<String>> uncompactedSSTFileList) {
+      Map<String, Set<String>> uncompactedSSTFileList) {
     this.uncompactedSSTFileList.clear();
     this.uncompactedSSTFileList.putAll(uncompactedSSTFileList);
   }
@@ -148,11 +149,11 @@ public abstract class OmSnapshotLocalData {
   /**
    * Adds an entry to the uncompacted SST file list.
    * @param table Table name
-   * @param sstFile SST file name
+   * @param sstFiles SST file name
    */
-  public void addUncompactedSSTFile(String table, String sstFile) {
-    this.uncompactedSSTFileList.computeIfAbsent(table, k -> Lists.newArrayList())
-        .add(sstFile);
+  public void addUncompactedSSTFileList(String table, Set<String> sstFiles) {
+    this.uncompactedSSTFileList.computeIfAbsent(table, k -> new HashSet<>())
+        .addAll(sstFiles);
   }
 
   /**
@@ -191,7 +192,7 @@ public abstract class OmSnapshotLocalData {
    * Returns the compacted SST file list.
    * @return Map of version to compacted SST file list
    */
-  public Map<Integer, Map<String, List<String>>> getCompactedSSTFileList() {
+  public Map<Integer, Map<String, Set<String>>> getCompactedSSTFileList() {
     return Collections.unmodifiableMap(this.compactedSSTFileList);
   }
 
@@ -200,7 +201,7 @@ public abstract class OmSnapshotLocalData {
    * @param compactedSSTFileList Map of version to compacted SST file list
    */
   public void setCompactedSSTFileList(
-      Map<Integer, Map<String, List<String>>> compactedSSTFileList) {
+      Map<Integer, Map<String, Set<String>>> compactedSSTFileList) {
     this.compactedSSTFileList.clear();
     this.compactedSSTFileList.putAll(compactedSSTFileList);
   }
@@ -209,12 +210,12 @@ public abstract class OmSnapshotLocalData {
    * Adds an entry to the compacted SST file list.
    * @param ver Version number (TODO: to be clarified)
    * @param table Table name
-   * @param sstFile SST file name
+   * @param sstFiles SST file name
    */
-  public void addCompactedSSTFile(Integer ver, String table, String sstFile) {
+  public void addCompactedSSTFileList(Integer ver, String table, Set<String> sstFiles) {
     this.compactedSSTFileList.computeIfAbsent(ver, k -> Maps.newHashMap())
-        .computeIfAbsent(table, k -> Lists.newArrayList())
-        .add(sstFile);
+        .computeIfAbsent(table, k -> new HashSet<>())
+        .addAll(sstFiles);
   }
 
   /**
