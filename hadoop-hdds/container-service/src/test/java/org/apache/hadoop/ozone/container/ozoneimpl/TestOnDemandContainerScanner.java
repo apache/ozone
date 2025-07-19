@@ -53,6 +53,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -345,6 +346,16 @@ public class TestOnDemandContainerScanner extends
       verify(controller, times(1))
           .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
     }
+  }
+
+  @Test
+  @Override
+  public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
+    when(controller.markContainerUnhealthy(anyLong(), any(ScanResult.class))).thenReturn(true);
+    LogCapturer logCapturer = LogCapturer.captureLogs(OnDemandContainerScanner.class);
+    scanContainer(corruptData);
+    verifyContainerMarkedUnhealthy(corruptData, times(1));
+    assertTrue(logCapturer.getOutput().contains("Triggering scan of volume"));
   }
 
   private void scanContainer(Container<?> container) throws Exception {
