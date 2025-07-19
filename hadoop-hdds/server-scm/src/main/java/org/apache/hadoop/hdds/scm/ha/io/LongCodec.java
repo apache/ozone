@@ -18,9 +18,9 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.common.primitives.Longs;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Proto2Utils;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.thirdparty.protobuf.Proto2Utils;
 
 /**
  * {@link Codec} for {@code Long} objects.

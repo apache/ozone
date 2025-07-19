@@ -31,7 +31,7 @@ import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.protobuf.BlockingService;
+import org.apache.hadoop.thirdparty.protobuf.BlockingService;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;

@@ -21,7 +21,7 @@ import static java.util.Collections.unmodifiableSortedMap;
 import static java.util.stream.Collectors.toMap;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 
-import com.google.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.stream.IntStream;

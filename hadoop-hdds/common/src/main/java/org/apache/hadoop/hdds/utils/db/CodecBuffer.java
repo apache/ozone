@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import static org.apache.hadoop.hdds.HddsUtils.formatStackTrace;
 import static org.apache.hadoop.hdds.HddsUtils.getStackTrace;
 
-import com.google.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;

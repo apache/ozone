@@ -24,8 +24,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIM
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
+import org.apache.hadoop.thirdparty.protobuf.Descriptors;
+import org.apache.hadoop.thirdparty.protobuf.Message;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.LinkedList;

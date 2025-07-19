@@ -29,7 +29,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.protobuf.Message;
+import org.apache.hadoop.thirdparty.protobuf.Message;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;

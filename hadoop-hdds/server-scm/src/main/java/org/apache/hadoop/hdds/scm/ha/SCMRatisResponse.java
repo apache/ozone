@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.thirdparty.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisResponseProto;
 import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
 import org.apache.ratis.protocol.Message;

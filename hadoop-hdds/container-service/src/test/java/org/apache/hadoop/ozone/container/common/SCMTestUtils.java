@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import com.google.protobuf.BlockingService;
+import org.apache.hadoop.thirdparty.protobuf.BlockingService;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
