@@ -388,7 +388,7 @@ public class TestDeleteBlocksCommandHandler {
       if (DeleteBlocksCommandHandler.isDuplicateTransaction(containerData.getContainerID(), containerData, tx, null)) {
         return;
       }
-      containerData.incrPendingDeletionBlocks(tx.getLocalIDCount());
+      containerData.incrPendingDeletionBlocks(tx.getLocalIDCount(), tx.getLocalIDCount() * 256L);
       containerData.updateDeleteTransactionId(tx.getTxID());
     }
   }
