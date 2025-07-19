@@ -22,8 +22,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
@@ -55,8 +55,8 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
   /**
    * Creates a new OmSnapshotLocalDataYaml with default values.
    */
-  public OmSnapshotLocalDataYaml() {
-    super();
+  public OmSnapshotLocalDataYaml(Map<String, Set<String>> uncompactedSSTFileList) {
+    super(uncompactedSSTFileList);
   }
 
   /**
@@ -126,32 +126,25 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
 
-        OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml();
+        Map<String, Set<String>> uncompactedSSTFileList =
+            (Map<String, Set<String>>) nodes.get(OzoneConsts.OM_SLD_UNCOMPACTED_SST_FILE_LIST);
+        OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml(uncompactedSSTFileList);
 
         // Set version from YAML
         Integer version = (Integer) nodes.get(OzoneConsts.OM_SLD_VERSION);
-        // Validate version.
-        if (version <= 0) {
-          // If version is not set or invalid, log a warning, but do not throw.
-          LOG.warn("Invalid version ({}) detected in snapshot local data YAML. Proceed with caution.", version);
-        }
         snapshotLocalData.setVersion(version);
 
         // Set other fields from parsed YAML
         snapshotLocalData.setSstFiltered((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_IS_SST_FILTERED, false));
 
-        Map<String, List<String>> uncompactedSSTFileList =
-            (Map<String, List<String>>) nodes.get(OzoneConsts.OM_SLD_UNCOMPACTED_SST_FILE_LIST);
-        if (uncompactedSSTFileList != null) {
-          snapshotLocalData.setUncompactedSSTFileList(uncompactedSSTFileList);
-        }
+
 
         snapshotLocalData.setLastCompactionTime(
             (Long) nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_COMPACTION_TIME, -1L));
         snapshotLocalData.setNeedsCompaction((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_COMPACTION, false));
 
-        Map<Integer, Map<String, List<String>>> compactedSSTFileList =
-            (Map<Integer, Map<String, List<String>>>) nodes.get(OzoneConsts.OM_SLD_COMPACTED_SST_FILE_LIST);
+        Map<Integer, Map<String, Set<String>>> compactedSSTFileList =
+            (Map<Integer, Map<String, Set<String>>>) nodes.get(OzoneConsts.OM_SLD_COMPACTED_SST_FILE_LIST);
         if (compactedSSTFileList != null) {
           snapshotLocalData.setCompactedSSTFileList(compactedSSTFileList);
         }

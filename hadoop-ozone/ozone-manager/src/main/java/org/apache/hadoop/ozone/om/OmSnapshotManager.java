@@ -42,6 +42,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
@@ -53,6 +56,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.RemovalListener;
+import com.google.common.collect.ImmutableSet;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
@@ -62,8 +66,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -107,6 +113,7 @@ import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -166,6 +173,13 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   private static final String SNAP_DIFF_PURGED_JOB_TABLE_NAME =
       "snap-diff-purged-job-table";
+
+  /**
+   * For snapshot compaction we need to capture SST files following column
+   * families before compaction.
+   */
+  public static final Set<String> COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT =
+      ImmutableSet.of(KEY_TABLE, DIRECTORY_TABLE, FILE_TABLE);
 
   private final long diffCleanupServiceInterval;
   private final int maxOpenSstFilesInSnapshotDb;
@@ -489,6 +503,14 @@ public final class OmSnapshotManager implements AutoCloseable {
     } else {
       dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
     }
+    // Create the snapshot local property file.
+    try {
+      OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager,
+          snapshotInfo);
+    } catch (IOException e) {
+      LOG.error("Failed to create local property file for snapshot: {}",
+          snapshotInfo.getName(), e);
+    }
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
     // There is no need to take any lock as of now, because transactions are flushed sequentially.
@@ -610,6 +632,44 @@ public final class OmSnapshotManager implements AutoCloseable {
     // deleteRange() operation. No need to invalidate cache entries
     // one by one.
   }
+
+  /**
+   * Captures the list of SST files for keyTable, fileTable and directoryTable in the DB.
+   * @param store AOS or snapshot DB for uncompacted or compacted snapshot respectively.
+   * @return a Map of (table, list of SST files corresponding to the table)
+   */
+  private static Map<String, Set<String>> getSnapshotSSTFileList(RDBStore store)
+      throws IOException {
+    Map<String, Set<String>> sstFileList = new HashMap<>();
+    List<LiveFileMetaData> liveFileMetaDataList = store.getDb().getLiveFilesMetaData();
+    for (LiveFileMetaData liveFileMetaData : liveFileMetaDataList) {
+      String cfName = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
+      if (COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT.contains(cfName)) {
+        sstFileList.computeIfAbsent(cfName, k -> new HashSet<>()).add(liveFileMetaData.fileName());
+      }
+    }
+    return sstFileList;
+  }
+
+  /**
+   * Creates and writes snapshot local properties to a YAML file.
+   * @param omMetadataManager the metadata manager
+   * @param snapshotInfo The metadata of snapshot to be created
+   * @return snapshot local data YAML file path
+   */
+  public static String createNewOmSnapshotLocalDataFile(
+      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo)
+      throws IOException {
+    Map<String, Set<String>> uncompactedSSTFileList = getSnapshotSSTFileList((RDBStore) omMetadataManager.getStore());
+    // Write a new YAML file with uncompacted SST File list in the snapshot local data path.
+    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(omMetadataManager, snapshotInfo));
+    Files.deleteIfExists(snapshotLocalDataPath);
+    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(uncompactedSSTFileList);
+    snapshotLocalDataYaml.writeToYaml(snapshotLocalDataPath.toFile());
+    return snapshotLocalDataPath.toString();
+  }
+
+
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
   @SuppressWarnings("unchecked")
@@ -735,7 +795,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * deletedDirectoryTable in DB don't have entries for the bucket before it sends a purgeSnapshot on a snapshot.
    * If that happens, and we just look into the cache, the addToBatch operation will fail when it tries to open
    * the DB and purgeKeys from the Snapshot because snapshot is already purged from the SnapshotInfoTable cache.
-   * Hence, it is needed to look into the table to make sure that snapshot exists somewhere either in cache or in DB.
+   * Hence, it is needed to look into the table to make sure that snapshot exists somewhere in cache or in DB.
    */
   private SnapshotInfo getSnapshotInfo(String snapshotKey) throws IOException {
     SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager().getSnapshotInfoTable().get(snapshotKey);
@@ -780,6 +840,11 @@ public final class OmSnapshotManager implements AutoCloseable {
       throw new IllegalArgumentException("Invalid snapshot path " + snapshotPath);
     }
     return snapshotPath.substring(index + OM_DB_NAME.length() + OM_SNAPSHOT_SEPARATOR.length());
+  }
+
+  public static String getSnapshotLocalPropertyYamlPath(OMMetadataManager omMetadataManager,
+      SnapshotInfo snapshotInfo) {
+    return getSnapshotPath(omMetadataManager, snapshotInfo) + ".yaml";
   }
 
   public static String getSnapshotLocalPropertyYamlPath(OzoneConfiguration conf,
