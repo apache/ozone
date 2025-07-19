@@ -102,7 +102,8 @@ public class SlidingWindow {
   }
 
   /**
-   * Returns the current number of events that are tracked within the sliding window.
+   * Returns the current number of events that are tracked within the sliding window queue.
+   * The number of events can exceed the window size.
    * This method ensures that expired events are removed before computing the count.
    *
    * @return the number of valid timestamps currently in the sliding window
@@ -112,6 +113,20 @@ public class SlidingWindow {
     synchronized (lock) {
       removeExpired();
       return timestamps.size();
+    }
+  }
+
+  /**
+   * Returns the current number of events that are tracked within the sliding window queue.
+   * The number of events cannot exceed the window size.
+   * This method ensures that expired events are removed before computing the count.
+   *
+   * @return the number of valid timestamps currently in the sliding window
+   */
+  public int getNumEventsInWindow() {
+    synchronized (lock) {
+      removeExpired();
+      return Math.min(timestamps.size(), windowSize);
     }
   }
 
