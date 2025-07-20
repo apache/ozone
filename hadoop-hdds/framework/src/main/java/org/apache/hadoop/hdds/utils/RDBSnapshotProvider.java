@@ -154,7 +154,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
       return;
     }
 
-    List<String> files = HAUtils.getExistingSstFiles(candidateDir);
+    List<String> files = HAUtils.getExistingFiles(candidateDir);
     if (!files.isEmpty()) {
       LOG.warn("Candidate DB directory {} is not empty when last leader is " +
           "null.", candidateDir);

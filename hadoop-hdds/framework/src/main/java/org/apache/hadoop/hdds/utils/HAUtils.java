@@ -318,21 +318,21 @@ public final class HAUtils {
   }
 
   /**
-   * Scan the DB dir and return the existing SST files,
-   * including omSnapshot sst files.
-   * SSTs could be used for avoiding repeated download.
+   * Scan the DB dir and return the existing files,
+   * including omSnapshot files.
    *
    * @param db the file representing the DB to be scanned
-   * @return the list of SST file name. If db not exist, will return empty list
+   * @return the list of file names. If db not exist, will return empty list
    */
-  public static List<String> getExistingSstFiles(File db) throws IOException {
+  public static List<String> getExistingFiles(File db) throws IOException {
     List<String> sstList = new ArrayList<>();
     if (!db.exists()) {
       return sstList;
     }
     // Walk the db dir and get all sst files including omSnapshot files.
     try (Stream<Path> files = Files.walk(db.toPath())) {
-      sstList = files.map(p -> p.getFileName().toString()).
+      sstList = files.filter(p -> p.toFile().isFile())
+          .map(p -> p.getFileName().toString()).
               collect(Collectors.toList());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Scanned SST files {} in {}.", sstList, db.getAbsolutePath());

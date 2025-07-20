@@ -562,7 +562,7 @@ public class TestOMRatisSnapshots {
     Path increment = Paths.get(tempDir.toString(), "increment" + numKeys);
     assertTrue(increment.toFile().mkdirs());
     unTarLatestTarBall(followerOM, increment);
-    List<String> sstFiles = HAUtils.getExistingSstFiles(increment.toFile());
+    List<String> sstFiles = HAUtils.getExistingFiles(increment.toFile());
     Path followerCandidatePath = followerOM.getOmSnapshotProvider().
         getCandidateDir().toPath();
 
@@ -648,7 +648,7 @@ public class TestOMRatisSnapshots {
     // Corrupt the mixed checkpoint in the candidate DB dir
     File followerCandidateDir = followerOM.getOmSnapshotProvider().
         getCandidateDir();
-    List<String> sstList = HAUtils.getExistingSstFiles(followerCandidateDir);
+    List<String> sstList = HAUtils.getExistingFiles(followerCandidateDir);
     assertThat(sstList.size()).isGreaterThan(0);
     for (int i = 0; i < sstList.size(); i += 2) {
       File victimSst = new File(followerCandidateDir, sstList.get(i));
