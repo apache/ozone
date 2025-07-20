@@ -24,12 +24,14 @@ import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -56,7 +59,10 @@ import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.DeletedBlock;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,16 +99,19 @@ public class DeletedBlockLogImpl
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
   private long lastProcessedTransactionId = -1;
   private final int logAppenderQueueByteLimit;
+  // an in memory map to cache the size of each transaction sending to DN.
+  private final Map<Long, TxBlockInfo> txSizeMap;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
       ContainerManager containerManager,
       DBTransactionBuffer dbTxBuffer,
-      ScmBlockDeletingServiceMetrics metrics) {
+      ScmBlockDeletingServiceMetrics metrics) throws IOException {
     maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
         OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.containerManager = containerManager;
     this.lock = new ReentrantLock();
+    this.txSizeMap = new ConcurrentHashMap<>();
 
     this.deletedBlockLogStateManager = DeletedBlockLogStateManagerImpl
         .newBuilder()
@@ -111,6 +120,9 @@ public class DeletedBlockLogImpl
         .setContainerManager(containerManager)
         .setRatisServer(scm.getScmHAManager().getRatisServer())
         .setSCMDBTransactionBuffer(dbTxBuffer)
+        .setStatefulConfigTable(scm.getScmMetadataStore().getStatefulServiceConfigTable())
+        .setTxBlockInfoMap(txSizeMap)
+        .setMetrics(metrics)
         .build();
     this.scmContext = scm.getScmContext();
     this.sequenceIdGen = scm.getSequenceIdGen();
@@ -126,8 +138,13 @@ public class DeletedBlockLogImpl
   }
 
   @VisibleForTesting
-  void setDeletedBlockLogStateManager(DeletedBlockLogStateManager manager) {
+  public void setDeletedBlockLogStateManager(DeletedBlockLogStateManager manager) {
     this.deletedBlockLogStateManager = manager;
+  }
+
+  @VisibleForTesting
+  public DeletedBlockLogStateManager getDeletedBlockLogStateManager() {
+    return deletedBlockLogStateManager;
   }
 
   @Override
@@ -229,13 +246,23 @@ public class DeletedBlockLogImpl
   }
 
   private DeletedBlocksTransaction constructNewTransaction(
-      long txID, long containerID, List<Long> blocks) {
-    return DeletedBlocksTransaction.newBuilder()
+      long txID, long containerID, List<DeletedBlock> blocks) {
+    List<Long> localIdList = blocks.stream().map(b -> b.getBlockID().getLocalID()).collect(Collectors.toList());
+    DeletedBlocksTransaction.Builder builder = DeletedBlocksTransaction.newBuilder()
         .setTxID(txID)
         .setContainerID(containerID)
-        .addAllLocalID(blocks)
-        .setCount(0)
-        .build();
+        .addAllLocalID(localIdList)
+        .setCount(0);
+
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
+      long replicatedSize = blocks.stream().mapToLong(DeletedBlock::getReplicatedSize).sum();
+      // even when HDDSLayoutFeature.DATA_DISTRIBUTION is finalized, old OM can still call the old API
+      if (replicatedSize >= 0) {
+        builder.setTotalBlockReplicatedSize(replicatedSize);
+        builder.setTotalBlockSize(blocks.stream().mapToLong(DeletedBlock::getSize).sum());
+      }
+    }
+    return builder.build();
   }
 
   @Override
@@ -260,11 +287,12 @@ public class DeletedBlockLogImpl
 
   @Override
   public void reinitialize(
-      Table<Long, DeletedBlocksTransaction> deletedTable) {
+      Table<Long, DeletedBlocksTransaction> deletedTable, Table<String, ByteString> statefulConfigTable) {
     // we don't need to handle SCMDeletedBlockTransactionStatusManager and
     // deletedBlockLogStateManager, since they will be cleared
     // when becoming leader.
-    deletedBlockLogStateManager.reinitialize(deletedTable);
+    txSizeMap.clear();
+    deletedBlockLogStateManager.reinitialize(deletedTable, statefulConfigTable);
   }
 
   /**
@@ -273,6 +301,7 @@ public class DeletedBlockLogImpl
    */
   public void onBecomeLeader() {
     transactionStatusManager.clear();
+    txSizeMap.clear();
   }
 
   /**
@@ -290,13 +319,13 @@ public class DeletedBlockLogImpl
    * @throws IOException
    */
   @Override
-  public void addTransactions(Map<Long, List<Long>> containerBlocksMap)
+  public void addTransactions(Map<Long, List<DeletedBlock>> containerBlocksMap)
       throws IOException {
     lock.lock();
     try {
       ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
       long currentBatchSizeBytes = 0;
-      for (Map.Entry< Long, List< Long > > entry :
+      for (Map.Entry<Long, List<DeletedBlock>> entry :
           containerBlocksMap.entrySet()) {
         long nextTXID = sequenceIdGen.getNextId(DEL_TXN_ID);
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
@@ -439,6 +468,11 @@ public class DeletedBlockLogImpl
           keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
+          if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION) &&
+              txn.hasTotalBlockReplicatedSize()) {
+            txSizeMap.put(txn.getTxID(),
+                new TxBlockInfo(txn.getLocalIDCount(), txn.getTotalBlockSize(), txn.getTotalBlockReplicatedSize()));
+          }
           try {
             // HDDS-7126. When container is under replicated, it is possible
             // that container is deleted, but transactions are not deleted.
@@ -515,6 +549,16 @@ public class DeletedBlockLogImpl
   }
 
   @Override
+  public DeletedBlocksTransactionSummary getTransactionSummary() {
+    return deletedBlockLogStateManager.getTransactionSummary();
+  }
+
+  @Override
+  public boolean isTransactionSummarySupported() {
+    return VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION);
+  }
+
+  @Override
   public void onDatanodeDead(DatanodeID dnId) {
     getSCMDeletedBlockTransactionStatusManager().onDatanodeDead(dnId);
   }
@@ -558,6 +602,33 @@ public class DeletedBlockLogImpl
       } finally {
         lock.unlock();
       }
+    }
+  }
+
+  /**
+   * Block size information of a transaction.
+   */
+  public static class TxBlockInfo {
+    private long totalBlockCount;
+    private long totalBlockSize;
+    private long totalReplicatedBlockSize;
+
+    public TxBlockInfo(long blockCount, long blockSize, long replicatedSize) {
+      this.totalBlockCount = blockCount;
+      this.totalBlockSize = blockSize;
+      this.totalReplicatedBlockSize = replicatedSize;
+    }
+
+    public long getTotalBlockCount() {
+      return totalBlockCount;
+    }
+
+    public long getTotalBlockSize() {
+      return totalBlockSize;
+    }
+
+    public long getTotalReplicatedBlockSize() {
+      return totalReplicatedBlockSize;
     }
   }
 }

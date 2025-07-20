@@ -1918,6 +1918,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcAddress));
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
+    scmInfo = HAUtils.getScmInfo(configuration);
 
     instantiateServices(false);
 

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
+import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.EMPTY_SUMMARY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -46,6 +48,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -69,12 +72,14 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
+import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -82,6 +87,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for DeletedBlockLog.
@@ -94,6 +101,7 @@ public class TestDeletedBlockLog {
   @TempDir
   private File testDir;
   private ContainerManager containerManager;
+  private BlockManager blockManager;
   private Table<ContainerID, ContainerInfo> containerTable;
   private StorageContainerManager scm;
   private List<DatanodeDetails> dnList;
@@ -120,7 +128,9 @@ public class TestDeletedBlockLog {
     containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
         new SCMHADBTransactionBufferStub(scm.getScmMetadataStore().getStore());
-    metrics = mock(ScmBlockDeletingServiceMetrics.class);
+    blockManager = mock(BlockManager.class);
+    when(blockManager.getDeletedBlockLog()).thenReturn(deletedBlockLog);
+    metrics = ScmBlockDeletingServiceMetrics.create(blockManager);
     deletedBlockLog = new DeletedBlockLogImpl(conf,
         scm,
         containerManager,
@@ -197,34 +207,41 @@ public class TestDeletedBlockLog {
 
   @AfterEach
   public void tearDown() throws Exception {
+    ScmBlockDeletingServiceMetrics.unRegister();
     deletedBlockLog.close();
     scm.stop();
     scm.join();
   }
 
-  private Map<Long, List<Long>> generateData(int dataSize) throws IOException {
-    return generateData(dataSize, HddsProtos.LifeCycleState.CLOSED);
+  private Map<Long, List<DeletedBlock>> generateData(int dataSize) throws IOException {
+    return generateData(dataSize, HddsProtos.LifeCycleState.CLOSED, true);
   }
 
-  private Map<Long, List<Long>> generateData(int dataSize,
+  private Map<Long, List<DeletedBlock>> generateData(int txCount,
       HddsProtos.LifeCycleState state) throws IOException {
-    Map<Long, List<Long>> blockMap = new HashMap<>();
-    int continerIDBase = RandomUtils.secure().randomInt(0, 100);
+    return generateData(txCount, state, true);
+  }
+
+  private Map<Long, List<DeletedBlock>> generateData(int txCount,
+      HddsProtos.LifeCycleState state, boolean updateContainerMetadata) throws IOException {
+    Map<Long, List<DeletedBlock>> blockMap = new HashMap<>();
+    long continerIDBase = RandomUtils.secure().randomLong(0, 100);
     int localIDBase = RandomUtils.secure().randomInt(0, 1000);
-    for (int i = 0; i < dataSize; i++) {
+    long blockSize = 1024 * 1024 * 64;
+    for (int i = 0; i < txCount; i++) {
+      List<DeletedBlock> blocks = new ArrayList<>();
       long containerID = continerIDBase + i;
       updateContainerMetadata(containerID, state);
-      List<Long> blocks = new ArrayList<>();
       for (int j = 0; j < BLOCKS_PER_TXN; j++)  {
         long localID = localIDBase + j;
-        blocks.add(localID);
+        blocks.add(new DeletedBlock(new BlockID(containerID, localID), blockSize + j, blockSize + j));
       }
       blockMap.put(containerID, blocks);
     }
     return blockMap;
   }
 
-  private void addTransactions(Map<Long, List<Long>> containerBlocksMap,
+  private void addTransactions(Map<Long, List<DeletedBlock>> containerBlocksMap,
       boolean shouldFlush) throws IOException {
     deletedBlockLog.addTransactions(containerBlocksMap);
     if (shouldFlush) {
@@ -443,7 +460,7 @@ public class TestDeletedBlockLog {
 
     log.setDeletedBlockLogStateManager(mockStateManager);
 
-    Map<Long, List<Long>> containerBlocksMap = generateData(100);
+    Map<Long, List<DeletedBlock>> containerBlocksMap = generateData(100);
     log.addTransactions(containerBlocksMap);
 
     verify(mockStateManager, atLeast(2)).addTransactionsToDB(any());
@@ -718,7 +735,7 @@ public class TestDeletedBlockLog {
 
   @Test
   public void testDNOnlyOneNodeHealthy() throws Exception {
-    Map<Long, List<Long>> deletedBlocks = generateData(50);
+    Map<Long, List<DeletedBlock>> deletedBlocks = generateData(50);
     addTransactions(deletedBlocks, true);
     mockContainerHealthResult(false);
     DatanodeDeletedBlockTransactions transactions
@@ -730,12 +747,12 @@ public class TestDeletedBlockLog {
 
   @Test
   public void testInadequateReplicaCommit() throws Exception {
-    Map<Long, List<Long>> deletedBlocks = generateData(50);
+    Map<Long, List<DeletedBlock>> deletedBlocks = generateData(50);
     addTransactions(deletedBlocks, true);
     long containerID;
     // let the first 30 container only consisting of only two unhealthy replicas
     int count = 0;
-    for (Map.Entry<Long, List<Long>> entry : deletedBlocks.entrySet()) {
+    for (Map.Entry<Long, List<DeletedBlock>> entry : deletedBlocks.entrySet()) {
       containerID = entry.getKey();
       mockInadequateReplicaUnhealthyContainerInfo(containerID, count);
       count += 1;
@@ -838,9 +855,9 @@ public class TestDeletedBlockLog {
     long containerID;
 
     // Creates {TXNum} TX in the log.
-    Map<Long, List<Long>> deletedBlocks = generateData(txNum);
+    Map<Long, List<DeletedBlock>> deletedBlocks = generateData(txNum);
     addTransactions(deletedBlocks, true);
-    for (Map.Entry<Long, List<Long>> entry :deletedBlocks.entrySet()) {
+    for (Map.Entry<Long, List<DeletedBlock>> entry :deletedBlocks.entrySet()) {
       count++;
       containerID = entry.getKey();
       // let the container replication factor to be ONE
@@ -860,10 +877,11 @@ public class TestDeletedBlockLog {
 
     // add two transactions for same container
     containerID = blocks.get(0).getContainerID();
-    Map<Long, List<Long>> deletedBlocksMap = new HashMap<>();
+    Map<Long, List<DeletedBlock>> deletedBlocksMap = new HashMap<>();
     long localId = RandomUtils.secure().randomLong();
-    deletedBlocksMap.put(containerID, new LinkedList<>(
-        Collections.singletonList(localId)));
+    List<DeletedBlock> blockIDList = new ArrayList<>();
+    blockIDList.add(new DeletedBlock(new BlockID(containerID, localId), -1, -1));
+    deletedBlocksMap.put(containerID, blockIDList);
     addTransactions(deletedBlocksMap, true);
     blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);
     // Only newly added Blocks will be sent, as previously sent transactions
@@ -886,13 +904,109 @@ public class TestDeletedBlockLog {
     List<DeletedBlocksTransaction> blocks;
 
     // Creates {TXNum} TX in the log.
-    Map<Long, List<Long>> deletedBlocks = generateData(txNum,
+    Map<Long, List<DeletedBlock>> deletedBlocks = generateData(txNum,
         HddsProtos.LifeCycleState.DELETED);
     addTransactions(deletedBlocks, true);
 
     blocks = getTransactions(txNum * BLOCKS_PER_TXN);
     // There should be no txn remaining
     assertEquals(0, blocks.size());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 10, 25, 50, 100})
+  public void testTransactionSerializedSize(int blockCount) {
+    long txID = 10000000;
+    long containerID = 1000000;
+    List<DeletedBlock> blocks = new ArrayList<>();
+    for (int i = 0; i < blockCount; i++) {
+      blocks.add(new DeletedBlock(new BlockID(containerID, 100000000 + i), 128 * 1024 * 1024, 128 * 1024 * 1024));
+    }
+    List<Long> localIdList = blocks.stream().map(b -> b.getBlockID().getLocalID()).collect(Collectors.toList());
+    DeletedBlocksTransaction tx1 = DeletedBlocksTransaction.newBuilder()
+        .setTxID(txID)
+        .setContainerID(containerID)
+        .addAllLocalID(localIdList)
+        .setCount(0)
+        .setTotalBlockSize(blocks.stream().mapToLong(DeletedBlock::getSize).sum())
+        .setTotalBlockReplicatedSize(blocks.stream().mapToLong(DeletedBlock::getReplicatedSize).sum())
+        .build();
+    DeletedBlocksTransaction tx2 = DeletedBlocksTransaction.newBuilder()
+        .setTxID(txID)
+        .setContainerID(containerID)
+        .addAllLocalID(localIdList)
+        .setCount(0)
+        .build();
+    /*
+     *  1 blocks tx with totalBlockSize size is 26
+     *  1 blocks tx without totalBlockSize size is 16
+     *  10 blocks tx with totalBlockSize size is 73
+     *  10 blocks tx without totalBlockSize size is 61
+     *  25 blocks tx with totalBlockSize size is 148
+     *  25 blocks tx without totalBlockSize size is 136
+     *  50 blocks tx with totalBlockSize size is 273
+     *  50 blocks tx without totalBlockSize size is 261
+     *  100 blocks tx with totalBlockSize size is 523
+     *  100 blocks tx without totalBlockSize size is 511
+     */
+    System.out.println(blockCount + " blocks tx with totalBlockSize size is " + tx1.getSerializedSize());
+    System.out.println(blockCount + " blocks tx without totalBlockSize size is " + tx2.getSerializedSize());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {100, 1000, 10000, 100000})
+  public void testAddRemoveTransactionPerformance(int txCount) throws Exception {
+    Map<Long, List<DeletedBlock>> data = generateData(txCount);
+    SCMHAInvocationHandler handler =
+        (SCMHAInvocationHandler) Proxy.getInvocationHandler(deletedBlockLog.getDeletedBlockLogStateManager());
+    DeletedBlockLogStateManagerImpl deletedBlockLogStateManager =
+        (DeletedBlockLogStateManagerImpl) handler.getLocalHandler();
+    HddsProtos.DeletedBlocksTransactionSummary summary = deletedBlockLogStateManager.getTransactionSummary();
+    assertEquals(EMPTY_SUMMARY, summary);
+
+    long startTime = System.nanoTime();
+    deletedBlockLog.addTransactions(data);
+    scmHADBTransactionBuffer.flush();
+    /**
+     * Before DataDistribution is enabled
+     *  - 979 ms to add 100 txs to DB
+     *  - 275 ms to add 1000 txs to DB
+     *  - 1106 ms to add 10000 txs to DB
+     *  - 11103 ms to add 100000 txs to DB
+     * After DataDistribution is enabled
+     *  - 908 ms to add 100 txs to DB
+     *  - 351 ms to add 1000 txs to DB
+     *  - 2875 ms to add 10000 txs to DB
+     *  - 12446 ms to add 100000 txs to DB
+     */
+    System.out.println((System.nanoTime() - startTime) / 100000 + " ms to add " + txCount + " txs to DB");
+    summary = deletedBlockLogStateManager.getTransactionSummary();
+    assertEquals(txCount, summary.getTotalTransactionCount());
+
+    ArrayList txIdList = data.keySet().stream().collect(Collectors.toCollection(ArrayList::new));
+    startTime = System.nanoTime();
+    deletedBlockLogStateManager.removeTransactionsFromDB(txIdList);
+    scmHADBTransactionBuffer.flush();
+    /**
+     * Before DataDistribution is enabled
+     *  - 19 ms to remove 100 txs from DB
+     *  - 26 ms to remove 1000 txs from DB
+     *  - 142 ms to remove 10000 txs from DB
+     *  - 2571 ms to remove 100000 txs from DB
+     * After DataDistribution is enabled (all cache miss)
+     *  - 62 ms to remove 100 txs from DB
+     *  - 186 ms to remove 1000 txs from DB
+     *  - 968 ms to remove 10000 txs from DB
+     *  - 8635 ms to remove 100000 txs from DB
+     * After DataDistribution is enabled (all cache hit)
+     *  - 40 ms to remove 100 txs from DB
+     *  - 112 ms to remove 1000 txs from DB
+     *  - 412 ms to remove 10000 txs from DB
+     *  - 3499 ms to remove 100000 txs from DB
+     */
+    System.out.println((System.nanoTime() - startTime) / 100000 + " ms to remove " + txCount + " txs from DB");
+    System.out.println("Cache hit: " + metrics.getNumBlockDeletionTransactionSizeFromCache());
+    System.out.println("Cache miss: " + metrics.getNumBlockDeletionTransactionSizeFromDB());
   }
 
   private void mockStandAloneContainerInfo(long containerID, DatanodeDetails dd)

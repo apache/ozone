@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.block;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -45,6 +46,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   public static final String SOURCE_NAME =
       SCMBlockDeletingService.class.getSimpleName();
   private final MetricsRegistry registry;
+  private final BlockManager blockManager;
 
   /**
    * Given all commands are finished and no new coming deletes from OM.
@@ -100,15 +102,38 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   private final Map<DatanodeID, DatanodeCommandDetails> numCommandsDatanode = new ConcurrentHashMap<>();
 
-  private ScmBlockDeletingServiceMetrics() {
+  @Metric(about = "The number of transactions whose totalBlockSize is fetched from in memory cache")
+  private MutableGaugeLong numBlockDeletionTransactionSizeFromCache;
+
+  @Metric(about = "The number of transactions whose totalBlockSize is fetched from DB")
+  private MutableGaugeLong numBlockDeletionTransactionSizeFromDB;
+
+  private static final MetricsInfo NUM_BLOCK_DELETION_TRANSACTION = Interns.info(
+      "numBlockDeletionTransaction",
+      "The number of transactions in DB.");
+
+  private static final MetricsInfo NUM_BLOCK_IN_DELETION_TRANSACTION = Interns.info(
+      "numBlockOfDeletionTransaction",
+      "The number of blocks in all transactions in DB.");
+
+  private static final MetricsInfo BLOCK_SIZE_OF_DELETION_TRANSACTION = Interns.info(
+      "blockSizeOfDeletionTransaction",
+      "The size of all blocks in all transactions in DB.");
+
+  private static final MetricsInfo REPLICATED_BLOCK_SIZE_OF_DELETION_TRANSACTION = Interns.info(
+      "replicatedBlockSizeOfDeletionTransaction",
+      "The replicated size of all blocks in all transactions in DB.");
+
+  private ScmBlockDeletingServiceMetrics(BlockManager blockManager) {
     this.registry = new MetricsRegistry(SOURCE_NAME);
+    this.blockManager = blockManager;
   }
 
-  public static synchronized ScmBlockDeletingServiceMetrics create() {
+  public static synchronized ScmBlockDeletingServiceMetrics create(BlockManager blockManager) {
     if (instance == null) {
       MetricsSystem ms = DefaultMetricsSystem.instance();
       instance = ms.register(SOURCE_NAME, "SCMBlockDeletingService",
-          new ScmBlockDeletingServiceMetrics());
+          new ScmBlockDeletingServiceMetrics(blockManager));
     }
 
     return instance;
@@ -161,6 +186,14 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
 
   public void incrProcessedTransaction() {
     this.numProcessedTransactions.incr();
+  }
+
+  public void incrBlockDeletionTransactionSizeFromCache() {
+    this.numBlockDeletionTransactionSizeFromCache.incr();
+  }
+
+  public void incrBlockDeletionTransactionSizeFromDB() {
+    this.numBlockDeletionTransactionSizeFromDB.incr();
   }
 
   public void setNumBlockDeletionTransactionDataNodes(long dataNodes) {
@@ -240,6 +273,14 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     return numBlockDeletionTransactionDataNodes.value();
   }
 
+  public long getNumBlockDeletionTransactionSizeFromCache() {
+    return numBlockDeletionTransactionSizeFromCache.value();
+  }
+
+  public long getNumBlockDeletionTransactionSizeFromDB() {
+    return numBlockDeletionTransactionSizeFromDB.value();
+  }
+
   @Override
   public void getMetrics(MetricsCollector metricsCollector, boolean all) {
     MetricsRecordBuilder builder = metricsCollector.addRecord(SOURCE_NAME);
@@ -255,6 +296,8 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     numProcessedTransactions.snapshot(builder, all);
     numBlockDeletionTransactionDataNodes.snapshot(builder, all);
     numBlockAddedForDeletionToDN.snapshot(builder, all);
+    numBlockDeletionTransactionSizeFromCache.snapshot(builder, all);
+    numBlockDeletionTransactionSizeFromDB.snapshot(builder, all);
 
     MetricsRecordBuilder recordBuilder = builder;
     for (Map.Entry<DatanodeID, DatanodeCommandDetails> e : numCommandsDatanode.entrySet()) {
@@ -271,6 +314,19 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
               e.getValue().getCommandsTimeout())
           .addGauge(DatanodeCommandDetails.BLOCKS_SENT_TO_DN_COMMAND,
           e.getValue().getBlocksSent());
+    }
+
+    // add metrics for deleted block transaction summary
+    if (blockManager.getDeletedBlockLog().isTransactionSummarySupported()) {
+      HddsProtos.DeletedBlocksTransactionSummary summary = blockManager.getDeletedBlockLog().getTransactionSummary();
+      recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(NUM_BLOCK_DELETION_TRANSACTION, summary.getTotalTransactionCount());
+      recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(NUM_BLOCK_IN_DELETION_TRANSACTION, summary.getTotalBlockCount());
+      recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(BLOCK_SIZE_OF_DELETION_TRANSACTION, summary.getTotalBlockSize());
+      recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(REPLICATED_BLOCK_SIZE_OF_DELETION_TRANSACTION, summary.getTotalBlockReplicatedSize());
     }
     recordBuilder.endRecord();
   }
@@ -399,7 +455,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
         .append(numBlockDeletionTransactionFailureOnDatanodes.value()).append('\t')
         .append("numBlockAddedForDeletionToDN = ")
         .append(numBlockAddedForDeletionToDN.value()).append('\t')
-        .append("numDeletionCommandsPerDatanode = ").append(numCommandsDatanode);
+        .append("numDeletionCommandsPerDatanode = ").append(numCommandsDatanode)
+        .append("numBlockDeletionTransactionSizeReFetch = ")
+        .append(numBlockDeletionTransactionSizeFromCache.value()).append('\t')
+        .append(numBlockDeletionTransactionSizeFromDB.value()).append('\t');
     return buffer.toString();
   }
 }

@@ -81,7 +81,7 @@ public class TestScmHAFinalization {
 
   public void init(OzoneConfiguration conf,
       UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
-      int numInactiveSCMs) throws Exception {
+      int numInactiveSCMs, boolean doFinalize) throws Exception {
 
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setUpgradeFinalizationExecutor(executor);
@@ -108,15 +108,17 @@ public class TestScmHAFinalization {
     // this call will block until finalization completes. If the test
     // involves restarts or leader changes the client may be disconnected,
     // but finalization should still proceed.
-    finalizationFuture = Executors.newSingleThreadExecutor().submit(
-        () -> {
-          try {
-            scmClient.finalizeScmUpgrade(CLIENT_ID);
-          } catch (IOException ex) {
-            LOG.info("finalization client failed. This may be expected if the" +
-                " test injected failures.", ex);
-          }
-        });
+    if (doFinalize) {
+      finalizationFuture = Executors.newSingleThreadExecutor().submit(
+          () -> {
+            try {
+              scmClient.finalizeScmUpgrade(CLIENT_ID);
+            } catch (IOException ex) {
+              LOG.info("finalization client failed. This may be expected if the" +
+                  " test injected failures.", ex);
+            }
+          });
+    }
   }
 
   @AfterEach
@@ -149,7 +151,7 @@ public class TestScmHAFinalization {
     CountDownLatch unpauseLatch = new CountDownLatch(1);
     init(new OzoneConfiguration(),
         UpgradeTestUtils.newPausingFinalizationExecutor(haltingPoint,
-            pauseLatch, unpauseLatch, LOG), 0);
+            pauseLatch, unpauseLatch, LOG), 0, true);
     pauseLatch.await();
 
     // Stop the leader, forcing a leader change in the middle of finalization.
@@ -202,7 +204,7 @@ public class TestScmHAFinalization {
     init(new OzoneConfiguration(),
         UpgradeTestUtils.newTerminatingFinalizationExecutor(haltingPoint,
             terminateLatch, LOG),
-        0);
+        0, true);
     terminateLatch.await();
 
     // Once upgrade finalization is stopped at the halting point, restart all
@@ -250,7 +252,7 @@ public class TestScmHAFinalization {
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         5);
 
-    init(conf, new DefaultUpgradeFinalizationExecutor<>(), numInactiveSCMs);
+    init(conf, new DefaultUpgradeFinalizationExecutor<>(), numInactiveSCMs, true);
 
     LogCapturer logCapture = LogCapturer.captureLogs(FinalizationStateManagerImpl.class);
 

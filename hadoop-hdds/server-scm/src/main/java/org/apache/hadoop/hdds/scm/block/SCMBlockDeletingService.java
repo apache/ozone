@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -99,7 +100,7 @@ public class SCMBlockDeletingService extends BackgroundService
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
              NodeManager nodeManager, EventPublisher eventPublisher,
              SCMContext scmContext, SCMServiceManager serviceManager,
-             ConfigurationSource conf,
+             ConfigurationSource conf, StatefulServiceStateManager stateManager,
       ScmConfig scmConfig, ScmBlockDeletingServiceMetrics metrics,
              Clock clock, ReconfigurationHandler reconfigurationHandler) {
     super("SCMBlockDeletingService",
