@@ -523,23 +523,36 @@ public class TestBucketList {
   }
 
   @Test
-  public void testListObjectsWithInvalidMaxKeys() throws Exception {
+  public void testListObjectsWithNegativeMaxKeys() throws Exception {
     OzoneClient client = createClientWithKeys("file1");
     client.getObjectStore().createS3Bucket("bucket");
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
-    // maxKeys < 0
+    // maxKeys < 0 should throw InvalidArgument
     OS3Exception e1 = assertThrows(OS3Exception.class, () ->
         bucketEndpoint.get("bucket", null, null, null, -1, null,
             null, null, null, null, null, null, 1000)
     );
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e1.getCode());
+  }
 
-    // maxKeys == 0
-    bucketEndpoint.get("bucket", null, null, null, 0, null,
-        null, null, null, null, null, null, 1000);
+  @Test
+  public void testListObjectsWithZeroMaxKeys() throws Exception {
+    OzoneClient client = createClientWithKeys("file1");
+    client.getObjectStore().createS3Bucket("bucket");
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    // maxKeys = 0, should return empty list and not throw.
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get(
+        "bucket", null, null, null, 0, null,
+        null, null, null, null, null, null, 1000).getEntity();
+
+    assertEquals(0, response.getContents().size());
+    assertFalse(response.isTruncated());
   }
 
   @Test

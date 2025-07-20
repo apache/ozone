@@ -225,7 +225,7 @@ public class BucketEndpoint extends EndpointBase {
     }
     String lastKey = null;
     int count = 0;
-    if (maxKeys > 0 ) {
+    if (maxKeys > 0) {
       while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
         OzoneKey next = ozoneKeyIterator.next();
         if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
