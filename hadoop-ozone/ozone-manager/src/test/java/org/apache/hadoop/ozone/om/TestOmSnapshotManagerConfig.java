@@ -24,6 +24,8 @@ import java.io.File;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -39,6 +41,7 @@ class TestOmSnapshotManagerConfig {
       "0,  false, 'Valid value: 0 should not throw exception'",
       "1,  false, 'Valid value: 1 should not throw exception'",
   })
+  @Execution(ExecutionMode.CONCURRENT)
   void testMaxOpenFilesConfig(int maxOpenFiles, boolean shouldThrowException,
       String description, @TempDir File tempDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -46,6 +49,13 @@ class TestOmSnapshotManagerConfig {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
     conf.setInt(OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, maxOpenFiles);
+
+    // Configure dynamic ports to avoid conflicts during parallel execution
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "127.0.0.1:0");
+    conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
+    conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, "127.0.0.1:0");
+    conf.set(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, "0");
+    conf.set(OMConfigKeys.OZONE_OM_GRPC_PORT_KEY, "0");
 
     if (shouldThrowException) {
       assertThrows(IllegalArgumentException.class, () -> new OmTestManagers(conf), description);
