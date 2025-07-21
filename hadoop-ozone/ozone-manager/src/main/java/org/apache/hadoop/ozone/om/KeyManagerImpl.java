@@ -58,10 +58,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
@@ -131,6 +127,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -160,6 +157,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -169,7 +167,6 @@ import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -212,7 +209,6 @@ public class KeyManagerImpl implements KeyManager {
 
   private BackgroundService openKeyCleanupService;
   private BackgroundService multipartUploadCleanupService;
-  private SnapshotDirectoryCleaningService snapshotDirectoryCleaningService;
   private DNSToSwitchMapping dnsToSwitchMapping;
   private CompactionService compactionService;
 
@@ -290,7 +286,7 @@ public class KeyManagerImpl implements KeyManager {
       dirDeletingService =
           new DirectoryDeletingService(dirDeleteInterval, TimeUnit.MILLISECONDS,
               serviceTimeout, ozoneManager, configuration,
-              dirDeletingServiceCorePoolSize);
+              dirDeletingServiceCorePoolSize, isSnapshotDeepCleaningEnabled);
       dirDeletingService.start();
     }
 
@@ -346,22 +342,6 @@ public class KeyManagerImpl implements KeyManager {
       } catch (IOException e) {
         LOG.error("Error starting Snapshot Deleting Service", e);
       }
-    }
-
-    if (isSnapshotDeepCleaningEnabled && snapshotDirectoryCleaningService == null &&
-        ozoneManager.isFilesystemSnapshotEnabled()) {
-      long dirDeleteInterval = configuration.getTimeDuration(
-          OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL,
-          OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      long serviceTimeout = configuration.getTimeDuration(
-          OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT,
-          OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      snapshotDirectoryCleaningService = new SnapshotDirectoryCleaningService(
-          dirDeleteInterval, TimeUnit.MILLISECONDS, serviceTimeout,
-          ozoneManager, scmClient.getBlockClient());
-      snapshotDirectoryCleaningService.start();
     }
 
     if (multipartUploadCleanupService == null) {
@@ -440,10 +420,6 @@ public class KeyManagerImpl implements KeyManager {
     if (multipartUploadCleanupService != null) {
       multipartUploadCleanupService.shutdown();
       multipartUploadCleanupService = null;
-    }
-    if (snapshotDirectoryCleaningService != null) {
-      snapshotDirectoryCleaningService.shutdown();
-      snapshotDirectoryCleaningService = null;
     }
     if (compactionService != null) {
       compactionService.shutdown();
@@ -734,21 +710,22 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public PendingKeysDeletion getPendingDeletionKeys(
-      final CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, final int count)
-      throws IOException {
-    return getPendingDeletionKeys(null, null, null, filter, count);
+      final CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, final int count,
+      int ratisByteLimit) throws IOException {
+    return getPendingDeletionKeys(null, null, null, filter, count, ratisByteLimit);
   }
 
   @Override
   public PendingKeysDeletion getPendingDeletionKeys(
       String volume, String bucket, String startKey,
-      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
-      int count) throws IOException {
+      CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
+      int count, int ratisByteLimit) throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
+    long serializedSize = 0;
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
-    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
 
       /* Seeking to the start key if it not null. The next key picked up would be ensured to start with the bucket
@@ -758,9 +735,10 @@ public class KeyManagerImpl implements KeyManager {
         delKeyIter.seek(startKey);
       }
       int currentCount = 0;
+      boolean maxReqSizeExceeded = false;
       while (delKeyIter.hasNext() && currentCount < count) {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
-        Table.KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
+        KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
         if (kv != null) {
           List<BlockGroup> blockGroupList = Lists.newArrayList();
           // Multiple keys with the same path can be queued in one DB entry
@@ -774,11 +752,26 @@ public class KeyManagerImpl implements KeyManager {
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
                   .addAllBlockIDs(blockIDS).build();
+              int keyBlockSerializedSize = keyBlocks.getProto().getSerializedSize();
+              serializedSize += keyBlockSerializedSize;
+              if (serializedSize > ratisByteLimit) {
+                maxReqSizeExceeded = true;
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug(
+                      "Total size of cumulative keys and rename entries in the snapshotRenamedTable in a cycle " +
+                          "crossed 90% ratis limit, serialized size of keys: {}",
+                      serializedSize);
+                }
+                break;
+              }
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);
             }
+          }
+          if (maxReqSizeExceeded) {
+            break;
           }
 
           List<OmKeyInfo> notReclaimableKeyInfoList = notReclaimableKeyInfo.getOmKeyInfoList();
@@ -795,12 +788,13 @@ public class KeyManagerImpl implements KeyManager {
     return new PendingKeysDeletion(keyBlocksList, keysToModify);
   }
 
-  private <V, R> List<Table.KeyValue<String, R>> getTableEntries(String startKey,
-          TableIterator<String, ? extends Table.KeyValue<String, V>> tableIterator,
+  private <V, R> List<KeyValue<String, R>> getTableEntries(String startKey,
+          TableIterator<String, ? extends KeyValue<String, V>> tableIterator,
           Function<V, R> valueFunction,
-          CheckedFunction<Table.KeyValue<String, V>, Boolean, IOException> filter,
-          int size) throws IOException {
-    List<Table.KeyValue<String, R>> entries = new ArrayList<>();
+          CheckedFunction<KeyValue<String, V>, Boolean, IOException> filter,
+          int size, int ratisLimit) throws IOException {
+    List<KeyValue<String, R>> entries = new ArrayList<>();
+    int consumedSize = 0;
     /* Seek to the start key if it's not null. The next key in queue is ensured to start with the bucket
          prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
     */
@@ -811,10 +805,15 @@ public class KeyManagerImpl implements KeyManager {
     }
     int currentCount = 0;
     while (tableIterator.hasNext() && currentCount < size) {
-      Table.KeyValue<String, V> kv = tableIterator.next();
+      KeyValue<String, V> kv = tableIterator.next();
       if (kv != null && filter.apply(kv)) {
-        entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue())));
+        consumedSize += kv.getValueByteSize();
+        entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue()), kv.getValueByteSize()));
         currentCount++;
+        if (consumedSize > ratisLimit) {
+          LOG.info("Serialized size exceeded the ratis limit, current serailized size : {}", consumedSize);
+          break;
+        }
       }
     }
     return entries;
@@ -833,13 +832,14 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<Table.KeyValue<String, String>> getRenamesKeyEntries(
+  public List<KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey,
-      CheckedFunction<Table.KeyValue<String, String>, Boolean, IOException> filter, int size) throws IOException {
+      CheckedFunction<KeyValue<String, String>, Boolean, IOException> filter, int size, int ratisLimit)
+      throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
-    try (TableIterator<String, ? extends Table.KeyValue<String, String>>
+    try (TableIterator<String, ? extends KeyValue<String, String>>
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size);
+      return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size, ratisLimit);
     }
   }
 
@@ -882,14 +882,14 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<Table.KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
+  public List<KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
       String volume, String bucket, String startKey,
-      CheckedFunction<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter,
-      int size) throws IOException {
+      CheckedFunction<KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter,
+      int size, int ratisLimit) throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
-    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size);
+      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size, ratisLimit);
     }
   }
 
@@ -951,11 +951,6 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public SnapshotDeletingService getSnapshotDeletingService() {
     return snapshotDeletingService;
-  }
-
-  @Override
-  public SnapshotDirectoryCleaningService getSnapshotDirectoryService() {
-    return snapshotDirectoryCleaningService;
   }
 
   @Override
@@ -1537,10 +1532,10 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         keyTblItr = keyTable.iterator(targetKey)) {
       while (keyTblItr.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
+        KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
         if (keyValue != null) {
           String key = keyValue.getKey();
           // HDDS-7871: RocksIterator#seek() may position at the key
@@ -1851,7 +1846,7 @@ public class KeyManagerImpl implements KeyManager {
     String keyArgs = OzoneFSUtils.addTrailingSlashIfNeeded(
         metadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
+    TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> iterator;
     Table<String, OmKeyInfo> keyTable;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
@@ -1908,12 +1903,12 @@ public class KeyManagerImpl implements KeyManager {
     return fileStatusList;
   }
 
-  private TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+  private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
       getIteratorForKeyInTableCache(
       boolean recursive, String startKey, String volumeName, String bucketName,
       TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
       Table<String, OmKeyInfo> keyTable) throws IOException {
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
+    TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> iterator;
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
         cacheIter = keyTable.cacheIterator();
     String startCacheKey = metadataManager.getOzoneKey(volumeName, bucketName, startKey);
@@ -1931,12 +1926,12 @@ public class KeyManagerImpl implements KeyManager {
       TreeMap<String, OzoneFileStatus> cacheKeyMap, String keyArgs,
       Table<String, OmKeyInfo> keyTable,
       TableIterator<String,
-          ? extends Table.KeyValue<String, OmKeyInfo>> iterator)
+          ? extends KeyValue<String, OmKeyInfo>> iterator)
       throws IOException {
     // Then, find key in DB
     String seekKeyInDb =
         metadataManager.getOzoneKey(volumeName, bucketName, startKey);
-    Table.KeyValue<String, OmKeyInfo> entry = iterator.seek(seekKeyInDb);
+    KeyValue<String, OmKeyInfo> entry = iterator.seek(seekKeyInDb);
     int countEntries = 0;
     if (iterator.hasNext()) {
       if (entry.getKey().equals(keyArgs)) {
@@ -2187,7 +2182,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
+  public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> getDeletedDirEntries(
       String volume, String bucket) throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, true);
     return metadataManager.getDeletedDirTable().iterator(bucketPrefix.orElse(""));
@@ -2195,102 +2190,66 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public DeleteKeysResult getPendingDeletionSubDirs(long volumeId, long bucketId,
-      OmKeyInfo parentInfo, long remainingBufLimit) throws IOException {
-    String seekDirInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
-        parentInfo.getObjectID(), "");
-    long countEntries = 0;
-
-    Table<String, OmDirectoryInfo> dirTable = metadataManager.getDirectoryTable();
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, OmDirectoryInfo>>
-        iterator = dirTable.iterator(seekDirInDB)) {
-      return gatherSubDirsWithIterator(parentInfo, countEntries, iterator, remainingBufLimit);
-    }
-
+      OmKeyInfo parentInfo, CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
+      long remainingBufLimit) throws IOException {
+    return gatherSubPathsWithIterator(volumeId, bucketId, parentInfo, metadataManager.getDirectoryTable(),
+        kv -> Table.newKeyValue(metadataManager.getOzoneDeletePathKey(kv.getValue().getObjectID(), kv.getKey()),
+            OMFileRequest.getKeyInfoWithFullPath(parentInfo, kv.getValue())),
+        filter, remainingBufLimit);
   }
 
-  private DeleteKeysResult gatherSubDirsWithIterator(OmKeyInfo parentInfo,
-      long countEntries,
-      TableIterator<String,
-          ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator, long remainingBufLimit)
-      throws IOException {
-    List<OmKeyInfo> directories = new ArrayList<>();
-    long consumedSize = 0;
-    boolean processedSubDirs = false;
-
-    while (iterator.hasNext() && remainingBufLimit > 0) {
-      Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
-      OmDirectoryInfo dirInfo = entry.getValue();
-      long objectSerializedSize = entry.getRawSize();
-      if (!OMFileRequest.isImmediateChild(dirInfo.getParentObjectID(),
-          parentInfo.getObjectID())) {
-        processedSubDirs = true;
-        break;
-      }
-      if (!metadataManager.getDirectoryTable().isExist(entry.getKey())) {
-        continue;
-      }
-      if (remainingBufLimit - objectSerializedSize < 0) {
-        break;
-      }
-      String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
-          dirInfo.getName());
-      OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(
-          parentInfo.getVolumeName(), parentInfo.getBucketName(), dirInfo,
-          dirName);
-      directories.add(omKeyInfo);
-      countEntries++;
-      remainingBufLimit -= objectSerializedSize;
-      consumedSize += objectSerializedSize;
-    }
-
-    processedSubDirs = processedSubDirs || (!iterator.hasNext());
-
-    return new DeleteKeysResult(directories, consumedSize, processedSubDirs);
-  }
-
-  @Override
-  public DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
-      long bucketId, OmKeyInfo parentInfo, long remainingBufLimit)
-          throws IOException {
-    List<OmKeyInfo> files = new ArrayList<>();
+  private <T extends WithParentObjectId> DeleteKeysResult gatherSubPathsWithIterator(
+      long volumeId, long bucketId, OmKeyInfo parentInfo,
+      Table<String, T> table,
+      CheckedFunction<KeyValue<String, T>, KeyValue<String, OmKeyInfo>, IOException> deleteKeyTransformer,
+      CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> deleteKeyFilter,
+      long remainingBufLimit) throws IOException {
+    List<OmKeyInfo> keyInfos = new ArrayList<>();
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
     long consumedSize = 0;
-    boolean processedSubFiles = false;
-
-    Table fileTable = metadataManager.getFileTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = fileTable.iterator(seekFileInDB)) {
-
+    boolean processedSubPaths = false;
+    try (TableIterator<String, ? extends KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
       while (iterator.hasNext() && remainingBufLimit > 0) {
-        Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
-        OmKeyInfo fileInfo = entry.getValue();
-        long objectSerializedSize = entry.getRawSize();
-        if (!OMFileRequest.isImmediateChild(fileInfo.getParentObjectID(),
+        KeyValue<String, T> entry = iterator.next();
+        T withParentObjectId = entry.getValue();
+        final long objectSerializedSize = entry.getValueByteSize();
+        if (!OMFileRequest.isImmediateChild(withParentObjectId.getParentObjectID(),
             parentInfo.getObjectID())) {
-          processedSubFiles = true;
+          processedSubPaths = true;
           break;
         }
-        if (!metadataManager.getFileTable().isExist(entry.getKey())) {
+        if (!table.isExist(entry.getKey())) {
           continue;
         }
         if (remainingBufLimit - objectSerializedSize < 0) {
           break;
         }
-        fileInfo.setFileName(fileInfo.getKeyName());
-        String fullKeyPath = OMFileRequest.getAbsolutePath(
-            parentInfo.getKeyName(), fileInfo.getKeyName());
-        fileInfo.setKeyName(fullKeyPath);
-
-        files.add(fileInfo);
-        remainingBufLimit -= objectSerializedSize;
-        consumedSize += objectSerializedSize;
+        KeyValue<String, OmKeyInfo> keyInfo = deleteKeyTransformer.apply(entry);
+        if (deleteKeyFilter.apply(keyInfo)) {
+          keyInfos.add(keyInfo.getValue());
+          remainingBufLimit -= objectSerializedSize;
+          consumedSize += objectSerializedSize;
+        }
       }
-      processedSubFiles = processedSubFiles || (!iterator.hasNext());
+      processedSubPaths = processedSubPaths || (!iterator.hasNext());
+      return new DeleteKeysResult(keyInfos, consumedSize, processedSubPaths);
     }
+  }
 
-    return new DeleteKeysResult(files, consumedSize, processedSubFiles);
+  @Override
+  public DeleteKeysResult getPendingDeletionSubFiles(long volumeId,
+      long bucketId, OmKeyInfo parentInfo,
+      CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, long remainingBufLimit)
+          throws IOException {
+    CheckedFunction<KeyValue<String, OmKeyInfo>, KeyValue<String, OmKeyInfo>, IOException> tranformer = kv -> {
+      OmKeyInfo keyInfo = OMFileRequest.getKeyInfoWithFullPath(parentInfo, kv.getValue());
+      String deleteKey = metadataManager.getOzoneDeletePathKey(keyInfo.getObjectID(),
+          metadataManager.getOzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(), keyInfo.getKeyName()));
+      return Table.newKeyValue(deleteKey, keyInfo);
+    };
+    return gatherSubPathsWithIterator(volumeId, bucketId, parentInfo, metadataManager.getFileTable(), tranformer,
+        filter, remainingBufLimit);
   }
 
   public boolean isBucketFSOptimized(String volName, String buckName)

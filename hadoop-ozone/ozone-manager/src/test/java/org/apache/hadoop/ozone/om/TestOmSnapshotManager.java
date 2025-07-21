@@ -51,7 +51,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -501,24 +500,17 @@ class TestOmSnapshotManager {
     Map<String, Map<Path, Path>> copyFiles = new HashMap<>();
     copyFiles.computeIfAbsent(copyFileName.toString(), (k) -> new HashMap<>()).put(copyFile,
         copyFile);
-    List<String> excluded = new ArrayList<>();
     Map<Path, Path> hardLinkFiles = new HashMap<>();
     long fileSize;
-    // Confirm the exclude file gets added to the excluded list,
-    //  (and thus is excluded.)
     fileSize = processFile(excludeFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, null);
-    assertEquals(excluded.size(), 1);
-    assertEquals((excluded.get(0)), excludeFile.toString());
+        toExcludeFiles, null);
     assertEquals(copyFiles.size(), 1);
     assertEquals(hardLinkFiles.size(), 0);
     assertEquals(fileSize, 0);
-    excluded = new ArrayList<>();
 
     // Confirm the linkToExcludedFile gets added as a link.
     fileSize = processFile(linkToExcludedFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, null);
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, null);
     assertEquals(copyFiles.size(), 1);
     assertEquals(hardLinkFiles.size(), 1);
     assertEquals(hardLinkFiles.get(linkToExcludedFile), excludeFile);
@@ -527,8 +519,7 @@ class TestOmSnapshotManager {
 
     // Confirm the linkToCopiedFile gets added as a link.
     fileSize = processFile(linkToCopiedFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, null);
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, null);
     assertEquals(copyFiles.size(), 1);
     assertEquals(hardLinkFiles.size(), 1);
     assertEquals(hardLinkFiles.get(linkToCopiedFile), copyFile);
@@ -537,8 +528,7 @@ class TestOmSnapshotManager {
 
     // Confirm the addToCopiedFiles gets added to list of copied files
     fileSize = processFile(addToCopiedFiles, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, null);
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, null);
     assertEquals(copyFiles.size(), 2);
     assertEquals(copyFiles.get(addToCopiedFiles.getFileName().toString()).get(addToCopiedFiles), addToCopiedFiles);
     assertEquals(fileSize, expectedFileSize);
@@ -547,8 +537,7 @@ class TestOmSnapshotManager {
 
     // Confirm the addNonSstToCopiedFiles gets added to list of copied files
     fileSize = processFile(addNonSstToCopiedFiles, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, null);
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, null);
     assertEquals(copyFiles.size(), 2);
     assertEquals(fileSize, 0);
     assertEquals(copyFiles.get(addNonSstToCopiedFiles.getFileName().toString()).get(addNonSstToCopiedFiles),
@@ -626,25 +615,18 @@ class TestOmSnapshotManager {
     toExcludeFiles.put(excludeFileName.toString(), ImmutableMap.of(excludeFile, destExcludeFile));
     Map<String, Map<Path, Path>> copyFiles = new HashMap<>();
     copyFiles.computeIfAbsent(copyFileName.toString(), (k) -> new HashMap<>()).put(copyFile, destCopyFile);
-    List<String> excluded = new ArrayList<>();
     Map<Path, Path> hardLinkFiles = new HashMap<>();
     long fileSize;
 
-    // Confirm the exclude file gets added to the excluded list,
-    //  (and thus is excluded.)
     fileSize = processFile(excludeFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, destExcludeFile.getParent());
-    assertEquals(excluded.size(), 1);
-    assertEquals((excluded.get(0)), destExcludeFile.toString());
+        toExcludeFiles, destExcludeFile.getParent());
     assertEquals(copyFiles.size(), 1);
     assertEquals(hardLinkFiles.size(), 0);
     assertEquals(fileSize, 0);
-    excluded = new ArrayList<>();
 
     // Confirm the linkToExcludedFile gets added as a link.
     fileSize = processFile(linkToExcludedFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, destLinkToExcludedFile.getParent());
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, destLinkToExcludedFile.getParent());
     assertEquals(copyFiles.size(), 1);
     assertEquals(hardLinkFiles.size(), 1);
     assertEquals(hardLinkFiles.get(destLinkToExcludedFile),
@@ -654,8 +636,7 @@ class TestOmSnapshotManager {
 
     // Confirm the file with same name as excluded file gets copied.
     fileSize = processFile(sameNameAsExcludeFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, destSameNameAsExcludeFile.getParent());
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, destSameNameAsExcludeFile.getParent());
     assertEquals(copyFiles.size(), 2);
     assertEquals(hardLinkFiles.size(), 0);
     assertEquals(copyFiles.get(sameNameAsExcludeFile.getFileName().toString()).get(sameNameAsExcludeFile),
@@ -667,8 +648,7 @@ class TestOmSnapshotManager {
 
     // Confirm the file with same name as copy file gets copied.
     fileSize = processFile(sameNameAsCopyFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, destSameNameAsCopyFile.getParent());
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, destSameNameAsCopyFile.getParent());
     assertEquals(copyFiles.size(), 2);
     assertEquals(hardLinkFiles.size(), 0);
     assertEquals(copyFiles.get(sameNameAsCopyFile.getFileName().toString()).get(sameNameAsCopyFile),
@@ -680,8 +660,7 @@ class TestOmSnapshotManager {
 
     // Confirm the linkToCopiedFile gets added as a link.
     fileSize = processFile(linkToCopiedFile, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, destLinkToCopiedFile.getParent());
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, destLinkToCopiedFile.getParent());
     assertEquals(copyFiles.size(), 1);
     assertEquals(hardLinkFiles.size(), 1);
     assertEquals(hardLinkFiles.get(destLinkToCopiedFile),
@@ -691,8 +670,7 @@ class TestOmSnapshotManager {
 
     // Confirm the addToCopiedFiles gets added to list of copied files
     fileSize = processFile(addToCopiedFiles, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, destAddToCopiedFiles.getParent());
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, destAddToCopiedFiles.getParent());
     assertEquals(copyFiles.size(), 2);
     assertEquals(copyFiles.get(addToCopiedFiles.getFileName().toString()).get(addToCopiedFiles),
         destAddToCopiedFiles);
@@ -702,8 +680,7 @@ class TestOmSnapshotManager {
 
     // Confirm the addNonSstToCopiedFiles gets added to list of copied files
     fileSize = processFile(addNonSstToCopiedFiles, copyFiles, hardLinkFiles,
-        toExcludeFiles, excluded, destAddNonSstToCopiedFiles.getParent());
-    assertEquals(excluded.size(), 0);
+        toExcludeFiles, destAddNonSstToCopiedFiles.getParent());
     assertEquals(copyFiles.size(), 2);
     assertEquals(fileSize, 0);
     assertEquals(copyFiles.get(addNonSstToCopiedFiles.getFileName().toString()).get(addNonSstToCopiedFiles),
@@ -771,5 +748,15 @@ class TestOmSnapshotManager {
         UUID.randomUUID().toString(),
         UUID.randomUUID(),
         Time.now());
+  }
+
+  @Test
+  void testNegativeMaxOpenFiles(@TempDir File tempDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
+    conf.setInt(OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, 0);
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
+
+    assertThrows(IllegalArgumentException.class, () -> new OmTestManagers(conf));
   }
 }

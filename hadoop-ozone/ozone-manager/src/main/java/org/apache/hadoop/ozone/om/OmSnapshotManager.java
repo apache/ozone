@@ -24,12 +24,15 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL;
@@ -214,6 +217,9 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES,
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
     );
+    Preconditions.checkArgument(this.maxOpenSstFilesInSnapshotDb > 0,
+        OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES + " must be positive.");
+
     ColumnFamilyHandle snapDiffJobCf;
     ColumnFamilyHandle snapDiffReportCf;
     ColumnFamilyHandle snapDiffPurgedJobCf;
@@ -289,8 +295,11 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getTimeDuration(OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
             OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
+    boolean compactNonSnapshotDiffTables = ozoneManager.getConfiguration()
+        .getBoolean(OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES,
+            OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT);
     this.snapshotCache = new SnapshotCache(loader, softCacheSize, ozoneManager.getMetrics(),
-        cacheCleanupServiceInterval);
+        cacheCleanupServiceInterval, compactNonSnapshotDiffTables, ozoneManager.getMetadataManager().getLock());
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
         ozoneManager, snapDiffJobCf, snapDiffReportCf,
@@ -753,10 +762,29 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   public static String getSnapshotPath(OzoneConfiguration conf,
-                                       SnapshotInfo snapshotInfo) {
+      SnapshotInfo snapshotInfo) {
+    return getSnapshotPath(conf, snapshotInfo.getCheckpointDirName());
+  }
+
+  public static String getSnapshotPath(OzoneConfiguration conf,
+      String checkpointDirName) {
     return OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
-        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+        OM_DB_NAME + checkpointDirName;
+  }
+
+  public static String extractSnapshotIDFromCheckpointDirName(String snapshotPath) {
+    // Find "om.db-" in the path and return whatever comes after
+    int index = snapshotPath.lastIndexOf(OM_DB_NAME);
+    if (index == -1 || index + OM_DB_NAME.length() + OM_SNAPSHOT_SEPARATOR.length() >= snapshotPath.length()) {
+      throw new IllegalArgumentException("Invalid snapshot path " + snapshotPath);
+    }
+    return snapshotPath.substring(index + OM_DB_NAME.length() + OM_SNAPSHOT_SEPARATOR.length());
+  }
+
+  public static String getSnapshotLocalPropertyYamlPath(OzoneConfiguration conf,
+      SnapshotInfo snapshotInfo) {
+    return getSnapshotPath(conf, snapshotInfo) + ".yaml";
   }
 
   public static boolean isSnapshotKey(String[] keyParts) {
@@ -900,7 +928,15 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   public void decrementInFlightSnapshotCount() {
-    inFlightSnapshotCount.decrementAndGet();
+    // TODO this is a work around for the accounting logic of `inFlightSnapshotCount`.
+    //    - It incorrectly assumes that LeaderReady means that there are no inflight snapshot requests.
+    //    We may consider fixing it by waiting all the pending requests in notifyLeaderReady().
+    //    - Also, it seems to have another bug that the PrepareState could disallow snapshot requests.
+    //    In such case, `inFlightSnapshotCount` won't be decremented.
+    int result = inFlightSnapshotCount.decrementAndGet();
+    if (result < 0) {
+      resetInFlightSnapshotCount();
+    }
   }
 
   public void resetInFlightSnapshotCount() {

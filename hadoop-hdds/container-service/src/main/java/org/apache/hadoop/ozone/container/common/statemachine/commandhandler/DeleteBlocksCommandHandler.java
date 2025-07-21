@@ -333,6 +333,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
         Thread.currentThread().interrupt();
         txResultBuilder.setContainerID(containerId).setSuccess(false);
+      } catch (Exception e) {
+        LOG.error("Unexpected exception while deleting blocks for " +
+                "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
       }
       return new DeleteBlockTransactionExecutionResult(
           txResultBuilder.build(), lockAcquisitionFailed);
@@ -344,6 +348,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     ContainerBlocksDeletionACKProto blockDeletionACK = null;
     long startTime = Time.monotonicNow();
     boolean cmdExecuted = false;
+    int successCount = 0, failedCount = 0;
     try {
       // move blocks to deleting state.
       // this is a metadata update, the actual deletion happens in another
@@ -381,7 +386,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       // Send ACK back to SCM as long as meta updated
       // TODO Or we should wait until the blocks are actually deleted?
       if (!containerBlocks.isEmpty()) {
-        int successCount = 0, failedCount = 0;
 
         for (DeleteBlockTransactionResult result : blockDeletionACK.getResultsList()) {
           boolean success = result.getSuccess();
@@ -399,8 +403,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             blockDeleteMetrics.incrProcessedTransactionFailCount(1);
           }
         }
-        LOG.info("Sending deletion ACK to SCM, successTransactionCount = {}," +
-            "failedTransactionCount= {}", successCount, failedCount);
       }
       cmdExecuted = true;
     } finally {
@@ -418,6 +420,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);
       long endTime = Time.monotonicNow();
       this.opsLatencyMs.add(endTime - startTime);
+      LOG.info("Sending deletion ACK to SCM, successTransactionCount = {}," +
+          "failedTransactionCount = {}, time elapsed = {}", successCount, failedCount, opsLatencyMs);
       invocationCount++;
     }
   }
@@ -480,8 +484,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try {
         DeleteBlockTransactionExecutionResult result = f.get();
         handler.accept(result);
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (ExecutionException e) {
         LOG.error("task failed.", e);
+      } catch (InterruptedException e) {
+        LOG.error("task interrupted.", e);
         Thread.currentThread().interrupt();
       }
     });

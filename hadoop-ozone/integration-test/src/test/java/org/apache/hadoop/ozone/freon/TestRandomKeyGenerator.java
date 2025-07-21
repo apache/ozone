@@ -21,6 +21,8 @@ import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
@@ -184,5 +186,26 @@ public abstract class TestRandomKeyGenerator implements NonHATests.TestCase {
     assertEquals(12, randomKeyGenerator.getNumberOfKeysAdded());
     assertEquals(2, randomKeyGenerator.getNumberOfVolumesCleaned());
     assertEquals(6, randomKeyGenerator.getNumberOfBucketsCleaned());
+  }
+
+  @Test
+  void testBucketLayoutOption() {
+    RandomKeyGenerator randomKeyGenerator =
+        new RandomKeyGenerator(cluster().getConf());
+    CommandLine cmd = new CommandLine(randomKeyGenerator);
+    cmd.execute("--num-of-volumes", "1",
+        "--num-of-buckets", "1",
+        "--num-of-keys", "2",
+        "--bucket-layout", "OBJECT_STORE"
+    );
+
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(2, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(1, randomKeyGenerator.getBucketMapSize());
+
+    // Fetch the bucket and check its layout
+    OzoneBucket bucket = randomKeyGenerator.getBucket(0);
+    assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
   }
 }
