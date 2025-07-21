@@ -641,10 +641,20 @@ public class OMDBInsightEndpoint {
     if (nsSummary == null) {
       return 0L;
     }
-    long totalSize = nsSummary.getSizeOfFiles();
+    
+    // Include both active files and deleted files that haven't been physically deleted yet
+    long totalSize = nsSummary.getSizeOfFiles() + nsSummary.getSizeOfDeletedFiles();
+    
+    // Add size from active child directories
     for (long childId : nsSummary.getChildDir()) {
       totalSize += fetchSizeForDeletedDirectory(childId);
     }
+    
+    // Add size from deleted child directories
+    for (long deletedChildId : nsSummary.getDeletedChildDir()) {
+      totalSize += fetchSizeForDeletedDirectory(deletedChildId);
+    }
+    
     return totalSize;
   }
 

@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 /**
  * Class for holding all NSSummaryTask methods
@@ -198,5 +199,120 @@ public class NSSummaryTaskDbEventHandler {
       nsSummaryMap.clear();
     }
     return true;
+  }
+
+  /**
+   * Handle PUT event on deleted table - when a file is moved to deleted table
+   */
+  protected void handlePutDeletedKeyEvent(RepeatedOmKeyInfo repeatedOmKeyInfo,
+                                          Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    for (OmKeyInfo keyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
+      long parentObjectId = keyInfo.getParentObjectID();
+      NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
+      if (nsSummary == null) {
+        nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+      }
+      if (nsSummary == null) {
+        LOG.error("The namespace table is not correctly populated for parent ID: {}", parentObjectId);
+        continue;
+      }
+
+      // Increment deleted files count and size
+      nsSummary.setNumOfDeletedFiles(nsSummary.getNumOfDeletedFiles() + 1);
+      nsSummary.setSizeOfDeletedFiles(nsSummary.getSizeOfDeletedFiles() + keyInfo.getDataSize());
+      nsSummaryMap.put(parentObjectId, nsSummary);
+    }
+  }
+
+  /**
+   * Handle DELETE event on deleted table - when a file is physically deleted from disk
+   */
+  protected void handleDeleteDeletedKeyEvent(RepeatedOmKeyInfo repeatedOmKeyInfo,
+                                             Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    for (OmKeyInfo keyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
+      long parentObjectId = keyInfo.getParentObjectID();
+      NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
+      if (nsSummary == null) {
+        nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+      }
+      if (nsSummary == null) {
+        LOG.error("The namespace table is not correctly populated for parent ID: {}", parentObjectId);
+        continue;
+      }
+
+      // Decrement deleted files count and size
+      nsSummary.setNumOfDeletedFiles(Math.max(0, nsSummary.getNumOfDeletedFiles() - 1));
+      nsSummary.setSizeOfDeletedFiles(Math.max(0, nsSummary.getSizeOfDeletedFiles() - keyInfo.getDataSize()));
+      nsSummaryMap.put(parentObjectId, nsSummary);
+    }
+  }
+
+  /**
+   * Handle PUT event on deleted directory table - when a directory is moved to deleted directory table
+   */
+  protected void handlePutDeletedDirEvent(OmKeyInfo deletedDirInfo,
+                                          Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    long parentObjectId = deletedDirInfo.getParentObjectID();
+    long objectId = deletedDirInfo.getObjectID();
+    
+    // Add to parent's deleted child directory list
+    NSSummary parentNsSummary = nsSummaryMap.get(parentObjectId);
+    if (parentNsSummary == null) {
+      parentNsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    }
+    if (parentNsSummary == null) {
+      LOG.error("The namespace table is not correctly populated for parent ID: {}", parentObjectId);
+      return;
+    }
+    
+    parentNsSummary.addDeletedChildDir(objectId);
+    parentNsSummary.setNumOfDeletedDirs(parentNsSummary.getNumOfDeletedDirs() + 1);
+    parentNsSummary.setSizeOfDeletedDirs(parentNsSummary.getSizeOfDeletedDirs() + deletedDirInfo.getDataSize());
+    nsSummaryMap.put(parentObjectId, parentNsSummary);
+
+    // Create or update the deleted directory's own NSSummary
+    NSSummary deletedDirNsSummary = nsSummaryMap.get(objectId);
+    if (deletedDirNsSummary == null) {
+      deletedDirNsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    }
+    if (deletedDirNsSummary == null) {
+      deletedDirNsSummary = new NSSummary();
+    }
+    
+    deletedDirNsSummary.setDirName(deletedDirInfo.getFileName());
+    deletedDirNsSummary.setParentId(parentObjectId);
+    nsSummaryMap.put(objectId, deletedDirNsSummary);
+  }
+
+  /**
+   * Handle DELETE event on deleted directory table - when a directory is physically deleted from disk
+   */
+  protected void handleDeleteDeletedDirEvent(OmKeyInfo deletedDirInfo,
+                                             Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    long parentObjectId = deletedDirInfo.getParentObjectID();
+    long objectId = deletedDirInfo.getObjectID();
+    
+    // Remove from parent's deleted child directory list
+    NSSummary parentNsSummary = nsSummaryMap.get(parentObjectId);
+    if (parentNsSummary == null) {
+      parentNsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    }
+    if (parentNsSummary == null) {
+      LOG.error("The namespace table is not correctly populated for parent ID: {}", parentObjectId);
+      return;
+    }
+    
+    parentNsSummary.removeDeletedChildDir(objectId);
+    parentNsSummary.setNumOfDeletedDirs(Math.max(0, parentNsSummary.getNumOfDeletedDirs() - 1));
+    parentNsSummary.setSizeOfDeletedDirs(Math.max(0, parentNsSummary.getSizeOfDeletedDirs() - deletedDirInfo.getDataSize()));
+    nsSummaryMap.put(parentObjectId, parentNsSummary);
+
+    // Remove the deleted directory's NSSummary
+    nsSummaryMap.remove(objectId);
+    reconNamespaceSummaryManager.deleteNSSummary(objectId);
   }
 }

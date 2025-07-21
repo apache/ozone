@@ -60,18 +60,23 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
   public byte[] toPersistedFormatImpl(NSSummary object) throws IOException {
     final byte[] dirName = stringCodec.toPersistedFormat(object.getDirName());
     Set<Long> childDirs = object.getChildDir();
+    Set<Long> deletedChildDirs = object.getDeletedChildDir();
     int numOfChildDirs = childDirs.size();
+    int numOfDeletedChildDirs = deletedChildDirs.size();
 
-    // int: 1 field (numOfFiles) + 2 sizes (childDirs, dirName) + NUM_OF_FILE_SIZE_BINS (fileSizeBucket)
-    final int resSize = (3 + ReconConstants.NUM_OF_FILE_SIZE_BINS) * Integer.BYTES
-        + (numOfChildDirs + 1) * Long.BYTES // 1 long field for parentId + list size
-        + Short.BYTES // 2 dummy shorts to track length
-        + dirName.length // directory name length
-        + Long.BYTES; // Added space for parentId serialization
+    // Calculate size: existing fields + new deleted fields
+    final int resSize = (6 + ReconConstants.NUM_OF_FILE_SIZE_BINS) * Integer.BYTES
+        + (numOfChildDirs + numOfDeletedChildDirs + 4) * Long.BYTES // sizes, parentId, and size fields
+        + Short.BYTES
+        + dirName.length;
 
     ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
     out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
     out.write(longCodec.toPersistedFormat(object.getSizeOfFiles()));
+    out.write(integerCodec.toPersistedFormat(object.getNumOfDeletedFiles()));
+    out.write(longCodec.toPersistedFormat(object.getSizeOfDeletedFiles()));
+    out.write(integerCodec.toPersistedFormat(object.getNumOfDeletedDirs()));
+    out.write(longCodec.toPersistedFormat(object.getSizeOfDeletedDirs()));
     out.write(shortCodec.toPersistedFormat(
         (short) ReconConstants.NUM_OF_FILE_SIZE_BINS));
     int[] fileSizeBucket = object.getFileSizeBucket();
@@ -81,6 +86,10 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     out.write(integerCodec.toPersistedFormat(numOfChildDirs));
     for (long childDirId : childDirs) {
       out.write(longCodec.toPersistedFormat(childDirId));
+    }
+    out.write(integerCodec.toPersistedFormat(numOfDeletedChildDirs));
+    for (long deletedChildDirId : deletedChildDirs) {
+      out.write(longCodec.toPersistedFormat(deletedChildDirId));
     }
     out.write(integerCodec.toPersistedFormat(dirName.length));
     out.write(dirName);
@@ -95,6 +104,25 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     NSSummary res = new NSSummary();
     res.setNumOfFiles(in.readInt());
     res.setSizeOfFiles(in.readLong());
+    
+    // Try to read new fields, if they exist
+    try {
+      res.setNumOfDeletedFiles(in.readInt());
+      res.setSizeOfDeletedFiles(in.readLong());
+      res.setNumOfDeletedDirs(in.readInt());
+      res.setSizeOfDeletedDirs(in.readLong());
+    } catch (IOException e) {
+      // If reading fails, these are old format records
+      res.setNumOfDeletedFiles(0);
+      res.setSizeOfDeletedFiles(0);
+      res.setNumOfDeletedDirs(0);
+      res.setSizeOfDeletedDirs(0);
+      // Reset stream position
+      in = new DataInputStream(new ByteArrayInputStream(rawData));
+      in.readInt(); // numOfFiles
+      in.readLong(); // sizeOfFiles
+    }
+    
     short len = in.readShort();
     assert (len == (short) ReconConstants.NUM_OF_FILE_SIZE_BINS);
     int[] fileSizeBucket = new int[len];
@@ -109,6 +137,19 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
       childDir.add(in.readLong());
     }
     res.setChildDir(childDir);
+
+    // Try to read deleted child directories
+    try {
+      int deletedListSize = in.readInt();
+      Set<Long> deletedChildDir = new HashSet<>();
+      for (int i = 0; i < deletedListSize; ++i) {
+        deletedChildDir.add(in.readLong());
+      }
+      res.setDeletedChildDir(deletedChildDir);
+    } catch (IOException e) {
+      // If reading fails, this is old format
+      res.setDeletedChildDir(new HashSet<>());
+    }
 
     int strLen = in.readInt();
     if (strLen == 0) {
@@ -136,8 +177,13 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     NSSummary copy = new NSSummary();
     copy.setNumOfFiles(object.getNumOfFiles());
     copy.setSizeOfFiles(object.getSizeOfFiles());
+    copy.setNumOfDeletedFiles(object.getNumOfDeletedFiles());
+    copy.setSizeOfDeletedFiles(object.getSizeOfDeletedFiles());
+    copy.setNumOfDeletedDirs(object.getNumOfDeletedDirs());
+    copy.setSizeOfDeletedDirs(object.getSizeOfDeletedDirs());
     copy.setFileSizeBucket(object.getFileSizeBucket());
-    copy.setChildDir(object.getChildDir());
+    copy.setChildDir(new HashSet<>(object.getChildDir()));
+    copy.setDeletedChildDir(new HashSet<>(object.getDeletedChildDir()));
     copy.setDirName(object.getDirName());
     copy.setParentId(object.getParentId());
     return copy;

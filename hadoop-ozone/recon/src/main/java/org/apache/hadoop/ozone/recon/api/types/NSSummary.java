@@ -31,26 +31,41 @@ import org.apache.hadoop.ozone.recon.ReconConstants;
 public class NSSummary {
   private int numOfFiles;
   private long sizeOfFiles;
+  private int numOfDeletedFiles;  // New field
+  private long sizeOfDeletedFiles; // New field
+  private int numOfDeletedDirs;   // New field
+  private long sizeOfDeletedDirs; // New field
   private int[] fileSizeBucket;
   private Set<Long> childDir;
+  private Set<Long> deletedChildDir; // New field to track deleted child directories
   private String dirName;
   private long parentId = 0;
 
   public NSSummary() {
-    this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
-        new HashSet<>(), "", 0);
+    this(0, 0L, 0, 0L, 0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
+        new HashSet<>(), new HashSet<>(), "", 0);
   }
 
   public NSSummary(int numOfFiles,
                    long sizeOfFiles,
+                   int numOfDeletedFiles,
+                   long sizeOfDeletedFiles,
+                   int numOfDeletedDirs,
+                   long sizeOfDeletedDirs,
                    int[] bucket,
                    Set<Long> childDir,
+                   Set<Long> deletedChildDir,
                    String dirName,
                    long parentId) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
+    this.numOfDeletedFiles = numOfDeletedFiles;
+    this.sizeOfDeletedFiles = sizeOfDeletedFiles;
+    this.numOfDeletedDirs = numOfDeletedDirs;
+    this.sizeOfDeletedDirs = sizeOfDeletedDirs;
     setFileSizeBucket(bucket);
     this.childDir = childDir;
+    this.deletedChildDir = deletedChildDir;
     this.dirName = dirName;
     this.parentId = parentId;
   }
@@ -109,6 +124,59 @@ public class NSSummary {
     }
   }
 
+  public int getNumOfDeletedFiles() {
+    return numOfDeletedFiles;
+  }
+
+  public void setNumOfDeletedFiles(int numOfDeletedFiles) {
+    this.numOfDeletedFiles = numOfDeletedFiles;
+  }
+
+  public long getSizeOfDeletedFiles() {
+    return sizeOfDeletedFiles;
+  }
+
+  public void setSizeOfDeletedFiles(long sizeOfDeletedFiles) {
+    this.sizeOfDeletedFiles = sizeOfDeletedFiles;
+  }
+
+  public int getNumOfDeletedDirs() {
+    return numOfDeletedDirs;
+  }
+
+  public void setNumOfDeletedDirs(int numOfDeletedDirs) {
+    this.numOfDeletedDirs = numOfDeletedDirs;
+  }
+
+  public long getSizeOfDeletedDirs() {
+    return sizeOfDeletedDirs;
+  }
+
+  public void setSizeOfDeletedDirs(long sizeOfDeletedDirs) {
+    this.sizeOfDeletedDirs = sizeOfDeletedDirs;
+  }
+
+  public Set<Long> getDeletedChildDir() {
+    return deletedChildDir;
+  }
+
+  public void setDeletedChildDir(Set<Long> deletedChildDir) {
+    this.deletedChildDir = deletedChildDir;
+  }
+
+  public void addDeletedChildDir(long childId) {
+    if (this.deletedChildDir.contains(childId)) {
+      return;
+    }
+    this.deletedChildDir.add(childId);
+  }
+
+  public void removeDeletedChildDir(long childId) {
+    if (this.deletedChildDir.contains(childId)) {
+      this.deletedChildDir.remove(childId);
+    }
+  }
+
   public long getParentId() {
     return parentId;
   }
@@ -122,8 +190,13 @@ public class NSSummary {
     return "NSSummary{dirName='" + dirName + '\'' +
         ", parentId=" + parentId +
         ", childDir=" + childDir +
+        ", deletedChildDir=" + deletedChildDir +
         ", numOfFiles=" + numOfFiles +
         ", sizeOfFiles=" + sizeOfFiles +
+        ", numOfDeletedFiles=" + numOfDeletedFiles +
+        ", sizeOfDeletedFiles=" + sizeOfDeletedFiles +
+        ", numOfDeletedDirs=" + numOfDeletedDirs +
+        ", sizeOfDeletedDirs=" + sizeOfDeletedDirs +
         ", fileSizeBucket=" + Arrays.toString(fileSizeBucket) +
         '}';
   }
