@@ -685,9 +685,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       try {
         if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
           compactDB();
-          // Close DB (and remove from cache) to avoid concurrent modification
-          // while packing it.
-//          BlockUtils.removeDB(containerData, config);
         }
       } finally {
         readLock();

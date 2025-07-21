@@ -18,10 +18,10 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
@@ -53,29 +53,30 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test class for verifying the race condition between container scanner
  * and export process for schema v2 containers.
  */
-public class TestContainerExportWithScanner {
+class TestContainerExportWithScanner {
+  private static final Logger LOG = LoggerFactory.getLogger(TestContainerExportWithScanner.class);
 
   @TempDir
   private File folder;
-
   private String scmId;
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private KeyValueContainerData containerData;
   private KeyValueContainer container;
-  private UUID datanodeId;
   private List<HddsVolume> hddsVolumes;
   private OzoneConfiguration conf;
 
   @BeforeEach
-  public void setup() throws Exception {
+  void setup() throws Exception {
     scmId = UUID.randomUUID().toString();
-    datanodeId = UUID.randomUUID();
+    UUID datanodeId = UUID.randomUUID();
     conf = new OzoneConfiguration();
 
     // Set schema version to V2
@@ -108,7 +109,7 @@ public class TestContainerExportWithScanner {
   }
 
   @AfterEach
-  public void tearDown() {
+  void tearDown() {
     // Clean up resources
     BlockUtils.shutdownCache(conf);
   }
@@ -117,7 +118,7 @@ public class TestContainerExportWithScanner {
    * Test that verifies the scanner can hold a DB reference without a lock.
    */
   @Test
-  public void testScannerHoldsDbReferenceWithoutLock() throws Exception {
+  void testScannerHoldsDbReferenceWithoutLock() throws Exception {
     // Create container
     container.create(volumeSet, volumeChoosingPolicy, scmId);
 
@@ -143,7 +144,7 @@ public class TestContainerExportWithScanner {
    * Test that verifies the export process fails to evict DB when scanner holds a reference.
    */
   @Test
-  public void testExportFailsToEvictDbWithScannerReference() throws Exception {
+  void testExportFailsToEvictDbWithScannerReference() throws Exception {
     // Create container
     container.create(volumeSet, volumeChoosingPolicy, scmId);
 
@@ -158,20 +159,18 @@ public class TestContainerExportWithScanner {
 
     // Now try to export the container (which will try to remove DB from cache)
     ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     try {
       // This will throw an IllegalArgumentException because it can't evict the DB
       // with a non-zero reference count
       try {
-        container.exportContainerData(outputStream, null);
-        // If we get here, the test should fail
-        fail("Expected IllegalArgumentException was not thrown");
+        container.exportContainerData(outputStream, packer);
       } catch (IllegalArgumentException e) {
-        // Expected exception - the export process failed to evict the DB
-        assertTrue(e.getMessage().contains("refCount"));
+        // Unexpected exception - the export process should not have any failures related to evicting the DB
+        assertFalse(e.getMessage().contains("refCount"));
       }
 
-      // The DB should still be in cache with reference count 1
+      // The DB should still be in cache with reference count 2
       ReferenceCountedDB cachedDB = (ReferenceCountedDB) BlockUtils.getDB(containerData, conf);
       assertEquals(2, cachedDB.getReferenceCount());
 
@@ -186,7 +185,7 @@ public class TestContainerExportWithScanner {
    * Test that simulates the race condition between scanner and export process.
    */
   @Test
-  public void testRaceConditionBetweenScannerAndExport() throws Exception {
+  void testRaceConditionBetweenScannerAndExport() throws Exception {
     // Create container
     container.create(volumeSet, volumeChoosingPolicy, scmId);
 
@@ -217,7 +216,7 @@ public class TestContainerExportWithScanner {
         scannerDb.close();
         scannerFinished.set(true);
       } catch (Exception e) {
-        e.printStackTrace();
+        LOG.error("Exception in scanner thread", e);
       }
     });
 
@@ -230,8 +229,9 @@ public class TestContainerExportWithScanner {
 
         // Try to export container
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
         try {
-          container.exportContainerData(outputStream, null);
+          container.exportContainerData(outputStream, packer);
         } catch (IllegalArgumentException e) {
           // Expected exception - the export process failed to evict the DB
           if (e.getMessage().contains("refCount")) {
@@ -239,7 +239,7 @@ public class TestContainerExportWithScanner {
           }
         }
       } catch (Exception e) {
-        e.printStackTrace();
+        LOG.error("Exception in export thread", e);
       }
     });
 
@@ -249,14 +249,14 @@ public class TestContainerExportWithScanner {
 
     // Verify scanner completed and exporter failed with the expected exception
     assertTrue(scannerFinished.get(), "Scanner should have finished");
-    assertTrue(exporterFailed.get(), "Exporter should have failed with refCount exception");
+    assertFalse(exporterFailed.get(), "Exporter should not have failed with refCount exception");
   }
 
   /**
    * Test that verifies the DB reference counting mechanism works correctly.
    */
   @Test
-  public void testDbReferenceCountingMechanism() throws Exception {
+  void testDbReferenceCountingMechanism() throws Exception {
     // Create container
     container.create(volumeSet, volumeChoosingPolicy, scmId);
 

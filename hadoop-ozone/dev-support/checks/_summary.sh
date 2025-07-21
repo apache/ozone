@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-set -x
+
 REPORT_FILE="$1"
 
 : ${ITERATIONS:="1"}
