@@ -529,7 +529,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 this::reconfOzoneKeyDeletingLimitPerTask)
             .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval)
             .register(OZONE_THREAD_NUMBER_DIR_DELETION, this::reconfOzoneThreadNumberDirDeletion)
-            .register(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, this::reconfOzoneSSTFilteringServiceInterval);
+            .register(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, this::reconfFSSnapshotSSTFilteringServiceInterval);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
@@ -5208,18 +5208,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return newVal;
   }
 
-  private String reconfOzoneSSTFilteringServiceInterval(String newVal) {
+  private String reconfFSSnapshotSSTFilteringServiceInterval(String newVal) {
+    boolean wasSstFilteringSvcEnabled = ((KeyManagerImpl) keyManager).isSstFilteringSvcEnabled();
     getConfiguration().set(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
 
     if (this.isFilesystemSnapshotEnabled()) {
-      if (((KeyManagerImpl) keyManager).isSstFilteringSvcEnabled()) {
-        LOG.info("Restarting SST filtering service as {} is reconfigured to {}",
+      if (wasSstFilteringSvcEnabled) {
+        LOG.info("Restarting SstFilteringService as {} is reconfigured to {}",
             OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
         // Sanity check
         Preconditions.checkNotNull(keyManager.getSnapshotSstFilteringService(),
             "sstFilteringService should not be null when SST filtering service is enabled.");
 
         ((KeyManagerImpl) keyManager).restartSnapshotSstFilteringService(getConfiguration());
+      } else {
+        // Start SstFilteringService
+        LOG.info("Starting SstFilteringService as {} is reconfigured to {}",
+            OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
+        ((KeyManagerImpl) keyManager).startSnapshotSstFilteringService(getConfiguration());
       }
     } else {
       LOG.warn("Ozone filesystem snapshot is not enabled. {} is reconfigured but will not make any difference.",

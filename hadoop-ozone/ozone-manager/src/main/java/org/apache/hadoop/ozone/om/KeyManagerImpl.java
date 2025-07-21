@@ -380,11 +380,20 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  public void restartSnapshotSstFilteringService(OzoneConfiguration conf) {
+  /**
+   * Stop the snapshot SST filtering service if it is running.
+   */
+  public void stopSnapshotSstFilteringService() {
     if (snapshotSstFilteringService != null) {
       snapshotSstFilteringService.shutdown();
       snapshotSstFilteringService = null;
+    } else {
+      LOG.info("SstFilteringService is already stopped or not started.");
     }
+  }
+
+  public void restartSnapshotSstFilteringService(OzoneConfiguration conf) {
+    stopSnapshotSstFilteringService();
     startSnapshotSstFilteringService(conf);
   }
 
