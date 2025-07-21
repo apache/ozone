@@ -81,69 +81,13 @@ public class TestReconInsightsForDeletedDirectories {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestReconInsightsForDeletedDirectories.class);
 
-  private static MiniOzoneCluster cluster;
-  private static FileSystem fs;
-  private static String volumeName;
-  private static String bucketName;
-  private static ReplicationConfig replicationConfig;
-  private static OzoneClient client;
-  private static ReconService recon;
-
-  protected static MiniOzoneCluster getCluster() {
-    return cluster;
-  }
-
-  protected static void setCluster(MiniOzoneCluster cluster) {
-    TestReconInsightsForDeletedDirectories.cluster = cluster;
-  }
-
-  protected static FileSystem getFs() {
-    return fs;
-  }
-
-  protected static void setFs(FileSystem fs) {
-    TestReconInsightsForDeletedDirectories.fs = fs;
-  }
-
-  protected static String getVolumeName() {
-    return volumeName;
-  }
-
-  protected static void setVolumeName(String volumeName) {
-    TestReconInsightsForDeletedDirectories.volumeName = volumeName;
-  }
-
-  protected static String getBucketName() {
-    return bucketName;
-  }
-
-  protected static void setBucketName(String bucketName) {
-    TestReconInsightsForDeletedDirectories.bucketName = bucketName;
-  }
-
-  protected static ReplicationConfig getReplicationConfig() {
-    return replicationConfig;
-  }
-
-  protected static void setReplicationConfig(ReplicationConfig replicationConfig) {
-    TestReconInsightsForDeletedDirectories.replicationConfig = replicationConfig;
-  }
-
-  protected static OzoneClient getClient() {
-    return client;
-  }
-
-  protected static void setClient(OzoneClient client) {
-    TestReconInsightsForDeletedDirectories.client = client;
-  }
-
-  protected static ReconService getRecon() {
-    return recon;
-  }
-
-  protected static void setRecon(ReconService recon) {
-    TestReconInsightsForDeletedDirectories.recon = recon;
-  }
+  protected static MiniOzoneCluster cluster;
+  protected static FileSystem fs;
+  protected static String volumeName;
+  protected static String bucketName;
+  protected static ReplicationConfig replicationConfig;
+  protected static OzoneClient client;
+  protected static ReconService recon;
 
   @BeforeAll
   public static void init() throws Exception {

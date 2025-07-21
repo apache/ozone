@@ -49,25 +49,25 @@ public class TestReconInsightsForDeletedDirectoriesEC
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    setRecon(new ReconService(conf));
-    setCluster(MiniOzoneCluster.newBuilder(conf)
+    recon = new ReconService(conf);
+    cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
-        .addService(getRecon())
-        .build());
-    getCluster().waitForClusterToBeReady();
-    setClient(getCluster().newClient());
-    setReplicationConfig(new ECReplicationConfig("RS-3-2-1024k"));
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(getClient(), BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        new DefaultReplicationConfig(getReplicationConfig()));
-    setVolumeName(bucket.getVolumeName());
-    setBucketName(bucket.getName());
+        .addService(recon)
+        .build();
+    cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
+    replicationConfig = new ECReplicationConfig("RS-3-2-1024k");
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        new DefaultReplicationConfig(replicationConfig));
+    volumeName = bucket.getVolumeName();
+    bucketName = bucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, getBucketName(), getVolumeName());
+        OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
 
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
 
-    setFs(FileSystem.get(conf));
+    fs = FileSystem.get(conf);
   }
 }
