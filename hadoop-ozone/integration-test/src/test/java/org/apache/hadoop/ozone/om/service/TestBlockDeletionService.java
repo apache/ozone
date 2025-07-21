@@ -216,7 +216,7 @@ public class TestBlockDeletionService {
 
   private void verifyAndAssertQuota(ReplicationConfig replicationConfig,
                                     ArgumentCaptor<List<BlockGroup>> captor,
-                                    boolean isDataDistributionEnabled) throws IOException {
+                                    boolean isIncludeBlockSize) throws IOException {
     int index = captor.getAllValues().size() - 1;
     List<BlockGroup> blockGroups = captor.getAllValues().get(index);
 
@@ -229,8 +229,8 @@ public class TestBlockDeletionService {
         .mapToLong(DeletedBlock::getSize).sum();
 
     assertEquals(1, blockGroups.get(0).getAllDeletedBlocks().size());
-    assertEquals(isDataDistributionEnabled ?
+    assertEquals(isIncludeBlockSize ?
         QuotaUtil.getReplicatedSize(KEY_SIZE, replicationConfig) : 0, totalUsedBytes);
-    assertEquals(isDataDistributionEnabled ? KEY_SIZE : 0, totalUnreplicatedBytes);
+    assertEquals(isIncludeBlockSize ? KEY_SIZE : 0, totalUnreplicatedBytes);
   }
 }

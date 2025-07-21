@@ -86,7 +86,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
   private final ScmBlockLocationProtocolPB rpcProxy;
   private SCMBlockLocationFailoverProxyProvider failoverProxyProvider;
-  private ScmInfo scmInfo;
+  private volatile ScmInfo scmInfo;
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.

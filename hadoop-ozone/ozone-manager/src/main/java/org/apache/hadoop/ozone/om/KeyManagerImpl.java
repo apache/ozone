@@ -124,7 +124,6 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -739,8 +738,6 @@ public class KeyManagerImpl implements KeyManager {
       }
       int currentCount = 0;
       boolean maxReqSizeExceeded = false;
-      boolean isDataDistributionEnabled =  ozoneManager.getScmInfo().getMetaDataLayoutVersion() >=
-          HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
       while (delKeyIter.hasNext() && currentCount < count) {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
@@ -759,7 +756,7 @@ public class KeyManagerImpl implements KeyManager {
                   .collect(Collectors.toList());
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
                   .addAllDeletedBlocks(deletedBlocks).build();
-              int keyBlockSerializedSize = keyBlocks.getProto(isDataDistributionEnabled).getSerializedSize();
+              int keyBlockSerializedSize = keyBlocks.getProto().getSerializedSize();
               serializedSize += keyBlockSerializedSize;
               if (serializedSize > ratisByteLimit) {
                 maxReqSizeExceeded = true;

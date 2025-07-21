@@ -45,8 +45,12 @@ public final class BlockGroup {
     return groupID;
   }
 
-  public KeyBlocks getProto(boolean isDistributionEnabled) {
-    return isDistributionEnabled ? getProtoForDeletedBlock() : getProtoForBlockID();
+  public KeyBlocks getProto() {
+    return getProtoForDeletedBlock();
+  }
+
+  public KeyBlocks getProto(boolean isIncludeBlockSize) {
+    return isIncludeBlockSize ? getProtoForDeletedBlock() : getProtoForBlockID();
   }
 
   public KeyBlocks getProtoForDeletedBlock() {
@@ -77,31 +81,21 @@ public final class BlockGroup {
    * @return a group of blocks.
    */
   public static BlockGroup getFromProto(KeyBlocks proto) {
-    return proto.getDeletedBlocksList().isEmpty() ? getFromBlockIDProto(proto) : getFromDeletedBlockProto(proto);
-  }
-
-  public static BlockGroup getFromBlockIDProto(KeyBlocks proto) {
     List<DeletedBlock> deletedBlocks = new ArrayList<>();
     for (HddsProtos.BlockID block : proto.getBlocksList()) {
       deletedBlocks.add(new DeletedBlock(new BlockID(block.getContainerBlockID().getContainerID(),
           block.getContainerBlockID().getLocalID()), 0, 0));
     }
-    return BlockGroup.newBuilder().setKeyName(proto.getKey())
-        .addAllDeletedBlocks(deletedBlocks).build();
-  }
 
-  public static BlockGroup getFromDeletedBlockProto(KeyBlocks proto) {
-    List<DeletedBlock> blocks = new ArrayList<>();
     for (ScmBlockLocationProtocolProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
       HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
-
-      blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
+      deletedBlocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
           containerBlockId.getLocalID()),
           block.getSize(),
           block.getReplicatedSize()));
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
-        .addAllDeletedBlocks(blocks).build();
+        .addAllDeletedBlocks(deletedBlocks).build();
   }
 
   public static Builder newBuilder() {
