@@ -376,7 +376,7 @@ public class KeyManagerImpl implements KeyManager {
               serviceTimeout, ozoneManager, conf);
       snapshotSstFilteringService.start();
     } else {
-      LOG.debug("Snapshot SST filtering service is disabled.");
+      LOG.info("SstFilteringService is disabled.");
     }
   }
 
