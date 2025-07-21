@@ -43,7 +43,7 @@ This is the current layout of the first two levels of the `ozone-tools` command 
 
 ## New Layout
 
-Since debug and repair tools are not meant to be scripted, we should be able to change the CLI layout without impact to compatibility. the following is a proposal to logically regroup all existing commands while leaving room for new additions.
+Since debug and repair tools are not meant to be scripted, we should be able to change the CLI layout without impact to compatibility. The following is a proposal to logically regroup all existing commands while leaving room for new additions.
 
 ### Debug
 
@@ -92,12 +92,12 @@ We can then apply these rules to group the existing commands:
 
 ### Repair
 
-Invoked as `ozone repair`, these commands make modifications to an Ozone instance. For now, there is no plan to support repair operations online or over the network, but this could be implemented in the future. All commands will support a `--dry-run` flag to show what they will do without making any modifications. Subcommand grouping follows similar guidelines to `ozone debug`.
+Invoked as `ozone repair`, these commands make modifications to an Ozone instance. Some commands, like quota repair, may go over the network and run while the cluster is online. Proper usage should be specified in each command's help message. All locally running commands will support a `--dry-run` flag to show what they will do without making any modifications. Subcommand grouping follows similar guidelines to `ozone debug`.
 
 - `ozone repair om`
     These commands make repairs to an individual OM instance.
     - `ozone repair om quota`
-        The new location of `ozone repair ldb quota`
+        The new location of `ozone repair quota`
     - `ozone repair om snapshot`
         A dedicated subcommand for all snapshot related repairs we may need to do now or in the future.
         - `ozone repair om snapshot chain`
