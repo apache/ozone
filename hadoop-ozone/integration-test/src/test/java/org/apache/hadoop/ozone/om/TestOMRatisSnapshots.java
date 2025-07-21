@@ -1158,7 +1158,7 @@ public class TestOMRatisSnapshots {
       // max size config.  That way next time through, we get multiple
       // tarballs.
       if (count == 1) {
-        long sstSize = getSizeOfSstFiles(tarball);
+        long sstSize = getSizeOfFiles(tarball);
         om.getConfiguration().setLong(
             OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, sstSize / 2);
         // Now empty the tarball to restart the download
@@ -1167,20 +1167,20 @@ public class TestOMRatisSnapshots {
       } else {
         // Each time we get a new tarball add a set of
         // its sst file to the list, (i.e. one per tarball.)
-        sstSetList.add(getSstFilenames(tarball));
+        sstSetList.add(getFilenames(tarball));
       }
     }
 
     // Get Size of sstfiles in tarball.
-    private long getSizeOfSstFiles(File tarball) throws IOException {
+    private long getSizeOfFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
       List<Path> sstPaths = Files.walk(tempDir).
           collect(Collectors.toList());
-      long sstSize = 0;
+      long totalFileSize = 0;
       for (Path sstPath : sstPaths) {
-        sstSize += Files.size(sstPath);
+        totalFileSize += Files.size(sstPath);
       }
-      return sstSize;
+      return totalFileSize;
     }
 
     private void createEmptyTarball(File dummyTarFile)
@@ -1191,18 +1191,18 @@ public class TestOMRatisSnapshots {
       archiveOutputStream.close();
     }
 
-    // Return a list of sst files in tarball.
-    private Set<String> getSstFilenames(File tarball)
+    // Return a list of files in tarball.
+    private Set<String> getFilenames(File tarball)
         throws IOException {
-      Set<String> sstFilenames = new HashSet<>();
+      Set<String> fileNames = new HashSet<>();
       try (TarArchiveInputStream tarInput =
            new TarArchiveInputStream(Files.newInputStream(tarball.toPath()))) {
         TarArchiveEntry entry;
         while ((entry = tarInput.getNextTarEntry()) != null) {
-          sstFilenames.add(entry.getName());
+          fileNames.add(entry.getName());
         }
       }
-      return sstFilenames;
+      return fileNames;
     }
 
     // Find the tarball in the dir.

@@ -145,7 +145,7 @@ public final class OmSnapshotUtils {
           String[] parts = l.split("\t");
           if (parts.length != 2) {
             LOG.warn("Skipping malformed line in hardlink file: {}", l);
-            return;
+            continue;
           }
           String from = parts[1];
           String to = parts[0];

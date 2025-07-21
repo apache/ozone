@@ -117,7 +117,8 @@ public class TestRDBSnapshotProvider {
             .collect(Collectors.toList()));
         try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
           Set<String> existingSstFiles = HAUtils.getExistingFiles(rdbSnapshotProvider.getCandidateDir())
-              .stream().filter(fName -> fName.endsWith("sst"))
+              .stream()
+              .filter(fName -> fName.endsWith(".sst") && !fName.equals(".sst"))
               .collect(Collectors.toSet());
           writeDBCheckpointToStream(dbCheckpoint, outputStream, existingSstFiles);
         }

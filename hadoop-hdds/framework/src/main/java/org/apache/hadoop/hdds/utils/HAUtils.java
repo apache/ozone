@@ -335,7 +335,7 @@ public final class HAUtils {
           .map(p -> p.getFileName().toString()).
               collect(Collectors.toList());
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Scanned SST files {} in {}.", sstList, db.getAbsolutePath());
+        LOG.debug("Scanned files {} in {}.", sstList, db.getAbsolutePath());
       }
     }
     return sstList;
