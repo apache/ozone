@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.Collections;
@@ -224,11 +223,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
     private DatanodeDetails datanodeDetails;
     private HddsProtos.NodeOperationalState operationalState;
     private HddsProtos.NodeState healthState;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Long used = null;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Long capacity = null;
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Double percentUsed = null;
 
     DatanodeWithAttributes(DatanodeDetails dn,

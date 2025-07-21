@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
@@ -42,25 +43,35 @@ public class DatanodeInfoJson {
   private final String networkFullPath;
   private final String networkLocation;
   private final String networkName;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Long used = null;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Long capacity = null;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Double percentUsed = null;
   
   DatanodeInfoJson(ListInfoSubcommand.DatanodeWithAttributes dna) {
-    this.id = dna.getDatanodeDetails().getUuid().toString();
-    this.ports = dna.getDatanodeDetails().getPorts();
+    DatanodeDetails dn = dna.getDatanodeDetails();
+    this.id = dn.getUuid().toString();
+    this.ports = dn.getPorts();
     this.opState = String.valueOf(dna.getOpState());
     this.healthState = String.valueOf(dna.getHealthState());
-    this.hostName = dna.getDatanodeDetails().getHostName();
-    this.ipAddress = dna.getDatanodeDetails().getIpAddress();
-    this.persistedOpStateExpiryEpochSec = dna.getDatanodeDetails().getPersistedOpStateExpiryEpochSec();
-    this.decommissioned = dna.getDatanodeDetails().isDecommissioned();
-    this.maintenance = dna.getDatanodeDetails().isMaintenance();
-    this.level = dna.getDatanodeDetails().getLevel();
-    this.cost = dna.getDatanodeDetails().getCost();
-    this.numOfLeaves = dna.getDatanodeDetails().getNumOfLeaves();
-    this.networkFullPath = dna.getDatanodeDetails().getNetworkFullPath();
-    this.networkLocation = dna.getDatanodeDetails().getNetworkLocation();
-    this.networkName = dna.getDatanodeDetails().getNetworkName();
-    this.setupTime = dna.getDatanodeDetails().getSetupTime();
-    this.currentVersion = dna.getDatanodeDetails().getCurrentVersion();
+    this.hostName = dn.getHostName();
+    this.ipAddress = dn.getIpAddress();
+    this.persistedOpStateExpiryEpochSec = dn.getPersistedOpStateExpiryEpochSec();
+    this.decommissioned = dn.isDecommissioned();
+    this.maintenance = dn.isMaintenance();
+    this.level = dn.getLevel();
+    this.cost = dn.getCost();
+    this.numOfLeaves = dn.getNumOfLeaves();
+    this.networkFullPath = dn.getNetworkFullPath();
+    this.networkLocation = dn.getNetworkLocation();
+    this.networkName = dn.getNetworkName();
+    this.setupTime = dn.getSetupTime();
+    this.currentVersion = dn.getCurrentVersion();
+    this.used = dna.getUsed();
+    this.capacity = dna.getCapacity();
+    this.percentUsed = dna.getPercentUsed();
   }
   
   public String getId() {
@@ -129,5 +140,17 @@ public class DatanodeInfoJson {
   
   public int getCurrentVersion() {
     return currentVersion;
+  }
+  
+  public Long getUsed() {
+    return used;
+  }
+
+  public Long getCapacity() {
+    return capacity;
+  }
+
+  public Double getPercentUsed() {
+    return percentUsed;
   }
 }
