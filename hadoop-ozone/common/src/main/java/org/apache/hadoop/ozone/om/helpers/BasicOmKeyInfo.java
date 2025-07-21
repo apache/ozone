@@ -228,8 +228,13 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
         .setETag(basicKeyInfo.getETag())
-        .setIsFile(basicKeyInfo.getIsFile())
         .setOwnerName(basicKeyInfo.getOwnerName());
+
+    if (basicKeyInfo.hasIsFile()) {
+      builder.setIsFile(basicKeyInfo.getIsFile());
+    } else {
+      builder.setIsFile(!keyName.endsWith("/"));
+    }
 
     return builder.build();
   }
@@ -254,8 +259,13 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
         .setETag(basicKeyInfo.getETag())
-        .setIsFile(basicKeyInfo.getIsFile())
         .setOwnerName(basicKeyInfo.getOwnerName());
+
+    if (basicKeyInfo.hasIsFile()) {
+      builder.setIsFile(basicKeyInfo.getIsFile());
+    } else {
+      builder.setIsFile(!keyName.endsWith("/"));
+    }
 
     return builder.build();
   }
