@@ -17,11 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -68,12 +71,10 @@ public class TestECContainerSafeModeRule {
 
   @Test
   public void testRefreshInitializeECContainers() {
-    ContainerInfo container1 = mockECContainer(LifeCycleState.CLOSED, 1L);
-    ContainerInfo container2 = mockECContainer(LifeCycleState.OPEN, 2L);
-
-    List<ContainerInfo> containers = new ArrayList<>();
-    containers.add(container1);
-    containers.add(container2);
+    List<ContainerInfo> containers = Arrays.asList(
+        mockECContainer(LifeCycleState.CLOSED, 1L),
+        mockECContainer(LifeCycleState.OPEN, 2L)
+    );
 
     when(containerManager.getContainers(ReplicationType.EC)).thenReturn(containers);
 
@@ -83,15 +84,14 @@ public class TestECContainerSafeModeRule {
   }
 
   @ParameterizedTest
-  @EnumSource(value = LifeCycleState.class, names = {"OPEN", "CLOSED"})
-  public void testValidateReturnsTrueAndFalse(LifeCycleState state)  {
+  @EnumSource(value = LifeCycleState.class,
+      names = {"OPEN", "CLOSING", "QUASI_CLOSED", "CLOSED", "DELETING", "DELETED", "RECOVERING"})
+  public void testValidateReturnsTrueAndFalse(LifeCycleState state) {
     ContainerInfo container = mockECContainer(state, 1L);
-    List<ContainerInfo> containers = new ArrayList<>();
-    containers.add(container);
 
-    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(Collections.singletonList(container));
 
-    boolean expected = state != LifeCycleState.CLOSED;
+    boolean expected = state != LifeCycleState.QUASI_CLOSED && state != LifeCycleState.CLOSED;
     assertEquals(expected, rule.validate());
   }
 
@@ -99,10 +99,8 @@ public class TestECContainerSafeModeRule {
   public void testProcessECContainer() {
     long containerId = 123L;
     ContainerInfo container = mockECContainer(LifeCycleState.CLOSED, containerId);
-    List<ContainerInfo> containers = new ArrayList<>();
-    containers.add(container);
 
-    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(Collections.singletonList(container));
     rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold());
@@ -125,10 +123,93 @@ public class TestECContainerSafeModeRule {
     assertEquals(1.0, rule.getCurrentContainerThreshold());
   }
 
-  private static ContainerInfo mockECContainer(LifeCycleState cycleState, long containerID) {
+  @Test
+  public void testAllContainersClosed() {
+    List<ContainerInfo> closedContainers = Arrays.asList(
+        mockECContainer(LifeCycleState.CLOSED, 11L),
+        mockECContainer(LifeCycleState.CLOSED, 32L)
+    );
+
+    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(closedContainers);
+
+    rule.refresh(false);
+
+    assertEquals(0.0, rule.getCurrentContainerThreshold(), "Threshold should be 0.0 when all containers are closed");
+    assertFalse(rule.validate(), "Validate should return false when all containers are closed");
+  }
+
+  @Test
+  public void testAllContainersOpen() {
+    List<ContainerInfo> openContainers = Arrays.asList(
+        mockECContainer(LifeCycleState.OPEN, 11L),
+        mockECContainer(LifeCycleState.OPEN, 32L)
+    );
+
+    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(openContainers);
+
+    rule.refresh(false);
+
+    assertEquals(1.0, rule.getCurrentContainerThreshold(), "Threshold should be 1.0 when all containers are open");
+    assertTrue(rule.validate(), "Validate should return true when all containers are open");
+  }
+
+  @Test
+  public void testDuplicateContainerIdsInReports() {
+    long containerId = 42L;
+    ContainerInfo container = mockECContainer(LifeCycleState.OPEN, containerId);
+
+    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(Collections.singletonList(container));
+
+    rule.refresh(false);
+
+    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
+    ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
+    NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+
+    when(replica.getContainerID()).thenReturn(containerId);
+    when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
+    when(report.getReport()).thenReturn(containerReport);
+    when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(datanodeDetails.getUuid()).thenReturn(UUID.randomUUID());
+
+    rule.process(report);
+    rule.process(report);
+
+    assertEquals(1.0, rule.getCurrentContainerThreshold(), "Duplicated containers should be counted only once");
+  }
+
+  @Test
+  public void testValidateBasedOnReportProcessingTrue() throws Exception {
+    rule.setValidateBasedOnReportProcessing(true);
+    long containerId = 1L;
+    ContainerInfo container = mockECContainer(LifeCycleState.OPEN, containerId);
+
+    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(Collections.singletonList(container));
+
+    rule.refresh(false);
+
+    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
+    ContainerReportsProto reportsProto = mock(ContainerReportsProto.class);
+    NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+
+    when(replica.getContainerID()).thenReturn(containerId);
+    when(reportsProto.getReportsList()).thenReturn(Collections.singletonList(replica));
+    when(report.getReport()).thenReturn(reportsProto);
+    when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(datanodeDetails.getUuid()).thenReturn(UUID.randomUUID());
+
+
+    rule.process(report);
+
+    assertTrue(rule.validate(), "Should validate based on reported containers");
+  }
+
+  private static ContainerInfo mockECContainer(LifeCycleState state, long containerID) {
     ContainerInfo container = mock(ContainerInfo.class);
     when(container.getReplicationType()).thenReturn(ReplicationType.EC);
-    when(container.getState()).thenReturn(cycleState);
+    when(container.getState()).thenReturn(state);
     when(container.getContainerID()).thenReturn(containerID);
     when(container.containerID()).thenReturn(ContainerID.valueOf(containerID));
     when(container.getNumberOfKeys()).thenReturn(1L);

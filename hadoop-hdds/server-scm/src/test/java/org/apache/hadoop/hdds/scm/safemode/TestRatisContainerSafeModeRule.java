@@ -17,11 +17,16 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -32,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -66,11 +72,10 @@ public class TestRatisContainerSafeModeRule {
 
   @Test
   public void testRefreshInitializeRatisContainers() {
-    ContainerInfo container1 = mockRatisContainer(LifeCycleState.CLOSED, 1L);
-    ContainerInfo container2 = mockRatisContainer(LifeCycleState.OPEN, 2L);
-    List<ContainerInfo> containers = new ArrayList<>();
-    containers.add(container1);
-    containers.add(container2);
+    List<ContainerInfo> containers = Arrays.asList(
+        mockRatisContainer(LifeCycleState.CLOSED, 1L),
+        mockRatisContainer(LifeCycleState.OPEN, 2L)
+    );
 
     when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
 
@@ -80,15 +85,14 @@ public class TestRatisContainerSafeModeRule {
   }
 
   @ParameterizedTest
-  @EnumSource(value = LifeCycleState.class, names = {"OPEN", "CLOSED"})
-  public void testValidateReturnsTrueAndFalse(LifeCycleState state)  {
+  @EnumSource(value = LifeCycleState.class,
+      names = {"OPEN", "CLOSING", "QUASI_CLOSED", "CLOSED", "DELETING", "DELETED", "RECOVERING"})
+  public void testValidateReturnsTrueAndFalse(LifeCycleState state) {
     ContainerInfo container = mockRatisContainer(state, 1L);
-    List<ContainerInfo> containers = new ArrayList<>();
-    containers.add(container);
 
-    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(Collections.singletonList(container));
 
-    boolean expected = state != LifeCycleState.CLOSED;
+    boolean expected = state != LifeCycleState.QUASI_CLOSED && state != LifeCycleState.CLOSED;
     assertEquals(expected, rule.validate());
   }
 
@@ -96,10 +100,8 @@ public class TestRatisContainerSafeModeRule {
   public void testProcessRatisContainer() {
     long containerId = 123L;
     ContainerInfo container = mockRatisContainer(LifeCycleState.CLOSED, containerId);
-    List<ContainerInfo> containers = new ArrayList<>();
-    containers.add(container);
 
-    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(Collections.singletonList(container));
     rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold());
@@ -119,10 +121,86 @@ public class TestRatisContainerSafeModeRule {
     assertEquals(1.0, rule.getCurrentContainerThreshold());
   }
 
-  private static ContainerInfo mockRatisContainer(LifeCycleState cycleState, long containerID) {
+  @Test
+  public void testAllContainersClosed() {
+    List<ContainerInfo> closedContainers = Arrays.asList(
+        mockRatisContainer(LifeCycleState.CLOSED, 11L),
+        mockRatisContainer(LifeCycleState.CLOSED, 32L)
+    );
+
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(closedContainers);
+
+    rule.refresh(false);
+
+    assertEquals(0.0, rule.getCurrentContainerThreshold(), "Threshold should be 0.0 when all containers are closed");
+    assertFalse(rule.validate(), "Validate should return false when all containers are closed");
+  }
+
+  @Test
+  public void testAllContainersOpen() {
+    List<ContainerInfo> openContainers = Arrays.asList(
+        mockRatisContainer(LifeCycleState.OPEN, 11L),
+        mockRatisContainer(LifeCycleState.OPEN, 32L)
+    );
+
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(openContainers);
+
+    rule.refresh(false);
+
+    assertEquals(1.0, rule.getCurrentContainerThreshold(), "Threshold should be 1.0 when all containers are open");
+    assertTrue(rule.validate(), "Validate should return true when all containers are open");
+  }
+
+  @Test
+  public void testDuplicateContainerIdsInReports() {
+    long containerId = 42L;
+    ContainerInfo container = mockRatisContainer(LifeCycleState.OPEN, containerId);
+
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(Collections.singletonList(container));
+
+    rule.refresh(false);
+
+    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
+    ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
+    NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+
+    when(replica.getContainerID()).thenReturn(containerId);
+    when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
+    when(report.getReport()).thenReturn(containerReport);
+
+    rule.process(report);
+    rule.process(report);
+
+    assertEquals(1.0, rule.getCurrentContainerThreshold(), "Duplicated containers should be counted only once");
+  }
+
+  @Test
+  public void testValidateBasedOnReportProcessingTrue() throws Exception {
+    rule.setValidateBasedOnReportProcessing(true);
+    long containerId = 1L;
+    ContainerInfo container = mockRatisContainer(LifeCycleState.OPEN, containerId);
+
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(Collections.singletonList(container));
+
+    rule.refresh(false);
+
+    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
+    ContainerReportsProto reportsProto = mock(ContainerReportsProto.class);
+    NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+
+    when(replica.getContainerID()).thenReturn(containerId);
+    when(reportsProto.getReportsList()).thenReturn(Collections.singletonList(replica));
+    when(report.getReport()).thenReturn(reportsProto);
+
+    rule.process(report);
+
+    assertTrue(rule.validate(), "Should validate based on reported containers");
+  }
+
+  private static ContainerInfo mockRatisContainer(LifeCycleState state, long containerID) {
     ContainerInfo container = mock(ContainerInfo.class);
     when(container.getReplicationType()).thenReturn(ReplicationType.RATIS);
-    when(container.getState()).thenReturn(cycleState);
+    when(container.getState()).thenReturn(state);
     when(container.getContainerID()).thenReturn(containerID);
     when(container.getNumberOfKeys()).thenReturn(1L);
     return container;
