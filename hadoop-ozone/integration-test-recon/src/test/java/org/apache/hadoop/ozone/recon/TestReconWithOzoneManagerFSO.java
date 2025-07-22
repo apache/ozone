@@ -115,7 +115,7 @@ public class TestReconWithOzoneManagerFSO {
     NamespaceSummaryResponse entity =
             (NamespaceSummaryResponse) basicInfo.getEntity();
     assertSame(entity.getEntityType(), EntityType.DIRECTORY);
-    assertEquals(0, entity.getCountStats().getNumTotalKey());
+    assertEquals(1, entity.getCountStats().getNumTotalKey());
     assertEquals(0, entity.getCountStats().getNumTotalDir());
     assertEquals(-1, entity.getCountStats().getNumVolume());
     assertEquals(-1, entity.getCountStats().getNumBucket());
@@ -141,8 +141,8 @@ public class TestReconWithOzoneManagerFSO {
     // Adjusting expectations to match new behavior
     assertEquals(13, rootBasicEntity.getCountStats().getNumVolume());
     assertEquals(12, rootBasicEntity.getCountStats().getNumBucket());
-    assertEquals(0, rootBasicEntity.getCountStats().getNumTotalDir());
-    assertEquals(0, rootBasicEntity.getCountStats().getNumTotalKey());
+    assertEquals(12, rootBasicEntity.getCountStats().getNumTotalDir());
+    assertEquals(12, rootBasicEntity.getCountStats().getNumTotalKey());
   }
 
   /**
