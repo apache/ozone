@@ -93,7 +93,7 @@ class TestOzoneFsSnapshot {
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
-    conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, KeyManagerImpl.DISABLE_VALUE);
+    conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, -1);
     conf.setInt(OmConfig.Keys.SERVER_LIST_MAX_SIZE, 20);
     conf.setInt(OZONE_FS_LISTING_PAGE_SIZE, 30);
 

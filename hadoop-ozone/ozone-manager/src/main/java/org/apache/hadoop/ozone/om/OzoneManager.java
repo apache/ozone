@@ -5214,19 +5214,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (this.isFilesystemSnapshotEnabled()) {
       if (wasSstFilteringSvcEnabled) {
-        LOG.info("Restarting SstFilteringService as {} is reconfigured to {}",
-            OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
         // Sanity check
         Preconditions.checkNotNull(keyManager.getSnapshotSstFilteringService(),
             "sstFilteringService should not be null when SST filtering service is enabled.");
-
-        ((KeyManagerImpl) keyManager).restartSnapshotSstFilteringService(getConfiguration());
-      } else {
-        // Start SstFilteringService
-        LOG.info("Starting SstFilteringService as {} is reconfigured to {}",
-            OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
-        ((KeyManagerImpl) keyManager).startSnapshotSstFilteringService(getConfiguration());
+        ((KeyManagerImpl) keyManager).stopSnapshotSstFilteringService();
       }
+      // Note startSnapshotSstFilteringService checks whether the config is set to a value that enables the service
+      ((KeyManagerImpl) keyManager).startSnapshotSstFilteringService(getConfiguration());
     } else {
       LOG.warn("Ozone filesystem snapshot is not enabled. {} is reconfigured but will not make any difference.",
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL);

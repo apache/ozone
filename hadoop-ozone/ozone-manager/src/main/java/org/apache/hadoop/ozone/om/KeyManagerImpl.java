@@ -186,7 +186,6 @@ import org.slf4j.LoggerFactory;
 public class KeyManagerImpl implements KeyManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyManagerImpl.class);
-  public static final int DISABLE_VALUE = -1;
 
   /**
    * A SCM block client, used to talk to SCM to allocate block during putKey.
@@ -306,7 +305,6 @@ public class KeyManagerImpl implements KeyManager {
 
     if (snapshotSstFilteringService == null &&
         ozoneManager.isFilesystemSnapshotEnabled()) {
-
       startSnapshotSstFilteringService(configuration);
     }
 
@@ -390,11 +388,6 @@ public class KeyManagerImpl implements KeyManager {
     } else {
       LOG.info("SstFilteringService is already stopped or not started.");
     }
-  }
-
-  public void restartSnapshotSstFilteringService(OzoneConfiguration conf) {
-    stopSnapshotSstFilteringService();
-    startSnapshotSstFilteringService(conf);
   }
 
   private void startCompactionService(OzoneConfiguration configuration,
@@ -990,7 +983,8 @@ public class KeyManagerImpl implements KeyManager {
         .getTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
             OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
-    return serviceInterval != DISABLE_VALUE;
+    // any interval <= 0 causes IllegalArgumentException from scheduleWithFixedDelay
+    return serviceInterval > 0;
   }
   
   @Override

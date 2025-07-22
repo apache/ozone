@@ -257,7 +257,6 @@ public class SstFilteringService extends BackgroundService
 
   @Override
   public void shutdown() {
-    LOG.info("Shutting down SstFilteringService");
     running.set(false);
     super.shutdown();
   }

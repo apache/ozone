@@ -36,7 +36,6 @@ import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -144,7 +143,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
         .getTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
             org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
             java.util.concurrent.TimeUnit.MILLISECONDS);
-    assertTrue(originalInterval > -1, "Original interval should be greater than -1");
+    assertTrue(originalInterval > 0, "Original interval should be greater than 0");
 
     // 1. Test reconfiguring to a different valid interval (30 seconds)
     // This should restart the SstFilteringService
@@ -165,7 +164,7 @@ public abstract class TestOmReconfiguration extends ReconfigurationTestBase {
     assertEquals(30000, newInterval, "New interval should be 30 seconds (30000ms)");
 
     // 2. Service should stop when interval is reconfigured to -1
-    final String disableValue = String.valueOf(KeyManagerImpl.DISABLE_VALUE);
+    final String disableValue = String.valueOf(-1);
     getSubject().reconfigurePropertyImpl(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, disableValue);
     assertEquals(disableValue, cluster().getOzoneManager().getConfiguration()
         .get(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL));
