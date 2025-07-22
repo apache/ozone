@@ -525,7 +525,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
             .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
-            .register(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, this::reconfFSSnapshotSSTFilteringServiceInterval)
+            .register(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+                this::reconfOzoneSnapshotSSTFilteringServiceInterval)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
                 this::reconfOzoneKeyDeletingLimitPerTask)
             .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval)
@@ -5208,7 +5209,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return newVal;
   }
 
-  private String reconfFSSnapshotSSTFilteringServiceInterval(String newVal) {
+  private String reconfOzoneSnapshotSSTFilteringServiceInterval(String newVal) {
     boolean wasSstFilteringSvcEnabled = ((KeyManagerImpl) keyManager).isSstFilteringSvcEnabled();
     getConfiguration().set(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
 
