@@ -511,7 +511,8 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
       // Mock the flushAndCommitUpdatedNSToDB method to fail on the last flush
       NSSummaryTaskWithFSO taskSpy = Mockito.spy(task);
-      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy).flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
+      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy)
+          .flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
 
       // Call the method under test
       Pair<Integer, Boolean> result1 = taskSpy.processWithFSO(events, 0);
