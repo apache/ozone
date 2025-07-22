@@ -49,7 +49,7 @@ class TestVolumeHealthMetrics {
     mockVolumeSet = mock(VolumeSet.class);
     volumes = new ArrayList<>();
 
-    volumeHealthMetrics = new VolumeHealthMetrics(StorageVolume.VolumeType.DATA_VOLUME, mockVolumeSet);
+    volumeHealthMetrics = VolumeHealthMetrics.create(StorageVolume.VolumeType.DATA_VOLUME, mockVolumeSet);
   }
 
   @AfterEach

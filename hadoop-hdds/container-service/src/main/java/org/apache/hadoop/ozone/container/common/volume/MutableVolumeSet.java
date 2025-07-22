@@ -125,8 +125,8 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     initializeVolumeSet();
-    
-    this.volumeHealthMetrics = new VolumeHealthMetrics(volumeType, this);
+
+    this.volumeHealthMetrics = VolumeHealthMetrics.create(volumeType, this);
   }
 
   public void setFailedVolumeListener(CheckedRunnable<IOException> runnable) {

@@ -56,14 +56,25 @@ public class VolumeHealthMetrics implements MetricsSource {
    * @param volumeType Type of volumes (DATA_VOLUME, META_VOLUME, DB_VOLUME)
    * @param volumeSet The volume set to track metrics for
    */
-  public VolumeHealthMetrics(StorageVolume.VolumeType volumeType, VolumeSet volumeSet) {
+  VolumeHealthMetrics(StorageVolume.VolumeType volumeType, VolumeSet volumeSet) {
     this.volumeSet = volumeSet;
 
     metricsSourceName = SOURCE_BASENAME + '-' + volumeType.name();
     registry = new MetricsRegistry(metricsSourceName);
+  }
 
+  /**
+   * Creates and registers a new VolumeHealthMetrics instance.
+   *
+   * @param volumeType Type of volumes (DATA_VOLUME, META_VOLUME, DB_VOLUME)
+   * @param volumeSet  The volume set to track metrics for
+   * @return The registered VolumeHealthMetrics instance
+   */
+  public static VolumeHealthMetrics create(StorageVolume.VolumeType volumeType,
+      VolumeSet volumeSet) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.register(metricsSourceName, "Volume Health Statistics", this);
+    VolumeHealthMetrics metrics = new VolumeHealthMetrics(volumeType, volumeSet);
+    return ms.register(metrics.metricsSourceName, "Volume Health Statistics", metrics);
   }
 
   public void unregister() {
