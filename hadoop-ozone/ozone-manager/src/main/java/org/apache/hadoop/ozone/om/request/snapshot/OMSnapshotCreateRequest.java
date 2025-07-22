@@ -30,7 +30,6 @@ import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -188,7 +187,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // because it is a design goal of CreateSnapshot to be an O(1) operation.
       // TODO: [SNAPSHOT] Assign actual data size once we have the
       //  pre-replicated key size counter in OmBucketInfo.
-      snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
+      snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo, ozoneManager.getDefaultReplicationConfig()));
 
       addSnapshotInfoToSnapshotChainAndCache(ozoneManager, omMetadataManager, context.getIndex());
 
@@ -335,12 +334,12 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
    * bucket used size (w/ replication) by the replication factor of the bucket.
    * @param bucketInfo OmBucketInfo
    */
-  private long estimateBucketDataSize(OmBucketInfo bucketInfo) {
+  private long estimateBucketDataSize(OmBucketInfo bucketInfo, ReplicationConfig defaultReplicationConfig) {
     DefaultReplicationConfig defRC = bucketInfo.getDefaultReplicationConfig();
     final ReplicationConfig rc;
     if (defRC == null) {
       //  Fall back to config default.
-      rc = ReplicationConfig.getDefault(new OzoneConfiguration());
+      rc = defaultReplicationConfig;
     } else {
       rc = defRC.getReplicationConfig();
     }

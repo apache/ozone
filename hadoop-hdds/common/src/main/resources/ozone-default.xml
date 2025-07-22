@@ -779,6 +779,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
+    <value>8</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      Factor with which number of delete blocks sent to each datanode in every interval.
+      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
+      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.block.size</name>
     <value>256MB</value>
     <tag>OZONE, SCM</tag>
@@ -2181,6 +2191,20 @@
     <value>32MB</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
     <description>Byte limit for Raft's Log Worker queue.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.server.pending.write.byte-limit</name>
+    <value>64MB</value>
+    <tag>OZONE, DEBUG, OM, RATIS</tag>
+    <description>Maximum byte size of all pending write requests.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.server.pending.write.element-limit</name>
+    <value>4096</value>
+    <tag>OZONE, DEBUG, OM, RATIS</tag>
+    <description>Maximum number of pending write requests.
     </description>
   </property>
   <property>
@@ -3982,7 +4006,7 @@
   </property>
   <property>
     <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
-    <value>600s</value>
+    <value>60s</value>
     <tag>SCM, OZONE</tag>
     <description>Wait duration for flush of buffered transaction.</description>
   </property>
