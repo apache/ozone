@@ -674,8 +674,8 @@ public class OMDBInsightEndpoint {
   }
 
   private void calculateTotalPendingDeletedDirSizes(Map<String, Long> dirSummary) {
-    long totalUnreplicatedSize = 0L;
-    long totalReplicatedSize = 0L;
+    long totalDataSize = 0L;
+    long totalReplicatedDataSize = 0L;
 
     Table<String, OmKeyInfo> deletedDirTable = omMetadataManager.getDeletedDirTable();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = deletedDirTable.iterator()) {
@@ -683,17 +683,18 @@ public class OMDBInsightEndpoint {
         Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
         OmKeyInfo omKeyInfo = kv.getValue();
         if (omKeyInfo != null) {
-          totalUnreplicatedSize += fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
-          // TODO: Based on HDDS-13180 merge, update totalReplicatedSize calculation using fetchSizeForDeletedDirectory.
-          totalReplicatedSize += omKeyInfo.getReplicatedSize();
+          totalDataSize += fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
+          // TODO: Based on HDDS-13180 merge, update totalReplicatedDataSize calculation using
+          //  fetchSizeForDeletedDirectory.
+          totalReplicatedDataSize += omKeyInfo.getReplicatedSize();
         }
       }
     } catch (IOException ex) {
       throw new WebApplicationException(ex, Response.Status.INTERNAL_SERVER_ERROR);
     }
 
-    dirSummary.put("totalUnreplicatedDataSize", totalUnreplicatedSize);
-    dirSummary.put("totalReplicatedDataSize", totalReplicatedSize);
+    dirSummary.put("totalDataSize", totalDataSize);
+    dirSummary.put("totalReplicatedDataSize", totalReplicatedDataSize);
   }
 
   /**
@@ -806,17 +807,17 @@ public class OMDBInsightEndpoint {
    * Retrieves the summary of the total delete pending directory size (unreplicated and replicated).
    *
    * @return The HTTP response body includes a map with the following entries:
-   * - "totalUnreplicatedDataSize": the total replicated size of delete pending directories.
+   * - "totalDataSize": the total replicated size of delete pending directories.
    * - "totalReplicatedDataSize": the total unreplicated size of delete pending directories.
    *
    * Example response:
    *   {
-   *    "totalUnreplicatedDataSize": 30000,
+   *    "totalDataSize": 30000,
    *    "totalReplicatedDataSize": 90000
    *   }
    */
   @GET
-  @Path("/deletePending/dirs/size")
+  @Path("/deletePending/dirs/size-summary")
   public Response getTotalDeletedDirectorySizeSummary() {
     Map<String, Long> dirSummary = new HashMap<>();
     // Create a keys summary for deleted directories
