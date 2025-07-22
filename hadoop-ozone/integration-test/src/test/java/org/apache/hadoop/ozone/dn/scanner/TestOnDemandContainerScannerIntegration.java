@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collection;
+import java.util.EnumSet;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
@@ -33,7 +35,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,7 +46,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * is triggered when there is an error while a client interacts with a
  * container.
  */
-class TestOnDemandContainerDataScannerIntegration
+class TestOnDemandContainerScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
   private final GenericTestUtils.LogCapturer logCapturer =
@@ -72,6 +74,13 @@ class TestOnDemandContainerDataScannerIntegration
         TestContainerCorruptions.TRUNCATED_BLOCK);
   }
 
+  static Collection<TestContainerCorruptions> supportedCorruptionTypesForOpen() {
+    Set<TestContainerCorruptions> set = EnumSet.copyOf(supportedCorruptionTypes());
+    // Open containers will be checked only for metadata corruption, so missing block is not a valid corruption type.
+    set.remove(TestContainerCorruptions.MISSING_BLOCK);
+    return set;
+  }
+
   @BeforeAll
   static void init() throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
@@ -90,7 +99,7 @@ class TestOnDemandContainerDataScannerIntegration
   }
 
   /**
-   * {@link OnDemandContainerDataScanner} should detect corrupted blocks
+   * {@link OnDemandContainerScanner} should detect corrupted blocks
    * in a closed container when a client reads from it.
    */
   @ParameterizedTest
@@ -137,4 +146,36 @@ class TestOnDemandContainerDataScannerIntegration
       assertEquals(newReportedDataChecksum, updatedChecksumInfo.getContainerMerkleTree().getDataChecksum());
     }
   }
+
+  /**
+   * {@link OnDemandContainerScanner} should detect corrupted blocks
+   * in an open container when a client reads from it.
+   */
+  @ParameterizedTest
+  @MethodSource("supportedCorruptionTypesForOpen")
+  void testCorruptionDetectedForOpenContainers(TestContainerCorruptions corruption)
+      throws Exception {
+    String keyName = "keyName";
+
+    long openContainerID = writeDataToOpenContainer();
+    Container<?> openContainer = getDnContainer(openContainerID);
+    assertEquals(State.OPEN, openContainer.getContainerState());
+
+    // Corrupt the container.
+    corruption.applyTo(openContainer);
+    // This method will check that reading from the corrupted key returns an
+    // error to the client.
+    readFromCorruptedKey(keyName);
+
+    // Reading from the corrupted key should have triggered an on-demand scan
+    // of the container, which will detect the corruption.
+    GenericTestUtils.waitFor(
+        () -> openContainer.getContainerState() == State.UNHEALTHY,
+        500, 5000);
+
+    // Wait for SCM to get a report of the unhealthy replica.
+    waitForScmToSeeReplicaState(openContainerID, UNHEALTHY);
+    corruption.assertLogged(openContainerID, 1, logCapturer);
+  }
+
 }

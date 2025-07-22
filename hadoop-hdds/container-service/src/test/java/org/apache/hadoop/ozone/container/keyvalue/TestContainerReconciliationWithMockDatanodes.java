@@ -81,7 +81,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
@@ -299,7 +299,7 @@ public class TestContainerReconciliationWithMockDatanodes {
   private static class MockDatanode {
     private final KeyValueHandler handler;
     private final DatanodeDetails dnDetails;
-    private final OnDemandContainerDataScanner onDemandScanner;
+    private final OnDemandContainerScanner onDemandScanner;
     private final ContainerSet containerSet;
     private final OzoneConfiguration conf;
 
@@ -322,7 +322,7 @@ public class TestContainerReconciliationWithMockDatanodes {
 
       ContainerController controller = new ContainerController(containerSet,
           Collections.singletonMap(ContainerProtos.ContainerType.KeyValueContainer, handler));
-      onDemandScanner = new OnDemandContainerDataScanner(
+      onDemandScanner = new OnDemandContainerScanner(
           conf.getObject(ContainerScannerConfiguration.class), controller);
       // Register the on-demand container scanner with the container set used by the KeyValueHandler.
       containerSet.registerOnDemandScanner(onDemandScanner);
