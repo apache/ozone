@@ -137,10 +137,12 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
         // Set other fields from parsed YAML
         snapshotLocalData.setSstFiltered((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_IS_SST_FILTERED, false));
 
+        // Handle potential Integer/Long type mismatch from YAML parsing
+        Object lastCompactionTimeObj = nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_COMPACTION_TIME, -1L);
+        long lastCompactionTime = (lastCompactionTimeObj instanceof Integer) ?
+            Long.valueOf((Integer) lastCompactionTimeObj) : (Long) lastCompactionTimeObj;
+        snapshotLocalData.setLastCompactionTime(lastCompactionTime);
 
-
-        snapshotLocalData.setLastCompactionTime(
-            (Long) nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_COMPACTION_TIME, -1L));
         snapshotLocalData.setNeedsCompaction((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_COMPACTION, false));
 
         Map<Integer, Map<String, Set<String>>> compactedSSTFileList =

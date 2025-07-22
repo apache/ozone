@@ -505,11 +505,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
     // Create the snapshot local property file.
     try {
-      OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager,
-          snapshotInfo);
+      OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager, snapshotInfo, store);
     } catch (IOException e) {
-      LOG.error("Failed to create local property file for snapshot: {}",
-          snapshotInfo.getName(), e);
+      LOG.error("Failed to create local property file for snapshot: {}", snapshotInfo.getName(), e);
     }
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
@@ -642,31 +640,28 @@ public final class OmSnapshotManager implements AutoCloseable {
       throws IOException {
     Map<String, Set<String>> sstFileList = new HashMap<>();
     List<LiveFileMetaData> liveFileMetaDataList = store.getDb().getLiveFilesMetaData();
-    for (LiveFileMetaData liveFileMetaData : liveFileMetaDataList) {
-      String cfName = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
+    liveFileMetaDataList.forEach(lfm -> {
+      String cfName = StringUtils.bytes2String(lfm.columnFamilyName());
       if (COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT.contains(cfName)) {
-        sstFileList.computeIfAbsent(cfName, k -> new HashSet<>()).add(liveFileMetaData.fileName());
+        sstFileList.computeIfAbsent(cfName, k -> new HashSet<>()).add(lfm.fileName());
       }
-    }
+    });
     return sstFileList;
   }
 
   /**
-   * Creates and writes snapshot local properties to a YAML file.
+   * Creates and writes snapshot local properties to a YAML file with uncompacted SST file list.
    * @param omMetadataManager the metadata manager
    * @param snapshotInfo The metadata of snapshot to be created
-   * @return snapshot local data YAML file path
+   * @param store The store used to get uncompacted SST file list from.
    */
-  public static String createNewOmSnapshotLocalDataFile(
-      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo)
+  public static void createNewOmSnapshotLocalDataFile(
+      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo, RDBStore store)
       throws IOException {
-    Map<String, Set<String>> uncompactedSSTFileList = getSnapshotSSTFileList((RDBStore) omMetadataManager.getStore());
-    // Write a new YAML file with uncompacted SST File list in the snapshot local data path.
     Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(omMetadataManager, snapshotInfo));
     Files.deleteIfExists(snapshotLocalDataPath);
-    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(uncompactedSSTFileList);
+    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(store));
     snapshotLocalDataYaml.writeToYaml(snapshotLocalDataPath.toFile());
-    return snapshotLocalDataPath.toString();
   }
 
 
