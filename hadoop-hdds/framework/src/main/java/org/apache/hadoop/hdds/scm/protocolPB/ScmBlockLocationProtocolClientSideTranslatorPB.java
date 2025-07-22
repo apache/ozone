@@ -263,7 +263,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     return results;
   }
 
-  private ScmInfo getScmInfoSafe() throws IOException {
+  private synchronized ScmInfo getScmInfoSafe() throws IOException {
     if (scmInfo == null || scmInfo.getMetaDataLayoutVersion() <
         HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion()) {
       getScmInfo(); // refresh cached scmInfo

@@ -89,7 +89,7 @@ public class TestBlockDeletionService {
         arguments(new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 2 * 1024 * 1024)),
         arguments(new ECReplicationConfig(6, 3, ECReplicationConfig.EcCodec.RS, 2 * 1024 * 1024)),
         arguments(StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE.toProto())),
-        arguments(StandaloneReplicationConfig.getInstance(ReplicationFactor.ONE.toProto()))
+        arguments(StandaloneReplicationConfig.getInstance(ReplicationFactor.THREE.toProto()))
     );
   }
 
