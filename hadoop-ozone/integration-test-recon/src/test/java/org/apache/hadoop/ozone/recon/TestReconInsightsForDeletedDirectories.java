@@ -86,7 +86,7 @@ public class TestReconInsightsForDeletedDirectories {
       LoggerFactory.getLogger(TestReconInsightsForDeletedDirectories.class);
 
   private static MiniOzoneCluster cluster;
-  private static FileSystem fs;
+  private FileSystem fs;
   private static OzoneClient client;
   private static ReconService recon;
   private static OzoneConfiguration conf;
