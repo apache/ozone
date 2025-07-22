@@ -123,10 +123,10 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static final long DB_TABLE_ITER_LOOP_THRESHOLD_NS = 100000;
 
   private final OzoneManager ozoneManager;
-  private final SnapshotDiffManager snapshotDiffManager;
+  private SnapshotDiffManager snapshotDiffManager;
   // Per-OM instance of snapshot cache map
-  private final SnapshotCache snapshotCache;
-  private final ManagedRocksDB snapshotDiffDb;
+  private SnapshotCache snapshotCache;
+  private ManagedRocksDB snapshotDiffDb;
 
   public static final String DELIMITER = "-";
 
@@ -167,40 +167,45 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static final String SNAP_DIFF_PURGED_JOB_TABLE_NAME =
       "snap-diff-purged-job-table";
 
-  private final long diffCleanupServiceInterval;
-  private final int maxOpenSstFilesInSnapshotDb;
-  private final ManagedColumnFamilyOptions columnFamilyOptions;
-  private final ManagedDBOptions options;
-  private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
-  private final List<ColumnFamilyHandle> columnFamilyHandles;
-  private final SnapshotDiffCleanupService snapshotDiffCleanupService;
+  private long diffCleanupServiceInterval;
+  private int maxOpenSstFilesInSnapshotDb;
+  private ManagedColumnFamilyOptions columnFamilyOptions;
+  private ManagedDBOptions options;
+  private List<ColumnFamilyDescriptor> columnFamilyDescriptors;
+  private List<ColumnFamilyHandle> columnFamilyHandles;
+  private SnapshotDiffCleanupService snapshotDiffCleanupService;
 
-  private final int maxPageSize;
+  private int maxPageSize;
 
   // Soft limit of the snapshot cache size.
-  private final int softCacheSize;
+  private int softCacheSize;
 
   private int fsSnapshotMaxLimit;
   private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
 
   public OmSnapshotManager(OzoneManager ozoneManager) {
+    this.ozoneManager = ozoneManager;
 
     boolean isFilesystemSnapshotEnabled =
         ozoneManager.isFilesystemSnapshotEnabled();
     LOG.info("Ozone filesystem snapshot feature is {}.",
         isFilesystemSnapshotEnabled ? "enabled" : "disabled");
 
-    // Confirm that snapshot feature can be safely disabled.
-    // Throw unchecked exception if that is not the case.
-    if (!isFilesystemSnapshotEnabled &&
-        !canDisableFsSnapshot(ozoneManager.getMetadataManager())) {
-      throw new RuntimeException("Ozone Manager is refusing to start up" +
-          "because filesystem snapshot feature is disabled in config while" +
-          "there are still snapshots remaining in the system (including the " +
-          "ones that are marked as deleted but not yet cleaned up by the " +
-          "background worker thread). " +
-          "Please set config ozone.filesystem.snapshot.enabled to true and " +
-          "try to start this Ozone Manager again.");
+    if (!isFilesystemSnapshotEnabled) {
+      // Confirm that snapshot feature can be safely disabled.
+      // Throw unchecked exception if that is not the case.
+      if (!canDisableFsSnapshot(ozoneManager.getMetadataManager())) {
+        throw new RuntimeException("Ozone Manager is refusing to start up " +
+            "because filesystem snapshot feature is disabled in config while " +
+            "there are still snapshots remaining in the system (including " +
+            "the ones that are marked as deleted but not yet cleaned up by " +
+            "the background worker thread). " +
+            "Please set config ozone.filesystem.snapshot.enabled to true and " +
+            "try to start this Ozone Manager again.");
+      }
+      // If snapshot is disabled, we don't need to initialize the rest of the
+      // fields. And we are done with the constructor.
+      return;
     }
 
     this.options = new ManagedDBOptions();
@@ -250,7 +255,6 @@ public final class OmSnapshotManager implements AutoCloseable {
       throw exception;
     }
 
-    this.ozoneManager = ozoneManager;
     RocksDBCheckpointDiffer differ = ozoneManager
         .getMetadataManager()
         .getStore()
@@ -315,21 +319,17 @@ public final class OmSnapshotManager implements AutoCloseable {
             OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
 
-    if (ozoneManager.isFilesystemSnapshotEnabled()) {
-      this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
-          diffCleanupServiceInterval,
-          diffCleanupServiceTimeout,
-          ozoneManager,
-          snapshotDiffDb,
-          snapDiffJobCf,
-          snapDiffPurgedJobCf,
-          snapDiffReportCf,
-          codecRegistry
-      );
-      this.snapshotDiffCleanupService.start();
-    } else {
-      this.snapshotDiffCleanupService = null;
-    }
+    this.snapshotDiffCleanupService = new SnapshotDiffCleanupService(
+        diffCleanupServiceInterval,
+        diffCleanupServiceTimeout,
+        ozoneManager,
+        snapshotDiffDb,
+        snapDiffJobCf,
+        snapDiffPurgedJobCf,
+        snapDiffReportCf,
+        codecRegistry
+    );
+    this.snapshotDiffCleanupService.start();
   }
 
   /**
@@ -1078,34 +1078,36 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   @Override
   public void close() {
-    if (snapshotDiffManager != null) {
-      snapshotDiffManager.close();
-    }
+    if (ozoneManager.isFilesystemSnapshotEnabled()) {
+      if (snapshotDiffManager != null) {
+        snapshotDiffManager.close();
+      }
 
-    if (snapshotCache != null) {
-      snapshotCache.close();
-    }
+      if (snapshotCache != null) {
+        snapshotCache.close();
+      }
 
-    if (snapshotDiffCleanupService != null) {
-      snapshotDiffCleanupService.shutdown();
-    }
+      if (snapshotDiffCleanupService != null) {
+        snapshotDiffCleanupService.shutdown();
+      }
 
-    if (columnFamilyHandles != null) {
-      columnFamilyHandles.forEach(ColumnFamilyHandle::close);
-    }
-    if (snapshotDiffDb != null) {
-      snapshotDiffDb.close();
-    }
-    if (columnFamilyDescriptors != null) {
-      columnFamilyDescriptors.forEach(columnFamilyDescriptor ->
-          closeColumnFamilyOptions((ManagedColumnFamilyOptions)
-              columnFamilyDescriptor.getOptions()));
-    }
-    if (columnFamilyOptions != null) {
-      closeColumnFamilyOptions(columnFamilyOptions);
-    }
-    if (options != null) {
-      options.close();
+      if (columnFamilyHandles != null) {
+        columnFamilyHandles.forEach(ColumnFamilyHandle::close);
+      }
+      if (snapshotDiffDb != null) {
+        snapshotDiffDb.close();
+      }
+      if (columnFamilyDescriptors != null) {
+        columnFamilyDescriptors.forEach(columnFamilyDescriptor ->
+            closeColumnFamilyOptions((ManagedColumnFamilyOptions)
+                columnFamilyDescriptor.getOptions()));
+      }
+      if (columnFamilyOptions != null) {
+        closeColumnFamilyOptions(columnFamilyOptions);
+      }
+      if (options != null) {
+        options.close();
+      }
     }
   }
 
