@@ -276,7 +276,7 @@ public class ContainerChecksumTreeManager {
         // thisTree = Unhealthy, peerTree = Unhealthy -> Do Nothing as both are corrupt.
         if (thisChunkMerkleTree.getDataChecksum() != peerChunkMerkleTree.getDataChecksum() &&
             !thisChunkMerkleTree.getChecksumMatches()) {
-          reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTreeList.get(peerIdx), report::addCorruptChunk);
+          reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTree, report::addCorruptChunk);
         }
         thisIdx++;
         peerIdx++;
@@ -286,7 +286,7 @@ public class ContainerChecksumTreeManager {
         thisIdx++;
       } else {
         // Peer chunk's offset is smaller; record missing chunk and advance peerIdx
-        reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTreeList.get(peerIdx), report::addMissingChunk);
+        reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTree, report::addMissingChunk);
         peerIdx++;
       }
     }
