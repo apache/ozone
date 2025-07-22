@@ -87,8 +87,6 @@ public class TestScmDataDistributionFinalization {
 
   private StorageContainerLocationProtocol scmClient;
   private MiniOzoneHAClusterImpl cluster;
-  private OzoneClient ozoneClient;
-  private ObjectStore store;
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
   private Future<?> finalizationFuture;
@@ -129,15 +127,16 @@ public class TestScmDataDistributionFinalization {
     scmClient = cluster.getStorageContainerLocationClient();
     cluster.waitForClusterToBeReady();
     assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(), scmClient.getScmInfo().getMetaDataLayoutVersion());
-    ozoneClient = OzoneClientFactory.getRpcClient(conf);
-    store = ozoneClient.getObjectStore();
 
     // Create Volume and Bucket
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    BucketArgs.Builder builder = BucketArgs.newBuilder();
-    volume.createBucket(bucketName, builder.build());
-    bucket = volume.getBucket(bucketName);
+    try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      store.createVolume(volumeName);
+      OzoneVolume volume = store.getVolume(volumeName);
+      BucketArgs.Builder builder = BucketArgs.newBuilder();
+      volume.createBucket(bucketName, builder.build());
+      bucket = volume.getBucket(bucketName);
+    }
 
     // Launch finalization from the client. In the current implementation,
     // this call will block until finalization completes. If the test
@@ -339,9 +338,8 @@ public class TestScmDataDistributionFinalization {
     // Create the key
     String value = "sample value";
     TestDataUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
-    // restart OM to get new scmInfo
-    cluster.restartOzoneManager();
-    cluster.waitForLeaderOM();
+    // update scmInfo in OM
+    cluster.getOzoneManager().setScmInfo(activeSCM.getBlockProtocolServer().getScmInfo());
     // delete the key
     bucket.deleteKey(keyName);
 
