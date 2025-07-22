@@ -115,7 +115,7 @@ class TestContainerMerkleTreeWriter {
 
   @Test
   public void testBlockIdIncludedInChecksum() {
-    // Create identical chunks to be used in different blocks
+    // Create a set of chunks to be used in different blocks with identical content.
     ContainerProtos.ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     ContainerProtos.ChunkInfo chunk2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
 
@@ -149,7 +149,7 @@ class TestContainerMerkleTreeWriter {
 
   @Test
   public void testIdenticalBlocksHaveSameChecksum() {
-    // Create identical chunks
+    // Create a set of chunks to be used in different blocks with identical content.
     ContainerProtos.ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     ContainerProtos.ChunkInfo chunk2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
 
@@ -371,12 +371,12 @@ class TestContainerMerkleTreeWriter {
 
   private ContainerProtos.BlockMerkleTree buildExpectedBlockTree(long blockID,
       List<ContainerProtos.ChunkMerkleTree> chunks) {
+    List<Long> itemsToChecksum = chunks.stream().map(ContainerProtos.ChunkMerkleTree::getDataChecksum)
+        .collect(Collectors.toList());
+    itemsToChecksum.add(0, blockID);
     return ContainerProtos.BlockMerkleTree.newBuilder()
         .setBlockID(blockID)
-        .setDataChecksum(computeExpectedBlockChecksum(blockID,
-            chunks.stream()
-                .map(ContainerProtos.ChunkMerkleTree::getDataChecksum)
-                .collect(Collectors.toList())))
+        .setDataChecksum(computeExpectedChecksum(itemsToChecksum))
         .addAllChunkMerkleTree(chunks)
         .build();
   }
@@ -400,17 +400,6 @@ class TestContainerMerkleTreeWriter {
     ChecksumByteBuffer checksumImpl = ContainerMerkleTreeWriter.CHECKSUM_BUFFER_SUPPLIER.get();
     ByteBuffer longBuffer = ByteBuffer.allocate(Long.BYTES * checksums.size());
     checksums.forEach(longBuffer::putLong);
-    longBuffer.flip();
-    checksumImpl.update(longBuffer);
-    return checksumImpl.getValue();
-  }
-
-  private long computeExpectedBlockChecksum(long blockID, List<Long> chunkChecksums) {
-    // Use the same checksum implementation as the tree writer under test.
-    ChecksumByteBuffer checksumImpl = ContainerMerkleTreeWriter.CHECKSUM_BUFFER_SUPPLIER.get();
-    ByteBuffer longBuffer = ByteBuffer.allocate(Long.BYTES * (1 + chunkChecksums.size()));
-    longBuffer.putLong(blockID);
-    chunkChecksums.forEach(longBuffer::putLong);
     longBuffer.flip();
     checksumImpl.update(longBuffer);
     return checksumImpl.getValue();
