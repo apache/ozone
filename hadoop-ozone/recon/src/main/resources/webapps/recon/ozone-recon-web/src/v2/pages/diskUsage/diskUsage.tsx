@@ -16,24 +16,20 @@
  * limitations under the License.
  */
 
-import React, { useRef, useState } from 'react';
-import { AxiosError } from 'axios';
-import {
-  Alert, Button, Tooltip
-} from 'antd';
-import {
-  InfoCircleFilled, ReloadOutlined,
-} from '@ant-design/icons';
-import { ValueType } from 'react-select';
+import React, {useRef, useState} from 'react';
+import {AxiosError} from 'axios';
+import {Alert, Button, Tooltip} from 'antd';
+import {InfoCircleFilled, ReloadOutlined,} from '@ant-design/icons';
+import {ValueType} from 'react-select';
 
 import DUMetadata from '@/v2/components/duMetadata/duMetadata';
 import DUPieChart from '@/v2/components/plots/duPieChart';
-import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
+import SingleSelect, {Option} from '@/v2/components/select/singleSelect';
 import DUBreadcrumbNav from '@/v2/components/duBreadcrumbNav/duBreadcrumbNav';
-import { showDataFetchError } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
+import {showDataFetchError} from '@/utils/common';
+import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
 
-import { DUResponse } from '@/v2/types/diskUsage.types';
+import {DUResponse} from '@/v2/types/diskUsage.types';
 
 import './diskUsage.less';
 
@@ -63,7 +59,7 @@ const DiskUsage: React.FC<{}> = () => {
   function loadData(path: string) {
     setLoading(true);
     const { request, controller } = AxiosGetHelper(
-      `/api/v1/namespace/du?path=${path}&files=true&sortSubPaths=true`,
+      `/api/v1/namespace/usage?path=${path}&files=true&sortSubPaths=true`,
       cancelPieSignal.current
     );
     cancelPieSignal.current = controller;
@@ -101,7 +97,7 @@ const DiskUsage: React.FC<{}> = () => {
   return (
     <>
       <div className='page-header-v2'>
-        Disk Usage
+        Namespace Usage
       </div>
       <div className='data-container'>
         <Alert
@@ -123,7 +119,7 @@ const DiskUsage: React.FC<{}> = () => {
               subPaths={duResponse.subPaths}
               updateHandler={loadData} />
             <Tooltip
-              title="Click to reload Disk Usage data">
+              title="Click to reload Namespace Usage data">
               <Button
                 type='primary'
                 icon={<ReloadOutlined />}

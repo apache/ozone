@@ -106,7 +106,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
-  public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
+  public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 50000;
   public static final String OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.key.deleting.limit.per.task";
   public static final int OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT
@@ -199,6 +199,15 @@ public final class OMConfigKeys {
       "ozone.om.ratis.log.appender.queue.byte-limit";
   public static final String
       OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT = "32MB";
+
+  // OM Ratis Pending Write configurations
+  public static final String OZONE_OM_RATIS_PENDING_WRITE_ELEMENT_LIMIT =
+      "ozone.om.ratis.server.pending.write.element-limit";
+  public static final int OZONE_OM_RATIS_PENDING_WRITE_NUM_LIMIT_DEFAULT = 4096;
+
+  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT = "ozone.om.ratis.server.pending.write.byte-limit";
+  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT_DEFAULT = "64MB";
+
   public static final String OZONE_OM_RATIS_LOG_PURGE_GAP =
       "ozone.om.ratis.log.purge.gap";
   public static final int OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT = 1000000;
@@ -322,11 +331,6 @@ public final class OMConfigKeys {
   // hadoop-policy.xml, "*" allows all users/groups to access.
   public static final String OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL =
       "ozone.om.security.admin.protocol.acl";
-
-  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
-          "ozone.om.keyname.character.check.enabled";
-  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
-          false;
 
   @Deprecated
   public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =

@@ -52,6 +52,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -209,8 +210,7 @@ public class TestContainerServer {
           Handler.getHandlerForContainerType(containerType, conf,
               dd.getUuid().toString(),
               containerSet, volumeSet, volumeChoosingPolicy, metrics,
-              c -> {
-              }));
+              c -> { }, new ContainerChecksumTreeManager(conf)));
     }
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics, null);

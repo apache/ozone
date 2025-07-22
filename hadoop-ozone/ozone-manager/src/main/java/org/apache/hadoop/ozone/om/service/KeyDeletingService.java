@@ -34,18 +34,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
@@ -86,9 +87,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
   private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
-  private final AtomicBoolean isRunningOnAOS;
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
+  private int ratisByteLimit;
+  private static final double RATIS_LIMIT_FACTOR = 0.9;
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient, long serviceInterval,
@@ -102,10 +104,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     Preconditions.checkArgument(keyLimitPerTask >= 0,
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
     this.deletedKeyCount = new AtomicLong(0);
-    this.isRunningOnAOS = new AtomicBoolean(false);
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.scmClient = scmClient;
+    int limit = (int) ozoneManager.getConfiguration().getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    // always go to 90% of max limit for request as other header will be added
+    this.ratisByteLimit = (int) (limit * RATIS_LIMIT_FACTOR);
   }
 
   /**
@@ -116,10 +123,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   @VisibleForTesting
   public AtomicLong getDeletedKeyCount() {
     return deletedKeyCount;
-  }
-
-  public boolean isRunningOnAOS() {
-    return isRunningOnAOS.get();
   }
 
   Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
@@ -260,7 +263,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new KeyDeletingTask(this, null));
+    queue.add(new KeyDeletingTask(null));
     if (deepCleanSnapshots) {
       Iterator<UUID> iterator = null;
       try {
@@ -271,7 +274,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
       while (iterator.hasNext()) {
         UUID snapshotId = iterator.next();
-        queue.add(new KeyDeletingTask(this, snapshotId));
+        queue.add(new KeyDeletingTask(snapshotId));
       }
     }
     return queue;
@@ -294,11 +297,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    */
   @VisibleForTesting
   final class KeyDeletingTask implements BackgroundTask {
-    private final KeyDeletingService deletingService;
     private final UUID snapshotId;
 
-    KeyDeletingTask(KeyDeletingService service, UUID snapshotId) {
-      this.deletingService = service;
+    KeyDeletingTask(UUID snapshotId) {
       this.snapshotId = snapshotId;
     }
 
@@ -324,7 +325,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
      * @param keyManager KeyManager of the underlying store.
      */
     private void processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
-        int remainNum) throws IOException {
+        int remainNum, int ratisLimit) throws IOException {
       String volume = null, bucket = null, snapshotTableKey = null;
       if (currentSnapshotInfo != null) {
         volume = currentSnapshotInfo.getVolumeName();
@@ -356,21 +357,24 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
              ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
                  getOzoneManager(), omSnapshotManager, snapshotChainManager, currentSnapshotInfo,
                  keyManager, lock)) {
-          List<String> renamedTableEntries =
-              keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum).stream()
-                  .map(entry -> {
-                    try {
-                      return entry.getKey();
-                    } catch (IOException e) {
-                      throw new UncheckedIOException(e);
-                    }
-                  }).collect(Collectors.toList());
+          List<Table.KeyValue<String, String>> renameKeyEntries =
+              keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum, ratisLimit);
+
+          List<String> renamedTableEntries = new ArrayList<>(renameKeyEntries.size());
+          int serializedSize = 0;
+
+          for (Table.KeyValue<String, String> kv : renameKeyEntries) {
+            renamedTableEntries.add(kv.getKey());
+            serializedSize += kv.getValueByteSize();
+          }
+
           remainNum -= renamedTableEntries.size();
+          ratisLimit -= serializedSize;
 
           // Get pending keys that can be deleted
-          PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null
-              ? keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum)
-              : keyManager.getPendingDeletionKeys(volume, bucket, null, reclaimableKeyFilter, remainNum);
+          PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null ?
+              keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum, ratisLimit) :
+              keyManager.getPendingDeletionKeys(volume, bucket, null, reclaimableKeyFilter, remainNum, ratisLimit);
           List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
           //submit purge requests if there are renamed entries to be purged or keys to be purged.
           if (!renamedTableEntries.isEmpty() || keyBlocksList != null && !keyBlocksList.isEmpty()) {
@@ -431,7 +435,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         final long run = getRunCount().incrementAndGet();
         if (snapshotId == null) {
           LOG.debug("Running KeyDeletingService for active object store, {}", run);
-          isRunningOnAOS.set(true);
         } else {
           LOG.debug("Running KeyDeletingService for snapshot : {}, {}", snapshotId, run);
         }
@@ -463,18 +466,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   snapInfo.getName())) {
             KeyManager keyManager = snapInfo == null ? getOzoneManager().getKeyManager()
                 : omSnapshot.get().getKeyManager();
-            processDeletedKeysForStore(snapInfo, keyManager, remainNum);
+            processDeletedKeysForStore(snapInfo, keyManager, remainNum, ratisByteLimit);
           }
         } catch (IOException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
               snapInfo, e);
-        } finally {
-          if (snapshotId == null) {
-            isRunningOnAOS.set(false);
-            synchronized (deletingService) {
-              this.deletingService.notify();
-            }
-          }
         }
       }
       // By design, no one cares about the results of this call back.

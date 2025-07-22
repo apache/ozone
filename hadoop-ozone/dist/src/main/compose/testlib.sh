@@ -28,8 +28,10 @@ source ${_testlib_dir}/compose_v2_compatibility.sh
 source "${_testlib_dir}/../smoketest/testlib.sh"
 
 : ${OZONE_COMPOSE_RUNNING:=false}
+: "${OZONE_VOLUME_OWNER:=}"
 : ${SECURITY_ENABLED:=false}
 : ${SCM:=scm}
+: ${SKIP_APACHE_VERIFY_DOWNLOAD:=${CI:-false}}
 
 # Check if running from output of Maven build or from source
 _is_build() {
@@ -248,7 +250,6 @@ execute_robot_test(){
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
-      -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
       -v SCM:"${SCM}" \
       ${ARGUMENTS[@]} --log NONE --report NONE --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
@@ -273,7 +274,7 @@ reorder_om_nodes() {
 
   if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
     for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om'); do
-      docker exec "${c}" sh -c \
+      docker exec "${c}" bash -c \
         "if [[ -f /etc/hadoop/ozone-site.xml ]]; then \
           sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \
           echo 'Replaced OM order with ${new_order} in ${c}'; \
@@ -289,7 +290,7 @@ create_stack_dumps() {
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
-    done < <(docker exec "${c}" sh -c "jps | grep -v Jps" || true)
+    done < <(docker exec "${c}" bash -c "jps | grep -v Jps" || true)
   done
 }
 
@@ -527,13 +528,27 @@ run_test_scripts() {
   return ${ret}
 }
 
+## @description Create the directory tree required for persisting data between
+##   compose cluster restarts
+create_data_dirs() {
+  if [[ -z "${OZONE_VOLUME}" ]]; then
+    return 1
+  fi
+
+  rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
+  for d in "$@"; do
+    mkdir -p "${OZONE_VOLUME}"/"${d}"
+  done
+  fix_data_dir_permissions
+}
+
 ## @description Make `OZONE_VOLUME_OWNER` the owner of the `OZONE_VOLUME`
 ##   directory tree (required in Github Actions runner environment)
 fix_data_dir_permissions() {
   if [[ -n "${OZONE_VOLUME}" ]] && [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
     current_user=$(whoami)
     if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
-      chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
+      chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" 2> /dev/null \
         || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
     fi
   fi
@@ -608,4 +623,31 @@ wait_for_root_certificate(){
   done
   echo "Timed out waiting on $count root certificates. Current timestamp " $(date +"%T")
   return 1
+}
+
+download_if_not_exists() {
+  local url="$1"
+  local f="$2"
+
+  if [[ -e "${f}" ]]; then
+    echo "${f} already downloaded"
+  else
+    echo "Downloading ${f} from ${url}"
+    curl --fail --location --output "${f}" --show-error --silent "${url}" || rm -fv "${f}"
+  fi
+}
+
+download_and_verify_apache_release() {
+  local remote_path="$1"
+
+  local f="$(basename "${remote_path}")"
+  local base_url="${APACHE_MIRROR_URL:-https://www.apache.org/dyn/closer.lua?action=download&filename=}"
+  local checksum_base_url="${APACHE_OFFICIAL_URL:-https://downloads.apache.org/}"
+  local download_dir="${DOWNLOAD_DIR:-/tmp}"
+
+  download_if_not_exists "${base_url}${remote_path}" "${download_dir}/${f}"
+  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
+    download_if_not_exists "${checksum_base_url}${remote_path}.asc"  "${download_dir}/${f}.asc"
+    gpg --verify "${download_dir}/${f}.asc" "${download_dir}/${f}" || exit 1
+  fi
 }

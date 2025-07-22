@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
@@ -39,7 +41,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -149,7 +150,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   // from parent directory info from deleted directory table concurrently
   // and send deletion requests.
   private int ratisByteLimit;
-  private final AtomicBoolean isRunningOnAOS;
   private final SnapshotChainManager snapshotChainManager;
   private final boolean deepCleanSnapshots;
   private final ExecutorService deletionThreadPool;
@@ -173,8 +173,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
-    this.isRunningOnAOS = new AtomicBoolean(false);
-    registerReconfigCallbacks(ozoneManager.getReconfigurationHandler(), configuration);
+    registerReconfigCallbacks(ozoneManager.getReconfigurationHandler());
     this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
     this.deepCleanSnapshots = deepCleanSnapshots;
     this.deletedDirsCount = new AtomicLong(0);
@@ -182,10 +181,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     this.movedFilesCount = new AtomicLong(0);
   }
 
-  public void registerReconfigCallbacks(ReconfigurationHandler handler, OzoneConfiguration conf) {
+  public void registerReconfigCallbacks(ReconfigurationHandler handler) {
     handler.registerCompleteCallback((changedKeys, newConf) -> {
-      if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL)) {
-        updateAndRestart(conf);
+      if (changedKeys.containsKey(OZONE_DIR_DELETING_SERVICE_INTERVAL) ||
+          changedKeys.containsKey(OZONE_THREAD_NUMBER_DIR_DELETION)) {
+        updateAndRestart((OzoneConfiguration) newConf);
       }
     });
   }
@@ -193,21 +193,21 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   private synchronized void updateAndRestart(OzoneConfiguration conf) {
     long newInterval = conf.getTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
         OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT, TimeUnit.SECONDS);
-    LOG.info("Updating and restarting DirectoryDeletingService with interval: {} {}",
-        newInterval, TimeUnit.SECONDS.name().toLowerCase());
+    int newCorePoolSize = conf.getInt(OZONE_THREAD_NUMBER_DIR_DELETION,
+        OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT);
+    LOG.info("Updating and restarting DirectoryDeletingService with interval {} {}" +
+            " and core pool size {}",
+        newInterval, TimeUnit.SECONDS.name().toLowerCase(), newCorePoolSize);
     shutdown();
     setInterval(newInterval, TimeUnit.SECONDS);
+    setPoolSize(newCorePoolSize);
     start();
-  }
-
-  public boolean isRunningOnAOS() {
-    return isRunningOnAOS.get();
   }
 
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new DirDeletingTask(this, null));
+    queue.add(new DirDeletingTask(null));
     if (deepCleanSnapshots) {
       Iterator<UUID> iterator = null;
       try {
@@ -218,7 +218,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       }
       while (iterator.hasNext()) {
         UUID snapshotId = iterator.next();
-        queue.add(new DirDeletingTask(this, snapshotId));
+        queue.add(new DirDeletingTask(snapshotId));
       }
     }
     return queue;
@@ -272,8 +272,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         break;
       }
     }
-    if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
+    if (purgePathRequestList.isEmpty() ||
+        submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId) == null) {
+      return;
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -468,11 +469,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   @VisibleForTesting
   final class DirDeletingTask implements BackgroundTask {
-    private final DirectoryDeletingService directoryDeletingService;
     private final UUID snapshotId;
 
-    private DirDeletingTask(DirectoryDeletingService service, UUID snapshotId) {
-      this.directoryDeletingService = service;
+    DirDeletingTask(UUID snapshotId) {
       this.snapshotId = snapshotId;
     }
 
@@ -650,7 +649,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         final long run = getRunCount().incrementAndGet();
         if (snapshotId == null) {
           LOG.debug("Running DirectoryDeletingService for active object store, {}", run);
-          isRunningOnAOS.set(true);
         } else {
           LOG.debug("Running DirectoryDeletingService for snapshot : {}, {}", snapshotId, run);
         }
@@ -681,13 +679,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         } catch (IOException | ExecutionException | InterruptedException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
               snapInfo, e);
-        } finally {
-          if (snapshotId == null) {
-            isRunningOnAOS.set(false);
-            synchronized (directoryDeletingService) {
-              this.directoryDeletingService.notify();
-            }
-          }
         }
       }
       // By design, no one cares about the results of this call back.

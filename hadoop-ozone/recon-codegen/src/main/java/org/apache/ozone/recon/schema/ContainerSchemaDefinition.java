@@ -102,6 +102,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     OVER_REPLICATED,
     MIS_REPLICATED,
     ALL_REPLICAS_BAD,
-    NEGATIVE_SIZE // Added new state to track containers with negative sizes
+    NEGATIVE_SIZE, // Added new state to track containers with negative sizes
+    REPLICA_MISMATCH
   }
 }

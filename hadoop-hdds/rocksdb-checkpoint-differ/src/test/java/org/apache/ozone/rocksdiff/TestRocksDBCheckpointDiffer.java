@@ -1935,6 +1935,12 @@ public class TestRocksDBCheckpointDiffer {
    */
   @Test
   public void testPruneSSTFileValues() throws Exception {
+    SSTFilePruningMetrics sstFilePruningMetrics = rocksDBCheckpointDiffer.getPruningMetrics();
+    assertEquals(0L, sstFilePruningMetrics.getPruneQueueSize());
+    assertEquals(0L, sstFilePruningMetrics.getFilesPrunedTotal());
+    assertEquals(0L, sstFilePruningMetrics.getFilesPrunedLast());
+    assertEquals(0L, sstFilePruningMetrics.getCompactionsProcessed());
+    assertEquals(0L, sstFilePruningMetrics.getFilesRemovedTotal());
 
     List<Pair<byte[], Integer>> keys = new ArrayList<Pair<byte[], Integer>>();
     keys.add(Pair.of("key1".getBytes(UTF_8), Integer.valueOf(1)));
@@ -1962,8 +1968,9 @@ public class TestRocksDBCheckpointDiffer {
     );
     byte[] compactionLogEntryKey = rocksDBCheckpointDiffer.addToCompactionLogTable(compactionLogEntry);
     rocksDBCheckpointDiffer.loadAllCompactionLogs();
+    assertEquals(1L, sstFilePruningMetrics.getPruneQueueSize());
 
-    // Pruning should not fail a source SST file has been removed by a another pruner.
+    // Pruning should not fail a source SST file has been removed by another pruner.
     Files.delete(sstBackUpDir.toPath().resolve(inputFile73 + SST_FILE_EXTENSION));
     // Run the SST file pruner.
     ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
@@ -2011,6 +2018,12 @@ public class TestRocksDBCheckpointDiffer {
 
     // Verify 000073.sst pruning has been skipped
     assertFalse(fileInfo73.isPruned());
+
+    assertEquals(0L, sstFilePruningMetrics.getPruneQueueSize());
+    assertEquals(1L, sstFilePruningMetrics.getFilesPrunedTotal());
+    assertEquals(1L, sstFilePruningMetrics.getFilesPrunedLast());
+    assertEquals(1L, sstFilePruningMetrics.getCompactionsProcessed());
+    assertEquals(1L, sstFilePruningMetrics.getFilesRemovedTotal());
   }
 
   private void createSSTFileWithKeys(String filePath, List<Pair<byte[], Integer>> keys)
