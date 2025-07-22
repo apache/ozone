@@ -74,10 +74,12 @@ import org.slf4j.LoggerFactory;
  * log4j.appender.inspectorAppender.layout=org.apache.log4j.PatternLayout
  */
 public class KeyValueContainerMetadataInspector implements ContainerInspector {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
-  public static final Logger REPORT_LOG = LoggerFactory.getLogger(
-      "ContainerMetadataInspectorReport");
+  private static final Logger LOG = LoggerFactory.getLogger(KeyValueContainerMetadataInspector.class);
+  public static final Logger REPORT_LOG = LoggerFactory.getLogger("ContainerMetadataInspectorReport");
+
+  public static final String SYSTEM_PROPERTY = "ozone.datanode.container.metadata.inspector";
+
+  private Mode mode;
 
   /**
    * The mode to run the inspector in.
@@ -98,11 +100,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       return name;
     }
   }
-
-  public static final String SYSTEM_PROPERTY = "ozone.datanode.container" +
-      ".metadata.inspector";
-
-  private Mode mode;
 
   public KeyValueContainerMetadataInspector(Mode mode) {
     this.mode = mode;
@@ -503,10 +500,9 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     Table<Long, DeletedBlocksTransaction> delTxTable =
         schemaTwoStore.getDeleteTransactionTable();
 
-    try (TableIterator<Long, ? extends Table.KeyValue<Long,
-        DeletedBlocksTransaction>> iterator = delTxTable.iterator()) {
+    try (TableIterator<Long, DeletedBlocksTransaction> iterator = delTxTable.valueIterator()) {
       while (iterator.hasNext()) {
-        DeletedBlocksTransaction txn = iterator.next().getValue();
+        final DeletedBlocksTransaction txn = iterator.next();
         final List<Long> localIDs = txn.getLocalIDList();
         // In schema 2, pending delete blocks are stored in the
         // transaction object. Since the actual blocks still exist in the
@@ -547,13 +543,10 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       KeyValueContainerData containerData) throws IOException {
     long pendingDeleteBlockCountTotal = 0;
     long pendingDeleteBytes = 0;
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String,
-            DeletedBlocksTransaction>>
-            iter = store.getDeleteTransactionTable()
-            .iterator(containerData.containerPrefix())) {
-      while (iter.hasNext()) {
-        DeletedBlocksTransaction delTx = iter.next().getValue();
+    try (TableIterator<String, DeletedBlocksTransaction> iterator
+        = store.getDeleteTransactionTable().valueIterator(containerData.containerPrefix())) {
+      while (iterator.hasNext()) {
+        final DeletedBlocksTransaction delTx = iterator.next();
         final List<Long> localIDs = delTx.getLocalIDList();
         pendingDeleteBlockCountTotal += localIDs.size();
         pendingDeleteBytes += computePendingDeleteBytes(

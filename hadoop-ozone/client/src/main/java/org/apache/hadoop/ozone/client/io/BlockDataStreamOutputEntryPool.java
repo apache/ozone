@@ -220,6 +220,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
     return streamEntries.stream().mapToLong(
         BlockDataStreamOutputEntry::getCurrentPosition).sum();
   }
+
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
    * first block has index = 0, second has index = 1 etc.)
@@ -236,7 +237,6 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
         omClient.allocateBlock(keyArgs, openID, excludeList);
     addKeyLocationInfo(subKeyInfo);
   }
-
 
   void commitKey(long offset) throws IOException {
     if (keyArgs != null) {

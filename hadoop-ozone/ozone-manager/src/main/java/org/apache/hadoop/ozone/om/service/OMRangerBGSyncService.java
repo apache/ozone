@@ -100,85 +100,6 @@ public class OMRangerBGSyncService extends BackgroundService {
 
   private volatile boolean isServiceStarted = false;
 
-  static class BGRole {
-    private final String name;
-    private String id;
-    private final HashSet<String> userSet;
-
-    BGRole(String n) {
-      this.name = n;
-      userSet = new HashSet<>();
-    }
-
-    public void setId(String id) {
-      this.id = id;
-    }
-
-    public String getId() {
-      return id;
-    }
-
-    public void addUserPrincipal(String userPrincipal) {
-      userSet.add(userPrincipal);
-    }
-
-    public HashSet<String> getUserSet() {
-      return userSet;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(name, id, userSet);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      BGRole bgRole = (BGRole) o;
-      return name.equals(bgRole.name)
-          && id.equals(bgRole.id)
-          && userSet.equals(bgRole.userSet);
-    }
-  }
-
-  enum PolicyType {
-    BUCKET_NAMESPACE_POLICY,
-    BUCKET_POLICY
-  }
-
-  /**
-   * Helper class that stores the tenant name and policy type.
-   */
-  static class PolicyInfo {
-
-    private final String tenantId;
-    private final PolicyType policyType;
-
-    PolicyInfo(String tenantId, PolicyType policyType) {
-      this.tenantId = tenantId;
-      this.policyType = policyType;
-    }
-
-    public String getTenantId() {
-      return tenantId;
-    }
-
-    public PolicyType getPolicyType() {
-      return policyType;
-    }
-
-    @Override
-    public String toString() {
-      return "PolicyInfo{" +
-          "tenantId='" + tenantId + '\'' + ", policyType=" + policyType + '}';
-    }
-  }
-
   // This map keeps all the policies found in OM DB. These policies should be
   // in Ranger. If not, the default policy will be (re)created.
   //
@@ -867,5 +788,83 @@ public class OMRangerBGSyncService extends BackgroundService {
    */
   public long getRangerSyncRunCount() {
     return runCount.get();
+  }
+
+  static class BGRole {
+    private final String name;
+    private String id;
+    private final HashSet<String> userSet;
+
+    BGRole(String n) {
+      this.name = n;
+      userSet = new HashSet<>();
+    }
+
+    public void setId(String id) {
+      this.id = id;
+    }
+
+    public String getId() {
+      return id;
+    }
+
+    public void addUserPrincipal(String userPrincipal) {
+      userSet.add(userPrincipal);
+    }
+
+    public HashSet<String> getUserSet() {
+      return userSet;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(name, id, userSet);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      BGRole bgRole = (BGRole) o;
+      return name.equals(bgRole.name)
+                 && id.equals(bgRole.id)
+                 && userSet.equals(bgRole.userSet);
+    }
+  }
+
+  enum PolicyType {
+    BUCKET_NAMESPACE_POLICY,
+    BUCKET_POLICY
+  }
+
+  /**
+   * Helper class that stores the tenant name and policy type.
+   */
+  static class PolicyInfo {
+
+    private final String tenantId;
+    private final PolicyType policyType;
+
+    PolicyInfo(String tenantId, PolicyType policyType) {
+      this.tenantId = tenantId;
+      this.policyType = policyType;
+    }
+
+    public String getTenantId() {
+      return tenantId;
+    }
+
+    public PolicyType getPolicyType() {
+      return policyType;
+    }
+
+    @Override
+    public String toString() {
+      return "PolicyInfo{tenantId='" + tenantId + '\'' + ", policyType=" + policyType + '}';
+    }
   }
 }

@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,7 +31,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
@@ -103,7 +103,7 @@ public class MockNodeManager implements NodeManager {
   private final List<DatanodeDetails> deadNodes;
   private final Map<DatanodeDetails, SCMNodeStat> nodeMetricMap;
   private final SCMNodeStat aggregateStat;
-  private final Map<UUID, List<SCMCommand<?>>> commandMap;
+  private final Map<DatanodeID, List<SCMCommand<?>>> commandMap;
   private Node2PipelineMap node2PipelineMap;
   private final NodeStateMap node2ContainerMap;
   private NetworkTopology clusterMap;
@@ -188,8 +188,7 @@ public class MockNodeManager implements NodeManager {
           setContainers(usageInfo.getDatanodeDetails(), entry.getValue());
         } catch (NodeNotFoundException e) {
           LOG.warn("Could not find Datanode {} for adding containers to it. " +
-                  "Skipping this node.", usageInfo
-              .getDatanodeDetails().getUuidString());
+                  "Skipping this node.", usageInfo.getDatanodeDetails());
           continue;
         }
 
@@ -271,12 +270,11 @@ public class MockNodeManager implements NodeManager {
         long used = nodeMetricMap.get(dd).getScmUsed().get();
         long remaining = nodeMetricMap.get(dd).getRemaining().get();
         StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-            di.getUuid(), "/data1-" + di.getUuidString(),
+            di.getID(), "/data1-" + di.getID(),
             capacity, used, remaining, null);
         MetadataStorageReportProto metaStorage1 =
             HddsTestUtils.createMetadataStorageReport(
-                "/metadata1-" + di.getUuidString(), capacity, used,
-                remaining, null);
+                "/metadata1-" + di.getID(), capacity, used, remaining, null);
         di.updateStorageReports(Collections.singletonList(storage1));
         di.updateMetaDataStorageReports(Collections.singletonList(metaStorage1));
 
@@ -460,7 +458,7 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public Set<PipelineID> getPipelines(DatanodeDetails dnId) {
-    return node2PipelineMap.getPipelines(dnId.getUuid());
+    return node2PipelineMap.getPipelines(dnId.getID());
   }
 
   /**
@@ -470,7 +468,7 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public int getPipelinesCount(DatanodeDetails datanodeDetails) {
-    return node2PipelineMap.getPipelinesCount(datanodeDetails.getUuid());
+    return node2PipelineMap.getPipelinesCount(datanodeDetails.getID());
   }
 
   /**
@@ -521,15 +519,15 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
-    if (commandMap.containsKey(dnId)) {
-      List<SCMCommand<?>> commandList = commandMap.get(dnId);
+  public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
+    if (commandMap.containsKey(datanodeID)) {
+      List<SCMCommand<?>> commandList = commandMap.get(datanodeID);
       Preconditions.checkNotNull(commandList);
       commandList.add(command);
     } else {
       List<SCMCommand<?>> commandList = new LinkedList<>();
       commandList.add(command);
-      commandMap.put(dnId, commandList);
+      commandMap.put(datanodeID, commandList);
     }
   }
 
@@ -582,12 +580,12 @@ public class MockNodeManager implements NodeManager {
   /**
    * Get the number of commands of the given type queued in the SCM CommandQueue
    * for the given datanode.
-   * @param dnID The UUID of the datanode.
+   * @param dnID The ID of the datanode.
    * @param cmdType The Type of command to query the current count for.
    * @return The count of commands queued, or zero if none.
    */
   @Override
-  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+  public int getCommandQueueCount(DatanodeID dnID, SCMCommandProto.Type cmdType) {
     return 0;
   }
 
@@ -635,11 +633,11 @@ public class MockNodeManager implements NodeManager {
 
   // Returns the number of commands that is queued to this node manager.
   public int getCommandCount(DatanodeDetails dd) {
-    List<SCMCommand<?>> list = commandMap.get(dd.getUuid());
+    List<SCMCommand<?>> list = commandMap.get(dd.getID());
     return (list == null) ? 0 : list.size();
   }
 
-  public void clearCommandQueue(UUID dnId) {
+  public void clearCommandQueue(DatanodeID dnId) {
     if (commandMap.containsKey(dnId)) {
       commandMap.put(dnId, new LinkedList<>());
     }
@@ -821,12 +819,12 @@ public class MockNodeManager implements NodeManager {
   @Override
   public void onMessage(CommandForDatanode commandForDatanode,
                         EventPublisher publisher) {
-    addDatanodeCommand(commandForDatanode.getDatanodeId(),
+    this.addDatanodeCommand(commandForDatanode.getDatanodeId(),
         commandForDatanode.getCommand());
   }
 
   @Override
-  public List<SCMCommand<?>> getCommandQueue(UUID dnID) {
+  public List<SCMCommand<?>> getCommandQueue(DatanodeID dnID) {
     return null;
   }
 
@@ -834,6 +832,21 @@ public class MockNodeManager implements NodeManager {
   public DatanodeDetails getNode(DatanodeID id) {
     Node node = clusterMap.getNode(NetConstants.DEFAULT_RACK + "/" + id);
     return node == null ? null : (DatanodeDetails)node;
+  }
+
+  @Nullable
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
+    DatanodeDetails node = getNode(datanodeDetails.getID());
+    if (node == null) {
+      return null;
+    }
+
+    DatanodeInfo datanodeInfo = new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy(), null);
+    long capacity = 50L * 1024 * 1024 * 1024;
+    datanodeInfo.updateStorageReports(HddsTestUtils.createStorageReports(datanodeInfo.getID(), capacity, capacity,
+        0L));
+    return datanodeInfo;
   }
 
   @Override

@@ -148,7 +148,6 @@ public class RecoverSCMCertificate extends RepairTool {
     return cert.get();
   }
 
-
   private static X509Certificate getSubCertificate(
       Map<BigInteger, X509Certificate> allCerts, String hostName) throws Exception {
     Optional<X509Certificate> cert = allCerts.values().stream().filter(

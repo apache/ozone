@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -382,6 +383,11 @@ public class HeartbeatEndpointTask
             commandResponseProto.getRefreshVolumeUsageCommandProto());
         processCommonCommand(commandResponseProto, refreshVolumeUsageCommand);
         break;
+      case reconcileContainerCommand:
+        ReconcileContainerCommand reconcileContainerCommand =
+            ReconcileContainerCommand.getFromProtobuf(commandResponseProto.getReconcileContainerCommandProto());
+        processCommonCommand(commandResponseProto, reconcileContainerCommand);
+        break;
       default:
         throw new IllegalArgumentException("Unknown response : "
             + commandResponseProto.getCommandType().name());
@@ -504,7 +510,7 @@ public class HeartbeatEndpointTask
 
       if (conf == null) {
         LOG.error("No config specified.");
-        throw new IllegalArgumentException("A valid configration is needed to" +
+        throw new IllegalArgumentException("A valid configuration is needed to" +
             " construct HeartbeatEndpointTask task");
       }
 

@@ -193,7 +193,7 @@ public class TestBlockInputStream {
 
     // Seek to random positions between 0 and the block size.
     for (int i = 0; i < 10; i++) {
-      pos = RandomUtils.nextInt(0, blockSize);
+      pos = RandomUtils.secure().randomInt(0, blockSize);
       seekAndVerify(pos);
     }
   }

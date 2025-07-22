@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 public final class NodeStatus {
   /** For the {@link NodeStatus} objects with {@link #opStateExpiryEpochSeconds} == 0. */
   private static final Map<NodeOperationalState, Map<NodeState, NodeStatus>> CONSTANTS;
+
   static {
     final Map<NodeOperationalState, Map<NodeState, NodeStatus>> map = new EnumMap<>(NodeOperationalState.class);
     for (NodeOperationalState op : NodeOperationalState.values()) {
@@ -57,6 +58,27 @@ public final class NodeStatus {
     }
     CONSTANTS = Collections.unmodifiableMap(map);
   }
+
+  private static final Set<NodeOperationalState> OUT_OF_SERVICE_STATES = Collections.unmodifiableSet(
+      EnumSet.of(DECOMMISSIONING, DECOMMISSIONED, ENTERING_MAINTENANCE, IN_MAINTENANCE));
+
+  private static final NodeStatus IN_SERVICE_HEALTHY = valueOf(IN_SERVICE, HEALTHY);
+
+  private static final NodeStatus IN_SERVICE_HEALTHY_READONLY = valueOf(IN_SERVICE, HEALTHY_READONLY);
+
+  private static final Set<NodeOperationalState> MAINTENANCE_STATES = Collections.unmodifiableSet(
+      EnumSet.of(ENTERING_MAINTENANCE, IN_MAINTENANCE));
+
+  private static final Set<NodeOperationalState> DECOMMISSION_STATES = Collections.unmodifiableSet(
+      EnumSet.of(DECOMMISSIONING, DECOMMISSIONED));
+
+  private static final NodeStatus IN_SERVICE_STALE = NodeStatus.valueOf(IN_SERVICE, STALE);
+
+  private static final NodeStatus IN_SERVICE_DEAD = NodeStatus.valueOf(IN_SERVICE, DEAD);
+
+  private final NodeState health;
+  private final NodeOperationalState operationalState;
+  private final long opStateExpiryEpochSeconds;
 
   /** @return a {@link NodeStatus} object with {@link #opStateExpiryEpochSeconds} == 0. */
   public static NodeStatus valueOf(NodeOperationalState op, NodeState health) {
@@ -71,8 +93,6 @@ public final class NodeStatus {
         : new NodeStatus(health, op, opExpiryEpochSeconds);
   }
 
-  private static final Set<NodeOperationalState> MAINTENANCE_STATES = Collections.unmodifiableSet(
-      EnumSet.of(ENTERING_MAINTENANCE, IN_MAINTENANCE));
   /**
    * @return the set consists of {@link NodeOperationalState#ENTERING_MAINTENANCE}
    *                         and {@link NodeOperationalState#IN_MAINTENANCE}.
@@ -81,8 +101,6 @@ public final class NodeStatus {
     return MAINTENANCE_STATES;
   }
 
-  private static final Set<NodeOperationalState> DECOMMISSION_STATES = Collections.unmodifiableSet(
-      EnumSet.of(DECOMMISSIONING, DECOMMISSIONED));
   /**
    * @return the set consists of {@link NodeOperationalState#DECOMMISSIONING}
    *                         and {@link NodeOperationalState#DECOMMISSIONED}.
@@ -91,8 +109,6 @@ public final class NodeStatus {
     return DECOMMISSION_STATES;
   }
 
-  private static final Set<NodeOperationalState> OUT_OF_SERVICE_STATES = Collections.unmodifiableSet(
-      EnumSet.of(DECOMMISSIONING, DECOMMISSIONED, ENTERING_MAINTENANCE, IN_MAINTENANCE));
   /**
    * @return the set consists of {@link NodeOperationalState#DECOMMISSIONING},
    *                             {@link NodeOperationalState#DECOMMISSIONED},
@@ -103,33 +119,25 @@ public final class NodeStatus {
     return OUT_OF_SERVICE_STATES;
   }
 
-  private static final NodeStatus IN_SERVICE_HEALTHY = valueOf(IN_SERVICE, HEALTHY);
   /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#HEALTHY}. */
   public static NodeStatus inServiceHealthy() {
     return IN_SERVICE_HEALTHY;
   }
 
-  private static final NodeStatus IN_SERVICE_HEALTHY_READONLY = valueOf(IN_SERVICE, HEALTHY_READONLY);
   /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#HEALTHY_READONLY}. */
   public static NodeStatus inServiceHealthyReadOnly() {
     return IN_SERVICE_HEALTHY_READONLY;
   }
 
-  private static final NodeStatus IN_SERVICE_STALE = NodeStatus.valueOf(IN_SERVICE, STALE);
   /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#STALE}. */
   public static NodeStatus inServiceStale() {
     return IN_SERVICE_STALE;
   }
 
-  private static final NodeStatus IN_SERVICE_DEAD = NodeStatus.valueOf(IN_SERVICE, DEAD);
   /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#DEAD}. */
   public static NodeStatus inServiceDead() {
     return IN_SERVICE_DEAD;
   }
-
-  private final NodeState health;
-  private final NodeOperationalState operationalState;
-  private final long opStateExpiryEpochSeconds;
 
   private NodeStatus(NodeState health, NodeOperationalState op, long opExpiryEpochSeconds) {
     this.health = health;

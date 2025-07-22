@@ -103,7 +103,6 @@ public class TestDnCertificateClientInit {
     dnCertificateClient = null;
   }
 
-
   @ParameterizedTest
   @MethodSource("parameters")
   public void testInitDatanode(boolean pvtKeyPresent, boolean pubKeyPresent,

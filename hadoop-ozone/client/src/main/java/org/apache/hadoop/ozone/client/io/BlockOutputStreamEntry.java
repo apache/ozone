@@ -82,7 +82,6 @@ public class BlockOutputStreamEntry extends OutputStream {
    */
   private AtomicInteger inflightCalls = new AtomicInteger();
 
-
   BlockOutputStreamEntry(Builder b) {
     this.config = b.config;
     this.outputStream = null;

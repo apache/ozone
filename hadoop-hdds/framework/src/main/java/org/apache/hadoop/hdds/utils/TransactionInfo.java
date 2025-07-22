@@ -45,6 +45,22 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
       TransactionInfo.class,
       DelegatedCodec.CopyType.SHALLOW);
 
+  public static final TransactionInfo DEFAULT_VALUE = valueOf(0, -1);
+
+  /** In non-Ratis clusters, term is -1. */
+  public static final long NON_RATIS_TERM = -1;
+
+  /**
+   * Use {@link SnapshotInfo} to store (term, index)
+   * which is the Ratis Log term-index in Ratis enabled cluster.
+   * In non-Ratis clusters, term is -1 and index is the unique transaction index
+   * in OzoneManagerProtocolServerSideTranslatorPB#transactionIndex.
+   */
+  private final SnapshotInfo snapshotInfo;
+
+  /** The string need to be persisted in OM DB. */
+  private final String transactionInfoString;
+
   public static Codec<TransactionInfo> getCodec() {
     return CODEC;
   }
@@ -78,24 +94,10 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
     return this.getTermIndex().compareTo(info.getTermIndex());
   }
 
-  public static final TransactionInfo DEFAULT_VALUE = valueOf(0, -1);
-
-  /** In non-Ratis clusters, term is -1. */
-  public static final long NON_RATIS_TERM = -1;
   /** For non-Ratis case. */
   public static TermIndex getTermIndex(long transactionIndex) {
     return TermIndex.valueOf(NON_RATIS_TERM, transactionIndex);
   }
-
-  /**
-   * Use {@link SnapshotInfo} to store (term, index)
-   * which is the Ratis Log term-index in Ratis enabled cluster.
-   * In non-Ratis clusters, term is -1 and index is the unique transaction index
-   * in OzoneManagerProtocolServerSideTranslatorPB#transactionIndex.
-   */
-  private final SnapshotInfo snapshotInfo;
-  /** The string need to be persisted in OM DB. */
-  private final String transactionInfoString;
 
   private TransactionInfo(TermIndex termIndex) {
     this.transactionInfoString = termIndex.getTerm() + TRANSACTION_INFO_SPLIT_KEY + termIndex.getIndex();

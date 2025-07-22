@@ -30,20 +30,22 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
-import org.eclipse.jetty.util.StringUtil;
+import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,13 +93,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
    */
   private void initializeNewRdbStore(File dbFile) throws IOException {
     try {
-      DBStoreBuilder dbStoreBuilder =
-          DBStoreBuilder.newBuilder(ozoneConfiguration)
-          .setName(dbFile.getName())
-          .setPath(dbFile.toPath().getParent());
-      addOMTablesAndCodecs(dbStoreBuilder);
-      dbStoreBuilder.addCodec(KeyEntityInfoProtoWrapper.class, KeyEntityInfoProtoWrapper.getCodec());
-      setStore(dbStoreBuilder.build());
+      setStore(DBStoreBuilder.newBuilder(ozoneConfiguration, OMDBDefinition.get(), dbFile).build());
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
@@ -110,9 +106,9 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   }
 
   @Override
-  public Table<String, KeyEntityInfoProtoWrapper> getKeyTableLite(BucketLayout bucketLayout) throws IOException {
-    String tableName = bucketLayout.isFileSystemOptimized() ? FILE_TABLE : KEY_TABLE;
-    return getStore().getTable(tableName, String.class, KeyEntityInfoProtoWrapper.class);
+  public Table<String, ReconBasicOmKeyInfo> getKeyTableBasic(BucketLayout bucketLayout) throws IOException {
+    String tableName = bucketLayout.isFileSystemOptimized() ? OMDBDefinition.FILE_TABLE : OMDBDefinition.KEY_TABLE;
+    return getStore().getTable(tableName, StringCodec.get(), ReconBasicOmKeyInfo.getCodec());
   }
 
   @Override
@@ -245,7 +241,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
     String startKey;
     boolean skipStartKey = false;
-    if (StringUtil.isNotBlank(startBucket)) {
+    if (StringUtils.isNotBlank(startBucket)) {
       startKey = getBucketKey(volumeName, startBucket);
       skipStartKey = true;
     } else {

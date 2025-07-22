@@ -24,10 +24,15 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL;
@@ -63,6 +68,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -88,15 +95,16 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.function.CheckedFunction;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -172,6 +180,9 @@ public final class OmSnapshotManager implements AutoCloseable {
   // Soft limit of the snapshot cache size.
   private final int softCacheSize;
 
+  private int fsSnapshotMaxLimit;
+  private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
+
   public OmSnapshotManager(OzoneManager ozoneManager) {
 
     boolean isFilesystemSnapshotEnabled =
@@ -206,6 +217,9 @@ public final class OmSnapshotManager implements AutoCloseable {
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES,
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
     );
+    Preconditions.checkArgument(this.maxOpenSstFilesInSnapshotDb >= -1,
+        OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES + " value should be larger than or equal to -1.");
+
     ColumnFamilyHandle snapDiffJobCf;
     ColumnFamilyHandle snapDiffReportCf;
     ColumnFamilyHandle snapDiffPurgedJobCf;
@@ -246,6 +260,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.softCacheSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE,
         OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT);
+      
+    fsSnapshotMaxLimit = ozoneManager.getConfiguration().getInt(OZONE_OM_FS_SNAPSHOT_MAX_LIMIT,
+        OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
 
     CacheLoader<UUID, OmSnapshot> loader = createCacheLoader();
 
@@ -278,8 +295,11 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getTimeDuration(OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
             OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
+    boolean compactNonSnapshotDiffTables = ozoneManager.getConfiguration()
+        .getBoolean(OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES,
+            OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT);
     this.snapshotCache = new SnapshotCache(loader, softCacheSize, ozoneManager.getMetrics(),
-        cacheCleanupServiceInterval);
+        cacheCleanupServiceInterval, compactNonSnapshotDiffTables, ozoneManager.getMetadataManager().getLock());
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
         ozoneManager, snapDiffJobCf, snapDiffReportCf,
@@ -410,6 +430,10 @@ public final class OmSnapshotManager implements AutoCloseable {
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
     registry.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
     return registry.build();
+  }
+
+  public int getMaxPageSize() {
+    return maxPageSize;
   }
 
   /**
@@ -589,7 +613,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
   @SuppressWarnings("unchecked")
-  public ReferenceCounted<IOmMetadataReader> getActiveFsMetadataOrSnapshot(
+  public UncheckedAutoCloseableSupplier<IOmMetadataReader> getActiveFsMetadataOrSnapshot(
       String volumeName,
       String bucketName,
       String keyName) throws IOException {
@@ -607,28 +631,28 @@ public final class OmSnapshotManager implements AutoCloseable {
           bucketName), false, false);
       volumeName = resolvedBucket.realVolume();
       bucketName = resolvedBucket.realBucket();
-      return (ReferenceCounted<IOmMetadataReader>) (ReferenceCounted<?>)
+      return (UncheckedAutoCloseableSupplier<IOmMetadataReader>) (UncheckedAutoCloseableSupplier<?>)
           getActiveSnapshot(volumeName, bucketName, snapshotName);
     } else {
       return ozoneManager.getOmMetadataReader();
     }
   }
 
-  public ReferenceCounted<OmSnapshot> getActiveSnapshot(
+  public UncheckedAutoCloseableSupplier<OmSnapshot> getActiveSnapshot(
       String volumeName,
       String bucketName,
       String snapshotName) throws IOException {
     return getSnapshot(volumeName, bucketName, snapshotName, false);
   }
 
-  public ReferenceCounted<OmSnapshot> getSnapshot(
+  public UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(
       String volumeName,
       String bucketName,
       String snapshotName) throws IOException {
     return getSnapshot(volumeName, bucketName, snapshotName, true);
   }
 
-  private ReferenceCounted<OmSnapshot> getSnapshot(
+  private UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(
       String volumeName,
       String bucketName,
       String snapshotName,
@@ -644,7 +668,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     return getSnapshot(snapshotTableKey, skipActiveCheck);
   }
 
-  private ReferenceCounted<OmSnapshot> getSnapshot(String snapshotTableKey, boolean skipActiveCheck)
+  private UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(String snapshotTableKey, boolean skipActiveCheck)
       throws IOException {
     SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotTableKey);
     // Block FS API reads when snapshot is not active.
@@ -690,13 +714,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     return true;
   }
 
-
   /**
    * Returns OmSnapshot object and skips active check.
    * This should only be used for API calls initiated by background service e.g. purgeKeys, purgeSnapshot,
    * snapshotMoveDeletedKeys, and SetSnapshotProperty.
    */
-  public ReferenceCounted<OmSnapshot> getSnapshot(UUID snapshotId) throws IOException {
+  public UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(UUID snapshotId) throws IOException {
     return snapshotCache.get(snapshotId);
   }
 
@@ -739,10 +762,29 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   public static String getSnapshotPath(OzoneConfiguration conf,
-                                       SnapshotInfo snapshotInfo) {
+      SnapshotInfo snapshotInfo) {
+    return getSnapshotPath(conf, snapshotInfo.getCheckpointDirName());
+  }
+
+  public static String getSnapshotPath(OzoneConfiguration conf,
+      String checkpointDirName) {
     return OMStorage.getOmDbDir(conf) +
         OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX +
-        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+        OM_DB_NAME + checkpointDirName;
+  }
+
+  public static String extractSnapshotIDFromCheckpointDirName(String snapshotPath) {
+    // Find "om.db-" in the path and return whatever comes after
+    int index = snapshotPath.lastIndexOf(OM_DB_NAME);
+    if (index == -1 || index + OM_DB_NAME.length() + OM_SNAPSHOT_SEPARATOR.length() >= snapshotPath.length()) {
+      throw new IllegalArgumentException("Invalid snapshot path " + snapshotPath);
+    }
+    return snapshotPath.substring(index + OM_DB_NAME.length() + OM_SNAPSHOT_SEPARATOR.length());
+  }
+
+  public static String getSnapshotLocalPropertyYamlPath(OzoneConfiguration conf,
+      SnapshotInfo snapshotInfo) {
+    return getSnapshotPath(conf, snapshotInfo) + ".yaml";
   }
 
   public static boolean isSnapshotKey(String[] keyParts) {
@@ -802,18 +844,20 @@ public final class OmSnapshotManager implements AutoCloseable {
     return snapshotDiffReport;
   }
 
-  public List<SnapshotDiffJob> getSnapshotDiffList(final String volumeName,
-                                                   final String bucketName,
-                                                   final String jobStatus,
-                                                   final boolean listAll)
-      throws IOException {
+  public ListSnapshotDiffJobResponse getSnapshotDiffList(
+      final String volumeName,
+      final String bucketName,
+      final String jobStatus,
+      final boolean listAllStatus,
+      final String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     String volumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
     String bucketKey = ozoneManager.getMetadataManager()
         .getBucketKey(volumeName, bucketName);
 
     if (!ozoneManager.getMetadataManager()
-            .getVolumeTable().isExist(volumeKey) ||
+        .getVolumeTable().isExist(volumeKey) ||
         !ozoneManager.getMetadataManager()
             .getBucketTable().isExist(bucketKey)) {
       throw new IOException("Provided volume name " + volumeName +
@@ -827,11 +871,15 @@ public final class OmSnapshotManager implements AutoCloseable {
     if (snapshotChainManager.getSnapshotChainPath(snapshotPath) == null) {
       // Return an empty ArrayList here to avoid
       // unnecessarily iterating the SnapshotDiffJob table.
-      return new ArrayList<>();
+      return new ListSnapshotDiffJobResponse(Collections.emptyList(), null);
     }
 
-    return snapshotDiffManager.getSnapshotDiffJobList(
-        volumeName, bucketName, jobStatus, listAll);
+    if (maxListResult <= 0 || maxListResult > maxPageSize) {
+      maxListResult = maxPageSize;
+    }
+
+    return snapshotDiffManager.getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAllStatus,
+        prevSnapshotDiffJob, maxListResult);
   }
 
   private void validateSnapshotsExistAndActive(final String volumeName,
@@ -847,6 +895,56 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Block SnapDiff if either of the snapshots is not active.
     checkSnapshotActive(fromSnapInfo, false);
     checkSnapshotActive(toSnapInfo, false);
+  }
+
+  public void snapshotLimitCheck() throws IOException, OMException {
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
+    SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
+
+    AtomicReference<IOException> exceptionRef = new AtomicReference<>(null);
+    inFlightSnapshotCount.updateAndGet(count -> {
+      int currentSnapshotNum = 0;
+      try {
+        currentSnapshotNum = snapshotChainManager.getGlobalSnapshotChain().size();
+      } catch (IOException e) {
+        exceptionRef.set(e);
+        return count;
+      }
+      if (currentSnapshotNum + count >= fsSnapshotMaxLimit) {
+        exceptionRef.set(new OMException(
+            String.format("Snapshot limit of %d reached. Cannot create more snapshots. " +
+                "Current snapshots: %d, In-flight creations: %d",
+                fsSnapshotMaxLimit, currentSnapshotNum, count) +
+                " If you already deleted some snapshots, " +
+                "please wait for the background service to complete the cleanup.",
+            OMException.ResultCodes.TOO_MANY_SNAPSHOTS));
+        return count;
+      }
+      return count + 1;
+    });
+    if (exceptionRef.get() != null) {
+      throw exceptionRef.get();
+    }
+  }
+
+  public void decrementInFlightSnapshotCount() {
+    // TODO this is a work around for the accounting logic of `inFlightSnapshotCount`.
+    //    - It incorrectly assumes that LeaderReady means that there are no inflight snapshot requests.
+    //    We may consider fixing it by waiting all the pending requests in notifyLeaderReady().
+    //    - Also, it seems to have another bug that the PrepareState could disallow snapshot requests.
+    //    In such case, `inFlightSnapshotCount` won't be decremented.
+    int result = inFlightSnapshotCount.decrementAndGet();
+    if (result < 0) {
+      resetInFlightSnapshotCount();
+    }
+  }
+
+  public void resetInFlightSnapshotCount() {
+    inFlightSnapshotCount.set(0);
+  }
+
+  public int getInFlightSnapshotCount() {
+    return inFlightSnapshotCount.get();
   }
 
   private int getIndexFromToken(final String token) throws IOException {

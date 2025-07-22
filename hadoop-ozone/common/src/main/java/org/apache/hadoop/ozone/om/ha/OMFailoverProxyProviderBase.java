@@ -148,7 +148,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     ).getProxy();
   }
 
-
   protected synchronized boolean shouldFailover(Exception ex) {
     Throwable unwrappedException = HddsUtils.getUnwrappedException(ex);
     if (unwrappedException instanceof AccessControlException ||
@@ -391,11 +390,9 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return waitBetweenRetries;
   }
 
-
   public List<ProxyInfo> getOMProxies() {
     return new ArrayList<ProxyInfo>(omProxies.values());
   }
-
 
   public Map<String, ProxyInfo<T>> getOMProxyMap() {
     return omProxies;

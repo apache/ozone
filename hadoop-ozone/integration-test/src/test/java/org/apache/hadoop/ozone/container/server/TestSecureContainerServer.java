@@ -83,6 +83,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -124,6 +125,7 @@ public class TestSecureContainerServer {
   private static OzoneBlockTokenSecretManager blockTokenSecretManager;
   private static ContainerTokenSecretManager containerTokenSecretManager;
   private static VolumeChoosingPolicy volumeChoosingPolicy;
+
   @BeforeAll
   public static void setup() throws Exception {
     DefaultMetricsSystem.setMiniClusterMode(true);
@@ -168,7 +170,7 @@ public class TestSecureContainerServer {
     ContainerSet containerSet = newContainerSet();
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(testDir.toString(), "dfs", "data", "hdds",
-            RandomStringUtils.randomAlphabetic(4)).toString());
+            RandomStringUtils.secure().nextAlphabetic(4)).toString());
     conf.set(OZONE_METADATA_DIRS, testDir.toString());
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
@@ -183,7 +185,7 @@ public class TestSecureContainerServer {
           Handler.getHandlerForContainerType(containerType, conf,
               dd.getUuid().toString(),
               containerSet, volumeSet, volumeChoosingPolicy, metrics,
-              c -> { }));
+              c -> { }, new ContainerChecksumTreeManager(conf)));
     }
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,
@@ -263,7 +265,7 @@ public class TestSecureContainerServer {
 
       Token<OzoneBlockTokenIdentifier> token =
           blockTokenSecretManager.generateToken(blockID,
-              EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
+              EnumSet.allOf(AccessModeProto.class), RandomUtils.secure().randomLong());
       String encodedToken = token.encodeToUrlString();
 
       ContainerCommandRequestProto.Builder writeChunk =

@@ -45,13 +45,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Class used to test {@link SCMContainerManagerMetrics}.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestCase {
 
   private StorageContainerManager scm;
@@ -111,7 +109,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
 
     assertThrows(ContainerNotFoundException.class, () ->
         containerManager.deleteContainer(
-            ContainerID.valueOf(RandomUtils.nextLong(10000, 20000))));
+            ContainerID.valueOf(RandomUtils.secure().randomLong(10000, 20000))));
     // deleteContainer should fail, so it should have the old metric value.
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     assertEquals(getLongCounter("NumSuccessfulDeleteContainers",

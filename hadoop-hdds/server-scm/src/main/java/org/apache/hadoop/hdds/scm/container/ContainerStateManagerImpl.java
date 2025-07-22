@@ -64,7 +64,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
@@ -234,12 +233,10 @@ public final class ContainerStateManagerImpl
    * @throws IOException in case of error while loading the containers
    */
   private void initialize() throws IOException {
-    try (TableIterator<ContainerID,
-        ? extends KeyValue<ContainerID, ContainerInfo>> iterator =
-             containerStore.iterator()) {
+    try (TableIterator<ContainerID, ContainerInfo> iterator = containerStore.valueIterator()) {
 
       while (iterator.hasNext()) {
-        final ContainerInfo container = iterator.next().getValue();
+        final ContainerInfo container = iterator.next();
         Objects.requireNonNull(container, "container == null");
         containers.addContainer(container);
         if (container.getState() == LifeCycleState.OPEN) {
@@ -517,7 +514,6 @@ public final class ContainerStateManagerImpl
     return null;
   }
 
-
   @Override
   public void removeContainer(final HddsProtos.ContainerID id)
       throws IOException {
@@ -536,20 +532,10 @@ public final class ContainerStateManagerImpl
   public void reinitialize(
       Table<ContainerID, ContainerInfo> store) throws IOException {
     try (AutoCloseableLock ignored = writeLock()) {
-      close();
       this.containerStore = store;
       this.containers = new ContainerStateMap();
       this.lastUsedMap = new ConcurrentHashMap<>();
       initialize();
-    }
-  }
-
-  @Override
-  public void close() throws IOException {
-    try {
-      containerStore.close();
-    } catch (Exception e) {
-      throw new IOException(e);
     }
   }
 
@@ -588,6 +574,7 @@ public final class ContainerStateManagerImpl
       this.transactionBuffer = buffer;
       return this;
     }
+
     public Builder setConfiguration(final Configuration config) {
       conf = config;
       return this;

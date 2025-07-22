@@ -49,8 +49,7 @@ public class ListKeysResponse {
 
   /** list of keys. */
   @JsonProperty("keys")
-  private List<KeyEntityInfoProtoWrapper> keys;
-
+  private List<ReconBasicOmKeyInfo> keys;
 
   public ListKeysResponse() {
     this.status = ResponseStatus.OK;
@@ -93,11 +92,11 @@ public class ListKeysResponse {
     this.path = path;
   }
 
-  public List<KeyEntityInfoProtoWrapper> getKeys() {
+  public List<ReconBasicOmKeyInfo> getKeys() {
     return keys;
   }
 
-  public void setKeys(List<KeyEntityInfoProtoWrapper> keys) {
+  public void setKeys(List<ReconBasicOmKeyInfo> keys) {
     this.keys = keys;
   }
 

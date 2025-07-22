@@ -36,7 +36,7 @@ public class RandomLoadGenerator extends LoadGenerator {
 
   @Override
   public void generateLoad() throws Exception {
-    int index = RandomUtils.nextInt();
+    int index = RandomUtils.secure().randomInt();
     ByteBuffer buffer = dataBuffer.getBuffer(index);
     String keyName = getKeyName(index);
     ozoneBucket.writeKey(buffer, keyName);

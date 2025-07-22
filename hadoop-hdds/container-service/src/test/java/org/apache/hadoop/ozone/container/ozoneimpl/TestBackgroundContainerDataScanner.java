@@ -18,32 +18,43 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
@@ -99,7 +110,7 @@ public class TestBackgroundContainerDataScanner extends
     ContainerDataScannerMetrics metrics = scanner.getMetrics();
     assertEquals(1, metrics.getNumScanIterations());
     assertEquals(2, metrics.getNumContainersScanned());
-    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
   }
 
   @Test
@@ -127,6 +138,17 @@ public class TestBackgroundContainerDataScanner extends
   }
 
   @Test
+  @Override
+  public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
+    when(controller.markContainerUnhealthy(anyLong(), any(ScanResult.class))).thenReturn(true);
+    try (MockedStatic<StorageVolumeUtil> mockedStatic = mockStatic(StorageVolumeUtil.class)) {
+      scanner.runIteration();
+      verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
+      mockedStatic.verify(() -> StorageVolumeUtil.onFailure(corruptData.getContainerData().getVolume()), times(1));
+    }
+  }
+
+  @Test
   public void testScanTimestampUpdated() throws Exception {
     scanner.runIteration();
     // Open containers should not be scanned.
@@ -151,11 +173,14 @@ public class TestBackgroundContainerDataScanner extends
 
   @Test
   @Override
-  public void testUnhealthyContainerNotRescanned() throws Exception {
+  public void testUnhealthyContainerRescanned() throws Exception {
     Container<?> unhealthy = mockKeyValueContainer();
-    when(unhealthy.scanMetaData()).thenReturn(ScanResult.healthy());
-    when(unhealthy.scanData(any(DataTransferThrottler.class),
-        any(Canceler.class))).thenReturn(getUnhealthyScanResult());
+    when(unhealthy.scanMetaData()).thenReturn(getHealthyMetadataScanResult());
+    when(unhealthy.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
+        .thenReturn(getUnhealthyDataScanResult());
+    // If a container is not already in an unhealthy state, the controller will return true from this method.
+    when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
+        any())).thenReturn(true);
 
     setContainers(unhealthy, healthy);
 
@@ -172,20 +197,29 @@ public class TestBackgroundContainerDataScanner extends
         .setState(UNHEALTHY);
     // Update the mock to reflect this.
     when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
-    assertFalse(unhealthy.shouldScanData());
-
-    // Clear metrics to check the next run.
-    metrics.resetNumContainersScanned();
-    metrics.resetNumUnhealthyContainers();
-
+    assertTrue(unhealthy.shouldScanData());
+    // Since the container is already unhealthy, the real controller would return false from this method.
+    when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
+        any())).thenReturn(false);
     scanner.runIteration();
-    // The only invocation of unhealthy on this container should have been from
-    // the previous scan.
-    verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
-    // This iteration should skip the already unhealthy container.
+    // The invocation of unhealthy on this container will also happen in the
+    // next iteration.
+    verifyContainerMarkedUnhealthy(unhealthy, atMost(2));
+    // This iteration should scan the unhealthy container.
     assertEquals(2, metrics.getNumScanIterations());
-    assertEquals(1, metrics.getNumContainersScanned());
-    assertEquals(0, metrics.getNumUnHealthyContainers());
+    assertEquals(4, metrics.getNumContainersScanned());
+    // numUnHealthyContainers metrics is not incremented in the 2nd iteration.
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+  }
+
+  @Test
+  @Override
+  public void testChecksumUpdateFailure() throws Exception {
+    doThrow(new IOException("Checksum update error for testing")).when(controller)
+        .updateContainerChecksum(anyLong(), any());
+    scanner.runIteration();
+    verifyContainerMarkedUnhealthy(corruptData, atMostOnce());
+    verify(corruptData.getContainerData(), atMostOnce()).setState(UNHEALTHY);
   }
 
   /**
@@ -217,7 +251,6 @@ public class TestBackgroundContainerDataScanner extends
     verify(openCorruptMetadata, never()).scanData(any(), any());
   }
 
-
   @Test
   @Override
   public void testShutdownDuringScan() throws Exception {
@@ -237,6 +270,22 @@ public class TestBackgroundContainerDataScanner extends
     scanner.shutdown();
     // The container should remain healthy.
     verifyContainerMarkedUnhealthy(healthy, never());
+  }
 
+  @Test
+  public void testMerkleTreeWritten() throws Exception {
+    scanner.runIteration();
+
+    // Merkle trees should not be written for open or deleted containers
+    for (Container<ContainerData> container : Arrays.asList(openContainer, openCorruptMetadata, deletedContainer)) {
+      verify(controller, times(0))
+          .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
+    }
+
+    // Merkle trees should be written for all other containers.
+    for (Container<ContainerData> container : Arrays.asList(healthy, corruptData)) {
+      verify(controller, times(1))
+          .updateContainerChecksum(eq(container.getContainerData().getContainerID()), any());
+    }
   }
 }

@@ -345,7 +345,6 @@ public class TestOpenKeysSearchEndpoint extends AbstractReconSqlDBTest {
         "Expected a message indicating no keys were found");
   }
 
-
   @Test
   public void testSearchUnderNestedDirectory() throws IOException {
     Response response = omdbInsightEndpoint

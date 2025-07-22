@@ -821,7 +821,6 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-
   public IOException setIoException(Throwable e) {
     IOException ioe = getIoException();
     if (ioe == null) {
@@ -1250,6 +1249,7 @@ public class BlockOutputStream extends OutputStream {
    */
   private static class FlushRuntimeException extends RuntimeException {
     private final IOException cause;
+
     FlushRuntimeException(IOException cause) {
       this.cause = cause;
     }

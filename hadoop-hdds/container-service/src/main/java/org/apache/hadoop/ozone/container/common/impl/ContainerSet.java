@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,15 +59,6 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
 
-  public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
-    return new ContainerSet(null, recoveringTimeout);
-  }
-
-  public static ContainerSet newRwContainerSet(Table<ContainerID, String> containerIdsTable, long recoveringTimeout) {
-    Objects.requireNonNull(containerIdsTable, "containerIdsTable == null");
-    return new ContainerSet(containerIdsTable, recoveringTimeout);
-  }
-
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
@@ -76,6 +68,17 @@ public class ContainerSet implements Iterable<Container<?>> {
   private final Clock clock;
   private long recoveringTimeout;
   private final Table<ContainerID, String> containerIdsTable;
+  // Handler that will be invoked when a scan of a container in this set is requested.
+  private OnDemandContainerScanner containerScanner;
+
+  public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
+    return new ContainerSet(null, recoveringTimeout);
+  }
+
+  public static ContainerSet newRwContainerSet(Table<ContainerID, String> containerIdsTable, long recoveringTimeout) {
+    Objects.requireNonNull(containerIdsTable, "containerIdsTable == null");
+    return new ContainerSet(containerIdsTable, recoveringTimeout);
+  }
 
   private ContainerSet(Table<ContainerID, String> continerIdsTable, long recoveringTimeout) {
     this(continerIdsTable, recoveringTimeout, null);
@@ -126,6 +129,45 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
+   * @param scanner The scanner instance will be invoked when a scan of a container in this set is requested.
+   */
+  public void registerOnDemandScanner(OnDemandContainerScanner scanner) {
+    this.containerScanner = scanner;
+  }
+
+  /**
+   * Triggers a scan of a container in this set. This is a no-op if no scanner is registered or the container does not
+   * exist in the set.
+   * @param containerID The container in this set to scan.
+   */
+  public void scanContainer(long containerID) {
+    if (containerScanner != null) {
+      Container<?> container = getContainer(containerID);
+      if (container != null) {
+        containerScanner.scanContainer(container);
+      } else {
+        LOG.warn("Request to scan container {} which was not found in the container set", containerID);
+      }
+    }
+  }
+
+  /**
+   * Triggers a scan of a container in this set regardless of whether it was recently scanned.
+   * This is a no-op if no scanner is registered or the container does not exist in the set.
+   * @param containerID The container in this set to scan.
+   */
+  public void scanContainerWithoutGap(long containerID) {
+    if (containerScanner != null) {
+      Container<?> container = getContainer(containerID);
+      if (container != null) {
+        containerScanner.scanContainerWithoutGap(container);
+      } else {
+        LOG.warn("Request to scan container {} which was not found in the container set", containerID);
+      }
+    }
+  }
+
+  /**
    * Add Container to container map.
    * @param container container to be added
    * @param overwrite if true should overwrite the container if the container was missing.
@@ -154,8 +196,6 @@ public class ContainerSet implements Iterable<Container<?>> {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
       missingContainerSet.remove(containerId);
-      // wish we could have done this from ContainerData.setState
-      container.getContainerData().commitSpace();
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(
             clock.millis() + recoveringTimeout, containerId);

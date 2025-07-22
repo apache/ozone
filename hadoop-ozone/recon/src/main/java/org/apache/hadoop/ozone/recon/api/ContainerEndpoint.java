@@ -139,7 +139,6 @@ public class ContainerEndpoint {
     }
   }
 
-
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
                            ContainerHealthSchemaManager containerHealthSchemaManager,

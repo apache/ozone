@@ -54,7 +54,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -62,7 +61,6 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Test OzoneFSInputStream by reading through multiple interfaces.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   private OzoneClient client;
@@ -83,8 +81,8 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
         OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
     fs =  FileSystem.get(URI.create(uri), cluster().getConf());
     int fileLen = 30 * 1024 * 1024;
-    data = string2Bytes(RandomStringUtils.randomAlphanumeric(fileLen));
-    filePath = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    data = string2Bytes(RandomStringUtils.secure().nextAlphanumeric(fileLen));
+    filePath = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     try (FSDataOutputStream stream = fs.create(filePath)) {
       stream.write(data);
     }
@@ -286,7 +284,7 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   @Test
   public void testSequenceFileReaderSync() throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
-    Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));
 
     // Upload test SequenceFile file
@@ -308,7 +306,7 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   @Test
   public void testSequenceFileReaderSyncEC() throws IOException {
     File srcfile = new File("src/test/resources/testSequenceFile");
-    Path path = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));
 
     // Upload test SequenceFile file

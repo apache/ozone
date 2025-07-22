@@ -485,6 +485,7 @@ public class RootCARotationManager extends StatefulService {
     isProcessing.set(false);
     processStartTime.set(null);
   }
+
   /**
    * Calculate time before root certificate will enter 2 * expiry grace period.
    * @return Duration, time before certificate enters the 2 * grace

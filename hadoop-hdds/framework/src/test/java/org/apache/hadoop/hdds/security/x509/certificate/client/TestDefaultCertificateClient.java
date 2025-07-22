@@ -191,7 +191,7 @@ public class TestDefaultCertificateClient {
 
   @Test
   public void testSignDataStream() throws Exception {
-    String data = RandomStringUtils.random(100);
+    String data = RandomStringUtils.secure().next(100);
     FileUtils.deleteQuietly(Paths.get(
         dnSecurityConfig.getKeyLocation(DN_COMPONENT).toString(),
         dnSecurityConfig.getPrivateKeyFileName()).toFile());
@@ -228,7 +228,7 @@ public class TestDefaultCertificateClient {
    */
   @Test
   public void verifySignatureStream() throws Exception {
-    String data = RandomStringUtils.random(500);
+    String data = RandomStringUtils.secure().next(500);
     byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.
@@ -246,7 +246,7 @@ public class TestDefaultCertificateClient {
    */
   @Test
   public void verifySignatureDataArray() throws Exception {
-    String data = RandomStringUtils.random(500);
+    String data = RandomStringUtils.secure().next(500);
     byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
 
     // Positive tests.

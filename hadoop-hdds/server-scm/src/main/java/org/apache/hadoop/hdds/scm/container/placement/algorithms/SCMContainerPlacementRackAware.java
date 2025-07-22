@@ -502,6 +502,14 @@ public final class SCMContainerPlacementRackAware
             " excludedNodes and affinityNode constrains.", null);
       }
 
+      if (usedNodes != null && usedNodes.contains(node)) {
+        if (excludedNodesForCapacity == null) {
+          excludedNodesForCapacity = new ArrayList<>();
+        }
+        excludedNodesForCapacity.add(node.getNetworkFullPath());
+        continue;
+      }
+
       if (isValidNode(node, metadataSizeRequired, dataSizeRequired)) {
         metrics.incrDatanodeChooseSuccessCount();
         if (isFallbacked) {
@@ -514,7 +522,7 @@ public final class SCMContainerPlacementRackAware
       if (maxRetry == 0) {
         // avoid the infinite loop
         String errMsg = "No satisfied datanode to meet the space constrains. "
-            + "metadatadata size required: " + metadataSizeRequired +
+            + "metadata size required: " + metadataSizeRequired +
             " data size required: " + dataSizeRequired;
         LOG.info(errMsg);
         throw new SCMException(errMsg, null);

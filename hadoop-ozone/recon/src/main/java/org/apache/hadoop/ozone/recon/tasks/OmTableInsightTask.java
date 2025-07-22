@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -64,7 +64,6 @@ public class OmTableInsightTask implements ReconOmTask {
   private Map<String, Long> objectCountMap;
   private Map<String, Long> unReplicatedSizeMap;
   private Map<String, Long> replicatedSizeMap;
-
 
   @Inject
   public OmTableInsightTask(GlobalStatsDao globalStatsDao,
@@ -234,7 +233,6 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
-
   private void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName) {
     OmTableHandler tableHandler = tableHandlers.get(tableName);
@@ -248,7 +246,6 @@ public class OmTableInsightTask implements ReconOmTask {
       }
     }
   }
-
 
   private void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName) {

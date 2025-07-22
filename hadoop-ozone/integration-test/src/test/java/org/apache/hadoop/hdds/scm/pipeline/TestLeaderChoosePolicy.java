@@ -29,12 +29,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -43,7 +43,6 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for LeaderChoosePolicy.
@@ -86,9 +85,9 @@ public class TestLeaderChoosePolicy {
           pipeline.getLeaderId().equals(pipeline.getSuggestedLeaderId()));
     }
 
-    Map<UUID, Integer> leaderCount = new HashMap<>();
+    Map<DatanodeID, Integer> leaderCount = new HashMap<>();
     for (Pipeline pipeline : pipelines) {
-      UUID leader = pipeline.getLeaderId();
+      DatanodeID leader = pipeline.getLeaderId();
       if (!leaderCount.containsKey(leader)) {
         leaderCount.put(leader, 0);
       }
@@ -97,12 +96,12 @@ public class TestLeaderChoosePolicy {
     }
 
     assertEquals(dnNum, leaderCount.size());
-    for (Map.Entry<UUID, Integer> entry: leaderCount.entrySet()) {
+    for (Map.Entry<DatanodeID, Integer> entry: leaderCount.entrySet()) {
       assertEquals(leaderNumOfEachDn, leaderCount.get(entry.getKey()));
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 360000)
+  @Test
   public void testRestoreSuggestedLeader() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
@@ -151,7 +150,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 360000)
+  @Test
   public void testMinLeaderCountChoosePolicy() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
@@ -182,9 +181,9 @@ public class TestLeaderChoosePolicy {
           .getPipelines(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
-      int destroyNum = RandomUtils.nextInt(0, pipelines.size());
+      int destroyNum = RandomUtils.secure().randomInt(0, pipelines.size());
       for (int k = 0; k <= destroyNum; k++) {
-        pipelineManager.closePipeline(pipelines.get(k), false);
+        pipelineManager.closePipeline(pipelines.get(k).getId());
       }
 
       waitForPipelines(pipelineNum);
@@ -193,7 +192,7 @@ public class TestLeaderChoosePolicy {
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 60000)
+  @Test
   public void testDefaultLeaderChoosePolicy() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,

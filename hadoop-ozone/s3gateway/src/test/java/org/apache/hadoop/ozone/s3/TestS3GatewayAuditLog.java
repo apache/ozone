@@ -143,7 +143,7 @@ public class TestS3GatewayAuditLog {
 
   @Test
   public void testHeadObject() throws Exception {
-    String value = RandomStringUtils.randomAlphanumeric(32);
+    String value = RandomStringUtils.secure().nextAlphanumeric(32);
     OzoneOutputStream out = bucket.createKey("key1",
         value.getBytes(UTF_8).length,
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,

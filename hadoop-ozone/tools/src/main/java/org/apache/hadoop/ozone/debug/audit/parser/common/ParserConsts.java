@@ -21,11 +21,6 @@ package org.apache.hadoop.ozone.debug.audit.parser.common;
  * Constants used for ozone audit parser.
  */
 public final class ParserConsts {
-
-  private ParserConsts() {
-    //Never constructed
-  }
-
   public static final String DRIVER = "org.sqlite.JDBC";
   public static final String CONNECTION_PREFIX = "jdbc:sqlite:";
   public static final String DATE_REGEX = "^\\d{4}-\\d{2}-\\d{2}.*$";
@@ -33,4 +28,7 @@ public final class ParserConsts {
   public static final String INSERT_AUDITS = "insertAuditEntry";
   public static final String CREATE_AUDIT_TABLE = "createAuditTable";
 
+  private ParserConsts() {
+    //Never constructed
+  }
 }

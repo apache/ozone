@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request;
 
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getOmKeyInfo;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.when;
@@ -276,6 +277,16 @@ public final class OMRequestTestUtils {
   }
 
   /**
+   * Add key entry to SnapshotRenamedTable.
+   */
+  public static String addRenamedEntryToTable(long trxnLogIndex, String volumeName, String bucketName, String key,
+      OMMetadataManager omMetadataManager) throws Exception {
+    String renameKey = omMetadataManager.getRenameKey(volumeName, bucketName, trxnLogIndex);
+    omMetadataManager.getSnapshotRenamedTable().put(renameKey, key);
+    return renameKey;
+  }
+
+  /**
    * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
    * to openKeyTable, else add's it to keyTable.
    * @throws Exception
@@ -493,13 +504,8 @@ public final class OMRequestTestUtils {
    *
    * @throws Exception
    */
-  public static void addDirKeyToDirTable(boolean addToCache,
-                                         OmDirectoryInfo omDirInfo,
-                                         String volume,
-                                         String bucket,
-                                         long trxnLogIndex,
-                                         OMMetadataManager omMetadataManager)
-          throws Exception {
+  public static String addDirKeyToDirTable(boolean addToCache, OmDirectoryInfo omDirInfo, String volume, String bucket,
+      long trxnLogIndex, OMMetadataManager omMetadataManager) throws Exception {
     final long volumeId = omMetadataManager.getVolumeId(volume);
     final long bucketId = omMetadataManager.getBucketId(volume, bucket);
     final String ozoneKey = omMetadataManager.getOzonePathKey(volumeId,
@@ -510,6 +516,7 @@ public final class OMRequestTestUtils {
               CacheValue.get(trxnLogIndex, omDirInfo));
     }
     omMetadataManager.getDirectoryTable().put(ozoneKey, omDirInfo);
+    return ozoneKey;
   }
 
   /**
@@ -821,7 +828,6 @@ public final class OMRequestTestUtils {
         .setSetVolumePropertyRequest(setVolumePropertyRequest).build();
   }
 
-
   /**
    * Create OMRequest for set volume property request with quota set.
    * @param volumeName
@@ -995,6 +1001,22 @@ public final class OMRequestTestUtils {
   }
 
   /**
+   * Deletes directory from directory table and adds it to DeletedDirectory table.
+   * @return the deletedDirectoryTable key.
+   */
+  public static String deleteDir(String ozoneKey, String volume, String bucket,
+      OMMetadataManager omMetadataManager)
+      throws IOException {
+    // Retrieve the keyInfo
+    OmDirectoryInfo omDirectoryInfo = omMetadataManager.getDirectoryTable().get(ozoneKey);
+    OmKeyInfo omKeyInfo = getOmKeyInfo(volume, bucket, omDirectoryInfo,
+        omDirectoryInfo.getName());
+    omMetadataManager.getDeletedDirTable().put(ozoneKey, omKeyInfo);
+    omMetadataManager.getDirectoryTable().delete(ozoneKey);
+    return ozoneKey;
+  }
+
+  /**
    * Create OMRequest which encapsulates InitiateMultipartUpload request.
    * @param volumeName
    * @param bucketName
@@ -1064,7 +1086,7 @@ public final class OMRequestTestUtils {
             .setValue(DatatypeConverter.printHexBinary(
                 new DigestInputStream(
                     new ByteArrayInputStream(
-                        RandomStringUtils.randomAlphanumeric((int) size)
+                        RandomStringUtils.secure().nextAlphanumeric((int) size)
                             .getBytes(StandardCharsets.UTF_8)),
                     eTagProvider)
                     .getMessageDigest().digest()))

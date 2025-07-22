@@ -64,6 +64,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
 
   private CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
       putBlkRspFuture = null;
+
   /**
    * Creates a new ECBlockOutputStream.
    *

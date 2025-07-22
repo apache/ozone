@@ -55,7 +55,6 @@ public class BufferPool {
   private final Lock lock = new ReentrantLock();
   private final Condition notFull = lock.newCondition();
 
-
   public static BufferPool empty() {
     return EMPTY;
   }

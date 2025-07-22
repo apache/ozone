@@ -28,6 +28,7 @@ ${SCM}       scm
 
 *** Keywords ***
 Create volumes
+    Get Security Enabled From Config
     ${random} =         Generate Random String  5  [NUMBERS]
     Set Suite Variable  ${source}  ${random}-source
     Set Suite Variable  ${target}  ${random}-target

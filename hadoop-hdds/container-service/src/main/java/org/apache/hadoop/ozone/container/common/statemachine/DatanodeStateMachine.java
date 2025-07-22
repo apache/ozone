@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Crea
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconcileContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
@@ -132,6 +134,7 @@ public class DatanodeStateMachine implements Closeable {
 
   private final DatanodeQueueMetrics queueMetrics;
   private final ReconfigurationHandler reconfigurationHandler;
+
   /**
    * Constructs a datanode state machine.
    * @param datanodeDetails - DatanodeDetails used to identify a datanode
@@ -229,6 +232,10 @@ public class DatanodeStateMachine implements Closeable {
         new ReconstructECContainersCommandHandler(conf, supervisor,
             ecReconstructionCoordinator);
 
+    // TODO HDDS-11218 combine the clients used for reconstruction and reconciliation so they share the same cache of
+    //  datanode clients.
+    DNContainerOperationClient dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
+
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat(threadNamePrefix + "PipelineCommandHandlerThread-%d")
         .build();
@@ -257,6 +264,7 @@ public class DatanodeStateMachine implements Closeable {
             supervisor::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
+        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -308,7 +316,6 @@ public class DatanodeStateMachine implements Closeable {
   public DatanodeDetails getDatanodeDetails() {
     return datanodeDetails;
   }
-
 
   /**
    * Returns the Connection manager for this state machine.
@@ -559,6 +566,7 @@ public class DatanodeStateMachine implements Closeable {
           ExitUtils.terminate(1, message, ex, LOG);
         })
         .build().newThread(startStateMachineTask);
+    stateMachineThread.setPriority(Thread.MAX_PRIORITY);
     stateMachineThread.start();
   }
 
@@ -682,6 +690,7 @@ public class DatanodeStateMachine implements Closeable {
 
     // We will have only one thread for command processing in a datanode.
     cmdProcessThread = getCommandHandlerThread(processCommandQueue);
+    cmdProcessThread.setPriority(Thread.NORM_PRIORITY);
     cmdProcessThread.start();
   }
 
@@ -734,6 +743,7 @@ public class DatanodeStateMachine implements Closeable {
     return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
         true);
   }
+
   public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
     return upgradeFinalizer;
   }
@@ -748,6 +758,14 @@ public class DatanodeStateMachine implements Closeable {
 
   public ReconfigurationHandler getReconfigurationHandler() {
     return reconfigurationHandler;
+  }
+
+  public Thread getStateMachineThread() {
+    return stateMachineThread;
+  }
+
+  public Thread getCmdProcessThread() {
+    return cmdProcessThread;
   }
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {

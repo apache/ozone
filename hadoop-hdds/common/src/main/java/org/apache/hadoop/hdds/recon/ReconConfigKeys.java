@@ -23,14 +23,6 @@ package org.apache.hadoop.hdds.recon;
  */
 public final class ReconConfigKeys {
 
-  /**
-   * This class contains constants for Recon related configuration keys used in
-   * SCM and Datanode.
-   * Never constructed.
-   */
-  private ReconConfigKeys() {
-  }
-
   public static final String RECON_SCM_CONFIG_PREFIX = "ozone.recon.scmconfig";
 
   public static final String OZONE_RECON_DB_DIR = "ozone.recon.db.dir";
@@ -84,4 +76,12 @@ public final class ReconConfigKeys {
 
   public static final String OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD
       = "ozone.recon.task.safemode.wait.threshold";
+
+  /**
+   * This class contains constants for Recon related configuration keys used in
+   * SCM and Datanode.
+   * Never constructed.
+   */
+  private ReconConfigKeys() {
+  }
 }

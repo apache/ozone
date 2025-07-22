@@ -28,15 +28,14 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 
 /** JSON Utilities. */
 final class JsonUtil {
-
-  private JsonUtil() {
-  }
-
   // Reuse ObjectMapper instance for improving performance.
   // ObjectMapper is thread safe as long as we always configure instance
   // before use. We don't have a re-entrant call pattern in WebHDFS,
   // so we just need to worry about thread-safety.
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  private JsonUtil() {
+  }
 
   private static String toJsonString(final Class<?> clazz, final Object value) {
     return toJsonString(clazz.getSimpleName(), value);

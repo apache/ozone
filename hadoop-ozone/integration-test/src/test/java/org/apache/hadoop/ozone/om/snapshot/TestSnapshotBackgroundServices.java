@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.TestDataUtil.readFully;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
@@ -42,13 +43,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -59,7 +59,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -79,17 +78,16 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests snapshot background services.
  */
-@Timeout(5000)
 public class TestSnapshotBackgroundServices {
   private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
@@ -262,7 +260,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot c
     OmSnapshot snapC;
-    try (ReferenceCounted<OmSnapshot> rcC = newLeaderOM
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcC = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoC.getName())) {
       assertNotNull(rcC);
@@ -286,7 +284,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot d
     OmSnapshot snapD;
-    try (ReferenceCounted<OmSnapshot> rcD = newLeaderOM
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcD = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoD.getName())) {
       assertNotNull(rcD);
@@ -309,7 +307,7 @@ public class TestSnapshotBackgroundServices {
   }
 
   private static <V> boolean isKeyInTable(String key, Table<String, V> table) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, V>> iterator
+    try (Table.KeyValueIterator<String, V> iterator
              = table.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, V> next = iterator.next();
@@ -430,8 +428,7 @@ public class TestSnapshotBackgroundServices {
   private List<CompactionLogEntry> getCompactionLogEntries(OzoneManager om)
       throws IOException {
     List<CompactionLogEntry> compactionLogEntries = new ArrayList<>();
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, CompactionLogEntry>>
+    try (Table.KeyValueIterator<String, CompactionLogEntry>
              iterator = om.getMetadataManager().getCompactionLogTable()
         .iterator()) {
       iterator.seekToFirst();
@@ -658,10 +655,7 @@ public class TestSnapshotBackgroundServices {
 
   private void readKeys(List<String> keys) throws IOException {
     for (String keyName : keys) {
-      OzoneInputStream inputStream = ozoneBucket.readKey(keyName);
-      byte[] data = new byte[100];
-      inputStream.read(data, 0, 100);
-      inputStream.close();
+      readFully(ozoneBucket, keyName);
     }
   }
 }

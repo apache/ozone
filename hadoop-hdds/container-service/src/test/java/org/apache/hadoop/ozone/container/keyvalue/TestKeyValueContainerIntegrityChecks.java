@@ -109,7 +109,6 @@ public class TestKeyValueContainerIntegrityChecks {
     return conf;
   }
 
-
   /**
    * Creates a container with normal and deleted blocks.
    * First it will insert normal blocks, and then it will insert
@@ -124,12 +123,12 @@ public class TestKeyValueContainerIntegrityChecks {
     int bytesPerChecksum = 2 * UNIT_LEN;
     Checksum checksum = new Checksum(ContainerProtos.ChecksumType.SHA256,
         bytesPerChecksum);
-    byte[] chunkData = RandomStringUtils.randomAscii(CHUNK_LEN).getBytes(UTF_8);
+    byte[] chunkData = RandomStringUtils.secure().nextAscii(CHUNK_LEN).getBytes(UTF_8);
     ChecksumData checksumData = checksum.computeChecksum(chunkData);
 
+    final long size = totalBlocks > 0 ? CHUNKS_PER_BLOCK * CHUNK_LEN * totalBlocks : 1;
     KeyValueContainerData containerData = new KeyValueContainerData(containerId,
-        containerLayoutTestInfo.getLayout(),
-        (long) CHUNKS_PER_BLOCK * CHUNK_LEN * totalBlocks,
+        containerLayoutTestInfo.getLayout(), size,
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),

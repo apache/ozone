@@ -23,10 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -61,7 +61,8 @@ abstract class AbstractContainerReportHandler {
   protected abstract Logger getLogger();
 
   /** @return the container in SCM and the replica from a datanode details for logging. */
-  static Object getDetailsForLogging(ContainerInfo container, ContainerReplicaProto replica, DatanodeDetails datanode) {
+  protected static Object getDetailsForLogging(ContainerInfo container, ContainerReplicaProto replica,
+      DatanodeDetails datanode) {
     Objects.requireNonNull(replica, "replica == null");
     Objects.requireNonNull(datanode, "datanode == null");
     if (container != null) {
@@ -96,22 +97,6 @@ abstract class AbstractContainerReportHandler {
   /**
    * Process the given ContainerReplica received from specified datanode.
    *
-   * @param datanodeDetails DatanodeDetails for the DN
-   * @param replicaProto Protobuf representing the replicas
-   * @param publisher EventPublisher instance
-   */
-  protected void processContainerReplica(final DatanodeDetails datanodeDetails,
-      final ContainerReplicaProto replicaProto, final EventPublisher publisher)
-      throws IOException, InvalidStateTransitionException {
-    ContainerInfo container = getContainerManager().getContainer(
-        ContainerID.valueOf(replicaProto.getContainerID()));
-    processContainerReplica(
-        datanodeDetails, container, replicaProto, publisher);
-  }
-
-  /**
-   * Process the given ContainerReplica received from specified datanode.
-   *
    * @param datanodeDetails DatanodeDetails of the node which reported
    *                        this replica
    * @param containerInfo ContainerInfo represending the container
@@ -120,18 +105,15 @@ abstract class AbstractContainerReportHandler {
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerInfo containerInfo,
-      final ContainerReplicaProto replicaProto, final EventPublisher publisher)
+      final ContainerReplicaProto replicaProto, final EventPublisher publisher, Object detailsForLogging)
       throws IOException, InvalidStateTransitionException {
-    final ContainerID containerId = containerInfo.containerID();
-    final Object detailsForLogging = getDetailsForLogging(containerInfo, replicaProto, datanodeDetails);
-
     getLogger().debug("Processing replica {}", detailsForLogging);
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
     synchronized (containerInfo) {
       updateContainerStats(datanodeDetails, containerInfo, replicaProto, detailsForLogging);
       if (!updateContainerState(datanodeDetails, containerInfo, replicaProto, publisher, detailsForLogging)) {
-        updateContainerReplica(datanodeDetails, containerId, replicaProto);
+        updateContainerReplica(datanodeDetails, containerInfo.containerID(), replicaProto);
       }
     }
   }
@@ -374,12 +356,13 @@ abstract class AbstractContainerReportHandler {
         .setContainerID(containerId)
         .setContainerState(replicaProto.getState())
         .setDatanodeDetails(datanodeDetails)
-        .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
+        .setOriginNodeId(DatanodeID.fromUuidString(replicaProto.getOriginNodeId()))
         .setSequenceId(replicaProto.getBlockCommitSequenceId())
         .setKeyCount(replicaProto.getKeyCount())
         .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
         .setEmpty(replicaProto.getIsEmpty())
+        .setDataChecksum(replicaProto.getDataChecksum())
         .build();
 
     if (replica.getState().equals(State.DELETED)) {

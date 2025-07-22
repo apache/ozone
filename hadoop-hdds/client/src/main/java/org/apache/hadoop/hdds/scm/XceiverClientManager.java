@@ -275,7 +275,6 @@ public class XceiverClientManager extends XceiverClientCreator {
       return unit.convert(staleThreshold, MILLISECONDS);
     }
 
-
     public int getMaxSize() {
       return maxSize;
     }

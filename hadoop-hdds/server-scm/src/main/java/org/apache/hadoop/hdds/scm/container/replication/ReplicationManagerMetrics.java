@@ -67,7 +67,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "Tracked inflight container deletion requests skipped" +
           " due to the configured limit.");
 
-
   private static final MetricsInfo INFLIGHT_MOVE = Interns.info(
       "InflightMove",
       "Tracked inflight container move requests.");
@@ -224,7 +223,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of replicate container commands that could not be sent due "
       + "to the pending commands on all source datanodes")
   private MutableCounterLong replicateContainerCmdsDeferredTotal;
-
 
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);

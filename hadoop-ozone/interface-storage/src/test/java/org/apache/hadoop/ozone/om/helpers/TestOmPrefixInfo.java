@@ -81,7 +81,6 @@ public class TestOmPrefixInfo {
         .build();
   }
 
-
   @Test
   public void testCopyObject() {
     String testPath = "/my/custom/path";

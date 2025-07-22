@@ -120,7 +120,7 @@ public class TransactionInfoRepair extends RepairTool {
   public static DBColumnFamilyDefinition<String, TransactionInfo> getColumnFamily(Component component) {
     switch (component) {
     case OM:
-      return OMDBDefinition.TRANSACTION_INFO_TABLE;
+      return OMDBDefinition.TRANSACTION_INFO_TABLE_DEF;
     case SCM:
       return SCMDBDefinition.TRANSACTIONINFO;
     default:

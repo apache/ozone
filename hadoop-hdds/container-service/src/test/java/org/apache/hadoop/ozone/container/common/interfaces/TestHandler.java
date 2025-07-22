@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -39,12 +40,10 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Handler interface.
  */
-@Timeout(300)
 public class TestHandler {
 
   private OzoneConfiguration conf;
@@ -70,7 +69,8 @@ public class TestHandler {
               containerType, conf,
               context.getParent().getDatanodeDetails().getUuidString(),
               containerSet, volumeSet, volumeChoosingPolicy, metrics,
-              TestHddsDispatcher.NO_OP_ICR_SENDER));
+              TestHddsDispatcher.NO_OP_ICR_SENDER,
+              new ContainerChecksumTreeManager(conf)));
     }
     this.dispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, null, metrics, null);

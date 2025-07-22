@@ -29,13 +29,11 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for Reconfiguration.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 abstract class ReconfigurationTestBase implements NonHATests.TestCase {
 
   private String currentUser;

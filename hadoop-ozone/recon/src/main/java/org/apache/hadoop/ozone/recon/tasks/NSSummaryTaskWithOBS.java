@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -50,7 +50,6 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
   private final long nsSummaryFlushToDBMaxThreshold;
 
-
   public NSSummaryTaskWithOBS(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager reconOMMetadataManager,
@@ -59,7 +58,6 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         reconOMMetadataManager);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
-
 
   public boolean reprocessWithOBS(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
@@ -219,7 +217,6 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     LOG.debug("Completed a process run of NSSummaryTaskWithOBS");
     return new ImmutablePair<>(seekPos, true);
   }
-
 
   /**
    * KeyTable entries don't have the parentId set.

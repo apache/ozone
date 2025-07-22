@@ -33,13 +33,11 @@ import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
 
 /**
  * Tests Freon with Datanode restarts without waiting for pipeline to close.
  */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestFreonWithDatanodeFastRestart {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;

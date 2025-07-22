@@ -28,10 +28,13 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 public interface OMStarterInterface {
   void start(OzoneConfiguration conf) throws IOException,
       AuthenticationException;
+
   boolean init(OzoneConfiguration conf) throws IOException,
       AuthenticationException;
+
   void bootstrap(OzoneConfiguration conf, boolean force) throws IOException,
       AuthenticationException;
+
   void startAndCancelPrepare(OzoneConfiguration conf) throws IOException,
       AuthenticationException;
 }

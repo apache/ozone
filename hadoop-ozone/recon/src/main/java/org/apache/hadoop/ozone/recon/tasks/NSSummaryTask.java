@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
  * Reprocess() will take a snapshots on OMDB, and iterate the keyTable,
@@ -211,7 +210,7 @@ public class NSSummaryTask implements ReconOmTask {
           TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
 
       // Log performance metrics
-      LOG.debug("Task execution time: {} milliseconds", durationInMillis);
+      LOG.info("Task execution time: {} milliseconds", durationInMillis);
     }
 
     return buildTaskResult(true);

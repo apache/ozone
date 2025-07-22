@@ -573,7 +573,7 @@ public class TestContainerBalancerTask {
         .setContainerID(containerID)
         .setContainerState(ContainerReplicaProto.State.CLOSED)
         .setDatanodeDetails(datanodeDetails)
-        .setOriginNodeId(datanodeDetails.getUuid())
+        .setOriginNodeId(datanodeDetails.getID())
         .setSequenceId(1000L)
         .setBytesUsed(usedBytes)
         .build();

@@ -182,7 +182,7 @@ public class SCMNodeInfo {
   }
 
   private static String buildAddress(String address, int port) {
-    return new StringBuilder().append(address).append(":")
+    return new StringBuilder().append(address).append(':')
         .append(port).toString();
   }
 

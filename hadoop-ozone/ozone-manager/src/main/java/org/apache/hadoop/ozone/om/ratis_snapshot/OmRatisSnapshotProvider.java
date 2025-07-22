@@ -91,7 +91,6 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     this.connectionFactory = connectionFactory;
   }
 
-
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
     super(omRatisSnapshotDir, OM_DB_NAME);
@@ -154,7 +153,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       connection.setRequestProperty("Content-Type", contentTypeValue);
       connection.setDoOutput(true);
       writeFormData(connection,
-          HAUtils.getExistingSstFiles(getCandidateDir()));
+          HAUtils.getExistingFiles(getCandidateDir()));
 
       connection.connect();
       int errorCode = connection.getResponseCode();

@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -74,7 +73,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  */
 public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
-
 
   /**
    * Register API without a layout version info object passed in. Useful for
@@ -137,11 +135,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       NodeOperationalState opState, NodeState health);
 
   /**
-   * Get all datanodes known to SCM.
-   *
-   * @return List of DatanodeDetails known to SCM.
+   * @return all datanodes known to SCM.
    */
-  List<DatanodeDetails> getAllNodes();
+  List<? extends DatanodeDetails> getAllNodes();
+
+  /** @return the number of datanodes. */
+  default int getAllNodeCount() {
+    return getAllNodes().size();
+  }
 
   /**
    * Returns the aggregated node stats.
@@ -268,13 +269,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       throws NodeNotFoundException;
 
   /**
-   * Add a {@link SCMCommand} to the command queue, which are
-   * handled by HB thread asynchronously.
-   * @param dnId datanode uuid
-   * @param command
+   * Add a {@link SCMCommand} to the command queue of the given datanode.
+   * The command will be handled by the HB thread asynchronously.
    */
-  void addDatanodeCommand(UUID dnId, SCMCommand<?> command);
-
+  void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command);
 
   /**
    * send refresh command to all the healthy datanodes to refresh
@@ -313,11 +311,11 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Get the number of commands of the given type queued in the SCM CommandQueue
    * for the given datanode.
-   * @param dnID The UUID of the datanode.
+   * @param dnID The ID of the datanode.
    * @param cmdType The Type of command to query the current count for.
    * @return The count of commands queued, or zero if none.
    */
-  int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType);
+  int getCommandQueueCount(DatanodeID dnID, SCMCommandProto.Type cmdType);
 
   /**
    * Get the total number of pending commands of the given type on the given
@@ -355,14 +353,16 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.
-   * @param dnID - Datanode uuid.
    * @return list of commands
    */
   // TODO: We can give better name to this method!
-  List<SCMCommand<?>> getCommandQueue(UUID dnID);
+  List<SCMCommand<?>> getCommandQueue(DatanodeID dnID);
 
   /** @return the datanode of the given id if it exists; otherwise, return null. */
   @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
+
+  @Nullable
+  DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails);
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of

@@ -1174,7 +1174,6 @@ public final class ContractTestUtils {
     }
   }
 
-
   /**
    * Assert that the data read matches the dataset at the given offset.
    * This helps verify that the seek process is moving the read pointer
@@ -1457,9 +1456,9 @@ public final class ContractTestUtils {
     builder.append(nl);
     for (Path path : paths) {
       builder.append("  \"").append(path.toString())
-          .append("\"").append(nl);
+          .append('"').append(nl);
     }
-    builder.append("]");
+    builder.append(']');
     return builder.toString();
   }
 
@@ -1475,7 +1474,6 @@ public final class ContractTestUtils {
     return collectionsEquivalent(left, right) &&
         !containsDuplicates(left) && !containsDuplicates(right);
   }
-
 
   /**
    * Predicate to test for a collection of paths containing duplicate entries.
@@ -1657,7 +1655,6 @@ public final class ContractTestUtils {
     }
   }
 
-
   /**
    * Custom assert to verify capabilities supported by
    * an object through {@link StreamCapabilities}.
@@ -1761,7 +1758,6 @@ public final class ContractTestUtils {
     }
   }
 
-
   /**
    * Results of recursive directory creation/scan operations.
    */
@@ -1771,7 +1767,6 @@ public final class ContractTestUtils {
     private final List<Path> files = new ArrayList<>();
     private final List<Path> directories = new ArrayList<>();
     private final List<Path> other = new ArrayList<>();
-
 
     public TreeScanResults() {
     }

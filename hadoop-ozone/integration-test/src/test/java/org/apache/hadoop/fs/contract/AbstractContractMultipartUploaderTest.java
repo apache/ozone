@@ -115,7 +115,7 @@ public abstract class AbstractContractMultipartUploaderTest extends
         LOG.info("Statistics {}",
             ioStatisticsSourceToString(uploader));
       } catch (Exception e) {
-        LOG.warn("Exeception in teardown", e);
+        LOG.warn("Exception in teardown", e);
       }
     }
 

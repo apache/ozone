@@ -42,6 +42,9 @@ public class TestOzoneLockProvider {
   private OzoneManager ozoneManager;
   private OzoneLockStrategy ozoneLockStrategy;
 
+  private boolean keyPathLockEnabled;
+  private boolean enableFileSystemPaths;
+
   public static Collection<Object[]> data() {
     return Arrays.asList(
         new Object[]{true, true},
@@ -49,8 +52,6 @@ public class TestOzoneLockProvider {
         new Object[]{false, true},
         new Object[]{false, false});
   }
-  private boolean keyPathLockEnabled;
-  private boolean enableFileSystemPaths;
 
   @BeforeEach
   public void setup() throws Exception {

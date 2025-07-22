@@ -165,7 +165,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   String getOzoneDirKey(String volume, String bucket, String key);
 
-
   /**
    * Returns the DB key name of a open key in OM metadata store. Should be
    * #open# prefix followed by actual key name.
@@ -467,6 +466,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, String> getSnapshotRenamedTable();
 
   Table<String, CompactionLogEntry> getCompactionLogTable();
+
   /**
    * Gets the OM Meta table.
    * @return meta table reference.
@@ -612,6 +612,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return DB rename key as String.
    */
   String getRenameKey(String volume, String bucket, long objectID);
+
+  /**
+   * Given renameKey, return the volume, bucket and objectID from the key.
+   */
+  String[] splitRenameKey(String renameKey);
 
   /**
    * Returns the DB key name of a multipart upload key in OM metadata store

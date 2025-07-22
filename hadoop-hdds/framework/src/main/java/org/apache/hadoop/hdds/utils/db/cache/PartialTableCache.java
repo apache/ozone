@@ -54,7 +54,6 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   private final ExecutorService executorService;
   private final CacheStatsRecorder statsRecorder;
 
-
   public PartialTableCache(String threadNamePrefix) {
     // We use concurrent Hash map for O(1) lookup for get API.
     // During list operation for partial cache we anyway merge between DB and

@@ -445,7 +445,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
       "150s";
 
-
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =
       "ozone.scm.pipeline.creation.auto.factor.one";
@@ -456,6 +455,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_BLOCK_DELETION_MAX_RETRY =
       "ozone.scm.block.deletion.max.retry";
   public static final int OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT = 4096;
+
+  public static final String OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR =
+      "ozone.scm.block.deletion.per.dn.distribution.factor";
+
+  public static final int OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT = 8;
 
   public static final String OZONE_SCM_SEQUENCE_ID_BATCH_SIZE =
       "ozone.scm.sequence.id.batch.size";
@@ -496,7 +500,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_CA_LIST_RETRY_INTERVAL =
       "ozone.scm.ca.list.retry.interval";
   public static final long OZONE_SCM_CA_LIST_RETRY_INTERVAL_DEFAULT = 10;
-
 
   public static final String OZONE_SCM_EVENT_PREFIX = "ozone.scm.event.";
 
@@ -619,7 +622,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL =
       "ozone.scm.ha.dbtransactionbuffer.flush.interval";
   public static final long
-      OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 600 * 1000L;
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 60 * 1000L;
 
   public static final String NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY =
       "net.topology.node.switch.mapping.impl";

@@ -187,7 +187,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PutObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
@@ -239,6 +238,7 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTok
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -1330,30 +1330,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public String printCompactionLogDag(String fileNamePrefix, String graphType)
-      throws IOException {
-    final PrintCompactionLogDagRequest.Builder request =
-        PrintCompactionLogDagRequest.newBuilder();
-
-    if (fileNamePrefix != null) {
-      request.setFileNamePrefix(fileNamePrefix);
-    }
-    if (graphType != null) {
-      request.setGraphType(graphType);
-    }
-
-    final OMRequest omRequest = createOMRequest(Type.PrintCompactionLogDag)
-        .setPrintCompactionLogDagRequest(request.build())
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
-    return omResponse.getPrintCompactionLogDagResponse().getMessage();
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
   public ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
@@ -1473,11 +1449,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   @Override
-  public List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
-                                                    String bucketName,
-                                                    String jobStatus,
-                                                    boolean listAll)
-      throws IOException {
+  public ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAllStatus,
+      String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     final OzoneManagerProtocolProtos
         .ListSnapshotDiffJobRequest.Builder requestBuilder =
         OzoneManagerProtocolProtos
@@ -1485,17 +1463,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setJobStatus(jobStatus)
-            .setListAll(listAll);
+            .setListAll(listAllStatus)
+            .setMaxListResult(maxListResult);
+
+    if (prevSnapshotDiffJob != null) {
+      requestBuilder.setPrevSnapshotDiffJob(prevSnapshotDiffJob);
+    }
 
     final OMRequest omRequest = createOMRequest(Type.ListSnapshotDiffJobs)
         .setListSnapshotDiffJobRequest(requestBuilder)
         .build();
     final OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
-    return omResponse.getListSnapshotDiffJobResponse()
-        .getSnapshotDiffJobList().stream()
+    OzoneManagerProtocolProtos.ListSnapshotDiffJobResponse response = omResponse.getListSnapshotDiffJobResponse();
+    List<SnapshotDiffJob> ozoneSnapshotDiffs = response.getSnapshotDiffJobList().stream()
         .map(SnapshotDiffJob::getFromProtoBuf)
         .collect(Collectors.toList());
+    return new ListSnapshotDiffJobResponse(ozoneSnapshotDiffs,
+        response.hasLastSnapshotDiffJob() ? response.getLastSnapshotDiffJob() : null);
   }
 
   /**
@@ -1925,7 +1910,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     handleError(submitRequest(omRequest));
   }
 
-
   @Override
   public boolean triggerRangerBGSync(boolean noWait) throws IOException {
     RangerBGSyncRequest req = RangerBGSyncRequest.newBuilder()
@@ -2091,6 +2075,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       S3Auth s3Auth) {
     this.threadLocalS3Auth.set(s3Auth);
   }
+
   @Override
   public void clearThreadLocalS3Auth() {
     this.threadLocalS3Auth.remove();
@@ -2338,7 +2323,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return new OpenKeySession(resp.getID(),
         OmKeyInfo.getFromProtobuf(resp.getKeyInfo()), resp.getOpenVersion());
   }
-
 
   @Nonnull
   private OMResponse handleSubmitRequestAndSCMSafeModeRetry(OMRequest omRequest) throws IOException {

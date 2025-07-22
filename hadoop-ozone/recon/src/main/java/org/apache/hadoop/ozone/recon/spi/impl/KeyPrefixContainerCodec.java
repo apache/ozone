@@ -35,6 +35,8 @@ public final class KeyPrefixContainerCodec
   private static final Codec<KeyPrefixContainer> INSTANCE =
       new KeyPrefixContainerCodec();
 
+  private static final String KEY_DELIMITER = "_";
+
   public static Codec<KeyPrefixContainer> get() {
     return INSTANCE;
   }
@@ -42,8 +44,6 @@ public final class KeyPrefixContainerCodec
   private KeyPrefixContainerCodec() {
     // singleton
   }
-
-  private static final String KEY_DELIMITER = "_";
 
   @Override
   public Class<KeyPrefixContainer> getTypeClass() {

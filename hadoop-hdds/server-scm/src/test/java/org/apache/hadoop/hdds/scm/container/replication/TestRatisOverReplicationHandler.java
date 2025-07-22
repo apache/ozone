@@ -414,6 +414,7 @@ public class TestRatisOverReplicationHandler {
 
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
   }
+
   @Test
   public void testOverReplicationOfQuasiClosedReplicaWithWrongSequenceID()
       throws IOException {

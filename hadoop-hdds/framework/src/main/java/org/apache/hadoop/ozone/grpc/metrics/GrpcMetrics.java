@@ -58,6 +58,35 @@ public class GrpcMetrics implements MetricsSource {
   private final boolean grpcQuantileEnable;
   private String requestType;
 
+  @Metric("Number of sent bytes")
+  private MutableCounterLong sentBytes;
+
+  @Metric("Number of received bytes")
+  private MutableCounterLong receivedBytes;
+
+  @Metric("Number of unknown messages sent")
+  private MutableCounterLong unknownMessagesSent;
+
+  @Metric("Number of unknown messages received")
+  private MutableCounterLong unknownMessagesReceived;
+
+  @Metric("Queue time")
+  private MutableRate grpcQueueTime;
+
+  // There should be no getter method to avoid
+  // exposing internal representation. FindBugs error raised.
+  private MutableQuantiles[] grpcQueueTimeMillisQuantiles;
+
+  @Metric("Processing time")
+  private MutableRate grpcProcessingTime;
+
+  // There should be no getter method to avoid
+  // exposing internal representation. FindBugs error raised.
+  private MutableQuantiles[] grpcProcessingTimeMillisQuantiles;
+
+  @Metric("Number of active clients connected")
+  private MutableCounterLong numOpenClientConnections;
+
   public GrpcMetrics(Configuration conf) {
     this.registry = new MetricsRegistry("grpc");
     this.requestType = "NoRequest";
@@ -110,35 +139,6 @@ public class GrpcMetrics implements MetricsSource {
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
     recordBuilder.tag(LATEST_REQUEST_TYPE, requestType);
   }
-
-  @Metric("Number of sent bytes")
-  private MutableCounterLong sentBytes;
-
-  @Metric("Number of received bytes")
-  private MutableCounterLong receivedBytes;
-
-  @Metric("Number of unknown messages sent")
-  private MutableCounterLong unknownMessagesSent;
-
-  @Metric("Number of unknown messages received")
-  private MutableCounterLong unknownMessagesReceived;
-
-  @Metric("Queue time")
-  private MutableRate grpcQueueTime;
-
-  // There should be no getter method to avoid
-  // exposing internal representation. FindBugs error raised.
-  private MutableQuantiles[] grpcQueueTimeMillisQuantiles;
-
-  @Metric("Processsing time")
-  private MutableRate grpcProcessingTime;
-
-  // There should be no getter method to avoid
-  // exposing internal representation. FindBugs error raised.
-  private MutableQuantiles[] grpcProcessingTimeMillisQuantiles;
-
-  @Metric("Number of active clients connected")
-  private MutableCounterLong numOpenClientConnections;
 
   public void incrSentBytes(long byteCount) {
     sentBytes.incr(byteCount);

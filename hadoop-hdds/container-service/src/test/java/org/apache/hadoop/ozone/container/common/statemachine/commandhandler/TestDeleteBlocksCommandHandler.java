@@ -40,13 +40,16 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -77,7 +80,6 @@ import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -85,7 +87,6 @@ import org.mockito.stubbing.Answer;
 /**
  * Test cases for TestDeleteBlocksCommandHandler.
  */
-@Timeout(300)
 public class TestDeleteBlocksCommandHandler {
   @TempDir
   private Path folder;
@@ -271,6 +272,28 @@ public class TestDeleteBlocksCommandHandler {
 
     assertEquals(0,
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
+  }
+
+  @Test
+  public void testDeleteBlocksCommandHandlerExceptionShouldNotInterrupt() throws Exception {
+    setup();
+    // future task will throw first execution exception, and next one will succeed
+    doAnswer((Answer<List<Future<DeleteBlockTransactionExecutionResult>>>) invocationOnMock -> {
+      List<Future<DeleteBlockTransactionExecutionResult>> result = new ArrayList<>();
+      CompletableFuture<DeleteBlockTransactionExecutionResult> future =
+          new CompletableFuture<>();
+      future.completeExceptionally(new ExecutionException("Simulated Exception", new IOException()));
+      result.add(future);
+      future = new CompletableFuture<>();
+      future.complete(new DeleteBlockTransactionExecutionResult(null, false));
+      result.add(future);
+      return result;
+    }).when(handler).submitTasks(any());
+
+    // last task as success should be returned as result, ignoring the first failed task
+    List<DeleteBlockTransactionResult> deleteBlockTransactionResults =
+        handler.executeCmdWithRetry(Collections.emptyList());
+    assertEquals(1, deleteBlockTransactionResults.size());
   }
 
   @ContainerTestVersionInfo.ContainerTest

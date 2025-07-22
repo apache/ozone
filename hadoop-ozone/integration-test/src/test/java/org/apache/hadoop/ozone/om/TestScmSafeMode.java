@@ -73,14 +73,12 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Timeout(300)
 @Unhealthy("HDDS-3260")
 public class TestScmSafeMode {
 
@@ -142,9 +140,9 @@ public class TestScmSafeMode {
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000);
 
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-    String keyName = "key" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
 
     ObjectStore store = client.getObjectStore();
     store.createVolume(volumeName);

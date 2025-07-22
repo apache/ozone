@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
 
@@ -40,6 +40,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
@@ -53,8 +55,7 @@ import org.slf4j.LoggerFactory;
  * Util class for snapshot diff APIs.
  */
 public final class SnapshotUtils {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SnapshotUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(SnapshotUtils.class);
 
   private SnapshotUtils() {
     throw new IllegalStateException("SnapshotUtils should not be initialized.");
@@ -92,6 +93,11 @@ public final class SnapshotUtils {
                                              SnapshotChainManager chainManager,
                                              UUID snapshotId) throws IOException {
     String tableKey = chainManager.getTableKey(snapshotId);
+    if (tableKey == null) {
+      LOG.error("Snapshot not found with UUID '{}'", snapshotId);
+      throw new OMException("Snapshot not found with UUID '" + snapshotId + "'",
+          FILE_NOT_FOUND);
+    }
     return SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
   }
 
@@ -189,7 +195,7 @@ public final class SnapshotUtils {
   /**
    * Get the previous snapshot in the snapshot chain.
    */
-  private static UUID getPreviousSnapshotId(SnapshotInfo snapInfo, SnapshotChainManager chainManager)
+  public static UUID getPreviousSnapshotId(SnapshotInfo snapInfo, SnapshotChainManager chainManager)
       throws IOException {
     // If the snapshot is deleted in the previous run, then the in-memory
     // SnapshotChainManager might throw NoSuchElementException as the snapshot
@@ -298,5 +304,60 @@ public final class SnapshotUtils {
           expectedPreviousSnapshotId + " but was " + previousSnapshotId,
           OMException.ResultCodes.INVALID_REQUEST);
     }
+  }
+
+  /**
+   * Compares the block location info of 2 key info.
+   * @return true if block locations are same else false.
+   */
+  public static boolean isBlockLocationInfoSame(OmKeyInfo prevKeyInfo,
+                                                OmKeyInfo deletedKeyInfo) {
+    if (prevKeyInfo == null && deletedKeyInfo == null) {
+      LOG.debug("Both prevKeyInfo and deletedKeyInfo are null.");
+      return true;
+    }
+    if (prevKeyInfo == null || deletedKeyInfo == null) {
+      LOG.debug("prevKeyInfo: '{}' or deletedKeyInfo: '{}' is null.",
+          prevKeyInfo, deletedKeyInfo);
+      return false;
+    }
+    // For hsync, Though the blockLocationInfo of a key may not be same
+    // at the time of snapshot and key deletion as blocks can be appended.
+    // If the objectId is same then the key is same.
+    if (prevKeyInfo.isHsync() && deletedKeyInfo.isHsync()) {
+      return prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID();
+    }
+
+    if (prevKeyInfo.getKeyLocationVersions().size() !=
+        deletedKeyInfo.getKeyLocationVersions().size()) {
+      return false;
+    }
+
+    OmKeyLocationInfoGroup deletedOmKeyLocation =
+        deletedKeyInfo.getLatestVersionLocations();
+    OmKeyLocationInfoGroup prevOmKeyLocation =
+        prevKeyInfo.getLatestVersionLocations();
+
+    if (deletedOmKeyLocation == null || prevOmKeyLocation == null) {
+      return false;
+    }
+
+    List<OmKeyLocationInfo> deletedLocationList =
+        deletedOmKeyLocation.getLocationList();
+    List<OmKeyLocationInfo> prevLocationList =
+        prevOmKeyLocation.getLocationList();
+
+    if (deletedLocationList.size() != prevLocationList.size()) {
+      return false;
+    }
+
+    for (int idx = 0; idx < deletedLocationList.size(); idx++) {
+      OmKeyLocationInfo deletedLocationInfo = deletedLocationList.get(idx);
+      OmKeyLocationInfo prevLocationInfo = prevLocationList.get(idx);
+      if (!deletedLocationInfo.hasSameBlockAs(prevLocationInfo)) {
+        return false;
+      }
+    }
+    return true;
   }
 }

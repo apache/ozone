@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -30,13 +31,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -91,8 +92,8 @@ public final class TestDataUtil {
 
   public static OzoneVolume createVolume(OzoneClient client,
                                          String volumeName) throws IOException {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
     VolumeArgs volumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)
         .setOwner(userName)
@@ -134,6 +135,13 @@ public final class TestDataUtil {
     }
   }
 
+  public static void readFully(OzoneBucket bucket, String keyName) throws IOException {
+    int len = Math.toIntExact(bucket.getKey(keyName).getDataSize());
+    try (InputStream inputStream = bucket.readKey(keyName)) {
+      assertDoesNotThrow(() -> IOUtils.readFully(inputStream, len));
+    }
+  }
+
   public static String getKey(OzoneBucket bucket, String keyName)
       throws IOException {
     try (InputStream stream = bucket.readKey(keyName)) {
@@ -166,7 +174,7 @@ public final class TestDataUtil {
     OzoneVolume volume = objectStore.getVolume(vol);
     String sourceBucket = bukName;
     if (createLinkedBucket) {
-      sourceBucket = bukName + RandomStringUtils.randomNumeric(5);
+      sourceBucket = bukName + RandomStringUtils.secure().nextNumeric(5);
     }
     volume.createBucket(sourceBucket, bucketArgs);
     OzoneBucket ozoneBucket = volume.getBucket(sourceBucket);
@@ -197,12 +205,12 @@ public final class TestDataUtil {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
-        String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-        String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+        String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+        String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
         OzoneBucket ozoneBucket = createVolumeAndBucket(client, volumeName, bucketName,
             bucketLayout);
         if (createLinkedBucket) {
-          String targetBucketName = ozoneBucket.getName() + RandomStringUtils.randomNumeric(5);
+          String targetBucketName = ozoneBucket.getName() + RandomStringUtils.secure().nextNumeric(5);
           ozoneBucket = createLinkedBucket(client, volumeName, bucketName, targetBucketName);
         }
         return ozoneBucket;
@@ -225,10 +233,10 @@ public final class TestDataUtil {
     try (OzoneClient client = cluster.newClient()) {
       OzoneBucket bucket = createVolumeAndBucket(client);
       for (int i = 0; i < numOfKeys; i++) {
-        String keyName = RandomStringUtils.randomAlphabetic(5) + i;
+        String keyName = RandomStringUtils.secure().nextAlphabetic(5) + i;
         createKey(bucket, keyName, ReplicationConfig
             .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
-            RandomStringUtils.randomAlphabetic(5).getBytes(UTF_8));
+            RandomStringUtils.secure().nextAlphabetic(5).getBytes(UTF_8));
         keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
       }
     }
@@ -238,7 +246,7 @@ public final class TestDataUtil {
   public static void cleanupDeletedTable(OzoneManager ozoneManager) throws IOException {
     Table<String, RepeatedOmKeyInfo> deletedTable = ozoneManager.getMetadataManager().getDeletedTable();
     List<String> nameList = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> keyIter = deletedTable.iterator()) {
+    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> keyIter = deletedTable.iterator()) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         nameList.add(kv.getKey());
@@ -256,7 +264,7 @@ public final class TestDataUtil {
   public static void cleanupOpenKeyTable(OzoneManager ozoneManager, BucketLayout bucketLayout) throws IOException {
     Table<String, OmKeyInfo> openKeyTable = ozoneManager.getMetadataManager().getOpenKeyTable(bucketLayout);
     List<String> nameList = new ArrayList<>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter = openKeyTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> keyIter = openKeyTable.iterator()) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
         nameList.add(kv.getKey());

@@ -84,7 +84,6 @@ public class OMHANodeDetails {
     return peerNodesMap;
   }
 
-
   /**
    * Inspects and loads OM node configurations.
    *

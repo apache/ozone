@@ -63,7 +63,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -74,7 +73,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Tests ozone containers via secure grpc/netty.
  */
-@Timeout(300)
 class TestSecureOzoneContainer {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestSecureOzoneContainer.class);

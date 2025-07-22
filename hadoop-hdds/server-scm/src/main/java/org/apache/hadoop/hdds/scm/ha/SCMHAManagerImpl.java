@@ -428,7 +428,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
     return ratisServer.removeSCM(request);
   }
 
-
   void stopServices() throws Exception {
 
     // just stop the SCMMetaData store. All other background

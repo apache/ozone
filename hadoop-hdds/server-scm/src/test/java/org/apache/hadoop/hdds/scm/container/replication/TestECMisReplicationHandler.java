@@ -61,7 +61,6 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   private static final int DATA = 3;
   private static final int PARITY = 2;
 
-
   @BeforeEach
   void setup(@TempDir File testDir) throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {

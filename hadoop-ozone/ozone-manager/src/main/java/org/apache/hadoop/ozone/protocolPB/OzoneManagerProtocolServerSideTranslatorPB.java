@@ -70,7 +70,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
   private OMRequest lastRequestToSubmit;
 
-
   /**
    * Constructs an instance of the server handler.
    *

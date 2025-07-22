@@ -49,7 +49,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   void addEcPipeline(Pipeline pipeline) throws IOException;
 
-
   Pipeline createPipeline(
       ReplicationConfig replicationConfig,
       List<DatanodeDetails> nodes
@@ -112,10 +111,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   int getNumberOfContainers(PipelineID pipelineID) throws IOException;
 
   void openPipeline(PipelineID pipelineId) throws IOException;
-
-  @Deprecated
-  void closePipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException;
 
   void closePipeline(PipelineID pipelineID) throws IOException;
 
@@ -221,4 +216,13 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * Release write lock.
    */
   void releaseWriteLock();
+
+  /**
+   * Checks whether all Datanodes in the specified pipeline have greater than the specified space, containerSize.
+   * @param pipeline pipeline to check
+   * @param containerSize the required amount of space
+   * @return false if all the volumes on any Datanode in the pipeline have space less than equal to the specified
+   * containerSize, otherwise true
+   */
+  boolean hasEnoughSpace(Pipeline pipeline, long containerSize);
 }

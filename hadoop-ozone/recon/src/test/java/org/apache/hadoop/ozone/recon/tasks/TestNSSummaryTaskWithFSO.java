@@ -18,12 +18,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -36,21 +31,14 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
-import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -65,94 +53,33 @@ import org.mockito.Mockito;
  * Test for NSSummaryTaskWithFSO.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestNSSummaryTaskWithFSO {
+public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private OMMetadataManager omMetadataManager;
-  private ReconOMMetadataManager reconOMMetadataManager;
-  private NSSummaryTaskWithFSO nSSummaryTaskWithFso;
-
-  private OzoneConfiguration ozoneConfiguration;
-
-  // Object names in FSO-enabled format
-  private static final String VOL = "vol";
-  private static final String BUCKET_ONE = "bucket1";
-  private static final String BUCKET_TWO = "bucket2";
-  private static final String KEY_ONE = "file1";
-  private static final String KEY_TWO = "file2";
-  private static final String KEY_THREE = "dir1/dir2/file3";
-  private static final String KEY_FOUR = "file4";
-  private static final String KEY_FIVE = "file5";
-  private static final String FILE_ONE = "file1";
-  private static final String FILE_TWO = "file2";
-  private static final String FILE_THREE = "file3";
-  private static final String FILE_FOUR = "file4";
-  private static final String FILE_FIVE = "file5";
-  private static final String DIR_ONE = "dir1";
-  private static final String DIR_ONE_RENAME = "dir1_new";
-  private static final String DIR_TWO = "dir2";
-  private static final String DIR_THREE = "dir3";
-  private static final String DIR_FOUR = "dir4";
-  private static final String DIR_FIVE = "dir5";
-
-  private static final long VOL_OBJECT_ID = 0L;
-  private static final long BUCKET_ONE_OBJECT_ID = 1L;
-  private static final long BUCKET_TWO_OBJECT_ID = 2L;
-  private static final long KEY_ONE_OBJECT_ID = 3L;
-  private static final long DIR_ONE_OBJECT_ID = 4L;
-  private static final long KEY_TWO_OBJECT_ID = 5L;
-  private static final long KEY_FOUR_OBJECT_ID = 6L;
-  private static final long DIR_TWO_OBJECT_ID = 7L;
-  private static final long KEY_THREE_OBJECT_ID = 8L;
-  private static final long KEY_FIVE_OBJECT_ID = 9L;
-  private static final long DIR_THREE_OBJECT_ID = 10L;
-  private static final long DIR_FOUR_OBJECT_ID = 11L;
-  private static final long DIR_FIVE_OBJECT_ID = 12L;
-
-  private static final long KEY_ONE_SIZE = 500L;
-  private static final long KEY_TWO_OLD_SIZE = 1025L;
-  private static final long KEY_TWO_UPDATE_SIZE = 1023L;
-  private static final long KEY_THREE_SIZE =
-          ReconConstants.MAX_FILE_SIZE_UPPER_BOUND - 100L;
-  private static final long KEY_FOUR_SIZE = 2050L;
-  private static final long KEY_FIVE_SIZE = 100L;
-
+  // Answer Sets
   private static Set<Long> bucketOneAns = new HashSet<>();
   private static Set<Long> bucketTwoAns = new HashSet<>();
   private static Set<Long> dirOneAns = new HashSet<>();
+  private NSSummaryTaskWithFSO nSSummaryTaskWithFso;
+
+  private static BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
 
   @BeforeAll
   void setUp(@TempDir File tmpDir) throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
-        3);
-    omMetadataManager = initializeNewOmMetadataManager(new File(tmpDir, "om"));
-    OzoneManagerServiceProvider ozoneManagerServiceProvider =
-        getMockOzoneManagerServiceProviderWithFSO();
-    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
-            new File(tmpDir, "recon"));
-
-    ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(tmpDir)
-            .withReconOm(reconOMMetadataManager)
-            .withOmServiceProvider(ozoneManagerServiceProvider)
-            .withReconSqlDb()
-            .withContainerDB()
-            .build();
-    reconNamespaceSummaryManager =
-            reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
-
-    NSSummary nonExistentSummary =
-            reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-    assertNull(nonExistentSummary);
-
-    populateOMDB();
-
-    long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 3);
+    commonSetup(tmpDir,
+        new OMConfigParameter(true,
+          false,
+          getBucketLayout(),
+          3,
+          true,
+          true,
+          false));
+    long threshold = getOzoneConfiguration().getLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD, 3);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager,
-         nsSummaryFlushToDBMaxThreshold);
+        getReconNamespaceSummaryManager(),
+        getReconOMMetadataManager(),
+        threshold);
   }
 
   /**
@@ -168,32 +95,16 @@ public class TestNSSummaryTaskWithFSO {
     public void setUp() throws IOException {
       // write a NSSummary prior to reprocess
       // verify it got cleaned up after.
-      NSSummary staleNSSummary = new NSSummary();
-      RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
-      reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, -1L,
-          staleNSSummary);
-      reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
-
-      // Verify commit
-      assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
-
-      // reinit Recon RocksDB's namespace CF.
-      reconNamespaceSummaryManager.clearNSSummaryTable();
-
-      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
-      assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
-
-      nsSummaryForBucket1 =
-          reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-      nsSummaryForBucket2 =
-          reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
-      assertNotNull(nsSummaryForBucket1);
-      assertNotNull(nsSummaryForBucket2);
+      List<NSSummary> result =
+          commonSetUpTestReprocess(() -> nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager()),
+              BUCKET_ONE_OBJECT_ID, BUCKET_TWO_OBJECT_ID);
+      nsSummaryForBucket1 = result.get(0);
+      nsSummaryForBucket2 = result.get(1);
     }
 
     @Test
     public void testReprocessNSSummaryNull() throws IOException {
-      assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNull(getReconNamespaceSummaryManager().getNSSummary(-1L));
     }
 
     @Test
@@ -204,7 +115,7 @@ public class TestNSSummaryTaskWithFSO {
       assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
       assertEquals(KEY_TWO_OLD_SIZE + KEY_FOUR_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
-    } 
+    }
 
     @Test
     public void testReprocessFileBucketSize() {
@@ -245,7 +156,7 @@ public class TestNSSummaryTaskWithFSO {
     public void testReprocessDirsUnderDir() throws Exception {
 
       // Dir 1 has two dir: dir2 and dir3.
-      NSSummary nsSummaryInDir1 = reconNamespaceSummaryManager
+      NSSummary nsSummaryInDir1 = getReconNamespaceSummaryManager()
           .getNSSummary(DIR_ONE_OBJECT_ID);
       assertNotNull(nsSummaryInDir1);
       Set<Long> childDirForDirOne = nsSummaryInDir1.getChildDir();
@@ -255,7 +166,7 @@ public class TestNSSummaryTaskWithFSO {
       dirOneAns.add(DIR_THREE_OBJECT_ID);
       assertEquals(dirOneAns, childDirForDirOne);
 
-      NSSummary nsSummaryInDir2 = reconNamespaceSummaryManager
+      NSSummary nsSummaryInDir2 = getReconNamespaceSummaryManager()
           .getNSSummary(DIR_TWO_OBJECT_ID);
       assertEquals(1, nsSummaryInDir2.getNumOfFiles());
       assertEquals(KEY_THREE_SIZE, nsSummaryInDir2.getSizeOfFiles());
@@ -280,11 +191,11 @@ public class TestNSSummaryTaskWithFSO {
     @Test
     public void testDirectoryParentIdAssignment() throws Exception {
       // Trigger reprocess to simulate reading from OM DB and processing into NSSummary.
-      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+      nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
 
       // Fetch NSSummary for DIR_ONE and verify its parent ID matches BUCKET_ONE_OBJECT_ID.
       NSSummary nsSummaryDirOne =
-          reconNamespaceSummaryManager.getNSSummary(DIR_ONE_OBJECT_ID);
+          getReconNamespaceSummaryManager().getNSSummary(DIR_ONE_OBJECT_ID);
       assertNotNull(nsSummaryDirOne,
           "NSSummary for DIR_ONE should not be null.");
       assertEquals(BUCKET_ONE_OBJECT_ID, nsSummaryDirOne.getParentId(),
@@ -292,7 +203,7 @@ public class TestNSSummaryTaskWithFSO {
 
       // Fetch NSSummary for DIR_TWO and verify its parent ID matches DIR_ONE_OBJECT_ID.
       NSSummary nsSummaryDirTwo =
-          reconNamespaceSummaryManager.getNSSummary(DIR_TWO_OBJECT_ID);
+          getReconNamespaceSummaryManager().getNSSummary(DIR_TWO_OBJECT_ID);
       assertNotNull(nsSummaryDirTwo,
           "NSSummary for DIR_TWO should not be null.");
       assertEquals(DIR_ONE_OBJECT_ID, nsSummaryDirTwo.getParentId(),
@@ -300,7 +211,7 @@ public class TestNSSummaryTaskWithFSO {
 
       // Fetch NSSummary for DIR_THREE and verify its parent ID matches DIR_ONE_OBJECT_ID.
       NSSummary nsSummaryDirThree =
-          reconNamespaceSummaryManager.getNSSummary(DIR_THREE_OBJECT_ID);
+          getReconNamespaceSummaryManager().getNSSummary(DIR_THREE_OBJECT_ID);
       assertNotNull(nsSummaryDirThree,
           "NSSummary for DIR_THREE should not be null.");
       assertEquals(DIR_ONE_OBJECT_ID, nsSummaryDirThree.getParentId(),
@@ -326,7 +237,7 @@ public class TestNSSummaryTaskWithFSO {
 
     @BeforeEach
     public void setUp() throws IOException {
-      nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
+      nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
       result = nSSummaryTaskWithFso.processWithFSO(processEventBatch(), 0);
     }
 
@@ -340,7 +251,7 @@ public class TestNSSummaryTaskWithFSO {
           OMUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omPutKey)
           .setValue(omPutKeyInfo)
-          .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
               .getName())
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
           .build();
@@ -354,7 +265,7 @@ public class TestNSSummaryTaskWithFSO {
           OMUpdateEventBuilder<String, OmKeyInfo>()
           .setKey(omDeleteKey)
           .setValue(omDeleteInfo)
-          .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
               .getName())
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
           .build();
@@ -372,7 +283,7 @@ public class TestNSSummaryTaskWithFSO {
           .setKey(omUpdateKey)
           .setValue(omUpdateInfo)
           .setOldValue(omOldInfo)
-          .setTable(omMetadataManager.getKeyTable(getBucketLayout())
+          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
               .getName())
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
           .build();
@@ -387,7 +298,7 @@ public class TestNSSummaryTaskWithFSO {
           .setKey(omDirPutKey1)
           .setValue(omDirPutValue1)
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
-          .setTable(omMetadataManager.getDirectoryTable().getName())
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
           .build();
 
       // add dir 5 under bucket 2
@@ -399,7 +310,7 @@ public class TestNSSummaryTaskWithFSO {
           .setKey(omDirPutKey2)
           .setValue(omDirPutValue2)
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
-          .setTable(omMetadataManager.getDirectoryTable().getName())
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
           .build();
 
       // delete dir 3 under dir 1
@@ -411,7 +322,7 @@ public class TestNSSummaryTaskWithFSO {
           .setKey(omDirDeleteKey)
           .setValue(omDirDeleteValue)
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
-          .setTable(omMetadataManager.getDirectoryTable().getName())
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
           .build();
 
       // rename dir1
@@ -426,7 +337,7 @@ public class TestNSSummaryTaskWithFSO {
           .setValue(omDirUpdateValue)
           .setOldValue(omDirOldValue)
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
-          .setTable(omMetadataManager.getDirectoryTable().getName())
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
           .build();
 
       return new OMUpdateEventBatch(Arrays.asList(
@@ -438,7 +349,7 @@ public class TestNSSummaryTaskWithFSO {
     @Test
     public void testProcessUpdateFileSize() throws IOException {
       NSSummary nsSummaryForBucket1 =
-          reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
+          getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
       // file 1 is gone, so bucket 1 is empty now
       assertNotNull(nsSummaryForBucket1);
       assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
@@ -455,7 +366,7 @@ public class TestNSSummaryTaskWithFSO {
     @Test
     public void testProcessBucket() throws IOException {
       NSSummary nsSummaryForBucket2 =
-          reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
+          getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
       // file 5 is added under bucket 2, so bucket 2 has 3 keys now
       // file 2 is updated with new datasize,
       // so file size dist for bucket 2 should be updated
@@ -489,7 +400,7 @@ public class TestNSSummaryTaskWithFSO {
     @Test
     public void testProcessDirDeleteRename() throws IOException {
       // after delete dir 3, dir 1 now has only one dir: dir2
-      NSSummary nsSummaryForDir1 = reconNamespaceSummaryManager
+      NSSummary nsSummaryForDir1 = getReconNamespaceSummaryManager()
           .getNSSummary(DIR_ONE_OBJECT_ID);
       assertNotNull(nsSummaryForDir1);
       Set<Long> childDirForDir1 = nsSummaryForDir1.getChildDir();
@@ -507,7 +418,7 @@ public class TestNSSummaryTaskWithFSO {
 
       // Verify the parent ID of DIR_FOUR after it's added under BUCKET_ONE.
       NSSummary nsSummaryDirFour =
-          reconNamespaceSummaryManager.getNSSummary(DIR_FOUR_OBJECT_ID);
+          getReconNamespaceSummaryManager().getNSSummary(DIR_FOUR_OBJECT_ID);
       assertNotNull(nsSummaryDirFour,
           "NSSummary for DIR_FOUR should not be null.");
       assertEquals(BUCKET_ONE_OBJECT_ID, nsSummaryDirFour.getParentId(),
@@ -515,7 +426,7 @@ public class TestNSSummaryTaskWithFSO {
 
       // Verify the parent ID of DIR_FIVE after it's added under BUCKET_TWO.
       NSSummary nsSummaryDirFive =
-          reconNamespaceSummaryManager.getNSSummary(DIR_FIVE_OBJECT_ID);
+          getReconNamespaceSummaryManager().getNSSummary(DIR_FIVE_OBJECT_ID);
       assertNotNull(nsSummaryDirFive,
           "NSSummary for DIR_FIVE should not be null.");
       assertEquals(BUCKET_TWO_OBJECT_ID, nsSummaryDirFive.getParentId(),
@@ -598,9 +509,10 @@ public class TestNSSummaryTaskWithFSO {
       Mockito.when(mockIterator.hasNext()).thenReturn(true, true, true, true, false);
       Mockito.when(mockIterator.next()).thenReturn(event1, event2, event3, event4);
 
-      // Mock the flushAndCommitNSToDB method to fail on the last flush
+      // Mock the flushAndCommitUpdatedNSToDB method to fail on the last flush
       NSSummaryTaskWithFSO taskSpy = Mockito.spy(task);
-      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy).flushAndCommitNSToDB(Mockito.anyMap());
+      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy)
+          .flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
 
       // Call the method under test
       Pair<Integer, Boolean> result1 = taskSpy.processWithFSO(events, 0);
@@ -611,152 +523,7 @@ public class TestNSSummaryTaskWithFSO {
 
       // Verify interactions
       Mockito.verify(mockIterator, Mockito.times(3)).next();
-      Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitNSToDB(Mockito.anyMap());
+      Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
     }
-  }
-
-  /**
-   * Build a key info for put/update action.
-   * @param volume volume name
-   * @param bucket bucket name
-   * @param key key name
-   * @param fileName file name
-   * @param objectID object ID
-   * @param parentObjectId parent object ID
-   * @param dataSize file size
-   * @return the KeyInfo
-   */
-  private static OmKeyInfo buildOmKeyInfo(String volume,
-                                          String bucket,
-                                          String key,
-                                          String fileName,
-                                          long objectID,
-                                          long parentObjectId,
-                                          long dataSize) {
-    return new OmKeyInfo.Builder()
-        .setBucketName(bucket)
-        .setVolumeName(volume)
-        .setKeyName(key)
-        .setFileName(fileName)
-        .setReplicationConfig(
-            StandaloneReplicationConfig.getInstance(
-                HddsProtos.ReplicationFactor.ONE))
-        .setObjectID(objectID)
-        .setParentObjectID(parentObjectId)
-        .setDataSize(dataSize)
-        .build();
-  }
-
-  /**
-   * Build a key info for delete action.
-   * @param volume volume name
-   * @param bucket bucket name
-   * @param key key name
-   * @param fileName file name
-   * @param objectID object ID
-   * @param parentObjectId parent object ID
-   * @return the KeyInfo
-   */
-  private static OmKeyInfo buildOmKeyInfo(String volume,
-                                          String bucket,
-                                          String key,
-                                          String fileName,
-                                          long objectID,
-                                          long parentObjectId) {
-    return new OmKeyInfo.Builder()
-            .setBucketName(bucket)
-            .setVolumeName(volume)
-            .setKeyName(key)
-            .setFileName(fileName)
-            .setReplicationConfig(
-                    StandaloneReplicationConfig.getInstance(
-                            HddsProtos.ReplicationFactor.ONE))
-            .setObjectID(objectID)
-            .setParentObjectID(parentObjectId)
-            .build();
-  }
-
-  private static OmDirectoryInfo buildOmDirInfo(String dirName,
-                                                long objectId,
-                                                long parentObjectId) {
-    return new OmDirectoryInfo.Builder()
-            .setName(dirName)
-            .setObjectID(objectId)
-            .setParentObjectID(parentObjectId)
-            .build();
-  }
-
-  /**
-   * Populate OMDB with the following configs.
-   *              vol
-   *            /     \
-   *        bucket1   bucket2
-   *        /    \      /    \
-   *     file1  dir1  file2  file4
-   *            /   \
-   *         dir2   dir3
-   *          /
-   *        file3
-   *
-   * @throws IOException
-   */
-  private void populateOMDB() throws IOException {
-    writeKeyToOm(reconOMMetadataManager,
-        KEY_ONE,
-        BUCKET_ONE,
-        VOL,
-        FILE_ONE,
-        KEY_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_ONE_SIZE,
-        getBucketLayout());
-    writeKeyToOm(reconOMMetadataManager,
-        KEY_TWO,
-        BUCKET_TWO,
-        VOL,
-        FILE_TWO,
-        KEY_TWO_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_TWO_OLD_SIZE,
-        getBucketLayout());
-    writeKeyToOm(reconOMMetadataManager,
-        KEY_THREE,
-        BUCKET_ONE,
-        VOL,
-        FILE_THREE,
-        KEY_THREE_OBJECT_ID,
-        DIR_TWO_OBJECT_ID,
-        BUCKET_ONE_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_THREE_SIZE,
-        getBucketLayout());
-    writeKeyToOm(reconOMMetadataManager,
-        KEY_FOUR,
-        BUCKET_TWO,
-        VOL,
-        FILE_FOUR,
-        KEY_FOUR_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
-        BUCKET_TWO_OBJECT_ID,
-        VOL_OBJECT_ID,
-        KEY_FOUR_SIZE,
-        getBucketLayout());
-    writeDirToOm(reconOMMetadataManager, DIR_ONE_OBJECT_ID,
-            BUCKET_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID, DIR_ONE);
-    writeDirToOm(reconOMMetadataManager, DIR_TWO_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID, DIR_TWO);
-    writeDirToOm(reconOMMetadataManager, DIR_THREE_OBJECT_ID,
-            DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID,
-            VOL_OBJECT_ID, DIR_THREE);
-  }
-
-  private static BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }

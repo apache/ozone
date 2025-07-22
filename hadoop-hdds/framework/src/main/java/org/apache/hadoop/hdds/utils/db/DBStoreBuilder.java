@@ -29,9 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.MessageLite;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -42,8 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -52,7 +50,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedLogger;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
-import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.InfoLogLevel;
 import org.rocksdb.StatsLevel;
@@ -70,7 +67,7 @@ public final class DBStoreBuilder {
       LoggerFactory.getLogger(ManagedRocksDB.ORIGINAL_CLASS);
 
   public static final String DEFAULT_COLUMN_FAMILY_NAME =
-      StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
+      org.apache.hadoop.hdds.StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY);
 
   // DB PKIProfile used by ROCKDB instances.
   public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
@@ -91,7 +88,6 @@ public final class DBStoreBuilder {
   // any options. On build, this will be replaced with defaultCfOptions.
   private Map<String, ManagedColumnFamilyOptions> cfOptions;
   private ConfigurationSource configuration;
-  private final CodecRegistry.Builder registry = CodecRegistry.newBuilder();
   private String rocksDbStat;
   // RocksDB column family write buffer size
   private long rocksDbCfWriteBufferSize;
@@ -110,28 +106,23 @@ public final class DBStoreBuilder {
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
    */
-  public static DBStore createDBStore(ConfigurationSource configuration,
-      DBDefinition definition) throws IOException {
-    return newBuilder(configuration, definition).build();
+  public static DBStore createDBStore(ConfigurationSource configuration, DBDefinition definition)
+      throws RocksDatabaseException {
+    return newBuilder(configuration, definition, null, null).build();
   }
 
-  public static DBStoreBuilder newBuilder(ConfigurationSource configuration,
-      DBDefinition definition) {
+  public static DBStoreBuilder newBuilder(ConfigurationSource conf, DBDefinition definition, File dbDir) {
+    return newBuilder(conf, definition, dbDir.getName(), dbDir.getParentFile().toPath());
+  }
 
-    DBStoreBuilder builder = newBuilder(configuration);
-    builder.applyDBDefinition(definition);
-
-    return builder;
+  public static DBStoreBuilder newBuilder(ConfigurationSource conf, DBDefinition definition,
+      String name, Path metadataDir) {
+    return newBuilder(conf).apply(definition, name, metadataDir);
   }
 
   public static DBStoreBuilder newBuilder(ConfigurationSource configuration) {
-    return newBuilder(configuration,
+    return new DBStoreBuilder(configuration,
         configuration.getObject(RocksDBConfiguration.class));
-  }
-
-  public static DBStoreBuilder newBuilder(ConfigurationSource configuration,
-      RocksDBConfiguration rocksDBConfiguration) {
-    return new DBStoreBuilder(configuration, rocksDBConfiguration);
   }
 
   private DBStoreBuilder(ConfigurationSource configuration,
@@ -173,21 +164,23 @@ public final class DBStoreBuilder {
     return metadataDir;
   }
 
-  private void applyDBDefinition(DBDefinition definition) {
-    // Set metadata dirs.
-    File metadataDir = getDBDirPath(definition, configuration);
+  private DBStoreBuilder apply(DBDefinition definition, String name, Path metadataDir) {
+    if (name == null) {
+      name = definition.getName();
+    }
+    setName(name);
 
-    setName(definition.getName());
-    setPath(Paths.get(metadataDir.getPath()));
+    // Set metadata dirs.
+    if (metadataDir == null) {
+      metadataDir = getDBDirPath(definition, configuration).toPath();
+    }
+    setPath(metadataDir);
 
     // Add column family names and codecs.
-    for (DBColumnFamilyDefinition columnFamily :
-        definition.getColumnFamilies()) {
-
+    for (DBColumnFamilyDefinition<?, ?> columnFamily : definition.getColumnFamilies()) {
       addTable(columnFamily.getName(), columnFamily.getCfOptions());
-      addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());
-      addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
     }
+    return this;
   }
 
   private void setDBOptionsProps(ManagedDBOptions dbOptions) {
@@ -206,10 +199,10 @@ public final class DBStoreBuilder {
    *
    * @return DBStore
    */
-  public DBStore build() throws IOException {
-    if (StringUtil.isBlank(dbname) || (dbPath == null)) {
+  public RDBStore build() throws RocksDatabaseException {
+    if (StringUtils.isBlank(dbname) || (dbPath == null)) {
       LOG.error("Required Parameter missing.");
-      throw new IOException("Required parameter is missing. Please make sure "
+      throw new RocksDatabaseException("Required parameter is missing. Please make sure "
           + "Path and DB name is provided.");
     }
 
@@ -225,11 +218,11 @@ public final class DBStoreBuilder {
 
       File dbFile = getDBFile();
       if (!dbFile.getParentFile().exists()) {
-        throw new IOException("The DB destination directory should exist.");
+        throw new RocksDatabaseException("The DB destination directory should exist.");
       }
 
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
-          registry.build(), openReadOnly, dbJmxBeanNameName, enableCompactionDag,
+          openReadOnly, dbJmxBeanNameName, enableCompactionDag,
           maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
           enableRocksDbMetrics);
     } finally {
@@ -255,15 +248,6 @@ public final class DBStoreBuilder {
       ManagedColumnFamilyOptions options) {
     cfOptions.put(tableName, options);
     return this;
-  }
-
-  public <T> DBStoreBuilder addCodec(Class<T> type, Codec<T> codec) {
-    registry.addCodec(type, codec);
-    return this;
-  }
-
-  public <T extends MessageLite> DBStoreBuilder addProto2Codec(T type) {
-    return addCodec((Class<T>)type.getClass(), Proto2Codec.get(type));
   }
 
   public DBStoreBuilder setDBOptions(ManagedDBOptions option) {
@@ -302,6 +286,7 @@ public final class DBStoreBuilder {
     this.enableRocksDbMetrics = enableRocksDbMetrics;
     return this;
   }
+
   /**
    * Set the {@link ManagedDBOptions} and default
    * {@link ManagedColumnFamilyOptions} based on {@code prof}.
@@ -434,7 +419,7 @@ public final class DBStoreBuilder {
 
     List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
 
-    if (StringUtil.isNotBlank(dbname)) {
+    if (StringUtils.isNotBlank(dbname)) {
       for (TableConfig tc : tableConfigs) {
         columnFamilyDescriptors.add(tc.getDescriptor());
       }
@@ -446,7 +431,7 @@ public final class DBStoreBuilder {
           if (option != null) {
             LOG.info("Using RocksDB DBOptions from {}.ini file", dbname);
           }
-        } catch (IOException ex) {
+        } catch (RocksDatabaseException ex) {
           LOG.info("Unable to read RocksDB DBOptions from {}", dbname, ex);
         } finally {
           columnFamilyDescriptors.forEach(d -> d.getOptions().close());
@@ -457,15 +442,15 @@ public final class DBStoreBuilder {
     return option;
   }
 
-  private File getDBFile() throws IOException {
+  private File getDBFile() throws RocksDatabaseException {
     if (dbPath == null) {
       LOG.error("DB path is required.");
-      throw new IOException("A Path to for DB file is needed.");
+      throw new RocksDatabaseException("A Path to for DB file is needed.");
     }
 
-    if (StringUtil.isBlank(dbname)) {
+    if (StringUtils.isBlank(dbname)) {
       LOG.error("DBName is a required.");
-      throw new IOException("A valid DB name is required.");
+      throw new RocksDatabaseException("A valid DB name is required.");
     }
     return Paths.get(dbPath.toString(), dbname).toFile();
   }

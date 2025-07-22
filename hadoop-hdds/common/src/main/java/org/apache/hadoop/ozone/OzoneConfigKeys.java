@@ -43,7 +43,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_OM_DB_DIRS_PERMISSIONS =
       "ozone.om.db.dirs.permissions";
 
-
   public static final String OZONE_OM_DB_DIRS = "ozone.om.db.dirs";
 
   /**
@@ -140,7 +139,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT
       = "60s";
 
-
   /**
    * When set to true, allocate a random free port for ozone container, so that
    * a mini cluster is able to launch multiple containers on a node.
@@ -196,7 +194,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT =
       "ozone.client.ec.grpc.write.timeout";
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
-
 
   /**
    * Ozone administrator users delimited by comma.
@@ -318,7 +315,6 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT = "20m";
 
-
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";
   public static final int OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT
@@ -410,7 +406,7 @@ public final class OzoneConfigKeys {
   public static final long HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
       ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
   public static final String HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
-      "hdds.ratis.leader.first.election.minimum.timeout.duration";
+      "hdds.raft.server.rpc.first-election.timeout";
 
   public static final String HDDS_DATANODE_PLUGINS_KEY =
       "hdds.datanode.plugins";
@@ -448,7 +444,6 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_CONTAINER_COPY_WORKDIR =
       "hdds.datanode.replication.work.dir";
-
 
   public static final int OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE = 8 * 1024;
 
@@ -508,7 +503,6 @@ public final class OzoneConfigKeys {
       "ozone.freon.http.auth.type";
   public static final String OZONE_FREON_HTTP_AUTH_CONFIG_PREFIX =
       "ozone.freon.http.auth.";
-
 
   public static final String OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY =
       "ozone.network.topology.aware.read";
@@ -625,10 +619,9 @@ public final class OzoneConfigKeys {
   public static final String
       OZONE_FS_LISTING_PAGE_SIZE_MAX = "ozone.fs.listing.page.size.max";
 
-
   public static final String FS_TRASH_CLASSNAME = "fs.trash.classname";
   public static final String FS_TRASH_CLASSNAME_DEFAULT =
-      "org.apache.hadoop.ozone.om.TrashPolicyOzone";
+      "org.apache.hadoop.fs.ozone.OzoneTrashPolicy";
 
   public static final String
       OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED =
@@ -645,6 +638,17 @@ public final class OzoneConfigKeys {
   public static final long
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
       TimeUnit.HOURS.toMillis(1);
+
+  public static final String
+      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE =
+      "ozone.om.snapshot.prune.compaction.backup.batch.size";
+
+  public static final int
+      OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT = 2000;
+
+  public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
+      "ozone.om.snapshot.load.native.lib";
+  public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
 
   public static final String OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT =
       "ozone.om.delta.update.data.size.max.limit";
@@ -664,7 +668,6 @@ public final class OzoneConfigKeys {
   public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
       "hdds.scmclient.failover.max.retry";
 
-
   public static final String OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
       "ozone.xceiver.client.metrics.percentiles.intervals.seconds";
 
@@ -677,7 +680,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE =
       "ozone.security.crypto.compliance.mode";
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
-
 
   /**
    * There is no need to instantiate this class.

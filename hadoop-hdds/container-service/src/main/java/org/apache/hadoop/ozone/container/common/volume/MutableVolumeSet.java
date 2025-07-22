@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
@@ -273,8 +274,18 @@ public class MutableVolumeSet implements VolumeSet {
         });
   }
 
+  public void startAllVolume() throws IOException {
+    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
+      entry.getValue().start();
+    }
+  }
+
   public void refreshAllVolumeUsage() {
     volumeMap.forEach((k, v) -> v.refreshVolumeUsage());
+  }
+
+  public void setGatherContainerUsages(Function<HddsVolume, Long> gatherContainerUsages) {
+    volumeMap.forEach((k, v) -> v.setGatherContainerUsages(gatherContainerUsages));
   }
 
   /**
@@ -467,4 +478,9 @@ public class MutableVolumeSet implements VolumeSet {
       this.readUnlock();
     }
   }
+
+  public StorageVolume.VolumeType getVolumeType() {
+    return volumeType;
+  }
+
 }

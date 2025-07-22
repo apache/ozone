@@ -43,20 +43,6 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerSchemaDefinition.class);
 
-  /**
-   * ENUM describing the allowed container states which can be stored in the
-   * unhealthy containers table.
-   */
-  public enum UnHealthyContainerStates {
-    MISSING,
-    EMPTY_MISSING,
-    UNDER_REPLICATED,
-    OVER_REPLICATED,
-    MIS_REPLICATED,
-    ALL_REPLICAS_BAD,
-    NEGATIVE_SIZE // Added new state to track containers with negative sizes
-  }
-
   private static final String CONTAINER_ID = "container_id";
   private static final String CONTAINER_STATE = "container_state";
   private final DataSource dataSource;
@@ -103,5 +89,20 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
   public DataSource getDataSource() {
     return dataSource;
+  }
+
+  /**
+   * ENUM describing the allowed container states which can be stored in the
+   * unhealthy containers table.
+   */
+  public enum UnHealthyContainerStates {
+    MISSING,
+    EMPTY_MISSING,
+    UNDER_REPLICATED,
+    OVER_REPLICATED,
+    MIS_REPLICATED,
+    ALL_REPLICAS_BAD,
+    NEGATIVE_SIZE, // Added new state to track containers with negative sizes
+    REPLICA_MISMATCH
   }
 }

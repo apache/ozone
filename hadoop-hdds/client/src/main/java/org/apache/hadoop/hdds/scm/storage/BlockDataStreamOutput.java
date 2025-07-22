@@ -139,6 +139,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // buffers for which putBlock is yet to be executed
   private List<StreamBuffer> buffersForPutBlock;
   private boolean isDatastreamPipelineMode;
+
   /**
    * Creates a new BlockDataStreamOutput.
    *
@@ -603,7 +604,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       throw sce;
     }
   }
-
 
   private void setIoException(Throwable e) {
     IOException ioe = getIoException();
