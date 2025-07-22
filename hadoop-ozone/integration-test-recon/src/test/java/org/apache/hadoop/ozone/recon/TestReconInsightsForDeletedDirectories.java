@@ -31,6 +31,7 @@ import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -42,6 +43,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -68,7 +70,9 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,99 +87,40 @@ public class TestReconInsightsForDeletedDirectories {
 
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
-  private static String volumeName;
-  private static String bucketName;
-  private static ReplicationConfig replicationConfig;
   private static OzoneClient client;
   private static ReconService recon;
-
-  protected static MiniOzoneCluster getCluster() {
-    return cluster;
-  }
-
-  protected static void setCluster(MiniOzoneCluster cluster) {
-    TestReconInsightsForDeletedDirectories.cluster = cluster;
-  }
-
-  protected static FileSystem getFs() {
-    return fs;
-  }
-
-  protected static void setFs(FileSystem fs) {
-    TestReconInsightsForDeletedDirectories.fs = fs;
-  }
-
-  protected static String getVolumeName() {
-    return volumeName;
-  }
-
-  protected static void setVolumeName(String volumeName) {
-    TestReconInsightsForDeletedDirectories.volumeName = volumeName;
-  }
-
-  protected static String getBucketName() {
-    return bucketName;
-  }
-
-  protected static void setBucketName(String bucketName) {
-    TestReconInsightsForDeletedDirectories.bucketName = bucketName;
-  }
-
-  protected static ReplicationConfig getReplicationConfig() {
-    return replicationConfig;
-  }
-
-  protected static void setReplicationConfig(ReplicationConfig replicationConfig) {
-    TestReconInsightsForDeletedDirectories.replicationConfig = replicationConfig;
-  }
-
-  protected static OzoneClient getClient() {
-    return client;
-  }
-
-  protected static void setClient(OzoneClient client) {
-    TestReconInsightsForDeletedDirectories.client = client;
-  }
-
-  protected static ReconService getRecon() {
-    return recon;
-  }
-
-  protected static void setRecon(ReconService recon) {
-    TestReconInsightsForDeletedDirectories.recon = recon;
-  }
+  private static OzoneConfiguration conf;
 
   @BeforeAll
   public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1000000);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     recon = new ReconService(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(5)
         .addService(recon)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
-    // create a volume and a bucket to be used by OzoneFileSystem
-    replicationConfig = ReplicationConfig.fromTypeAndFactor(RATIS, THREE);
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        new DefaultReplicationConfig(replicationConfig));
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
-
-    String rootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
-
-    // Set the fs.defaultFS and start the filesystem
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+  }
 
-    fs = FileSystem.get(conf);
+  /**
+   * Provides a list of replication configurations (RATIS and EC)
+   * to be used for parameterized tests.
+   *
+   * @return List of replication configurations as Arguments.
+   */
+  static List<Arguments> replicationConfigs() {
+    return Arrays.asList(
+        Arguments.of(ReplicationConfig.fromTypeAndFactor(RATIS, THREE)),
+        Arguments.of(new ECReplicationConfig("RS-3-2-1024k"))
+    );
   }
 
   @AfterAll
@@ -184,7 +129,6 @@ public class TestReconInsightsForDeletedDirectories {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @AfterEach
@@ -196,6 +140,8 @@ public class TestReconInsightsForDeletedDirectories {
         fs.delete(fileStatus.getPath(), true);
       }
     });
+
+    IOUtils.closeQuietly(fs);
   }
 
   /**
@@ -207,9 +153,17 @@ public class TestReconInsightsForDeletedDirectories {
    *      ├── ...
    *      └── file10
    */
-  @Test
-  public void testGetDeletedDirectoryInfo()
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  public void testGetDeletedDirectoryInfo(ReplicationConfig replicationConfig)
       throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        new DefaultReplicationConfig(replicationConfig));
+    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+        bucket.getVolumeName());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    fs = FileSystem.get(conf);
+
     // Create a directory structure with 10 files in dir1.
     Path dir1 = new Path("/dir1");
     fs.mkdirs(dir1);
@@ -318,9 +272,17 @@ public class TestReconInsightsForDeletedDirectories {
    *      │   │   └── file3
    *
    */
-  @Test
-  public void testGetDeletedDirectoryInfoForNestedDirectories()
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  public void testGetDeletedDirectoryInfoForNestedDirectories(ReplicationConfig replicationConfig)
       throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        new DefaultReplicationConfig(replicationConfig));
+    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+        bucket.getVolumeName());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    fs = FileSystem.get(conf);
+
     // Create a directory structure with 10 files and 3 nested directories.
     Path path = new Path("/dir1/dir2/dir3");
     fs.mkdirs(path);
@@ -416,9 +378,18 @@ public class TestReconInsightsForDeletedDirectories {
    *        ├── ...
    *        └── file10
    */
-  @Test
-  public void testGetDeletedDirectoryInfoWithMultipleSubdirectories()
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  public void testGetDeletedDirectoryInfoWithMultipleSubdirectories(ReplicationConfig replicationConfig)
       throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        new DefaultReplicationConfig(replicationConfig));
+    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+        bucket.getVolumeName());
+    // Set the fs.defaultFS and start the filesystem
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    fs = FileSystem.get(conf);
+
     int numSubdirectories = 10;
     int filesPerSubdirectory = 10;
 
