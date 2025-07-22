@@ -212,7 +212,6 @@ public class TestCloseContainer {
   }
 
   @Test
-  @Flaky("HDDS-13346")
   public void testContainerChecksumForClosedContainer() throws Exception {
     // Create some keys to write data into the open containers
     ReplicationConfig repConfig = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
