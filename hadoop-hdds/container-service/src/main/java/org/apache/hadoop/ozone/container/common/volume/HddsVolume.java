@@ -319,7 +319,7 @@ public class HddsVolume extends StorageVolume {
       getIoTestSlidingWindow().add();
     }
 
-    if (getIoTestSlidingWindow().isFull()) {
+    if (getIoTestSlidingWindow().isExceeded()) {
       LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
               "encountered more than the {} tolerated failures.",
           dbFile, this, getIoTestSlidingWindow().getWindowSize());
@@ -328,7 +328,7 @@ public class HddsVolume extends StorageVolume {
 
     LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}: " +
             "encountered {} out of {} tolerated failures",
-        dbFile, this, getIoTestSlidingWindow().getSize(), getIoTestSlidingWindow().getWindowSize());
+        dbFile, this, getIoTestSlidingWindow().getNumEventsInWindow(), getIoTestSlidingWindow().getWindowSize());
     return VolumeCheckResult.HEALTHY;
   }
 

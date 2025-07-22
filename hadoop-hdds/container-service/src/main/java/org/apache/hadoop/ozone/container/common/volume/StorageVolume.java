@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
@@ -47,7 +48,6 @@ import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
-import org.apache.hadoop.ozone.container.common.utils.SlidingWindow;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -702,14 +702,14 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     // If the failure threshold has been crossed, fail the volume without further scans.
     // Once the volume is failed, it will not be checked anymore.
     // The failure counts can be left as is.
-    if (ioTestSlidingWindow.isFull()) {
+    if (ioTestSlidingWindow.isExceeded()) {
       LOG.error("Failed IO test for volume {}: encountered more than the {} tolerated failures within the past {} ms.",
-          this, ioTestSlidingWindow.getWindowSize(), ioTestSlidingWindow.getExpiryDuration().toMillis());
+          this, ioTestSlidingWindow.getWindowSize(), ioTestSlidingWindow.getExpiryDurationMillis());
       return VolumeCheckResult.FAILED;
     }
 
     LOG.debug("IO test results for volume {}: encountered {} out of {} tolerated failures",
-        this, ioTestSlidingWindow.getSize(), ioTestSlidingWindow.getWindowSize());
+        this, ioTestSlidingWindow.getNumEventsInWindow(), ioTestSlidingWindow.getWindowSize());
 
     return VolumeCheckResult.HEALTHY;
   }

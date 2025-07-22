@@ -149,6 +149,10 @@ public class SlidingWindow {
     return clock.millis();
   }
 
+  public long getExpiryDurationMillis() {
+    return expiryDurationMillis;
+  }
+
   /**
    * A custom monotonic clock implementation.
    * Implementation of Clock that uses System.nanoTime() for real usage.

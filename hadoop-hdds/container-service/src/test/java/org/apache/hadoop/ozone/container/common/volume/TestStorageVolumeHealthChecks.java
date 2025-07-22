@@ -30,10 +30,11 @@ import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
-import org.apache.hadoop.ozone.container.common.utils.SlidingWindow;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
@@ -315,16 +316,17 @@ public class TestStorageVolumeHealthChecks {
     // Sliding window protocol transitioned from count-based to a time-based system
     // Update the default failure duration of the window from 1 hour to a shorter duration for the test
     long eventRate = 1L;
-    Field expiryDuration = SlidingWindow.class.getDeclaredField("expiryDuration");
+    TestClock testClock = TestClock.newInstance();
+    Field clock = SlidingWindow.class.getDeclaredField("clock");
     Field expiryDurationMillis = SlidingWindow.class.getDeclaredField("expiryDurationMillis");
-    expiryDuration.setAccessible(true);
+    clock.setAccessible(true);
     expiryDurationMillis.setAccessible(true);
-    expiryDuration.set(volume.getIoTestSlidingWindow(), Duration.ofMillis(eventRate * ioTestCount));
+    clock.set(volume.getIoTestSlidingWindow(), testClock);
     expiryDurationMillis.set(volume.getIoTestSlidingWindow(), Duration.ofMillis(eventRate * ioTestCount).toMillis());
 
     for (int i = 0; i < checkResults.length; i++) {
       // Sleep to allow entries in the sliding window to eventually timeout
-      Thread.sleep(eventRate);
+      testClock.fastForward(eventRate);
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override
