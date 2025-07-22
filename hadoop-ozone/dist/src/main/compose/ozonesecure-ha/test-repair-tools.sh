@@ -76,17 +76,17 @@ repair_and_restart_om() {
   fi
 }
 
-# Test for repairing a ratis transaction
+echo "Testing ratis transaction repair on all OMs"
 execute_robot_test ${SCM} kinit.robot
 execute_robot_test ${SCM} repair/ratis-transaction-repair.robot
 repair_and_restart_om "ozonesecure-ha-om1-1" "om1"
 repair_and_restart_om "ozonesecure-ha-om2-1" "om2"
 repair_and_restart_om "ozonesecure-ha-om3-1" "om3"
-if ! execute_command_in_container scm1.org timeout 15s ozone sh volume list; then
+if ! execute_command_in_container scm1.org timeout 15s ozone sh volume list 1>/dev/null; then
   echo "Command timed out or failed => OMs are not running as expected. Test for repairing ratis transaction failed."
   exit 1
 fi
-# End of test for repairing a ratis transaction
+echo "Testing ratis transaction repair completed successfully."
 
 execute_robot_test ${OM} kinit.robot
 

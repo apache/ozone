@@ -32,3 +32,4 @@ Verify OM crash at bucket create
     Inject Fault Into OMs Only      ${CRASH_RULE}
     Execute         ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME}
     Run Process     ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/${BAD_BUCKET}    timeout=${TIMEOUT}    shell=True
+    Remove Fault From OMs Only      ${CRASH_RULE}
