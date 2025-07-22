@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -125,13 +126,23 @@ public class TestKeyValueContainerData {
     KeyValueContainerData containerData = new KeyValueContainerData(1, layout, MAXSIZE, UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
 
+    // When the container is initially created without a checksum, the checksum will be 0 but the container still
+    // indicates it needs the actual one generated.
     assertFalse(containerData.isEmpty());
     assertTrue(containerData.needsDataChecksum());
+    assertEquals(0, containerData.getDataChecksum());
+
+    // Once the setter is called with any value, the container should no longer consider the checksum missing.
+    containerData.setDataChecksum(0);
+    assertFalse(containerData.needsDataChecksum());
     assertEquals(0, containerData.getDataChecksum());
 
     containerData.setDataChecksum(123L);
     assertFalse(containerData.isEmpty());
     assertFalse(containerData.needsDataChecksum());
     assertEquals(123L, containerData.getDataChecksum());
+
+    assertThrows(IllegalArgumentException.class, () -> containerData.setDataChecksum(-1L),
+        "Negative checksum value should throw an exception.");
   }
 }
