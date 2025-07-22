@@ -83,6 +83,7 @@ public class MutableVolumeSet implements VolumeSet {
   private final StorageVolumeFactory volumeFactory;
   private final StorageVolume.VolumeType volumeType;
   private int maxVolumeFailuresTolerated;
+  private VolumeHealthMetrics volumeHealthMetrics;
 
   public MutableVolumeSet(String dnUuid, ConfigurationSource conf,
       StateContext context, StorageVolume.VolumeType volumeType,
@@ -123,6 +124,8 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     initializeVolumeSet();
+    
+    this.volumeHealthMetrics = new VolumeHealthMetrics(volumeType, this);
   }
 
   public void setFailedVolumeListener(CheckedRunnable<IOException> runnable) {
@@ -404,6 +407,10 @@ public class MutableVolumeSet implements VolumeSet {
       }
     }
     volumeMap.clear();
+    
+    if (volumeHealthMetrics != null) {
+      volumeHealthMetrics.unregister();
+    }
   }
 
   @Override

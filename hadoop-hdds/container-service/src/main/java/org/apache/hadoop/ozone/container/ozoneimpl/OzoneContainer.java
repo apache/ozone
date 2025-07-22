@@ -89,7 +89,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
-import org.apache.hadoop.ozone.container.common.volume.VolumeHealthMetrics;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
@@ -140,8 +139,6 @@ public class OzoneContainer {
   private final ContainerMetrics metrics;
   private WitnessedContainerMetadataStore witnessedContainerMetadataStore;
 
-  private VolumeHealthMetrics dataVolumeHealthMetrics;
-
   enum InitializingStatus {
     UNINITIALIZED, INITIALIZING, INITIALIZED
   }
@@ -175,9 +172,6 @@ public class OzoneContainer {
     dbVolumeSet = HddsServerUtil.getDatanodeDbDirs(conf).isEmpty() ? null :
         new MutableVolumeSet(datanodeDetails.getUuidString(), conf,
             context, VolumeType.DB_VOLUME, volumeChecker);
-
-    // Initialize volume health metrics
-    initVolumeHealthMetrics();
 
     final DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
@@ -561,11 +555,6 @@ public class OzoneContainer {
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
 
-    // Unregister volume health metrics
-    if (dataVolumeHealthMetrics != null) {
-      dataVolumeHealthMetrics.unregister();
-    }
-
     if (this.witnessedContainerMetadataStore != null) {
       try {
         this.witnessedContainerMetadataStore.stop();
@@ -581,14 +570,6 @@ public class OzoneContainer {
     if (containerSet != null) {
       containerSet.handleVolumeFailures(context);
     }
-  }
-
-  /**
-   * Initialize volume health metrics for all volume sets.
-   */
-  private void initVolumeHealthMetrics() {
-    dataVolumeHealthMetrics = new VolumeHealthMetrics(
-        VolumeType.DATA_VOLUME, volumeSet);
   }
 
   @VisibleForTesting

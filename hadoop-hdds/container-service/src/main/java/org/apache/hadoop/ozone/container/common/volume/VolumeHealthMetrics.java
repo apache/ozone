@@ -49,7 +49,6 @@ public class VolumeHealthMetrics implements MetricsSource {
   private final MetricsRegistry registry;
   private final String metricsSourceName;
   private final VolumeSet volumeSet;
-  private final StorageVolume.VolumeType volumeType;
 
   /**
    * Constructor for VolumeHealthMetrics.
@@ -58,16 +57,11 @@ public class VolumeHealthMetrics implements MetricsSource {
    * @param volumeSet The volume set to track metrics for
    */
   public VolumeHealthMetrics(StorageVolume.VolumeType volumeType, VolumeSet volumeSet) {
-    this.volumeType = volumeType;
     this.volumeSet = volumeSet;
 
     metricsSourceName = SOURCE_BASENAME + '-' + volumeType.name();
     registry = new MetricsRegistry(metricsSourceName);
 
-    init();
-  }
-
-  public void init() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.register(metricsSourceName, "Volume Health Statistics", this);
   }
