@@ -749,4 +749,14 @@ class TestOmSnapshotManager {
         UUID.randomUUID(),
         Time.now());
   }
+
+  @Test
+  void testNegativeMaxOpenFiles(@TempDir File tempDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
+    conf.setInt(OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, 0);
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
+
+    assertThrows(IllegalArgumentException.class, () -> new OmTestManagers(conf));
+  }
 }

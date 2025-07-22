@@ -184,9 +184,12 @@ public class ContainerChecksumTreeManager {
     // Update Container Diff metrics based on the diff report.
     if (report.needsRepair()) {
       metrics.incrementRepairContainerDiffs();
-      return report;
+      metrics.incrementCorruptChunksIdentified(report.getNumCorruptChunks());
+      metrics.incrementMissingBlocksIdentified(report.getNumMissingBlocks());
+      metrics.incrementMissingChunksIdentified(report.getNumMissingChunks());
+    } else {
+      metrics.incrementNoRepairContainerDiffs();
     }
-    metrics.incrementNoRepairContainerDiffs();
     return report;
   }
 

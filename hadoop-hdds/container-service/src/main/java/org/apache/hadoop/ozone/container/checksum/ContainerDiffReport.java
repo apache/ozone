@@ -44,26 +44,46 @@ public class ContainerDiffReport {
     return containerID;
   }
 
+  /**
+   * @param missingBlockMerkleTree The block merkle tree of the block to report as missing.
+   */
   public void addMissingBlock(ContainerProtos.BlockMerkleTree missingBlockMerkleTree) {
     this.missingBlocks.add(missingBlockMerkleTree);
   }
 
+  /**
+   * @param blockId The ID of the block with missing chunks identified.
+   * @param missingChunkMerkleTree The chunk within this block to report as missing.
+   */
   public void addMissingChunk(long blockId, ContainerProtos.ChunkMerkleTree missingChunkMerkleTree) {
     this.missingChunks.computeIfAbsent(blockId, any -> new ArrayList<>()).add(missingChunkMerkleTree);
   }
 
+  /**
+   * @param blockId The ID of the block with missing chunks identified.
+   * @param corruptChunk The chunk within this block to report as corrupt.
+   */
   public void addCorruptChunk(long blockId, ContainerProtos.ChunkMerkleTree corruptChunk) {
     this.corruptChunks.computeIfAbsent(blockId, any -> new ArrayList<>()).add(corruptChunk);
   }
 
+  /**
+   * @return A list of BlockMerkleTree objects that were reported as missing.
+   */
   public List<ContainerProtos.BlockMerkleTree> getMissingBlocks() {
     return missingBlocks;
   }
 
+  /**
+   * @return A map of block IDs to lists of missing ChunkMerkleTree objects within those blocks.
+   */
   public Map<Long, List<ContainerProtos.ChunkMerkleTree>> getMissingChunks() {
     return missingChunks;
   }
 
+  /**
+   * @return A map of block IDs to lists of corrupt ChunkMerkleTree objects within those blocks.
+   */
   public Map<Long, List<ContainerProtos.ChunkMerkleTree>> getCorruptChunks() {
     return corruptChunks;
   }
@@ -77,14 +97,23 @@ public class ContainerDiffReport {
     return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty();
   }
 
-  // TODO: HDDS-11763 - Add metrics for missing blocks, missing chunks, corrupt chunks.
+  public long getNumCorruptChunks() {
+    return corruptChunks.values().stream().mapToInt(List::size).sum();
+  }
+
+  public long getNumMissingChunks() {
+    return missingChunks.values().stream().mapToInt(List::size).sum();
+  }
+
+  public long getNumMissingBlocks() {
+    return missingBlocks.size();
+  }
+
   @Override
   public String toString() {
     return "Diff report for container " + containerID + ":" +
-        " MissingBlocks= " + missingBlocks.size() + " blocks" +
-        ", MissingChunks= " + missingChunks.values().stream().mapToInt(List::size).sum()
-        + " chunks from " + missingChunks.size() + " blocks" +
-        ", CorruptChunks= " + corruptChunks.values().stream().mapToInt(List::size).sum()
-        + " chunks from " + corruptChunks.size() + " blocks";
+        " Missing Blocks: " + getNumMissingBlocks() +
+        " Missing Chunks: " + getNumMissingChunks() + " chunks from " + missingChunks.size() + " blocks" +
+        " Corrupt Chunks: " + getNumCorruptChunks() + " chunks from " + corruptChunks.size() + " blocks";
   }
 }
