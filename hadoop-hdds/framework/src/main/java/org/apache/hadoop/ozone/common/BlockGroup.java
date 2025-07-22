@@ -53,7 +53,7 @@ public final class BlockGroup {
     return isIncludeBlockSize ? getProtoForDeletedBlock() : getProtoForBlockID();
   }
 
-  public KeyBlocks getProtoForDeletedBlock() {
+  private KeyBlocks getProtoForDeletedBlock() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
     for (DeletedBlock block : deletedBlocks) {
       ScmBlockLocationProtocolProtos.DeletedBlock deletedBlock = ScmBlockLocationProtocolProtos.DeletedBlock
@@ -67,7 +67,7 @@ public final class BlockGroup {
     return kbb.setKey(groupID).build();
   }
 
-  public KeyBlocks getProtoForBlockID() {
+  private KeyBlocks getProtoForBlockID() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
     for (DeletedBlock block : deletedBlocks) {
       kbb.addBlocks(block.getBlockID().getProtobuf());
