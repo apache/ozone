@@ -67,6 +67,9 @@ hadoop distcp \
   hdfs://ns1/tmp ofs://ozone1/vol1/bucket1/dst
 ```
 
+> Note: `-skipcrccheck` should also be used when copying between encrypted clusters.
+```
+
 ## Copy from Ozone to HDFS
 
 When copying files from Ozone to HDFS, similar issues can occur due to differences in checksum types. In this case, you must configure the checksum type for HDFS, as it is the destination system.
@@ -82,9 +85,13 @@ hadoop distcp \
 
 By specifying the appropriate checksum configuration or skipping the validation, you can ensure that DistCp jobs complete successfully when transferring data between HDFS and Ozone.
 
+> Note: `-skipcrccheck` should also be used when copying between encrypted clusters.
+
 ## Encrypted data
 
 When data resides in an HDFS encryption zone or Ozone encrypted buckets, the file checksum will not match. This is because the underlying block data differs due to the use of a new EDEK (Encryption Data Encryption Key) at the destination. In such cases, specify the `-skipcrccheck` parameter to avoid job failures.
+
+Note that `distcp` is supported between encrypted Ozone clusters in Ozone 2.0.
 
 For more information about using Hadoop DistCp, consult the [DistCp Guide](https://hadoop.apache.org/docs/current/hadoop-distcp/DistCp.html).
 
