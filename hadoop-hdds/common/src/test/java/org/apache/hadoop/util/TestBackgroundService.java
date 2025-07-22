@@ -118,7 +118,7 @@ public class TestBackgroundService {
     IntStream.range(0, nTasks).forEach(i -> queue.add(new TestTask(i, map, locks)));
     // Acquire locks on all even indices.
     List<Lock> lockList = new ArrayList<>();
-    IntStream.range(0, nTasks).filter(i -> i % 2 == 0).forEach(i -> {
+    IntStream.range(0, nTasks).filter(i -> (i & 1) == 0).forEach(i -> {
       lockList.add(locks.get(i));
       locks.get(i).lock();
     });
@@ -128,7 +128,7 @@ public class TestBackgroundService {
     backgroundService.start();
     // Wait for odd index tasks to complete.
     GenericTestUtils.waitFor(() ->
-            IntStream.range(1, nTasks).filter(i -> i % 2 == 1).allMatch(i -> map.get(i) == 1),
+            IntStream.range(1, nTasks).filter(i -> (i & 1) == 1).allMatch(i -> map.get(i) == 1),
         interval / 5, serviceTimeout);
     Thread.sleep(serviceTimeout);
     // Verify that even index tasks have not run even after serviceTimeout.
