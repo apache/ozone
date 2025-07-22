@@ -160,14 +160,8 @@ Key Info File Flag Should Be Set Correctly
     Pass Execution If    '${CLUSTER_VERSION}' <= '${EC_VERSION}'   Cluster does not support 'file' flag
     Pass Execution If    '${CLIENT_VERSION}' <= '${EC_VERSION}'    Client does not support 'file' flag
 
-    ${volume} =       Create Random Volume
-    ${bucket} =       Create bucket with layout    ${volume}   FILE_SYSTEM_OPTIMIZED
-
-    ${keypath} =      Set Variable    /${volume}/${bucket}/dir-${DATA_VERSION}/file-${DATA_VERSION}
-    ${dirpath} =      Set Variable    /${volume}/${bucket}/dir-${DATA_VERSION}/
-
-    Execute           ozone fs -mkdir -p ${dirpath}
-    Create Key        ${keypath}    ${TESTFILE}
+    ${keypath} =      Set Variable    /vol1/bucket1/dir-${DATA_VERSION}/file-${DATA_VERSION}
+    ${dirpath} =      Set Variable    /vol1/bucket1/dir-${DATA_VERSION}/
 
     ${key_info} =     Execute    ozone sh key info ${keypath}
     Should Contain    ${key_info}    \"file\" : true
