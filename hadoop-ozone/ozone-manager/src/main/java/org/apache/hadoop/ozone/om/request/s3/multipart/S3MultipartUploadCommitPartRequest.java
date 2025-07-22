@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -39,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -162,7 +165,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       // set the data size and location info list
       omKeyInfo.setDataSize(keyArgs.getDataSize());
-      omKeyInfo.updateLocationInfoList(keyArgs.getKeyLocationsList().stream()
+      List<OmKeyLocationInfo> uncommitted = omKeyInfo.updateLocationInfoList(
+          keyArgs.getKeyLocationsList().stream()
           .map(OmKeyLocationInfo::getFromProtobuf)
           .collect(Collectors.toList()), true);
       // Set Modification time
@@ -220,15 +224,42 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
+      // This map should contain maximum of two entries
+      // 1. Overwritten part
+      // 2. Uncommitted pseudo part key
+      Map<String, RepeatedOmKeyInfo> keyVersionsToDeleteMap = null;
+
       long correctedSpace = omKeyInfo.getReplicatedSize();
       if (null != oldPartKeyInfo) {
         OmKeyInfo partKeyToBeDeleted =
             OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
         correctedSpace -= partKeyToBeDeleted.getReplicatedSize();
+        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(partKeyToBeDeleted, trxnLogIndex);
+        String delKeyName = omMetadataManager.getOzoneDeletePathKey(
+            partKeyToBeDeleted.getObjectID(), multipartKey);
+
+        if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
+          keyVersionsToDeleteMap = new HashMap<>();
+          keyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
+        }
       }
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           correctedSpace);
       omBucketInfo.incrUsedBytes(correctedSpace);
+
+      // let the uncommitted blocks pretend as key's old version blocks
+      // which will be deleted as RepeatedOmKeyInfo
+      final OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
+      if (pseudoKeyInfo != null) {
+        long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
+        String delKeyName = omMetadataManager.getOzoneDeletePathKey(
+            pseudoObjId, ozoneKey);
+        if (null == keyVersionsToDeleteMap) {
+          keyVersionsToDeleteMap = new HashMap<>();
+        }
+        keyVersionsToDeleteMap.computeIfAbsent(delKeyName,
+            key -> new RepeatedOmKeyInfo()).addOmKeyInfo(pseudoKeyInfo);
+      }
 
       MultipartCommitUploadPartResponse.Builder commitResponseBuilder = MultipartCommitUploadPartResponse.newBuilder()
           .setPartName(partName);
@@ -238,7 +269,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       }
       omResponse.setCommitMultiPartUploadResponse(commitResponseBuilder);
       omClientResponse =
-          getOmClientResponse(ozoneManager, oldPartKeyInfo, openKey,
+          getOmClientResponse(ozoneManager, keyVersionsToDeleteMap, openKey,
               omKeyInfo, multipartKey, multipartKeyInfo, omResponse.build(),
               omBucketInfo.copyObject());
 
@@ -247,7 +278,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse =
-          getOmClientResponse(ozoneManager, oldPartKeyInfo, openKey,
+          getOmClientResponse(ozoneManager, null, openKey,
               omKeyInfo, multipartKey, multipartKeyInfo,
               createErrorOMResponse(omResponse, exception), copyBucketInfo);
     } finally {
@@ -275,14 +306,13 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   protected S3MultipartUploadCommitPartResponse getOmClientResponse(
-      OzoneManager ozoneManager,
-      OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo, String openKey,
-      OmKeyInfo omKeyInfo, String multipartKey,
+      OzoneManager ozoneManager, Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
+      String openKey, OmKeyInfo omKeyInfo, String multipartKey,
       OmMultipartKeyInfo multipartKeyInfo, OMResponse build,
       OmBucketInfo omBucketInfo) {
 
     return new S3MultipartUploadCommitPartResponse(build, multipartKey, openKey,
-        multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
+        multipartKeyInfo, keyToDeleteMap, omKeyInfo,
         omBucketInfo, getBucketLayout());
   }
 
