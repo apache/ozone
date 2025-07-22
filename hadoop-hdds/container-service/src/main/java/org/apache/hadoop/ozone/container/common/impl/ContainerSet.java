@@ -70,7 +70,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   private final Clock clock;
   private long recoveringTimeout;
   @Nullable
-  private final WitnessedContainerMetadataStore metadataStore;
+  private final WitnessedContainerMetadataStore containerMetadataStore;
   // Handler that will be invoked when a scan of a container in this set is requested.
   private OnDemandContainerScanner containerScanner;
 
@@ -84,13 +84,13 @@ public class ContainerSet implements Iterable<Container<?>> {
     return new ContainerSet(metadataStore, recoveringTimeout);
   }
 
-  private ContainerSet(WitnessedContainerMetadataStore metadataStore, long recoveringTimeout) {
-    this(metadataStore, recoveringTimeout, null);
+  private ContainerSet(WitnessedContainerMetadataStore containerMetadataStore, long recoveringTimeout) {
+    this(containerMetadataStore, recoveringTimeout, null);
   }
 
-  ContainerSet(WitnessedContainerMetadataStore metadataStore, long recoveringTimeout, Clock clock) {
+  ContainerSet(WitnessedContainerMetadataStore containerMetadataStore, long recoveringTimeout, Clock clock) {
     this.clock = clock != null ? clock : Clock.systemUTC();
-    this.metadataStore = metadataStore;
+    this.containerMetadataStore = containerMetadataStore;
     this.recoveringTimeout = recoveringTimeout;
   }
 
@@ -208,9 +208,9 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   private void updateContainerIdTable(long containerId, State containerState) throws StorageContainerException {
-    if (null != metadataStore) {
+    if (null != containerMetadataStore) {
       try {
-        metadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(containerId),
+        containerMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(containerId),
             ContainerCreateInfo.valueOf(containerState));
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
@@ -293,9 +293,9 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   private void deleteFromContainerTable(long containerId) throws StorageContainerException {
-    if (null != metadataStore) {
+    if (null != containerMetadataStore) {
       try {
-        metadataStore.getContainerCreateInfoTable().delete(ContainerID.valueOf(containerId));
+        containerMetadataStore.getContainerCreateInfoTable().delete(ContainerID.valueOf(containerId));
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }
