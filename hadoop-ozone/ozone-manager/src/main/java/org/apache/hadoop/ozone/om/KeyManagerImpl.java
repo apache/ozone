@@ -213,7 +213,7 @@ public class KeyManagerImpl implements KeyManager {
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
-    this (om, scmClient, om.getMetadataManager(), conf,
+    this(om, scmClient, om.getMetadataManager(), conf,
         om.getBlockTokenMgr(), om.getKmsProvider(), metrics);
   }
 
@@ -360,15 +360,16 @@ public class KeyManagerImpl implements KeyManager {
    * @param conf
    */
   public void startSnapshotSstFilteringService(OzoneConfiguration conf) {
-    long serviceInterval = conf.getTimeDuration(
-        OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
-        OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    long serviceTimeout = conf.getTimeDuration(
-        OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
-        OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
     if (isSstFilteringSvcEnabled()) {
+      long serviceInterval = conf.getTimeDuration(
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = conf.getTimeDuration(
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+
       snapshotSstFilteringService =
           new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
               serviceTimeout, ozoneManager, conf);
