@@ -126,6 +126,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return checksums;
   }
 
+  public long getDataChecksum() {
+    return checksums.getDataChecksum();
+  }
+
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)
