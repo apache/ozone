@@ -123,10 +123,10 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static final long DB_TABLE_ITER_LOOP_THRESHOLD_NS = 100000;
 
   private final OzoneManager ozoneManager;
-  private SnapshotDiffManager snapshotDiffManager;
+  private final SnapshotDiffManager snapshotDiffManager;
   // Per-OM instance of snapshot cache map
-  private SnapshotCache snapshotCache;
-  private ManagedRocksDB snapshotDiffDb;
+  private final SnapshotCache snapshotCache;
+  private final ManagedRocksDB snapshotDiffDb;
 
   public static final String DELIMITER = "-";
 
@@ -167,18 +167,18 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static final String SNAP_DIFF_PURGED_JOB_TABLE_NAME =
       "snap-diff-purged-job-table";
 
-  private long diffCleanupServiceInterval;
-  private int maxOpenSstFilesInSnapshotDb;
-  private ManagedColumnFamilyOptions columnFamilyOptions;
-  private ManagedDBOptions options;
-  private List<ColumnFamilyDescriptor> columnFamilyDescriptors;
-  private List<ColumnFamilyHandle> columnFamilyHandles;
-  private SnapshotDiffCleanupService snapshotDiffCleanupService;
+  private final long diffCleanupServiceInterval;
+  private final int maxOpenSstFilesInSnapshotDb;
+  private final ManagedColumnFamilyOptions columnFamilyOptions;
+  private final ManagedDBOptions options;
+  private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
+  private final List<ColumnFamilyHandle> columnFamilyHandles;
+  private final SnapshotDiffCleanupService snapshotDiffCleanupService;
 
-  private int maxPageSize;
+  private final int maxPageSize;
 
   // Soft limit of the snapshot cache size.
-  private int softCacheSize;
+  private final int softCacheSize;
 
   private int fsSnapshotMaxLimit;
   private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
@@ -205,6 +205,19 @@ public final class OmSnapshotManager implements AutoCloseable {
       }
       // If snapshot is disabled, we don't need to initialize the rest of the
       // fields. And we are done with the constructor.
+      snapshotDiffManager = null;
+      snapshotCache = null;
+      snapshotDiffDb = null;
+      diffCleanupServiceInterval = 0;
+      maxOpenSstFilesInSnapshotDb = 0;
+      columnFamilyOptions = null;
+      options = null;
+      columnFamilyDescriptors = null;
+      columnFamilyHandles = null;
+      snapshotDiffCleanupService = null;
+      maxPageSize = 0;
+      softCacheSize = 0;
+      fsSnapshotMaxLimit = 0;
       return;
     }
 
@@ -1078,36 +1091,31 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   @Override
   public void close() {
-    if (ozoneManager.isFilesystemSnapshotEnabled()) {
-      if (snapshotDiffManager != null) {
-        snapshotDiffManager.close();
-      }
-
-      if (snapshotCache != null) {
-        snapshotCache.close();
-      }
-
-      if (snapshotDiffCleanupService != null) {
-        snapshotDiffCleanupService.shutdown();
-      }
-
-      if (columnFamilyHandles != null) {
-        columnFamilyHandles.forEach(ColumnFamilyHandle::close);
-      }
-      if (snapshotDiffDb != null) {
-        snapshotDiffDb.close();
-      }
-      if (columnFamilyDescriptors != null) {
-        columnFamilyDescriptors.forEach(columnFamilyDescriptor ->
-            closeColumnFamilyOptions((ManagedColumnFamilyOptions)
-                columnFamilyDescriptor.getOptions()));
-      }
-      if (columnFamilyOptions != null) {
-        closeColumnFamilyOptions(columnFamilyOptions);
-      }
-      if (options != null) {
-        options.close();
-      }
+    if (snapshotDiffManager != null) {
+      snapshotDiffManager.close();
+    }
+    if (snapshotCache != null) {
+      snapshotCache.close();
+    }
+    if (snapshotDiffCleanupService != null) {
+      snapshotDiffCleanupService.shutdown();
+    }
+    if (columnFamilyHandles != null) {
+      columnFamilyHandles.forEach(ColumnFamilyHandle::close);
+    }
+    if (snapshotDiffDb != null) {
+      snapshotDiffDb.close();
+    }
+    if (columnFamilyDescriptors != null) {
+      columnFamilyDescriptors.forEach(columnFamilyDescriptor ->
+          closeColumnFamilyOptions((ManagedColumnFamilyOptions)
+              columnFamilyDescriptor.getOptions()));
+    }
+    if (columnFamilyOptions != null) {
+      closeColumnFamilyOptions(columnFamilyOptions);
+    }
+    if (options != null) {
+      options.close();
     }
   }
 
