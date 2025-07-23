@@ -65,11 +65,10 @@ class S3GatewayWebAdminServer extends BaseHttpServer {
   S3GatewayWebAdminServer(MutableConfigurationSource conf, String name) throws IOException {
     super(conf, name);
     addServlet("icon", "/favicon.ico", IconServlet.class);
-    addAuthenticationFor("Secret", conf);
-    addAuthenticationFor("STS", conf);
+    addSecretAuthentication(conf);
   }
 
-  private void addAuthenticationFor(String endpoint, MutableConfigurationSource conf)
+  private void addSecretAuthentication(MutableConfigurationSource conf)
       throws IOException {
 
     if (conf.getBoolean(OZONE_S3G_SECRET_HTTP_ENABLED_KEY,
@@ -94,59 +93,18 @@ class S3GatewayWebAdminServer extends BaseHttpServer {
         }
         params.put(AUTH_TYPE, "kerberos");
 
-        String serviceName = endpoint.toLowerCase() + "Authentication";
         FilterHolder holder = ServletElementsFactory.createFilterHolder(
-            serviceName, AuthenticationFilter.class.getName(),
+            "secretAuthentication", AuthenticationFilter.class.getName(),
             params);
         FilterMapping filterMapping =
             ServletElementsFactory.createFilterMapping(
-                serviceName,
-                new String[]{"/" + endpoint + "/*"});
+                "secretAuthentication",
+                new String[]{"/secret/*"});
 
         handler.addFilter(holder, filterMapping);
       } else {
-        LOG.error("${} Endpoint should be secured with Kerberos", endpoint);
-        throw new IllegalStateException(endpoint + " Endpoint should be secured"
-            + " with Kerberos");
-      }
-    }
-  }
-
-  private void addStsAuthentication(MutableConfigurationSource conf)
-      throws IOException {
-
-    if (conf.getBoolean(OZONE_S3G_WEBADMIN_HTTP_ENABLED_KEY, true)) {
-      String authType = conf.get(OZONE_S3G_HTTP_AUTH_TYPE, "kerberos");
-
-      if (UserGroupInformation.isSecurityEnabled()
-          && authType.equals("kerberos")) {
-        ServletHandler handler = getWebAppContext().getServletHandler();
-        Map<String, String> params = new HashMap<>();
-
-        String principalInConf =
-            conf.get(OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
-        if (!Strings.isNullOrEmpty(principalInConf)) {
-          params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
-              principalInConf, conf.get(OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY)));
-        }
-        String httpKeytab = conf.get(OZONE_S3G_KEYTAB_FILE);
-        if (!Strings.isNullOrEmpty(httpKeytab)) {
-          params.put("kerberos.keytab", httpKeytab);
-        }
-        params.put(AUTH_TYPE, "kerberos");
-
-        FilterHolder holder = ServletElementsFactory.createFilterHolder(
-            "stsAuthentication", AuthenticationFilter.class.getName(),
-            params);
-        FilterMapping filterMapping =
-            ServletElementsFactory.createFilterMapping(
-                "stsAuthentication",
-                new String[]{"/sts/*"});
-
-        handler.addFilter(holder, filterMapping);
-      } else {
-        LOG.error("STS Endpoint should be secured with Kerberos");
-        throw new IllegalStateException("STS Endpoint should be secured"
+        LOG.error("Secret Endpoint should be secured with Kerberos");
+        throw new IllegalStateException("Secret Endpoint should be secured"
             + " with Kerberos");
       }
     }

@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.s3.util.AuditUtils;
 /**
  * Base class for STS endpoints.
  */
-public class STSEndpointBase implements Auditor {
+public class S3STSEndpointBase implements Auditor {
 
   @Context
   private ContainerRequestContext context;

@@ -93,6 +93,7 @@ OZONE-SITE.XML_hdds.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keyta
 
 OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
 OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
+OZONE-SITE.XML_ozone.s3g.sts.http.enabled=true
 OZONE-SITE.XML_ozone.http.filter.initializers=org.apache.hadoop.security.AuthenticationFilterInitializer
 
 OZONE-SITE.XML_ozone.om.http.auth.type=kerberos
@@ -100,6 +101,7 @@ OZONE-SITE.XML_hdds.scm.http.auth.type=kerberos
 OZONE-SITE.XML_hdds.datanode.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.s3g.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.s3g.secret.http.auth.type=kerberos
+OZONE-SITE.XML_ozone.s3g.sts.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.httpfs.http.auth.type=kerberos
 OZONE-SITE.XML_ozone.recon.http.auth.type=kerberos
 

@@ -53,9 +53,9 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
  * @see <a href="https://docs.aws.amazon.com/STS/latest/APIReference/">AWS STS API Reference</a>
  */
 @Path("/")
-public class STSEndpoint extends STSEndpointBase {
+public class S3STSEndpoint extends S3STSEndpointBase {
 
-  private static final Logger LOG = LoggerFactory.getLogger(STSEndpoint.class);
+  private static final Logger LOG = LoggerFactory.getLogger(S3STSEndpoint.class);
 
   // STS API constants
   private static final String STS_ACTION_PARAM = "Action";
