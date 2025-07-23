@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.util.Objects;
-
 import net.jcip.annotations.Immutable;
 
 /**
