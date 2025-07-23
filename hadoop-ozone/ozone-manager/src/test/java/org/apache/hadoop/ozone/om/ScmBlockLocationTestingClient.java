@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,36 +146,47 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   }
 
   @Override
-  public List<DeleteBlockGroupResult> deleteKeyBlocks(
-      List<BlockGroup> keyBlocksInfoList) throws IOException {
+  public List<DeleteBlockGroupResult> deleteKeyBlocks(List<BlockGroup> keyBlocksInfoList)
+      throws IOException {
     List<DeleteBlockGroupResult> results = new ArrayList<>();
-    List<DeleteBlockResult> blockResultList = new ArrayList<>();
-    Result result;
     for (BlockGroup keyBlocks : keyBlocksInfoList) {
-      for (BlockID blockKey : keyBlocks.getBlockIDList()) {
-        currentCall++;
-        switch (this.failCallsFrequency) {
-        case 0:
-          result = success;
-          numBlocksDeleted++;
-          break;
-        case 1:
-          result = unknownFailure;
-          break;
-        default:
-          if (currentCall % this.failCallsFrequency == 0) {
-            result = unknownFailure;
-          } else {
-            result = success;
-            numBlocksDeleted++;
-          }
+      List<DeleteBlockResult> blockResultList = new ArrayList<>();
+      // Process BlockIDs directly if present
+      if (keyBlocks.getBlockIDs() != null && !keyBlocks.getBlockIDs().isEmpty()) {
+        for (BlockID blockID : keyBlocks.getBlockIDs()) {
+          blockResultList.add(processBlock(blockID));
         }
-        blockResultList.add(new DeleteBlockResult(blockKey, result));
+      } else {
+        // Otherwise, use DeletedBlock's BlockID
+        for (DeletedBlock deletedBlock : keyBlocks.getAllDeletedBlocks()) {
+          blockResultList.add(processBlock(deletedBlock.getBlockID()));
+        }
       }
-      results.add(new DeleteBlockGroupResult(keyBlocks.getGroupID(),
-          blockResultList));
+      results.add(new DeleteBlockGroupResult(keyBlocks.getGroupID(), blockResultList));
     }
     return results;
+  }
+
+  private DeleteBlockResult processBlock(BlockID blockID) {
+    currentCall++;
+    Result result;
+    switch (failCallsFrequency) {
+    case 0:
+      result = success;
+      numBlocksDeleted++;
+      break;
+    case 1:
+      result = unknownFailure;
+      break;
+    default:
+      if (currentCall % failCallsFrequency == 0) {
+        result = unknownFailure;
+      } else {
+        result = success;
+        numBlocksDeleted++;
+      }
+    }
+    return new DeleteBlockResult(blockID, result);
   }
 
   @Override

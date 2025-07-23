@@ -42,8 +42,10 @@ import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequ
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -58,6 +60,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -646,9 +649,9 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setKey(omKeyInfo.getFileName());
         keyEntityInfo.setPath(createPath(omKeyInfo));
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(
-            fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
-        keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
+        Pair<Long, Long> sizeInfo = fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
+        keyEntityInfo.setSize(sizeInfo.getLeft());
+        keyEntityInfo.setReplicatedSize(sizeInfo.getRight());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         pendingForDeletionKeyInfo.setUnreplicatedDataSize(
             pendingForDeletionKeyInfo.getUnreplicatedDataSize() +
@@ -698,24 +701,32 @@ public class OMDBInsightEndpoint {
   }
 
   /**
-   * Given an object ID, return total data size (no replication)
+   * Given an object ID, return total data size as a pair of Total Size, Total Replicated Size
    * under this object. Note:- This method is RECURSIVE.
    *
    * @param objectId the object's ID
-   * @return total used data size in bytes
+   * @return total used data size and replicated total used data size in bytes
    * @throws IOException ioEx
    */
-  protected long fetchSizeForDeletedDirectory(long objectId)
+  protected Pair<Long, Long> fetchSizeForDeletedDirectory(long objectId)
       throws IOException {
-    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-    if (nsSummary == null) {
-      return 0L;
+    long totalSize = 0;
+    long totalReplicatedSize = 0;
+    Deque<Long> stack = new ArrayDeque();
+    stack.push(objectId);
+
+    while (!stack.isEmpty()) {
+      long currentId = stack.pop();
+      NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(currentId);
+      if (nsSummary != null) {
+        totalSize += nsSummary.getSizeOfFiles();
+        totalReplicatedSize += nsSummary.getReplicatedSizeOfFiles();
+        for (long childId : nsSummary.getChildDir()) {
+          stack.push(childId);
+        }
+      }
     }
-    long totalSize = nsSummary.getSizeOfFiles();
-    for (long childId : nsSummary.getChildDir()) {
-      totalSize += fetchSizeForDeletedDirectory(childId);
-    }
-    return totalSize;
+    return Pair.of(totalSize, totalReplicatedSize);
   }
 
   /** This method retrieves set of directories pending for deletion.

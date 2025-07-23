@@ -124,6 +124,7 @@ import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -137,6 +138,7 @@ import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -156,6 +158,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -736,6 +739,8 @@ public class KeyManagerImpl implements KeyManager {
       }
       int currentCount = 0;
       boolean maxReqSizeExceeded = false;
+      boolean isDataDistributionEnabled = ozoneManager.getScmInfo().getMetaDataLayoutVersion() >=
+          HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
       while (delKeyIter.hasNext() && currentCount < count) {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
@@ -747,11 +752,21 @@ public class KeyManagerImpl implements KeyManager {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
             if (filter == null || filter.apply(Table.newKeyValue(kv.getKey(), info))) {
-              List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
-                  .flatMap(versionLocations -> versionLocations.getLocationList().stream()
-                      .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
-              BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
-                  .addAllBlockIDs(blockIDS).build();
+              BlockGroup.Builder keyBlocksBuilder = BlockGroup.newBuilder().setKeyName(kv.getKey());
+              if (isDataDistributionEnabled) {
+                List<DeletedBlock> deletedBlocks = info.getKeyLocationVersions().stream()
+                    .flatMap(versionLocations -> versionLocations.getLocationList().stream()
+                        .map(b -> new DeletedBlock(new BlockID(b.getContainerID(), b.getLocalID()),
+                            b.getLength(), QuotaUtil.getReplicatedSize(b.getLength(), info.getReplicationConfig()))))
+                    .collect(Collectors.toList());
+                keyBlocksBuilder.addAllDeletedBlocks(deletedBlocks);
+              } else {
+                List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
+                    .flatMap(versionLocations -> versionLocations.getLocationList().stream()
+                        .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
+                keyBlocksBuilder.addAllBlockIDs(blockIDS);
+              }
+              BlockGroup keyBlocks = keyBlocksBuilder.build();
               int keyBlockSerializedSize = keyBlocks.getProto().getSerializedSize();
               serializedSize += keyBlockSerializedSize;
               if (serializedSize > ratisByteLimit) {

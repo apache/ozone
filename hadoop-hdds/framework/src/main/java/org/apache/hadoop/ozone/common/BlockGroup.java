@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
 
 /**
@@ -29,14 +30,21 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyB
 public final class BlockGroup {
 
   private String groupID;
+  @Deprecated
   private List<BlockID> blockIDs;
+  private List<DeletedBlock> deletedBlocks;
 
-  private BlockGroup(String groupID, List<BlockID> blockIDs) {
+  private BlockGroup(String groupID, List<BlockID> blockIDs, List<DeletedBlock> deletedBlocks) {
     this.groupID = groupID;
-    this.blockIDs = blockIDs;
+    this.blockIDs = blockIDs == null ? new ArrayList<>() : blockIDs;
+    this.deletedBlocks = deletedBlocks == null ? new ArrayList<>() : deletedBlocks;
   }
 
-  public List<BlockID> getBlockIDList() {
+  public List<DeletedBlock> getAllDeletedBlocks() {
+    return deletedBlocks;
+  }
+
+  public List<BlockID> getBlockIDs() {
     return blockIDs;
   }
 
@@ -45,6 +53,24 @@ public final class BlockGroup {
   }
 
   public KeyBlocks getProto() {
+    return deletedBlocks.isEmpty() ? getProtoForBlockID() : getProtoForDeletedBlock();
+  }
+
+  public KeyBlocks getProtoForDeletedBlock() {
+    KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
+    for (DeletedBlock block : deletedBlocks) {
+      ScmBlockLocationProtocolProtos.DeletedBlock deletedBlock = ScmBlockLocationProtocolProtos.DeletedBlock
+          .newBuilder()
+          .setBlockId(block.getBlockID().getProtobuf())
+          .setSize(block.getSize())
+          .setReplicatedSize(block.getReplicatedSize())
+          .build();
+      kbb.addDeletedBlocks(deletedBlock);
+    }
+    return kbb.setKey(groupID).build();
+  }
+
+  public KeyBlocks getProtoForBlockID() {
     KeyBlocks.Builder kbb = KeyBlocks.newBuilder();
     for (BlockID block : blockIDs) {
       kbb.addBlocks(block.getProtobuf());
@@ -58,6 +84,10 @@ public final class BlockGroup {
    * @return a group of blocks.
    */
   public static BlockGroup getFromProto(KeyBlocks proto) {
+    return proto.getDeletedBlocksList().isEmpty() ? getFromBlockIDProto(proto) : getFromDeletedBlockProto(proto);
+  }
+
+  public static BlockGroup getFromBlockIDProto(KeyBlocks proto) {
     List<BlockID> blockIDs = new ArrayList<>();
     for (HddsProtos.BlockID block : proto.getBlocksList()) {
       blockIDs.add(new BlockID(block.getContainerBlockID().getContainerID(),
@@ -65,6 +95,20 @@ public final class BlockGroup {
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllBlockIDs(blockIDs).build();
+  }
+
+  public static BlockGroup getFromDeletedBlockProto(KeyBlocks proto) {
+    List<DeletedBlock> blocks = new ArrayList<>();
+    for (ScmBlockLocationProtocolProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
+      HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
+
+      blocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
+          containerBlockId.getLocalID()),
+          block.getSize(),
+          block.getReplicatedSize()));
+    }
+    return BlockGroup.newBuilder().setKeyName(proto.getKey())
+        .addAllDeletedBlocks(blocks).build();
   }
 
   public static Builder newBuilder() {
@@ -75,7 +119,8 @@ public final class BlockGroup {
   public String toString() {
     return "BlockGroup[" +
         "groupID='" + groupID + '\'' +
-        ", blockIDs=" + blockIDs +
+        ", blockIDs=" + blockIDs + '\'' +
+        ", deletedBlocks=" + deletedBlocks +
         ']';
   }
 
@@ -85,20 +130,26 @@ public final class BlockGroup {
   public static class Builder {
 
     private String groupID;
-    private List<BlockID> blockIDs;
+    private List<BlockID> blocksIDs;
+    private List<DeletedBlock> blocks;
 
     public Builder setKeyName(String blockGroupID) {
       this.groupID = blockGroupID;
       return this;
     }
 
-    public Builder addAllBlockIDs(List<BlockID> keyBlocks) {
-      this.blockIDs = keyBlocks;
+    public Builder addAllBlockIDs(List<BlockID> blockIDs) {
+      this.blocksIDs = blockIDs;
+      return this;
+    }
+
+    public Builder addAllDeletedBlocks(List<DeletedBlock> keyBlocks) {
+      this.blocks = keyBlocks;
       return this;
     }
 
     public BlockGroup build() {
-      return new BlockGroup(groupID, blockIDs);
+      return new BlockGroup(groupID, blocksIDs, blocks);
     }
   }
 
