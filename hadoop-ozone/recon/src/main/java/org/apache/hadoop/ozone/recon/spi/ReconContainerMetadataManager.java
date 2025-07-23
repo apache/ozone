@@ -240,6 +240,12 @@ public interface ReconContainerMetadataManager {
   TableIterator getKeyContainerTableIterator() throws IOException;
 
   /**
+   * Get iterator to the entire Container_Key_Count DB.
+   * @return TableIterator
+   */
+  TableIterator getContainerKeyCountTableIterator() throws IOException;
+
+  /**
    * Get the entire keyContainerTable.
    * @return keyContainerTable
    */

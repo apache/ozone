@@ -477,14 +477,6 @@ public class ReconContainerMetadataManagerImpl
     }
 
     @Override
-    public Long peekNextKey() {
-      if (currentKey == null) {
-        return null;
-      }
-      return currentKey.getKey();
-    }
-
-    @Override
     public void close() {
       try {
         containerIterator.close();
@@ -609,6 +601,11 @@ public class ReconContainerMetadataManagerImpl
   @Override
   public TableIterator getKeyContainerTableIterator() throws IOException {
     return keyContainerTable.iterator();
+  }
+
+  @Override
+  public TableIterator getContainerKeyCountTableIterator() throws IOException {
+    return containerKeyCountTable.iterator();
   }
 
   @Override

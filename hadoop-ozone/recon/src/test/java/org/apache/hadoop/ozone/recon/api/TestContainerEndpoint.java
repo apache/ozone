@@ -1482,31 +1482,6 @@ public class TestContainerEndpoint {
     assertEquals(2L, containerList.get(0).getContainerID());
   }
 
-  @Test
-  public void testContainerIteratorPeekNextKey() throws Exception {
-    putContainerInfos(3);
-
-    try (SeekableIterator<Long, ContainerMetadata> iterator =
-             reconContainerMetadataManager.getContainersIterator()) {
-
-      // Test peek without consuming
-      Long firstKey = iterator.peekNextKey();
-      assertEquals(1L, firstKey.longValue());
-
-      // Peek again - should return same key
-      Long secondPeek = iterator.peekNextKey();
-      assertEquals(firstKey, secondPeek);
-
-      // Now consume and verify
-      ContainerMetadata first = iterator.next();
-      assertEquals(1L, first.getContainerID());
-
-      // Peek next
-      Long nextKey = iterator.peekNextKey();
-      assertEquals(2L, nextKey.longValue());
-    }
-  }
-
   // Tweak this test as needed to test out your performance expectations and improvements.
   @Test
   public void testMismatchAPIPerformanceWithManyKeys() throws Exception {
