@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.ByteString;
+import org.apache.hadoop.thirdparty.protobuf.ByteString;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;

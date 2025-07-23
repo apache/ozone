@@ -18,8 +18,6 @@
 package org.apache.hadoop.hdds.protocolPB;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -42,9 +40,11 @@ import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.internal.ShadedProtobufHelper;
+import org.apache.hadoop.thirdparty.protobuf.RpcController;
+import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
 /**
  * This class is the client-side translator that forwards requests for
@@ -90,7 +90,7 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
       handleError(response);
 
     } catch (ServiceException ex) {
-      throw ProtobufHelper.getRemoteException(ex);
+      throw ShadedProtobufHelper.getRemoteException(ex);
     }
     return response;
   }

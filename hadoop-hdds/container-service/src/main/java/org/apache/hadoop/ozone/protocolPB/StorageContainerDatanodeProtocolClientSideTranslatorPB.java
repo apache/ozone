@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.function.Consumer;
@@ -37,10 +35,12 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.Type;
-import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.internal.ShadedProtobufHelper;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
+import org.apache.hadoop.thirdparty.protobuf.RpcController;
+import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -104,7 +104,7 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
 
       response = rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
     } catch (ServiceException ex) {
-      throw ProtobufHelper.getRemoteException(ex);
+      throw ShadedProtobufHelper.getRemoteException(ex);
     }
     return response;
   }

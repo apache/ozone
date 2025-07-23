@@ -34,13 +34,14 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
+      <groupId>org.apache.hadoop.thirdparty</groupId>
+      <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
     </dependency>
     <!-- required to use common hdds.proto -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-interface-client</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
@@ -58,6 +59,9 @@
       <plugin>
         <groupId>com.salesforce.servicelibs</groupId>
         <artifactId>proto-backwards-compatibility</artifactId>
+        <configuration>
+          <allowBreakingChanges>false</allowBreakingChanges>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -73,7 +77,7 @@
         <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc-3</id>
+            <id>compile-protoc-grpc</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
@@ -94,14 +98,17 @@
             </configuration>
           </execution>
           <execution>
-            <id>compile-protoc-2</id>
+            <id>compile-protoc-3</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${proto3.hadooprpc.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+              <additionalProtoPathElements>
+                <additionalProtoPathElement>${basedir}/../interface-client/src/main/proto/</additionalProtoPathElement>
+              </additionalProtoPathElements>
               <excludes>
                 <exclude>InterSCMProtocol.proto</exclude>
                 <exclude>SCMUpdateProtocol.proto</exclude>
@@ -123,6 +130,9 @@
             <phase>generate-sources</phase>
             <configuration>
               <target>
+                <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/proto" token="com.google.protobuf" value="org.apache.hadoop.thirdparty.protobuf" />
+                <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/proto" token="io.grpc" value="org.apache.hadoop.thirdparty.io.grpc" />
+                <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/proto" token="com.google.common" value="org.apache.hadoop.thirdparty.com.google.common" />
                 <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
                 <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto" token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc" />
                 <replace dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/scm/proto" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />

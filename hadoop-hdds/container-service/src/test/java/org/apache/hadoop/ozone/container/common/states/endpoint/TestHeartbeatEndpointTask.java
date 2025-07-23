@@ -29,7 +29,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.protobuf.Proto2Utils;
+import org.apache.hadoop.thirdparty.protobuf.Proto2Utils;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;

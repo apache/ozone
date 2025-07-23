@@ -402,7 +402,7 @@
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
-        <version>${proto2.hadooprpc.protobuf.version}</version>
+        <version>${proto3.hadooprpc.protobuf.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.re2j</groupId>

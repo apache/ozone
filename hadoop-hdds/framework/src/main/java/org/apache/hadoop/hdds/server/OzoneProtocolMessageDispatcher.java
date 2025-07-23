@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.server;
 
-import com.google.protobuf.ServiceException;
+import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 import io.opentracing.Span;
 import java.util.function.UnaryOperator;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
