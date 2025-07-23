@@ -65,8 +65,8 @@ public final class OnDemandContainerScanner {
    * @return An Optional containing a Future representing the pending scan task if the task is queued.
    *   The optional is empty if the task is not queued due to an ongoing scan.
    */
-  public Optional<Future<?>> scanContainer(Container<?> container) {
-    return scanContainer(container, scannerHelper);
+  public Optional<Future<?>> scanContainer(Container<?> container, String reasonForScan) {
+    return scanContainer(container, scannerHelper, reasonForScan);
   }
 
   /**
@@ -74,11 +74,14 @@ public final class OnDemandContainerScanner {
    * @return An Optional containing a Future representing the pending scan task if the task is queued.
    *   The optional is empty if the task is not queued due to an ongoing scan.
    */
-  public Optional<Future<?>> scanContainerWithoutGap(Container<?> container) {
-    return scanContainer(container, scannerHelperWithoutGap);
+  public Optional<Future<?>> scanContainerWithoutGap(Container<?> container, String reasonForScan) {
+    return scanContainer(container, scannerHelperWithoutGap, reasonForScan);
   }
 
-  private Optional<Future<?>> scanContainer(Container<?> container, ContainerScanHelper helper) {
+  private Optional<Future<?>> scanContainer(Container<?> container, ContainerScanHelper helper, String reasonForScan) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Container {}: {}", container.getContainerData().getContainerID(), reasonForScan);
+    }
     if (!helper.shouldScanMetadata(container)) {
       return Optional.empty();
     }

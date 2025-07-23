@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -293,11 +294,11 @@ public class TestContainerSet {
     setLayoutVersion(layout);
     ContainerSet containerSet = createContainerSet();
     // Scan when no handler is registered should not throw an exception.
-    containerSet.scanContainer(FIRST_ID);
+    containerSet.scanContainer(FIRST_ID, "OnDemand container scan triggered when no handler is registered.");
 
     AtomicLong invocationCount = new AtomicLong();
     OnDemandContainerScanner mockScanner = mock(OnDemandContainerScanner.class);
-    when(mockScanner.scanContainer(any())).then(inv -> {
+    when(mockScanner.scanContainer(any(), anyString())).then(inv -> {
       KeyValueContainer c = inv.getArgument(0);
       // If the handler was incorrectly triggered for a non-existent container, this assert would fail.
       assertEquals(FIRST_ID, c.getContainerData().getContainerID());
@@ -307,11 +308,11 @@ public class TestContainerSet {
     containerSet.registerOnDemandScanner(mockScanner);
 
     // Scan of an existing container when a handler is registered should trigger a scan.
-    containerSet.scanContainer(FIRST_ID);
+    containerSet.scanContainer(FIRST_ID, "OnDemand container scan triggered for existing container.");
     assertEquals(1, invocationCount.get());
 
     // Scan of non-existent container should not throw exception or trigger an additional invocation.
-    containerSet.scanContainer(FIRST_ID - 1);
+    containerSet.scanContainer(FIRST_ID - 1, "OnDemand container scan triggered for non-existing container.");
     assertEquals(1, invocationCount.get());
   }
 
@@ -320,11 +321,11 @@ public class TestContainerSet {
     setLayoutVersion(layout);
     ContainerSet containerSet = createContainerSet();
     // Scan when no handler is registered should not throw an exception.
-    containerSet.scanContainer(FIRST_ID);
+    containerSet.scanContainer(FIRST_ID, "OnDemand container scan triggered when no handler is registered.");
 
     AtomicLong invocationCount = new AtomicLong();
     OnDemandContainerScanner mockScanner = mock(OnDemandContainerScanner.class);
-    when(mockScanner.scanContainerWithoutGap(any())).then(inv -> {
+    when(mockScanner.scanContainerWithoutGap(any(), anyString())).then(inv -> {
       KeyValueContainer c = inv.getArgument(0);
       // If the handler was incorrectly triggered for a non-existent container, this assert would fail.
       assertEquals(FIRST_ID, c.getContainerData().getContainerID());
@@ -334,11 +335,11 @@ public class TestContainerSet {
     containerSet.registerOnDemandScanner(mockScanner);
 
     // Scan of an existing container when a handler is registered should trigger a scan.
-    containerSet.scanContainerWithoutGap(FIRST_ID);
+    containerSet.scanContainerWithoutGap(FIRST_ID, "OnDemand container scan triggered for existing container.");
     assertEquals(1, invocationCount.get());
 
     // Scan of non-existent container should not throw exception or trigger an additional invocation.
-    containerSet.scanContainerWithoutGap(FIRST_ID - 1);
+    containerSet.scanContainerWithoutGap(FIRST_ID - 1, "OnDemand container scan triggered for non-existing container.");
     assertEquals(1, invocationCount.get());
   }
 

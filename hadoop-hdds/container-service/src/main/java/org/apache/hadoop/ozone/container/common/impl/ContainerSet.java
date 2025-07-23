@@ -140,11 +140,11 @@ public class ContainerSet implements Iterable<Container<?>> {
    * exist in the set.
    * @param containerID The container in this set to scan.
    */
-  public void scanContainer(long containerID) {
+  public void scanContainer(long containerID, String reasonForScan) {
     if (containerScanner != null) {
       Container<?> container = getContainer(containerID);
       if (container != null) {
-        containerScanner.scanContainer(container);
+        containerScanner.scanContainer(container, reasonForScan);
       } else {
         LOG.warn("Request to scan container {} which was not found in the container set", containerID);
       }
@@ -156,11 +156,11 @@ public class ContainerSet implements Iterable<Container<?>> {
    * This is a no-op if no scanner is registered or the container does not exist in the set.
    * @param containerID The container in this set to scan.
    */
-  public void scanContainerWithoutGap(long containerID) {
+  public void scanContainerWithoutGap(long containerID, String reasonForScan) {
     if (containerScanner != null) {
       Container<?> container = getContainer(containerID);
       if (container != null) {
-        containerScanner.scanContainerWithoutGap(container);
+        containerScanner.scanContainerWithoutGap(container, reasonForScan);
       } else {
         LOG.warn("Request to scan container {} which was not found in the container set", containerID);
       }

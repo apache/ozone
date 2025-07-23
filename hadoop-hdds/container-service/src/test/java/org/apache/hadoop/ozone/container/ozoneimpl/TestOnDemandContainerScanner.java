@@ -89,7 +89,8 @@ public class TestOnDemandContainerScanner extends
   public void testBypassScanGap() throws Exception {
     setScannedTimestampRecent(healthy);
 
-    Optional<Future<?>> scanFutureOptional = onDemandScanner.scanContainerWithoutGap(healthy);
+    Optional<Future<?>> scanFutureOptional = onDemandScanner.scanContainerWithoutGap(healthy,
+        "OnDemand container scan triggered to bypass scan gap.");
     assertTrue(scanFutureOptional.isPresent());
     Future<?> scanFuture = scanFutureOptional.get();
     scanFuture.get();
@@ -123,7 +124,8 @@ public class TestOnDemandContainerScanner extends
 
   @Test
   public void testScanTimestampUpdated() throws Exception {
-    Optional<Future<?>> scanFuture = onDemandScanner.scanContainer(healthy);
+    Optional<Future<?>> scanFuture = onDemandScanner.scanContainer(healthy,
+        "OnDemand container scan triggered to verify timestamp update for healthy container.");
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, atLeastOnce())
@@ -131,7 +133,8 @@ public class TestOnDemandContainerScanner extends
             eq(healthy.getContainerData().getContainerID()), any());
 
     // Metrics for deleted container should not be updated.
-    scanFuture = onDemandScanner.scanContainer(healthy);
+    scanFuture = onDemandScanner.scanContainer(healthy,
+        "OnDemand container scan triggered to verify no timestamp update for deleted container.");
     assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
     verify(controller, never())
@@ -157,11 +160,12 @@ public class TestOnDemandContainerScanner extends
           latch.await();
           return getUnhealthyDataScanResult();
         });
-    Optional<Future<?>> onGoingScan = onDemandScanner.scanContainer(corruptData);
+    Optional<Future<?>> onGoingScan = onDemandScanner.scanContainer(corruptData, "OnDemand container scan triggered.");
     assertTrue(onGoingScan.isPresent());
     assertFalse(onGoingScan.get().isDone());
     //When scheduling the same container again
-    Optional<Future<?>> secondScan = onDemandScanner.scanContainer(corruptData);
+    Optional<Future<?>> secondScan = onDemandScanner.scanContainer(corruptData,
+        "OnDemand container scan triggered to verify no scheduling during active scan.");
     //Then the second scan is not scheduled and the first scan can still finish
     assertFalse(secondScan.isPresent());
     latch.countDown();
@@ -179,11 +183,13 @@ public class TestOnDemandContainerScanner extends
           latch.await();
           return getUnhealthyDataScanResult();
         });
-    Optional<Future<?>> onGoingScan = onDemandScanner.scanContainer(openCorruptMetadata);
+    Optional<Future<?>> onGoingScan = onDemandScanner.scanContainer(openCorruptMetadata,
+        "OnDemand container scan triggered.");
     assertTrue(onGoingScan.isPresent());
     assertFalse(onGoingScan.get().isDone());
     //When scheduling the same container again
-    Optional<Future<?>> secondScan = onDemandScanner.scanContainer(openCorruptMetadata);
+    Optional<Future<?>> secondScan = onDemandScanner.scanContainer(openCorruptMetadata,
+        "OnDemand container scan triggered to verify no scheduling during active scan.");
     //Then the second scan is not scheduled and the first scan can still finish
     assertFalse(secondScan.isPresent());
     latch.countDown();
@@ -196,12 +202,17 @@ public class TestOnDemandContainerScanner extends
   @Override
   public void testScannerMetrics() throws Exception {
     ArrayList<Optional<Future<?>>> resultFutureList = Lists.newArrayList();
-    resultFutureList.add(onDemandScanner.scanContainer(corruptData));
-    resultFutureList.add(onDemandScanner.scanContainer(openContainer));
-    resultFutureList.add(onDemandScanner.scanContainer(openCorruptMetadata));
-    resultFutureList.add(onDemandScanner.scanContainer(healthy));
+    resultFutureList.add(onDemandScanner.scanContainer(corruptData,
+        "OnDemand container scan triggered for container with corrupt data."));
+    resultFutureList.add(onDemandScanner.scanContainer(openContainer,
+        "OnDemand container scan triggered for open container."));
+    resultFutureList.add(onDemandScanner.scanContainer(openCorruptMetadata,
+        "OnDemand container scan triggered for open container with corrupt data."));
+    resultFutureList.add(onDemandScanner.scanContainer(healthy,
+        "OnDemand container scan triggered for healthy container."));
     // Deleted containers will not count towards the scan count metric.
-    resultFutureList.add(onDemandScanner.scanContainer(deletedContainer));
+    resultFutureList.add(onDemandScanner.scanContainer(deletedContainer,
+        "OnDemand container scan triggered for deleted container."));
     waitOnScannerToFinish(resultFutureList);
     OnDemandScannerMetrics metrics = onDemandScanner.getMetrics();
     //Containers with shouldScanData = false shouldn't increase
@@ -224,7 +235,7 @@ public class TestOnDemandContainerScanner extends
   public void testUnhealthyContainersDetected() throws Exception {
     // Without initialization,
     // there shouldn't be interaction with containerController
-    onDemandScanner.scanContainer(corruptData);
+    onDemandScanner.scanContainer(corruptData, "OnDemand container scan triggered to check unhealthy detection.");
     verifyNoInteractions(controller);
 
     scanContainer(healthy);
@@ -275,7 +286,8 @@ public class TestOnDemandContainerScanner extends
     });
 
     // Start the blocking scan.
-    onDemandScanner.scanContainer(healthy);
+    onDemandScanner.scanContainer(healthy,
+        "OnDemand container scan triggered to test shutdown interruption during scan.");
     // Shut down the on demand scanner. This will interrupt the blocked scan
     // on the healthy container.
     onDemandScanner.shutdown();
@@ -359,7 +371,7 @@ public class TestOnDemandContainerScanner extends
   }
 
   private void scanContainer(Container<?> container) throws Exception {
-    Optional<Future<?>> scanFuture = onDemandScanner.scanContainer(container);
+    Optional<Future<?>> scanFuture = onDemandScanner.scanContainer(container, "OnDemand container scan triggered.");
     if (scanFuture.isPresent()) {
       scanFuture.get().get();
     }

@@ -125,7 +125,7 @@ public class ContainerImporter {
         // After container import is successful, increase used space for the volume and schedule an OnDemand scan for it
         targetVolume.incrementUsedSpace(container.getContainerData().getBytesUsed());
         containerSet.addContainerByOverwriteMissingContainer(container);
-        containerSet.scanContainer(containerID);
+        containerSet.scanContainer(containerID, "OnDemand container scan triggered for imported container.");
       }
     } finally {
       importContainerProgress.remove(containerID);
