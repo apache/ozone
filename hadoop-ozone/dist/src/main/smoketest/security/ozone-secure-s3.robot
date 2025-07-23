@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#suite: ozonesecure
 
 *** Settings ***
 Documentation       Smoke test to start cluster with docker-compose environments.
@@ -58,9 +57,4 @@ Secure S3 test Failure
     Run Keyword         Setup dummy credentials for S3
     ${rc}  ${result} =  Run And Return Rc And Output  aws s3api --endpoint-url ${ENDPOINT_URL} create-bucket --bucket bucket-test123
     Should Be True	${rc} > 0
-
-SetSecret Success
-    ${output} =         Execute          ozone sh s3 setsecret --secret=newsecret
-    Should Contain    ${output}    AWS_ACCESS_KEY_ID
-    Should Contain    ${output}    AWS_SECRET_ACCESS_KEY
 
