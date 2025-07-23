@@ -335,7 +335,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
 
     @Override
-    public void close() {
+    public synchronized void close() {
       IOUtils.closeQuietly(deleteTableIterator);
     }
   }
@@ -521,7 +521,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
      * @param currentSnapshotInfo if null, deleted directories in AOS should be processed.
      * @param keyManager KeyManager of the underlying store.
      */
-    private void processDeletedDirsForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
+    void processDeletedDirsForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
         long remainingBufLimit, long rnCnt) throws IOException, ExecutionException, InterruptedException {
       String volume, bucket; String snapshotTableKey;
       if (currentSnapshotInfo != null) {
