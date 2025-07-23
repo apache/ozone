@@ -132,5 +132,5 @@ into the balancer's activity, progress, and overall health.
 | `moveFailureTime`                        | The time spent on failed container moves.                                                                          |
 | `runningLoopCount`                       | The total number of times the balancer's main loop has run.                                                        |
 | `idleLoopNoAvailableVolumePairCount `    | The number of loops where balancing did not run because no suitable source/destination volume pair could be found. |
-| `idleLoopExceedsBandwidthCoun`           | The number of loops where balancing did not run due to bandwidth limits.                                           |
+| `idleLoopExceedsBandwidthCount`          | The number of loops where balancing did not run due to bandwidth limits.                                           |
 
