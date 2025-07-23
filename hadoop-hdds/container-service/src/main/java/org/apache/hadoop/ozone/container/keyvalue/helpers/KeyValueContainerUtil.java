@@ -294,14 +294,14 @@ public final class KeyValueContainerUtil {
     }
 
     Long containerDataChecksum = metadataTable.get(kvContainerData.getContainerDataChecksumKey());
-    if (containerDataChecksum != null) {
+    if (containerDataChecksum != null && kvContainerData.needsDataChecksum()) {
       kvContainerData.setDataChecksum(containerDataChecksum);
       return;
     }
 
     try {
       ContainerChecksumInfo containerChecksumInfo = ContainerChecksumTreeManager.readChecksumInfo(kvContainerData);
-      if (containerChecksumInfo != null) {
+      if (containerChecksumInfo != null && kvContainerData.needsDataChecksum()) {
         containerDataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
         kvContainerData.setDataChecksum(containerDataChecksum);
         metadataTable.put(kvContainerData.getContainerDataChecksumKey(), containerDataChecksum);

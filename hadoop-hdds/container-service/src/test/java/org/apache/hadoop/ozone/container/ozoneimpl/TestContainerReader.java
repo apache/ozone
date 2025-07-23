@@ -20,12 +20,14 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyList;
@@ -39,8 +41,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,6 +53,9 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -607,6 +614,123 @@ public class TestContainerReader {
             .getEstimatedKeyCount());
       }
     }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerLoadingWithMerkleTreePresent(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+
+    // Create a container with blocks and write MerkleTree
+    KeyValueContainerData containerData = createContainerWithBlocks(10L);
+    ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
+    ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
+    List<Long> deletedBlockIds = Arrays.asList(1L, 2L, 3L);
+    checksumManager.markBlocksAsDeleted(containerData, deletedBlockIds);
+    ContainerProtos.ContainerChecksumInfo checksumInfo =
+        checksumManager.writeContainerDataTree(containerData, treeWriter);
+    long expectedDataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
+
+    // Test container loading
+    ContainerCache.getInstance(conf).shutdownCache();
+    ContainerReader containerReader = new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true);
+    containerReader.run();
+
+    // Verify container was loaded successfully and data checksum is set
+    Container<?> loadedContainer = containerSet.getContainer(10L);
+    assertNotNull(loadedContainer);
+    KeyValueContainerData loadedData = (KeyValueContainerData) loadedContainer.getContainerData();
+    assertNotSame(containerData, loadedData);
+    assertEquals(expectedDataChecksum, loadedData.getDataChecksum());
+    ContainerProtos.ContainerChecksumInfo loadedChecksumInfo =
+        ContainerChecksumTreeManager.readChecksumInfo(loadedData);
+    verifyAllDataChecksumsMatch(loadedData, conf);
+
+    // Verify the deleted block IDs match what we set
+    List<Long> loadedDeletedBlockIds = loadedChecksumInfo.getDeletedBlocksList().stream()
+        .map(ContainerProtos.BlockMerkleTree::getBlockID)
+        .sorted()
+        .collect(Collectors.toList());
+    assertEquals(3, loadedChecksumInfo.getDeletedBlocksCount());
+    assertEquals(deletedBlockIds, loadedDeletedBlockIds);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerLoadingWithMerkleTreeFallbackToRocksDB(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+
+    KeyValueContainerData containerData = createContainerWithBlocks(11L);
+    ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
+    ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
+    ContainerProtos.ContainerChecksumInfo checksumInfo =
+        checksumManager.writeContainerDataTree(containerData, treeWriter);
+    long dataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
+
+    // Verify no checksum in RocksDB initially
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+      assertNull(dbDataChecksum);
+    }
+    ContainerCache.getInstance(conf).shutdownCache();
+
+    // Test container loading - should read from MerkleTree and store in RocksDB
+    ContainerReader containerReader = new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true);
+    containerReader.run();
+
+    // Verify container uses checksum from MerkleTree
+    Container<?> loadedContainer = containerSet.getContainer(11L);
+    assertNotNull(loadedContainer);
+    KeyValueContainerData loadedData = (KeyValueContainerData) loadedContainer.getContainerData();
+    assertNotSame(containerData, loadedData);
+    assertEquals(dataChecksum, loadedData.getDataChecksum());
+
+    // Verify checksum was stored in RocksDB as fallback
+    verifyAllDataChecksumsMatch(loadedData, conf);
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerLoadingWithNoChecksumAnywhere(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+
+    KeyValueContainerData containerData = createContainerWithBlocks(12L);
+    // Verify no checksum in RocksDB
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+      assertNull(dbDataChecksum);
+    }
+
+    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(containerData);
+    assertFalse(checksumFile.exists());
+
+    // Test container loading - should default to 0
+    ContainerCache.getInstance(conf).shutdownCache();
+    ContainerReader containerReader = new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true);
+    containerReader.run();
+
+    // Verify container loads with default checksum of 0
+    Container<?> loadedContainer = containerSet.getContainer(12L);
+    assertNotNull(loadedContainer);
+    KeyValueContainerData loadedData = (KeyValueContainerData) loadedContainer.getContainerData();
+    assertNotSame(containerData, loadedData);
+    assertEquals(0L, loadedData.getDataChecksum());
+
+    // Verify 0 checksum was stored in RocksDB
+    verifyAllDataChecksumsMatch(loadedData, conf);
+  }
+
+  private KeyValueContainerData createContainerWithBlocks(long containerId) throws Exception {
+    KeyValueContainerData containerData = new KeyValueContainerData(containerId, layout,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(), datanodeId.toString());
+    containerData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, volumeChoosingPolicy, clusterId);
+    addBlocks(container, true);
+    return containerData;
   }
 
   private long addDbEntry(KeyValueContainerData containerData)

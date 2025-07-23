@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
-import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -421,15 +420,16 @@ public class ContainerChecksumTreeManager {
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  public static @Nullable ContainerProtos.ContainerChecksumInfo readChecksumInfo(ContainerData data)
+  public static ContainerProtos.ContainerChecksumInfo readChecksumInfo(ContainerData data)
       throws IOException {
     long containerID = data.getContainerID();
     File checksumFile = getContainerChecksumFile(data);
     try {
       if (!checksumFile.exists()) {
         LOG.debug("No checksum file currently exists for container {} at the path {}", containerID, checksumFile);
-        return null;
+        return ContainerProtos.ContainerChecksumInfo.newBuilder().build();
       }
+
       try (InputStream inStream = Files.newInputStream(checksumFile.toPath())) {
         return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
       }
