@@ -96,7 +96,7 @@ public class ContainerReplicaHistory {
       ContainerReplicaHistoryProto proto) {
     return new ContainerReplicaHistory(UUID.fromString(proto.getUuid()),
         proto.getFirstSeenTime(), proto.getLastSeenTime(), proto.getBcsId(),
-        proto.getState(), new ContainerChecksums(proto.getDataChecksum()));
+        proto.getState(), ContainerChecksums.dataOnly(proto.getDataChecksum()));
   }
 
   public ContainerReplicaHistoryProto toProto() {

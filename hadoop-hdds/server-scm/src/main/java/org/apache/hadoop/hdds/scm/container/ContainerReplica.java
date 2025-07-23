@@ -300,7 +300,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
      */
     public ContainerReplica build() {
       if (this.checksums == null) {
-        this.checksums = new ContainerChecksums(0L);
+        this.checksums = ContainerChecksums.unknown();
       }
       return new ContainerReplica(this);
     }

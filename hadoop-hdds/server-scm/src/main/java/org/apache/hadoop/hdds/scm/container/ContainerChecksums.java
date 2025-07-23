@@ -19,21 +19,40 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.util.Objects;
 
+import net.jcip.annotations.Immutable;
+
 /**
  * Wrapper for container checksums (data, metadata, etc.).
  * Provides equality, hash, and hex string rendering.
  */
-public class ContainerChecksums {
+@Immutable
+public final class ContainerChecksums {
+
+  private static final ContainerChecksums UNKNOWN =
+      new ContainerChecksums(0, null);
+
   private final long dataChecksum;
   private final Long metadataChecksum; // nullable for future use
 
-  public ContainerChecksums(long dataChecksum) {
-    this(dataChecksum, null);
-  }
-
-  public ContainerChecksums(long dataChecksum, Long metadataChecksum) {
+  private ContainerChecksums(long dataChecksum, Long metadataChecksum) {
     this.dataChecksum = dataChecksum;
     this.metadataChecksum = metadataChecksum;
+  }
+
+  public static ContainerChecksums unknown() {
+    return UNKNOWN;
+  }
+
+  public static ContainerChecksums dataOnly(long dataChecksum) {
+    return new ContainerChecksums(dataChecksum, null);
+  }
+
+  public static ContainerChecksums metadataOnly(long metadataChecksum) {
+    return new ContainerChecksums(0, metadataChecksum);
+  }
+
+  public static ContainerChecksums of(long dataChecksum, long metadataChecksum) {
+    return new ContainerChecksums(dataChecksum, metadataChecksum);
   }
 
   public long getDataChecksum() {
@@ -54,7 +73,7 @@ public class ContainerChecksums {
     }
     ContainerChecksums that = (ContainerChecksums) obj;
     return dataChecksum == that.dataChecksum &&
-           Objects.equals(metadataChecksum, that.metadataChecksum);
+        Objects.equals(metadataChecksum, that.metadataChecksum);
   }
 
   @Override
@@ -71,4 +90,4 @@ public class ContainerChecksums {
     }
     return sb.toString();
   }
-} 
+}

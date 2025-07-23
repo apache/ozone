@@ -691,7 +691,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           .setContainerState(s)
           .setContainerID(ContainerID.valueOf(containerId))
           .setSequenceId(1)
-          .setChecksums(new ContainerChecksums(1234L))
+          .setChecksums(ContainerChecksums.dataOnly(1234L))
           .build());
     }
     return replicas;
@@ -707,7 +707,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           .setContainerState(s)
           .setContainerID(ContainerID.valueOf(containerId))
           .setSequenceId(1)
-          .setChecksums(new ContainerChecksums(checksum))
+          .setChecksums(ContainerChecksums.dataOnly(checksum))
           .build());
       checksum++;
     }

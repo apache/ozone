@@ -417,7 +417,7 @@ public class TestContainerHealthStatus {
       replicas.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
-          .setChecksums(new ContainerChecksums(1234L))
+          .setChecksums(ContainerChecksums.dataOnly(1234L))
           .setContainerState(s)
           .build());
     }
@@ -433,7 +433,7 @@ public class TestContainerHealthStatus {
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
           .setContainerState(s)
-          .setChecksums(new ContainerChecksums(checksum))
+          .setChecksums(ContainerChecksums.dataOnly(checksum))
           .build());
       checksum++;
     }

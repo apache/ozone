@@ -17,22 +17,21 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.assertj.core.api.Assertions.assertThat;  
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-class ContainerChecksumsTest {
+class TestContainerChecksums {
   @Test
   void testEqualsAndHashCode() {
-    ContainerChecksums c1 = new ContainerChecksums(123L);
-    ContainerChecksums c2 = new ContainerChecksums(123L);
-    ContainerChecksums c3 = new ContainerChecksums(456L);
-    ContainerChecksums c4 = new ContainerChecksums(123L, 789L);
-    ContainerChecksums c5 = new ContainerChecksums(123L, 789L);
-    ContainerChecksums c6 = new ContainerChecksums(123L, 790L);
+    ContainerChecksums c1 = ContainerChecksums.dataOnly(123L);
+    ContainerChecksums c2 = ContainerChecksums.dataOnly(123L);
+    ContainerChecksums c3 = ContainerChecksums.dataOnly(456L);
+    ContainerChecksums c4 = ContainerChecksums.of(123L, 789L);
+    ContainerChecksums c5 = ContainerChecksums.of(123L, 789L);
+    ContainerChecksums c6 = ContainerChecksums.of(123L, 790L);
 
     assertEquals(c1, c2);
     assertEquals(c1.hashCode(), c2.hashCode());
@@ -44,12 +43,10 @@ class ContainerChecksumsTest {
 
   @Test
   void testToString() {
-    ContainerChecksums c1 = new ContainerChecksums(0x1234ABCDL);
-    assertTrue(c1.toString().contains("data=1234abcd"));
-    assertFalse(c1.toString().contains("metadata="));
+    ContainerChecksums c1 = ContainerChecksums.dataOnly(0x1234ABCDL);
+    assertThat(c1.toString()).contains("data=1234abcd").doesNotContain("metadata=");
 
-    ContainerChecksums c2 = new ContainerChecksums(0x1234ABCDL, 0xDEADBEEFL);
-    assertTrue(c2.toString().contains("data=1234abcd"));
-    assertTrue(c2.toString().contains("metadata=deadbeef"));
+    ContainerChecksums c2 = ContainerChecksums.of(0x1234ABCDL, 0xDEADBEEFL);
+    assertThat(c2.toString()).contains("data=1234abcd").contains("metadata=deadbeef");
   }
 } 
