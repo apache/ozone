@@ -80,10 +80,10 @@ public class NSSummaryTask implements ReconOmTask {
   }
 
   // Unified control for all NSS tree rebuild operations
-  private static final AtomicReference<RebuildState> rebuildState = 
+  private static final AtomicReference<RebuildState> REBUILD_STATE =
       new AtomicReference<>(RebuildState.IDLE);
 
-  protected final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager reconOMMetadataManager;
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
@@ -123,7 +123,7 @@ public class NSSummaryTask implements ReconOmTask {
    * @return current RebuildState
    */
   public static RebuildState getRebuildState() {
-    return rebuildState.get();
+    return REBUILD_STATE.get();
   }
 
   /**
@@ -189,13 +189,13 @@ public class NSSummaryTask implements ReconOmTask {
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     // Unified control for all NSS tree rebuild operations
-    RebuildState currentState = rebuildState.get();
+    RebuildState currentState = REBUILD_STATE.get();
     if (currentState == RebuildState.RUNNING) {
       LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
       return buildTaskResult(false);
     }
     
-    if (!rebuildState.compareAndSet(currentState, RebuildState.RUNNING)) {
+    if (!REBUILD_STATE.compareAndSet(currentState, RebuildState.RUNNING)) {
       LOG.info("Failed to acquire rebuild lock, another thread may have started rebuild.");
       return buildTaskResult(false);
     }
@@ -207,7 +207,7 @@ public class NSSummaryTask implements ReconOmTask {
       return executeReprocess(omMetadataManager, startTime);
     } catch (Exception e) {
       LOG.error("NSSummary reprocess failed with exception.", e);
-      rebuildState.set(RebuildState.FAILED);
+      REBUILD_STATE.set(RebuildState.FAILED);
       return buildTaskResult(false);
     }
   }
@@ -224,7 +224,7 @@ public class NSSummaryTask implements ReconOmTask {
       reconNamespaceSummaryManager.clearNSSummaryTable();
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ", ioEx);
-      rebuildState.set(RebuildState.FAILED);
+      REBUILD_STATE.set(RebuildState.FAILED);
       return buildTaskResult(false);
     }
 
@@ -247,7 +247,7 @@ public class NSSummaryTask implements ReconOmTask {
       for (Future<Boolean> result : results) {
         if (result.get().equals(false)) {
           LOG.error("NSSummary reprocess failed for one of the sub-tasks.");
-          rebuildState.set(RebuildState.FAILED);
+          REBUILD_STATE.set(RebuildState.FAILED);
           return buildTaskResult(false);
         }
       }
@@ -255,7 +255,7 @@ public class NSSummaryTask implements ReconOmTask {
       
     } catch (InterruptedException | ExecutionException ex) {
       LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
-      rebuildState.set(RebuildState.FAILED);
+      REBUILD_STATE.set(RebuildState.FAILED);
       return buildTaskResult(false);
       
     } finally {
@@ -271,7 +271,7 @@ public class NSSummaryTask implements ReconOmTask {
       
       // Reset state to IDLE on successful completion
       if (success) {
-        rebuildState.set(RebuildState.IDLE);
+        REBUILD_STATE.set(RebuildState.IDLE);
         LOG.info("NSSummary tree reprocess completed successfully with unified control.");
       }
     }
@@ -294,7 +294,7 @@ public class NSSummaryTask implements ReconOmTask {
    */
   @VisibleForTesting
   public static void resetRebuildState() {
-    rebuildState.set(RebuildState.IDLE);
+    REBUILD_STATE.set(RebuildState.IDLE);
   }
 
   /**
@@ -302,7 +302,7 @@ public class NSSummaryTask implements ReconOmTask {
    */
   @VisibleForTesting
   public static void setRebuildStateToFailed() {
-    rebuildState.set(RebuildState.FAILED);
+    REBUILD_STATE.set(RebuildState.FAILED);
   }
 
 }

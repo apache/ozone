@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -28,15 +27,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -96,8 +92,9 @@ public class TestNSSummaryTaskControllerIntegration {
     ReconTaskStatusUpdaterManager mockTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
     ReconTaskStatusUpdater mockTaskStatusUpdater = mock(ReconTaskStatusUpdater.class);
     when(mockTaskStatusUpdaterManager.getTaskStatusUpdater(any())).thenReturn(mockTaskStatusUpdater);
-    
-    taskController = new ReconTaskControllerImpl(ozoneConfiguration, java.util.Collections.emptySet(), mockTaskStatusUpdaterManager);
+
+    taskController =
+        new ReconTaskControllerImpl(ozoneConfiguration, java.util.Collections.emptySet(), mockTaskStatusUpdaterManager);
     taskController.start(); // Initialize the executor service
     taskController.registerTask(nsSummaryTask);
     taskController.registerTask(mockOtherTask);

@@ -51,7 +51,6 @@ import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -83,7 +82,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -304,7 +302,8 @@ public class ReconUtils {
       if (nsSummary.getParentId() == -1) {
         // Trigger async rebuild using unified control mechanism
         triggerAsyncNSSummaryRebuild(reconNamespaceSummaryManager, omMetadataManager);
-        log.warn("NSSummary tree corruption detected, rebuild triggered. Returning empty string for path construction.");
+        log.warn(
+            "NSSummary tree corruption detected, rebuild triggered. Returning empty string for path construction.");
         throw new ServiceNotReadyException("Service is initializing. Please try again later.");
       }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
@@ -435,7 +434,6 @@ public class ReconUtils {
     }
     return prevKeyPrefix;
   }
-
 
   /**
    * Make HTTP GET call on the URL and return HttpURLConnection instance.
