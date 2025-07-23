@@ -686,10 +686,9 @@ public class OMDBInsightEndpoint {
         Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
         OmKeyInfo omKeyInfo = kv.getValue();
         if (omKeyInfo != null) {
-          totalDataSize += fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
-          // TODO: Based on HDDS-13180 merge, update totalReplicatedDataSize calculation using
-          //  fetchSizeForDeletedDirectory.
-          totalReplicatedDataSize += omKeyInfo.getReplicatedSize();
+          Pair<Long, Long> sizeInfo = fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
+          totalDataSize += sizeInfo.getLeft();
+          totalReplicatedDataSize += sizeInfo.getRight();
         }
       }
     } catch (IOException ex) {
