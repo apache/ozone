@@ -528,7 +528,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
               return false;
             }
           }, deletionThreadPool);
-          processedAllDeletedDirs = future.thenCombine(future, (a, b) -> a && b);
+          processedAllDeletedDirs = processedAllDeletedDirs.thenCombine(future, (a, b) -> a && b);
         }
         // If AOS or all directories have been processed for snapshot, update snapshot size delta and deep clean flag
         // if it is a snapshot.
