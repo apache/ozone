@@ -99,7 +99,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -384,7 +384,8 @@ public class TestKeyValueHandler {
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
         keyValueHandler.handleCloseContainer(closeContainerRequest, container);
-    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
+    // Checksum will not be generated for an invalid container.
+    assertFalse(ContainerChecksumTreeManager.getContainerChecksumFile(kvData).exists());
 
     assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
         response.getResult(),
@@ -680,7 +681,8 @@ public class TestKeyValueHandler {
 
     // Initially, container should have no checksum information.
     assertEquals(0, containerData.getDataChecksum());
-    assertFalse(checksumManager.read(containerData).isPresent());
+    assertFalse(checksumManager.read(containerData).hasContainerMerkleTree());
+    assertFalse(ContainerChecksumTreeManager.getContainerChecksumFile(containerData).exists());
     assertEquals(0, icrCount.get());
 
     // Update container with checksum information.
@@ -690,7 +692,7 @@ public class TestKeyValueHandler {
     // Check all data checksums are updated correctly.
     verifyAllDataChecksumsMatch(containerData, conf);
     // Check disk content.
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData).get();
+    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData);
     assertTreesSortedAndMatch(treeWriter.toProto(), checksumInfo.getContainerMerkleTree());
   }
 
@@ -819,7 +821,7 @@ public class TestKeyValueHandler {
     // Register the on-demand container scanner with the container set used by the KeyValueHandler.
     ContainerController controller = new ContainerController(containerSet,
         Collections.singletonMap(ContainerType.KeyValueContainer, kvHandler));
-    OnDemandContainerDataScanner onDemandScanner = new OnDemandContainerDataScanner(
+    OnDemandContainerScanner onDemandScanner = new OnDemandContainerScanner(
         conf.getObject(ContainerScannerConfiguration.class), controller);
     containerSet.registerOnDemandScanner(onDemandScanner);
 

@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.includeSnapshotData;
 import static org.apache.hadoop.ozone.om.snapshot.OMDBCheckpointUtils.logEstimatedTarballSize;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_PREFIX;
@@ -41,15 +42,14 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import javax.servlet.ServletException;
@@ -126,7 +126,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   @Override
   public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
       boolean isFormData, boolean flush) {
-    List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
@@ -147,7 +146,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
-      logSstFileList(excludedSstList,
+      logSstFileList(receivedSstFiles,
           "Excluded {} SST files from the latest checkpoint{}: {}", 5);
     } catch (Exception e) {
       LOG.error(
@@ -255,6 +254,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
               hardLinkFileMap, getCompactionLogDir());
           writeDBToArchive(sstFilesToExclude, tmpSstBackupDir, maxTotalSstSize, archiveOutputStream, tmpdir,
               hardLinkFileMap, getSstBackupDir());
+          // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
+          transferSnapshotData(sstFilesToExclude, tmpdir, snapshotPaths, maxTotalSstSize,
+              archiveOutputStream, hardLinkFileMap);
         }
         writeHardlinkFile(getConf(), hardLinkFileMap, archiveOutputStream);
         includeRatisSnapshotCompleteFlag(archiveOutputStream);
@@ -265,6 +267,36 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       throw ioe;
     } finally {
       cleanupCheckpoint(checkpoint);
+    }
+  }
+
+  /**
+   * Transfers the snapshot data from the specified snapshot directories into the archive output stream,
+   * handling deduplication and managing resource locking.
+   *
+   * @param sstFilesToExclude   Set of SST file identifiers to exclude from the archive.
+   * @param tmpdir              Temporary directory for intermediate processing.
+   * @param snapshotPaths       Set of paths to snapshot directories to be processed.
+   * @param maxTotalSstSize     AtomicLong to track the cumulative size of SST files included.
+   * @param archiveOutputStream Archive output stream to write the snapshot data.
+   * @param hardLinkFileMap     Map of hardlink file paths to their unique identifiers for deduplication.
+   * @throws IOException if an I/O error occurs during processing.
+   */
+  private void transferSnapshotData(Set<String> sstFilesToExclude, Path tmpdir, Set<Path> snapshotPaths,
+      AtomicLong maxTotalSstSize, ArchiveOutputStream<TarArchiveEntry> archiveOutputStream,
+      Map<String, String> hardLinkFileMap) throws IOException {
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    OMMetadataManager omMetadataManager = om.getMetadataManager();
+    for (Path snapshotDir : snapshotPaths) {
+      String snapshotId = OmSnapshotManager.extractSnapshotIDFromCheckpointDirName(snapshotDir.toString());
+      omMetadataManager.getLock().acquireReadLock(SNAPSHOT_DB_LOCK, snapshotId);
+      try {
+        // invalidate closes the snapshot DB
+        om.getOmSnapshotManager().invalidateCacheEntry(UUID.fromString(snapshotId));
+        writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap);
+      } finally {
+        omMetadataManager.getLock().releaseReadLock(SNAPSHOT_DB_LOCK, snapshotId);
+      }
     }
   }
 

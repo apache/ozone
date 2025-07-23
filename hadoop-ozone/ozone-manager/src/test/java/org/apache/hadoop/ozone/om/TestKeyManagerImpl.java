@@ -30,6 +30,7 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -121,6 +122,11 @@ public class TestKeyManagerImpl {
     String bucketNamePrefix = "bucket";
     String keyPrefix = "key";
     OzoneConfiguration configuration = new OzoneConfiguration();
+    int limit = (int) configuration.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    limit = (int) (limit * 0.9);
     OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
     when(metadataManager.getBucketKeyPrefix(anyString(), anyString())).thenAnswer(i ->
         "/" + i.getArguments()[0] + "/" + i.getArguments()[1] + "/");
@@ -146,10 +152,12 @@ public class TestKeyManagerImpl {
         : (String.format("/%s%010d/%s%010d/%s%010d", volumeNamePrefix, startVolumeNumber, bucketNamePrefix,
         startBucketNumber, keyPrefix, startKeyNumber));
     if (expectedException != null) {
+      int finalLimit = limit;
       assertThrows(expectedException, () -> km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter,
-          numberOfEntries));
+          numberOfEntries, finalLimit));
     } else {
-      assertEquals(expectedEntries, km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
+      assertEquals(expectedEntries,
+          km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries, limit));
     }
   }
 
@@ -165,6 +173,11 @@ public class TestKeyManagerImpl {
     String bucketNamePrefix = "bucket";
     String keyPrefix = "";
     OzoneConfiguration configuration = new OzoneConfiguration();
+    int limit = (int) configuration.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    limit = (int) (limit * 0.9);
     OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
     when(metadataManager.getBucketKeyPrefix(anyString(), anyString())).thenAnswer(i ->
         "/" + i.getArguments()[0] + "/" + i.getArguments()[1] + "/");
@@ -183,10 +196,12 @@ public class TestKeyManagerImpl {
         : (String.format("/%s%010d/%s%010d/%s%010d", volumeNamePrefix, startVolumeNumber, bucketNamePrefix,
         startBucketNumber, keyPrefix, startKeyNumber));
     if (expectedException != null) {
+      int finalLimit = limit;
       assertThrows(expectedException, () -> km.getRenamesKeyEntries(volumeName, bucketName, startKey,
-          filter, numberOfEntries));
+          filter, numberOfEntries, finalLimit));
     } else {
-      assertEquals(expectedEntries, km.getRenamesKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
+      assertEquals(expectedEntries,
+          km.getRenamesKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries, limit));
     }
   }
 

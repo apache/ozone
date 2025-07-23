@@ -183,7 +183,7 @@ public class TestTarContainerPacker {
     //write container checksum file in the metadata directory
     ContainerMerkleTreeWriter treeWriter = buildTestTree(conf);
     checksumTreeManager.writeContainerDataTree(sourceContainerData, treeWriter);
-    assertTrue(ContainerChecksumTreeManager.hasContainerChecksumFile(sourceContainerData));
+    assertTrue(ContainerChecksumTreeManager.getContainerChecksumFile(sourceContainerData).exists());
 
     //sample container descriptor file
     writeDescriptor(sourceContainer);
@@ -252,9 +252,9 @@ public class TestTarContainerPacker {
         TEST_CHUNK_FILE_NAME);
 
     assertEquals(sourceContainerData.getContainerID(), destinationContainerData.getContainerID());
-    assertTrue(ContainerChecksumTreeManager.hasContainerChecksumFile(destinationContainerData));
-    assertTreesSortedAndMatch(checksumTreeManager.read(sourceContainerData).get().getContainerMerkleTree(),
-        checksumTreeManager.read(destinationContainerData).get().getContainerMerkleTree());
+    assertTrue(ContainerChecksumTreeManager.getContainerChecksumFile(destinationContainerData).exists());
+    assertTreesSortedAndMatch(checksumTreeManager.read(sourceContainerData).getContainerMerkleTree(),
+        checksumTreeManager.read(destinationContainerData).getContainerMerkleTree());
 
     String containerFileData = new String(Files.readAllBytes(destinationContainer.getContainerFile().toPath()), UTF_8);
     assertTrue(containerFileData.contains("RECOVERING"),

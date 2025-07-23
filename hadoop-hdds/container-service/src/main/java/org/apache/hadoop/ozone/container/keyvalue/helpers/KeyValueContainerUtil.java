@@ -235,8 +235,8 @@ public final class KeyValueContainerUtil {
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
         kvContainerData);
     if (!dbFile.exists()) {
-      LOG.error("Container DB file is missing for ContainerID {}. " +
-          "Skipping loading of this container.", containerID);
+      LOG.error("Container DB file is missing at {} for ContainerID {}. " +
+          "Skipping loading of this container.", dbFile, containerID);
       // Don't further process this container, as it is missing db file.
       throw new IOException("Container DB file is missing for containerID "
           + containerID);
@@ -282,14 +282,7 @@ public final class KeyValueContainerUtil {
       } else if (store != null) {
         // We only stop the store if cacheDB is null, as otherwise we would
         // close the rocksDB handle in the cache and the next reader would fail
-        try {
-          store.stop();
-        } catch (IOException e) {
-          throw e;
-        } catch (Exception e) {
-          throw new RuntimeException("Unexpected exception closing the " +
-              "RocksDB when loading containers", e);
-        }
+        store.stop();
       }
     }
   }
