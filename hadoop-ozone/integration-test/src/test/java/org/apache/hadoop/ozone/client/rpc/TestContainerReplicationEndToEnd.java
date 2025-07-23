@@ -213,7 +213,7 @@ public class TestContainerReplicationEndToEnd {
 
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       Predicate<DatanodeDetails> p =
-          i -> i.getUuid().equals(dn.getDatanodeDetails().getUuid());
+          i -> i.getID().equals(dn.getDatanodeDetails().getID());
       if (!pipeline.getNodes().stream().anyMatch(p)) {
         dnService = dn;
       }

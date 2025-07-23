@@ -46,7 +46,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
@@ -163,10 +162,10 @@ public class TestContainerEndpoint {
   private static final long LOCAL_ID = 0L;
   private static final long KEY_ONE_SIZE = 500L; // 500 bytes
 
-  private UUID uuid1;
-  private UUID uuid2;
-  private UUID uuid3;
-  private UUID uuid4;
+  private DatanodeID id1;
+  private DatanodeID id2;
+  private DatanodeID id3;
+  private DatanodeID id4;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -732,10 +731,10 @@ public class TestContainerEndpoint {
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
     putContainerInfos(5);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 0, 0, 0, 0);
 
     Response responseWithLimit = containerEndpoint.getMissingContainers(3);
@@ -816,11 +815,11 @@ public class TestContainerEndpoint {
 
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
-    putContainerInfos(15);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    putContainerInfos(14);
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 1);
 
     response = containerEndpoint.getUnhealthyContainers(1000, 1);
@@ -938,10 +937,10 @@ public class TestContainerEndpoint {
 
     // Add unhealthy records
     putContainerInfos(5);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 1);
     createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
     createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
@@ -996,10 +995,10 @@ public class TestContainerEndpoint {
   public void testUnhealthyContainersPaging()
       throws IOException, TimeoutException {
     putContainerInfos(6);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 0);
     UnhealthyContainersResponse firstBatch =
         (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
@@ -1031,10 +1030,10 @@ public class TestContainerEndpoint {
   @Test
   public void testGetReplicaHistoryForContainer() throws IOException {
     // Add container history for container id 1
-    final UUID u1 = newDatanode("host1", "127.0.0.1");
-    final UUID u2 = newDatanode("host2", "127.0.0.2");
-    final UUID u3 = newDatanode("host3", "127.0.0.3");
-    final UUID u4 = newDatanode("host4", "127.0.0.4");
+    final DatanodeID u1 = newDatanode("host1", "127.0.0.1");
+    final DatanodeID u2 = newDatanode("host2", "127.0.0.2");
+    final DatanodeID u3 = newDatanode("host3", "127.0.0.3");
+    final DatanodeID u4 = newDatanode("host4", "127.0.0.4");
     reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", 1234L);
     reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", 1234L);
     reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", 1234L);
@@ -1075,15 +1074,15 @@ public class TestContainerEndpoint {
     }
   }
 
-  UUID newDatanode(String hostName, String ipAddress) throws IOException {
-    final UUID uuid = UUID.randomUUID();
-    reconContainerManager.getNodeDB().put(DatanodeID.of(uuid),
+  DatanodeID newDatanode(String hostName, String ipAddress) throws IOException {
+    final DatanodeID id = DatanodeID.randomID();
+    reconContainerManager.getNodeDB().put(id,
         DatanodeDetails.newBuilder()
-            .setUuid(uuid)
+            .setID(id)
             .setHostName(hostName)
             .setIpAddress(ipAddress)
             .build());
-    return uuid;
+    return id;
   }
 
   private void createEmptyMissingUnhealthyRecords(int emptyMissing) {
@@ -1149,14 +1148,10 @@ public class TestContainerEndpoint {
 
     long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
 
-    reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L,
-        "UNHEALTHY", differentChecksum);
-    reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L,
-        "UNHEALTHY", differentChecksum);
-    reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L,
-        "UNHEALTHY", 1234L);
-    reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
-        "UNHEALTHY", 1234L);
+    reconContainerManager.upsertContainerHistory(cID, id1, 1L, 1L, "UNHEALTHY", differentChecksum);
+    reconContainerManager.upsertContainerHistory(cID, id2, 2L, 1L, "UNHEALTHY", differentChecksum);
+    reconContainerManager.upsertContainerHistory(cID, id3, 3L, 1L, "UNHEALTHY", differentChecksum);
+    reconContainerManager.upsertContainerHistory(cID, id4, 4L, 1L, "UNHEALTHY", differentChecksum);
   }
 
   protected ContainerWithPipeline getTestContainer(
