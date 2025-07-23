@@ -94,9 +94,9 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
    * @param options DBOptions. This would be modified based on the latest options.
    * @param path DB path.
    * @param columnFamilyDescriptors Column family descriptors. These would be modified based on the latest options.
-   * @param columnFamilyHandles Column family handles. The underlying column family
+   * @param columnFamilyHandles Column family handles of the underlying column family
    * @return A RocksDB instance.
-   * @throws RocksDBException exception if thrown when opening a RocksDB instance.
+   * @throws RocksDBException thrown if error happens in underlying native library.
    */
   public static ManagedRocksDB openWithLatestOptions(
       final ManagedConfigOptions configOptions,

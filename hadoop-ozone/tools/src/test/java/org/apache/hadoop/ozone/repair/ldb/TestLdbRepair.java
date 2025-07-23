@@ -262,7 +262,6 @@ public class TestLdbRepair {
       assertEquals(this.walTTL, other.walTTL);
       assertEquals(this.walSizeLimit, other.walSizeLimit);
 
-
       assertEquals(this.bytesPerSync, other.bytesPerSync);
       assertEquals(this.writeBufferSize, other.writeBufferSize);
       assertEquals(this.blockSize, other.blockSize);
@@ -284,9 +283,6 @@ public class TestLdbRepair {
       // BlockBasedTableConfig
       private long blockSize;
       private boolean pinL0FilterAndIndexBlocksInCache;
-
-      Builder() {
-      }
 
       public Builder setMaxBackgroundCompactions(int maxBackgroundCompactions) {
         this.maxBackgroundCompactions = maxBackgroundCompactions;
