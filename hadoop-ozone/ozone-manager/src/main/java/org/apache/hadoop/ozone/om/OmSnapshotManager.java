@@ -226,7 +226,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     this.columnFamilyOptions = new ManagedColumnFamilyOptions();
     this.columnFamilyDescriptors = new ArrayList<>();
     this.columnFamilyHandles = new ArrayList<>();
-    CodecRegistry codecRegistry = createCodecRegistryForSnapDiff();
     this.maxPageSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE,
         OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
@@ -238,31 +237,17 @@ public final class OmSnapshotManager implements AutoCloseable {
     Preconditions.checkArgument(this.maxOpenSstFilesInSnapshotDb > 0,
         OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES + " must be positive.");
 
-    ColumnFamilyHandle snapDiffJobCf;
-    ColumnFamilyHandle snapDiffReportCf;
-    ColumnFamilyHandle snapDiffPurgedJobCf;
-    String dbPath = getDbPath(ozoneManager.getConfiguration());
+    final CodecRegistry codecRegistry = createCodecRegistryForSnapDiff();
+    final ColumnFamilyHandle snapDiffJobCf;
+    final ColumnFamilyHandle snapDiffReportCf;
+    final ColumnFamilyHandle snapDiffPurgedJobCf;
 
     try {
-      // Add default CF
-      columnFamilyDescriptors.add(new ColumnFamilyDescriptor(
-          StringUtils.string2Bytes(DEFAULT_COLUMN_FAMILY_NAME),
-          new ManagedColumnFamilyOptions(columnFamilyOptions)));
-
-      columnFamilyDescriptors.addAll(getExitingColumnFamilyDescriptors(dbPath));
-
-      this.snapshotDiffDb = createRocksDbForSnapshotDiff(options,
-          dbPath, columnFamilyDescriptors, columnFamilyHandles);
-
-      snapDiffJobCf = getOrCreateColumnFamily(SNAP_DIFF_JOB_TABLE_NAME,
-          columnFamilyDescriptors, columnFamilyHandles);
-      snapDiffReportCf = getOrCreateColumnFamily(SNAP_DIFF_REPORT_TABLE_NAME,
-          columnFamilyDescriptors, columnFamilyHandles);
-      snapDiffPurgedJobCf = getOrCreateColumnFamily(
-          SNAP_DIFF_PURGED_JOB_TABLE_NAME, columnFamilyDescriptors,
-          columnFamilyHandles);
-
-      dropUnknownColumnFamilies(columnFamilyHandles);
+      Pair<ColumnFamilyHandle, Pair<ColumnFamilyHandle, ColumnFamilyHandle>>
+          handles = initializeSnapshotDiffDb();
+      snapDiffJobCf = handles.getLeft();
+      snapDiffReportCf = handles.getRight().getLeft();
+      snapDiffPurgedJobCf = handles.getRight().getRight();
     } catch (RuntimeException exception) {
       close();
       throw exception;
@@ -343,6 +328,33 @@ public final class OmSnapshotManager implements AutoCloseable {
         codecRegistry
     );
     this.snapshotDiffCleanupService.start();
+  }
+
+  private Pair<ColumnFamilyHandle, Pair<ColumnFamilyHandle, ColumnFamilyHandle>>
+      initializeSnapshotDiffDb() {
+    String dbPath = getDbPath(ozoneManager.getConfiguration());
+
+    // Add default CF
+    columnFamilyDescriptors.add(new ColumnFamilyDescriptor(
+        StringUtils.string2Bytes(DEFAULT_COLUMN_FAMILY_NAME),
+        new ManagedColumnFamilyOptions(columnFamilyOptions)));
+
+    columnFamilyDescriptors.addAll(getExitingColumnFamilyDescriptors(dbPath));
+
+    this.snapshotDiffDb = createRocksDbForSnapshotDiff(options,
+        dbPath, columnFamilyDescriptors, columnFamilyHandles);
+
+    ColumnFamilyHandle snapDiffJobCf = getOrCreateColumnFamily(SNAP_DIFF_JOB_TABLE_NAME,
+        columnFamilyDescriptors, columnFamilyHandles);
+    ColumnFamilyHandle snapDiffReportCf = getOrCreateColumnFamily(SNAP_DIFF_REPORT_TABLE_NAME,
+        columnFamilyDescriptors, columnFamilyHandles);
+    ColumnFamilyHandle snapDiffPurgedJobCf = getOrCreateColumnFamily(
+        SNAP_DIFF_PURGED_JOB_TABLE_NAME, columnFamilyDescriptors,
+        columnFamilyHandles);
+
+    dropUnknownColumnFamilies(columnFamilyHandles);
+
+    return Pair.of(snapDiffJobCf, Pair.of(snapDiffReportCf, snapDiffPurgedJobCf));
   }
 
   /**
