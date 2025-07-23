@@ -86,6 +86,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
   private final ScmBlockLocationProtocolPB rpcProxy;
   private SCMBlockLocationFailoverProxyProvider failoverProxyProvider;
+  private volatile ScmInfo scmInfo;
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -231,8 +232,12 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
+
+    boolean useDataDistribution = getScmInfoSafe().getMetaDataLayoutVersion() >=
+        HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion();
     List<KeyBlocks> keyBlocksProto = keyBlocksInfoList.stream()
-        .map(BlockGroup::getProto).collect(Collectors.toList());
+        .map(blockGroup -> blockGroup.getProto(useDataDistribution))
+        .collect(Collectors.toList());
     DeleteScmKeyBlocksRequestProto request = DeleteScmKeyBlocksRequestProto
         .newBuilder()
         .addAllKeyBlocks(keyBlocksProto)
@@ -256,6 +261,14 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
                 .convertBlockResultProto(result.getBlockResultsList())))
         .collect(Collectors.toList()));
     return results;
+  }
+
+  private synchronized ScmInfo getScmInfoSafe() throws IOException {
+    if (scmInfo == null || scmInfo.getMetaDataLayoutVersion() <
+        HDDSLayoutFeature.DATA_DISTRIBUTION.layoutVersion()) {
+      getScmInfo(); // refresh cached scmInfo
+    }
+    return scmInfo;
   }
 
   /**
@@ -282,7 +295,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
         .setScmId(resp.getScmId())
         .setMetaDataLayoutVersion(resp.hasMetaDataLayoutVersion() ?
             resp.getMetaDataLayoutVersion() : HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
-    return builder.build();
+    scmInfo = builder.build();
+    return scmInfo;
   }
 
   /**
