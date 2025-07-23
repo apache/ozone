@@ -125,6 +125,14 @@ public class UnhealthyContainersResponse {
     return replicaMismatchCount;
   }
 
+  public long getLastKey() {
+    return lastKey;
+  }
+
+  public long getFirstKey() {
+    return firstKey;
+  }
+
   public Collection<UnhealthyContainerMetadata> getContainers() {
     return containers;
   }
