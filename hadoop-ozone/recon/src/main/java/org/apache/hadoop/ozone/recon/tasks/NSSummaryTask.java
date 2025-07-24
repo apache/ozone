@@ -70,15 +70,6 @@ public class NSSummaryTask implements ReconOmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTask.class);
 
-  /**
-   * Rebuild state enum to track NSSummary tree rebuild status.
-   */
-  public enum RebuildState {
-    IDLE,     // No rebuild in progress
-    RUNNING,  // Rebuild currently in progress
-    FAILED    // Last rebuild failed
-  }
-
   // Unified control for all NSS tree rebuild operations
   private static final AtomicReference<RebuildState> REBUILD_STATE =
       new AtomicReference<>(RebuildState.IDLE);
@@ -88,6 +79,15 @@ public class NSSummaryTask implements ReconOmTask {
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
+
+  /**
+   * Rebuild state enum to track NSSummary tree rebuild status.
+   */
+  public enum RebuildState {
+    IDLE,     // No rebuild in progress
+    RUNNING,  // Rebuild currently in progress
+    FAILED    // Last rebuild failed
+  }
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager
@@ -282,6 +282,7 @@ public class NSSummaryTask implements ReconOmTask {
   /**
    * Build a TaskResult with the given success status.
    */
+  @Override
   public TaskResult buildTaskResult(boolean success) {
     return new TaskResult.Builder()
         .setTaskName(getTaskName())
