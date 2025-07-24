@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -37,9 +38,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
@@ -50,8 +53,10 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.admin.scm.GetDeletedBlockSummarySubcommand;
 import org.apache.hadoop.ozone.admin.scm.GetFailedDeletedBlocksTxnSubcommand;
 import org.apache.hadoop.ozone.admin.scm.ResetDeletedBlockRetryCountSubcommand;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,6 +82,9 @@ public class TestDeletedBlocksTxnShell {
   private int numOfSCMs = 3;
 
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
+  private static final int BLOCKS_PER_TX = 5;
+  private static final int BLOCK_SIZE = 100;
+  private static final int BLOCK_REPLICATED_SIZE = 300;
 
   @TempDir
   private Path tempDir;
@@ -118,17 +126,17 @@ public class TestDeletedBlocksTxnShell {
   }
 
   //<containerID,  List<blockID>>
-  private Map<Long, List<Long>> generateData(int dataSize) throws Exception {
-    Map<Long, List<Long>> blockMap = new HashMap<>();
+  private Map<Long, List<DeletedBlock>> generateData(int dataSize) throws Exception {
+    Map<Long, List<DeletedBlock>> blockMap = new HashMap<>();
     int continerIDBase = RandomUtils.secure().randomInt(0, 100);
     int localIDBase = RandomUtils.secure().randomInt(0, 1000);
     for (int i = 0; i < dataSize; i++) {
       long containerID = continerIDBase + i;
       updateContainerMetadata(containerID);
-      List<Long> blocks = new ArrayList<>();
-      for (int j = 0; j < 5; j++)  {
+      List<DeletedBlock> blocks = new ArrayList<>();
+      for (int j = 0; j < BLOCKS_PER_TX; j++)  {
         long localID = localIDBase + j;
-        blocks.add(localID);
+        blocks.add(new DeletedBlock(new BlockID(containerID, localID), BLOCK_SIZE, BLOCK_REPLICATED_SIZE));
       }
       blockMap.put(containerID, blocks);
     }
@@ -277,5 +285,36 @@ public class TestDeletedBlocksTxnShell {
       matchCount += 1;
     }
     assertEquals(5, matchCount);
+  }
+
+  @Test
+  public void testGetDeletedBlockSummarySubcommand() throws Exception {
+    int currentValidTxnNum;
+    // add 30 block deletion transactions
+    DeletedBlockLog deletedBlockLog = getSCMLeader().
+        getScmBlockManager().getDeletedBlockLog();
+    deletedBlockLog.addTransactions(generateData(30));
+    flush();
+    currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
+    LOG.info("Valid num of txns: {}", currentValidTxnNum);
+    assertEquals(30, currentValidTxnNum);
+    DeletedBlocksTransactionSummary summary = deletedBlockLog.getTransactionSummary();
+    assertEquals(1, summary.getFirstTxID());
+    assertEquals(30, summary.getTotalTransactionCount());
+    assertEquals(30 * BLOCKS_PER_TX, summary.getTotalBlockCount());
+    assertEquals(30 * BLOCKS_PER_TX * BLOCK_SIZE, summary.getTotalBlockSize());
+    assertEquals(30 * BLOCKS_PER_TX * BLOCK_REPLICATED_SIZE, summary.getTotalBlockReplicatedSize());
+
+    GetDeletedBlockSummarySubcommand getDeletedBlockSummarySubcommand =
+        new GetDeletedBlockSummarySubcommand();
+    outContent.reset();
+    ContainerOperationClient scmClient = new ContainerOperationClient(conf);
+    getDeletedBlockSummarySubcommand.execute(scmClient);
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertTrue(output.contains("Start from tx ID: 1"));
+    assertTrue(output.contains("Total number of transactions: 30"));
+    assertTrue(output.contains("Total number of blocks: 150"));
+    assertTrue(output.contains("Total size of blocks: 15000"));
+    assertTrue(output.contains("Total replicated size of blocks: 45000"));
   }
 }
