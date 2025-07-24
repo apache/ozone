@@ -189,7 +189,10 @@ public class TestNSSummaryUnifiedControl {
       firstRebuildStarted.set(true);
       startLatch.countDown();
       // Wait for test to signal completion
-      finishLatch.await(10, TimeUnit.SECONDS);
+      boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
+      if (!awaitSuccess) {
+        LOG.warn("finishLatch.await() timed out");
+      }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
 
@@ -286,7 +289,10 @@ public class TestNSSummaryUnifiedControl {
       
       if (callNum == 1) {
         startLatch.countDown();
-        finishLatch.await(10, TimeUnit.SECONDS);
+        boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
+        if (!awaitSuccess) {
+          LOG.warn("finishLatch.await() timed out");
+        }
       }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
@@ -358,7 +364,10 @@ public class TestNSSummaryUnifiedControl {
     // Setup rebuild to block so we can test state
     doAnswer(invocation -> {
       rebuildStarted.countDown();
-      rebuildCanFinish.await(5, TimeUnit.SECONDS);
+      boolean awaitSuccess = rebuildCanFinish.await(5, TimeUnit.SECONDS);
+      if (!awaitSuccess) {
+        LOG.warn("rebuildCanFinish.await() timed out");
+      }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
 
@@ -391,7 +400,10 @@ public class TestNSSummaryUnifiedControl {
     // Setup first rebuild to block
     doAnswer(invocation -> {
       firstRebuildStarted.countDown();
-      firstRebuildCanFinish.await(5, TimeUnit.SECONDS);
+      boolean awaitSuccess = firstRebuildCanFinish.await(5, TimeUnit.SECONDS);
+      if (!awaitSuccess) {
+        LOG.warn("firstRebuildCanFinish.await() timed out");
+      }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
 

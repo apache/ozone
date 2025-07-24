@@ -172,7 +172,10 @@ public class TestNSSummaryTaskControllerIntegration {
       
       if (attempt == 1) {
         rebuildStarted.countDown();
-        rebuildCanFinish.await(10, TimeUnit.SECONDS);
+        boolean awaitSuccess = rebuildCanFinish.await(10, TimeUnit.SECONDS);
+        if (!awaitSuccess) {
+          LOG.warn("rebuildCanFinish.await() timed out");
+        }
       }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
@@ -244,7 +247,10 @@ public class TestNSSummaryTaskControllerIntegration {
       if (callNumber == 1) {
         // First call - block to test concurrent behavior
         rebuildStarted.countDown();
-        rebuildCanFinish.await(10, TimeUnit.SECONDS);
+        boolean awaitSuccess = rebuildCanFinish.await(10, TimeUnit.SECONDS);
+        if (!awaitSuccess) {
+          LOG.warn("rebuildCanFinish.await() timed out");
+        }
       }
       // Subsequent calls complete quickly
       return null;
@@ -356,7 +362,10 @@ public class TestNSSummaryTaskControllerIntegration {
       if (count == 1) {
         // First call (external) - block
         externalRebuildStarted.countDown();
-        externalRebuildCanFinish.await(10, TimeUnit.SECONDS);
+        boolean awaitSuccess = externalRebuildCanFinish.await(10, TimeUnit.SECONDS);
+        if (!awaitSuccess) {
+          LOG.warn("externalRebuildCanFinish.await() timed out");
+        }
       }
       // Subsequent calls should not happen due to unified control
       return null;
@@ -473,7 +482,7 @@ public class TestNSSummaryTaskControllerIntegration {
 
     try {
       // Start rebuild
-      CompletableFuture<Void> rebuildFuture = CompletableFuture.runAsync(() -> {
+      CompletableFuture.runAsync(() -> {
         taskController.reInitializeTasks(mockReconOMMetadataManager, null);
       }, executor);
 
