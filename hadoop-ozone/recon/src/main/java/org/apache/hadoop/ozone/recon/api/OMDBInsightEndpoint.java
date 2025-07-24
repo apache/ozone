@@ -642,6 +642,29 @@ public class OMDBInsightEndpoint {
     }
   }
 
+  private void calculateTotalPendingDeletedDirSizes(Map<String, Long> dirSummary) {
+    long totalDataSize = 0L;
+    long totalReplicatedDataSize = 0L;
+
+    Table<String, OmKeyInfo> deletedDirTable = omMetadataManager.getDeletedDirTable();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = deletedDirTable.iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        OmKeyInfo omKeyInfo = kv.getValue();
+        if (omKeyInfo != null) {
+          Pair<Long, Long> sizeInfo = fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
+          totalDataSize += sizeInfo.getLeft();
+          totalReplicatedDataSize += sizeInfo.getRight();
+        }
+      }
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex, Response.Status.INTERNAL_SERVER_ERROR);
+    }
+
+    dirSummary.put("totalDataSize", totalDataSize);
+    dirSummary.put("totalReplicatedDataSize", totalReplicatedDataSize);
+  }
+
   /**
    * Given an object ID, return total data size as a pair of Total Size, Total Replicated Size
    * under this object. Note:- This method is RECURSIVE.
@@ -741,6 +764,28 @@ public class OMDBInsightEndpoint {
     Map<String, Long> dirSummary = new HashMap<>();
     // Create a keys summary for deleted directories
     createSummaryForDeletedDirectories(dirSummary);
+    return Response.ok(dirSummary).build();
+  }
+
+  /**
+   * Retrieves the summary of the total delete pending directory size (unreplicated and replicated).
+   *
+   * @return The HTTP response body includes a map with the following entries:
+   * - "totalDataSize": the total replicated size of delete pending directories.
+   * - "totalReplicatedDataSize": the total unreplicated size of delete pending directories.
+   *
+   * Example response:
+   *   {
+   *    "totalDataSize": 30000,
+   *    "totalReplicatedDataSize": 90000
+   *   }
+   */
+  @GET
+  @Path("/deletePending/dirs/size-summary")
+  public Response getTotalDeletedDirectorySizeSummary() {
+    Map<String, Long> dirSummary = new HashMap<>();
+    // Create a keys summary for deleted directories
+    calculateTotalPendingDeletedDirSizes(dirSummary);
     return Response.ok(dirSummary).build();
   }
 
