@@ -504,11 +504,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
     }
     // Create the snapshot local property file.
-    try {
-      OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager, snapshotInfo, store);
-    } catch (IOException e) {
-      LOG.error("Failed to create local property file for snapshot: {}", snapshotInfo.getName(), e);
-    }
+    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager, snapshotInfo, store);
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
     // There is no need to take any lock as of now, because transactions are flushed sequentially.
@@ -634,7 +630,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   /**
    * Captures the list of SST files for keyTable, fileTable and directoryTable in the DB.
    * @param store AOS or snapshot DB for uncompacted or compacted snapshot respectively.
-   * @return a Map of (table, list of SST files corresponding to the table)
+   * @return a Map of (table, set of SST files corresponding to the table)
    */
   private static Map<String, Set<String>> getSnapshotSSTFileList(RDBStore store)
       throws IOException {
@@ -663,8 +659,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(store));
     snapshotLocalDataYaml.writeToYaml(snapshotLocalDataPath.toFile());
   }
-
-
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
   @SuppressWarnings("unchecked")
@@ -837,6 +831,13 @@ public final class OmSnapshotManager implements AutoCloseable {
     return snapshotPath.substring(index + OM_DB_NAME.length() + OM_SNAPSHOT_SEPARATOR.length());
   }
 
+  /**
+   * Returns the path to the YAML file that stores local properties for the given snapshot.
+   *
+   * @param omMetadataManager metadata manager to get the base path
+   * @param snapshotInfo snapshot metadata
+   * @return the path to the snapshot's local property YAML file
+   */
   public static String getSnapshotLocalPropertyYamlPath(OMMetadataManager omMetadataManager,
       SnapshotInfo snapshotInfo) {
     return getSnapshotPath(omMetadataManager, snapshotInfo) + ".yaml";

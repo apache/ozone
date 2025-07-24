@@ -66,7 +66,7 @@ public abstract class OmSnapshotLocalData {
    */
   public OmSnapshotLocalData(Map<String, Set<String>> uncompactedSSTFileList) {
     this.isSSTFiltered = false;
-    this.uncompactedSSTFileList = uncompactedSSTFileList;
+    this.uncompactedSSTFileList = uncompactedSSTFileList != null ? uncompactedSSTFileList : new HashMap<>();
     this.lastCompactionTime = 0L;
     this.needsCompaction = false;
     this.compactedSSTFileList = new HashMap<>();

@@ -139,8 +139,13 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
 
         // Handle potential Integer/Long type mismatch from YAML parsing
         Object lastCompactionTimeObj = nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_COMPACTION_TIME, -1L);
-        long lastCompactionTime = (lastCompactionTimeObj instanceof Integer) ?
-            Long.valueOf((Integer) lastCompactionTimeObj) : (Long) lastCompactionTimeObj;
+        long lastCompactionTime;
+        if (lastCompactionTimeObj instanceof Number) {
+          lastCompactionTime = ((Number) lastCompactionTimeObj).longValue();
+        } else {
+          throw new IllegalArgumentException("Invalid type for lastCompactionTime: " +
+              lastCompactionTimeObj.getClass().getName() + ". Expected Number type.");
+        }
         snapshotLocalData.setLastCompactionTime(lastCompactionTime);
 
         snapshotLocalData.setNeedsCompaction((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_COMPACTION, false));
