@@ -135,7 +135,7 @@ public class TestListInfoSubcommand {
     List<String> operationalStates = new ArrayList<>();
     for (JsonNode node : root) {
       healthStates.add(node.get("healthState").asText());
-      operationalStates.add(node.get("opState").asText());
+      operationalStates.add(node.get("persistedOpState").asText());
     }
 
     // Check expected operational states are present
@@ -206,7 +206,7 @@ public class TestListInfoSubcommand {
     assertEquals(1, root.size(), "Expected 1 node in JSON output");
 
     JsonNode node = root.get(0);
-    String opState = node.get("opState").asText();
+    String opState = node.get("persistedOpState").asText();
     String uuid = node.get("id").asText();
 
     assertEquals("IN_SERVICE", opState, "Expected opState IN_SERVICE but got: " + opState);
@@ -335,18 +335,22 @@ public class TestListInfoSubcommand {
       if (i == 0) {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.IN_SERVICE);
+        dnd.setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE);
         builder.addNodeStates(HddsProtos.NodeState.STALE);
       } else if (i == 1) {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.DECOMMISSIONING);
+        dnd.setPersistedOpState(HddsProtos.NodeOperationalState.DECOMMISSIONING);
         builder.addNodeStates(HddsProtos.NodeState.DEAD);
       } else if (i == 2) {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.IN_SERVICE);
+        dnd.setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE);
         builder.addNodeStates(HddsProtos.NodeState.HEALTHY_READONLY);
       } else {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.IN_SERVICE);
+        dnd.setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE);
         builder.addNodeStates(HddsProtos.NodeState.HEALTHY);
       }
       builder.setNodeID(dnd.build());

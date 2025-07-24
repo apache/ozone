@@ -17,24 +17,26 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 /**
  * Represents filtered Datanode information for json use.
  */
 
-public class DatanodeInfoJson {
+public class BasicDatanodeInfoJson {
   private final String id;
   private final String hostName;
   private final String ipAddress;
   private final List<DatanodeDetails.Port> ports;
   private final long setupTime;
   private final int currentVersion;
-  private final String opState;
+  private final String persistedOpState;
   private final long persistedOpStateExpiryEpochSec;
-  private final String healthState;
+  private final HddsProtos.NodeState healthState;
   private final boolean decommissioned;
   private final boolean maintenance;
   private final int level;
@@ -49,29 +51,36 @@ public class DatanodeInfoJson {
   private Long capacity = null;
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private Double percentUsed = null;
+  @JsonIgnore
+  private DatanodeDetails dn;
   
-  DatanodeInfoJson(ListInfoSubcommand.DatanodeWithAttributes dna) {
-    DatanodeDetails dn = dna.getDatanodeDetails();
-    this.id = dn.getUuid().toString();
-    this.ports = dn.getPorts();
-    this.opState = String.valueOf(dna.getOpState());
-    this.healthState = String.valueOf(dna.getHealthState());
-    this.hostName = dn.getHostName();
-    this.ipAddress = dn.getIpAddress();
-    this.persistedOpStateExpiryEpochSec = dn.getPersistedOpStateExpiryEpochSec();
-    this.decommissioned = dn.isDecommissioned();
-    this.maintenance = dn.isMaintenance();
-    this.level = dn.getLevel();
-    this.cost = dn.getCost();
-    this.numOfLeaves = dn.getNumOfLeaves();
-    this.networkFullPath = dn.getNetworkFullPath();
-    this.networkLocation = dn.getNetworkLocation();
-    this.networkName = dn.getNetworkName();
-    this.setupTime = dn.getSetupTime();
-    this.currentVersion = dn.getCurrentVersion();
-    this.used = dna.getUsed();
-    this.capacity = dna.getCapacity();
-    this.percentUsed = dna.getPercentUsed();
+  public BasicDatanodeInfoJson(DatanodeDetails dnDetails, HddsProtos.NodeState healthState) {
+    this.dn = dnDetails;
+    this.id = dnDetails.getUuid().toString();
+    this.ports = dnDetails.getPorts();
+    this.persistedOpState = String.valueOf(dnDetails.getPersistedOpState());
+    this.healthState = healthState;
+    this.hostName = dnDetails.getHostName();
+    this.ipAddress = dnDetails.getIpAddress();
+    this.persistedOpStateExpiryEpochSec = dnDetails.getPersistedOpStateExpiryEpochSec();
+    this.decommissioned = dnDetails.isDecommissioned();
+    this.maintenance = dnDetails.isMaintenance();
+    this.level = dnDetails.getLevel();
+    this.cost = dnDetails.getCost();
+    this.numOfLeaves = dnDetails.getNumOfLeaves();
+    this.networkFullPath = dnDetails.getNetworkFullPath();
+    this.networkLocation = dnDetails.getNetworkLocation();
+    this.networkName = dnDetails.getNetworkName();
+    this.setupTime = dnDetails.getSetupTime();
+    this.currentVersion = dnDetails.getCurrentVersion();
+  }
+
+  public BasicDatanodeInfoJson(DatanodeDetails dnDetails, HddsProtos.NodeState healthState,
+      long used, long capacity, double percentUsed) {
+    this(dnDetails, healthState);
+    this.used = used;
+    this.capacity = capacity;
+    this.percentUsed = percentUsed;
   }
   
   public String getId() {
@@ -82,11 +91,11 @@ public class DatanodeInfoJson {
     return ports;
   }
   
-  public String getOpState() {
-    return opState;
+  public String getPersistedOpState() {
+    return persistedOpState;
   }
   
-  public String getHealthState() {
+  public HddsProtos.NodeState getHealthState() {
     return healthState;
   }
   
@@ -152,5 +161,10 @@ public class DatanodeInfoJson {
 
   public Double getPercentUsed() {
     return percentUsed;
+  }
+
+  @JsonIgnore
+  public DatanodeDetails getDatanodeDetails() {
+    return dn;
   }
 }
