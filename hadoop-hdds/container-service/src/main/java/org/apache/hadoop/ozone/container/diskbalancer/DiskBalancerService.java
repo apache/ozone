@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -366,6 +369,24 @@ public class DiskBalancerService extends BackgroundService {
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
+
+    if (!conf.getBoolean(HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY,
+        HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT)) {
+      // If the feature is disabled globally, do nothing and ensure state is STOPPED.
+      if (this.operationalState != DiskBalancerOperationalState.STOPPED) {
+        LOG.info("Disk Balancer feature is disabled via '{}'. " +
+            "Ensuring service is stopped.", HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY);
+        this.operationalState = DiskBalancerOperationalState.STOPPED;
+        try {
+          // Persist the updated state to the info file.
+          writeDiskBalancerInfoTo(getDiskBalancerInfo(), diskBalancerInfoFile);
+        } catch (IOException e) {
+          LOG.error("Failed to persist STOPPED state to diskbalancer.info file after detecting " +
+              "the service is disabled.", e);
+        }
+      }
+      return queue;
+    }
 
     if (this.operationalState == DiskBalancerOperationalState.STOPPED ||
         this.operationalState == DiskBalancerOperationalState.PAUSED_BY_NODE_STATE) {
