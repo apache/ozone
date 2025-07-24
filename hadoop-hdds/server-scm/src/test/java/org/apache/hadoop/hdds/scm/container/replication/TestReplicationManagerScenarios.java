@@ -184,7 +184,7 @@ public class TestReplicationManagerScenarios {
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock, configuration);
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
 
     when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(
         invocation -> {
@@ -222,6 +222,7 @@ public class TestReplicationManagerScenarios {
 
   private ReplicationManager createReplicationManager() throws IOException {
     return new ReplicationManager(
+        configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
         configuration,
         containerManager,
         ratisPlacementPolicy,

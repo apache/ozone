@@ -77,7 +77,7 @@ public class TestContainerReplicaPendingOps {
     rmConf = conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     ReplicationManager rm = mock(ReplicationManager.class);
     when(rm.getConfig()).thenReturn(rmConf);
-    pendingOps = new ContainerReplicaPendingOps(clock, conf);
+    pendingOps = new ContainerReplicaPendingOps(clock, rmConf.getEventTimeout());
     metrics = ReplicationManagerMetrics.create(rm);
     pendingOps.setReplicationMetrics(metrics);
     dn1 = MockDatanodeDetails.randomDatanodeDetails();

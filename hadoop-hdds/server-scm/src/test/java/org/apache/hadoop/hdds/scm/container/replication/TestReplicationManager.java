@@ -159,7 +159,7 @@ public class TestReplicationManager {
 
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(clock, configuration);
+        new ContainerReplicaPendingOps(clock);
 
     when(containerManager
         .getContainerReplicas(any(ContainerID.class))).thenAnswer(
@@ -201,6 +201,7 @@ public class TestReplicationManager {
 
   private ReplicationManager createReplicationManager() throws IOException {
     return new ReplicationManager(
+        configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
         configuration,
         containerManager,
         ratisPlacementPolicy,
@@ -1660,6 +1661,7 @@ public class TestReplicationManager {
     ReplicationQueue queue = mock(ReplicationQueue.class);
     when(queue.isEmpty()).thenReturn(queueIsEmpty);
     final ReplicationManager customRM = new ReplicationManager(
+        configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
         configuration,
         containerManager,
         ratisPlacementPolicy,

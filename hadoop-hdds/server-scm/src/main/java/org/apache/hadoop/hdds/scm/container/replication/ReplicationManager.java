@@ -206,7 +206,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * @param replicaPendingOps The pendingOps instance
    */
   @SuppressWarnings("parameternumber")
-  public ReplicationManager(final ConfigurationSource conf,
+  public ReplicationManager(final ReplicationManagerConfiguration rmConf,
+             final ConfigurationSource conf,
              final ContainerManager containerManager,
              final PlacementPolicy ratisContainerPlacement,
              final PlacementPolicy ecContainerPlacement,
@@ -218,7 +219,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
              throws IOException {
     this.containerManager = containerManager;
     this.scmContext = scmContext;
-    this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
+    this.rmConf = rmConf;
     this.replicationServerConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
     this.running = false;

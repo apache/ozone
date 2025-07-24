@@ -116,7 +116,7 @@ public class TestContainerReportHandler {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault()), conf))
+            Clock.system(ZoneId.systemDefault())))
         .build();
     publisher = mock(EventPublisher.class);
 

@@ -33,7 +33,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -63,14 +62,16 @@ public class ContainerReplicaPendingOps {
       new ArrayList<>();
   // tracks how much data is pending to be added to a target Datanode because of pending ADD ops
   private final ConcurrentHashMap<DatanodeID, SizeAndTime> containerSizeScheduled = new ConcurrentHashMap<>();
-  private final long replicationManagerEventTimeout;
+  private long replicationManagerEventTimeout;
 
-  public ContainerReplicaPendingOps(Clock clock, OzoneConfiguration conf) {
+  public ContainerReplicaPendingOps(Clock clock) {
     this.clock = clock;
-    ReplicationManager.ReplicationManagerConfiguration rmConf =
-        conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
-    replicationManagerEventTimeout = rmConf.getEventTimeout();
     resetCounters();
+  }
+
+  public ContainerReplicaPendingOps(Clock clock, long replicationManagerEventTimeout) {
+    this(clock);
+    this.replicationManagerEventTimeout = replicationManagerEventTimeout;
   }
 
   /**

@@ -159,7 +159,7 @@ public class TestBlockManager {
             pipelineManager,
             scmMetadataStore.getContainerTable(),
             new ContainerReplicaPendingOps(
-                Clock.system(ZoneId.systemDefault()), conf));
+                Clock.system(ZoneId.systemDefault())));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
     SCMConfigurator configurator = new SCMConfigurator();
