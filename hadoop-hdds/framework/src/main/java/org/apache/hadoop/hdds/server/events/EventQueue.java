@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.hdds.server.events;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.gson.ExclusionStrategy;
-import com.google.gson.FieldAttributes;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
@@ -59,9 +60,10 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   private boolean isRunning = true;
 
-  private static final Gson TRACING_SERIALIZER = new GsonBuilder()
-          .setExclusionStrategies(new DatanodeDetailsGsonExclusionStrategy())
-          .create();
+  private static final ObjectMapper TRACING_SERIALIZER = new ObjectMapper()
+      .enable(SerializationFeature.INDENT_OUTPUT)
+      .addMixIn(NodeImpl.class, DatanodeDetailsJacksonMixin.class)
+      .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
 
   private boolean isSilent = false;
   private final String threadNamePrefix;
@@ -77,18 +79,9 @@ public class EventQueue implements EventPublisher, AutoCloseable {
   // The field parent in DatanodeDetails class has the circular reference
   // which will result in Gson infinite recursive parsing. We need to exclude
   // this field when generating json string for DatanodeDetails object
-  static class DatanodeDetailsGsonExclusionStrategy
-          implements ExclusionStrategy {
-    @Override
-    public boolean shouldSkipField(FieldAttributes f) {
-      return f.getDeclaringClass() == NodeImpl.class
-              && f.getName().equals("parent");
-    }
-
-    @Override
-    public boolean shouldSkipClass(Class<?> aClass) {
-      return false;
-    }
+  abstract static class DatanodeDetailsJacksonMixin {
+    @JsonIgnore
+    abstract InnerNode getParent();
   }
 
   /**
@@ -196,30 +189,32 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
     eventCount.incrementAndGet();
     if (eventExecutorListMap != null) {
-
       for (Map.Entry<EventExecutor, List<EventHandler>> executorAndHandlers :
           eventExecutorListMap.entrySet()) {
-
         for (EventHandler handler : executorAndHandlers.getValue()) {
           queuedCount.incrementAndGet();
-          if (LOG.isTraceEnabled()) {
-            LOG.trace(
-                "Delivering [event={}] to executor/handler {}: <json>{}</json>",
-                event.getName(),
-                executorAndHandlers.getKey().getName(),
-                TRACING_SERIALIZER.toJson(payload).replaceAll("\n", "\\\\n"));
-          } else if (LOG.isDebugEnabled()) {
-            LOG.debug("Delivering [event={}] to executor/handler {}: {}",
-                event.getName(),
-                executorAndHandlers.getKey().getName(),
-                payload.getClass().getSimpleName());
+          try {
+            if (LOG.isTraceEnabled()) {
+              String jsonPayload = TRACING_SERIALIZER.writeValueAsString(payload);
+              LOG.trace(
+                  "Delivering [event={}] to executor/handler {}: <json>{}</json>",
+                  event.getName(),
+                  executorAndHandlers.getKey().getName(),
+                  jsonPayload.replaceAll("\n", "\\\\n"));
+            } else if (LOG.isDebugEnabled()) {
+              LOG.debug("Delivering [event={}] to executor/handler {}: {}",
+                  event.getName(),
+                  executorAndHandlers.getKey().getName(),
+                  payload.getClass().getSimpleName());
+            }
+          } catch (JsonProcessingException e) {
+            LOG.error("Error serializing payload: {}", e.getMessage());
           }
           executorAndHandlers.getKey()
               .onMessage(handler, payload, this);
 
         }
       }
-
     } else {
       if (!isSilent) {
         LOG.warn("No event handler registered for event {}", event);
