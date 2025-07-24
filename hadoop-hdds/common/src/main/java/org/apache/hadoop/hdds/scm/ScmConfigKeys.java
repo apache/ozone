@@ -526,7 +526,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE =
           "ozone.scm.ha.ratis.segment.size";
-  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT = "4MB";
+  public static final String OZONE_SCM_HA_RAFT_SEGMENT_SIZE_DEFAULT = "64MB";
 
   public static final String OZONE_SCM_HA_RAFT_SEGMENT_PRE_ALLOCATED_SIZE =
           "ozone.scm.ha.ratis.segment.preallocated.size";
