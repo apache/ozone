@@ -332,7 +332,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     Files.createDirectories(dbDir);
     // Create dummy files: one SST, one non-SST
     Path sstFile = dbDir.resolve("test.sst");
-    Files.write(sstFile, "sst content".getBytes()); // Write some content to make it non-empty
+    Files.write(sstFile, "sst content".getBytes(StandardCharsets.UTF_8)); // Write some content to make it non-empty
 
     Path nonSstFile = dbDir.resolve("test.log");
     Files.write(nonSstFile, "log content".getBytes());
