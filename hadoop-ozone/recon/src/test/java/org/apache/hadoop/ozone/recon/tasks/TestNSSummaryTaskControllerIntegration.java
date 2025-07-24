@@ -27,10 +27,19 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -131,27 +140,64 @@ public class TestNSSummaryTaskControllerIntegration {
       
       @Override 
       protected TaskResult executeReprocess(OMMetadataManager omMetadataManager, long startTime) {
-        // Simplified execution that mimics the real flow with proper state management
-        boolean success = false;
+        // Simplified test implementation that mimics the real execution flow
+        // but bypasses the complex sub-task execution while maintaining proper state management
+        
+        // Initialize a list of tasks to run in parallel (empty for testing)
+        Collection<Callable<Boolean>> tasks = new ArrayList<>();
+
         try {
           // This will call the mocked clearNSSummaryTable (might throw Exception for failure tests)
           getReconNamespaceSummaryManager().clearNSSummaryTable();
-          
-          // Simulate successful sub-task execution without actual table operations
-          // This bypasses the complex table mocking requirements
-          success = true;
-          
-          return buildTaskResult(true);
-        } catch (Exception e) {
-          // Set FAILED state on exception (mimicking real flow)
+        } catch (IOException ioEx) {
+          LOG.error("Unable to clear NSSummary table in Recon DB. ", ioEx);
           NSSummaryTask.setRebuildStateToFailed();
           return buildTaskResult(false);
+        }
+
+        // Add mock sub-tasks that always succeed
+        tasks.add(() -> true); // Mock FSO task
+        tasks.add(() -> true); // Mock Legacy task  
+        tasks.add(() -> true); // Mock OBS task
+
+        List<Future<Boolean>> results;
+        ThreadFactory threadFactory = new ThreadFactoryBuilder()
+            .setNameFormat("Test-NSSummaryTask-%d")
+            .build();
+        ExecutorService executorService = Executors.newFixedThreadPool(2, threadFactory);
+        boolean success = false;
+        
+        try {
+          results = executorService.invokeAll(tasks);
+          for (Future<Boolean> result : results) {
+            if (result.get().equals(false)) {
+              LOG.error("NSSummary reprocess failed for one of the sub-tasks.");
+              NSSummaryTask.setRebuildStateToFailed();
+              return buildTaskResult(false);
+            }
+          }
+          success = true;
+          
+        } catch (InterruptedException | ExecutionException ex) {
+          LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
+          NSSummaryTask.setRebuildStateToFailed();
+          return buildTaskResult(false);
+          
         } finally {
-          // Set state to IDLE on successful completion (mimicking real flow)
+          executorService.shutdown();
+
+          long endTime = System.nanoTime();
+          long durationInMillis = TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
+          LOG.info("Test NSSummary reprocess execution time: {} milliseconds", durationInMillis);
+          
+          // Reset state to IDLE on successful completion
           if (success) {
-            NSSummaryTask.resetRebuildState(); // This sets to IDLE
+            NSSummaryTask.resetRebuildState();
+            LOG.info("Test NSSummary tree reprocess completed successfully with unified control.");
           }
         }
+
+        return buildTaskResult(true);
       }
     };
   }
