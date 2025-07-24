@@ -320,7 +320,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   private static final class DeletedDirSupplier implements Closeable {
-    private TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+    private final TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
         deleteTableIterator;
 
     private DeletedDirSupplier(TableIterator<String, ? extends KeyValue<String, OmKeyInfo>> deleteTableIterator) {
@@ -521,6 +521,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
      * @param currentSnapshotInfo if null, deleted directories in AOS should be processed.
      * @param keyManager KeyManager of the underlying store.
      */
+    @VisibleForTesting
     void processDeletedDirsForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
         long remainingBufLimit, long rnCnt) throws IOException, ExecutionException, InterruptedException {
       String volume, bucket; String snapshotTableKey;

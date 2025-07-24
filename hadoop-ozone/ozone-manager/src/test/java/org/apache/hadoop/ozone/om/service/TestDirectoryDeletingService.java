@@ -60,11 +60,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test Directory Deleting Service.
  */
 public class TestDirectoryDeletingService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TestDirectoryDeletingService.class);
+
   @TempDir
   private Path folder;
   private OzoneManagerProtocol writeClient;
@@ -188,7 +193,7 @@ public class TestDirectoryDeletingService {
           try {
             Thread.sleep(100);
           } catch (InterruptedException e) {
-            e.printStackTrace();
+            LOG.error("Error while sleeping", e);
           }
         }
         for (int i = futureList.size() - 1; i >= 0; i--) {
@@ -199,7 +204,7 @@ public class TestDirectoryDeletingService {
           try {
             Thread.sleep(500);
           } catch (InterruptedException e) {
-            e.printStackTrace();
+            LOG.error("Error while sleeping", e);
           }
         }
       });
