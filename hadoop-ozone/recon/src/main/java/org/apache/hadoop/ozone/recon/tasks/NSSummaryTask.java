@@ -305,4 +305,7 @@ public class NSSummaryTask implements ReconOmTask {
     REBUILD_STATE.set(RebuildState.FAILED);
   }
 
+  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
+    return reconNamespaceSummaryManager;
+  }
 }

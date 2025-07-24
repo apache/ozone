@@ -135,7 +135,7 @@ public class TestNSSummaryTaskControllerIntegration {
         boolean success = false;
         try {
           // This will call the mocked clearNSSummaryTable (might throw Exception for failure tests)
-          reconNamespaceSummaryManager.clearNSSummaryTable();
+          getReconNamespaceSummaryManager().clearNSSummaryTable();
           
           // Simulate successful sub-task execution without actual table operations
           // This bypasses the complex table mocking requirements
