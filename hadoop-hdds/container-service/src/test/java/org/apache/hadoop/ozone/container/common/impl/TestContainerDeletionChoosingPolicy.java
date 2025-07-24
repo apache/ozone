@@ -134,6 +134,7 @@ public class TestContainerDeletionChoosingPolicy {
     fail("Chosen container results were same 100 times");
 
   }
+
   @ContainerLayoutTestInfo.ContainerTest
   public void testBlockDeletionAllowedAndDisallowedStates(ContainerLayoutVersion layout)
       throws IOException {
@@ -197,7 +198,6 @@ public class TestContainerDeletionChoosingPolicy {
     assertThat(containerSet.getContainerMapCopy()).containsKey(containerId);
     return data;
   }
-
 
   @ContainerLayoutTestInfo.ContainerTest
   public void testTopNOrderedChoosingPolicy(ContainerLayoutVersion layout)
