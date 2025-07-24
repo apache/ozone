@@ -335,7 +335,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     Files.write(sstFile, "sst content".getBytes(StandardCharsets.UTF_8)); // Write some content to make it non-empty
 
     Path nonSstFile = dbDir.resolve("test.log");
-    Files.write(nonSstFile, "log content".getBytes());
+    Files.write(nonSstFile, "log content".getBytes(StandardCharsets.UTF_8));
     Set<String> sstFilesToExclude = new HashSet<>();
     AtomicLong maxTotalSstSize = new AtomicLong(1000000); // Sufficient size
     Map<String, String> hardLinkFileMap = new java.util.HashMap<>();
