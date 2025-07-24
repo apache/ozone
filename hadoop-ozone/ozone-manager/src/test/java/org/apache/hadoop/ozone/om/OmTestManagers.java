@@ -156,4 +156,22 @@ public final class OmTestManagers {
     return kmsProvider;
   }
 
+  /**
+   * Stops all managed components and releases resources.
+   */
+  public void stop() {
+    try {
+      if (rpcClient != null) {
+        rpcClient.close();
+      }
+    } catch (IOException e) {
+      // Log but don't fail the stop operation
+      System.err.println("Error closing RPC client: " + e.getMessage());
+    }
+
+    if (om != null) {
+      om.stop();
+    }
+  }
+
 }

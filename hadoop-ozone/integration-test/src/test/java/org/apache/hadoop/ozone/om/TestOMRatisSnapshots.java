@@ -245,8 +245,8 @@ public class TestOMRatisSnapshots {
     // Wait & for follower to update transactions to leader snapshot index.
     // Timeout error if follower does not load update within 10s
     GenericTestUtils.waitFor(() -> {
-      return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
+      long index = followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+      return index >= leaderOMSnapshotIndex - 1;
     }, 100, 30_000);
 
     long followerOMLastAppliedIndex =
@@ -412,7 +412,7 @@ public class TestOMRatisSnapshots {
     SnapshotInfo snapshotInfo2 = createOzoneSnapshot(leaderOM, "snap100");
     followerOM.getConfiguration().setInt(
         OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
-        KeyManagerImpl.DISABLE_VALUE);
+        -1);
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
 
@@ -562,7 +562,7 @@ public class TestOMRatisSnapshots {
     Path increment = Paths.get(tempDir.toString(), "increment" + numKeys);
     assertTrue(increment.toFile().mkdirs());
     unTarLatestTarBall(followerOM, increment);
-    List<String> sstFiles = HAUtils.getExistingSstFiles(increment.toFile());
+    List<String> sstFiles = HAUtils.getExistingFiles(increment.toFile());
     Path followerCandidatePath = followerOM.getOmSnapshotProvider().
         getCandidateDir().toPath();
 
@@ -648,7 +648,7 @@ public class TestOMRatisSnapshots {
     // Corrupt the mixed checkpoint in the candidate DB dir
     File followerCandidateDir = followerOM.getOmSnapshotProvider().
         getCandidateDir();
-    List<String> sstList = HAUtils.getExistingSstFiles(followerCandidateDir);
+    List<String> sstList = HAUtils.getExistingFiles(followerCandidateDir);
     assertThat(sstList.size()).isGreaterThan(0);
     for (int i = 0; i < sstList.size(); i += 2) {
       File victimSst = new File(followerCandidateDir, sstList.get(i));
@@ -1003,6 +1003,7 @@ public class TestOMRatisSnapshots {
     DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    OmSnapshotUtils.createHardLinks(leaderCheckpointLocation, true);
     TransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
 
@@ -1157,7 +1158,7 @@ public class TestOMRatisSnapshots {
       // max size config.  That way next time through, we get multiple
       // tarballs.
       if (count == 1) {
-        long sstSize = getSizeOfSstFiles(tarball);
+        long sstSize = getSizeOfFiles(tarball);
         om.getConfiguration().setLong(
             OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, sstSize / 2);
         // Now empty the tarball to restart the download
@@ -1166,21 +1167,20 @@ public class TestOMRatisSnapshots {
       } else {
         // Each time we get a new tarball add a set of
         // its sst file to the list, (i.e. one per tarball.)
-        sstSetList.add(getSstFilenames(tarball));
+        sstSetList.add(getFilenames(tarball));
       }
     }
 
     // Get Size of sstfiles in tarball.
-    private long getSizeOfSstFiles(File tarball) throws IOException {
+    private long getSizeOfFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
-      List<Path> sstPaths = Files.walk(tempDir).filter(
-          path -> path.toString().endsWith(".sst")).
+      List<Path> sstPaths = Files.walk(tempDir).
           collect(Collectors.toList());
-      long sstSize = 0;
+      long totalFileSize = 0;
       for (Path sstPath : sstPaths) {
-        sstSize += Files.size(sstPath);
+        totalFileSize += Files.size(sstPath);
       }
-      return sstSize;
+      return totalFileSize;
     }
 
     private void createEmptyTarball(File dummyTarFile)
@@ -1191,21 +1191,18 @@ public class TestOMRatisSnapshots {
       archiveOutputStream.close();
     }
 
-    // Return a list of sst files in tarball.
-    private Set<String> getSstFilenames(File tarball)
+    // Return a list of files in tarball.
+    private Set<String> getFilenames(File tarball)
         throws IOException {
-      Set<String> sstFilenames = new HashSet<>();
+      Set<String> fileNames = new HashSet<>();
       try (TarArchiveInputStream tarInput =
            new TarArchiveInputStream(Files.newInputStream(tarball.toPath()))) {
         TarArchiveEntry entry;
         while ((entry = tarInput.getNextTarEntry()) != null) {
-          String name = entry.getName();
-          if (name.toLowerCase().endsWith(".sst")) {
-            sstFilenames.add(entry.getName());
-          }
+          fileNames.add(entry.getName());
         }
       }
-      return sstFilenames;
+      return fileNames;
     }
 
     // Find the tarball in the dir.
