@@ -22,13 +22,8 @@ Test Timeout        10 minutes
 
 *** Variables ***
 ${OM_DB_PATH}       /data/metadata/om.db
-${KEY_COUNT}        200000
-${THREAD_COUNT}     20
 
 *** Keywords ***
-Create Test Keys
-    Execute    ozone freon ockg -n ${KEY_COUNT} -t ${THREAD_COUNT} -s 0
-
 Delete Test Keys
     Execute    ozone fs -rm -R -skipTrash ofs://${OM_SERVICE_ID}/vol1/bucket1
 
@@ -43,8 +38,7 @@ Compact OM DB Column Family
 
 *** Test Cases ***
 Testing OM DB Size Reduction After Compaction
-    [Setup]    Create Test Keys
-    
+    # Test keys are already created and flushed
     # Delete keys to create tombstones that need compaction
     Delete Test Keys
     
