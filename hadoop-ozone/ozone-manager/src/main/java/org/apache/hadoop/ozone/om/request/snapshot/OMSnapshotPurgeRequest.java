@@ -26,6 +26,9 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.BackgroundDeletionAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
@@ -51,6 +54,12 @@ import org.slf4j.LoggerFactory;
 public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMSnapshotPurgeRequest.class);
+
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.BGDELETIONLOGGER);
+  private static final String AUDIT_PARAM_MESSAGE = "msg";
+  private static final String AUDIT_PARAM_SNAPSHOTS_PURGED = "snapshotsPurged";
+  private static final String AUDIT_PARAM_SNAPSHOT_DB_KEYS = "snapshotsDBKeys";
+  private static final String AUDIT_PARAM_SNAPSHOTS_UPDATED = "snapshotsUpdated";
 
   /**
    * This map contains up to date snapshotInfo and works as a local cache for OMSnapshotPurgeRequest.
@@ -80,6 +89,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     SnapshotPurgeRequest snapshotPurgeRequest = getOmRequest()
         .getSnapshotPurgeRequest();
+    OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
     try {
       List<String> snapshotDbKeys = snapshotPurgeRequest
@@ -125,11 +135,23 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       omSnapshotIntMetrics.incNumSnapshotPurges();
       LOG.info("Successfully executed snapshotPurgeRequest: {{}} along with updating snapshots:{}.",
           snapshotPurgeRequest, updatedSnapshotInfos);
+      
+      Map<String, String> auditParams = new HashMap<>();
+      auditParams.put(AUDIT_PARAM_SNAPSHOTS_PURGED, String.valueOf(snapshotDbKeys.size()));
+      auditParams.put(AUDIT_PARAM_SNAPSHOT_DB_KEYS, snapshotDbKeys.toString());
+      auditParams.put(AUDIT_PARAM_SNAPSHOTS_UPDATED, updatedSnapshotInfos.toString());
+      AUDIT.logWriteSuccess(buildAuditMessageForBGD(BackgroundDeletionAction.SNAPSHOT_DELETION,
+          auditParams, null, userInfo));
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotPurgeResponse(
           createErrorOMResponse(omResponse, ex));
       omSnapshotIntMetrics.incNumSnapshotPurgeFails();
       LOG.error("Failed to execute snapshotPurgeRequest:{{}}.", snapshotPurgeRequest, ex);
+
+      Map<String, String> errorAuditParams = new HashMap<>();
+      errorAuditParams.put(AUDIT_PARAM_MESSAGE, "Failed to execute snapshotPurgeRequest: " + snapshotPurgeRequest);
+      AUDIT.logWriteFailure(buildAuditMessageForBGD(BackgroundDeletionAction.SNAPSHOT_DELETION,
+          errorAuditParams, ex, userInfo));
     }
 
     return omClientResponse;

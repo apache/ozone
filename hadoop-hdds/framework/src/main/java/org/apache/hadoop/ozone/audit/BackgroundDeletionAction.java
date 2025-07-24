@@ -18,23 +18,23 @@
 package org.apache.hadoop.ozone.audit;
 
 /**
- * Enumeration for defining types of Audit Loggers in Ozone.
+ * Enum to define Audit Action types for Background Deletion Services.
  */
-public enum AuditLoggerType {
-  DNLOGGER("DNAudit"),
-  OMLOGGER("OMAudit"),
-  SCMLOGGER("SCMAudit"),
-  S3GLOGGER("S3GAudit"),
-  OMSYSTEMLOGGER("OMSystemAudit"),
-  BGDELETIONLOGGER("BackgroundDeletionAudit");
+public enum BackgroundDeletionAction implements AuditAction {
 
-  private String type;
+  //OM Background Deletion Services
+  DIRECTORY_DELETION,
+  KEY_DELETION,
+  SNAPSHOT_DELETION,
 
-  public String getType() {
-    return type;
+  //SCM Background Deletion Service
+  SCMBLOCK_DELETION,
+
+  //DN Background Deletion Service
+  BLOCK_DELETION;
+
+  @Override
+  public String getAction() {
+    return this.toString();
   }
-
-  AuditLoggerType(String type) {
-    this.type = type;
-  }
-}
+} 

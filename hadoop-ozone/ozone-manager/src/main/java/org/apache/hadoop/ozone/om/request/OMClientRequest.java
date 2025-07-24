@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
@@ -503,6 +504,21 @@ public abstract class OMClientRequest implements RequestAuditor {
         .withException(throwable);
     auditBuilder.setAuditMap(auditMap);
     return auditBuilder;
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForBGD(AuditAction op,
+      Map<String, String> auditMap, Throwable throwable,
+      OzoneManagerProtocolProtos.UserInfo userInfo) {
+    return new AuditMessage.Builder()
+        .setUser(userInfo != null ? userInfo.getUserName() : null)
+        .atIp(userInfo != null ? userInfo.getRemoteAddress() : null)
+        .forOperation(op)
+        .withParams(auditMap)
+        .withResult(throwable != null ? AuditEventStatus.FAILURE :
+            AuditEventStatus.SUCCESS)
+        .withException(throwable)
+        .build();
   }
 
   @Override

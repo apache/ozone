@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
@@ -47,8 +48,16 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.audit.AuditAction;
+import org.apache.hadoop.ozone.audit.AuditEventStatus;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.Auditor;
+import org.apache.hadoop.ozone.audit.BackgroundDeletionAction;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -76,10 +85,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Handle block deletion commands.
  */
-public class DeleteBlocksCommandHandler implements CommandHandler {
+public class DeleteBlocksCommandHandler implements CommandHandler, Auditor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DeleteBlocksCommandHandler.class);
+  private static final AuditLogger AUDIT =
+      new AuditLogger(AuditLoggerType.BGDELETIONLOGGER);
+  private static final String AUDIT_PARAM_CONTAINER_ID = "containerID";
+  private static final String AUDIT_PARAM_TXN_ID = "txnID";
+  private static final String AUDIT_PARAM_BLOCKS_TO_DELETE = "blocksToDelete";
 
   private final ContainerSet containerSet;
   private final ConfigurationSource conf;
@@ -531,6 +545,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     if (isDuplicateTransaction(containerId, containerData, delTX, blockDeleteMetrics)) {
       return;
     }
+
+    Map<String, String> auditParams = new HashMap<>();
+    auditParams.put(AUDIT_PARAM_CONTAINER_ID, String.valueOf(containerId));
+    auditParams.put(AUDIT_PARAM_TXN_ID, String.valueOf(txnID));
+    auditParams.put(AUDIT_PARAM_BLOCKS_TO_DELETE, String.valueOf(delTX.getLocalIDList().size()));
+
     try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
       DeleteTransactionStore<?> store =
           (DeleteTransactionStore<?>) containerDB.getStore();
@@ -543,7 +563,13 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         updateMetaData(containerData, delTX, newDeletionBlocks, containerDB,
             batch);
         containerDB.getStore().getBatchHandler().commitBatchOperation(batch);
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+            BackgroundDeletionAction.BLOCK_DELETION, auditParams));
       }
+    } catch (IOException e) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          BackgroundDeletionAction.BLOCK_DELETION, auditParams, e));
+      throw e;
     }
     blockDeleteMetrics.incrMarkedBlockCount(delTX.getLocalIDCount());
   }
@@ -762,5 +788,32 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       executor.setCorePoolSize(size);
       executor.setMaximumPoolSize(size);
     }
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForSuccess(
+      AuditAction op, Map<String, String> auditMap) {
+
+    return new AuditMessage.Builder()
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
+        .withParams(auditMap)
+        .withResult(AuditEventStatus.SUCCESS)
+        .build();
+  }
+
+  @Override
+  public AuditMessage buildAuditMessageForFailure(AuditAction op, Map<String,
+      String> auditMap, Throwable throwable) {
+
+    return new AuditMessage.Builder()
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
+        .withParams(auditMap)
+        .withResult(AuditEventStatus.FAILURE)
+        .withException(throwable)
+        .build();
   }
 }

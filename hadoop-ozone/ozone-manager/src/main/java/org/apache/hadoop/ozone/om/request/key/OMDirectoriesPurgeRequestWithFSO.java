@@ -34,6 +34,9 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.BackgroundDeletionAction;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -55,12 +58,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * Handles purging of keys from OM DB.
  */
 public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.BGDELETIONLOGGER);
+  private static final String AUDIT_PARAM_MESSAGE = "msg";
+  private static final String AUDIT_PARAM_DIRS_DELETED = "directoriesDeleted";
+  private static final String AUDIT_PARAM_SUBDIRS_MOVED = "subdirectoriesMoved";
+  private static final String AUDIT_PARAM_SUBFILES_MOVED = "subFilesMoved";
 
   public OMDirectoriesPurgeRequestWithFSO(OMRequest omRequest) {
     super(omRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeDirsRequest =
         getOmRequest().getPurgeDirectoriesRequest();
@@ -77,6 +86,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
+    OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     final SnapshotInfo fromSnapshotInfo;
     try {
       fromSnapshotInfo = fromSnapshot != null ? SnapshotUtils.getSnapshotInfo(ozoneManager,
@@ -95,6 +105,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OMDirectoriesPurge. ", e);
+      Map<String, String> errorAuditParams = new HashMap<>();
+      errorAuditParams.put(AUDIT_PARAM_MESSAGE, "Error occurred while performing OMDirectoriesPurge");
+      AUDIT.logWriteFailure(buildAuditMessageForBGD(BackgroundDeletionAction.DIRECTORY_DELETION,
+          errorAuditParams, e, userInfo));
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     try {
@@ -184,10 +198,19 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), fromSnapshotInfo));
       }
+
+      Map<String, String> auditParams = new HashMap<>();
+      auditParams.put(AUDIT_PARAM_DIRS_DELETED, String.valueOf(numDirsDeleted));
+      auditParams.put(AUDIT_PARAM_SUBDIRS_MOVED, String.valueOf(numSubDirMoved));
+      auditParams.put(AUDIT_PARAM_SUBFILES_MOVED, String.valueOf(numSubFilesMoved));
+      AUDIT.logWriteSuccess(buildAuditMessageForBGD(BackgroundDeletionAction.DIRECTORY_DELETION,
+          auditParams, null, userInfo));
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen
       // as this is created and send within OM
       // only case of upgrade where compatibility is broken can have
+      AUDIT.logWriteFailure(buildAuditMessageForBGD(BackgroundDeletionAction.DIRECTORY_DELETION,
+          null, ex, userInfo));
       throw new IllegalStateException(ex);
     } finally {
       lockSet.stream().forEach(e -> omMetadataManager.getLock()
