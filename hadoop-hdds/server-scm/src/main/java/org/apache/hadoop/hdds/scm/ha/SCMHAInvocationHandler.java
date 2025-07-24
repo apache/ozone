@@ -93,6 +93,10 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     }
   }
 
+  public Object getLocalHandler() {
+    return localHandler;
+  }
+
   /**
    * TODO.
    */

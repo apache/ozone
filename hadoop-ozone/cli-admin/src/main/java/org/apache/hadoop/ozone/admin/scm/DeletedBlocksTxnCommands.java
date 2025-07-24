@@ -31,6 +31,7 @@ import picocli.CommandLine;
     subcommands = {
         GetFailedDeletedBlocksTxnSubcommand.class,
         ResetDeletedBlockRetryCountSubcommand.class,
+        GetDeletedBlockSummarySubcommand.class,
     })
 public class DeletedBlocksTxnCommands {
 

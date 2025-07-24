@@ -31,8 +31,9 @@ public final class BlockGroup {
 
   private String groupID;
   private List<DeletedBlock> deletedBlocks;
+  public static final long SIZE_NOT_AVAILABLE = -1;
 
-  private BlockGroup(String groupID, List<BlockID> blockIDs, List<DeletedBlock> deletedBlocks) {
+  private BlockGroup(String groupID, List<DeletedBlock> deletedBlocks) {
     this.groupID = groupID;
     this.deletedBlocks = deletedBlocks == null ? new ArrayList<>() : deletedBlocks;
   }
@@ -84,7 +85,7 @@ public final class BlockGroup {
     List<DeletedBlock> deletedBlocks = new ArrayList<>();
     for (HddsProtos.BlockID block : proto.getBlocksList()) {
       deletedBlocks.add(new DeletedBlock(new BlockID(block.getContainerBlockID().getContainerID(),
-          block.getContainerBlockID().getLocalID()), 0, 0));
+          block.getContainerBlockID().getLocalID()), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
     }
 
     for (ScmBlockLocationProtocolProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
@@ -116,16 +117,10 @@ public final class BlockGroup {
   public static class Builder {
 
     private String groupID;
-    private List<BlockID> blocksIDs;
     private List<DeletedBlock> blocks;
 
     public Builder setKeyName(String blockGroupID) {
       this.groupID = blockGroupID;
-      return this;
-    }
-
-    public Builder addAllBlockIDs(List<BlockID> blockIDs) {
-      this.blocksIDs = blockIDs;
       return this;
     }
 
@@ -135,8 +130,7 @@ public final class BlockGroup {
     }
 
     public BlockGroup build() {
-      return new BlockGroup(groupID, blocksIDs, blocks);
+      return new BlockGroup(groupID, blocks);
     }
   }
-
 }
