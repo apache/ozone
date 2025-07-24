@@ -27,12 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -48,7 +46,6 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableConfig;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
@@ -118,10 +115,12 @@ public class TestRDBSnapshotProvider {
             .map(a -> "".concat(a.getName()).concat(" length: ").
                 concat(String.valueOf(a.length())))
             .collect(Collectors.toList()));
-        try (OutputStream outputStream = new FileOutputStream(targetFile)) {
-          writeDBCheckpointToStream(dbCheckpoint, outputStream,
-              HAUtils.getExistingSstFiles(
-                  rdbSnapshotProvider.getCandidateDir()), new ArrayList<>());
+        try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
+          Set<String> existingSstFiles = HAUtils.getExistingFiles(rdbSnapshotProvider.getCandidateDir())
+              .stream()
+              .filter(fName -> fName.endsWith(".sst") && !fName.equals(".sst"))
+              .collect(Collectors.toSet());
+          writeDBCheckpointToStream(dbCheckpoint, outputStream, existingSstFiles);
         }
       }
     };
@@ -144,7 +143,7 @@ public class TestRDBSnapshotProvider {
     assertTrue(candidateDir.exists());
 
     DBCheckpoint checkpoint;
-    int before = HAUtils.getExistingSstFiles(
+    int before = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertEquals(0, before);
 
@@ -152,12 +151,12 @@ public class TestRDBSnapshotProvider {
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
     File checkpointDir = checkpoint.getCheckpointLocation().toFile();
     assertEquals(candidateDir, checkpointDir);
-    int first = HAUtils.getExistingSstFiles(
+    int first = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
 
     // Get second snapshot
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
-    int second = HAUtils.getExistingSstFiles(
+    int second = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertThat(second).withFailMessage("The second snapshot should have more SST files")
         .isGreaterThan(first);
@@ -167,7 +166,7 @@ public class TestRDBSnapshotProvider {
 
     // Get third snapshot
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
-    int third = HAUtils.getExistingSstFiles(
+    int third = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertThat(third).withFailMessage("The third snapshot should have more SST files")
         .isGreaterThan(second);
@@ -176,7 +175,7 @@ public class TestRDBSnapshotProvider {
 
     // Test cleanup candidateDB
     rdbSnapshotProvider.init();
-    assertEquals(0, HAUtils.getExistingSstFiles(
+    assertEquals(0, HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size());
   }
 
@@ -191,7 +190,7 @@ public class TestRDBSnapshotProvider {
         final String name = families.get(i);
         final Table<byte[], byte[]> table1 = rdbStore1.getTable(name);
         final Table<byte[], byte[]> table2 = rdbStore2.getTable(name);
-        try (TableIterator<byte[], ? extends KeyValue<byte[], byte[]>> iterator
+        try (Table.KeyValueIterator<byte[], byte[]> iterator
                  = table1.iterator()) {
           while (iterator.hasNext()) {
             KeyValue<byte[], byte[]> keyValue = iterator.next();
@@ -224,18 +223,12 @@ public class TestRDBSnapshotProvider {
 
   public void insertRandomData(RDBStore dbStore, int familyIndex)
       throws IOException {
-    try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
-        get(familyIndex))) {
-      assertNotNull(firstTable, "Table cannot be null");
-      for (int x = 0; x < 100; x++) {
-        byte[] key =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-      }
-    } catch (Exception e) {
-      throw new IOException(e);
+    Table<byte[], byte[]> firstTable = dbStore.getTable(families.get(familyIndex));
+    assertNotNull(firstTable, "Table cannot be null");
+    for (int x = 0; x < 100; x++) {
+      byte[] key = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      byte[] value = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      firstTable.put(key, value);
     }
   }
 

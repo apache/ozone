@@ -24,7 +24,6 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -40,8 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 public class VersionEndpointTask implements
     Callable<EndpointStateMachine.EndPointStates> {
-  public static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask
-      .class);
+  private static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask.class);
   private final EndpointStateMachine rpcEndPoint;
   private final ConfigurationSource configuration;
   private final OzoneContainer ozoneContainer;
@@ -88,11 +86,6 @@ public class VersionEndpointTask implements
           // Check HddsVolumes
           checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
 
-          DatanodeLayoutStorage layoutStorage
-              = new DatanodeLayoutStorage(configuration);
-          layoutStorage.setClusterId(clusterId);
-          layoutStorage.persistCurrentState();
-
           // Start the container services after getting the version information
           ozoneContainer.start(clusterId);
         }
@@ -132,7 +125,7 @@ public class VersionEndpointTask implements
           volumeSet.failVolume(volume.getStorageDir().getPath());
         }
       }
-      if (volumeSet.getVolumesList().size() == 0) {
+      if (volumeSet.getVolumesList().isEmpty()) {
         // All volumes are in inconsistent state
         throw new DiskOutOfSpaceException(
             "All configured Volumes are in Inconsistent State");

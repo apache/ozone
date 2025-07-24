@@ -47,13 +47,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -80,7 +81,7 @@ public class TestHddsSecureDatanodeInit {
   private static String[] args = new String[]{};
   private static PrivateKey privateKey;
   private static PublicKey publicKey;
-  private static GenericTestUtils.LogCapturer dnLogs;
+  private static LogCapturer dnLogs;
   private static SecurityConfig securityConfig;
   private static KeyStorage keyStorage;
   private static CertificateCodec certCodec;
@@ -98,7 +99,7 @@ public class TestHddsSecureDatanodeInit {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     //conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
     String volumeDir = testDir + "/disk1";
-    conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeDir);
 
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     conf.setClass(OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY,
@@ -125,8 +126,7 @@ public class TestHddsSecureDatanodeInit {
       service.initializeCertificateClient(service.getCertificateClient());
       return null;
     });
-    dnLogs = GenericTestUtils.LogCapturer.captureLogs(
-        ((DNCertificateClient)service.getCertificateClient()).getLogger());
+    dnLogs = LogCapturer.captureLogs(DNCertificateClient.class);
     certCodec = new CertificateCodec(securityConfig, DN_COMPONENT);
     keyStorage = new KeyStorage(securityConfig, DN_COMPONENT);
     dnLogs.clearOutput();

@@ -56,7 +56,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
 
   /**
@@ -285,6 +285,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return streamEntries.stream()
         .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
   }
+
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
    * first block has index = 0, second has index = 1 etc.)
@@ -345,7 +346,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       if (keyArgs.getIsMultipartKey()) {
         throw new IOException("Hsync is unsupported for multipart keys.");
       } else {
-        if (keyArgs.getLocationInfoList().size() == 0) {
+        if (keyArgs.getLocationInfoList().isEmpty()) {
           MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
               () -> omClient.hsyncKey(keyArgs, openID));
         } else {

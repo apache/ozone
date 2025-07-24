@@ -89,10 +89,22 @@ public abstract class ClusterForTests<C extends MiniOzoneCluster> {
     return cluster;
   }
 
+  /** Hook method for subclasses. */
+  protected MiniOzoneCluster.Builder newClusterBuilder() {
+    return MiniOzoneCluster.newBuilder(createOzoneConfig())
+        .setNumDatanodes(5);
+  }
+
+  /** Hook method for subclasses. */
+  protected void onClusterReady() throws Exception {
+    // override if needed
+  }
+
   @BeforeAll
   void startCluster() throws Exception {
     cluster = createCluster();
     cluster.waitForClusterToBeReady();
+    onClusterReady();
   }
 
   @AfterAll

@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutputEntryPool.class);
 
   private final List<BlockDataStreamOutputEntry> streamEntries;
@@ -56,7 +56,6 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
   private final OzoneManagerProtocol omClient;
   private final OmKeyArgs keyArgs;
   private final XceiverClientFactory xceiverClientFactory;
-  private final String requestID;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
   private final ExcludeList excludeList;
@@ -67,7 +66,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
   public BlockDataStreamOutputEntryPool(
       OzoneClientConfig config,
       OzoneManagerProtocol omClient,
-      String requestId, ReplicationConfig replicationConfig,
+      ReplicationConfig replicationConfig,
       String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
@@ -84,7 +83,6 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber)
         .setSortDatanodesInPipeline(true).build();
-    this.requestID = requestId;
     this.openID = openID;
     this.excludeList = createExcludeList();
     this.bufferList = new ArrayList<>();
@@ -163,7 +161,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       if (keyArgs.getIsMultipartKey()) {
         throw new IOException("Hsync is unsupported for multipart keys.");
       } else {
-        if (keyArgs.getLocationInfoList().size() == 0) {
+        if (keyArgs.getLocationInfoList().isEmpty()) {
           omClient.hsyncKey(keyArgs, openID);
         } else {
           ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
@@ -222,6 +220,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
     return streamEntries.stream().mapToLong(
         BlockDataStreamOutputEntry::getCurrentPosition).sum();
   }
+
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
    * first block has index = 0, second has index = 1 etc.)
@@ -238,7 +237,6 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
         omClient.allocateBlock(keyArgs, openID, excludeList);
     addKeyLocationInfo(subKeyInfo);
   }
-
 
   void commitKey(long offset) throws IOException {
     if (keyArgs != null) {

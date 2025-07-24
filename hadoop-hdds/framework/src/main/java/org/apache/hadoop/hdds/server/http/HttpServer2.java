@@ -62,7 +62,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -89,6 +89,7 @@ import org.apache.hadoop.util.StringUtils;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.CustomRequestLog;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
@@ -96,6 +97,7 @@ import org.eclipse.jetty.server.RequestLog;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.Slf4jRequestLogWriter;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.HandlerCollection;
@@ -131,7 +133,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public final class HttpServer2 implements FilterContainer {
-  public static final Logger LOG = LoggerFactory.getLogger(HttpServer2.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HttpServer2.class);
 
   public static final String HTTP_SCHEME = "http";
   public static final String HTTPS_SCHEME = "https";
@@ -181,6 +183,8 @@ public final class HttpServer2 implements FilterContainer {
   private static final String NO_CACHE_FILTER = "NoCacheFilter";
 
   private static final String BIND_ADDRESS = "bind.address";
+  private static final String HADOOP_JETTY_LOGS_SERVE_ALIASES = "hadoop.jetty.logs.serve.aliases";
+  private static final boolean DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES = true;
 
   private final AccessControlList adminsAcl;
 
@@ -212,6 +216,7 @@ public final class HttpServer2 implements FilterContainer {
   private static final String X_FRAME_OPTIONS = "X-FRAME-OPTIONS";
   private static final Pattern PATTERN_HTTP_HEADER_REGEX =
       Pattern.compile(HTTP_HEADER_REGEX);
+
   /**
    * Class to construct instances of HTTP server with specific options.
    */
@@ -618,14 +623,13 @@ public final class HttpServer2 implements FilterContainer {
     handler.getSessionCookieConfig().setSecure(true);
 
     ContextHandlerCollection contexts = new ContextHandlerCollection();
-    RequestLog requestLog = HttpRequestLog.getRequestLog(builder.name);
-
     handlers.addHandler(contexts);
-    if (requestLog != null) {
-      RequestLogHandler requestLogHandler = new RequestLogHandler();
-      requestLogHandler.setRequestLog(requestLog);
-      handlers.addHandler(requestLogHandler);
-    }
+
+    RequestLog requestLog = getRequestLog(builder.name);
+    RequestLogHandler requestLogHandler = new RequestLogHandler();
+    requestLogHandler.setRequestLog(requestLog);
+    handlers.addHandler(requestLogHandler);
+
     handlers.addHandler(webAppContext);
     final String appDir = getWebAppsPath(builder.name);
     if (!builder.skipDefaultApps) {
@@ -759,16 +763,14 @@ public final class HttpServer2 implements FilterContainer {
     // and it's enabled.
     String logDir = System.getProperty("hadoop.log.dir");
     boolean logsEnabled = conf.getBoolean(
-        CommonConfigurationKeys.HADOOP_HTTP_LOGS_ENABLED,
-        CommonConfigurationKeys.HADOOP_HTTP_LOGS_ENABLED_DEFAULT);
+        CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED,
+        CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED_DEFAULT);
     if (logDir != null && logsEnabled) {
       ServletContextHandler logContext =
           new ServletContextHandler(parent, "/logs");
       logContext.setResourceBase(logDir);
       logContext.addServlet(AdminAuthorizedServlet.class, "/*");
-      if (conf.getBoolean(
-          CommonConfigurationKeys.HADOOP_JETTY_LOGS_SERVE_ALIASES,
-          CommonConfigurationKeys.DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
+      if (conf.getBoolean(HADOOP_JETTY_LOGS_SERVE_ALIASES, DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
         Map<String, String> params = logContext.getInitParams();
         params.put("org.eclipse.jetty.servlet.Default.aliases", "true");
       }
@@ -894,19 +896,18 @@ public final class HttpServer2 implements FilterContainer {
     // Jetty doesn't like the same path spec mapping to different servlets, so
     // if there's already a mapping for this pathSpec, remove it and assume that
     // the newest one is the one we want
-    final ServletMapping[] servletMappings =
-        webAppContext.getServletHandler().getServletMappings();
-    for (int i = 0; i < servletMappings.length; i++) {
-      if (servletMappings[i].containsPathSpec(pathSpec)) {
+    final ServletMapping[] servletMappings = webAppContext.getServletHandler().getServletMappings();
+
+    for (ServletMapping servletMapping : servletMappings) {
+      if (servletMapping.containsPathSpec(pathSpec)) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Found existing " + servletMappings[i].getServletName() +
+          LOG.debug("Found existing " + servletMapping.getServletName() +
               " servlet at path " + pathSpec + "; will replace mapping" +
               " with " + holder.getName() + " servlet");
         }
-        ServletMapping[] newServletMappings =
-            ArrayUtil.removeFromArray(servletMappings, servletMappings[i]);
-        webAppContext.getServletHandler()
-            .setServletMappings(newServletMappings);
+
+        ServletMapping[] newServletMappings = ArrayUtil.removeFromArray(servletMappings, servletMapping);
+        webAppContext.getServletHandler().setServletMappings(newServletMappings);
         break;
       }
     }
@@ -916,20 +917,23 @@ public final class HttpServer2 implements FilterContainer {
     // Kerberos replay error.
     FilterMapping[] filterMappings = webAppContext.getServletHandler().
         getFilterMappings();
-    for (int i = 0; i < filterMappings.length; i++) {
-      if (filterMappings[i].getPathSpecs() == null) {
-        LOG.debug("Skip checking {} filterMappings {} without a path spec.",
-            filterMappings[i].getFilterName(), filterMappings[i]);
+    for (FilterMapping filterMapping : filterMappings) {
+      if (filterMapping.getPathSpecs() == null) {
+        LOG.debug(
+            "Skip checking {} filterMappings {} without a path spec.",
+            filterMapping.getFilterName(),
+            filterMapping
+        );
         continue;
       }
-      int oldPathSpecsLen = filterMappings[i].getPathSpecs().length;
-      String[] newPathSpecs =
-          ArrayUtil.removeFromArray(filterMappings[i].getPathSpecs(), pathSpec);
+
+      int oldPathSpecsLen = filterMapping.getPathSpecs().length;
+      String[] newPathSpecs = ArrayUtil.removeFromArray(filterMapping.getPathSpecs(), pathSpec);
+
       if (newPathSpecs.length == 0) {
-        webAppContext.getServletHandler().setFilterMappings(
-            ArrayUtil.removeFromArray(filterMappings, filterMappings[i]));
+        webAppContext.getServletHandler().setFilterMappings(ArrayUtil.removeFromArray(filterMappings, filterMapping));
       } else if (newPathSpecs.length != oldPathSpecsLen) {
-        filterMappings[i].setPathSpecs(newPathSpecs);
+        filterMapping.setPathSpecs(newPathSpecs);
       }
     }
 
@@ -966,15 +970,15 @@ public final class HttpServer2 implements FilterContainer {
     sh.setInitParameters(params);
     final ServletMapping[] servletMappings =
         webAppContext.getServletHandler().getServletMappings();
-    for (int i = 0; i < servletMappings.length; i++) {
-      if (servletMappings[i].containsPathSpec(pathSpec)) {
+    for (ServletMapping servletMapping : servletMappings) {
+      if (servletMapping.containsPathSpec(pathSpec)) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Found existing " + servletMappings[i].getServletName() +
+          LOG.debug("Found existing " + servletMapping.getServletName() +
               " servlet at path " + pathSpec + "; will replace mapping" +
               " with " + sh.getName() + " servlet");
         }
-        ServletMapping[] newServletMappings =
-            ArrayUtil.removeFromArray(servletMappings, servletMappings[i]);
+
+        ServletMapping[] newServletMappings = ArrayUtil.removeFromArray(servletMappings, servletMapping);
         webAppContext.getServletHandler()
             .setServletMappings(newServletMappings);
         break;
@@ -1406,7 +1410,7 @@ public final class HttpServer2 implements FilterContainer {
             : STATE_DESCRIPTION_NOT_LIVE)
         .append("), listening at:");
     for (ServerConnector l : listeners) {
-      sb.append(l.getHost()).append(":").append(l.getPort()).append("/,");
+      sb.append(l.getHost()).append(':').append(l.getPort()).append("/,");
     }
     return sb.toString();
   }
@@ -1437,7 +1441,7 @@ public final class HttpServer2 implements FilterContainer {
 
     boolean access = true;
     boolean adminAccess = conf.getBoolean(
-        CommonConfigurationKeys.HADOOP_SECURITY_INSTRUMENTATION_REQUIRES_ADMIN,
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_INSTRUMENTATION_REQUIRES_ADMIN,
         false);
     if (adminAccess) {
       access = hasAdministratorAccess(servletContext, request, response);
@@ -1462,7 +1466,7 @@ public final class HttpServer2 implements FilterContainer {
             .getAttribute(CONF_CONTEXT_ATTRIBUTE);
     // If there is no authorization, anybody has administrator access.
     if (!conf.getBoolean(
-        CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false)) {
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       return true;
     }
 
@@ -1505,7 +1509,6 @@ public final class HttpServer2 implements FilterContainer {
         UserGroupInformation.createRemoteUser(remoteUser);
     return adminsAcl != null && adminsAcl.isUserAllowed(remoteUserUGI);
   }
-
 
   /**
    * A very simple servlet to serve up a text representation of the current
@@ -1700,11 +1703,11 @@ public final class HttpServer2 implements FilterContainer {
   public enum XFrameOption {
     DENY("DENY"), SAMEORIGIN("SAMEORIGIN"), ALLOWFROM("ALLOW-FROM");
 
+    private final String name;
+
     XFrameOption(String name) {
       this.name = name;
     }
-
-    private final String name;
 
     @Override
     public String toString() {
@@ -1791,5 +1794,12 @@ public final class HttpServer2 implements FilterContainer {
       ozoneConfiguration.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
               tmpMetaDir.getAbsolutePath());
     }
+  }
+
+  private static RequestLog getRequestLog(String name) {
+    String loggerName = "http.requests." + name;
+    Slf4jRequestLogWriter writer = new Slf4jRequestLogWriter();
+    writer.setLoggerName(loggerName);
+    return new CustomRequestLog(writer, CustomRequestLog.EXTENDED_NCSA_FORMAT);
   }
 }

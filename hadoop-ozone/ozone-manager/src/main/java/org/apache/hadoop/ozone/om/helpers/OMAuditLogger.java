@@ -37,14 +37,16 @@ import org.slf4j.LoggerFactory;
  * This class is used for OM Audit logs.
  */
 public final class OMAuditLogger {
-  private OMAuditLogger() {
-  }
+
+  private static final Logger LOG = LoggerFactory.getLogger(OMAuditLogger.class);
 
   private static final Map<Type, OMAction> CMD_AUDIT_ACTION_MAP = new HashMap<>();
-  private static final Logger LOG = LoggerFactory.getLogger(OMAuditLogger.class);
 
   static {
     init();
+  }
+
+  private OMAuditLogger() {
   }
 
   private static void init() {
@@ -120,7 +122,7 @@ public final class OMAuditLogger {
       if (null == builder.getAuditMap()) {
         builder.setAuditMap(new HashMap<>());
       }
-      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getAuditMap().put("Transaction", String.valueOf(termIndex.getIndex()));
       builder.getMessageBuilder().withParams(builder.getAuditMap());
       builder.getAuditLogger().logWrite(builder.getMessageBuilder().build());
     }
@@ -150,7 +152,7 @@ public final class OMAuditLogger {
     }
     try {
       builder.getAuditMap().put("Command", request.getOmRequest().getCmdType().name());
-      builder.getAuditMap().put("Transaction", "" + termIndex.getIndex());
+      builder.getAuditMap().put("Transaction", String.valueOf(termIndex.getIndex()));
       request.buildAuditMessage(action, builder.getAuditMap(),
           th, request.getUserInfo());
       builder.setLog(true);

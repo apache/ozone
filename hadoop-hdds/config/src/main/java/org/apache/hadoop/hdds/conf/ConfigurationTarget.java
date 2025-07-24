@@ -39,6 +39,10 @@ public interface ConfigurationTarget {
     set(name, Double.toString(value));
   }
 
+  default void setFloat(String name, float value) {
+    set(name, Float.toString(value));
+  }
+
   default void setBoolean(String name, boolean value) {
     set(name, Boolean.toString(value));
   }
@@ -56,10 +60,7 @@ public interface ConfigurationTarget {
   }
 
   default <T> void setFromObject(T object) {
-    ConfigGroup configGroup =
-        object.getClass().getAnnotation(ConfigGroup.class);
-    String prefix = configGroup.prefix();
-    ConfigurationReflectionUtil.updateConfiguration(this, object, prefix);
+    ConfigurationReflectionUtil.updateConfiguration(this, object);
   }
 
 }

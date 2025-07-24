@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
@@ -28,9 +27,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -77,11 +75,9 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       LOG.info("No pipeline exists in current db");
       return;
     }
-    try (TableIterator<PipelineID,
-        ? extends Table.KeyValue<PipelineID, Pipeline>> iterator =
-             pipelineStore.iterator()) {
+    try (TableIterator<PipelineID, Pipeline> iterator = pipelineStore.valueIterator()) {
       while (iterator.hasNext()) {
-        Pipeline pipeline = iterator.next().getValue();
+        final Pipeline pipeline = iterator.next();
         pipelineStateMap.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
       }
@@ -149,7 +145,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       lock.readLock().unlock();
     }
   }
-
 
   @Override
   public List<Pipeline> getPipelines(
@@ -307,15 +302,10 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     lock.writeLock().lock();
     try {
-      if (pipelineStore != null) {
-        pipelineStore.close();
-        pipelineStore = null;
-      }
-    } catch (Exception ex) {
-      LOG.error("Pipeline store close failed", ex);
+      pipelineStore = null;
     } finally {
       lock.writeLock().unlock();
     }
@@ -326,7 +316,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       throws IOException {
     lock.writeLock().lock();
     try {
-      pipelineStore.close();
       this.pipelineStateMap = new PipelineStateMap();
       this.pipelineStore = store;
       initialize();
@@ -380,13 +369,8 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
           new PipelineStateManagerImpl(
               pipelineStore, nodeManager, transactionBuffer);
 
-      final SCMHAInvocationHandler invocationHandler =
-          new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.PIPELINE,
-              pipelineStateManager, scmRatisServer);
-
-      return (PipelineStateManager) Proxy.newProxyInstance(
-          SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{PipelineStateManager.class}, invocationHandler);
+      return scmRatisServer.getProxyHandler(RequestType.PIPELINE,
+          PipelineStateManager.class, pipelineStateManager);
     }
   }
 }

@@ -44,6 +44,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -573,9 +574,11 @@ public class TestStateContext {
 
     // task num greater than pool size
     for (int i = 0; i < threadPoolSize; i++) {
-      executorService.submit((Callable<String>) futureOne::get);
+      Future<String> future = executorService.submit((Callable<String>) futureOne::get);
+      assertFalse(future.isDone());
     }
-    executorService.submit((Callable<String>) futureTwo::get);
+    Future<String> future = executorService.submit((Callable<String>) futureTwo::get);
+    assertFalse(future.isDone());
 
     assertFalse(stateContext.isThreadPoolAvailable(executorService));
 
@@ -593,9 +596,11 @@ public class TestStateContext {
     final AtomicInteger awaited = new AtomicInteger();
 
     ExecutorService executorService = Executors.newFixedThreadPool(1);
-    CompletableFuture<String> future = new CompletableFuture<>();
-    executorService.submit((Callable<String>) future::get);
-    executorService.submit((Callable<String>) future::get);
+    CompletableFuture<String> task = new CompletableFuture<>();
+    Future<String> future = executorService.submit((Callable<String>) task::get);
+    assertFalse(future.isDone());
+    future = executorService.submit((Callable<String>) task::get);
+    assertFalse(future.isDone());
 
     StateContext subject = new StateContext(new OzoneConfiguration(),
         DatanodeStates.INIT, mock(DatanodeStateMachine.class), "") {
@@ -632,7 +637,7 @@ public class TestStateContext {
     assertEquals(0, awaited.get());
     assertEquals(0, executed.get());
 
-    future.complete("any");
+    task.complete("any");
     LambdaTestUtils.await(1000, 100, () ->
         subject.isThreadPoolAvailable(executorService));
 

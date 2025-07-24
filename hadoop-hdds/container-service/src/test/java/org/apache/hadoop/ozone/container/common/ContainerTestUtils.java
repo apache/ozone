@@ -17,26 +17,31 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
@@ -49,17 +54,22 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -72,10 +82,12 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
@@ -92,9 +104,6 @@ import org.mockito.Mockito;
  */
 public final class ContainerTestUtils {
 
-  private ContainerTestUtils() {
-  }
-
   public static final DispatcherContext WRITE_STAGE = DispatcherContext
       .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
       .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
@@ -108,6 +117,14 @@ public final class ContainerTestUtils {
 
   public static final DispatcherContext COMBINED_STAGE
       = DispatcherContext.getHandleWriteChunk();
+
+  private static final ContainerDispatcher NOOP_CONTAINER_DISPATCHER = new NoopContainerDispatcher();
+
+  private static final ContainerController EMPTY_CONTAINER_CONTROLLER
+      = new ContainerController(ContainerImplTestUtils.newContainerSet(), Collections.emptyMap());
+
+  private ContainerTestUtils() {
+  }
 
   /**
    * Creates an Endpoint class for testing purpose.
@@ -141,7 +158,8 @@ public final class ContainerTestUtils {
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
     StateContext context = getMockContext(datanodeDetails, conf);
-    return new OzoneContainer(datanodeDetails, conf, context);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+    return new OzoneContainer(datanodeDetails, conf, context, volumeChoosingPolicy);
   }
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,
@@ -396,15 +414,9 @@ public final class ContainerTestUtils {
     }
   }
 
-  private static final ContainerDispatcher NOOP_CONTAINER_DISPATCHER
-      = new NoopContainerDispatcher();
-
   public static ContainerDispatcher getNoopContainerDispatcher() {
     return NOOP_CONTAINER_DISPATCHER;
   }
-
-  private static final ContainerController EMPTY_CONTAINER_CONTROLLER
-      = new ContainerController(new ContainerSet(1000), Collections.emptyMap());
 
   public static ContainerController getEmptyContainerController() {
     return EMPTY_CONTAINER_CONTROLLER;
@@ -418,5 +430,37 @@ public final class ContainerTestUtils {
     return XceiverServerRatis.newXceiverServerRatis(null, dn, conf,
         getNoopContainerDispatcher(), getEmptyContainerController(),
         null, null);
+  }
+
+  /** Initialize {@link DatanodeLayoutStorage}.  Normally this is done during {@link HddsDatanodeService} start,
+   * have to do the same for tests that create {@link OzoneContainer} manually. */
+  public static void initializeDatanodeLayout(ConfigurationSource conf, DatanodeDetails dn) throws IOException {
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf, dn.getUuidString());
+    if (layoutStorage.getState() != INITIALIZED) {
+      layoutStorage.initialize();
+    }
+  }
+
+  /**
+   * Creates block metadata for the given container with the specified number of blocks and chunks per block.
+   */
+  public static void createBlockMetaData(KeyValueContainerData data, int numOfBlocksPerContainer,
+                                         int numOfChunksPerBlock) throws IOException {
+    try (DBHandle metadata = BlockUtils.getDB(data, new OzoneConfiguration())) {
+      for (int j = 0; j < numOfBlocksPerContainer; j++) {
+        BlockID blockID = new BlockID(data.getContainerID(), j);
+        String blockKey = data.getBlockKey(blockID.getLocalID());
+        BlockData kd = new BlockData(blockID);
+        List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
+        for (int k = 0; k < numOfChunksPerBlock; k++) {
+          long dataLen = 10L;
+          ChunkInfo chunkInfo = ContainerTestHelper.getChunk(blockID.getLocalID(), k, k * dataLen, dataLen);
+          ContainerTestHelper.setDataChecksum(chunkInfo, ContainerTestHelper.getData((int) dataLen));
+          chunks.add(chunkInfo.getProtoBufMessage());
+        }
+        kd.setChunks(chunks);
+        metadata.getStore().getBlockDataTable().put(blockKey, kd);
+      }
+    }
   }
 }

@@ -121,8 +121,7 @@ public class RSRawDecoder extends RawErasureDecoder {
     this.erasureFlags = new boolean[getNumAllUnits()];
     this.numErasedDataUnits = 0;
 
-    for (int i = 0; i < erasedIndexes.length; i++) {
-      int index = erasedIndexes[i];
+    for (int index : erasedIndexes) {
       erasureFlags[index] = true;
       if (index < getNumDataUnits()) {
         numErasedDataUnits++;

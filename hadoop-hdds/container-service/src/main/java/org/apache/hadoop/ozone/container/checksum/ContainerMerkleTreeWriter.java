@@ -49,10 +49,25 @@ public class ContainerMerkleTreeWriter {
   public static final Supplier<ChecksumByteBuffer> CHECKSUM_BUFFER_SUPPLIER = ChecksumByteBufferFactory::crc32CImpl;
 
   /**
-   * Constructs an empty Container merkle tree object.
+   * Constructs a writer for an initially empty container merkle tree.
    */
   public ContainerMerkleTreeWriter() {
     id2Block = new TreeMap<>();
+  }
+
+  /**
+   * Constructs a writer for a container merkle tree which initially contains all the information from the specified
+   * proto.
+   */
+  public ContainerMerkleTreeWriter(ContainerProtos.ContainerMerkleTree fromTree) {
+    id2Block = new TreeMap<>();
+    for (ContainerProtos.BlockMerkleTree blockTree: fromTree.getBlockMerkleTreeList()) {
+      long blockID = blockTree.getBlockID();
+      addBlock(blockID);
+      for (ContainerProtos.ChunkMerkleTree chunkTree: blockTree.getChunkMerkleTreeList()) {
+        addChunks(blockID, chunkTree);
+      }
+    }
   }
 
   /**
@@ -60,10 +75,40 @@ public class ContainerMerkleTreeWriter {
    * If the block entry already exists, the chunks will be added to the existing chunks for that block.
    *
    * @param blockID The ID of the block that these chunks belong to.
+   * @param checksumMatches True if there were no checksum errors detected with these chunks. False indicates that all
+   *    the chunks being added had checksum errors.
    * @param chunks A list of chunks to add to this block. The chunks will be sorted internally by their offset.
    */
-  public void addChunks(long blockID, Collection<ContainerProtos.ChunkInfo> chunks) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new).addChunks(chunks);
+  public void addChunks(long blockID, boolean checksumMatches, Collection<ContainerProtos.ChunkInfo> chunks) {
+    for (ContainerProtos.ChunkInfo chunk: chunks) {
+      addChunks(blockID, checksumMatches, chunk);
+    }
+  }
+
+  public void addChunks(long blockID, boolean checksumMatches, ContainerProtos.ChunkInfo... chunks) {
+    for (ContainerProtos.ChunkInfo chunk: chunks) {
+      addChunks(blockID, new ChunkMerkleTreeWriter(chunk, checksumMatches));
+    }
+  }
+
+  private void addChunks(long blockID, ContainerProtos.ChunkMerkleTree... chunks) {
+    for (ContainerProtos.ChunkMerkleTree chunkTree: chunks) {
+      addChunks(blockID, new ChunkMerkleTreeWriter(chunkTree));
+    }
+  }
+
+  private void addChunks(long blockID, ChunkMerkleTreeWriter chunkWriter) {
+    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new).addChunks(chunkWriter);
+  }
+
+  /**
+   * Adds an empty block to the tree. This method is not a pre-requisite to {@code addChunks}.
+   * If the block entry already exists, it will not be modified.
+   *
+   * @param blockID The ID of the empty block to add to the tree
+   */
+  public void addBlock(long blockID) {
+    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new);
   }
 
   /**
@@ -112,9 +157,9 @@ public class ContainerMerkleTreeWriter {
      *
      * @param chunks A list of chunks to add to this block.
      */
-    public void addChunks(Collection<ContainerProtos.ChunkInfo> chunks) {
-      for (ContainerProtos.ChunkInfo chunk: chunks) {
-        offset2Chunk.put(chunk.getOffset(), new ChunkMerkleTreeWriter(chunk));
+    public void addChunks(ChunkMerkleTreeWriter... chunks) {
+      for (ChunkMerkleTreeWriter chunk: chunks) {
+        offset2Chunk.put(chunk.getOffset(), chunk);
       }
     }
 
@@ -127,7 +172,10 @@ public class ContainerMerkleTreeWriter {
     public ContainerProtos.BlockMerkleTree toProto() {
       ContainerProtos.BlockMerkleTree.Builder blockTreeBuilder = ContainerProtos.BlockMerkleTree.newBuilder();
       ChecksumByteBuffer checksumImpl = CHECKSUM_BUFFER_SUPPLIER.get();
-      ByteBuffer blockChecksumBuffer = ByteBuffer.allocate(Long.BYTES * offset2Chunk.size());
+      // Allocate space for block ID + all chunk checksums
+      ByteBuffer blockChecksumBuffer = ByteBuffer.allocate(Long.BYTES * (1 + offset2Chunk.size()));
+      // Hash the block ID into the beginning of the block checksum calculation
+      blockChecksumBuffer.putLong(blockID);
 
       for (ChunkMerkleTreeWriter chunkTree: offset2Chunk.values()) {
         // Ordering of checksums within a chunk is assumed to be in the order they are written.
@@ -157,18 +205,29 @@ public class ContainerMerkleTreeWriter {
   private static class ChunkMerkleTreeWriter {
     private final long length;
     private final long offset;
-    private final boolean isHealthy;
+    private final boolean checksumMatches;
     private final long dataChecksum;
 
-    ChunkMerkleTreeWriter(ContainerProtos.ChunkInfo chunk) {
+    ChunkMerkleTreeWriter(ContainerProtos.ChunkInfo chunk, boolean checksumMatches) {
       length = chunk.getLen();
       offset = chunk.getOffset();
-      isHealthy = true;
+      this.checksumMatches = checksumMatches;
       ChecksumByteBuffer checksumImpl = CHECKSUM_BUFFER_SUPPLIER.get();
       for (ByteString checksum: chunk.getChecksumData().getChecksumsList()) {
         checksumImpl.update(checksum.asReadOnlyByteBuffer());
       }
       this.dataChecksum = checksumImpl.getValue();
+    }
+
+    ChunkMerkleTreeWriter(ContainerProtos.ChunkMerkleTree chunkTree) {
+      length = chunkTree.getLength();
+      offset = chunkTree.getOffset();
+      checksumMatches = chunkTree.getChecksumMatches();
+      dataChecksum = chunkTree.getDataChecksum();
+    }
+
+    public long getOffset() {
+      return offset;
     }
 
     /**
@@ -181,7 +240,7 @@ public class ContainerMerkleTreeWriter {
       return ContainerProtos.ChunkMerkleTree.newBuilder()
           .setOffset(offset)
           .setLength(length)
-          .setIsHealthy(isHealthy)
+          .setChecksumMatches(checksumMatches)
           .setDataChecksum(dataChecksum)
           .build();
     }

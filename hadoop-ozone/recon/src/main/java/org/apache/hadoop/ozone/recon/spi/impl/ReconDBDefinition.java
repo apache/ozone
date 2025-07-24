@@ -36,11 +36,6 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
 
   private final String dbName;
 
-  public ReconDBDefinition(String dbName) {
-    super(COLUMN_FAMILIES);
-    this.dbName = dbName;
-  }
-
   public static final DBColumnFamilyDefinition<ContainerKeyPrefix, Integer>
       CONTAINER_KEY =
       new DBColumnFamilyDefinition<>(
@@ -91,6 +86,11 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
           NAMESPACE_SUMMARY,
           REPLICA_HISTORY,
           REPLICA_HISTORY_V2);
+
+  public ReconDBDefinition(String dbName) {
+    super(COLUMN_FAMILIES);
+    this.dbName = dbName;
+  }
 
   @Override
   public String getName() {

@@ -191,7 +191,7 @@ public abstract class ServerWebApp
       if (authority == null) {
         authority = resolveAuthority();
       }
+      return authority;
     }
-    return authority;
   }
 }

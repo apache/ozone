@@ -44,7 +44,6 @@ import java.util.OptionalInt;
 import javax.servlet.http.HttpServlet;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.HddsConfServlet;
@@ -128,12 +127,12 @@ public abstract class BaseHttpServer {
       }
 
       final boolean xFrameEnabled = conf.getBoolean(
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED,
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED_DEFAULT);
+          HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED,
+          HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED_DEFAULT);
 
       final String xFrameOptionValue = conf.getTrimmed(
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE,
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE_DEFAULT);
+          HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE,
+          HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE_DEFAULT);
 
       builder.configureXFrame(xFrameEnabled).setXFrameOption(xFrameOptionValue);
 
@@ -245,7 +244,6 @@ public abstract class BaseHttpServer {
     return builder;
   }
 
-
   /**
    * Add a servlet to BaseHttpServer.
    *
@@ -356,19 +354,18 @@ public abstract class BaseHttpServer {
     int connIdx = 0;
     if (policy.isHttpEnabled()) {
       httpAddress = httpServer.getConnectorAddress(connIdx++);
-      String realAddress = NetUtils.getHostPortString(httpAddress);
+      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpAddress));
       conf.set(getHttpAddressKey(), realAddress);
       LOG.info("HTTP server of {} listening at http://{}", name, realAddress);
     }
 
     if (policy.isHttpsEnabled()) {
       httpsAddress = httpServer.getConnectorAddress(connIdx);
-      String realAddress = NetUtils.getHostPortString(httpsAddress);
+      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpsAddress));
       conf.set(getHttpsAddressKey(), realAddress);
       LOG.info("HTTPS server of {} listening at https://{}", name, realAddress);
     }
   }
-
 
   public static HttpServer2.Builder loadSslConfToHttpServerBuilder(
       HttpServer2.Builder builder, ConfigurationSource sslConf) {
@@ -413,6 +410,7 @@ public abstract class BaseHttpServer {
     }
     return password;
   }
+
   /**
    * Load HTTPS-related configuration.
    */

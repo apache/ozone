@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.security;
 
-import java.lang.reflect.Proxy;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyState;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyStateImpl;
@@ -47,13 +45,7 @@ public class ScmSecretKeyStateBuilder {
 
   public SecretKeyState build() {
     final SecretKeyState impl = new SecretKeyStateImpl(secretKeyStore);
-
-    final SCMHAInvocationHandler scmhaInvocationHandler =
-        new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.SECRET_KEY,
-            impl, scmRatisServer);
-
-    return (SecretKeyState) Proxy.newProxyInstance(
-        SCMHAInvocationHandler.class.getClassLoader(),
-        new Class<?>[]{SecretKeyState.class}, scmhaInvocationHandler);
+    return scmRatisServer.getProxyHandler(SCMRatisProtocol.RequestType.SECRET_KEY,
+       SecretKeyState.class, impl);
   }
 }

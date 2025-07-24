@@ -38,7 +38,7 @@ class TestConfigurationReflectionUtil {
     return Stream.of(
         arguments(ConfigurationExample.class, "waitTime",
             Optional.of(ConfigType.TIME),
-            Optional.of("ozone.scm.client.wait"),
+            Optional.of("ozone.test.config.wait"),
             Optional.of("30m")),
         arguments(ConfigurationExampleGrandParent.class, "number",
             Optional.of(ConfigType.AUTO),
@@ -46,7 +46,7 @@ class TestConfigurationReflectionUtil {
             Optional.of("2")),
         arguments(ConfigurationExample.class, "secure",
             Optional.of(ConfigType.AUTO),
-            Optional.of("ozone.scm.client.secure"),
+            Optional.of("ozone.test.config.secure"),
             Optional.of("true")),
         arguments(ConfigurationExample.class, "no-such-field",
             Optional.empty(),
@@ -58,7 +58,7 @@ class TestConfigurationReflectionUtil {
             Optional.empty()),
         arguments(ConfigurationExample.class, "threshold",
             Optional.of(ConfigType.DOUBLE),
-            Optional.of("ozone.scm.client.threshold"),
+            Optional.of("ozone.test.config.threshold"),
             Optional.of("10"))
     );
   }
@@ -88,7 +88,7 @@ class TestConfigurationReflectionUtil {
         ConfigurationReflectionUtil.mapReconfigurableProperties(
             ConfigurationExample.class).keySet();
 
-    String prefix = "ozone.scm.client";
+    String prefix = "ozone.test.config";
     assertEquals(ImmutableSet.of(
         prefix + ".dynamic",
         prefix + ".grandpa.dyna"

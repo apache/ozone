@@ -144,6 +144,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     return TracingUtil.executeInNewSpan("ofs recoverLease",
         () -> recoverLeaseTraced(f));
   }
+
   private boolean recoverLeaseTraced(final Path f) throws IOException {
     GlobalTracer.get().activeSpan().setTag("path", f.toString());
     statistics.incrementWriteOps(1);

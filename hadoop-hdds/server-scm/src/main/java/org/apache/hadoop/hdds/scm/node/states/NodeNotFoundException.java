@@ -17,12 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+
 /**
  * This exception represents that the node that is being accessed does not
  * exist in NodeStateMap.
  */
 public class NodeNotFoundException extends NodeException {
-
 
   /**
    * Constructs an {@code NodeNotFoundException} with {@code null}
@@ -33,15 +34,10 @@ public class NodeNotFoundException extends NodeException {
   }
 
   /**
-   * Constructs an {@code NodeNotFoundException} with the specified
-   * detail message.
-   *
-   * @param message
-   *        The detail message (which is saved for later retrieval
-   *        by the {@link #getMessage()} method)
+   * Constructs an {@code NodeNotFoundException} with the given {@link DatanodeID}.
    */
-  public NodeNotFoundException(String message) {
-    super(message);
+  public NodeNotFoundException(DatanodeID datanodeID) {
+    super("Datanode " + datanodeID + " not found");
   }
 
 }

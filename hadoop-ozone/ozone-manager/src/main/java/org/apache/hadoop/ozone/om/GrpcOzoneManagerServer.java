@@ -148,9 +148,7 @@ public class GrpcOzoneManagerServer {
         .channelType(NioServerSocketChannel.class)
         .executor(readExecutors)
         .addService(ServerInterceptors.intercept(
-            new OzoneManagerServiceGrpc(omTranslator,
-                delegationTokenMgr,
-                omServerConfig),
+            new OzoneManagerServiceGrpc(omTranslator),
             new ClientAddressServerInterceptor(),
             new GrpcMetricsServerResponseInterceptor(omS3gGrpcMetrics),
             new GrpcMetricsServerRequestInterceptor(omS3gGrpcMetrics)))
@@ -196,6 +194,7 @@ public class GrpcOzoneManagerServer {
       omS3gGrpcMetrics.unRegister();
     }
   }
+
   public int getPort() {
     return port;
   }

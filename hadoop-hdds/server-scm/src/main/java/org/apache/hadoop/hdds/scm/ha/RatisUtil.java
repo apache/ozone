@@ -57,7 +57,6 @@ public final class RatisUtil {
   private RatisUtil() {
   }
 
-
   /**
    * Constructs new Raft Properties instance using {@link ConfigurationSource}.
    *
@@ -138,6 +137,8 @@ public final class RatisUtil {
                             OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT_DEFAULT,
                     TimeUnit.MILLISECONDS),
             TimeUnit.MILLISECONDS));
+    RatisHelper.setFirstElectionTimeoutDuration(
+        ozoneConf, properties, ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT);
   }
 
   /**
@@ -195,6 +196,12 @@ public final class RatisUtil {
             ozoneConf.getInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP,
                     ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
+
+    // This avoids writing commit metadata to Raft Log, which can be used to recover the
+    // commit index even if a majority of servers are dead. We don't need this for StorageContainerManager,
+    // disabling this will avoid the additional disk IO.
+    Log.setLogMetadataEnabled(properties, false);
+
     return logAppenderQueueByteLimit;
   }
 
@@ -235,7 +242,7 @@ public final class RatisUtil {
   }
 
   public static void checkRatisException(IOException e, String port,
-      String scmId) throws ServiceException {
+      String scmId, String hostname, String roleType) throws ServiceException {
     if (SCMHAUtils.isNonRetriableException(e)) {
       throw new ServiceException(new NonRetriableException(e));
     } else if (SCMHAUtils.isRetriableWithNoFailoverException(e)) {
@@ -245,7 +252,7 @@ public final class RatisUtil {
           (NotLeaderException) SCMHAUtils.getNotLeaderException(e);
       throw new ServiceException(ServerNotLeaderException
           .convertToNotLeaderException(nle,
-              SCMRatisServerImpl.getSelfPeerId(scmId), port));
+              SCMRatisServerImpl.getSelfPeerId(scmId), port, hostname, roleType));
     } else if (e instanceof SCMSecurityException) {
       // For NOT_A_PRIMARY_SCM error client needs to retry on next SCM.
       // GetSCMCertificate call can happen on non-leader SCM and only an

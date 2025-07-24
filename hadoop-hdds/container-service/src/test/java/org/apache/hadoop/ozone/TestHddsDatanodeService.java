@@ -34,10 +34,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -99,7 +99,7 @@ public class TestHddsDatanodeService {
     conf.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
 
     String volumeDir = testDir + OZONE_URI_DELIMITER + "disk1";
-    conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeDir);
   }
 
   @ParameterizedTest
@@ -146,6 +146,7 @@ public class TestHddsDatanodeService {
     service.stop();
     service.join();
     service.close();
+    DefaultMetricsSystem.shutdown();
 
     deletedContainersAfterShutdown =
         hddsVolume.getDeletedContainerDir().listFiles();

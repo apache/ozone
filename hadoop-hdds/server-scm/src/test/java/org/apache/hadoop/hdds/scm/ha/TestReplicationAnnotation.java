@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -43,7 +42,6 @@ import org.junit.jupiter.api.Test;
  * Tests on {@link org.apache.hadoop.hdds.scm.metadata.Replicate}.
  */
 public class TestReplicationAnnotation {
-  private SCMHAInvocationHandler scmhaInvocationHandler;
   private SCMRatisServer scmRatisServer;
 
   @BeforeEach
@@ -118,20 +116,16 @@ public class TestReplicationAnnotation {
       public RaftPeerId getLeaderId() {
         return RaftPeerId.valueOf(UUID.randomUUID().toString());
       }
+
     };
   }
 
   @Test
   public void testReplicateAnnotationBasic() throws Throwable {
 
-    scmhaInvocationHandler = new SCMHAInvocationHandler(
-        RequestType.CONTAINER, null, scmRatisServer);
+    ContainerStateManager proxy = scmRatisServer.getProxyHandler(RequestType.CONTAINER,
+        ContainerStateManager.class, null);
 
-    ContainerStateManager proxy =
-        (ContainerStateManager) Proxy.newProxyInstance(
-            SCMHAInvocationHandler.class.getClassLoader(),
-            new Class<?>[]{ContainerStateManager.class},
-            scmhaInvocationHandler);
     IOException e =
         assertThrows(IOException.class,
             () -> proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance()));

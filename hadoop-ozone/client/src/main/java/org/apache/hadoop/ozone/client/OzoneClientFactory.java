@@ -50,13 +50,12 @@ public final class OzoneClientFactory {
   private static final Logger LOG = LoggerFactory.getLogger(
       OzoneClientFactory.class);
 
+  private static final LeakDetector OZONE_CLIENT_LEAK_DETECTOR = new LeakDetector("OzoneClientObject");
+
   /**
    * Private constructor, class is not meant to be initialized.
    */
   private OzoneClientFactory() { }
-
-  private static final LeakDetector OZONE_CLIENT_LEAK_DETECTOR =
-      new LeakDetector("OzoneClientObject");
 
   public static UncheckedAutoCloseable track(AutoCloseable object) {
     final Class<?> clazz = object.getClass();
@@ -65,11 +64,6 @@ public final class OzoneClientFactory {
         () -> HddsUtils.reportLeak(clazz,
             HddsUtils.formatStackTrace(stackTrace, 4), LOG));
   }
-
-  public static Logger getLogger() {
-    return LOG;
-  }
-
 
   /**
    * Constructs and return an OzoneClient with default configuration.

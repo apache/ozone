@@ -18,10 +18,11 @@
 package org.apache.hadoop.ozone.shell.snapshot;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.Iterator;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.shell.Handler;
+import org.apache.hadoop.ozone.shell.ListPaginationOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import picocli.CommandLine;
@@ -37,16 +38,19 @@ public class ListSnapshotDiffHandler extends Handler {
   @CommandLine.Mixin
   private BucketUri snapshotPath;
 
-  @CommandLine.Option(names = {"-s", "--status"},
+  @CommandLine.Option(names = {"--job-status"},
       description = "List jobs based on status.\n" +
       "Accepted values are: queued, in_progress, done, failed, rejected",
       defaultValue = "in_progress")
   private String jobStatus;
 
-  @CommandLine.Option(names = {"-a", "--all"},
+  @CommandLine.Option(names = {"--all-status"},
       description = "List all jobs regardless of status.",
       defaultValue = "false")
-  private boolean listAll;
+  private boolean listAllStatus;
+
+  @CommandLine.Mixin
+  private ListPaginationOptions listOptions;
 
   @Override
   protected OzoneAddress getAddress() {
@@ -54,21 +58,17 @@ public class ListSnapshotDiffHandler extends Handler {
   }
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException {
-
+  protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
 
-    List<OzoneSnapshotDiff> jobList =
-        client.getObjectStore().listSnapshotDiffJobs(
-            volumeName, bucketName, jobStatus, listAll);
+    Iterator<OzoneSnapshotDiff> iterator = client.getObjectStore()
+        .listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAllStatus, listOptions.getStartItem());
 
-    int counter = printAsJsonArray(jobList.iterator(),
-        jobList.size());
+    int counter = printAsJsonArray(iterator, listOptions.getLimit());
+
     if (isVerbose()) {
-      System.out.printf("Found : %d snapshot diff jobs for o3://%s/ %s ",
-          counter, volumeName, bucketName);
+      System.out.printf("Found : %d snapshot diff jobs for o3://%s/ %s ", counter, volumeName, bucketName);
     }
   }
 }

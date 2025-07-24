@@ -67,10 +67,10 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.api.types.KeyEntityInfoProtoWrapper;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.ListKeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
@@ -82,12 +82,12 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithLegacy;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithOBS;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -153,26 +153,12 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final String KEY_TWELVE = "key12";
   private static final String KEY_THIRTEEN = "dir4/dir7/key13";
 
-  private static final String KEY_FOURTEEN = "dir8/key14";
-  private static final String KEY_FIFTEEN = "dir8/key15";
-  private static final String KEY_SIXTEEN = "dir9/key16";
-  private static final String KEY_SEVENTEEN = "dir9/key17";
-  private static final String KEY_EIGHTEEN = "dir8/key18";
-  private static final String KEY_NINETEEN = "dir8/key19";
-
   private static final String FILE_EIGHT = "key8";
   private static final String FILE_NINE = "key9";
   private static final String FILE_TEN = "key10";
   private static final String FILE_ELEVEN = "key11";
   private static final String FILE_TWELVE = "key12";
   private static final String FILE_THIRTEEN = "key13";
-
-  private static final String FILE_FOURTEEN = "key14";
-  private static final String FILE_FIFTEEN = "key15";
-  private static final String FILE_SIXTEEN = "key16";
-  private static final String FILE_SEVENTEEN = "key17";
-  private static final String FILE_EIGHTEEN = "key18";
-  private static final String FILE_NINETEEN = "key19";
 
   private static final long PARENT_OBJECT_ID_ZERO = 0L;
   private static final long VOLUME_ONE_OBJECT_ID = 1L;
@@ -217,7 +203,6 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final long KEY_TWENTY_TWO_OBJECT_ID = 37L;
   private static final long KEY_TWENTY_THREE_OBJECT_ID = 38L;
   private static final long KEY_TWENTY_FOUR_OBJECT_ID = 39L;
-  private static final long KEY_TWENTY_FIVE_OBJECT_ID = 42L;
 
   private static final long EMPTY_OBS_BUCKET_OBJECT_ID = 40L;
   private static final long EMPTY_FSO_BUCKET_OBJECT_ID = 41L;
@@ -243,7 +228,6 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private static final long KEY_SEVENTEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_EIGHTEEN_SIZE = OzoneConsts.KB + 1; // bin 1
   private static final long KEY_NINETEEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
-  private static final long KEY_TWENTY_SIZE = OzoneConsts.KB + 1; // bin 1
 
   private static final String OBS_BUCKET_PATH = "/volume1/obs-bucket";
   private static final String FSO_BUCKET_PATH = "/volume1/fso-bucket";
@@ -321,13 +305,13 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     setUpOmData();
     nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, ozoneConfiguration, 10);
     nsSummaryTaskWithOBS  = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, 10);
     nsSummaryTaskWithFSO  = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager,
-        reconOMMetadataManager, ozoneConfiguration);
+        reconOMMetadataManager, 10);
     reconNamespaceSummaryManager.clearNSSummaryTable();
     nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
@@ -403,8 +387,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     when(tableMock.getName()).thenReturn("KeyTable");
     when(omMetadataManagerMock.getKeyTable(getBucketLayout()))
         .thenReturn(tableMock);
-    ContainerKeyMapperTask containerKeyMapperTask =
-        new ContainerKeyMapperTask(reconContainerMetadataManager,
+    ContainerKeyMapperTaskOBS containerKeyMapperTask =
+        new ContainerKeyMapperTaskOBS(reconContainerMetadataManager,
             ozoneConfiguration);
     containerKeyMapperTask.reprocess(reconOMMetadataManager);
 
@@ -1405,7 +1389,6 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         keyInsightInfoResp.getRepeatedOmKeyInfoList().get(3).getOmKeyInfoList().get(0).getKeyName());
   }
 
-
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
                                  String keyName, boolean isFile) {
     return new OmKeyInfo.Builder()
@@ -1575,7 +1558,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "", 1000);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(6, listKeysResponse.getKeys().size());
-    KeyEntityInfoProtoWrapper keyEntityInfo = listKeysResponse.getKeys().get(0);
+    ReconBasicOmKeyInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/11/file1", keyEntityInfo.getKey());
     assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
@@ -1607,7 +1590,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "", 2);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getKeys().size());
-    KeyEntityInfoProtoWrapper keyEntityInfo = listKeysResponse.getKeys().get(0);
+    ReconBasicOmKeyInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/11/testfile", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
@@ -1649,7 +1632,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "", 2);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getKeys().size());
-    KeyEntityInfoProtoWrapper keyEntityInfo = listKeysResponse.getKeys().get(0);
+    ReconBasicOmKeyInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/11/testfile", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
@@ -1691,7 +1674,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "", 1);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(1, listKeysResponse.getKeys().size());
-    KeyEntityInfoProtoWrapper keyEntityInfo = listKeysResponse.getKeys().get(0);
+    ReconBasicOmKeyInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/11/file1", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
@@ -1742,7 +1725,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "", 3);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(3, listKeysResponse.getKeys().size());
-    KeyEntityInfoProtoWrapper keyEntityInfo = listKeysResponse.getKeys().get(0);
+    ReconBasicOmKeyInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket2/dir8/file1", keyEntityInfo.getPath());
     assertEquals("/1/30/32/file1", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
@@ -1775,7 +1758,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "", 2);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getKeys().size());
-    KeyEntityInfoProtoWrapper keyEntityInfo = listKeysResponse.getKeys().get(0);
+    ReconBasicOmKeyInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/dir2/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/12/testfile", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
@@ -1808,7 +1791,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "", 2);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getKeys().size());
-    KeyEntityInfoProtoWrapper keyEntityInfo = listKeysResponse.getKeys().get(0);
+    ReconBasicOmKeyInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/fso-bucket/dir1/dir2/dir3/file1", keyEntityInfo.getPath());
     assertEquals("/1/10/13/testfile", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());
@@ -1895,7 +1878,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "", 2);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
     assertEquals(2, listKeysResponse.getKeys().size());
-    KeyEntityInfoProtoWrapper keyEntityInfo = listKeysResponse.getKeys().get(0);
+    ReconBasicOmKeyInfo keyEntityInfo = listKeysResponse.getKeys().get(0);
     assertEquals("volume1/obs-bucket/key1", keyEntityInfo.getPath());
     assertEquals("/volume1/obs-bucket/key1/key2", listKeysResponse.getLastKey());
     assertEquals("RATIS", keyEntityInfo.getReplicationConfig().getReplicationType().toString());

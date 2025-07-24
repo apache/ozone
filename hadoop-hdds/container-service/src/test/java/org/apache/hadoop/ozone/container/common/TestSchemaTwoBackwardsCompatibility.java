@@ -18,12 +18,13 @@
 package org.apache.hadoop.ozone.container.common;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.apache.commons.lang3.RandomStringUtils.secure;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -110,7 +111,7 @@ public class TestSchemaTwoBackwardsCompatibility {
   private static final int BLOCKS_PER_TXN = 2;
   private static final int CHUNK_LENGTH = 1024;
   private static final byte[] SAMPLE_DATA =
-      randomAlphanumeric(1024).getBytes(UTF_8);
+      secure().nextAlphanumeric(1024).getBytes(UTF_8);
 
   @BeforeEach
   public void setup() throws Exception {
@@ -128,9 +129,9 @@ public class TestSchemaTwoBackwardsCompatibility {
         StorageVolume.VolumeType.DATA_VOLUME, null);
 
     blockManager = new BlockManagerImpl(conf);
-    chunkManager = new FilePerBlockStrategy(true, blockManager, volumeSet);
+    chunkManager = new FilePerBlockStrategy(true, blockManager);
 
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
     keyValueHandler = ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet);
     ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);

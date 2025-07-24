@@ -115,6 +115,7 @@ public class TestNativeRSRawCoder extends TestRSRawCoderBase {
     testCodingWithErasingTooMany();
   }
 
+  @Override
   @Test
   public void testCoding10x4ErasingD0P0() {
     prepare(null, 10, 4, new int[] {0}, new int[] {0});

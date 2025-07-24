@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.hadoop.ozone.recon.codegen.SqlDbUtils.DERBY_DRIVER_CLASS;
+import static org.apache.ozone.recon.schema.SqlDbUtils.DERBY_DRIVER_CLASS;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.google.inject.AbstractModule;
@@ -36,7 +36,7 @@ import java.util.List;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule;
 import org.apache.hadoop.ozone.recon.ReconSchemaManager;
-import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
+import org.apache.ozone.recon.schema.ReconSchemaGenerationModule;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;

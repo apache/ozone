@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
@@ -55,12 +54,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
   private final Map<ContainerLayoutVersion, ChunkManager> handlers
       = new EnumMap<>(ContainerLayoutVersion.class);
 
-  ChunkManagerDispatcher(boolean sync, BlockManager manager,
-                         VolumeSet volSet) {
+  ChunkManagerDispatcher(boolean sync, BlockManager manager) {
     handlers.put(FILE_PER_CHUNK,
-        new FilePerChunkStrategy(sync, manager, volSet));
+        new FilePerChunkStrategy(sync, manager));
     handlers.put(FILE_PER_BLOCK,
-        new FilePerBlockStrategy(sync, manager, volSet));
+        new FilePerBlockStrategy(sync, manager));
   }
 
   @Override
@@ -110,7 +108,7 @@ public class ChunkManagerDispatcher implements ChunkManager {
         .readChunk(container, blockID, info, dispatcherContext);
 
     Preconditions.checkState(data != null);
-    container.getContainerData().updateReadStats(info.getLen());
+    container.getContainerData().getStatistics().updateRead(info.getLen());
 
     return data;
   }

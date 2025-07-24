@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
@@ -37,9 +36,8 @@ public class ReconStaleNodeHandler extends StaleNodeHandler {
 
   public ReconStaleNodeHandler(NodeManager nodeManager,
                                  PipelineManager pipelineManager,
-                                 OzoneConfiguration conf,
                                  PipelineSyncTask pipelineSyncTask) {
-    super(nodeManager, pipelineManager, conf);
+    super(nodeManager, pipelineManager);
     this.pipelineSyncTask = pipelineSyncTask;
   }
 

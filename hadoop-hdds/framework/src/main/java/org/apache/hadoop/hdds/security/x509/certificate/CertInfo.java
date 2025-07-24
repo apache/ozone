@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.security.x509.certificate;
 
 import jakarta.annotation.Nonnull;
-import java.io.IOException;
 import java.io.Serializable;
+import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Comparator;
 import java.util.Objects;
@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CertInfoProto;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 
@@ -40,10 +41,6 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
       CertInfo::getProtobuf,
       CertInfo.class);
 
-  public static Codec<CertInfo> getCodec() {
-    return CODEC;
-  }
-
   static final Comparator<CertInfo> COMPARATOR
       = Comparator.comparingLong(CertInfo::getTimestamp);
 
@@ -56,27 +53,38 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
     this.timestamp = timestamp;
   }
 
-  public static CertInfo fromProtobuf(CertInfoProto info) throws IOException {
+  public static Codec<CertInfo> getCodec() {
+    return CODEC;
+  }
+
+  public static CertInfo fromProtobuf(CertInfoProto info) throws CodecException {
+    final X509Certificate cert;
+    try {
+      cert = CertificateCodec.getX509Certificate(info.getX509Certificate());
+    } catch (CertificateException e) {
+      throw new CodecException("Failed to getX509Certificate from " + info.getX509Certificate(), e);
+    }
     return new CertInfo.Builder()
-        .setX509Certificate(info.getX509Certificate())
+        .setX509Certificate(cert)
         .setTimestamp(info.getTimestamp())
         .build();
   }
 
-  public CertInfoProto getProtobuf() throws SCMSecurityException {
+  public CertInfoProto getProtobuf() throws CodecException {
+    final String cert;
+    try {
+      cert = CertificateCodec.getPEMEncodedString(getX509Certificate());
+    } catch (SCMSecurityException e) {
+      throw new CodecException("Failed to getX509Certificate from " + getX509Certificate(), e);
+    }
     return CertInfoProto.newBuilder()
-        .setX509Certificate(getX509CertificatePEMEncodedString())
+        .setX509Certificate(cert)
         .setTimestamp(getTimestamp())
         .build();
   }
 
   public X509Certificate getX509Certificate() {
     return x509Certificate;
-  }
-
-  public String getX509CertificatePEMEncodedString()
-      throws SCMSecurityException {
-    return CertificateCodec.getPEMEncodedString(getX509Certificate());
   }
 
   public long getTimestamp() {
@@ -139,12 +147,6 @@ public final class CertInfo implements Comparable<CertInfo>, Serializable {
     public Builder setX509Certificate(X509Certificate x509Certificate) {
       this.x509Certificate = x509Certificate;
       return this;
-    }
-
-    public Builder setX509Certificate(String x509Certificate)
-        throws IOException {
-      return setX509Certificate(CertificateCodec.getX509Certificate(
-          x509Certificate, CertificateCodec::toIOException));
     }
 
     public Builder setTimestamp(long timestamp) {

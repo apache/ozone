@@ -21,12 +21,10 @@ import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.time.LocalDate;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -59,7 +57,7 @@ public class TestBucketPut {
   @Test
   public void testBucketFailWithAuthHeaderMissing() throws Exception {
     try {
-      bucketEndpoint.put(bucketName, null, null, null);
+      bucketEndpoint.put(bucketName, null, null);
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
       assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
@@ -68,13 +66,13 @@ public class TestBucketPut {
 
   @Test
   public void testBucketPut() throws Exception {
-    Response response = bucketEndpoint.put(bucketName, null, null, null);
+    Response response = bucketEndpoint.put(bucketName, null, null);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getLocation());
 
     // Create-bucket on an existing bucket fails
     OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
-        bucketName, null, null, null));
+        bucketName, null, null));
     assertEquals(HTTP_CONFLICT, e.getHttpCode());
     assertEquals(BUCKET_ALREADY_EXISTS.getCode(), e.getCode());
   }
@@ -82,24 +80,10 @@ public class TestBucketPut {
   @Test
   public void testBucketFailWithInvalidHeader() throws Exception {
     try {
-      bucketEndpoint.put(bucketName, null, null, null);
+      bucketEndpoint.put(bucketName, null, null);
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
       assertEquals(MALFORMED_HEADER.getCode(), ex.getCode());
     }
   }
-
-  /**
-   * Generate dummy auth header.
-   * @return auth header.
-   */
-  private String generateAuthHeader() {
-    LocalDate now = LocalDate.now();
-    String curDate = DATE_FORMATTER.format(now);
-    return  "AWS4-HMAC-SHA256 " +
-        "Credential=ozone/" + curDate + "/us-east-1/s3/aws4_request, " +
-        "SignedHeaders=host;range;x-amz-date, " +
-        "Signature=fe5f80f77d5fa3beca038a248ff027";
-  }
-
 }

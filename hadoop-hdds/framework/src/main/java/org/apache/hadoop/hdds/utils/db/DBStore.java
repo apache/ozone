@@ -17,14 +17,15 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.Closeable;
 import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * The DBStore interface provides the ability to create Tables, which store
@@ -34,65 +35,53 @@ import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
  *
  */
 @InterfaceStability.Evolving
-public interface DBStore extends Closeable, BatchOperationHandler {
+public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
 
   /**
    * Gets an existing TableStore.
    *
    * @param name - Name of the TableStore to get
    * @return - TableStore.
-   * @throws IOException on Failure
    */
-  Table<byte[], byte[]> getTable(String name) throws IOException;
+  Table<byte[], byte[]> getTable(String name) throws RocksDatabaseException;
 
+  /** The same as getTable(name, keyCodec, valueCodec, CacheType.PARTIAL_CACHE). */
+  default <KEY, VALUE> TypedTable<KEY, VALUE> getTable(String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec)
+      throws RocksDatabaseException, CodecException {
+    return getTable(name, keyCodec, valueCodec, CacheType.PARTIAL_CACHE);
+  }
 
   /**
-   * Gets an existing TableStore with implicit key/value conversion and
-   * with default cache type for cache. Default cache type is partial cache.
+   * Gets table store with implict key/value conversion.
    *
-   * @param name - Name of the TableStore to get
-   * @param keyType
-   * @param valueType
-   * @return - TableStore.
-   * @throws IOException on Failure
+   * @param name - table name
+   * @param keyCodec - key codec
+   * @param valueCodec - value codec
+   * @param cacheType - cache type
+   * @return - Table Store
    */
-  <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType) throws IOException;
-
-  /**
-   * Gets an existing TableStore with implicit key/value conversion and
-   * with specified cache type.
-   * @param name - Name of the TableStore to get
-   * @param keyType
-   * @param valueType
-   * @param cacheType
-   * @return - TableStore.
-   * @throws IOException
-   */
-  <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType,
-      TableCache.CacheType cacheType) throws IOException;
+  <KEY, VALUE> TypedTable<KEY, VALUE> getTable(
+      String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, TableCache.CacheType cacheType)
+      throws RocksDatabaseException, CodecException;
 
   /**
    * Lists the Known list of Tables in a DB.
    *
    * @return List of Tables, in case of Rocks DB and LevelDB we will return at
    * least one entry called DEFAULT.
-   * @throws IOException on Failure
    */
-  ArrayList<Table> listTables() throws IOException;
+  List<Table<?, ?>> listTables();
 
   /**
    * Flush the DB buffer onto persistent storage.
-   * @throws IOException
    */
-  void flushDB() throws IOException;
+  void flushDB() throws RocksDatabaseException;
 
   /**
    * Flush the outstanding I/O operations of the DB.
    * @param sync if true will sync the outstanding I/Os to the disk.
    */
-  void flushLog(boolean sync) throws IOException;
+  void flushLog(boolean sync) throws RocksDatabaseException;
 
   /**
    * Returns the RocksDB checkpoint differ.
@@ -101,59 +90,30 @@ public interface DBStore extends Closeable, BatchOperationHandler {
 
   /**
    * Compact the entire database.
-   *
-   * @throws IOException on Failure
    */
-  void compactDB() throws IOException;
+  void compactDB() throws RocksDatabaseException;
 
   /**
-   * Moves a key from the Source Table to the destination Table.
+   * Compact the specific table.
    *
-   * @param key - Key to move.
-   * @param source - Source Table.
-   * @param dest - Destination Table.
-   * @throws IOException on Failure
+   * @param tableName - Name of the table to compact.
    */
-  <KEY, VALUE> void move(KEY key, Table<KEY, VALUE> source,
-                         Table<KEY, VALUE> dest) throws IOException;
+  void compactTable(String tableName) throws RocksDatabaseException;
 
   /**
-   * Moves a key from the Source Table to the destination Table and updates the
-   * destination to the new value.
+   * Compact the specific table.
    *
-   * @param key - Key to move.
-   * @param value - new value to write to the destination table.
-   * @param source - Source Table.
-   * @param dest - Destination Table.
-   * @throws IOException on Failure
+   * @param tableName - Name of the table to compact.
+   * @param options - Options for the compact operation.
    */
-  <KEY, VALUE> void move(KEY key, VALUE value, Table<KEY, VALUE> source,
-                         Table<KEY, VALUE> dest)
-      throws IOException;
-
-  /**
-   * Moves a key from the Source Table to the destination Table and updates the
-   * destination with the new key name and value.
-   * This is similar to deleting an entry in one table and adding an entry in
-   * another table, here it is done atomically.
-   *
-   * @param sourceKey - Key to move.
-   * @param destKey - Destination key name.
-   * @param value - new value to write to the destination table.
-   * @param source - Source Table.
-   * @param dest - Destination Table.
-   * @throws IOException on Failure
-   */
-  <KEY, VALUE> void move(KEY sourceKey, KEY destKey, VALUE value,
-                         Table<KEY, VALUE> source, Table<KEY, VALUE> dest)
-      throws IOException;
+  void compactTable(String tableName, ManagedCompactRangeOptions options) throws RocksDatabaseException;
 
   /**
    * Returns an estimated count of keys in this DB.
    *
    * @return long, estimate of keys in the DB.
    */
-  long getEstimatedKeyCount() throws IOException;
+  long getEstimatedKeyCount() throws RocksDatabaseException;
 
 
   /**
@@ -162,7 +122,7 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    * @return An object that encapsulates the checkpoint information along with
    * location.
    */
-  DBCheckpoint getCheckpoint(boolean flush) throws IOException;
+  DBCheckpoint getCheckpoint(boolean flush) throws RocksDatabaseException;
 
   /**
    * Get current snapshot of DB store as an artifact stored on
@@ -170,7 +130,7 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    * @return An object that encapsulates the checkpoint information along with
    * location.
    */
-  DBCheckpoint getCheckpoint(String parentDir, boolean flush) throws IOException;
+  DBCheckpoint getCheckpoint(String parentDir, boolean flush) throws RocksDatabaseException;
 
   /**
    * Get DB Store location.
@@ -189,13 +149,13 @@ public interface DBStore extends Closeable, BatchOperationHandler {
    * Get data written to DB since a specific sequence number.
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
-      throws IOException;
+      throws SequenceNumberNotFoundException;
 
   /**
    * Get limited data written to DB since a specific sequence number.
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
-      throws IOException;
+      throws SequenceNumberNotFoundException;
 
   /**
    * Return if the underlying DB is closed. This call is thread safe.

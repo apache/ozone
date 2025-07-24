@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.security;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,28 +30,18 @@ import org.slf4j.LoggerFactory;
 /**
  * SecretStore for Ozone Master.
  */
-public class OzoneSecretStore implements Closeable {
+public class OzoneSecretStore {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneSecretStore.class);
   private OMMetadataManager omMetadataManager;
-  @Override
-  public void close() throws IOException {
-    if (omMetadataManager != null) {
-      try {
-        omMetadataManager.getDelegationTokenTable().close();
-      } catch (Exception e) {
-        throw new IOException("Error while closing OzoneSecretStore.", e);
-      }
-    }
-  }
-
 
   /**
    * Support class to maintain state of OzoneSecretStore.
    */
   public static class OzoneManagerSecretState<T> {
     private Map<T, Long> tokenState = new HashMap<>();
+
     public Map<T, Long> getTokenState() {
       return tokenState;
     }

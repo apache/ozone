@@ -25,10 +25,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconSafeModeManager;
@@ -48,9 +48,8 @@ public class ReconSafeModeMgrTask {
   private ContainerManager containerManager;
   private ReconNodeManager nodeManager;
   private ReconSafeModeManager safeModeManager;
-  private List<DatanodeDetails> allNodes;
+  private List<DatanodeInfo> allNodes;
   private List<ContainerInfo> containers;
-  private OzoneConfiguration ozoneConfiguration;
   private final long interval;
   private final long dnHBInterval;
 
@@ -65,7 +64,6 @@ public class ReconSafeModeMgrTask {
     this.nodeManager = nodeManager;
     this.allNodes = nodeManager.getAllNodes();
     this.containers = containerManager.getContainers();
-    this.ozoneConfiguration = ozoneConfiguration;
     interval = reconTaskConfig.getSafeModeWaitThreshold().toMillis();
     dnHBInterval = ozoneConfiguration.getTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
@@ -84,23 +82,26 @@ public class ReconSafeModeMgrTask {
       }
       // Exceeded safe mode grace period. Exit safe mode
       if (safeModeManager.getInSafeMode()) {
+        LOG.warn("Recon could not exit safe mode after {} ms. Exiting safe mode anyway. " +
+            "Please check for any unexpected startup issues", timeElapsed);
         safeModeManager.setInSafeMode(false);
+      } else {
+        LOG.info("Recon exited safe mode after {} ms.", timeElapsed);
       }
     } catch (Throwable t) {
-      LOG.error("Exception in Missing Container task Thread.", t);
+      LOG.error("Exception in ReconSafeModeMgrTask Thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
     }
   }
 
-  private void tryReconExitSafeMode()
-      throws InterruptedException {
+  private void tryReconExitSafeMode() {
       // Recon starting first time
-    if (null == allNodes || allNodes.size() == 0) {
+    if (null == allNodes || allNodes.isEmpty()) {
       return;
     }
-    if (null == containers || containers.size() == 0) {
+    if (null == containers || containers.isEmpty()) {
       return;
     }
     final Set<ContainerID> currentContainersInAllDatanodes =
@@ -110,7 +111,7 @@ public class ReconSafeModeMgrTask {
         currentContainersInAllDatanodes.addAll(
             nodeManager.getContainers(node));
       } catch (NodeNotFoundException e) {
-        LOG.error("{} node not found.", node.getUuid());
+        LOG.error("Node not found: {}", node);
       }
     });
     if (containers.size() == currentContainersInAllDatanodes.size()) {

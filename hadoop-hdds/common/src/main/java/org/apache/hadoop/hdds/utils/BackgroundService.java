@@ -37,18 +37,20 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BackgroundService {
 
-  @VisibleForTesting
-  public static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(BackgroundService.class);
 
   // Executor to launch child tasks
-  private final ScheduledThreadPoolExecutor exec;
-  private final ThreadGroup threadGroup;
+  private ScheduledThreadPoolExecutor exec;
+  private ThreadGroup threadGroup;
   private final String serviceName;
-  private final long interval;
-  private final long serviceTimeoutInNanos;
-  private final TimeUnit unit;
+  private long interval;
+  private volatile long serviceTimeoutInNanos;
+  private TimeUnit unit;
+  private final int threadPoolSize;
+  private final String threadNamePrefix;
   private final PeriodicalTask service;
+  private CompletableFuture<Void> future;
 
   public BackgroundService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout) {
@@ -63,15 +65,15 @@ public abstract class BackgroundService {
     this.serviceName = serviceName;
     this.serviceTimeoutInNanos = TimeDuration.valueOf(serviceTimeout, unit)
             .toLong(TimeUnit.NANOSECONDS);
-    threadGroup = new ThreadGroup(serviceName);
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setThreadFactory(r -> new Thread(threadGroup, r))
-        .setDaemon(true)
-        .setNameFormat(threadNamePrefix + serviceName + "#%d")
-        .build();
-    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(
-        threadPoolSize, threadFactory);
+    this.threadPoolSize = threadPoolSize;
+    this.threadNamePrefix = threadNamePrefix;
+    initExecutorAndThreadGroup();
     service = new PeriodicalTask();
+    this.future = CompletableFuture.completedFuture(null);
+  }
+
+  protected CompletableFuture<Void> getFuture() {
+    return future;
   }
 
   @VisibleForTesting
@@ -90,6 +92,11 @@ public abstract class BackgroundService {
     exec.setCorePoolSize(size);
   }
 
+  public synchronized void setServiceTimeoutInNanos(long newTimeout) {
+    LOG.info("{} timeout is set to {} {}", serviceName, newTimeout, TimeUnit.NANOSECONDS.name().toLowerCase());
+    this.serviceTimeoutInNanos = newTimeout;
+  }
+
   @VisibleForTesting
   public int getThreadCount() {
     return threadGroup.activeCount();
@@ -98,15 +105,28 @@ public abstract class BackgroundService {
   @VisibleForTesting
   public void runPeriodicalTaskNow() throws Exception {
     BackgroundTaskQueue tasks = getTasks();
-    while (tasks.size() > 0) {
+    while (!tasks.isEmpty()) {
       tasks.poll().call();
     }
   }
 
-
   // start service
-  public void start() {
+  public synchronized void start() {
+    if (exec == null || exec.isShutdown() || exec.isTerminated()) {
+      initExecutorAndThreadGroup();
+    }
+    LOG.info("Starting service {} with interval {} {}", serviceName,
+        interval, unit.name().toLowerCase());
     exec.scheduleWithFixedDelay(service, 0, interval, unit);
+  }
+
+  protected synchronized void setInterval(long newInterval, TimeUnit newUnit) {
+    this.interval = newInterval;
+    this.unit = newUnit;
+  }
+
+  protected synchronized long getIntervalMillis() {
+    return this.unit.toMillis(interval);
   }
 
   public abstract BackgroundTaskQueue getTasks();
@@ -131,9 +151,9 @@ public abstract class BackgroundService {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
 
-      while (tasks.size() > 0) {
+      while (!tasks.isEmpty()) {
         BackgroundTask task = tasks.poll();
-        CompletableFuture.runAsync(() -> {
+        future = future.thenCombine(CompletableFuture.runAsync(() -> {
           long startTime = System.nanoTime();
           try {
             BackgroundTaskResult result = task.call();
@@ -152,7 +172,7 @@ public abstract class BackgroundService {
                   serviceName, endTime - startTime, serviceTimeoutInNanos);
             }
           }
-        }, exec);
+        }, exec), (Void1, Void) -> null);
       }
     }
   }
@@ -173,5 +193,15 @@ public abstract class BackgroundService {
     if (threadGroup.activeCount() == 0 && !threadGroup.isDestroyed()) {
       threadGroup.destroy();
     }
+  }
+
+  private void initExecutorAndThreadGroup() {
+    threadGroup = new ThreadGroup(serviceName);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setThreadFactory(r -> new Thread(threadGroup, r))
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + serviceName + "#%d")
+        .build();
+    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
   }
 }

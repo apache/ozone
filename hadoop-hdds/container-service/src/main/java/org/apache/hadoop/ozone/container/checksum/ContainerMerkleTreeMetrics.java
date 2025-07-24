@@ -30,21 +30,6 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 public class ContainerMerkleTreeMetrics {
   private static final String METRICS_SOURCE_NAME = ContainerMerkleTreeMetrics.class.getSimpleName();
 
-  public static ContainerMerkleTreeMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    MetricsSource source = ms.getSource(METRICS_SOURCE_NAME);
-    if (source != null) {
-      ms.unregisterSource(METRICS_SOURCE_NAME);
-    }
-    return ms.register(METRICS_SOURCE_NAME, "Container Merkle Tree Metrics",
-        new ContainerMerkleTreeMetrics());
-  }
-
-  public static void unregister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(METRICS_SOURCE_NAME);
-  }
-
   @Metric(about = "Number of Merkle tree write failure")
   private MutableCounterLong numMerkleTreeWriteFailure;
 
@@ -60,6 +45,15 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Number of container diff that requires repair")
   private MutableCounterLong numRepairContainerDiff;
 
+  @Metric(about = "Number of missing blocks identified during container reconciliation")
+  private MutableCounterLong numMissingBlocksIdentified;
+
+  @Metric(about = "Number of missing chunks identified during container reconciliation")
+  private MutableCounterLong numMissingChunksIdentified;
+
+  @Metric(about = "Number of corrupt chunks identified during container reconciliation")
+  private MutableCounterLong numCorruptChunksIdentified;
+
   @Metric(about = "Merkle tree write latency")
   private MutableRate merkleTreeWriteLatencyNS;
 
@@ -71,6 +65,21 @@ public class ContainerMerkleTreeMetrics {
 
   @Metric(about = "Merkle tree diff latency")
   private MutableRate merkleTreeDiffLatencyNS;
+
+  public static ContainerMerkleTreeMetrics create() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    MetricsSource source = ms.getSource(METRICS_SOURCE_NAME);
+    if (source != null) {
+      ms.unregisterSource(METRICS_SOURCE_NAME);
+    }
+    return ms.register(METRICS_SOURCE_NAME, "Container Merkle Tree Metrics",
+        new ContainerMerkleTreeMetrics());
+  }
+
+  public static void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(METRICS_SOURCE_NAME);
+  }
 
   public void incrementMerkleTreeWriteFailures() {
     this.numMerkleTreeWriteFailure.incr();
@@ -90,6 +99,18 @@ public class ContainerMerkleTreeMetrics {
 
   public void incrementRepairContainerDiffs() {
     this.numRepairContainerDiff.incr();
+  }
+
+  public void incrementMissingBlocksIdentified(long value) {
+    this.numMissingBlocksIdentified.incr(value);
+  }
+
+  public void incrementMissingChunksIdentified(long value) {
+    this.numMissingChunksIdentified.incr(value);
+  }
+
+  public void incrementCorruptChunksIdentified(long value) {
+    this.numCorruptChunksIdentified.incr(value);
   }
 
   public MutableRate getWriteContainerMerkleTreeLatencyNS() {
@@ -118,5 +139,17 @@ public class ContainerMerkleTreeMetrics {
 
   public long getMerkleTreeDiffFailure() {
     return this.numMerkleTreeDiffFailure.value();
+  }
+
+  public long getMissingBlocksIdentified() {
+    return this.numMissingBlocksIdentified.value();
+  }
+
+  public long getMissingChunksIdentified() {
+    return this.numMissingChunksIdentified.value();
+  }
+
+  public long getCorruptChunksIdentified() {
+    return this.numCorruptChunksIdentified.value();
   }
 }

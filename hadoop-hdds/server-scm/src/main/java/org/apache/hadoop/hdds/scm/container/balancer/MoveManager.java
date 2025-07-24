@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -53,56 +52,7 @@ import org.slf4j.LoggerFactory;
 public final class MoveManager implements
     ContainerReplicaPendingOpsSubscriber {
 
-  /**
-   * Various move return results.
-   */
-  public enum MoveResult {
-    // both replication and deletion are completed
-    COMPLETED,
-    // RM is not ratis leader
-    FAIL_LEADER_NOT_READY,
-    // replication fail because the container does not exist in src
-    REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
-    // replication fail because the container exists in target
-    REPLICATION_FAIL_EXIST_IN_TARGET,
-    // replication fail because the container is not cloesed
-    REPLICATION_FAIL_CONTAINER_NOT_CLOSED,
-    // replication fail because the container is in inflightDeletion
-    REPLICATION_FAIL_INFLIGHT_DELETION,
-    // replication fail because the container is in inflightReplication
-    REPLICATION_FAIL_INFLIGHT_REPLICATION,
-    // replication fail because of timeout
-    REPLICATION_FAIL_TIME_OUT,
-    // replication fail because of node is not in service
-    REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
-    // replication fail because node is unhealthy
-    REPLICATION_FAIL_NODE_UNHEALTHY,
-    // replication succeed, but deletion fail because of timeout
-    DELETION_FAIL_TIME_OUT,
-    // deletion fail because of node is not in service
-    DELETION_FAIL_NODE_NOT_IN_SERVICE,
-    // replication succeed, but deletion fail because because
-    // node is unhealthy
-    DELETION_FAIL_NODE_UNHEALTHY,
-    // replication succeed, but if we delete the container from
-    // the source datanode , the policy(eg, replica num or
-    // rack location) will not be satisfied, so we should not delete
-    // the container
-    DELETE_FAIL_POLICY,
-    /*
-    Container is not healthy if it has issues such as under, over, or mis
-    replication. We don't try to move replicas of such containers.
-     */
-    REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
-    //  replicas + target - src does not satisfy placement policy
-    REPLICATION_NOT_HEALTHY_AFTER_MOVE,
-    // A move is already scheduled for this container
-    FAIL_CONTAINER_ALREADY_BEING_MOVED,
-    // Unexpected error
-    FAIL_UNEXPECTED_ERROR
-  }
-
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(MoveManager.class);
 
   // TODO - Should pending ops notify under lock to allow MM to schedule a
@@ -118,8 +68,7 @@ public final class MoveManager implements
   private final ContainerManager containerManager;
   private final Clock clock;
 
-  private final Map<ContainerID,
-      Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> pendingMoves =
+  private final Map<ContainerID, MoveOperation> pendingMoves =
       new ConcurrentHashMap<>();
 
   public MoveManager(final ReplicationManager replicationManager,
@@ -132,8 +81,7 @@ public final class MoveManager implements
   /**
    * get all the pending move operations.
    */
-  public Map<ContainerID,
-      Pair<CompletableFuture<MoveResult>, MoveDataNodePair>> getPendingMove() {
+  public Map<ContainerID, MoveOperation> getPendingMove() {
     return pendingMoves;
   }
 
@@ -147,10 +95,9 @@ public final class MoveManager implements
    * @param cid Container id to which the move option is finished
    */
   private void completeMove(final ContainerID cid, final MoveResult mr) {
-    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> move =
-        pendingMoves.remove(cid);
+    MoveOperation move = pendingMoves.remove(cid);
     if (move != null) {
-      CompletableFuture<MoveResult> future = move.getLeft();
+      CompletableFuture<MoveResult> future = move.getResult();
       if (future != null && mr != null) {
         // when we know the future is null, and we want to complete
         // the move , then we set mr to null.
@@ -174,9 +121,8 @@ public final class MoveManager implements
   private void startMove(
       final ContainerInfo containerInfo, final DatanodeDetails src,
       final DatanodeDetails tgt, final CompletableFuture<MoveResult> ret) {
-    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> move =
-        pendingMoves.putIfAbsent(containerInfo.containerID(),
-            Pair.of(ret, new MoveDataNodePair(src, tgt)));
+    MoveOperation move = pendingMoves.putIfAbsent(containerInfo.containerID(),
+        new MoveOperation(ret, new MoveDataNodePair(src, tgt)));
     if (move == null) {
       // A move for this container did not exist, so send a replicate command
       try {
@@ -300,7 +246,7 @@ public final class MoveManager implements
       }
       startMove(containerInfo, src, tgt, ret);
       LOG.debug("Processed a move request for container {}, from {} to {}",
-          cid, src.getUuidString(), tgt.getUuidString());
+          cid, src, tgt);
       return ret;
     }
   }
@@ -313,10 +259,9 @@ public final class MoveManager implements
    */
   private void notifyContainerOpCompleted(ContainerReplicaOp containerReplicaOp,
       ContainerID containerID) {
-    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
-        pendingMoves.get(containerID);
-    if (pair != null) {
-      MoveDataNodePair mdnp = pair.getRight();
+    MoveOperation move = pendingMoves.get(containerID);
+    if (move != null) {
+      MoveDataNodePair mdnp = move.getMoveDataNodePair();
       PendingOpType opType = containerReplicaOp.getOpType();
       DatanodeDetails dn = containerReplicaOp.getTarget();
       if (opType.equals(PendingOpType.ADD) && mdnp.getTgt().equals(dn)) {
@@ -327,7 +272,7 @@ public final class MoveManager implements
           LOG.warn("Failed to handle successful Add for container {} being " +
               "moved from source {} to target {}.", containerID,
               mdnp.getSrc(), mdnp.getTgt(), e);
-          pair.getLeft().complete(MoveResult.FAIL_UNEXPECTED_ERROR);
+          move.getResult().complete(MoveResult.FAIL_UNEXPECTED_ERROR);
         }
       } else if (
             opType.equals(PendingOpType.DELETE) && mdnp.getSrc().equals(dn)) {
@@ -344,10 +289,9 @@ public final class MoveManager implements
    */
   private void notifyContainerOpExpired(ContainerReplicaOp containerReplicaOp,
       ContainerID containerID) {
-    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
-        pendingMoves.get(containerID);
+    MoveOperation pair = pendingMoves.get(containerID);
     if (pair != null) {
-      MoveDataNodePair mdnp = pair.getRight();
+      MoveDataNodePair mdnp = pair.getMoveDataNodePair();
       PendingOpType opType = containerReplicaOp.getOpType();
       DatanodeDetails dn = containerReplicaOp.getTarget();
       if (opType.equals(PendingOpType.ADD) && mdnp.getTgt().equals(dn)) {
@@ -363,12 +307,11 @@ public final class MoveManager implements
       throws ContainerNotFoundException,
       ContainerReplicaNotFoundException, NodeNotFoundException,
       NotLeaderException {
-    Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
-        pendingMoves.get(cid);
-    if (pair == null) {
+    MoveOperation moveOp = pendingMoves.get(cid);
+    if (moveOp == null) {
       return;
     }
-    MoveDataNodePair movePair = pair.getRight();
+    MoveDataNodePair movePair = moveOp.getMoveDataNodePair();
     final DatanodeDetails src = movePair.getSrc();
     final DatanodeDetails tgt = movePair.getTgt();
     LOG.debug("Handling successful addition of Container {} from" +
@@ -405,7 +348,7 @@ public final class MoveManager implements
 
       if (healthResult.getHealthState() ==
           ContainerHealthResult.HealthState.HEALTHY) {
-        sendDeleteCommand(containerInfo, src);
+        sendDeleteCommand(containerInfo, src, moveOp.getMoveStartTime());
       } else {
         LOG.info("Cannot remove source replica as the container health would " +
             "be {}", healthResult.getHealthState());
@@ -452,6 +395,7 @@ public final class MoveManager implements
     long now = clock.millis();
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
         replicaIndex, src, tgt, now + replicationTimeout);
+    pendingMoves.get(containerInfo.containerID()).setMoveStartTime(now);
   }
 
   /**
@@ -460,17 +404,17 @@ public final class MoveManager implements
    *
    * @param containerInfo Container to be deleted
    * @param datanode The datanode on which the replica should be deleted
+   * @param moveStartTime The time at which the replicate command for the container was scheduled
    */
   private void sendDeleteCommand(
-      final ContainerInfo containerInfo, final DatanodeDetails datanode)
+      final ContainerInfo containerInfo, final DatanodeDetails datanode,
+      long moveStartTime)
       throws ContainerReplicaNotFoundException, ContainerNotFoundException,
       NotLeaderException {
     int replicaIndex = getContainerReplicaIndex(
         containerInfo.containerID(), datanode);
-    long deleteTimeout = moveTimeout - replicationTimeout;
-    long now = clock.millis();
     replicationManager.sendDeleteCommand(
-        containerInfo, replicaIndex, datanode, true, now + deleteTimeout);
+        containerInfo, replicaIndex, datanode, true, moveStartTime + moveTimeout);
   }
 
   private int getContainerReplicaIndex(
@@ -481,7 +425,7 @@ public final class MoveManager implements
         //there should not be more than one replica of a container on the same
         //datanode. handle this if found in the future.
         .findFirst().orElseThrow(() ->
-            new ContainerReplicaNotFoundException("ID " + id + ", DN " + dn))
+            new ContainerReplicaNotFoundException(id, dn))
         .getReplicaIndex();
   }
 
@@ -501,5 +445,93 @@ public final class MoveManager implements
 
   void setReplicationTimeout(long replicationTimeout) {
     this.replicationTimeout = replicationTimeout;
+  }
+
+  /**
+   * All details about a move operation.
+   */
+  static class MoveOperation {
+    private CompletableFuture<MoveResult> result;
+    private MoveDataNodePair moveDataNodePair;
+    private long moveStartTime;
+
+    MoveOperation(CompletableFuture<MoveResult> result, MoveDataNodePair srcTgt) {
+      this.result = result;
+      this.moveDataNodePair = srcTgt;
+    }
+
+    public CompletableFuture<MoveResult> getResult() {
+      return result;
+    }
+
+    public MoveDataNodePair getMoveDataNodePair() {
+      return moveDataNodePair;
+    }
+
+    public long getMoveStartTime() {
+      return moveStartTime;
+    }
+
+    public void setResult(
+        CompletableFuture<MoveResult> result) {
+      this.result = result;
+    }
+
+    public void setMoveDataNodePair(MoveDataNodePair srcTgt) {
+      this.moveDataNodePair = srcTgt;
+    }
+
+    public void setMoveStartTime(long time) {
+      this.moveStartTime = time;
+    }
+  }
+
+  /**
+   * Various move return results.
+   */
+  public enum MoveResult {
+    // both replication and deletion are completed
+    COMPLETED,
+    // RM is not ratis leader
+    FAIL_LEADER_NOT_READY,
+    // replication fail because the container does not exist in src
+    REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
+    // replication fail because the container exists in target
+    REPLICATION_FAIL_EXIST_IN_TARGET,
+    // replication fail because the container is not cloesed
+    REPLICATION_FAIL_CONTAINER_NOT_CLOSED,
+    // replication fail because the container is in inflightDeletion
+    REPLICATION_FAIL_INFLIGHT_DELETION,
+    // replication fail because the container is in inflightReplication
+    REPLICATION_FAIL_INFLIGHT_REPLICATION,
+    // replication fail because of timeout
+    REPLICATION_FAIL_TIME_OUT,
+    // replication fail because of node is not in service
+    REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
+    // replication fail because node is unhealthy
+    REPLICATION_FAIL_NODE_UNHEALTHY,
+    // replication succeed, but deletion fail because of timeout
+    DELETION_FAIL_TIME_OUT,
+    // deletion fail because of node is not in service
+    DELETION_FAIL_NODE_NOT_IN_SERVICE,
+    // replication succeed, but deletion fail because because
+    // node is unhealthy
+    DELETION_FAIL_NODE_UNHEALTHY,
+    // replication succeed, but if we delete the container from
+    // the source datanode , the policy(eg, replica num or
+    // rack location) will not be satisfied, so we should not delete
+    // the container
+    DELETE_FAIL_POLICY,
+    /*
+    Container is not healthy if it has issues such as under, over, or mis
+    replication. We don't try to move replicas of such containers.
+     */
+    REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
+    //  replicas + target - src does not satisfy placement policy
+    REPLICATION_NOT_HEALTHY_AFTER_MOVE,
+    // A move is already scheduled for this container
+    FAIL_CONTAINER_ALREADY_BEING_MOVED,
+    // Unexpected error
+    FAIL_UNEXPECTED_ERROR
   }
 }

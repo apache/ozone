@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
@@ -57,7 +56,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -98,6 +96,7 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconcileContainerEve
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerEventHandler;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
@@ -405,6 +404,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins);
 
+    reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
+
     initializeSystemManagers(conf, configurator);
 
     if (isSecretKeyEnable(securityConfig)) {
@@ -444,7 +445,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     containerBalancer = new ContainerBalancer(this);
 
     // Emit initial safe mode status, as now handlers are registered.
-    scmSafeModeManager.emitSafeModeStatus();
+    scmSafeModeManager.start();
     scmHostName = HddsUtils.getHostName(conf);
 
     registerMXBean();
@@ -470,18 +471,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new CommandStatusReportHandler();
 
     NewNodeHandler newNodeHandler = new NewNodeHandler(pipelineManager,
-        scmDecommissionManager, configuration, serviceManager);
+        scmDecommissionManager, serviceManager);
     NodeAddressUpdateHandler nodeAddressUpdateHandler =
             new NodeAddressUpdateHandler(pipelineManager,
                     scmDecommissionManager, serviceManager);
     StaleNodeHandler staleNodeHandler =
-        new StaleNodeHandler(scmNodeManager, pipelineManager, configuration);
+        new StaleNodeHandler(scmNodeManager, pipelineManager);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
         pipelineManager, containerManager);
     StartDatanodeAdminHandler datanodeStartAdminHandler =
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
-        new ReadOnlyHealthyToHealthyNodeHandler(configuration, serviceManager);
+        new ReadOnlyHealthyToHealthyNodeHandler(serviceManager);
     HealthyReadOnlyNodeHandler
         healthyReadOnlyNodeHandler =
         new HealthyReadOnlyNodeHandler(scmNodeManager,
@@ -496,7 +497,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new IncrementalContainerReportHandler(
             scmNodeManager, containerManager, scmContext);
     PipelineActionHandler pipelineActionHandler =
-        new PipelineActionHandler(pipelineManager, scmContext, configuration);
+        new PipelineActionHandler(pipelineManager, scmContext);
+
+    ReplicationManagerEventHandler replicationManagerEventHandler =
+        new ReplicationManagerEventHandler(replicationManager, scmContext);
 
     ReconcileContainerEventHandler reconcileContainerEventHandler =
         new ReconcileContainerEventHandler(containerManager, scmContext);
@@ -506,6 +510,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND_COUNT_UPDATED,
         new DatanodeCommandCountUpdatedHandler(replicationManager));
+    eventQueue.addHandler(SCMEvents.REPLICATION_MANAGER_NOTIFY,
+        replicationManagerEventHandler);
 
     // Use the same executor for both ICR and FCR.
     // The Executor maps the event to a thread for DN.
@@ -704,8 +710,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmContext = new SCMContext.Builder()
           .setLeader(false)
           .setTerm(0)
-          .setIsInSafeMode(true)
-          .setIsPreCheckComplete(false)
+          .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.INITIAL)
           .setSCM(this)
           .setThreadNamePrefix(threadNamePrefix)
           .setFinalizationCheckpoint(finalizationManager.getCheckpoint())
@@ -714,7 +719,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         conf.getClass(
-            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             TableMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, conf);
@@ -832,9 +837,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
     } else {
-      scmSafeModeManager = new SCMSafeModeManager(conf,
-          containerManager, pipelineManager, eventQueue,
-          serviceManager, scmContext);
+      scmSafeModeManager = new SCMSafeModeManager(conf, scmNodeManager, pipelineManager,
+          containerManager, serviceManager, eventQueue, scmContext);
     }
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager, containerManager,
@@ -1099,7 +1103,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       int readThreads)
       throws IOException {
 
-    RPC.Server rpcServer = preserveThreadName(() -> new RPC.Builder(conf)
+    RPC.Server rpcServer = new RPC.Builder(conf)
         .setProtocol(protocol)
         .setInstance(instance)
         .setBindAddress(addr.getHostString())
@@ -1108,7 +1112,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setNumReaders(readThreads)
         .setVerbose(false)
         .setSecretManager(null)
-        .build());
+        .build();
 
     HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;
@@ -1339,7 +1343,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
 
     InetSocketAddress scmAddress = null;
-    if (SCMHAUtils.getScmServiceId(conf) != null) {
+    if (HddsUtils.getScmServiceId(conf) != null) {
       for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
         if (haDetails.getLocalNodeDetails().getNodeId() != null
             && haDetails.getLocalNodeDetails().getNodeId().equals(
@@ -1379,12 +1383,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public static SCMMetrics getMetrics() {
     return metrics == null ? SCMMetrics.create() : metrics;
   }
+
   /**
    * Initialize SCMPerformance metrics.
    */
   public static void initPerfMetrics() {
     perfMetrics = SCMPerformanceMetrics.create();
   }
+
   /**
    * Return SCMPerformance metrics instance.
    */
@@ -1576,8 +1582,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           getScmSecurityClientWithMaxRetry(configuration, getCurrentUser()).listCACertificate();
       // Write the primary SCM CA and Root CA during startup.
       for (String cert : pemEncodedCerts) {
-        X509Certificate x509Certificate = CertificateCodec.getX509Certificate(
-            cert, CertificateCodec::toIOException);
+        final X509Certificate x509Certificate = CertificateCodec.readX509Certificate(cert);
         if (certificateStore.getCertificateByID(x509Certificate.getSerialNumber()) == null) {
           LOG.info("Persist certificate serialId {} on Scm Bootstrap Node " +
                   "{}", x509Certificate.getSerialNumber(),
@@ -1706,7 +1711,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMHAMetrics.unRegister();
     }
 
-    IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
     if (ms != null) {
@@ -1934,11 +1938,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmSafeModeManager.getInSafeMode();
   }
 
-  @Override
-  public boolean isSafeModeExitForceful() {
-    return scmSafeModeManager.isForceExitSafeMode();
-  }
-
   /**
    * Returns EventPublisher.
    */
@@ -1971,7 +1970,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Force SCM out of safe mode.
    */
   public boolean exitSafeMode() {
-    scmSafeModeManager.exitSafeMode(eventQueue, true);
+    scmSafeModeManager.forceExitSafeMode();
     return true;
   }
 
@@ -2014,6 +2013,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public String getNamespace() {
     return scmHANodeDetails.getLocalNodeDetails().getServiceId();
   }
+
   /**
    * Get the safe mode status of all rules.
    *
@@ -2142,7 +2142,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public String getPrimordialNode() {
     String primordialNode = SCMHAUtils.getPrimordialSCM(configuration);
     // primordialNode can be nodeId too . If it is then return hostname.
-    if (SCMHAUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
+    if (HddsUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
       List<SCMNodeDetails> localAndPeerNodes =
           new ArrayList<>(scmHANodeDetails.getPeerNodeDetails());
       localAndPeerNodes.add(getSCMHANodeDetails().getLocalNodeDetails());

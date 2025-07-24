@@ -47,6 +47,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
@@ -58,9 +59,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,6 @@ import org.slf4j.LoggerFactory;
  * Test OzoneManager list volume operation under combinations of configs
  * in secure mode.
  */
-@Timeout(1200)
 public class TestOzoneManagerListVolumesSecure {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneManagerListVolumesSecure.class);
@@ -100,6 +100,11 @@ public class TestOzoneManagerListVolumesSecure {
   private File userKeytab2;
   private UserGroupInformation userUGI1;
   private UserGroupInformation userUGI2;
+
+  @BeforeAll
+  static void setup() {
+    DefaultMetricsSystem.setMiniClusterMode(true);
+  }
 
   @BeforeEach
   public void init() throws Exception {
@@ -208,7 +213,7 @@ public class TestOzoneManagerListVolumesSecure {
     OzoneManagerProtocolClientSideTranslatorPB omClient =
         new OzoneManagerProtocolClientSideTranslatorPB(
             OmTransportFactory.create(conf, this.adminUGI, null),
-            RandomStringUtils.randomAscii(5));
+            RandomStringUtils.secure().nextAscii(5));
 
     // Create volume with ACL
     /* r = READ, w = WRITE, c = CREATE, d = DELETE
@@ -254,7 +259,7 @@ public class TestOzoneManagerListVolumesSecure {
         new OzoneManagerProtocolClientSideTranslatorPB(
             OmTransportFactory.create(conf,
                 UserGroupInformation.getCurrentUser(), null),
-            RandomStringUtils.randomAscii(5));
+            RandomStringUtils.secure().nextAscii(5));
 
     // `ozone sh volume list` shall return volumes with LIST permission of user.
     List<OmVolumeArgs> volumeList;

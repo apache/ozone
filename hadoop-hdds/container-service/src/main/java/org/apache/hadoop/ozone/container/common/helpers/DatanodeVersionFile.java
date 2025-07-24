@@ -18,11 +18,9 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.Properties;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -64,18 +62,8 @@ public class DatanodeVersionFile {
    */
   public void createVersionFile(File path) throws
       IOException {
-    try (RandomAccessFile file = new RandomAccessFile(path, "rws");
-         FileOutputStream out = new FileOutputStream(file.getFD())) {
-      file.getChannel().truncate(0);
-      Properties properties = createProperties();
-      /*
-       * If server is interrupted before this line,
-       * the version file will remain unchanged.
-       */
-      properties.store(out, null);
-    }
+    IOUtils.writePropertiesToFile(path, createProperties());
   }
-
 
   /**
    * Creates a property object from the specified file content.
@@ -84,11 +72,6 @@ public class DatanodeVersionFile {
    * @throws IOException
    */
   public static Properties readFrom(File versionFile) throws IOException {
-    try (RandomAccessFile file = new RandomAccessFile(versionFile, "rws");
-         FileInputStream in = new FileInputStream(file.getFD())) {
-      Properties props = new Properties();
-      props.load(in);
-      return props;
-    }
+    return IOUtils.readPropertiesFromFile(versionFile);
   }
 }

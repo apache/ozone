@@ -62,13 +62,11 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 class TestBlockOutputStream {
 
   static final int CHUNK_SIZE = 100;
@@ -200,7 +198,7 @@ class TestBlockOutputStream {
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = 50;
       final int totalWriteLength = dataLength * 2;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       KeyOutputStream keyOutputStream =
           assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
@@ -298,7 +296,7 @@ class TestBlockOutputStream {
       OzoneOutputStream key = createKey(client, keyName);
       // write data equal to 2 chunks
       int dataLength = FLUSH_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
 
       assertEquals(writeChunkCount + 2,
@@ -416,7 +414,7 @@ class TestBlockOutputStream {
       OzoneOutputStream key = createKey(client, keyName);
       // write data more than 1 chunk
       int dataLength = CHUNK_SIZE + 50;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       assertEquals(totalOpCount + 1, metrics.getTotalOpCount());
       KeyOutputStream keyOutputStream =
@@ -505,7 +503,7 @@ class TestBlockOutputStream {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = FLUSH_SIZE + 50;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
 
       assertEquals(totalOpCount + 3, metrics.getTotalOpCount());
@@ -594,7 +592,7 @@ class TestBlockOutputStream {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = MAX_FLUSH_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
 
       KeyOutputStream keyOutputStream =
@@ -689,7 +687,7 @@ class TestBlockOutputStream {
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = MAX_FLUSH_SIZE + 50;
       // write data more than 1 chunk
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       KeyOutputStream keyOutputStream =
           assertInstanceOf(KeyOutputStream.class, key.getOutputStream());

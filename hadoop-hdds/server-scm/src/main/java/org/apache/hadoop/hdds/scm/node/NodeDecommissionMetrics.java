@@ -60,83 +60,6 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   @Metric("Number of containers sufficiently replicated in tracked nodes.")
   private MutableGaugeLong containersSufficientlyReplicatedTotal;
 
-  /**
-   * Inner class for snapshot of Datanode ContainerState in
-   * Decommissioning and Maintenance mode workflow.
-   */
-  public static final class ContainerStateInWorkflow {
-    private long sufficientlyReplicated = 0;
-    private long unclosedContainers = 0;
-    private long underReplicatedContainers = 0;
-    private String host = "";
-    private long pipelinesWaitingToClose = 0;
-    private long startTime = 0;
-
-    private static final MetricsInfo HOST_UNDER_REPLICATED = Interns.info(
-        "UnderReplicatedDN",
-        "Number of under-replicated containers "
-            + "for host in decommissioning and "
-            + "maintenance mode");
-
-    private static final MetricsInfo HOST_PIPELINES_TO_CLOSE = Interns.info(
-        "PipelinesWaitingToCloseDN",
-        "Number of pipelines waiting to close for "
-            + "host in decommissioning and "
-            + "maintenance mode");
-
-    private static final MetricsInfo HOST_SUFFICIENTLY_REPLICATED = Interns
-        .info(
-            "SufficientlyReplicatedDN",
-        "Number of sufficiently replicated containers "
-            + "for host in decommissioning and "
-            + "maintenance mode");
-
-    private static final MetricsInfo HOST_UNCLOSED_CONTAINERS = Interns.info("UnclosedContainersDN",
-        "Number of containers not fully closed for host in decommissioning and maintenance mode");
-
-    private static final MetricsInfo HOST_START_TIME = Interns.info("StartTimeDN",
-        "Time at which decommissioning was started");
-
-
-    public ContainerStateInWorkflow(String host,
-                                    long sufficiently,
-                                    long under,
-                                    long unclosed,
-                                    long pipelinesToClose,
-                                    long startTime) {
-      this.host = host;
-      sufficientlyReplicated = sufficiently;
-      underReplicatedContainers = under;
-      unclosedContainers = unclosed;
-      pipelinesWaitingToClose = pipelinesToClose;
-      this.startTime = startTime;
-    }
-
-    public String getHost() {
-      return host;
-    }
-
-    public long getSufficientlyReplicated() {
-      return sufficientlyReplicated;
-    }
-
-    public long getPipelinesWaitingToClose() {
-      return pipelinesWaitingToClose;
-    }
-
-    public long getUnderReplicatedContainers() {
-      return underReplicatedContainers;
-    }
-
-    public long getUnclosedContainers() {
-      return unclosedContainers;
-    }
-
-    public long getStartTime() {
-      return startTime;
-    }
-  }
-
   private MetricsRegistry registry;
 
   private Map<String, ContainerStateInWorkflow> metricsByHost;
@@ -293,5 +216,81 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     ContainerStateInWorkflow workflowMetrics = metricsByHost.get(host);
     return workflowMetrics == null ? null :
         workflowMetrics.getUnclosedContainers();
+  }
+
+  /**
+   * Inner class for snapshot of Datanode ContainerState in
+   * Decommissioning and Maintenance mode workflow.
+   */
+  public static final class ContainerStateInWorkflow {
+    private long sufficientlyReplicated = 0;
+    private long unclosedContainers = 0;
+    private long underReplicatedContainers = 0;
+    private String host = "";
+    private long pipelinesWaitingToClose = 0;
+    private long startTime = 0;
+
+    private static final MetricsInfo HOST_UNDER_REPLICATED = Interns.info(
+        "UnderReplicatedDN",
+        "Number of under-replicated containers "
+            + "for host in decommissioning and "
+            + "maintenance mode");
+
+    private static final MetricsInfo HOST_PIPELINES_TO_CLOSE = Interns.info(
+        "PipelinesWaitingToCloseDN",
+        "Number of pipelines waiting to close for "
+            + "host in decommissioning and "
+            + "maintenance mode");
+
+    private static final MetricsInfo HOST_SUFFICIENTLY_REPLICATED = Interns
+        .info(
+            "SufficientlyReplicatedDN",
+            "Number of sufficiently replicated containers "
+                + "for host in decommissioning and "
+                + "maintenance mode");
+
+    private static final MetricsInfo HOST_UNCLOSED_CONTAINERS = Interns.info("UnclosedContainersDN",
+        "Number of containers not fully closed for host in decommissioning and maintenance mode");
+
+    private static final MetricsInfo HOST_START_TIME = Interns.info("StartTimeDN",
+        "Time at which decommissioning was started");
+
+    public ContainerStateInWorkflow(String host,
+                                    long sufficiently,
+                                    long under,
+                                    long unclosed,
+                                    long pipelinesToClose,
+                                    long startTime) {
+      this.host = host;
+      sufficientlyReplicated = sufficiently;
+      underReplicatedContainers = under;
+      unclosedContainers = unclosed;
+      pipelinesWaitingToClose = pipelinesToClose;
+      this.startTime = startTime;
+    }
+
+    public String getHost() {
+      return host;
+    }
+
+    public long getSufficientlyReplicated() {
+      return sufficientlyReplicated;
+    }
+
+    public long getPipelinesWaitingToClose() {
+      return pipelinesWaitingToClose;
+    }
+
+    public long getUnderReplicatedContainers() {
+      return underReplicatedContainers;
+    }
+
+    public long getUnclosedContainers() {
+      return unclosedContainers;
+    }
+
+    public long getStartTime() {
+      return startTime;
+    }
   }
 }

@@ -17,16 +17,12 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Credential in the AWS authorization header.
  * Ref: https://docs.aws.amazon.com/AmazonS3/latest/API/
  * sigv4-auth-using-authorization-header.html
  */
 public class Credential {
-  private static final Logger LOG = LoggerFactory.getLogger(Credential.class);
 
   private String accessKeyID;
   private String date;

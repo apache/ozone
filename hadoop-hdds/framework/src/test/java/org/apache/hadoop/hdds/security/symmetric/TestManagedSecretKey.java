@@ -39,7 +39,7 @@ public class TestManagedSecretKey {
   @Test
   public void testSignAndVerifySuccess() throws Exception {
     // Data can be signed and verified by same key.
-    byte[] data = RandomUtils.nextBytes(100);
+    byte[] data = RandomUtils.secure().randomBytes(100);
     ManagedSecretKey secretKey = generateHmac(now(), ofDays(1));
     byte[] signature = secretKey.sign(data);
     assertTrue(secretKey.isValidSignature(data, signature));
@@ -62,10 +62,10 @@ public class TestManagedSecretKey {
 
   @Test
   public void testVerifyFailure() throws Exception {
-    byte[] data = RandomUtils.nextBytes(100);
+    byte[] data = RandomUtils.secure().randomBytes(100);
     ManagedSecretKey secretKey = generateHmac(now(), ofDays(1));
     // random signature is not valid.
-    assertFalse(secretKey.isValidSignature(data, RandomUtils.nextBytes(100)));
+    assertFalse(secretKey.isValidSignature(data, RandomUtils.secure().randomBytes(100)));
 
     // Data sign by one key can't be verified by another key.
     byte[] signature = secretKey.sign(data);

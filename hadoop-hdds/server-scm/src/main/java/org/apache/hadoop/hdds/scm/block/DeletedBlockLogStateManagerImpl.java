@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.block;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,15 +27,15 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +47,7 @@ import org.slf4j.LoggerFactory;
 public class DeletedBlockLogStateManagerImpl
     implements DeletedBlockLogStateManager {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeletedBlockLogStateManagerImpl.class);
 
   private Table<Long, DeletedBlocksTransaction> deletedTable;
@@ -68,14 +67,11 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
-  public TableIterator<Long, TypedTable.KeyValue<Long,
-      DeletedBlocksTransaction>> getReadOnlyIterator() throws IOException {
-    return new TableIterator<Long, TypedTable.KeyValue<Long,
-        DeletedBlocksTransaction>>() {
+  public Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator()
+      throws IOException {
+    return new Table.KeyValueIterator<Long, DeletedBlocksTransaction>() {
 
-      private TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-          deletedTable.iterator();
+      private final Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter = deletedTable.iterator();
       private TypedTable.KeyValue<Long, DeletedBlocksTransaction> nextTx;
 
       {
@@ -86,12 +82,7 @@ public class DeletedBlockLogStateManagerImpl
         while (iter.hasNext()) {
           TypedTable.KeyValue<Long, DeletedBlocksTransaction> next = iter
               .next();
-          long txID;
-          try {
-            txID = next.getKey();
-          } catch (IOException e) {
-            throw new IllegalStateException("");
-          }
+          final long txID = next.getKey();
 
           if ((deletingTxIDs == null || !deletingTxIDs.contains(txID)) && (
               skippingRetryTxIDs == null || !skippingRetryTxIDs
@@ -124,7 +115,7 @@ public class DeletedBlockLogStateManagerImpl
       }
 
       @Override
-      public void close() throws IOException {
+      public void close() throws RocksDatabaseException {
         iter.close();
       }
 
@@ -140,15 +131,15 @@ public class DeletedBlockLogStateManagerImpl
       }
 
       @Override
-      public TypedTable.KeyValue<Long, DeletedBlocksTransaction> seek(
-          Long key) throws IOException {
+      public TypedTable.KeyValue<Long, DeletedBlocksTransaction> seek(Long key)
+          throws RocksDatabaseException, CodecException {
         iter.seek(key);
         findNext();
         return nextTx;
       }
 
       @Override
-      public void removeFromDB() throws IOException {
+      public void removeFromDB() {
         throw new UnsupportedOperationException("read-only");
       }
     };
@@ -302,18 +293,11 @@ public class DeletedBlockLogStateManagerImpl
       Preconditions.checkNotNull(conf);
       Preconditions.checkNotNull(table);
 
-      final DeletedBlockLogStateManager impl =
-          new DeletedBlockLogStateManagerImpl(conf, table, containerManager,
-              transactionBuffer);
+      final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
+          conf, table, containerManager, transactionBuffer);
 
-      final SCMHAInvocationHandler invocationHandler =
-          new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.BLOCK,
-              impl, scmRatisServer);
-
-      return (DeletedBlockLogStateManager) Proxy.newProxyInstance(
-          SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{DeletedBlockLogStateManager.class},
-          invocationHandler);
+      return scmRatisServer.getProxyHandler(RequestType.BLOCK,
+          DeletedBlockLogStateManager.class, impl);
     }
   }
 }

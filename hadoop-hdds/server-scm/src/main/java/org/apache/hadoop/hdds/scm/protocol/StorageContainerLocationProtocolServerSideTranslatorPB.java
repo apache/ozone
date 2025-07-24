@@ -149,7 +149,7 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -180,6 +180,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   private final StorageContainerLocationProtocol impl;
   private final StorageContainerManager scm;
+  private static final String ROLE_TYPE = "SCM";
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
       ScmContainerLocationResponse, ProtocolMessageEnum>
@@ -212,7 +213,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
-          scm.getClientRpcPort(), scm.getScmId());
+          scm.getClientRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);
     }
     // After the request interceptor (now validator) framework is extended to
     // this server interface, this should be removed and solved via new
@@ -744,7 +745,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       }
     } catch (IOException e) {
       RatisUtil
-          .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId());
+          .checkRatisException(e, scm.getClientRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);
       throw new ServiceException(e);
     }
   }
@@ -760,9 +761,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,
       int clientVersion) throws IOException {
-    ContainerWithPipeline cp = impl
-        .allocateContainer(request.getReplicationType(),
-            request.getReplicationFactor(), request.getOwner());
+    ReplicationConfig replicationConfig = ReplicationConfig.fromProto(request.getReplicationType(), 
+        request.getReplicationFactor(),
+        request.getEcReplicationConfig()
+    );
+    ContainerWithPipeline cp = impl.allocateContainer(replicationConfig, request.getOwner());
     return ContainerResponseProto.newBuilder()
         .setContainerWithPipeline(cp.getProtobuf(clientVersion))
         .setErrorCode(ContainerResponseProto.Error.success)
@@ -1008,8 +1011,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
-        .addAllPeerRoles(scmInfo.getRatisPeerRoles())
-        .setScmRatisEnabled(scmInfo.getScmRatisEnabled())
+        .addAllPeerRoles(scmInfo.getPeerRoles())
         .build();
   }
 

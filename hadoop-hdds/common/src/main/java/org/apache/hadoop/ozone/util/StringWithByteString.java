@@ -26,16 +26,16 @@ import net.jcip.annotations.Immutable;
  */
 @Immutable
 public final class StringWithByteString {
-  public static StringWithByteString valueOf(String string) {
-    return string != null ? new StringWithByteString(string, ByteString.copyFromUtf8(string)) : null;
-  }
-
   private final String string;
   private final ByteString bytes;
 
   public StringWithByteString(String string, ByteString bytes) {
     this.string = Objects.requireNonNull(string, "string == null");
     this.bytes = Objects.requireNonNull(bytes, "bytes == null");
+  }
+
+  public static StringWithByteString valueOf(String string) {
+    return string != null ? new StringWithByteString(string, ByteString.copyFromUtf8(string)) : null;
   }
 
   public String getString() {

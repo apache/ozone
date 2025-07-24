@@ -29,7 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ORIGIN_PIPELINE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STATE;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -39,14 +39,17 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.ratis.util.Preconditions;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -58,6 +61,8 @@ public abstract class ContainerData {
   //Type of the container.
   // For now, we support only KeyValueContainer.
   private final ContainerType containerType;
+
+  private final AtomicBoolean immediateCloseActionSent = new AtomicBoolean(false);
 
   // Unique identifier for the container
   private final long containerID;
@@ -80,17 +85,12 @@ public abstract class ContainerData {
   private boolean committedSpace;
 
   //ID of the pipeline where this container is created
-  private String originPipelineId;
+  private final String originPipelineId;
   //ID of the datanode where this container is created
-  private String originNodeId;
+  private final String originNodeId;
 
-  /** parameters for read/write statistics on the container. **/
-  private final AtomicLong readBytes;
-  private final AtomicLong writeBytes;
-  private final AtomicLong readCount;
-  private final AtomicLong writeCount;
-  private final AtomicLong bytesUsed;
-  private final AtomicLong blockCount;
+  /** Read/write/block statistics of this container. **/
+  private final Statistics statistics = new Statistics();
 
   private HddsVolume volume;
 
@@ -99,6 +99,7 @@ public abstract class ContainerData {
 
   // Checksum of the data within the container.
   private long dataChecksum;
+  private static final long UNSET_DATA_CHECKSUM = -1;
 
   private boolean isEmpty;
 
@@ -111,7 +112,7 @@ public abstract class ContainerData {
   private transient Optional<Instant> lastDataScanTime = Optional.empty();
 
   public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
-  private static final String ZERO_CHECKSUM = new String(new byte[64],
+  public static final String ZERO_CHECKSUM = new String(new byte[64],
       CHARSET_ENCODING);
 
   // Common Fields need to be stored in .container file.
@@ -141,25 +142,19 @@ public abstract class ContainerData {
                           ContainerLayoutVersion layoutVersion, long size,
                           String originPipelineId,
                           String originNodeId) {
-    Preconditions.checkNotNull(type);
-
-    this.containerType = type;
+    this.containerType = Objects.requireNonNull(type, "type == null");
     this.containerID = containerId;
     this.layOutVersion = layoutVersion.getVersion();
     this.metadata = new TreeMap<>();
     this.state = ContainerDataProto.State.OPEN;
-    this.readCount = new AtomicLong(0L);
-    this.readBytes =  new AtomicLong(0L);
-    this.writeCount =  new AtomicLong(0L);
-    this.writeBytes =  new AtomicLong(0L);
-    this.bytesUsed = new AtomicLong(0L);
-    this.blockCount = new AtomicLong(0L);
     this.maxSize = size;
+    Preconditions.assertTrue(maxSize > 0, () -> "maxSize = " + maxSize + " <= 0");
+
     this.originPipelineId = originPipelineId;
     this.originNodeId = originNodeId;
     this.isEmpty = false;
     this.checksum = ZERO_CHECKSUM;
-    this.dataChecksum = 0;
+    this.dataChecksum = UNSET_DATA_CHECKSUM;
   }
 
   protected ContainerData(ContainerData source) {
@@ -174,6 +169,10 @@ public abstract class ContainerData {
    */
   public long getContainerID() {
     return containerID;
+  }
+
+  public AtomicBoolean getImmediateCloseActionSent() {
+    return immediateCloseActionSent;
   }
 
   /**
@@ -195,7 +194,6 @@ public abstract class ContainerData {
   public ContainerType getContainerType() {
     return containerType;
   }
-
 
   /**
    * Returns the state of the container.
@@ -225,16 +223,14 @@ public abstract class ContainerData {
         (state != oldState)) {
       releaseCommitSpace();
     }
+  }
 
-    /**
-     * commit space when container transitions (back) to Open.
-     * when? perhaps closing a container threw an exception
-     */
-    if ((state == ContainerDataProto.State.OPEN) &&
-        (state != oldState)) {
-      Preconditions.checkState(getMaxSize() > 0);
-      commitSpace();
-    }
+  public boolean isCommittedSpace() {
+    return committedSpace;
+  }
+
+  public void setCommittedSpace(boolean committed) {
+    committedSpace = committed;
   }
 
   /**
@@ -362,7 +358,7 @@ public abstract class ContainerData {
     setState(ContainerDataProto.State.CLOSED);
   }
 
-  private void releaseCommitSpace() {
+  public void releaseCommitSpace() {
     long unused = getMaxSize() - getBytesUsed();
 
     // only if container size < max size
@@ -382,7 +378,7 @@ public abstract class ContainerData {
     HddsVolume cVol;
 
     //we don't expect duplicate calls
-    Preconditions.checkState(!committedSpace);
+    Preconditions.assertTrue(!committedSpace);
 
     // Only Open Containers have Committed Space
     if (myState != ContainerDataProto.State.OPEN) {
@@ -397,43 +393,8 @@ public abstract class ContainerData {
     }
   }
 
-  /**
-   * Get the number of bytes read from the container.
-   * @return the number of bytes read from the container.
-   */
-  public long getReadBytes() {
-    return readBytes.get();
-  }
-
-  /**
-   * Increase the number of bytes read from the container.
-   * @param bytes number of bytes read.
-   */
-  public void incrReadBytes(long bytes) {
-    this.readBytes.addAndGet(bytes);
-  }
-
-  /**
-   * Get the number of times the container is read.
-   * @return the number of times the container is read.
-   */
-  public long getReadCount() {
-    return readCount.get();
-  }
-
-  /**
-   * Increase the number of container read count by 1.
-   */
-  public void incrReadCount() {
-    this.readCount.incrementAndGet();
-  }
-
-  /**
-   * Get the number of bytes write into the container.
-   * @return the number of bytes write into the container.
-   */
-  public long getWriteBytes() {
-    return writeBytes.get();
+  public Statistics getStatistics() {
+    return statistics;
   }
 
   /**
@@ -441,45 +402,24 @@ public abstract class ContainerData {
    * Also decrement committed bytes against the bytes written.
    * @param bytes the number of bytes write into the container.
    */
-  public void incrWriteBytes(long bytes) {
-    long unused = getMaxSize() - getBytesUsed();
-
-    this.writeBytes.addAndGet(bytes);
+  private void incrWriteBytes(long bytes) {
     /*
        Increase the cached Used Space in VolumeInfo as it
        maybe not updated, DU or DedicatedDiskSpaceUsage runs
        periodically to update the Used Space in VolumeInfo.
      */
     this.getVolume().incrementUsedSpace(bytes);
-    // only if container size < max size
-    if (committedSpace && unused > 0) {
-      //with this write, container size might breach max size
-      long decrement = Math.min(bytes, unused);
-      this.getVolume().incCommittedBytes(0 - decrement);
+    // Calculate bytes used before this write operation.
+    // Note that getBytesUsed() already includes the 'bytes' from the current write.
+    long bytesUsedBeforeWrite = getBytesUsed() - bytes;
+    // Calculate how much space was available within the max size limit before this write
+    long availableSpaceBeforeWrite = getMaxSize() - bytesUsedBeforeWrite;
+    if (committedSpace && availableSpaceBeforeWrite > 0) {
+      // Decrement committed space only by the portion of the write that fits within the originally committed space,
+      // up to maxSize
+      long decrement = Math.min(bytes, availableSpaceBeforeWrite);
+      this.getVolume().incCommittedBytes(-decrement);
     }
-  }
-
-  /**
-   * Get the number of writes into the container.
-   * @return the number of writes into the container.
-   */
-  public long getWriteCount() {
-    return writeCount.get();
-  }
-
-  /**
-   * Increase the number of writes into the container by 1.
-   */
-  public void incrWriteCount() {
-    this.writeCount.incrementAndGet();
-  }
-
-  /**
-   * Sets the number of bytes used by the container.
-   * @param used
-   */
-  public void setBytesUsed(long used) {
-    this.bytesUsed.set(used);
   }
 
   /**
@@ -487,25 +427,7 @@ public abstract class ContainerData {
    * @return the number of bytes used by the container.
    */
   public long getBytesUsed() {
-    return bytesUsed.get();
-  }
-
-  /**
-   * Increase the number of bytes used by the container.
-   * @param used number of bytes used by the container.
-   * @return the current number of bytes used by the container afert increase.
-   */
-  public long incrBytesUsed(long used) {
-    return this.bytesUsed.addAndGet(used);
-  }
-
-  /**
-   * Decrease the number of bytes used by the container.
-   * @param reclaimed the number of bytes reclaimed from the container.
-   * @return the current number of bytes used by the container after decrease.
-   */
-  public long decrBytesUsed(long reclaimed) {
-    return this.bytesUsed.addAndGet(-1L * reclaimed);
+    return getStatistics().getBlockBytes();
   }
 
   /**
@@ -526,35 +448,10 @@ public abstract class ContainerData {
     return volume;
   }
 
-  /**
-   * Increments the number of blocks in the container.
-   */
-  public void incrBlockCount() {
-    this.blockCount.incrementAndGet();
-  }
-
-  /**
-   * Decrements number of blocks in the container.
-   */
-  public void decrBlockCount() {
-    this.blockCount.decrementAndGet();
-  }
-
-  /**
-   * Decrease the count of blocks (blocks) in the container.
-   *
-   * @param deletedBlockCount
-   */
-  public void decrBlockCount(long deletedBlockCount) {
-    this.blockCount.addAndGet(-1 * deletedBlockCount);
-  }
-
-  /**
-   * Returns number of blocks in the container.
-   * @return block count
-   */
+  /** For testing only. */
+  @VisibleForTesting
   public long getBlockCount() {
-    return this.blockCount.get();
+    return getStatistics().getBlockByteAndCounts().getCount();
   }
 
   public boolean isEmpty() {
@@ -567,14 +464,6 @@ public abstract class ContainerData {
    */
   public void markAsEmpty() {
     this.isEmpty = true;
-  }
-
-  /**
-   * Set's number of blocks in the container.
-   * @param count
-   */
-  public void setBlockCount(long count) {
-    this.blockCount.set(count);
   }
 
   public void setContainerFileChecksum(String checkSum) {
@@ -650,11 +539,22 @@ public abstract class ContainerData {
   }
 
   public void setDataChecksum(long dataChecksum) {
+    if (dataChecksum < 0) {
+      throw new IllegalArgumentException("Data checksum cannot be set to a negative number.");
+    }
     this.dataChecksum = dataChecksum;
   }
 
   public long getDataChecksum() {
+    // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
+    if (needsDataChecksum()) {
+      return 0;
+    }
     return dataChecksum;
+  }
+
+  public boolean needsDataChecksum() {
+    return dataChecksum == UNSET_DATA_CHECKSUM;
   }
 
   /**
@@ -669,17 +569,164 @@ public abstract class ContainerData {
    */
   public abstract long getBlockCommitSequenceId();
 
-  public void updateReadStats(long length) {
-    incrReadCount();
-    incrReadBytes(length);
-  }
-
   public void updateWriteStats(long bytesWritten, boolean overwrite) {
-    if (!overwrite) {
-      incrBytesUsed(bytesWritten);
-    }
-    incrWriteCount();
+    getStatistics().updateWrite(bytesWritten, overwrite);
     incrWriteBytes(bytesWritten);
   }
 
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + " #" + containerID
+        + " (" + state
+        + ", " + (isEmpty ? "empty" : "non-empty")
+        + ", ri=" + replicaIndex
+        + ", origin=[dn_" + originNodeId + ", pipeline_" + originPipelineId + "])";
+  }
+
+  /**
+   * Block byte used, block count and pending deletion count.
+   * This class is immutable.
+   */
+  public static class BlockByteAndCounts {
+    private final long bytes;
+    private final long count;
+    private final long pendingDeletion;
+
+    public BlockByteAndCounts(long bytes, long count, long pendingDeletion) {
+      this.bytes = bytes;
+      this.count = count;
+      this.pendingDeletion = pendingDeletion;
+    }
+
+    public long getBytes() {
+      return bytes;
+    }
+
+    public long getCount() {
+      return count;
+    }
+
+    public long getPendingDeletion() {
+      return pendingDeletion;
+    }
+  }
+
+  /**
+   * Read/write/block statistics of a container.
+   * This class is thread-safe -- all methods are synchronized.
+   */
+  public static class Statistics {
+    private long readBytes;
+    private long readCount;
+
+    private long writeBytes;
+    private long writeCount;
+
+    private long blockBytes;
+    private long blockCount;
+    private long blockPendingDeletion;
+
+    public synchronized long getWriteBytes() {
+      return writeBytes;
+    }
+
+    public synchronized long getBlockBytes() {
+      return blockBytes;
+    }
+
+    public synchronized BlockByteAndCounts getBlockByteAndCounts() {
+      return new BlockByteAndCounts(blockBytes, blockCount, blockPendingDeletion);
+    }
+
+    public synchronized long getBlockPendingDeletion() {
+      return blockPendingDeletion;
+    }
+
+    public synchronized void incrementBlockCount() {
+      blockCount++;
+    }
+
+    /** Update for reading a block with the given length. */
+    public synchronized void updateRead(long length) {
+      readCount++;
+      readBytes += length;
+    }
+
+    /** Update for writing a block with the given length. */
+    public synchronized void updateWrite(long length, boolean overwrite) {
+      if (!overwrite) {
+        blockBytes += length;
+      }
+      writeCount++;
+      writeBytes += length;
+    }
+
+    public synchronized void updateDeletion(long deletedBytes, long deletedBlockCount, long processedBlockCount) {
+      blockBytes -= deletedBytes;
+      blockCount -= deletedBlockCount;
+      blockPendingDeletion -= processedBlockCount;
+    }
+
+    public synchronized void updateBlocks(long bytes, long count, long pendingDeletionIncrement) {
+      blockBytes = bytes;
+      blockCount = count;
+      blockPendingDeletion += pendingDeletionIncrement;
+    }
+
+    public synchronized ContainerDataProto.Builder setContainerDataProto(ContainerDataProto.Builder b) {
+      if (blockBytes > 0) {
+        b.setBytesUsed(blockBytes);
+      }
+      return b.setBlockCount(blockCount);
+    }
+
+    public synchronized ContainerReplicaProto.Builder setContainerReplicaProto(ContainerReplicaProto.Builder b) {
+      return b.setReadBytes(readBytes)
+          .setReadCount(readCount)
+          .setWriteBytes(writeBytes)
+          .setWriteCount(writeCount)
+          .setUsed(blockBytes)
+          .setKeyCount(blockCount);
+    }
+
+    public synchronized void addBlockPendingDeletion(long count) {
+      blockPendingDeletion += count;
+    }
+
+    public synchronized void resetBlockPendingDeletion() {
+      blockPendingDeletion = 0;
+    }
+
+    public synchronized void assertRead(long expectedBytes, long expectedCount) {
+      Preconditions.assertSame(expectedBytes, readBytes, "readBytes");
+      Preconditions.assertSame(expectedCount, readCount, "readCount");
+    }
+
+    public synchronized void assertWrite(long expectedBytes, long expectedCount) {
+      Preconditions.assertSame(expectedBytes, writeBytes, "writeBytes");
+      Preconditions.assertSame(expectedCount, writeCount, "writeCount");
+    }
+
+    public synchronized void assertBlock(long expectedBytes, long expectedCount, long expectedPendingDeletion) {
+      Preconditions.assertSame(expectedBytes, blockBytes, "blockBytes");
+      Preconditions.assertSame(expectedCount, blockCount, "blockCount");
+      Preconditions.assertSame(expectedPendingDeletion, blockPendingDeletion, "blockPendingDeletion");
+    }
+
+    public synchronized void setBlockCountForTesting(long count) {
+      blockCount = count;
+    }
+
+    public synchronized void setBlockBytesForTesting(long bytes) {
+      blockBytes = bytes;
+    }
+
+    @Override
+    public synchronized String toString() {
+      return "Statistics{read(" + readBytes + " bytes, #" + readCount + ")"
+          + ", write(" + writeBytes + " bytes, #" + writeCount + ")"
+          + ", block(" + blockBytes + " bytes, #" + blockCount
+          + ", pendingDelete=" + blockPendingDeletion + ")}";
+    }
+  }
 }

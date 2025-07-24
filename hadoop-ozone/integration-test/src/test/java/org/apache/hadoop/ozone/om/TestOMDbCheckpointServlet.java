@@ -63,7 +63,6 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Sets;
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -98,6 +97,9 @@ import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -115,13 +117,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class used for testing the OM DB Checkpoint provider servlet.
  */
-@Timeout(240)
 public class TestOMDbCheckpointServlet {
   public static final String JAVA_IO_TMPDIR = "java.io.tmpdir";
   private OzoneConfiguration conf;
@@ -222,13 +222,15 @@ public class TestOMDbCheckpointServlet {
         responseMock);
 
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeDbDataToStream(any(), any(), any(), any(), any(), any());
+        .writeDbDataToStream(any(), any(), any(), any(), any());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
 
     doCallRealMethod().when(omDbCheckpointServletMock).getCheckpoint(any(),
         anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
   }
 
   @Test
@@ -265,7 +267,7 @@ public class TestOMDbCheckpointServlet {
     doNothing().when(responseMock).setContentType("application/x-tar");
     doNothing().when(responseMock).setHeader(anyString(), anyString());
 
-    List<String> toExcludeList = new ArrayList<>();
+    Set<String> toExcludeList = new HashSet<>();
     toExcludeList.add("sstFile1.sst");
     toExcludeList.add("sstFile2.sst");
 
@@ -288,7 +290,7 @@ public class TestOMDbCheckpointServlet {
         .isGreaterThan(initialCheckpointCount);
 
     verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
-        any(), any(), eq(toExcludeList), any(), any());
+        any(), any(), eq(toExcludeList), any());
   }
 
   private void testDoPostWithInvalidContentType() throws Exception {
@@ -526,9 +528,9 @@ public class TestOMDbCheckpointServlet {
 
     // Get the tarball.
     Path tmpdir = folder.resolve("bootstrapData");
-    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+    try (OutputStream fileOutputStream = Files.newOutputStream(tempFile.toPath())) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, new ArrayList<>(), new ArrayList<>(), tmpdir);
+          fileOutputStream, new HashSet<>(), tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.
@@ -558,12 +560,11 @@ public class TestOMDbCheckpointServlet {
     File dummyFile = new File(dbCheckpoint.getCheckpointLocation().toString(),
         "dummy.sst");
     try (OutputStreamWriter writer = new OutputStreamWriter(
-        new FileOutputStream(dummyFile), StandardCharsets.UTF_8)) {
+        Files.newOutputStream(dummyFile.toPath()), StandardCharsets.UTF_8)) {
       writer.write("Dummy data.");
     }
     assertTrue(dummyFile.exists());
-    List<String> toExcludeList = new ArrayList<>();
-    List<String> excludedList = new ArrayList<>();
+    Set<String> toExcludeList = new HashSet<>();
     toExcludeList.add(dummyFile.getName());
 
     // Set http param to exclude snapshot data.
@@ -572,9 +573,9 @@ public class TestOMDbCheckpointServlet {
 
     // Get the tarball.
     Path tmpdir = folder.resolve("bootstrapData");
-    try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
+    try (OutputStream fileOutputStream = Files.newOutputStream(tempFile.toPath())) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
-          fileOutputStream, toExcludeList, excludedList, tmpdir);
+          fileOutputStream, toExcludeList, tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.
@@ -611,7 +612,7 @@ public class TestOMDbCheckpointServlet {
    * @param toExcludeList SST file names to be excluded.
    * @throws IOException
    */
-  private void setupHttpMethod(String method, List<String> toExcludeList) throws IOException {
+  private void setupHttpMethod(String method, Collection <String> toExcludeList) throws IOException {
     if (method.equals("POST")) {
       setupPostMethod(toExcludeList);
     } else {
@@ -624,7 +625,7 @@ public class TestOMDbCheckpointServlet {
    * @param toExcludeList SST file names to be excluded.
    * @throws IOException
    */
-  private void setupPostMethod(List<String> toExcludeList)
+  private void setupPostMethod(Collection<String> toExcludeList)
       throws IOException {
     when(requestMock.getMethod()).thenReturn("POST");
     when(requestMock.getContentType()).thenReturn("multipart/form-data; " +
@@ -662,7 +663,7 @@ public class TestOMDbCheckpointServlet {
    * Setups details for HTTP GET request.
    * @param toExcludeList SST file names to be excluded.
    */
-  private void setupGetMethod(List<String> toExcludeList) {
+  private void setupGetMethod(Collection<String> toExcludeList) {
     when(requestMock.getMethod()).thenReturn("GET");
     when(requestMock
         .getParameterValues(OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST))
@@ -676,10 +677,12 @@ public class TestOMDbCheckpointServlet {
         .createVolumeAndBucket(client);
 
     // Create dummy keys for snapshotting.
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
-    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(),
-        "content");
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
+            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+        "content".getBytes(StandardCharsets.UTF_8));
+    TestDataUtil.createKey(bucket, UUID.randomUUID().toString(), ReplicationConfig
+            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
+        "content".getBytes(StandardCharsets.UTF_8));
 
     snapshotDirName =
         createSnapshot(bucket.getVolumeName(), bucket.getName());
@@ -690,7 +693,7 @@ public class TestOMDbCheckpointServlet {
     Path fabricatedSnapshot  = Paths.get(
         new File(snapshotDirName).getParent(),
         "fabricatedSnapshot");
-    fabricatedSnapshot.toFile().mkdirs();
+    assertTrue(fabricatedSnapshot.toFile().mkdirs());
     assertTrue(Paths.get(fabricatedSnapshot.toString(),
         FABRICATED_FILE_NAME).toFile().createNewFile());
 

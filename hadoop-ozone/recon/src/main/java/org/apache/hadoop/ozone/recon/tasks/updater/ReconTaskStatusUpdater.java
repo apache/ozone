@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.recon.tasks.updater;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +72,14 @@ public class ReconTaskStatusUpdater {
 
   public void setIsCurrentTaskRunning(int isCurrentTaskRunning) {
     this.reconTaskStatus.setIsCurrentTaskRunning(isCurrentTaskRunning);
+  }
+
+  public Long getLastUpdatedSeqNumber() {
+    return this.reconTaskStatus.getLastUpdatedSeqNumber();
+  }
+
+  public String getTaskName() {
+    return this.taskName;
   }
 
   /**

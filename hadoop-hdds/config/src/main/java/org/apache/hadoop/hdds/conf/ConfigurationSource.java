@@ -98,7 +98,7 @@ public interface ConfigurationSource {
 
   default String[] getTrimmedStrings(String name) {
     String valueString = get(name);
-    if (null == valueString || valueString.trim().isEmpty()) {
+    if (null == valueString) {
       return EMPTY_STRING_ARRAY;
     }
 
@@ -151,6 +151,7 @@ public interface ConfigurationSource {
   default boolean isConfigured(String key) {
     return get(key) != null;
   }
+
   /**
    * Create a Configuration object and inject the required configuration values.
    *
@@ -168,14 +169,7 @@ public interface ConfigurationSource {
       throw new ConfigurationException(
           "Configuration class can't be created: " + configurationClass, e);
     }
-    ConfigGroup configGroup =
-        configurationClass.getAnnotation(ConfigGroup.class);
-
-    String prefix = configGroup.prefix();
-
-    ConfigurationReflectionUtil
-        .injectConfiguration(this, configurationClass, configObject,
-            prefix, false);
+    ConfigurationReflectionUtil.injectConfiguration(this, configurationClass, configObject, false);
 
     ConfigurationReflectionUtil.callPostConstruct(configObject);
 
@@ -187,10 +181,7 @@ public interface ConfigurationSource {
    * Update {@code object}'s reconfigurable properties from this configuration.
    */
   default <T> void reconfigure(Class<T> configClass, T object) {
-    ConfigGroup configGroup = configClass.getAnnotation(ConfigGroup.class);
-    String prefix = configGroup.prefix();
-    ConfigurationReflectionUtil.injectConfiguration(
-        this, configClass, object, prefix, true);
+    ConfigurationReflectionUtil.injectConfiguration(this, configClass, object, true);
   }
 
   /**

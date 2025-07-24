@@ -40,6 +40,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalInt;
+import net.jcip.annotations.Immutable;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -52,15 +54,16 @@ import org.slf4j.LoggerFactory;
  * This class is used by SCM clients like OzoneManager, Client, Admin
  * commands to figure out SCM Node Information to make contact to SCM.
  */
+@Immutable
 public class SCMNodeInfo {
 
   private static final Logger LOG = LoggerFactory.getLogger(SCMNodeInfo.class);
-  private String serviceId;
-  private String nodeId;
-  private String blockClientAddress;
-  private String scmClientAddress;
-  private String scmSecurityAddress;
-  private String scmDatanodeAddress;
+  private final String serviceId;
+  private final String nodeId;
+  private final String blockClientAddress;
+  private final String scmClientAddress;
+  private final String scmSecurityAddress;
+  private final String scmDatanodeAddress;
 
   /**
    * Build SCM Node information from configuration.
@@ -72,11 +75,11 @@ public class SCMNodeInfo {
     // If service Id is not defined, fall back to non-HA config.
 
     List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
-    String scmServiceId = SCMHAUtils.getScmServiceId(conf);
+    String scmServiceId = HddsUtils.getScmServiceId(conf);
     if (scmServiceId != null) {
       ArrayList< String > scmNodeIds = new ArrayList<>(
-          SCMHAUtils.getSCMNodeIds(conf, scmServiceId));
-      if (scmNodeIds.size() == 0) {
+          HddsUtils.getSCMNodeIds(conf, scmServiceId));
+      if (scmNodeIds.isEmpty()) {
         throw new ConfigurationException(
             String.format("Configuration does not have any value set for %s " +
                     "for the SCM serviceId %s. List of SCM Node ID's should " +
@@ -179,7 +182,7 @@ public class SCMNodeInfo {
   }
 
   private static String buildAddress(String address, int port) {
-    return new StringBuilder().append(address).append(":")
+    return new StringBuilder().append(address).append(':')
         .append(port).toString();
   }
 

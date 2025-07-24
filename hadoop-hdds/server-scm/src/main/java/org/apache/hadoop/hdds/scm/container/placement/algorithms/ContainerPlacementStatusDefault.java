@@ -35,7 +35,6 @@ public class ContainerPlacementStatusDefault
   private final int maxReplicasPerRack;
   private final List<Integer> rackReplicaCnts;
 
-
   public ContainerPlacementStatusDefault(int currentRacks, int requiredRacks,
       int totalRacks, int maxReplicasPerRack, List<Integer> rackReplicaCnts) {
     this.requiredRacks = requiredRacks;

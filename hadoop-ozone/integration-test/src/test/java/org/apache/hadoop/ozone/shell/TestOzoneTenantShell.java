@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.shell;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
@@ -26,10 +25,8 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENAN
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -61,7 +58,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +70,6 @@ import picocli.CommandLine;
  * TODO: HDDS-6338. Add a Kerberized version of this
  * TODO: HDDS-6336. Add a mock Ranger server to test Ranger HTTP endpoint calls
  */
-@Timeout(300)
 public class TestOzoneTenantShell {
 
   private static final Logger LOG =
@@ -83,8 +78,6 @@ public class TestOzoneTenantShell {
   static {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
   }
-
-  private static final String DEFAULT_ENCODING = UTF_8.name();
 
   /**
    * Set the timeout for every test.
@@ -117,9 +110,7 @@ public class TestOzoneTenantShell {
   @BeforeAll
   public static void init() throws Exception {
     // Remove audit log output if it exists
-    if (AUDIT_LOG_FILE.exists()) {
-      AUDIT_LOG_FILE.delete();
-    }
+    FileUtils.deleteQuietly(AUDIT_LOG_FILE);
 
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
@@ -136,8 +127,7 @@ public class TestOzoneTenantShell {
     }
 
     testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
-    testFile.getParentFile().mkdirs();
-    testFile.createNewFile();
+    FileUtils.touch(testFile);
 
     ozoneSh = new OzoneShell();
     tenantShell = new TenantShell();
@@ -162,9 +152,7 @@ public class TestOzoneTenantShell {
       cluster.shutdown();
     }
 
-    if (AUDIT_LOG_FILE.exists()) {
-      AUDIT_LOG_FILE.delete();
-    }
+    FileUtils.deleteQuietly(AUDIT_LOG_FILE);
   }
 
   @BeforeEach
@@ -174,14 +162,14 @@ public class TestOzoneTenantShell {
     ozoneSh.getCmd().setOut(new PrintWriter(out));
     ozoneSh.getCmd().setErr(new PrintWriter(err));
     // Suppress OMNotLeaderException in the log
-    GenericTestUtils.setLogLevel(RetryInvocationHandler.LOG, Level.WARN);
+    GenericTestUtils.setLogLevel(RetryInvocationHandler.class, Level.WARN);
     // Enable debug logging for interested classes
-    GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMTenantCreateRequest.class, Level.DEBUG);
     GenericTestUtils.setLogLevel(
-        OMTenantAssignUserAccessIdRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
+        OMTenantAssignUserAccessIdRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(AuthorizerLockImpl.class, Level.DEBUG);
 
-    GenericTestUtils.setLogLevel(OMRangerBGSyncService.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMRangerBGSyncService.class, Level.DEBUG);
   }
 
   /**
@@ -212,26 +200,6 @@ public class TestOzoneTenantShell {
     System.arraycopy(args, 0, newArgs, 0, args.length);
     newArgs[args.length] = "--om-service-id=" + omServiceId;
     return execute(shell, newArgs);
-  }
-
-  /**
-   * Execute command, assert exception message and returns true if error
-   * was thrown.
-   */
-  private void executeWithError(OzoneShell shell, String[] args,
-                                String expectedError) {
-    if (Strings.isNullOrEmpty(expectedError)) {
-      execute(shell, args);
-    } else {
-      Exception ex = assertThrows(Exception.class, () -> execute(shell, args));
-      if (!Strings.isNullOrEmpty(expectedError)) {
-        Throwable exceptionToCheck = ex;
-        if (exceptionToCheck.getCause() != null) {
-          exceptionToCheck = exceptionToCheck.getCause();
-        }
-        assertThat(exceptionToCheck.getMessage()).contains(expectedError);
-      }
-    }
   }
 
   private String getSetConfStringFromConf(String key) {
@@ -414,7 +382,7 @@ public class TestOzoneTenantShell {
     checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
 
     // Check volume creation
-    OmVolumeArgs volArgs = cluster.getOzoneManager().getVolumeInfo("finance");
+    OmVolumeArgs volArgs = cluster.getOMLeader().getVolumeInfo("finance");
     assertEquals("finance", volArgs.getVolume());
 
     // Creating the tenant with the same name again should fail

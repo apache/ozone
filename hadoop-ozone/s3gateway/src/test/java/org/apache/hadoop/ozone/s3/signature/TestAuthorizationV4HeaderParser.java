@@ -320,7 +320,6 @@ public class TestAuthorizationV4HeaderParser {
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
             "/aws4_request,"
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-            + ""
             + "=";
     assertThrows(MalformedResourceException.class,
         () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)

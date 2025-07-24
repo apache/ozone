@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
@@ -88,6 +89,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.io.IOUtils;
@@ -168,7 +170,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,7 +177,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class to for security enabled Ozone cluster.
  */
-@Timeout(80)
 final class TestSecureOzoneCluster {
 
   private static final String COMPONENT = "om";
@@ -538,6 +538,31 @@ final class TestSecureOzoneCluster {
   }
 
   /**
+   * Tests the secure om Initialization Failure due to delegation token and secret key configuration don't meet
+   * requirement.
+   */
+  @Test
+  void testSecureOMDelegationTokenSecretManagerInitializationFailure() throws Exception {
+    initSCM();
+    // Create a secure SCM instance as om client will connect to it
+    scm = HddsTestUtils.getScmSimple(conf);
+    try {
+      scm.start();
+      conf.setTimeDuration(HDDS_SECRET_KEY_EXPIRY_DURATION, 7, TimeUnit.DAYS);
+      conf.setTimeDuration(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY, 7, TimeUnit.DAYS);
+      IllegalArgumentException exception = assertThrows(
+          IllegalArgumentException.class, () -> setupOm(conf));
+      assertTrue(exception.getMessage().contains("Secret key expiry duration hdds.secret.key.expiry.duration "  +
+          "should be greater than value of (ozone.manager.delegation.token.max-lifetime + " +
+          "ozone.manager.delegation.remover.scan.interval + hdds.secret.key.rotate.duration"));
+    } finally {
+      if (scm != null) {
+        scm.stop();
+      }
+    }
+  }
+
+  /**
    * Tests the secure om Initialization success.
    */
   @Test
@@ -545,8 +570,8 @@ final class TestSecureOzoneCluster {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
     scm = HddsTestUtils.getScmSimple(conf);
-    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
-    GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
+    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
+    GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
 
     try {
       scm.start();
@@ -566,8 +591,8 @@ final class TestSecureOzoneCluster {
   @Test
   void testAccessControlExceptionOnClient() throws Exception {
     initSCM();
-    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
-    GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
+    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.class);
+    GenericTestUtils.setLogLevel(OzoneManager.class, INFO);
     try {
       // Create a secure SCM instance as om client will connect to it
       scm = HddsTestUtils.getScmSimple(conf);
@@ -605,7 +630,7 @@ final class TestSecureOzoneCluster {
             ClientId.randomId().toString());
     String exMessage = "org.apache.hadoop.security.AccessControlException: " +
         "Client cannot authenticate via:[TOKEN, KERBEROS]";
-    logs = LogCapturer.captureLogs(Client.LOG);
+    logs = LogCapturer.captureLogs(Client.class);
     IOException ioException = assertThrows(IOException.class,
         () -> unsecureClient.listAllVolumes(null, null, 0));
     assertThat(ioException).hasMessageContaining(exMessage);
@@ -626,9 +651,8 @@ final class TestSecureOzoneCluster {
    */
   @Test
   void testDelegationTokenRenewal() throws Exception {
-    GenericTestUtils
-        .setLogLevel(LoggerFactory.getLogger(Server.class.getName()), INFO);
-    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
+    GenericTestUtils.setLogLevel(Server.class, INFO);
+    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.class);
 
     // Setup SCM
     initSCM();
@@ -651,7 +675,7 @@ final class TestSecureOzoneCluster {
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       // Since client is already connected get a delegation token
       Token<OzoneTokenIdentifier> token = omClient.getDelegationToken(
@@ -739,7 +763,7 @@ final class TestSecureOzoneCluster {
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       // Creates a secret since it does not exist
       S3SecretValue attempt1 = omClient.getS3Secret(username);
@@ -800,7 +824,7 @@ final class TestSecureOzoneCluster {
       final OzoneManagerProtocolClientSideTranslatorPB omClientNonAdmin =
           new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugiNonAdmin, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       OMException omException = assertThrows(OMException.class,
           () -> omClientNonAdmin.getS3Secret("HADOOP/JOHN"));
@@ -822,8 +846,7 @@ final class TestSecureOzoneCluster {
    */
   @Test
   void testSecureOmReInit() throws Exception {
-    LogCapturer omLogs =
-        LogCapturer.captureLogs(OMCertificateClient.LOG);
+    LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.class);
     omLogs.clearOutput();
 
     initSCM();
@@ -870,7 +893,6 @@ final class TestSecureOzoneCluster {
         scm.stop();
       }
     }
-
   }
 
   /**
@@ -879,7 +901,7 @@ final class TestSecureOzoneCluster {
   @Test
   void testSecureOmInitSuccess() throws Exception {
     LogCapturer omLogs =
-        LogCapturer.captureLogs(OMCertificateClient.LOG);
+        LogCapturer.captureLogs(OMCertificateClient.class);
     omLogs.clearOutput();
     initSCM();
     try {
@@ -917,7 +939,6 @@ final class TestSecureOzoneCluster {
       }
       IOUtils.closeQuietly(om);
     }
-
   }
 
   /**
@@ -999,12 +1020,13 @@ final class TestSecureOzoneCluster {
           1000, certificateLifetime * 1000);
     }
   }
+
   /**
    * Test unexpected SCMGetCertResponseProto returned from SCM.
    */
   @Test
   void testCertificateRotationRecoverableFailure() throws Exception {
-    LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.LOG);
+    LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.class);
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
     omStorage.setOmId(omId);
@@ -1094,8 +1116,8 @@ final class TestSecureOzoneCluster {
   void testCertificateRotationUnRecoverableFailure() throws Exception {
     ExitUtils.disableSystemExit();
     ExitUtil.disableSystemExit();
-    LogCapturer certClientLogs = LogCapturer.captureLogs(OMCertificateClient.LOG);
-    LogCapturer exitUtilLog = LogCapturer.captureLogs(LoggerFactory.getLogger(ExitUtil.class));
+    LogCapturer certClientLogs = LogCapturer.captureLogs(OMCertificateClient.class);
+    LogCapturer exitUtilLog = LogCapturer.captureLogs(ExitUtil.class);
 
 
     OMStorage omStorage = new OMStorage(conf);
@@ -1190,7 +1212,7 @@ final class TestSecureOzoneCluster {
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(newConf, ugi, null),
-          RandomStringUtils.randomAscii(5));
+          RandomStringUtils.secure().nextAscii(5));
 
       // Since client is already connected get a delegation token
       Token<OzoneTokenIdentifier> token1 = omClient.getDelegationToken(

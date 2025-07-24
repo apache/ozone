@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -97,6 +98,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     auditLogger = mock(AuditLogger.class);
@@ -720,8 +722,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // dir should inherit parent DEFAULT acls and self has DEFAULT scope
     // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
-    for (int indx = 0; indx < dirs.size(); indx++) {
-      String dirName = dirs.get(indx);
+    for (String dirName : dirs) {
       String dbKey;
       // for index=0, parentID is bucketID
       dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
@@ -742,11 +743,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
   @Nonnull
   private String createDirKey(List<String> dirs, int depth) {
-    String keyName = RandomStringUtils.randomAlphabetic(5);
+    String keyName = RandomStringUtils.secure().nextAlphabetic(5);
     dirs.add(keyName);
     StringBuffer buf = new StringBuffer(keyName);
     for (int i = 0; i < depth; i++) {
-      String dirName = RandomStringUtils.randomAlphabetic(5);
+      String dirName = RandomStringUtils.secure().nextAlphabetic(5);
       dirs.add(dirName);
       buf.append(OzoneConsts.OM_KEY_PREFIX);
       buf.append(dirName);
@@ -759,14 +760,11 @@ public class TestOMDirectoryCreateRequestWithFSO {
           throws IOException {
     // bucketID is the parent
     long parentID = bucketId;
-    for (int indx = 0; indx < dirs.size(); indx++) {
-      String dirName = dirs.get(indx);
+    for (String dirName : dirs) {
       String dbKey;
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-              parentID, dirName);
-      OmDirectoryInfo omDirInfo =
-              omMetadataManager.getDirectoryTable().get(dbKey);
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentID, dirName);
+      OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().get(dbKey);
       assertNotNull(omDirInfo, "Invalid directory!");
       assertEquals(dirName, omDirInfo.getName(),
           "Invalid directory!");
@@ -781,15 +779,12 @@ public class TestOMDirectoryCreateRequestWithFSO {
           throws IOException {
     // bucketID is the parent
     long parentID = bucketId;
-    for (int indx = 0; indx < dirs.size(); indx++) {
-      String dirName = dirs.get(indx);
+    for (String dirName : dirs) {
       String dbKey;
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-              parentID, dirName);
+      dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, parentID, dirName);
       CacheValue<OmDirectoryInfo> omDirInfoCacheValue =
-              omMetadataManager.getDirectoryTable()
-                      .getCacheValue(new CacheKey<>(dbKey));
+              omMetadataManager.getDirectoryTable().getCacheValue(new CacheKey<>(dbKey));
       assertNull(omDirInfoCacheValue, "Unexpected directory!");
     }
   }

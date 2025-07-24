@@ -91,7 +91,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -133,7 +132,6 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -144,7 +142,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test HSync.
  */
-@Timeout(value = 300)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestHSync {
   private static final Logger LOG =
@@ -368,8 +365,7 @@ public class TestHSync {
 
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
     // deletedTable should not have an entry for file at all in this case
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, RepeatedOmKeyInfo>>
+    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo>
         tableIter = metadataManager.getDeletedTable().iterator()) {
       while (tableIter.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = tableIter.next();
@@ -456,7 +452,6 @@ public class TestHSync {
     }
   }
 
-
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   public void testOfsHSync(boolean incrementalChunkList) throws Exception {
@@ -505,7 +500,7 @@ public class TestHSync {
           // Verify hsync openKey gets committed eventually
           // Key without hsync is deleted
           GenericTestUtils.waitFor(() ->
-              0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
+              getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
           // Verify only one key is still present in fileTable
           assertThat(1 == getKeyInfo(BUCKET_LAYOUT).size());
 
@@ -590,7 +585,7 @@ public class TestHSync {
         // Verify if DELETED_HSYNC_KEY metadata is added to openKey
         GenericTestUtils.waitFor(() -> {
           List<OmKeyInfo> omKeyInfo = getOpenKeyInfo(BUCKET_LAYOUT);
-          return omKeyInfo.size() > 0 && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
+          return !omKeyInfo.isEmpty() && omKeyInfo.get(0).getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY);
         }, 1000, 12000);
 
         // Resume openKeyCleanupService
@@ -598,7 +593,7 @@ public class TestHSync {
 
         // Verify entry from openKey gets deleted eventually
         GenericTestUtils.waitFor(() ->
-            0 == getOpenKeyInfo(BUCKET_LAYOUT).size(), 1000, 12000);
+            getOpenKeyInfo(BUCKET_LAYOUT).isEmpty(), 1000, 12000);
       } catch (OMException ex) {
         assertEquals(OMException.ResultCodes.DIRECTORY_NOT_FOUND, ex.getResult());
       } finally {
@@ -612,7 +607,7 @@ public class TestHSync {
 
     Table<String, OmKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager().getOpenKeyTable(bucketLayout);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+    try (Table.KeyValueIterator<String, OmKeyInfo>
              iterator = openFileTable.iterator()) {
       while (iterator.hasNext()) {
         omKeyInfo.add(iterator.next().getValue());
@@ -627,7 +622,7 @@ public class TestHSync {
 
     Table<String, OmKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager().getKeyTable(bucketLayout);
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+    try (Table.KeyValueIterator<String, OmKeyInfo>
              iterator = openFileTable.iterator()) {
       while (iterator.hasNext()) {
         omKeyInfo.add(iterator.next().getValue());
@@ -723,7 +718,8 @@ public class TestHSync {
     // test file with all blocks pre-allocated
     omMetrics.resetNumKeyHSyncs();
     long writtenSize = 0;
-    try (OzoneOutputStream outputStream = bucket.createKey("key-" + RandomStringUtils.randomNumeric(5),
+    try (OzoneOutputStream outputStream = bucket.createKey("key-" +
+            RandomStringUtils.secure().nextNumeric(5),
         BLOCK_SIZE * 2, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
       // make sure at least writing 2 blocks data
       while (writtenSize <= BLOCK_SIZE) {
@@ -819,7 +815,6 @@ public class TestHSync {
       }
     }, 500, 3000);
   }
-
 
   public static Stream<Arguments> concurrentExceptionHandling() {
     return Stream.of(
@@ -1137,7 +1132,7 @@ public class TestHSync {
    * @return OmKeyInfo
    */
   private OmKeyInfo getFirstKeyInTable(String keyName, Table<String, OmKeyInfo> openKeyTable) throws IOException {
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> it = openKeyTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> it = openKeyTable.iterator()) {
       assertTrue(it.hasNext());
       Table.KeyValue<String, OmKeyInfo> kv = it.next();
       String dbOpenKey = kv.getKey();
@@ -1205,7 +1200,7 @@ public class TestHSync {
 
     final String keyName = UUID.randomUUID().toString();
     int fileSize = 16 << 11;
-    String s = RandomStringUtils.randomAlphabetic(bufferSize);
+    String s = RandomStringUtils.secure().nextAlphabetic(bufferSize);
     ByteBuffer byteBuffer = ByteBuffer.wrap(s.getBytes(StandardCharsets.UTF_8));
 
     int writtenSize = 0;
@@ -1328,7 +1323,7 @@ public class TestHSync {
       outputStream1.write(data2.getBytes(UTF_8), 0, data2.length());
       outputStream1.hsync();
       // write more data
-      String s = RandomStringUtils.randomAlphabetic(BLOCK_SIZE);
+      String s = RandomStringUtils.secure().nextAlphabetic(BLOCK_SIZE);
       byte[] newData = s.getBytes(StandardCharsets.UTF_8);
       outputStream1.write(newData);
 
@@ -1340,13 +1335,13 @@ public class TestHSync {
 
       // hsync call for overwritten hsync key, should fail
       OMException omException = assertThrows(OMException.class, () -> outputStream1.hsync());
-      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omException.getResult());
       assertTrue(omException.getMessage().contains("already deleted/overwritten"));
 
       // allocate new block for overwritten hsync key, should fail
       IOException ioException = assertThrows(IOException.class, () -> outputStream1.write(newData));
       assertTrue(ioException.getCause() instanceof OMException);
-      assertTrue(((OMException)ioException.getCause()).getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ((OMException)ioException.getCause()).getResult());
       assertTrue(ioException.getMessage().contains("already deleted/overwritten"));
 
       // recover key will success since key is already committed by outputStream2
@@ -1378,7 +1373,7 @@ public class TestHSync {
       // Verify entry from openKey gets deleted eventually
       GenericTestUtils.waitFor(() -> {
         try {
-          return getAllOpenKeys(openKeyTable).size() == 0 && getAllDeletedKeys(deletedTable).size() == 2;
+          return getAllOpenKeys(openKeyTable).isEmpty() && getAllDeletedKeys(deletedTable).size() == 2;
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
@@ -1508,7 +1503,7 @@ public class TestHSync {
 
       // close first hsync key should fail
       OMException omException = assertThrows(OMException.class, () -> outputStream1.close());
-      assertTrue(omException.getResult() == OMException.ResultCodes.KEY_NOT_FOUND);
+      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omException.getResult());
       assertTrue(omException.getMessage().contains("already deleted/overwritten"));
 
       // hsync/close second hsync key should success
@@ -1546,7 +1541,7 @@ public class TestHSync {
 
   private Map<String, OmKeyInfo> getAllOpenKeys(Table<String, OmKeyInfo> table) throws IOException {
     Map<String, OmKeyInfo> keys = new HashMap<String, OmKeyInfo>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> tableIter = table.iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> tableIter = table.iterator()) {
       while (tableIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = tableIter.next();
         String key = kv.getKey();
@@ -1558,7 +1553,7 @@ public class TestHSync {
 
   private Map<String, RepeatedOmKeyInfo> getAllDeletedKeys(Table<String, RepeatedOmKeyInfo> table) throws IOException {
     Map<String, RepeatedOmKeyInfo> keys = new HashMap<String, RepeatedOmKeyInfo>();
-    try (TableIterator<String, ? extends Table.KeyValue<String, RepeatedOmKeyInfo>> tableIter = table.iterator()) {
+    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> tableIter = table.iterator()) {
       while (tableIter.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = tableIter.next();
         String key = kv.getKey();
@@ -1570,9 +1565,11 @@ public class TestHSync {
 
   private static class ErrorInjectorImpl implements ErrorInjector {
     private final AtomicInteger remaining = new AtomicInteger();
+
     void start(int count) {
       remaining.set(count);
     }
+
     @Override
     public RaftClientReply getResponse(ContainerProtos.ContainerCommandRequestProto request, ClientId clientId,
         Pipeline pipeline) {

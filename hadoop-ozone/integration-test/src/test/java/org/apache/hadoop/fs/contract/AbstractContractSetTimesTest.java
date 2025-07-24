@@ -23,16 +23,12 @@ import java.io.FileNotFoundException;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test setTimes -if supported.
  */
 public abstract class AbstractContractSetTimesTest extends
     AbstractFSContractTestBase {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(AbstractContractSetTimesTest.class);
 
   private Path testPath;
   private Path target;

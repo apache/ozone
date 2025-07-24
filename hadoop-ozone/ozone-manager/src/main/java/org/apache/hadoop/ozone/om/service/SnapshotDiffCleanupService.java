@@ -58,7 +58,6 @@ public class SnapshotDiffCleanupService extends BackgroundService {
   private final AtomicBoolean suspended;
   private final AtomicLong runCount;
   private final AtomicLong successRunCount;
-  private final OzoneManager ozoneManager;
   private final ManagedRocksDB db;
   private final ColumnFamilyHandle snapDiffJobCfh;
   private final ColumnFamilyHandle snapDiffPurgedJobCfh;
@@ -91,7 +90,6 @@ public class SnapshotDiffCleanupService extends BackgroundService {
     this.suspended = new AtomicBoolean(false);
     this.runCount = new AtomicLong(0);
     this.successRunCount = new AtomicLong(0);
-    this.ozoneManager = ozoneManager;
     this.db = db;
     this.snapDiffJobCfh = snapDiffJobCfh;
     this.snapDiffPurgedJobCfh = snapDiffPurgedJobCfh;

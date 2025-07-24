@@ -24,8 +24,12 @@ import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamData
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.writeFully;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
@@ -38,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
@@ -48,6 +53,9 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.WriteMethod;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.FilePositionCount;
@@ -68,7 +76,7 @@ import org.slf4j.LoggerFactory;
 
 /** For testing {@link KeyValueStreamDataChannel}. */
 public class TestKeyValueStreamDataChannel {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueStreamDataChannel.class);
 
   private static final ContainerCommandRequestProto PUT_BLOCK_PROTO
@@ -82,6 +90,7 @@ public class TestKeyValueStreamDataChannel {
       .setVersion(ClientVersion.CURRENT.toProtoValue())
       .build();
   static final int PUT_BLOCK_PROTO_SIZE = PUT_BLOCK_PROTO.toByteString().size();
+
   static {
     LOG.info("PUT_BLOCK_PROTO_SIZE = {}", PUT_BLOCK_PROTO_SIZE);
   }
@@ -148,6 +157,28 @@ public class TestKeyValueStreamDataChannel {
           Result.MALFORMED_REQUEST);
     }
     return request;
+  }
+
+  @Test
+  public void testVolumeFullCase() throws Exception {
+    File tempFile = File.createTempFile("test-kv-stream", ".tmp");
+    tempFile.deleteOnExit();
+    HddsVolume mockVolume = mock(HddsVolume.class);
+    when(mockVolume.getStorageID()).thenReturn("storageId");
+    when(mockVolume.getCurrentUsage()).thenReturn(new SpaceUsageSource.Fixed(100L, 0L, 100L));
+    ContainerData mockContainerData = mock(ContainerData.class);
+    when(mockContainerData.getContainerID()).thenReturn(123L);
+    when(mockContainerData.getVolume()).thenReturn(mockVolume);
+    ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
+    KeyValueStreamDataChannel writeChannel = new KeyValueStreamDataChannel(tempFile, mockContainerData, mockMetrics);
+    assertThrows(StorageContainerException.class,
+        () -> writeChannel.assertSpaceAvailability(1));
+    final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
+        PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
+    ReferenceCountedObject<ByteBuffer> wrap = ReferenceCountedObject.wrap(putBlockBuf);
+    wrap.retain();
+    assertThrows(StorageContainerException.class, () -> writeChannel.write(wrap));
+    wrap.release();
   }
 
   @Test

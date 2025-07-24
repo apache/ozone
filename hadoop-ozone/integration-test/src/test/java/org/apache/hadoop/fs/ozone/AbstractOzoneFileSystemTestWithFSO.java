@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -241,6 +242,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
   /**
    * Case-2) Cannot rename a directory to its own subdirectory.
    */
+  @Override
   @Test
   public void testRenameDirToItsOwnSubDir() throws Exception {
     final String root = "/root";
@@ -262,6 +264,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
    * is not yet supported.
    * Fails if the (a) parent of dst does not exist or (b) parent is a file.
    */
+  @Override
   @Test
   public void testRenameDestinationParentDoesntExist() throws Exception {
     final String root = "/root_dir";
@@ -516,8 +519,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
 
   @Test
   public void testFSDeleteLogWarnNoExist() throws Exception {
-    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
-        .captureLogs(BasicOzoneClientAdapterImpl.LOG);
+    LogCapturer logCapture = LogCapturer.captureLogs(BasicOzoneClientAdapterImpl.class);
     getFs().delete(new Path("/d1/d3/noexist/"), true);
     assertThat(logCapture.getOutput()).contains(
         "delete key failed Unable to get file status");

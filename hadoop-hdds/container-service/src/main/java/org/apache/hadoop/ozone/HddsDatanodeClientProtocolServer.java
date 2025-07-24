@@ -22,14 +22,13 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_READ_THREADPOOL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_READ_THREADPOOL_KEY;
-import static org.apache.hadoop.hdds.HddsUtils.preserveThreadName;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.CLIENT_RPC;
 
 import com.google.protobuf.BlockingService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -67,7 +66,7 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
         HDDS_DATANODE_CLIENT_ADDRESS_KEY,
         HddsUtils.getDatanodeRpcAddress(conf), rpcServer);
     datanodeDetails.setPort(CLIENT_RPC, clientRpcAddress.getPort());
-    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
+    if (conf.getBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       rpcServer.refreshServiceAcl(conf, HddsPolicyProvider.getInstance());
     }
@@ -114,8 +113,8 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
         .ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
 
-    return preserveThreadName(() -> startRpcServer(configuration, rpcAddress,
-        ReconfigureProtocolDatanodePB.class, reconfigureService, handlerCount, readThreads));
+    return startRpcServer(configuration, rpcAddress,
+        ReconfigureProtocolDatanodePB.class, reconfigureService, handlerCount, readThreads);
   }
 
   /**

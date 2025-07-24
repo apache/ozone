@@ -80,8 +80,11 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         // redundant tombstone entry in the deletedTable. It is better to skip the transaction.
         UUID expectedPreviousSnapshotId = purgeKeysRequest.getExpectedPreviousSnapshotID().hasUuid()
             ? fromProtobuf(purgeKeysRequest.getExpectedPreviousSnapshotID().getUuid()) : null;
-        validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
-            expectedPreviousSnapshotId);
+        if (!validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+            expectedPreviousSnapshotId)) {
+          return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
+              new OMException("Snapshot validation failed", OMException.ResultCodes.INVALID_REQUEST)));
+        }
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OmKeyPurge. ", e);
@@ -91,6 +94,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     List<String> keysToBePurgedList = new ArrayList<>();
 
     int numKeysDeleted = 0;
+    List<String> renamedKeysToBePurged = new ArrayList<>(purgeKeysRequest.getRenamedKeysList());
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
       List<String> keysList = bucketWithDeleteKeys.getKeysList();
       keysToBePurgedList.addAll(keysList);
@@ -98,8 +102,9 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
     DeletingServiceMetrics deletingServiceMetrics = ozoneManager.getDeletionMetrics();
     deletingServiceMetrics.incrNumKeysPurged(numKeysDeleted);
+    deletingServiceMetrics.incrNumRenameEntriesPurged(renamedKeysToBePurged.size());
 
-    if (keysToBePurgedList.isEmpty()) {
+    if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
           new OMException("None of the keys can be purged be purged since a new snapshot was created for all the " +
               "buckets, making this request invalid", OMException.ResultCodes.KEY_DELETION_ERROR)));
@@ -118,7 +123,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
 
     return new OMKeyPurgeResponse(omResponse.build(),
-        keysToBePurgedList, fromSnapshotInfo, keysToUpdateList);
+        keysToBePurgedList, renamedKeysToBePurged, fromSnapshotInfo, keysToUpdateList);
   }
 
 }

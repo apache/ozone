@@ -61,7 +61,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ECUnderReplicationHandler.class);
   private final PlacementPolicy containerPlacement;
   private final long currentContainerSize;
@@ -430,7 +430,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     ContainerInfo container = replicaCount.getContainer();
     Set<Integer> decomIndexes = replicaCount.decommissioningOnlyIndexes(true);
     int commandsSent = 0;
-    if (decomIndexes.size() > 0) {
+    if (!decomIndexes.isEmpty()) {
       LOG.debug("Processing decommissioning indexes {} for container {}.",
           decomIndexes, container.containerID());
       final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(

@@ -32,7 +32,7 @@ class TestSCMHAMetrics {
   private static final MetricsCollectorImpl METRICS_COLLECTOR =
       new MetricsCollectorImpl();
   private static final String NODE_ID =
-      "scm" + RandomStringUtils.randomNumeric(5);
+      "scm" + RandomStringUtils.secure().nextNumeric(5);
   private String leaderId;
   private SCMHAMetrics scmhaMetrics;
 
@@ -57,7 +57,7 @@ class TestSCMHAMetrics {
   @Test
   public void testGetMetricsWithFollower() {
     // GIVEN
-    leaderId = "scm" + RandomStringUtils.randomNumeric(5);
+    leaderId = "scm" + RandomStringUtils.secure().nextNumeric(5);
 
     // WHEN
     scmhaMetrics = SCMHAMetrics.create(NODE_ID, leaderId);

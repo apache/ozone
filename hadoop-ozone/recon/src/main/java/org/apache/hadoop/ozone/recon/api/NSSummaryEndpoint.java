@@ -51,6 +51,7 @@ public class NSSummaryEndpoint {
   private final ReconOMMetadataManager omMetadataManager;
 
   private final OzoneStorageContainerManager reconSCM;
+
   @Inject
   public NSSummaryEndpoint(ReconNamespaceSummaryManager namespaceSummaryManager,
                            ReconOMMetadataManager omMetadataManager,
@@ -71,7 +72,7 @@ public class NSSummaryEndpoint {
   public Response getBasicInfo(
       @QueryParam("path") String path) throws IOException {
 
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
@@ -105,14 +106,14 @@ public class NSSummaryEndpoint {
    * @throws IOException
    */
   @GET
-  @Path("/du")
+  @Path("/usage")
   @SuppressWarnings("methodlength")
   public Response getDiskUsage(@QueryParam("path") String path,
                                @DefaultValue("false") @QueryParam("files") boolean listFile,
                                @DefaultValue("false") @QueryParam("replica") boolean withReplica,
                                @DefaultValue("true") @QueryParam("sortSubPaths") boolean sortSubpaths)
       throws IOException {
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
@@ -143,7 +144,7 @@ public class NSSummaryEndpoint {
   public Response getQuotaUsage(@QueryParam("path") String path)
       throws IOException {
 
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
@@ -173,7 +174,7 @@ public class NSSummaryEndpoint {
   public Response getFileSizeDistribution(@QueryParam("path") String path)
       throws IOException {
 
-    if (path == null || path.length() == 0) {
+    if (path == null || path.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 

@@ -246,7 +246,7 @@ The default value of java.library.path depends on the OS and Java version. For e
 You can check if ISA-L is accessible to Ozone by running the following command:
 
 ```shell
-ozone checknative
+ozone debug checknative
 ```
 
 

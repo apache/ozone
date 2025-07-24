@@ -121,8 +121,8 @@ public class FetchMetrics {
       jg.writeStringField("name", oname.toString());
       jg.writeStringField("modelerType", code);
       MBeanAttributeInfo[] attrs = minfo.getAttributes();
-      for (int i = 0; i < attrs.length; ++i) {
-        this.writeAttribute(jg, oname, attrs[i]);
+      for (MBeanAttributeInfo attr : attrs) {
+        this.writeAttribute(jg, oname, attr);
       }
       jg.writeEndObject();
     }

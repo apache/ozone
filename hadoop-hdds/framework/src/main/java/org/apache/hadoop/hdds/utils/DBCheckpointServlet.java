@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.utils;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -33,8 +33,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -106,10 +108,22 @@ public class DBCheckpointServlet extends HttpServlet
     }
     bootstrapTempData = Paths.get(tempData,
         "temp-bootstrap-data").toFile();
+    if (bootstrapTempData.exists()) {
+      try {
+        FileUtils.cleanDirectory(bootstrapTempData);
+      } catch (IOException e) {
+        LOG.error("Failed to clean-up: {} dir.", bootstrapTempData);
+        throw new ServletException("Failed to clean-up: " + bootstrapTempData);
+      }
+    }
     if (!bootstrapTempData.exists() &&
         !bootstrapTempData.mkdirs()) {
       throw new ServletException("Failed to make:" + bootstrapTempData);
     }
+  }
+
+  public File getBootstrapTempData() {
+    return bootstrapTempData;
   }
 
   private boolean hasPermission(UserGroupInformation user) {
@@ -119,6 +133,18 @@ public class DBCheckpointServlet extends HttpServlet
       return admins.isAdmin(user);
     } else {
       return true;
+    }
+  }
+
+  protected static void logSstFileList(Collection<String> sstList, String msg, int sampleSize) {
+    int count = sstList.size();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(msg, count, "", sstList);
+    } else if (count > sampleSize) {
+      List<String> sample = sstList.stream().limit(sampleSize).collect(Collectors.toList());
+      LOG.info(msg, count, ", sample", sample);
+    } else {
+      LOG.info(msg, count, "", sstList);
     }
   }
 
@@ -167,8 +193,6 @@ public class DBCheckpointServlet extends HttpServlet
       }
     }
 
-    DBCheckpoint checkpoint = null;
-
     boolean flush = false;
     String flushParam =
         request.getParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH);
@@ -176,20 +200,18 @@ public class DBCheckpointServlet extends HttpServlet
       flush = Boolean.parseBoolean(flushParam);
     }
 
-    List<String> receivedSstList = new ArrayList<>();
+    processMetadataSnapshotRequest(request, response, isFormData, flush);
+  }
+
+  @VisibleForTesting
+  public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+      boolean isFormData, boolean flush) {
     List<String> excludedSstList = new ArrayList<>();
     String[] sstParam = isFormData ?
         parseFormDataParameters(request) : request.getParameterValues(
         OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST);
-    if (sstParam != null) {
-      receivedSstList.addAll(
-          Arrays.stream(sstParam)
-              .filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
-              .distinct()
-              .collect(Collectors.toList()));
-      LOG.info("Received excluding SST {}", receivedSstList);
-    }
-
+    Set<String> receivedSstFiles = extractSstFilesToExclude(sstParam);
+    DBCheckpoint checkpoint = null;
     Path tmpdir = null;
     try (BootstrapStateHandler.Lock lock = getBootstrapStateLock().lock()) {
       tmpdir = Files.createTempDirectory(bootstrapTempData.toPath(),
@@ -214,16 +236,15 @@ public class DBCheckpointServlet extends HttpServlet
                file + ".tar\"");
 
       Instant start = Instant.now();
-      writeDbDataToStream(checkpoint, request,
-          response.getOutputStream(), receivedSstList, excludedSstList, tmpdir);
+      writeDbDataToStream(checkpoint, request, response.getOutputStream(),
+          receivedSstFiles, tmpdir);
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: {} milliseconds", duration);
-
-      LOG.info("Excluded SST {} from the latest checkpoint.",
-          excludedSstList);
+      logSstFileList(excludedSstList,
+          "Excluded {} SST files from the latest checkpoint{}: {}", 5);
       if (!excludedSstList.isEmpty()) {
         dbMetrics.incNumIncrementalCheckpoint();
       }
@@ -256,6 +277,16 @@ public class DBCheckpointServlet extends HttpServlet
     }
   }
 
+  protected static Set<String> extractSstFilesToExclude(String[] sstParam) {
+    Set<String> receivedSstFiles = new HashSet<>();
+    if (sstParam != null) {
+      receivedSstFiles.addAll(
+          Arrays.stream(sstParam).distinct().collect(Collectors.toList()));
+      logSstFileList(receivedSstFiles, "Received list of {} SST files to be excluded{}: {}", 5);
+    }
+    return receivedSstFiles;
+  }
+
   public DBCheckpoint getCheckpoint(Path ignoredTmpdir, boolean flush)
       throws IOException {
     return dbStore.getCheckpoint(flush);
@@ -266,7 +297,7 @@ public class DBCheckpointServlet extends HttpServlet
    * @param request the HTTP servlet request
    * @return array of parsed sst form data parameters for exclusion
    */
-  private static String[] parseFormDataParameters(HttpServletRequest request) {
+  protected static String[] parseFormDataParameters(HttpServletRequest request) {
     ServletFileUpload upload = new ServletFileUpload();
     List<String> sstParam = new ArrayList<>();
 
@@ -281,7 +312,7 @@ public class DBCheckpointServlet extends HttpServlet
         sstParam.add(Streams.asString(item.openStream()));
       }
     } catch (Exception e) {
-      LOG.warn("Exception occured during form data parsing {}", e.getMessage());
+      LOG.warn("Exception occurred during form data parsing {}", e.getMessage());
     }
 
     return sstParam.isEmpty() ? null : sstParam.toArray(new String[0]);
@@ -326,20 +357,16 @@ public class DBCheckpointServlet extends HttpServlet
    *        (Parameter is ignored in this class but used in child classes).
    * @param destination The stream to write to.
    * @param toExcludeList the files to be excluded
-   * @param excludedList  the files excluded
    *
    */
   public void writeDbDataToStream(DBCheckpoint checkpoint,
       HttpServletRequest ignoredRequest,
       OutputStream destination,
-      List<String> toExcludeList,
-      List<String> excludedList, Path tmpdir)
+      Set<String> toExcludeList,
+      Path tmpdir)
       throws IOException, InterruptedException {
     Objects.requireNonNull(toExcludeList);
-    Objects.requireNonNull(excludedList);
-
-    writeDBCheckpointToStream(checkpoint, destination,
-        toExcludeList, excludedList);
+    writeDBCheckpointToStream(checkpoint, destination, toExcludeList);
   }
 
   public DBStore getDbStore() {

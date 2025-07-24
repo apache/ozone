@@ -24,6 +24,9 @@ import java.util.List;
  * Interface for load generator.
  */
 public abstract class LoadGenerator {
+
+  private static final String KEY_NAME_DELIMITER = "_";
+
   public static List<Class<? extends LoadGenerator>> getClassList() {
     List<Class<? extends LoadGenerator>> classList = new ArrayList<>();
 
@@ -48,8 +51,6 @@ public abstract class LoadGenerator {
    *   }
    * }
    */
-
-  private static final String KEY_NAME_DELIMITER = "_";
 
   public abstract void initialize() throws Exception;
 

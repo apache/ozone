@@ -34,14 +34,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -127,7 +125,7 @@ public class TestOMSnapshotCreateResponse {
 
     // Check contents of entry
     SnapshotInfo storedInfo;
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+    try (Table.KeyValueIterator<String, SnapshotInfo>
              it = omMetadataManager.getSnapshotInfoTable().iterator()) {
       Table.KeyValue<String, SnapshotInfo> keyValue = it.next();
       storedInfo = keyValue.getValue();
@@ -211,8 +209,7 @@ public class TestOMSnapshotCreateResponse {
     // Add deletedDirectoryTable key entries that "surround" the snapshot scope
     Set<String> sentinelKeys = new HashSet<>();
 
-    final String dbKeyPfx = SnapshotUtils.getOzonePathKeyForFso(
-            omMetadataManager, volumeName, bucketName);
+    final String dbKeyPfx = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
 
     // Calculate offset to bucketId's last character in dbKeyPfx.
     // First -1 for offset, second -1 for second to last char (before '/')
@@ -262,7 +259,7 @@ public class TestOMSnapshotCreateResponse {
   private void verifyEntriesLeftInTable(
       Table<String, ?> table, Set<String> expectedKeys) throws IOException {
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>>
+    try (Table.KeyValueIterator<String, ?>
              keyIter = table.iterator()) {
       keyIter.seekToFirst();
       while (keyIter.hasNext()) {

@@ -91,7 +91,7 @@ public enum TestContainerCorruptions {
   MISSING_BLOCK((container, blockID) -> {
     File blockFile = getBlock(container, blockID);
     assertTrue(blockFile.delete());
-  }, ContainerScanError.FailureType.MISSING_CHUNK_FILE),
+  }, ContainerScanError.FailureType.MISSING_DATA_FILE),
 
   CORRUPT_CONTAINER_FILE((container, blockID) -> {
     File containerFile = container.getContainerFile();
@@ -111,7 +111,10 @@ public enum TestContainerCorruptions {
   TRUNCATED_BLOCK((container, blockID) -> {
     File blockFile = getBlock(container, blockID);
     truncateFile(blockFile);
-  }, ContainerScanError.FailureType.INCONSISTENT_CHUNK_LENGTH);
+  },
+      // This test completely removes all content from the block file. The scanner will see this as all the chunks in
+      // the block missing, hence MISSING_CHUNK instead of INCONSISTENT_CHUNK_LENGTH.
+      ContainerScanError.FailureType.MISSING_CHUNK);
 
   private final BiConsumer<Container<?>, Long> corruption;
   private final ContainerScanError.FailureType expectedResult;
@@ -195,7 +198,7 @@ public enum TestContainerCorruptions {
     }
   }
 
-  private static File getBlock(Container<?> container, long blockID) {
+  public static File getBlock(Container<?> container, long blockID) {
     File blockFile;
     File chunksDir = new File(container.getContainerData().getContainerPath(),
         "chunks");

@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 
 /**
  * The interface to call into underlying container layer.
@@ -179,9 +179,12 @@ public interface ScmClient extends Closeable {
    * @return ContainerInfo
    * @throws IOException - in case of error.
    */
+  @Deprecated
   ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor replicationFactor,
       String owner) throws IOException;
+
+  ContainerWithPipeline createContainer(ReplicationConfig replicationConfig, String owner) throws IOException;
 
   /**
    * Gets the list of underReplicated and unClosed containers on a decommissioning node.
@@ -389,18 +392,9 @@ public interface ScmClient extends Closeable {
   ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException;
 
   /**
-   * returns the list of ratis peer roles. Currently only include peer address.
+   * returns the list of SCM peer roles. Currently only include peer address.
    */
-  List<String> getScmRatisRoles() throws IOException;
-
-  /**
-   * Get the current SCM mode.
-   *
-   * @return `true` indicates that it is in RATIS mode,
-   * while `false` indicates that it is in STANDALONE mode.
-   * @throws IOException  an I/O exception of some sort has occurred.
-   */
-  boolean isScmRatisEnable() throws IOException;
+  List<String> getScmRoles() throws IOException;
 
   /**
    * Force generates new secret keys (rotate).

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
-import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,7 +32,7 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,7 +85,7 @@ public class TestInitialConstraintUpgradeAction extends AbstractReconSqlDBTest {
   @Test
   public void testUpgradeAppliesConstraintModificationForAllStates() throws SQLException {
     // Run the upgrade action
-    upgradeAction.execute(mockScmFacade);
+    upgradeAction.execute(mockScmFacade.getDataSource());
 
     // Iterate over all valid states and insert records
     for (ContainerSchemaDefinition.UnHealthyContainerStates state :

@@ -28,7 +28,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -94,7 +96,7 @@ public class ContainerController {
         warning = "The Container is not found. ContainerID: " + containerId;
       }
       LOG.warn(warning);
-      throw new ContainerNotFoundException(warning);
+      throw new ContainerNotFoundException(ContainerID.valueOf(containerId));
     } else {
       if (container.getContainerState() == State.OPEN) {
         getHandler(container).markContainerForClose(container);
@@ -112,14 +114,34 @@ public class ContainerController {
   public boolean markContainerUnhealthy(final long containerId, ScanResult reason)
           throws IOException {
     Container container = getContainer(containerId);
-    if (container != null && container.getContainerState() != State.UNHEALTHY) {
+    if (container == null) {
+      LOG.warn("Container {} not found, may be deleted, skip marking UNHEALTHY", containerId);
+      return false;
+    } else if (container.getContainerState() == State.UNHEALTHY) {
+      LOG.debug("Container {} is already UNHEALTHY, skip marking UNHEALTHY", containerId);
+      return false;
+    } else {
       getHandler(container).markContainerUnhealthy(container, reason);
       return true;
-    } else {
-      LOG.warn("Container {} not found, may be deleted, skip mark UNHEALTHY",
-          containerId);
     }
-    return false;
+  }
+
+  /**
+   * Updates the container checksum information on disk and in memory.
+   *
+   * @param containerId The ID of the container to update
+   * @param treeWriter The container merkle tree with the updated information about the container
+   * @throws IOException For errors sending an ICR or updating the container checksum on disk. If the disk update
+   * fails, the checksum in memory will not be updated.
+   */
+  public void updateContainerChecksum(long containerId, ContainerMerkleTreeWriter treeWriter)
+      throws IOException {
+    Container container = getContainer(containerId);
+    if (container == null) {
+      LOG.warn("Container {} not found, may be deleted, skip updating checksums", containerId);
+    } else {
+      getHandler(container).updateContainerChecksum(container, treeWriter);
+    }
   }
 
   /**

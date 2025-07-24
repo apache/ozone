@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
 import com.google.common.base.Preconditions;
@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  *     - Update DB tables
  */
 public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       OMTenantRevokeUserAccessIdRequest.class);
 
   public OMTenantRevokeUserAccessIdRequest(OMRequest omRequest) {
@@ -193,7 +193,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       Preconditions.checkNotNull(principalInfo);
       principalInfo.removeAccessId(accessId);
       CacheValue<OmDBUserPrincipalInfo> cacheValue =
-          principalInfo.getAccessIds().size() > 0
+          !principalInfo.getAccessIds().isEmpty()
               ? CacheValue.get(transactionLogIndex, principalInfo)
               // Invalidate (remove) the entry if accessIds set is empty
               : CacheValue.get(transactionLogIndex);

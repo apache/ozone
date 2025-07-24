@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
  * Grpc transport for grpc between s3g and om.
  */
 public class GrpcOmTransport implements OmTransport {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOmTransport.class);
 
   private static final String CLIENT_NAME = "GrpcOmTransport";
@@ -75,11 +75,9 @@ public class GrpcOmTransport implements OmTransport {
   // gRPC specific
   private static List<X509Certificate> caCerts = null;
 
-  private OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub client;
   private Map<String,
       OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub> clients;
   private Map<String, ManagedChannel> channels;
-  private int lastVisited = -1;
   private ConfigurationSource conf;
 
   private AtomicReference<String> host;
@@ -87,15 +85,14 @@ public class GrpcOmTransport implements OmTransport {
   private final int maxSize;
   private SecurityConfig secConfig;
 
-  public static void setCaCerts(List<X509Certificate> x509Certificates) {
-    caCerts = x509Certificates;
-  }
-
-  private List<String> oms;
   private RetryPolicy retryPolicy;
   private int failoverCount = 0;
   private GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
       omFailoverProxyProvider;
+
+  public static void setCaCerts(List<X509Certificate> x509Certificates) {
+    caCerts = x509Certificates;
+  }
 
   public GrpcOmTransport(ConfigurationSource conf,
                           UserGroupInformation ugi, String omServiceId)

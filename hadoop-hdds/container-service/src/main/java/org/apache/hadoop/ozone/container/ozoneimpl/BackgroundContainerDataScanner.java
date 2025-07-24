@@ -19,14 +19,9 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Iterator;
-import java.util.Optional;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
@@ -37,7 +32,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BackgroundContainerDataScanner extends
     AbstractBackgroundContainerScanner {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BackgroundContainerDataScanner.class);
 
   /**
@@ -49,12 +44,11 @@ public class BackgroundContainerDataScanner extends
   private final Canceler canceler;
   private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
   private final ContainerDataScannerMetrics metrics;
-  private final long minScanGap;
-  private final ContainerChecksumTreeManager checksumManager;
+  private final ContainerScanHelper scanHelper;
 
   public BackgroundContainerDataScanner(ContainerScannerConfiguration conf,
                                         ContainerController controller,
-                                        HddsVolume volume, ContainerChecksumTreeManager checksumManager) {
+                                        HddsVolume volume) {
     super(String.format(NAME_FORMAT, volume), conf.getDataScanInterval());
     this.controller = controller;
     this.volume = volume;
@@ -62,13 +56,7 @@ public class BackgroundContainerDataScanner extends
     canceler = new Canceler();
     this.metrics = ContainerDataScannerMetrics.create(volume.toString());
     this.metrics.setStorageDirectory(volume.toString());
-    this.minScanGap = conf.getContainerScanMinGap();
-    this.checksumManager = checksumManager;
-  }
-
-  private boolean shouldScan(Container<?> container) {
-    return container.shouldScanData() &&
-        !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
+    this.scanHelper = ContainerScanHelper.withScanGap(LOG, controller, metrics, conf);
   }
 
   @Override
@@ -80,62 +68,12 @@ public class BackgroundContainerDataScanner extends
       shutdown("The volume has failed.");
       return;
     }
-
-    if (!shouldScan(c)) {
-      return;
-    }
-    ContainerData containerData = c.getContainerData();
-    long containerId = containerData.getContainerID();
-    logScanStart(containerData);
-    DataScanResult result = c.scanData(throttler, canceler);
-
-    if (result.isDeleted()) {
-      LOG.debug("Container [{}] has been deleted during the data scan.", containerId);
-    } else {
-      if (!result.isHealthy()) {
-        logUnhealthyScanResult(containerId, result, LOG);
-
-        // Only increment the number of unhealthy containers if the container was not already unhealthy.
-        // TODO HDDS-11593 (to be merged in to the feature branch from master): Scanner counters will start from zero
-        //  at the beginning of each run, so this will need to be incremented for every unhealthy container seen
-        //  regardless of its previous state.
-        if (controller.markContainerUnhealthy(containerId, result)) {
-          metrics.incNumUnHealthyContainers();
-        }
-      }
-      checksumManager.writeContainerDataTree(containerData, result.getDataTree());
-      metrics.incNumContainersScanned();
-    }
-
-    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
-    Instant now = Instant.now();
-    logScanCompleted(containerData, now);
-
-    if (!result.isDeleted()) {
-      controller.updateDataScanTimestamp(containerId, now);
-    }
+    scanHelper.scanData(c, throttler, canceler);
   }
 
   @Override
   public Iterator<Container<?>> getContainerIterator() {
     return controller.getContainers(volume);
-  }
-
-  private static void logScanStart(ContainerData containerData) {
-    if (LOG.isDebugEnabled()) {
-      Optional<Instant> scanTimestamp = containerData.lastDataScanTime();
-      Object lastScanTime = scanTimestamp.map(ts -> "at " + ts).orElse("never");
-      LOG.debug("Scanning container {}, last scanned {}",
-          containerData.getContainerID(), lastScanTime);
-    }
-  }
-
-  private static void logScanCompleted(
-      ContainerData containerData, Instant timestamp) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Completed scan of container {} at {}",
-          containerData.getContainerID(), timestamp);
-    }
   }
 
   @Override

@@ -42,14 +42,13 @@ import org.junit.jupiter.api.Test;
  */
 public class TestPipelineActionHandler {
 
-
   @Test
   public void testPipelineActionHandlerForValidPipeline() throws IOException {
 
     final PipelineManager manager = mock(PipelineManager.class);
     final EventQueue queue = mock(EventQueue.class);
     final PipelineActionHandler actionHandler = new PipelineActionHandler(
-        manager, SCMContext.emptyContext(), null);
+        manager, SCMContext.emptyContext());
     final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
 
     actionHandler.onMessage(getPipelineActionsFromDatanode(
@@ -64,7 +63,7 @@ public class TestPipelineActionHandler {
     final EventQueue queue = mock(EventQueue.class);
     final SCMContext context = SCMContext.emptyContext();
     final PipelineActionHandler actionHandler = new PipelineActionHandler(
-        manager, context, null);
+        manager, context);
     final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
 
     context.updateLeaderAndTerm(false, 1);
@@ -80,7 +79,7 @@ public class TestPipelineActionHandler {
     final PipelineManager manager = mock(PipelineManager.class);
     final EventQueue queue = mock(EventQueue.class);
     final PipelineActionHandler actionHandler = new PipelineActionHandler(
-        manager, SCMContext.emptyContext(), null);
+        manager, SCMContext.emptyContext());
     final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
 
     doThrow(new PipelineNotFoundException())
@@ -99,7 +98,7 @@ public class TestPipelineActionHandler {
     final EventQueue queue = mock(EventQueue.class);
     final SCMContext context = SCMContext.emptyContext();
     final PipelineActionHandler actionHandler = new PipelineActionHandler(
-        manager, context, null);
+        manager, context);
     final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
 
     context.updateLeaderAndTerm(false, 1);

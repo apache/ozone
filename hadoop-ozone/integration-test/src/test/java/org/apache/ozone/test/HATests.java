@@ -18,8 +18,14 @@
 package org.apache.ozone.test;
 
 import java.util.UUID;
+import org.apache.hadoop.fs.ozone.TestOzoneFsHAURLs;
+import org.apache.hadoop.hdds.scm.TestStorageContainerManagerHAWithAllRunning;
+import org.apache.hadoop.hdds.scm.container.TestScmApplyTransactionFailure;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.TestGetClusterTreeInformation;
+import org.apache.hadoop.ozone.container.metrics.TestDatanodeQueueMetrics;
+import org.apache.hadoop.ozone.shell.TestScmAdminHA;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
@@ -33,8 +39,8 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
 
-  /** Hook method for subclasses. */
-  MiniOzoneHAClusterImpl.Builder newClusterBuilder() {
+  @Override
+  protected MiniOzoneHAClusterImpl.Builder newClusterBuilder() {
     return MiniOzoneCluster.newHABuilder(createOzoneConfig())
         .setOMServiceId("om-" + UUID.randomUUID())
         .setNumOfOzoneManagers(3)
@@ -48,7 +54,7 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class OzoneFsHAURLs extends org.apache.hadoop.fs.ozone.TestOzoneFsHAURLs {
+  class OzoneFsHAURLs extends TestOzoneFsHAURLs {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();
@@ -56,7 +62,7 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class ScmApplyTransactionFailure extends org.apache.hadoop.hdds.scm.container.TestScmApplyTransactionFailure {
+  class StorageContainerManagerHAWithAllRunning extends TestStorageContainerManagerHAWithAllRunning {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();
@@ -64,7 +70,7 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class GetClusterTreeInformation extends org.apache.hadoop.ozone.TestGetClusterTreeInformation {
+  class ScmApplyTransactionFailure extends TestScmApplyTransactionFailure {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();
@@ -72,7 +78,7 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class DatanodeQueueMetrics extends org.apache.hadoop.ozone.container.metrics.TestDatanodeQueueMetrics {
+  class GetClusterTreeInformation extends TestGetClusterTreeInformation {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();
@@ -80,7 +86,15 @@ public abstract class HATests extends ClusterForTests<MiniOzoneHAClusterImpl> {
   }
 
   @Nested
-  class ScmAdminHA extends org.apache.hadoop.ozone.shell.TestScmAdminHA {
+  class DatanodeQueueMetrics extends TestDatanodeQueueMetrics {
+    @Override
+    public MiniOzoneHAClusterImpl cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class ScmAdminHA extends TestScmAdminHA {
     @Override
     public MiniOzoneHAClusterImpl cluster() {
       return getCluster();

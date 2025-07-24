@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,7 +30,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -39,8 +39,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
@@ -83,9 +83,7 @@ public class TestContainerDeletionChoosingPolicy {
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
         RandomContainerDeletionChoosingPolicy.class.getName());
-    List<StorageLocation> pathLists = new LinkedList<>();
-    pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
 
     int numContainers = 10;
     for (int i = 0; i < numContainers; i++) {
@@ -146,9 +144,7 @@ public class TestContainerDeletionChoosingPolicy {
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
         TopNOrderedContainerDeletionChoosingPolicy.class.getName());
-    List<StorageLocation> pathLists = new LinkedList<>();
-    pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
-    containerSet = new ContainerSet(1000);
+    containerSet = newContainerSet();
 
     int numContainers = 10;
     Random random = new Random();
@@ -156,7 +152,7 @@ public class TestContainerDeletionChoosingPolicy {
     List<Integer> numberOfBlocks = new ArrayList<Integer>();
     // create [numContainers + 1] containers
     for (int i = 0; i <= numContainers; i++) {
-      long containerId = RandomUtils.nextLong();
+      long containerId = RandomUtils.secure().randomLong();
       KeyValueContainerData data =
           new KeyValueContainerData(containerId,
               layout,
@@ -193,9 +189,9 @@ public class TestContainerDeletionChoosingPolicy {
     // the empty deletion blocks container should not be chosen
     int containerCount = 0;
     int c = 0;
-    for (int i = 0; i < numberOfBlocks.size(); i++) {
+    for (Integer numberOfBlock : numberOfBlocks) {
       containerCount++;
-      c = c + numberOfBlocks.get(i);
+      c = c + numberOfBlock;
       if (c >= (numContainers + 1)) {
         break;
       }
@@ -223,7 +219,7 @@ public class TestContainerDeletionChoosingPolicy {
     when(ozoneContainer.getWriteChannel()).thenReturn(null);
     blockDeletingService = new BlockDeletingService(ozoneContainer,
         SERVICE_INTERVAL_IN_MILLISECONDS, SERVICE_TIMEOUT_IN_MILLISECONDS,
-        TimeUnit.MILLISECONDS, 10, conf);
+        TimeUnit.MILLISECONDS, 10, conf, new ContainerChecksumTreeManager(conf));
     return blockDeletingService;
 
   }

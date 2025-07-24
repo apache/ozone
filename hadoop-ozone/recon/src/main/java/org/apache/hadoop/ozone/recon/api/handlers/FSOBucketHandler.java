@@ -25,7 +25,6 @@ import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -37,25 +36,19 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Class for handling FSO buckets NameSpaceSummaries.
  */
 public class FSOBucketHandler extends BucketHandler {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(FSOBucketHandler.class);
   private final long volumeId;
   private final long bucketId;
   
   public FSOBucketHandler(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager,
-      OzoneStorageContainerManager reconSCM,
       OmBucketInfo bucketInfo) throws IOException {
-    super(reconNamespaceSummaryManager, omMetadataManager,
-        reconSCM);
+    super(reconNamespaceSummaryManager, omMetadataManager);
 
     String vol = bucketInfo.getVolumeName();
     String bucket = bucketInfo.getBucketName();

@@ -37,6 +37,7 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -45,6 +46,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerDiffReport;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -117,7 +120,7 @@ public class TestKeyValueContainerCheck
     KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(conf, container);
 
     DataScanResult result = kvCheck.fullCheck(throttler, null);
-    assertTrue(result.isHealthy());
+    assertFalse(result.hasErrors());
 
     // Inject a metadata and a data error.
     metadataCorruption.applyTo(container);
@@ -127,7 +130,7 @@ public class TestKeyValueContainerCheck
     }
 
     result = kvCheck.fullCheck(throttler, null);
-    assertFalse(result.isHealthy());
+    assertTrue(result.hasErrors());
     // Scan should have failed after the first metadata error and not made it to the data error.
     assertEquals(1, result.getErrors().size());
     assertEquals(metadataCorruption.getExpectedResult(), result.getErrors().get(0).getFailureType());
@@ -153,14 +156,23 @@ public class TestKeyValueContainerCheck
     KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(conf, container);
 
     DataScanResult result = kvCheck.fullCheck(throttler, null);
-    assertTrue(result.isHealthy());
+    assertFalse(result.hasErrors());
+    // The scanner would write the checksum file to disk. `KeyValueContainerCheck` does not, so we will create the
+    // result here.
+    ContainerProtos.ContainerChecksumInfo healthyChecksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerID(containerID)
+        .setContainerMerkleTree(result.getDataTree().toProto())
+        .build();
 
     // Put different types of block failures in the middle of the container.
-    CORRUPT_BLOCK.applyTo(container, 1);
-    MISSING_BLOCK.applyTo(container, 2);
-    TRUNCATED_BLOCK.applyTo(container, 4);
+    long corruptBlockID = 1;
+    long missingBlockID = 2;
+    long truncatedBlockID = 4;
+    CORRUPT_BLOCK.applyTo(container, corruptBlockID);
+    MISSING_BLOCK.applyTo(container, missingBlockID);
+    TRUNCATED_BLOCK.applyTo(container, truncatedBlockID);
     List<FailureType> expectedErrors = new ArrayList<>();
-    // Corruption is applied to two different chunks within the block.
+    // Corruption is applied to two different chunks within the block, so the error will be raised twice.
     expectedErrors.add(CORRUPT_BLOCK.getExpectedResult());
     expectedErrors.add(CORRUPT_BLOCK.getExpectedResult());
     expectedErrors.add(MISSING_BLOCK.getExpectedResult());
@@ -173,14 +185,43 @@ public class TestKeyValueContainerCheck
     result = kvCheck.fullCheck(throttler, null);
     result.getErrors().forEach(e -> LOG.info("Error detected: {}", e));
 
-    assertFalse(result.isHealthy());
+    assertTrue(result.hasErrors());
     // Check that all data errors were detected in order.
-    // TODO HDDS-10374 Use merkle tree to check the actual content affected by the errors.
     assertEquals(expectedErrors.size(), result.getErrors().size());
     List<FailureType> actualErrors = result.getErrors().stream()
         .map(ContainerScanError::getFailureType)
         .collect(Collectors.toList());
     assertEquals(expectedErrors, actualErrors);
+
+    // Write the new tree into the container, as the scanner would do.
+    ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
+    KeyValueContainerData containerData = container.getContainerData();
+    checksumManager.writeContainerDataTree(containerData, result.getDataTree());
+    // This will read the corrupted tree from the disk, which represents the current state of the container, and
+    // compare it against the original healthy tree. The diff we get back should match the failures we injected.
+    ContainerProtos.ContainerChecksumInfo generatedChecksumInfo = checksumManager.read(container.getContainerData());
+    ContainerDiffReport diffReport = checksumManager.diff(generatedChecksumInfo, healthyChecksumInfo);
+
+    LOG.info("Diff of healthy container with actual container {}", diffReport);
+
+    // Check that the new tree identified all the expected errors by checking the diff.
+    Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks = diffReport.getCorruptChunks();
+    // One block had corrupted chunks.
+    assertEquals(1, corruptChunks.size());
+    List<ContainerProtos.ChunkMerkleTree> corruptChunksInBlock = corruptChunks.get(corruptBlockID);
+    assertEquals(2, corruptChunksInBlock.size());
+
+    // One block was truncated which resulted in all of its chunks being reported as missing.
+    Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks = diffReport.getMissingChunks();
+    assertEquals(1, missingChunks.size());
+    List<ContainerProtos.ChunkMerkleTree> missingChunksInBlock = missingChunks.get(truncatedBlockID);
+    assertEquals(CHUNKS_PER_BLOCK, missingChunksInBlock.size());
+
+    // Check missing block was correctly identified in the tree diff.
+    List<ContainerProtos.BlockMerkleTree> missingBlocks = diffReport.getMissingBlocks();
+    assertEquals(1, missingBlocks.size());
+    assertEquals(missingBlockID, missingBlocks.get(0).getBlockID());
+
   }
 
   /**
@@ -203,14 +244,14 @@ public class TestKeyValueContainerCheck
     KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(conf, container);
 
     // first run checks on a Open Container
-    boolean valid = kvCheck.fastCheck().isHealthy();
+    boolean valid = !kvCheck.fastCheck().hasErrors();
     assertTrue(valid);
 
     container.close();
 
     // next run checks on a Closed Container
-    valid = kvCheck.fullCheck(new DataTransferThrottler(
-        c.getBandwidthPerVolume()), null).isHealthy();
+    valid = !kvCheck.fullCheck(new DataTransferThrottler(
+        c.getBandwidthPerVolume()), null).hasErrors();
     assertTrue(valid);
   }
 
@@ -258,12 +299,12 @@ public class TestKeyValueContainerCheck
     }
 
     // metadata check should pass.
-    boolean valid = kvCheck.fastCheck().isHealthy();
+    boolean valid = !kvCheck.fastCheck().hasErrors();
     assertTrue(valid);
 
     // checksum validation should fail.
-    valid = kvCheck.fullCheck(new DataTransferThrottler(
-            sc.getBandwidthPerVolume()), null).isHealthy();
+    valid = !kvCheck.fullCheck(new DataTransferThrottler(
+            sc.getBandwidthPerVolume()), null).hasErrors();
     assertFalse(valid);
   }
 
@@ -277,7 +318,7 @@ public class TestKeyValueContainerCheck
     KeyValueContainerCheck kvCheck = new KeyValueContainerCheck(getConf(), container);
     // The full container should exist and pass a scan.
     ScanResult result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
-    assertTrue(result.isHealthy());
+    assertFalse(result.hasErrors());
     assertFalse(result.isDeleted());
 
     // When a container is not marked for deletion and it has pieces missing, the scan should fail.
@@ -285,14 +326,14 @@ public class TestKeyValueContainerCheck
     FileUtils.deleteDirectory(metadataDir);
     assertFalse(metadataDir.exists());
     result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
-    assertFalse(result.isHealthy());
+    assertTrue(result.hasErrors());
     assertFalse(result.isDeleted());
 
     // Once the container is marked for deletion, the scan should pass even if some of the internal pieces are missing.
     // Here the metadata directory has been deleted.
     container.markContainerForDelete();
     result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
-    assertTrue(result.isHealthy());
+    assertFalse(result.hasErrors());
     assertTrue(result.isDeleted());
 
     // Now the data directory is deleted.
@@ -300,7 +341,7 @@ public class TestKeyValueContainerCheck
     FileUtils.deleteDirectory(chunksDir);
     assertFalse(chunksDir.exists());
     result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
-    assertTrue(result.isHealthy());
+    assertFalse(result.hasErrors());
     assertTrue(result.isDeleted());
 
     // Now the whole container directory is gone.
@@ -308,7 +349,7 @@ public class TestKeyValueContainerCheck
     FileUtils.deleteDirectory(containerDir);
     assertFalse(containerDir.exists());
     result = kvCheck.fullCheck(mock(DataTransferThrottler.class), mock(Canceler.class));
-    assertTrue(result.isHealthy());
+    assertFalse(result.hasErrors());
     assertTrue(result.isDeleted());
   }
 }

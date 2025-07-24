@@ -44,15 +44,15 @@ public class TestConfigFileGenerator {
 
     assertThat(generatedXml)
         .as("annotation in ConfigurationExample")
-        .contains("<name>ozone.scm.client.bind.host</name>");
+        .contains("<name>ozone.test.config.bind.host</name>");
 
     assertThat(generatedXml)
         .as("annotation in ConfigurationExampleParent")
-        .contains("<name>ozone.scm.client.secure</name>");
+        .contains("<name>ozone.test.config.secure</name>");
 
     assertThat(generatedXml)
         .as("annotation in ConfigurationExampleGrandParent")
-        .contains("<name>ozone.scm.client.number</name>");
+        .contains("<name>ozone.test.config.number</name>");
 
     assertThat(generatedXml)
         .contains("<tag>MANAGEMENT</tag>");

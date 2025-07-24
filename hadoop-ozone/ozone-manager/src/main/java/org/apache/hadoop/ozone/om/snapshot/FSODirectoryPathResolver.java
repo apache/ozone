@@ -83,13 +83,13 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
     objectIdPathVals.add(root);
     addToPathMap(root, objIds, objectIdPathMap);
 
-    while (!objectIdPathVals.isEmpty() && objIds.size() > 0) {
+    while (!objectIdPathVals.isEmpty() && !objIds.isEmpty()) {
       Pair<Long, Path> parent = objectIdPathVals.poll();
       try (TableIterator<String,
               ? extends Table.KeyValue<String, OmDirectoryInfo>>
               subDirIter = dirInfoTable.iterator(
                   prefix + parent.getKey() + OM_KEY_PREFIX)) {
-        while (objIds.size() > 0 && subDirIter.hasNext()) {
+        while (!objIds.isEmpty() && subDirIter.hasNext()) {
           OmDirectoryInfo childDir = subDirIter.next().getValue();
           Pair<Long, Path> pathVal = Pair.of(childDir.getObjectID(),
               parent.getValue().resolve(childDir.getName()));
@@ -99,7 +99,7 @@ public class FSODirectoryPathResolver implements ObjectPathResolver {
       }
     }
     // Invalid directory objectId which does not exist in the given bucket.
-    if (objIds.size() > 0 && !skipUnresolvedObjs) {
+    if (!objIds.isEmpty() && !skipUnresolvedObjs) {
       throw new IllegalArgumentException(
           "Dir object Ids required but not found in bucket: " + objIds);
     }

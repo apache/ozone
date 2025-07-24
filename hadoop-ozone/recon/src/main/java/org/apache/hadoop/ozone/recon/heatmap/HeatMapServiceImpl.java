@@ -58,7 +58,7 @@ public class HeatMapServiceImpl extends HeatMapService {
     this.reconSCM = reconSCM;
     heatMapUtil =
         new HeatMapUtil(reconNamespaceSummaryManager, omMetadataManager,
-            reconSCM, ozoneConfiguration);
+            reconSCM);
     initializeProvider();
   }
 

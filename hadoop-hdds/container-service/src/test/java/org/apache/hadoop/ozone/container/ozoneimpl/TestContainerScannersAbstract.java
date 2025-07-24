@@ -31,6 +31,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -82,7 +83,6 @@ public abstract class TestContainerScannersAbstract {
   protected ContainerScannerConfiguration conf;
   protected ContainerController controller;
 
-
   private Collection<Container<?>> containers;
 
   public void setup() {
@@ -123,6 +123,16 @@ public abstract class TestContainerScannersAbstract {
 
   @Test
   public abstract void testUnhealthyContainerRescanned() throws Exception;
+
+  /**
+   * When the container checksum cannot be updated, the scan should still complete and move the container state without
+   * throwing an exception.
+   */
+  @Test
+  public abstract void testChecksumUpdateFailure() throws Exception;
+
+  @Test
+  public abstract void testUnhealthyContainersTriggersVolumeScan() throws Exception;
 
   // HELPER METHODS
 
@@ -191,6 +201,10 @@ public abstract class TestContainerScannersAbstract {
     DataScanResult unhealthyData = getUnhealthyDataScanResult();
     MetadataScanResult healthyMetadata = getHealthyMetadataScanResult();
     MetadataScanResult unhealthyMetadata = getUnhealthyMetadataScanResult();
+
+    File volLocation = mock(File.class);
+    when(volLocation.getPath()).thenReturn("/temp/volume-testcontainerscanner");
+    when(vol.getStorageDir()).thenReturn(volLocation);
 
     // healthy container
     ContainerTestUtils.setupMockContainer(healthy,

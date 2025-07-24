@@ -22,46 +22,37 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import java.net.URI;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * Tests OFS behavior when filesystem paths are enabled and parent directory is
  * missing for some reason.
  */
-public class TestOzoneFileSystemMissingParent {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestOzoneFileSystemMissingParent implements NonHATests.TestCase {
 
-  private static OzoneConfiguration conf;
-  private static MiniOzoneCluster cluster;
-  private static Path bucketPath;
-  private static FileSystem fs;
-  private static OzoneClient client;
+  private Path bucketPath;
+  private FileSystem fs;
+  private OzoneClient client;
 
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
-        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
-
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+  void init() throws Exception {
+    client = cluster().newClient();
 
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
@@ -70,13 +61,11 @@ public class TestOzoneFileSystemMissingParent {
     String bucketName = bucket.getName();
     bucketPath = new Path(volumePath, bucketName);
 
-    String rootPath = String
-        .format("%s://%s/", OzoneConsts.OZONE_OFS_URI_SCHEME,
-            conf.get(OZONE_OM_ADDRESS_KEY));
+    String rootPath = String.format("%s://%s/",
+        OzoneConsts.OZONE_OFS_URI_SCHEME,
+        cluster().getConf().get(OZONE_OM_ADDRESS_KEY));
 
-    // Set the fs.defaultFS and create filesystem.
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    fs = FileSystem.get(conf);
+    fs = FileSystem.get(URI.create(rootPath), cluster().getConf());
   }
 
   @AfterEach
@@ -85,12 +74,8 @@ public class TestOzoneFileSystemMissingParent {
   }
 
   @AfterAll
-  public static void tearDown() {
-    IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-      cluster = null;
-    }
+  void tearDown() {
+    IOUtils.closeQuietly(client, fs);
   }
 
   /**

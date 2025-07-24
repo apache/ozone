@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -44,7 +43,6 @@ import org.slf4j.LoggerFactory;
 public class HeatMapUtil {
   private static final Logger LOG =
       LoggerFactory.getLogger(HeatMapUtil.class);
-  private OzoneConfiguration ozoneConfiguration;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager omMetadataManager;
   private final OzoneStorageContainerManager reconSCM;
@@ -53,12 +51,10 @@ public class HeatMapUtil {
   public HeatMapUtil(ReconNamespaceSummaryManager
                       namespaceSummaryManager,
                      ReconOMMetadataManager omMetadataManager,
-                     OzoneStorageContainerManager reconSCM,
-                     OzoneConfiguration ozoneConfiguration) {
+                     OzoneStorageContainerManager reconSCM) {
     this.reconNamespaceSummaryManager = namespaceSummaryManager;
     this.omMetadataManager = omMetadataManager;
     this.reconSCM = reconSCM;
-    this.ozoneConfiguration = ozoneConfiguration;
   }
 
   private long getEntitySize(String path) throws IOException {
@@ -91,7 +87,7 @@ public class HeatMapUtil {
     List<EntityReadAccessHeatMapResponse> bucketList =
         children.stream().filter(entity -> entity.getLabel().
             equalsIgnoreCase(split[1])).collect(Collectors.toList());
-    if (bucketList.size() > 0) {
+    if (!bucketList.isEmpty()) {
       bucketEntity = bucketList.get(0);
     }
     if (children.contains(bucketEntity)) {
@@ -118,7 +114,6 @@ public class HeatMapUtil {
                                 long keySize) {
     bucket.setSize(bucket.getSize() + keySize);
   }
-
 
   private void addPrefixPathInfoToBucket(
       EntityReadAccessHeatMapResponse rootEntity, String[] split,
@@ -188,7 +183,7 @@ public class HeatMapUtil {
       entity.setAccessCount(entity.getAccessCount() + child.getAccessCount());
     });
     // This is being taken as whole number
-    if (entity.getAccessCount() > 0 && children.size() > 0) {
+    if (entity.getAccessCount() > 0 && !children.isEmpty()) {
       entity.setAccessCount(entity.getAccessCount() / children.size());
     }
   }
@@ -236,10 +231,10 @@ public class HeatMapUtil {
       EntityReadAccessHeatMapResponse entity) {
     List<EntityReadAccessHeatMapResponse> children =
         entity.getChildren();
-    if (children.size() == 0) {
+    if (children.isEmpty()) {
       entity.setMaxAccessCount(entity.getMinAccessCount());
     }
-    if (children.size() > 0) {
+    if (!children.isEmpty()) {
       entity.setMinAccessCount(Long.MAX_VALUE);
     }
     return children;
@@ -278,7 +273,7 @@ public class HeatMapUtil {
     List<EntityReadAccessHeatMapResponse> children =
         entity.getChildren();
     children.stream().forEach(path -> {
-      if (path.getChildren().size() != 0) {
+      if (!path.getChildren().isEmpty()) {
         updateEntityAccessRatio(path);
       } else {
         path.setColor(1.000);
@@ -422,7 +417,7 @@ public class HeatMapUtil {
       List<EntityReadAccessHeatMapResponse> volumeList =
           children.stream().filter(entity -> entity.getLabel().
               equalsIgnoreCase(split[0])).collect(Collectors.toList());
-      if (volumeList.size() > 0) {
+      if (!volumeList.isEmpty()) {
         volumeEntity = volumeList.get(0);
       }
       if (null != volumeEntity) {

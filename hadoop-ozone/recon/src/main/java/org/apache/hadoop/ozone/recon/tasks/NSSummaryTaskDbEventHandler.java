@@ -17,12 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
-
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -45,19 +43,12 @@ public class NSSummaryTaskDbEventHandler {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
 
-  private final long nsSummaryFlushToDBMaxThreshold;
-
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
                                      ReconOMMetadataManager
-                                     reconOMMetadataManager,
-                                     OzoneConfiguration
-                                     ozoneConfiguration) {
+                                     reconOMMetadataManager) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
-    nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
-        OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
   }
 
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
@@ -68,20 +59,28 @@ public class NSSummaryTaskDbEventHandler {
     return reconOMMetadataManager;
   }
 
-  protected void writeNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap)
+  private void updateNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap, Collection<Long> objectIdsToBeDeleted)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      nsSummaryMap.keySet().forEach((Long key) -> {
+      for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
-          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
-              key, nsSummaryMap.get(key));
+          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, entry.getKey(), entry.getValue());
         } catch (IOException e) {
-          LOG.error("Unable to write Namespace Summary data in Recon DB.",
-              e);
+          LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+          throw e;
         }
-      });
+      }
+      for (Long objectId : objectIdsToBeDeleted) {
+        try {
+          reconNamespaceSummaryManager.batchDeleteNSSummaries(rdbBatchOperation, objectId);
+        } catch (IOException e) {
+          LOG.error("Unable to delete Namespace Summary data from Recon DB.", e);
+          throw e;
+        }
+      }
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
     }
+    LOG.debug("Successfully updated Namespace Summary data in Recon DB.");
   }
 
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
@@ -200,21 +199,32 @@ public class NSSummaryTaskDbEventHandler {
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
-      writeNSSummariesToDB(nsSummaryMap);
-      nsSummaryMap.clear();
+      updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
       return false;
+    } finally {
+      nsSummaryMap.clear();
     }
     return true;
   }
 
-  protected boolean checkAndCallFlushToDB(
-      Map<Long, NSSummary> nsSummaryMap) {
-    // if map contains more than entries, flush to DB and clear the map
-    if (null != nsSummaryMap && nsSummaryMap.size() >=
-        nsSummaryFlushToDBMaxThreshold) {
-      return flushAndCommitNSToDB(nsSummaryMap);
+  /**
+   * Flush and commit updated NSSummary to DB. This includes deleted objects of OM metadata also.
+   *
+   * @param nsSummaryMap Map of objectId to NSSummary
+   * @param objectIdsToBeDeleted list of objectids to be deleted
+   * @return true if successful, false otherwise
+   */
+  protected boolean flushAndCommitUpdatedNSToDB(Map<Long, NSSummary> nsSummaryMap,
+                                                Collection<Long> objectIdsToBeDeleted) {
+    try {
+      updateNSSummariesToDB(nsSummaryMap, objectIdsToBeDeleted);
+    } catch (IOException e) {
+      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      return false;
+    } finally {
+      nsSummaryMap.clear();
     }
     return true;
   }

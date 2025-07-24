@@ -29,7 +29,7 @@ public class VolumeBucketUri
     implements CommandLine.ITypeConverter<OzoneAddress> {
 
   private static final String OZONE_VOLUME_BUCKET_URI_DESCRIPTION =
-      "URI of the volume or bucket.\n" + Shell.OZONE_URI_DESCRIPTION;
+      "URI of the volume (format: volume) or bucket (format: volume/bucket).\n" + Shell.OZONE_URI_DESCRIPTION;
 
   @CommandLine.Parameters(index = "0", arity = "1..1",
       description = OZONE_VOLUME_BUCKET_URI_DESCRIPTION,

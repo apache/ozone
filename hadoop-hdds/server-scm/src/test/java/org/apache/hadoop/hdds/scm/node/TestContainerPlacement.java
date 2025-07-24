@@ -33,13 +33,13 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -191,9 +191,9 @@ public class TestContainerPlacement {
     XceiverClientManager xceiverClientManager = null;
     try {
       for (DatanodeDetails datanodeDetails : datanodes) {
-        UUID dnId = datanodeDetails.getUuid();
+        DatanodeID dnId = datanodeDetails.getID();
         DatanodeInfo datanodeInfo = scmNodeManager.getNodeStateManager()
-            .getNode(dnId);
+            .getNode(datanodeDetails.getID());
         StorageContainerDatanodeProtocolProtos.StorageReportProto report =
             HddsTestUtils
                 .createStorageReport(dnId,
@@ -231,9 +231,8 @@ public class TestContainerPlacement {
             SCMTestUtils.getReplicationFactor(conf).getNumber()) {
           break;
         }
-        UUID dnId = datanodeDetails.getUuid();
         DatanodeInfo datanodeInfo = scmNodeManager.getNodeStateManager()
-            .getNode(dnId);
+            .getNode(datanodeDetails.getID());
         addReplica(container, datanodeInfo);
         replicaCount++;
       }
@@ -243,7 +242,6 @@ public class TestContainerPlacement {
     } catch (NodeNotFoundException e) {
       throw new RuntimeException(e);
     } finally {
-      IOUtils.closeQuietly(containerManager);
       IOUtils.closeQuietly(scmNodeManager);
       if (xceiverClientManager != null) {
         xceiverClientManager.close();
@@ -260,6 +258,6 @@ public class TestContainerPlacement {
         .setDatanodeDetails(node)
         .build();
     containerManager.getContainerStateManager()
-        .updateContainerReplica(cont.containerID(), replica);
+        .updateContainerReplica(replica);
   }
 }

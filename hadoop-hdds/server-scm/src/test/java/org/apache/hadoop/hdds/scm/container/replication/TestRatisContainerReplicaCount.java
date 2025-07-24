@@ -415,7 +415,7 @@ class TestRatisContainerReplicaCount {
           .setContainerID(ContainerID.valueOf(1))
           .setContainerState(OPEN)
           .setDatanodeDetails(dn)
-          .setOriginNodeId(dn.getUuid())
+          .setOriginNodeId(dn.getID())
           .setSequenceId(1)
           .build();
       replica.remove(r);
@@ -841,7 +841,7 @@ class TestRatisContainerReplicaCount {
           .setContainerID(ContainerID.valueOf(1))
           .setContainerState(State.CLOSED)
           .setDatanodeDetails(dn)
-          .setOriginNodeId(dn.getUuid())
+          .setOriginNodeId(dn.getID())
           .setSequenceId(1)
           .build());
     }
@@ -850,7 +850,7 @@ class TestRatisContainerReplicaCount {
 
   private ContainerInfo createContainer(HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
-        .setContainerID(ContainerID.valueOf(1).getId())
+        .setContainerID(1)
         .setState(state)
         .build();
   }

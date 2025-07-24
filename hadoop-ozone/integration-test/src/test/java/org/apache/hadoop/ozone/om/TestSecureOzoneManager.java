@@ -49,13 +49,11 @@ import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test secure Ozone Manager operation in distributed handler scenario.
  */
-@Timeout(25)
 class TestSecureOzoneManager {
 
   private static final String COMPONENT = "om";

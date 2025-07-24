@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.common.helpers;
 
 import java.io.Closeable;
 import java.util.EnumMap;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -56,7 +56,8 @@ public class ContainerMetrics implements Closeable {
   @Metric private MutableCounterLong containerForceDelete;
   @Metric private MutableCounterLong numReadStateMachine;
   @Metric private MutableCounterLong bytesReadStateMachine;
-
+  @Metric private MutableCounterLong numContainerReconciledWithoutChanges;
+  @Metric private MutableCounterLong numContainerReconciledWithChanges;
 
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> numOpsArray;
   private final EnumMap<ContainerProtos.Type, MutableCounterLong> opsBytesArray;
@@ -98,7 +99,7 @@ public class ContainerMetrics implements Closeable {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =
-        conf.getInts(DFSConfigKeysLegacy.DFS_METRICS_PERCENTILES_INTERVALS_KEY);
+        conf.getInts(HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY);
     return ms.register(STORAGE_CONTAINER_METRICS,
                        "Storage Container Node Metrics",
                        new ContainerMetrics(intervals));
@@ -137,6 +138,7 @@ public class ContainerMetrics implements Closeable {
   public void incContainerDeleteFailedBlockCountNotZero() {
     containerDeleteFailedBlockCountNotZero.incr();
   }
+
   public void incContainerDeleteFailedNonEmpty() {
     containerDeleteFailedNonEmpty.incr();
   }
@@ -171,5 +173,13 @@ public class ContainerMetrics implements Closeable {
 
   public long getBytesReadStateMachine() {
     return bytesReadStateMachine.value();
+  }
+
+  public void incContainerReconciledWithoutChanges() {
+    numContainerReconciledWithoutChanges.incr();
+  }
+
+  public void incContainerReconciledWithChanges() {
+    numContainerReconciledWithChanges.incr();
   }
 }

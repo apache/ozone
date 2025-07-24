@@ -98,7 +98,7 @@ public class Component {
   }
 
   public String prefix() {
-    return name + (id != null && id.length() > 0 ? "-" + id : "");
+    return name + (id != null && !id.isEmpty() ? "-" + id : "");
   }
 
   @Override

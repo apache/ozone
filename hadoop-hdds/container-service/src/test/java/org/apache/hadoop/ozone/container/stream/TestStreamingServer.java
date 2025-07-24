@@ -108,6 +108,7 @@ public class TestStreamingServer {
     assertArrayEquals(CONTENT, targetContent);
 
   }
+
   @Test
   public void failedStream() throws Exception {
     Files.createDirectories(sourceDir.resolve(SUBDIR));
