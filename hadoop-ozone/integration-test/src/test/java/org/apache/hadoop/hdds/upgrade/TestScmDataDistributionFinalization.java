@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.EMPTY_SUMMARY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -371,7 +372,7 @@ public class TestScmDataDistributionFinalization {
         if (withSize) {
           blocks.add(new DeletedBlock(new BlockID(containerID, localID), BLOCK_SIZE, BLOCK_SIZE * 3));
         } else {
-          blocks.add(new DeletedBlock(new BlockID(containerID, localID), -1, -1));
+          blocks.add(new DeletedBlock(new BlockID(containerID, localID), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
         }
       }
       blockMap.put(containerID, blocks);

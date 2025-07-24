@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.block;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.EMPTY_SUMMARY;
+import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
@@ -214,16 +215,11 @@ public class TestDeletedBlockLog {
   }
 
   private Map<Long, List<DeletedBlock>> generateData(int dataSize) throws IOException {
-    return generateData(dataSize, HddsProtos.LifeCycleState.CLOSED, true);
+    return generateData(dataSize, HddsProtos.LifeCycleState.CLOSED);
   }
 
   private Map<Long, List<DeletedBlock>> generateData(int txCount,
       HddsProtos.LifeCycleState state) throws IOException {
-    return generateData(txCount, state, true);
-  }
-
-  private Map<Long, List<DeletedBlock>> generateData(int txCount,
-      HddsProtos.LifeCycleState state, boolean updateContainerMetadata) throws IOException {
     Map<Long, List<DeletedBlock>> blockMap = new HashMap<>();
     long continerIDBase = RandomUtils.secure().randomLong(0, 100);
     int localIDBase = RandomUtils.secure().randomInt(0, 1000);
@@ -880,7 +876,7 @@ public class TestDeletedBlockLog {
     Map<Long, List<DeletedBlock>> deletedBlocksMap = new HashMap<>();
     long localId = RandomUtils.secure().randomLong();
     List<DeletedBlock> blockIDList = new ArrayList<>();
-    blockIDList.add(new DeletedBlock(new BlockID(containerID, localId), -1, -1));
+    blockIDList.add(new DeletedBlock(new BlockID(containerID, localId), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
     deletedBlocksMap.put(containerID, blockIDList);
     addTransactions(deletedBlocksMap, true);
     blocks = getTransactions(txNum * BLOCKS_PER_TXN * ONE);

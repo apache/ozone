@@ -108,20 +108,20 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @Metric(about = "The number of transactions whose totalBlockSize is fetched from DB")
   private MutableGaugeLong numBlockDeletionTransactionSizeFromDB;
 
-  private static final MetricsInfo NUM_BLOCK_DELETION_TRANSACTION = Interns.info(
-      "numBlockDeletionTransaction",
+  private static final MetricsInfo NUM_BLOCK_DELETION_TRANSACTIONS = Interns.info(
+      "numBlockDeletionTransactions",
       "The number of transactions in DB.");
 
-  private static final MetricsInfo NUM_BLOCK_IN_DELETION_TRANSACTION = Interns.info(
-      "numBlockOfDeletionTransaction",
+  private static final MetricsInfo NUM_BLOCK_OF_ALL_DELETION_TRANSACTIONS = Interns.info(
+      "numBlockOfAllDeletionTransactions",
       "The number of blocks in all transactions in DB.");
 
-  private static final MetricsInfo BLOCK_SIZE_OF_DELETION_TRANSACTION = Interns.info(
-      "blockSizeOfDeletionTransaction",
+  private static final MetricsInfo BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS = Interns.info(
+      "blockSizeOfAllDeletionTransactions",
       "The size of all blocks in all transactions in DB.");
 
-  private static final MetricsInfo REPLICATED_BLOCK_SIZE_OF_DELETION_TRANSACTION = Interns.info(
-      "replicatedBlockSizeOfDeletionTransaction",
+  private static final MetricsInfo REPLICATED_BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS = Interns.info(
+      "replicatedBlockSizeOfAllDeletionTransactions",
       "The replicated size of all blocks in all transactions in DB.");
 
   private ScmBlockDeletingServiceMetrics(BlockManager blockManager) {
@@ -320,13 +320,13 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     if (blockManager.getDeletedBlockLog().isTransactionSummarySupported()) {
       HddsProtos.DeletedBlocksTransactionSummary summary = blockManager.getDeletedBlockLog().getTransactionSummary();
       recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
-          .addGauge(NUM_BLOCK_DELETION_TRANSACTION, summary.getTotalTransactionCount());
+          .addGauge(NUM_BLOCK_DELETION_TRANSACTIONS, summary.getTotalTransactionCount());
       recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
-          .addGauge(NUM_BLOCK_IN_DELETION_TRANSACTION, summary.getTotalBlockCount());
+          .addGauge(NUM_BLOCK_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockCount());
       recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
-          .addGauge(BLOCK_SIZE_OF_DELETION_TRANSACTION, summary.getTotalBlockSize());
+          .addGauge(BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockSize());
       recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
-          .addGauge(REPLICATED_BLOCK_SIZE_OF_DELETION_TRANSACTION, summary.getTotalBlockReplicatedSize());
+          .addGauge(REPLICATED_BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockReplicatedSize());
     }
     recordBuilder.endRecord();
   }
