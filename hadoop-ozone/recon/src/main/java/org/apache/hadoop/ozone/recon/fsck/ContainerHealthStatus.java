@@ -161,10 +161,9 @@ public class ContainerHealthStatus {
     return numKeys == 0;
   }
 
-  public boolean isDataChecksumMismatched() {
+  public boolean areChecksumsMismatched() {
     return !replicas.isEmpty() && replicas.stream()
             .map(ContainerReplica::getChecksums)
-            .map(ContainerChecksums::getDataChecksum)
             .distinct()
             .count() != 1;
   }

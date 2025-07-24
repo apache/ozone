@@ -26,9 +26,9 @@ import org.junit.jupiter.api.Test;
 class TestContainerChecksums {
   @Test
   void testEqualsAndHashCode() {
-    ContainerChecksums c1 = ContainerChecksums.dataOnly(123L);
-    ContainerChecksums c2 = ContainerChecksums.dataOnly(123L);
-    ContainerChecksums c3 = ContainerChecksums.dataOnly(456L);
+    ContainerChecksums c1 = ContainerChecksums.of(123L, 0L);
+    ContainerChecksums c2 = ContainerChecksums.of(123L, 0L);
+    ContainerChecksums c3 = ContainerChecksums.of(456L, 0L);
     ContainerChecksums c4 = ContainerChecksums.of(123L, 789L);
     ContainerChecksums c5 = ContainerChecksums.of(123L, 789L);
     ContainerChecksums c6 = ContainerChecksums.of(123L, 790L);
@@ -43,8 +43,8 @@ class TestContainerChecksums {
 
   @Test
   void testToString() {
-    ContainerChecksums c1 = ContainerChecksums.dataOnly(0x1234ABCDL);
-    assertThat(c1.toString()).contains("data=1234abcd").doesNotContain("metadata=");
+    ContainerChecksums c1 = ContainerChecksums.of(0x1234ABCDL, 0L);
+    assertThat(c1.toString()).contains("data=1234abcd", "metadata=0");
 
     ContainerChecksums c2 = ContainerChecksums.of(0x1234ABCDL, 0xDEADBEEFL);
     assertThat(c2.toString()).contains("data=1234abcd").contains("metadata=deadbeef");

@@ -28,12 +28,12 @@ import net.jcip.annotations.Immutable;
 public final class ContainerChecksums {
 
   private static final ContainerChecksums UNKNOWN =
-      new ContainerChecksums(0, null);
+      new ContainerChecksums(0, 0L);
 
   private final long dataChecksum;
-  private final Long metadataChecksum; // nullable for future use
+  private final long metadataChecksum;
 
-  private ContainerChecksums(long dataChecksum, Long metadataChecksum) {
+  private ContainerChecksums(long dataChecksum, long metadataChecksum) {
     this.dataChecksum = dataChecksum;
     this.metadataChecksum = metadataChecksum;
   }
@@ -41,15 +41,7 @@ public final class ContainerChecksums {
   public static ContainerChecksums unknown() {
     return UNKNOWN;
   }
-
-  public static ContainerChecksums dataOnly(long dataChecksum) {
-    return new ContainerChecksums(dataChecksum, null);
-  }
-
-  public static ContainerChecksums metadataOnly(long metadataChecksum) {
-    return new ContainerChecksums(0, metadataChecksum);
-  }
-
+  
   public static ContainerChecksums of(long dataChecksum, long metadataChecksum) {
     return new ContainerChecksums(dataChecksum, metadataChecksum);
   }
@@ -58,7 +50,7 @@ public final class ContainerChecksums {
     return dataChecksum;
   }
 
-  public Long getMetadataChecksum() {
+  public long getMetadataChecksum() {
     return metadataChecksum;
   }
 
@@ -72,7 +64,7 @@ public final class ContainerChecksums {
     }
     ContainerChecksums that = (ContainerChecksums) obj;
     return dataChecksum == that.dataChecksum &&
-        Objects.equals(metadataChecksum, that.metadataChecksum);
+        metadataChecksum == that.metadataChecksum;
   }
 
   @Override
@@ -82,11 +74,7 @@ public final class ContainerChecksums {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("data=").append(Long.toHexString(dataChecksum));
-    if (metadataChecksum != null) {
-      sb.append(", metadata=").append(Long.toHexString(metadataChecksum));
-    }
-    return sb.toString();
+    return "data=" + Long.toHexString(dataChecksum) +
+        ", metadata=" + Long.toHexString(metadataChecksum);
   }
 }

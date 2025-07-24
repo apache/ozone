@@ -190,7 +190,7 @@ public class TestContainerHealthStatus {
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isMisReplicated());
-    assertFalse(status.isDataChecksumMismatched());
+    assertFalse(status.areChecksumsMismatched());
   }
 
   @Test
@@ -207,7 +207,7 @@ public class TestContainerHealthStatus {
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isMisReplicated());
-    assertTrue(status.isDataChecksumMismatched());
+    assertTrue(status.areChecksumsMismatched());
   }
 
   /**
@@ -417,7 +417,7 @@ public class TestContainerHealthStatus {
       replicas.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
-          .setChecksums(ContainerChecksums.dataOnly(1234L))
+          .setChecksums(ContainerChecksums.of(1234L, 0L))
           .setContainerState(s)
           .build());
     }
@@ -433,7 +433,7 @@ public class TestContainerHealthStatus {
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
           .setContainerState(s)
-          .setChecksums(ContainerChecksums.dataOnly(checksum))
+          .setChecksums(ContainerChecksums.of(checksum, 0L))
           .build());
       checksum++;
     }

@@ -211,7 +211,7 @@ public class TestReconContainerManager
     ContainerReplica containerReplica1 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
         .setDatanodeDetails(datanodeDetails1).setSequenceId(1001L)
-        .setChecksums(ContainerChecksums.dataOnly(1234L)).build();
+        .setChecksums(ContainerChecksums.of(1234L, 0L)).build();
 
     final ReconContainerManager containerManager = getContainerManager();
     final Map<Long, Map<UUID, ContainerReplicaHistory>> repHistMap =
@@ -259,7 +259,7 @@ public class TestReconContainerManager
     final ContainerReplica containerReplica2 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
         .setDatanodeDetails(datanodeDetails2).setSequenceId(1051L)
-        .setChecksums(ContainerChecksums.dataOnly(1234L)).build();
+        .setChecksums(ContainerChecksums.of(1234L, 0L)).build();
 
     // Add replica to DN02
     containerManager.updateContainerReplica(containerID1, containerReplica2);

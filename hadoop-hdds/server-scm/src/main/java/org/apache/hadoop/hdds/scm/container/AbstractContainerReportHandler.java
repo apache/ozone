@@ -362,7 +362,7 @@ abstract class AbstractContainerReportHandler {
         .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
         .setEmpty(replicaProto.getIsEmpty())
-        .setChecksums(ContainerChecksums.dataOnly(replicaProto.getDataChecksum()))
+        .setChecksums(ContainerChecksums.of(replicaProto.getDataChecksum(), 0L))
         .build();
 
     if (replica.getState().equals(State.DELETED)) {

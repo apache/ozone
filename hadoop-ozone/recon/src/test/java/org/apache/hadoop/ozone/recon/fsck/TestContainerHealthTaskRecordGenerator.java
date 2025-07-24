@@ -643,7 +643,7 @@ public class TestContainerHealthTaskRecordGenerator {
       replicas.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
-          .setChecksums(ContainerChecksums.dataOnly(1234L))
+          .setChecksums(ContainerChecksums.of(1234L, 0L))
           .setContainerState(s)
           .build());
     }
@@ -659,7 +659,7 @@ public class TestContainerHealthTaskRecordGenerator {
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
           .setContainerState(s)
-          .setChecksums(ContainerChecksums.dataOnly(checksum))
+          .setChecksums(ContainerChecksums.of(checksum, 0L))
           .build());
       checksum++;
     }
