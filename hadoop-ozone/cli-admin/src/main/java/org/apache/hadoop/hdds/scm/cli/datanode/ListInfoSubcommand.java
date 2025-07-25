@@ -110,7 +110,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .compareToIgnoreCase(nodeSelectionMixin.getHostname()) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeOperationalState)) {
-      allNodes = allNodes.filter(p -> p.getPersistedOpState()
+      allNodes = allNodes.filter(p -> p.getPersistedOpState().toString()
           .compareToIgnoreCase(nodeOperationalState) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeState)) {

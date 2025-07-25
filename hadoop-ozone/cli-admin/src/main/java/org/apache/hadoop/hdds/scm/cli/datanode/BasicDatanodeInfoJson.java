@@ -34,7 +34,7 @@ public class BasicDatanodeInfoJson {
   private final List<DatanodeDetails.Port> ports;
   private final long setupTime;
   private final int currentVersion;
-  private final String persistedOpState;
+  private final HddsProtos.NodeOperationalState persistedOpState;
   private final long persistedOpStateExpiryEpochSec;
   private final HddsProtos.NodeState healthState;
   private final boolean decommissioned;
@@ -58,7 +58,7 @@ public class BasicDatanodeInfoJson {
     this.dn = dnDetails;
     this.id = dnDetails.getUuid().toString();
     this.ports = dnDetails.getPorts();
-    this.persistedOpState = String.valueOf(dnDetails.getPersistedOpState());
+    this.persistedOpState = dnDetails.getPersistedOpState();
     this.healthState = healthState;
     this.hostName = dnDetails.getHostName();
     this.ipAddress = dnDetails.getIpAddress();
@@ -91,7 +91,7 @@ public class BasicDatanodeInfoJson {
     return ports;
   }
   
-  public String getPersistedOpState() {
+  public HddsProtos.NodeOperationalState getPersistedOpState() {
     return persistedOpState;
   }
   
