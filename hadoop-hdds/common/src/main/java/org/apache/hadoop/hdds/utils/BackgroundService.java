@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
@@ -41,10 +40,8 @@ public abstract class BackgroundService {
   protected static final Logger LOG =
       LoggerFactory.getLogger(BackgroundService.class);
 
-  // Executor to launch the runner
+  // Executor to launch child tasks
   private ScheduledThreadPoolExecutor exec;
-  // Executor to launch all the worker tasks
-  private ThreadPoolExecutor taskExec;
   private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
@@ -81,15 +78,18 @@ public abstract class BackgroundService {
 
   @VisibleForTesting
   public ExecutorService getExecutorService() {
-    return this.taskExec;
+    return this.exec;
   }
 
   public void setPoolSize(int size) {
     if (size <= 0) {
       throw new IllegalArgumentException("Pool size must be positive.");
     }
-    taskExec.setCorePoolSize(size);
-    taskExec.setMaximumPoolSize(size);
+
+    // In ScheduledThreadPoolExecutor, maximumPoolSize is Integer.MAX_VALUE
+    // the corePoolSize will always less maximumPoolSize.
+    // So we can directly set the corePoolSize
+    exec.setCorePoolSize(size);
   }
 
   @VisibleForTesting
@@ -131,6 +131,15 @@ public abstract class BackgroundService {
   public class PeriodicalTask implements Runnable {
     @Override
     public synchronized void run() {
+      // wait for previous set of tasks to complete
+      try {
+        future.join();
+      } catch (RuntimeException e) {
+        LOG.error("Background service execution failed.", e);
+      } finally {
+        execTaskCompletion();
+      }
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running background service : {}", serviceName);
       }
@@ -143,7 +152,6 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
-      long serviceStartTime = System.nanoTime();
       while (!tasks.isEmpty()) {
         BackgroundTask task = tasks.poll();
         future = future.thenCombine(CompletableFuture.runAsync(() -> {
@@ -165,19 +173,7 @@ public abstract class BackgroundService {
                   serviceName, endTime - startTime, serviceTimeoutInNanos);
             }
           }
-        }, taskExec).exceptionally(e -> null), (Void1, Void) -> null);
-      }
-      try {
-        future.join();
-      } catch (RuntimeException e) {
-        LOG.error("Background service execution failed.", e);
-      } finally {
-        long endTime = System.nanoTime();
-        if (endTime - serviceStartTime > serviceTimeoutInNanos) {
-          LOG.warn("{} Background service execution took {}ns > {}ns(timeout)",
-              service, endTime - serviceStartTime, serviceTimeoutInNanos);
-        }
-        execTaskCompletion();
+        }, exec).exceptionally(e -> null), (Void1, Void) -> null);
       }
     }
   }
@@ -185,25 +181,18 @@ public abstract class BackgroundService {
   // shutdown and make sure all threads are properly released.
   public synchronized void shutdown() {
     LOG.info("Shutting down service {}", this.serviceName);
-    shutdownExecutor(exec);
-    shutdownExecutor(taskExec);
+    exec.shutdown();
+    try {
+      if (!exec.awaitTermination(60, TimeUnit.SECONDS)) {
+        exec.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
+      exec.shutdownNow();
+    }
     if (threadGroup.activeCount() == 0 && !threadGroup.isDestroyed()) {
       threadGroup.destroy();
-    }
-  }
-
-  private void shutdownExecutor(ExecutorService executor) {
-    if (executor != null) {
-      executor.shutdown();
-      try {
-        if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
-          executor.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-        // Re-interrupt the thread while catching InterruptedException
-        Thread.currentThread().interrupt();
-        executor.shutdownNow();
-      }
     }
   }
 
@@ -214,10 +203,6 @@ public abstract class BackgroundService {
         .setDaemon(true)
         .setNameFormat(threadNamePrefix + serviceName + "#%d")
         .build();
-    // Use a single thread for the scheduled runner
-    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(1, threadFactory);
-    // Use a separate pool for the worker tasks
-    taskExec = (ThreadPoolExecutor) Executors.newFixedThreadPool(threadPoolSize, threadFactory);
-
+    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
   }
 }

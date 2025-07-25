@@ -80,7 +80,7 @@ public class TestBackgroundService {
   @BeforeEach
   public void setUp() {
     queue = new BackgroundTaskQueue();
-    runCount = new AtomicInteger(0);
+    runCount = new AtomicInteger(-1);
   }
 
   @AfterEach
