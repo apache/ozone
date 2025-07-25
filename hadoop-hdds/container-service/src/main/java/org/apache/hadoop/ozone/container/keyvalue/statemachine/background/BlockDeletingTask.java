@@ -485,10 +485,6 @@ public class BlockDeletingTask implements BackgroundTask {
         }
       }
 
-      // Mark blocks as deleted in the container checksum tree.
-      // Data for these blocks does not need to be copied if container replicas diverge during container reconciliation.
-      // Do this before the delete transactions are removed from the database.
-      checksumTreeManager.markBlocksAsDeleted(containerData, succeedDeletedBlocks);
       deletedBlocksTxs.add(entry);
       Duration execTime = Duration.between(startTime, Instant.now());
       if (deletedBlocksTxs.size() < delBlocks.size() &&
@@ -503,6 +499,11 @@ public class BlockDeletingTask implements BackgroundTask {
         break;
       }
     }
+
+    // Mark blocks as deleted in the container checksum tree.
+    // Data for these blocks does not need to be copied if container replicas diverge during container reconciliation.
+    // Do this before the delete transactions are removed from the database.
+    checksumTreeManager.markBlocksAsDeleted(containerData, succeedDeletedBlocks);
     return new DeleteTransactionStats(blocksProcessed,
         blocksDeleted, bytesReleased, deletedBlocksTxs);
   }
