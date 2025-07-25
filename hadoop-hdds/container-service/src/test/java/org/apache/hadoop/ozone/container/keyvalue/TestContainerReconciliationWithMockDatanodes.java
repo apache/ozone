@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.createBlockMerkleTreeFromBlockData;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
@@ -89,6 +90,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -224,6 +226,56 @@ public class TestContainerReconciliationWithMockDatanodes {
     // After reconciliation, checksums should be the same for all containers.
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
+  }
+
+  @Test
+  public void testReconciliationWithPeerDeletedBlocksNotInOurList() throws Exception {
+    MockDatanode sourceDatanode = datanodes.get(0);
+    MockDatanode peerDatanode = datanodes.get(1);
+    // Use a different container ID to avoid conflicts with other tests
+    long newContainerID = CONTAINER_ID + 1000;
+    
+    // Create containers with different block sets to simulate the scenario:
+    // - Source: has blocks 0-6 (will learn about deleted blocks from peer)
+    // - Peer: initially has blocks 0-9, then deletes blocks 7-9
+    sourceDatanode.addContainerWithBlocks(newContainerID, 7);
+    peerDatanode.addContainerWithBlocks(newContainerID, 10);
+
+    // Simulate peer having deleted blocks 7-9
+    KeyValueContainer peerContainer = peerDatanode.getContainer(newContainerID);
+    List<ContainerProtos.BlockMerkleTree> peerDeletedBlocks = new ArrayList<>();
+    for (long blockId = 7; blockId < 10; blockId++) {
+      BlockData block = peerDatanode.handler.getBlockManager().getBlock(peerContainer,
+          new BlockID(newContainerID, blockId));
+      ContainerProtos.BlockMerkleTree deletedBlockTree = createBlockMerkleTreeFromBlockData(block);
+      peerDeletedBlocks.add(deletedBlockTree);
+    }
+
+    // Add peer's deleted blocks to its container metadata
+    peerDatanode.handler.getChecksumManager().markBlocksAsDeleted(peerContainer.getContainerData(), peerDeletedBlocks);
+    long sourceChecksumBefore = sourceDatanode.checkAndGetDataChecksum(newContainerID);
+    long peerChecksumBefore = peerDatanode.checkAndGetDataChecksum(newContainerID);
+    assertNotEquals(sourceChecksumBefore, peerChecksumBefore, "Checksums should differ before reconciliation");
+
+    // Perform reconciliation - source datanode reconciles with peer
+    List<DatanodeDetails> peersForSource = Collections.singletonList(peerDatanode.getDnDetails());
+    sourceDatanode.reconcileContainer(dnClient, peersForSource, newContainerID);
+
+    long sourceChecksumAfter = sourceDatanode.checkAndGetDataChecksum(newContainerID);
+    long peerChecksumAfter = peerDatanode.checkAndGetDataChecksum(newContainerID);
+    assertEquals(sourceChecksumAfter, peerChecksumAfter, "Checksums should match after reconciliation");
+
+    // Verify the source datanode learned about peer's deleted blocks
+    ContainerProtos.ContainerChecksumInfo sourceChecksumInfo = sourceDatanode.handler.getChecksumManager()
+        .read(sourceDatanode.getContainer(newContainerID).getContainerData());
+    List<Long> sourceDeletedBlockIds = sourceChecksumInfo.getDeletedBlocksList().stream()
+        .map(ContainerProtos.BlockMerkleTree::getBlockID)
+        .collect(Collectors.toList());
+
+    // Verify source now has the peer's deleted blocks in its deleted list
+    assertTrue(sourceDeletedBlockIds.contains(7L));
+    assertTrue(sourceDeletedBlockIds.contains(8L));
+    assertTrue(sourceDeletedBlockIds.contains(9L));
   }
 
   /**

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.checksum;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Supplier;
@@ -138,9 +139,50 @@ public class ContainerMerkleTreeWriter {
   }
 
   /**
+   * Converts this writer to a protobuf representation, including deleted blocks in the data checksum calculation.
+   * This ensures that the container checksum remains consistent across peers even when blocks are deleted
+   * asynchronously.
+   *
+   * @param deletedBlocks List of deleted blocks to include in checksum calculation
+   * @return ContainerMerkleTree protobuf with data checksum that accounts for deleted blocks
+   */
+  public ContainerProtos.ContainerMerkleTree toProto(List<ContainerProtos.BlockMerkleTree> deletedBlocks) {
+    // Compute checksums and return the result.
+    ContainerProtos.ContainerMerkleTree.Builder containerTreeBuilder = ContainerProtos.ContainerMerkleTree.newBuilder();
+    ChecksumByteBuffer checksumImpl = CHECKSUM_BUFFER_SUPPLIER.get();
+
+    // Create a combined sorted map of all blocks (active + deleted) for consistent checksum calculation
+    SortedMap<Long, Long> allBlockChecksums = new TreeMap<>();
+
+    // Add active blocks from the tree
+    for (BlockMerkleTreeWriter blockTree: id2Block.values()) {
+      ContainerProtos.BlockMerkleTree blockTreeProto = blockTree.toProto();
+      containerTreeBuilder.addBlockMerkleTree(blockTreeProto);
+      allBlockChecksums.put(blockTreeProto.getBlockID(), blockTreeProto.getDataChecksum());
+    }
+
+    // Add deleted blocks to the checksum calculation
+    for (ContainerProtos.BlockMerkleTree deletedBlock : deletedBlocks) {
+      allBlockChecksums.putIfAbsent(deletedBlock.getBlockID(), deletedBlock.getDataChecksum());
+    }
+
+    // Calculate container checksum using all blocks (active + deleted) in sorted order
+    ByteBuffer containerChecksumBuffer = ByteBuffer.allocate(Long.BYTES * allBlockChecksums.size());
+    for (Long blockChecksum : allBlockChecksums.values()) {
+      containerChecksumBuffer.putLong(blockChecksum);
+    }
+    containerChecksumBuffer.flip();
+    checksumImpl.update(containerChecksumBuffer);
+
+    return containerTreeBuilder
+        .setDataChecksum(checksumImpl.getValue())
+        .build();
+  }
+
+  /**
    * Constructs a merkle tree for a single block within a container.
    */
-  private static class BlockMerkleTreeWriter {
+  public static class BlockMerkleTreeWriter {
     // Map of each offset within the block to its chunk info.
     // Chunk order in the checksum is determined by their offset.
     private final SortedMap<Long, ChunkMerkleTreeWriter> offset2Chunk;
@@ -160,6 +202,12 @@ public class ContainerMerkleTreeWriter {
     public void addChunks(ChunkMerkleTreeWriter... chunks) {
       for (ChunkMerkleTreeWriter chunk: chunks) {
         offset2Chunk.put(chunk.getOffset(), chunk);
+      }
+    }
+
+    public void addChunks(List<ContainerProtos.ChunkInfo> chunkInfos) {
+      for (ContainerProtos.ChunkInfo chunkInfo: chunkInfos) {
+        offset2Chunk.put(chunkInfo.getOffset(), new ChunkMerkleTreeWriter(chunkInfo, true));
       }
     }
 
