@@ -42,6 +42,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -92,9 +93,16 @@ public class TarContainerPacker
     byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot);
 
     if (!Files.exists(destContainerDir)) {
-      Files.createDirectories(destContainerDir);.
+      Files.createDirectories(destContainerDir);
     }
     if (FileUtils.isEmptyDirectory(destContainerDir.toFile())) {
+      // Before the atomic move, the destination dir is empty and doesn't have a metadata directory.
+      // Writing the .container file will fail as the metadata dir doesn't exist.
+      // So we instead save the container file to the containerUntarDir.
+      Path containerMetadataPath = Paths.get(container.getContainerData().getMetadataPath());
+      Path tempContainerMetadataPath = Paths.get(containerUntarDir.toString(),
+          containerMetadataPath.getName(containerMetadataPath.getNameCount() - 1).toString());
+      persistCustomContainerState(container, descriptorFileContent, State.RECOVERING, tempContainerMetadataPath);
       Files.move(containerUntarDir, destContainerDir,
               StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
