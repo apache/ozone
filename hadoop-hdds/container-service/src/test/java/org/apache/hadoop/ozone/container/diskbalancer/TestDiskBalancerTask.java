@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,7 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -42,7 +46,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -69,6 +73,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 /**
  * Tests the container move logic within DiskBalancerTask.
@@ -91,57 +97,8 @@ public class TestDiskBalancerTask {
   private HddsVolume destVolume;
   private DiskBalancerServiceTestImpl diskBalancerService;
 
-  private final TestFaultInjector kvFaultInjector = new TestFaultInjector();
-  private final TestFaultInjector csFaultInjector = new TestFaultInjector();
-  private final TestFaultInjector kvUtilFaultInjector = new TestFaultInjector();
-
   private static final long CONTAINER_ID = 1L;
   private static final long CONTAINER_SIZE = 1024L * 1024L; // 1 MB
-
-  /**
-   * A FaultInjector that can be configured to throw an exception on a
-   * specific invocation number. This allows tests to target failure points
-   * that occur after initial checks.
-   */
-  private static class TestFaultInjector extends FaultInjector {
-    private Throwable exception;
-    private int throwOnInvocation = -1; // -1 means never throw
-    private int invocationCount = 0;
-
-    /**
-     * Sets an exception to be thrown on a specific invocation.
-     * @param e The exception to throw.
-     * @param onInvocation The invocation number to throw on (e.g., 1 for the
-     * first call, 2 for the second, etc.).
-     */
-    public void setException(Throwable e, int onInvocation) {
-      this.exception = e;
-      this.throwOnInvocation = onInvocation;
-      this.invocationCount = 0; // Reset count for each new test setup
-    }
-
-    @Override
-    public void setException(Throwable e) {
-      // Default to throwing on the first invocation if no number is specified.
-      setException(e, 1);
-    }
-
-    @Override
-    public Throwable getException() {
-      invocationCount++;
-      if (exception != null && invocationCount == throwOnInvocation) {
-        return exception;
-      }
-      return null;
-    }
-
-    @Override
-    public void reset() {
-      this.exception = null;
-      this.throwOnInvocation = -1;
-      this.invocationCount = 0;
-    }
-  }
 
   @BeforeEach
   public void setup() throws Exception {
@@ -178,10 +135,6 @@ public class TestDiskBalancerTask {
     List<StorageVolume> volumes = volumeSet.getVolumesList();
     sourceVolume = (HddsVolume) volumes.get(0);
     destVolume = (HddsVolume) volumes.get(1);
-
-    KeyValueContainer.setInjector(kvFaultInjector);
-    ContainerSet.setFaultInjector(csFaultInjector);
-    KeyValueContainerUtil.setInjector(kvUtilFaultInjector);
   }
 
   @AfterEach
@@ -197,13 +150,6 @@ public class TestDiskBalancerTask {
     if (testRoot.exists()) {
       FileUtils.deleteDirectory(testRoot);
     }
-
-    kvFaultInjector.reset();
-    csFaultInjector.reset();
-    kvUtilFaultInjector.reset();
-    KeyValueContainer.setInjector(null);
-    ContainerSet.setFaultInjector(null);
-    KeyValueContainerUtil.setInjector(null);
   }
 
   @Test
@@ -216,7 +162,6 @@ public class TestDiskBalancerTask {
     DiskBalancerService.DiskBalancerTask task = getTask(container.getContainerData());
     task.call();
 
-    // Asserts
     Container newContainer = containerSet.getContainer(CONTAINER_ID);
     assertNotNull(newContainer);
     assertNotEquals(container, newContainer);
@@ -241,7 +186,11 @@ public class TestDiskBalancerTask {
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     String oldContainerPath = container.getContainerData().getContainerPath();
 
-    kvFaultInjector.setException(new IOException("Fault injection: copy failed"), 1);
+    // Use spy ContainerController to inject failure during copy
+    ContainerController spyController = spy(controller);
+    doThrow(new IOException("Mockito spy: copy failed"))
+        .when(spyController).copyContainer(any(ContainerData.class), any(Path.class));
+    when(ozoneContainer.getController()).thenReturn(spyController);
 
     DiskBalancerService.DiskBalancerTask task = getTask(container.getContainerData());
     task.call();
@@ -262,15 +211,17 @@ public class TestDiskBalancerTask {
   }
 
   @Test
-  public void moveFailsOnAtomicMove() throws IOException {
+  public void moveFailsOnImportContainer() throws IOException {
     Container container = createContainer(CONTAINER_ID, sourceVolume);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     String oldContainerPath = container.getContainerData().getContainerPath();
 
-    // Inject a failure that will be thrown just after the atomic move during container import.
-    kvFaultInjector.setException(new
-        IOException("Fault injection: container import failed after atomic move"), 2);
+    // Use spy to inject failure during the atomic move
+    ContainerController spyController = spy(controller);
+    doThrow(new IOException("Mockito spy: container import failed"))
+        .when(spyController).importContainer(any(ContainerData.class), any(Path.class));
+    when(ozoneContainer.getController()).thenReturn(spyController);
 
     DiskBalancerService.DiskBalancerTask task = getTask(
         container.getContainerData());
@@ -297,10 +248,12 @@ public class TestDiskBalancerTask {
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
     String oldContainerPath = container.getContainerData().getContainerPath();
 
-    // Use the fault injector to fail the final
-    // in-memory update after container import
-    csFaultInjector.setException(
-        new IOException("Fault Injection: updateContainer failed"), 1);
+    ContainerSet spyContainerSet = spy(containerSet);
+    doThrow(new StorageContainerException("Mockito spy: updateContainer failed",
+        CONTAINER_INTERNAL_ERROR))
+        .when(spyContainerSet).updateContainer(any(Container.class));
+    when(ozoneContainer.getContainerSet()).thenReturn(spyContainerSet);
+
 
     DiskBalancerService.DiskBalancerTask task = getTask(
         container.getContainerData());
@@ -333,15 +286,18 @@ public class TestDiskBalancerTask {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
 
-    // 2. Fault Injection:
-    // Fail the final 'delete' call on the old container instance.
-    // This simulates a failure during the cleanup of the old replica's files.
-    kvUtilFaultInjector.setException(
-        new IOException("Fault Injection: old container delete() failed"), 1);
+    // Use a static mock for the KeyValueContainer utility class
+    try (MockedStatic<KeyValueContainerUtil> mockedUtil =
+             mockStatic(KeyValueContainerUtil.class, Mockito.CALLS_REAL_METHODS)) {
+      // Stub the static method to throw an exception
+      mockedUtil.when(() -> KeyValueContainerUtil.removeContainer(
+              any(KeyValueContainerData.class), any(OzoneConfiguration.class)))
+          .thenThrow(new IOException("Mockito: old container delete() failed"));
 
-    DiskBalancerService.DiskBalancerTask task = getTask(
-        container.getContainerData());
-    task.call();
+      DiskBalancerService.DiskBalancerTask task = getTask(
+          container.getContainerData());
+      task.call();
+    }
 
     // Assertions for successful move despite old container cleanup failure
     assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());

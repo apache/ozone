@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -44,7 +43,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -60,8 +58,6 @@ import org.slf4j.LoggerFactory;
 public class ContainerSet implements Iterable<Container<?>> {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
-
-  private static FaultInjector faultInjector;
 
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
@@ -221,15 +217,6 @@ public class ContainerSet implements Iterable<Container<?>> {
    */
   public Container updateContainer(Container<?> container) throws
       StorageContainerException {
-    // Check for an injected fault before proceeding.
-    if (faultInjector != null) {
-      Throwable e = faultInjector.getException();
-      if (e != null) {
-        throw new StorageContainerException("Fault Injection", e,
-            CONTAINER_INTERNAL_ERROR);
-      }
-    }
-
     Preconditions.checkNotNull(container, "container cannot be null");
 
     long containerId = container.getContainerData().getContainerID();
@@ -462,11 +449,6 @@ public class ContainerSet implements Iterable<Container<?>> {
 
   public Map<Long, Container<?>> getContainerMap() {
     return Collections.unmodifiableMap(containerMap);
-  }
-
-  @VisibleForTesting
-  public static void setFaultInjector(FaultInjector injector) {
-    faultInjector = injector;
   }
 
   /**
