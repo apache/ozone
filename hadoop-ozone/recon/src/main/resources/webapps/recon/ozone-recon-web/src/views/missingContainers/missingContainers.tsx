@@ -260,8 +260,8 @@ export class MissingContainers extends React.Component<Record<string, object>, I
     let baseUrl =
         `/api/v1/containers/unhealthy/${encodeURIComponent(this.state.currentState)}?limit=${total_fetch_entries}`;
     let queryParam = direction
-        ? `&prevLastKey=${encodeURIComponent(this.state.lastSeenKey)}`
-        : `&prevStartKey=${encodeURIComponent(this.state.firstSeenKey)}`;
+        ? `&minContainerId=${encodeURIComponent(this.state.lastSeenKey)}`
+        : `&maxContainerId=${encodeURIComponent(this.state.firstSeenKey)}`;
     let urlVal = baseUrl + queryParam;
     const { request, controller } = AxiosGetHelper(urlVal, cancelContainerSignal);
     cancelContainerSignal = controller;
