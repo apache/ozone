@@ -84,6 +84,10 @@ public class ContainerReplicaHistory {
     this.state = state;
   }
 
+  public long getDataChecksum() {
+    return getChecksums().getDataChecksum();
+  }
+
   public ContainerChecksums getChecksums() {
     return checksums;
   }

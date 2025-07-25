@@ -98,7 +98,7 @@ class TestBackgroundContainerMetadataScannerIntegration
     assertEquals(State.CLOSED, closedContainer.getContainerState());
     assertTrue(containerChecksumFileExists(closedContainerID));
     waitForScmToSeeReplicaState(closedContainerID, CLOSED);
-    long initialClosedChecksum = getContainerReplica(closedContainerID).getChecksums().getDataChecksum();
+    long initialClosedChecksum = getContainerReplica(closedContainerID).getDataChecksum();
     assertNotEquals(0, initialClosedChecksum);
 
     long openContainerID = writeDataToOpenContainer();
@@ -106,7 +106,7 @@ class TestBackgroundContainerMetadataScannerIntegration
     assertEquals(State.OPEN, openContainer.getContainerState());
     waitForScmToSeeReplicaState(openContainerID, OPEN);
     // Open containers should not yet have a checksum generated.
-    assertEquals(0, getContainerReplica(openContainerID).getChecksums().getDataChecksum());
+    assertEquals(0, getContainerReplica(openContainerID).getDataChecksum());
 
     // Corrupt both containers.
     corruption.applyTo(closedContainer);
@@ -124,17 +124,17 @@ class TestBackgroundContainerMetadataScannerIntegration
     // The metadata scanner does not generate data checksums and the other scanners have been turned off for this
     // test, so the data checksums should not change.
     waitForScmToSeeReplicaState(closedContainerID, UNHEALTHY);
-    assertEquals(initialClosedChecksum, getContainerReplica(closedContainerID).getChecksums().getDataChecksum());
+    assertEquals(initialClosedChecksum, getContainerReplica(closedContainerID).getDataChecksum());
     waitForScmToSeeReplicaState(openContainerID, UNHEALTHY);
     if (corruption == MISSING_METADATA_DIR || corruption == MISSING_CONTAINER_DIR) {
       // In these cases the tree cannot be generated when the container is marked unhealthy and the checksum should
       // remain at 0.
       // The tree is generated from metadata by the container changing to unhealthy, not by the metadata scanner.
-      assertEquals(0, getContainerReplica(openContainerID).getChecksums().getDataChecksum());
+      assertEquals(0, getContainerReplica(openContainerID).getDataChecksum());
     } else {
       // The checksum will be generated for the first time when the container is marked unhealthy.
       // The tree is generated from metadata by the container changing to unhealthy, not by the metadata scanner.
-      assertNotEquals(0, getContainerReplica(openContainerID).getChecksums().getDataChecksum());
+      assertNotEquals(0, getContainerReplica(openContainerID).getDataChecksum());
     }
 
     // Once the unhealthy replica is reported, the open container's lifecycle

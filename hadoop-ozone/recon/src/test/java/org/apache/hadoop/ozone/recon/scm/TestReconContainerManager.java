@@ -239,7 +239,7 @@ public class TestReconContainerManager
     assertEquals(repHist1.getLastSeenTime(), repHist1.getFirstSeenTime());
     assertEquals(containerReplica1.getSequenceId().longValue(),
         repHist1.getBcsId());
-    assertEquals(containerReplica1.getChecksums().getDataChecksum(), repHist1.getChecksums().getDataChecksum());
+    assertEquals(containerReplica1.getDataChecksum(), repHist1.getDataChecksum());
 
     // Let's update the entry again
     containerReplica1 = ContainerReplica.newBuilder()
@@ -273,7 +273,7 @@ public class TestReconContainerManager
     // Because this is a new entry, first seen time equals last seen time
     assertEquals(repHist2.getLastSeenTime(), repHist2.getFirstSeenTime());
     assertEquals(1051L, repHist2.getBcsId());
-    assertEquals(containerReplica2.getChecksums().getDataChecksum(), repHist2.getChecksums().getDataChecksum());
+    assertEquals(containerReplica2.getDataChecksum(), repHist2.getDataChecksum());
 
     // Remove replica from DN01
     containerManager.removeContainerReplica(containerID1, containerReplica1);

@@ -393,7 +393,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       final long lastSeenTime = entry.getValue().getLastSeenTime();
       long bcsId = entry.getValue().getBcsId();
       String state = entry.getValue().getState();
-      long dataChecksum = entry.getValue().getChecksums().getDataChecksum();
+      long dataChecksum = entry.getValue().getDataChecksum();
 
       resList.add(new ContainerHistory(containerID, uuid.toString(), hostname,
           firstSeenTime, lastSeenTime, bcsId, state, dataChecksum));

@@ -48,5 +48,8 @@ class TestContainerChecksums {
 
     ContainerChecksums c2 = ContainerChecksums.of(0x1234ABCDL, 0xDEADBEEFL);
     assertThat(c2.toString()).contains("data=1234abcd").contains("metadata=deadbeef");
+
+    ContainerChecksums c3 = ContainerChecksums.unknown();
+    assertThat(c3.toString()).contains("data=0").contains("metadata=0");
   }
 } 
