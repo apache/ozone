@@ -120,7 +120,7 @@ class TestBackgroundContainerDataScannerIntegration
   }
 
   private void assertReplicaChecksumMatches(
-    Container<?> container, ContainerChecksums expectedChecksum) throws Exception {
+      Container<?> container, ContainerChecksums expectedChecksum) throws Exception {
     assertTrue(containerChecksumFileExists(container.getContainerData().getContainerID()));
     long dataChecksumFromFile = readChecksumFile(container.getContainerData())
         .getContainerMerkleTree().getDataChecksum();

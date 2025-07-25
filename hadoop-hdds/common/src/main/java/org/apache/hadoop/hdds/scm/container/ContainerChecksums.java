@@ -31,11 +31,11 @@ public final class ContainerChecksums {
       new ContainerChecksums(-1L, -1L);
 
   // Checksum of the data within the wrapper.
-  private long dataChecksum;
+  private final long dataChecksum;
   private static final long UNSET_DATA_CHECKSUM = -1;
 
   // Checksum of the metadata within the wrapper.
-  private long metadataChecksum;
+  private final long metadataChecksum;
   private static final long UNSET_METADATA_CHECKSUM = -1;
 
   private ContainerChecksums(long dataChecksum, long metadataChecksum) {
@@ -50,13 +50,6 @@ public final class ContainerChecksums {
   public static ContainerChecksums of(long dataChecksum, long metadataChecksum) {
     return new ContainerChecksums(dataChecksum, metadataChecksum);
   }
-  
-  public void setDataChecksum(long dataChecksum) {
-    if (dataChecksum < 0) {
-      throw new IllegalArgumentException("Data checksum cannot be set to a negative number.");
-    }
-    this.dataChecksum = dataChecksum;
-  }
 
   public long getDataChecksum() {
     // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
@@ -68,13 +61,6 @@ public final class ContainerChecksums {
 
   public boolean needsDataChecksum() {
     return dataChecksum == UNSET_DATA_CHECKSUM;
-  }
-
-  public void setMetadataChecksum(long metadataChecksum) {
-    if (metadataChecksum < 0) {
-      throw new IllegalArgumentException("Metadata checksum cannot be set to a negative number.");
-    }
-    this.metadataChecksum = metadataChecksum;
   }
 
   public long getMetadataChecksum() {
