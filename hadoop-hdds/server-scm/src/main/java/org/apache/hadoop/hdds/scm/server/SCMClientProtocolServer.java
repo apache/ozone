@@ -360,7 +360,7 @@ public class SCMClientProtocolServer implements
                 .setKeyCount(r.getKeyCount())
                 .setSequenceID(r.getSequenceId())
                 .setReplicaIndex(r.getReplicaIndex())
-                .setDataChecksum(r.getChecksums().getDataChecksum())
+                .setDataChecksum(r.getDataChecksum())
                 .build()
         );
       }

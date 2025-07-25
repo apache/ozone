@@ -159,7 +159,7 @@ public class TestCloseContainer {
     GenericTestUtils.waitFor(() ->
             getContainerReplicas(newContainer).size() == 3, 200, 30000);
     for (ContainerReplica replica : getContainerReplicas(newContainer)) {
-      assertNotEquals(0, replica.getChecksums().getDataChecksum());
+      assertNotEquals(0, replica.getDataChecksum());
     }
   }
 
@@ -201,7 +201,7 @@ public class TestCloseContainer {
     }
 
     for (ContainerReplica replica : getContainerReplicas(container)) {
-      assertNotEquals(0, replica.getChecksums().getDataChecksum());
+      assertNotEquals(0, replica.getDataChecksum());
     }
 
     assertThrows(IOException.class,
@@ -277,9 +277,9 @@ public class TestCloseContainer {
 
     // Wait for SCM to receive container reports with non-zero checksums for all replicas
     GenericTestUtils.waitFor(() -> getContainerReplicas(containerInfo1).stream()
-            .allMatch(r -> r.getChecksums().getDataChecksum() != 0), 200, 5000);
+            .allMatch(r -> r.getDataChecksum() != 0), 200, 5000);
     GenericTestUtils.waitFor(() -> getContainerReplicas(containerInfo2).stream()
-            .allMatch(r -> r.getChecksums().getDataChecksum() != 0), 200, 5000);
+            .allMatch(r -> r.getDataChecksum() != 0), 200, 5000);
   }
 
   private boolean checkContainerCloseInDatanode(HddsDatanodeService hddsDatanode,
