@@ -92,7 +92,7 @@ public class TarContainerPacker
     byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot);
 
     if (!Files.exists(destContainerDir)) {
-      Files.createDirectories(destContainerDir);
+      Files.createDirectories(destContainerDir);.
     }
     if (FileUtils.isEmptyDirectory(destContainerDir.toFile())) {
       Files.move(containerUntarDir, destContainerDir,
