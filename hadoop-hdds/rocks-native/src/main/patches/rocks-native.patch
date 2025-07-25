@@ -394,7 +394,7 @@ index 000000000..5ba8a82ee
 +                                 static_cast<size_t>(prefetch_size),
 +                                 Env::IO_TOTAL /* rate_limiter_priority */);
 +
-+    s = ReadFooterFromFile(opts, rep_->file_.get(), &prefetch_buffer, file_size,
++    s = ReadFooterFromFile(opts, rep_->file_.get(), *fs, &prefetch_buffer, file_size,
 +                           &footer);
 +  }
 +  if (s.ok()) {
