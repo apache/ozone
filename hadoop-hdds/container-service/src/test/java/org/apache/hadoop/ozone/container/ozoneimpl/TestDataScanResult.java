@@ -56,7 +56,7 @@ class TestDataScanResult {
     assertEquals(1, result.getErrors().size());
     assertTrue(result.toString().contains("1 error"));
     // Tree should be empty if the metadata scan failed, since the data scan could not proceed.
-    assertEquals(0, result.getDataTree().toProto().getBlockMerkleTreeCount());
+    assertEquals(0, result.getDataTree().toProto(Collections.emptyList()).getBlockMerkleTreeCount());
   }
 
   @Test
@@ -78,6 +78,6 @@ class TestDataScanResult {
     assertTrue(result.getErrors().isEmpty());
     assertTrue(result.toString().contains("deleted"));
     // Tree should be empty if the container was deleted.
-    assertEquals(0, result.getDataTree().toProto().getBlockMerkleTreeCount());
+    assertEquals(0, result.getDataTree().toProto(Collections.emptyList()).getBlockMerkleTreeCount());
   }
 }

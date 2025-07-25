@@ -28,7 +28,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -160,7 +162,7 @@ public final class ContainerMerkleTreeTestUtils {
       buildTestTreeWithMismatches(ContainerMerkleTreeWriter originalTree, int numMissingBlocks, int numMissingChunks,
                                   int numCorruptChunks) {
 
-    ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto().toBuilder();
+    ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto(Collections.emptyList()).toBuilder();
     ContainerDiffReport diff = new ContainerDiffReport(1);
 
     introduceMissingBlocks(treeBuilder, numMissingBlocks, diff);
@@ -345,5 +347,15 @@ public final class ContainerMerkleTreeTestUtils {
           + data.getContainerID(), ex);
     }
     data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
+  }
+
+  public static List<ContainerProtos.BlockMerkleTree> createBlockMerkleTreesFromIds(List<Long> blockIDs) {
+    List<ContainerProtos.BlockMerkleTree> blockMerkleTrees = new ArrayList<>();
+    for (Long blockID : blockIDs) {
+      ContainerProtos.BlockMerkleTree blockMerkleTree = ContainerProtos.BlockMerkleTree.newBuilder().setBlockID(blockID)
+          .setDataChecksum(0).build();
+      blockMerkleTrees.add(blockMerkleTree);
+    }
+    return blockMerkleTrees;
   }
 }

@@ -662,7 +662,7 @@ public class TestKeyValueHandler {
     // Allows checking the invocation count of the lambda.
     AtomicInteger icrCount = new AtomicInteger(0);
     ContainerMerkleTreeWriter treeWriter = buildTestTree(conf);
-    final long updatedDataChecksum = treeWriter.toProto().getDataChecksum();
+    final long updatedDataChecksum = treeWriter.toProto(Collections.emptyList()).getDataChecksum();
     IncrementalReportSender<Container> icrSender = c -> {
       // Check that the ICR contains expected info about the container.
       ContainerReplicaProto report = c.getContainerReport();
@@ -692,7 +692,7 @@ public class TestKeyValueHandler {
     assertEquals(updatedDataChecksum, containerData.getDataChecksum());
     // Check disk content.
     ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData);
-    assertTreesSortedAndMatch(treeWriter.toProto(), checksumInfo.getContainerMerkleTree());
+    assertTreesSortedAndMatch(treeWriter.toProto(Collections.emptyList()), checksumInfo.getContainerMerkleTree());
   }
 
   @Test
