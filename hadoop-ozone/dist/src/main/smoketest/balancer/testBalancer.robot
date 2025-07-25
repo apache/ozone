@@ -43,14 +43,10 @@ Prepare For Tests
 Datanode In Maintenance Mode
     ${result} =             Execute                         ozone admin datanode maintenance ${HOST}
                             Should Contain                  ${result}             Entering maintenance mode on datanode
-                            Wait Until Keyword Succeeds      30sec   5sec    Datanode Operational State Should Be    ENTERING_MAINTENANCE
+    ${result} =             Execute                         ozone admin datanode list | grep "Operational State:*"
+                            Wait Until Keyword Succeeds      30sec   5sec    Should contain   ${result}   ENTERING_MAINTENANCE
                             Wait Until Keyword Succeeds      3min    10sec   Related pipelines are closed
                             Sleep                   60000ms
-
-Datanode Operational State Should Be
-    [Arguments]    ${expected_state}
-    ${result} =    Execute    ozone admin datanode list | grep "Operational State:*"
-    Should Contain    ${result}    ${expected_state}
 
 Related pipelines are closed
     ${result} =         Execute          ozone admin datanode list | awk -v RS= '{$1=$1}1'|grep MAINT | sed -e 's/^.*pipelines: \\(.*\\)$/\\1/'

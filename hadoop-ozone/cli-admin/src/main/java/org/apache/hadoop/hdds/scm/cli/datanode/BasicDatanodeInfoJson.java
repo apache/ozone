@@ -35,6 +35,7 @@ public class BasicDatanodeInfoJson {
   private final long setupTime;
   private final int currentVersion;
   private final HddsProtos.NodeOperationalState persistedOpState;
+  private final HddsProtos.NodeOperationalState opState;
   private final long persistedOpStateExpiryEpochSec;
   private final HddsProtos.NodeState healthState;
   private final boolean decommissioned;
@@ -54,11 +55,13 @@ public class BasicDatanodeInfoJson {
   @JsonIgnore
   private DatanodeDetails dn;
   
-  public BasicDatanodeInfoJson(DatanodeDetails dnDetails, HddsProtos.NodeState healthState) {
+  public BasicDatanodeInfoJson(DatanodeDetails dnDetails, HddsProtos.NodeOperationalState opState,
+      HddsProtos.NodeState healthState) {
     this.dn = dnDetails;
     this.id = dnDetails.getUuid().toString();
     this.ports = dnDetails.getPorts();
     this.persistedOpState = dnDetails.getPersistedOpState();
+    this.opState = opState;
     this.healthState = healthState;
     this.hostName = dnDetails.getHostName();
     this.ipAddress = dnDetails.getIpAddress();
@@ -75,9 +78,10 @@ public class BasicDatanodeInfoJson {
     this.currentVersion = dnDetails.getCurrentVersion();
   }
 
-  public BasicDatanodeInfoJson(DatanodeDetails dnDetails, HddsProtos.NodeState healthState,
+  public BasicDatanodeInfoJson(DatanodeDetails dnDetails, HddsProtos.NodeOperationalState opState,
+      HddsProtos.NodeState healthState,
       long used, long capacity, double percentUsed) {
-    this(dnDetails, healthState);
+    this(dnDetails, opState, healthState);
     this.used = used;
     this.capacity = capacity;
     this.percentUsed = percentUsed;
@@ -93,6 +97,10 @@ public class BasicDatanodeInfoJson {
   
   public HddsProtos.NodeOperationalState getPersistedOpState() {
     return persistedOpState;
+  }
+
+  public HddsProtos.NodeOperationalState getOpState() {
+    return opState;
   }
   
   public HddsProtos.NodeState getHealthState() {

@@ -91,7 +91,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     if (!Strings.isNullOrEmpty(nodeSelectionMixin.getNodeId())) {
       HddsProtos.Node node = scmClient.queryNode(UUID.fromString(nodeSelectionMixin.getNodeId()));
       BasicDatanodeInfoJson singleNodeInfo = new BasicDatanodeInfoJson(
-          DatanodeDetails.getFromProtoBuf(node.getNodeID()), node.getNodeStates(0));
+          DatanodeDetails.getFromProtoBuf(node.getNodeID()), node.getNodeOperationalStates(0), node.getNodeStates(0));
       if (json) {
         List<BasicDatanodeInfoJson> dtoList = Collections.singletonList(singleNodeInfo);
         System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dtoList));
@@ -110,7 +110,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
           .compareToIgnoreCase(nodeSelectionMixin.getHostname()) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeOperationalState)) {
-      allNodes = allNodes.filter(p -> p.getPersistedOpState().toString()
+      allNodes = allNodes.filter(p -> p.getOpState().toString()
           .compareToIgnoreCase(nodeOperationalState) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeState)) {
@@ -151,6 +151,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
               double percentUsed = (capacity > 0) ? (used * 100.0) / capacity : 0.0;
               return new BasicDatanodeInfoJson(
                   DatanodeDetails.getFromProtoBuf(node.getNodeID()),
+                  node.getNodeOperationalStates(0),
                   node.getNodeStates(0),
                   used,
                   capacity,
@@ -168,7 +169,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
     return nodes.stream()
         .map(p -> new BasicDatanodeInfoJson(
-            DatanodeDetails.getFromProtoBuf(p.getNodeID()), p.getNodeStates(0)))
+            DatanodeDetails.getFromProtoBuf(p.getNodeID()),
+            p.getNodeOperationalStates(0), p.getNodeStates(0)))
         .sorted((o1, o2) -> o1.getHealthState().compareTo(o2.getHealthState()))
         .collect(Collectors.toList());
   }
@@ -201,7 +203,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines)");
-    System.out.println("Operational State: " + dn.getPersistedOpState());
+    System.out.println("Operational State: " + dn.getOpState());
     System.out.println("Health State: " + dn.getHealthState());
     System.out.println("Related pipelines:\n" + pipelineListInfo);
 
