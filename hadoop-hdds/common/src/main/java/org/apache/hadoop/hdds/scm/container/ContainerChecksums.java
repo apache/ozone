@@ -50,6 +50,7 @@ public final class ContainerChecksums {
   public static ContainerChecksums of(long dataChecksum, long metadataChecksum) {
     return new ContainerChecksums(dataChecksum, metadataChecksum);
   }
+  
   public void setDataChecksum(long dataChecksum) {
     if (dataChecksum < 0) {
       throw new IllegalArgumentException("Data checksum cannot be set to a negative number.");
