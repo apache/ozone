@@ -389,7 +389,8 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID,
+        "OnDemand container scan triggered to detect missing blocks in container.");
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
@@ -438,7 +439,8 @@ public class TestContainerCommandReconciliation {
       TestContainerCorruptions.CORRUPT_BLOCK.applyTo(container, blockID);
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID,
+        "OnDemand container scan triggered to detect block corruption in container.");
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterChunkCorruption =
         readChecksumFile(container.getContainerData());
@@ -509,7 +511,8 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID,
+        "OnDemand container scan triggered to detect missing blocks in container.");
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
