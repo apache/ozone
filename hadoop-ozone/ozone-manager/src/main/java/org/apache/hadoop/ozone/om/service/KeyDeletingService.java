@@ -92,6 +92,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private int ratisByteLimit;
   private static final double RATIS_LIMIT_FACTOR = 0.9;
   // Track metrics for current task execution
+  private long latestRunTimestamp = 0L;
   private final DeletionStats aosDeletionStats = new DeletionStats();
   private final DeletionStats snapshotDeletionStats = new DeletionStats();
 
@@ -131,7 +132,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   Pair<Pair<Integer, Long>, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
       String snapTableKey, UUID expectedPreviousSnapshotId, Map<String, Long> keyBlockReplicatedSize)
-      throws IOException {
+      throws IOException, InterruptedException {
     long startTime = Time.monotonicNow();
     Pair<Pair<Integer, Long>, Boolean> purgeResult = Pair.of(Pair.of(0, 0L), false);
     if (LOG.isDebugEnabled()) {
@@ -170,7 +171,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    */
   private Pair<Pair<Integer, Long>, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
       Map<String, RepeatedOmKeyInfo> keysToModify,  List<String> renameEntriesToBeDeleted,
-      String snapTableKey, UUID expectedPreviousSnapshotId, Map<String, Long> keyBlockReplicatedSize) {
+      String snapTableKey, UUID expectedPreviousSnapshotId, Map<String, Long> keyBlockReplicatedSize)
+      throws InterruptedException {
     List<String> purgeKeys = new ArrayList<>();
 
     // Put all keys to be purged in a list
@@ -282,23 +284,22 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     getMetrics().updateSnapLastRunMetrics(snapshotDeletionStats.reclaimedKeyCount.get(),
         snapshotDeletionStats.reclaimedKeySize.get(), snapshotDeletionStats.iteratedKeyCount.get(),
         snapshotDeletionStats.notReclaimableKeyCount.get());
-    getMetrics().setKdsServiceState(false);
-    getMetrics().setKdsLastRunTimestamp(System.currentTimeMillis());
-    getMetrics().setKdsNextRunTimestamp(System.currentTimeMillis() + getIntervalMs());
+    getMetrics().setKdsLastRunTimestamp(latestRunTimestamp);
   }
 
   /**
    * Resets ServiceMetrics for the current run of the service.
    */
-  private void execTaskInit() {
-    getMetrics().setKdsServiceState(true);
+  private void resetMetrics() {
     aosDeletionStats.reset();
     snapshotDeletionStats.reset();
+    latestRunTimestamp = System.currentTimeMillis();
+    getMetrics().setKdsCurRunTimestamp(latestRunTimestamp);
   }
 
   @Override
   public BackgroundTaskQueue getTasks() {
-    execTaskInit();
+    resetMetrics();
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
     queue.add(new KeyDeletingTask(null));
     if (deepCleanSnapshots) {

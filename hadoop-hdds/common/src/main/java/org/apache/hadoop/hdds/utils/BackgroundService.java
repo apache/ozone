@@ -108,6 +108,7 @@ public abstract class BackgroundService {
     while (!tasks.isEmpty()) {
       tasks.poll().call();
     }
+    execTaskCompletion();
   }
 
   // start service
@@ -130,8 +131,6 @@ public abstract class BackgroundService {
   }
 
   public abstract BackgroundTaskQueue getTasks();
-
-  protected void execTaskCompletion() { }
 
   /**
    * Run one or more background tasks concurrently.
@@ -176,8 +175,6 @@ public abstract class BackgroundService {
           }
         }, exec), (Void1, Void) -> null);
       }
-      future.join();
-      execTaskCompletion();
     }
   }
 
