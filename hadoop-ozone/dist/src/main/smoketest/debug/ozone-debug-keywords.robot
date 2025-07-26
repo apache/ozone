@@ -30,6 +30,10 @@ Execute replicas verify block existence debug tool
     ${output}      Execute          ozone debug replicas verify --block-existence o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} --all-results
     [Return]       ${output}
 
+Execute replicas verify container state debug tool
+    ${output}      Execute          ozone debug replicas verify --container-state o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} --all-results
+    [Return]       ${output}
+
 Parse replicas verify JSON output
     [Arguments]    ${output}
     ${json} =      Evaluate    json.loads('''${output}''')    json

@@ -38,6 +38,7 @@ chunkinfo="${key}-blocks-${prefix}"
 docker-compose exec -T ${SCM} bash -c "ozone debug replicas chunk-info ${volume}/${bucket}/${key}" > "$chunkinfo"
 host="$(jq -r '.keyLocations[0][0].datanode["hostname"]' ${chunkinfo})"
 container="${host%%.*}"
+dn_with_num="$(sed -E 's/^.*-(datanode[0-9]+)-[0-9]+$/\1/' <<< "$container")"
 
 # corrupt the first block of key on one of the datanodes
 datafile="$(jq -r '.keyLocations[0][0].file' ${chunkinfo})"
@@ -60,6 +61,8 @@ docker start "${container}"
 wait_for_datanode "${container}" HEALTHY 60
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "DATANODE:${host}" debug/block-existence-check.robot
+
+execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "DATANODE:${host}" -v "FAULT_INJ_DATANODE:${dn_with_num}" debug/container-state-verifier.robot
 
 execute_robot_test ${OM} kinit.robot
 execute_robot_test ${OM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec3-2.robot
