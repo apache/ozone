@@ -108,6 +108,7 @@ public abstract class BackgroundService {
     while (!tasks.isEmpty()) {
       tasks.poll().call();
     }
+    execTaskCompletion();
   }
 
   // start service
@@ -186,8 +187,6 @@ public abstract class BackgroundService {
           }, exec).exceptionally(e -> null), (Void1, Void) -> null);
         }
       }
-      future.join();
-      execTaskCompletion();
     }
   }
 

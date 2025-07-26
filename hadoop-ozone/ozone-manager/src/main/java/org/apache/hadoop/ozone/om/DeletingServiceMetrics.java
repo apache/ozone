@@ -84,12 +84,10 @@ public final class DeletingServiceMetrics {
   /*
    * Deletion service state metrics.
    */
-  @Metric("Key Deleting Service state: 1=Running, 0=Idle")
-  private MutableGaugeLong kdsServiceState;
   @Metric("Key Deleting Service last run timestamp in ms")
   private MutableGaugeLong kdsLastRunTimestamp;
-  @Metric("Key Deleting Service next scheduled run timestamp in ms")
-  private MutableGaugeLong kdsNextRunTimestamp;
+  @Metric("Key Deleting Service current run timestamp in ms")
+  private MutableGaugeLong kdsCurRunTimestamp;
 
   /*
    * Deletion service last run metrics.
@@ -203,16 +201,12 @@ public final class DeletingServiceMetrics {
     this.numRenameEntriesPurged.incr(renameEntriesPurged);
   }
 
-  public void setKdsServiceState(boolean running) {
-    this.kdsServiceState.set(running ? 1 : 0);
-  }
-
   public void setKdsLastRunTimestamp(long timestamp) {
     this.kdsLastRunTimestamp.set(timestamp);
   }
 
-  public void setKdsNextRunTimestamp(long timestamp) {
-    this.kdsNextRunTimestamp.set(timestamp);
+  public void setKdsCurRunTimestamp(long timestamp) {
+    this.kdsCurRunTimestamp.set(timestamp);
   }
 
   private void resetMetrics() {

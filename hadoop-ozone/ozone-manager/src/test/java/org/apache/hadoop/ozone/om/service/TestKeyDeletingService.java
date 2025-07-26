@@ -945,8 +945,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // Create 10 keys
       List<OmKeyArgs> createdKeys = new ArrayList<>();
       for (int i = 1; i <= 10; i++) {
-        OmKeyArgs args = createAndCommitKey(volumeName, bucketName,
-            uniqueObjectName("key"), 1);
+        OmKeyArgs args = createAndCommitKey(volumeName, bucketName, uniqueObjectName("key"), 1);
         createdKeys.add(args);
       }
 
@@ -956,8 +955,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Create 5 Keys
       for (int i = 11; i <= 15; i++) {
-        OmKeyArgs args = createAndCommitKey(volumeName, bucketName,
-            uniqueObjectName("key"), 1);
+        OmKeyArgs args = createAndCommitKey(volumeName, bucketName, uniqueObjectName("key"), 1);
         createdKeys.add(args);
       }
 
@@ -972,13 +970,23 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Create and delete 5 more keys.
       for (int i = 16; i <= 20; i++) {
-        OmKeyArgs args = createAndCommitKey(volumeName, bucketName,
-            uniqueObjectName("key"), 1);
+        OmKeyArgs args = createAndCommitKey(volumeName, bucketName, uniqueObjectName("key"), 1);
         createdKeys.add(args);
       }
       for (int i = 15; i < 20; i++) {
         writeClient.deleteKey(createdKeys.get(i));
       }
+
+      // Wait for snap2 to be flushed.
+      GenericTestUtils.waitFor(
+          () -> {
+            try {
+              SnapshotInfo snapshotInfo = writeClient.getSnapshotInfo(volumeName, bucketName, snap2);
+              return OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }, 1000, 100000);
 
       // Resume DeletingService
       keyDeletingService.resume();
@@ -986,11 +994,9 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // wait for AOS deleted keys to be reclaimed and
       // snap2 to be deep cleaned.
-      long initialDeletedKeyCount = keyDeletingService.getDeletedKeyCount().get();
+      directoryDeletingService.runPeriodicalTaskNow();
       keyDeletingService.runPeriodicalTaskNow();
-      GenericTestUtils.waitFor(
-          () -> getDeletedKeyCount() >= initialDeletedKeyCount + 10,
-          100, 10000);
+      GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 10, 100, 10000);
       // Verify last run AOS deletion metrics.
       assertEquals(5, metrics.getAosKeysReclaimedLast());
       assertEquals(5 * DATA_SIZE * 3, metrics.getAosReclaimedSizeLast());
@@ -1005,15 +1011,24 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertEquals(10, metrics.getKeysReclaimedInInterval());
       assertEquals(10 * DATA_SIZE * 3, metrics.getReclaimedSizeInInterval());
 
-      // Delete snap1
+      // Delete snap1. Which also sets the snap2 to be deep cleaned.
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
       keyManager.getSnapshotDeletingService().runPeriodicalTaskNow();
+      // Wait for changes to the snap2 to be flushed.
+      GenericTestUtils.waitFor(
+          () -> {
+            try {
+              SnapshotInfo snapshotInfo = writeClient.getSnapshotInfo(volumeName, bucketName, snap2);
+              return OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }, 1000, 100000);
 
       // wait for snap2 to be deep cleaned.
+      directoryDeletingService.runPeriodicalTaskNow();
       keyDeletingService.runPeriodicalTaskNow();
-      GenericTestUtils.waitFor(
-          () -> getDeletedKeyCount() >= initialDeletedKeyCount + 20,
-          100, 10000);
+      GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 20, 100, 10000);
 
       // Verify last run AOS deletion metrics.
       assertEquals(0, metrics.getAosKeysReclaimedLast());
