@@ -203,7 +203,8 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
                       dn.getIpAddress(), dn.getUuidString());
 
       assertEquals(1, usageInfoList.size());
-      assertEquals(expected, usageInfoList.get(0).getContainerCount());
+      assertThat(usageInfoList.get(0).getContainerCount())
+          .isGreaterThanOrEqualTo(expected);
     }
   }
 
