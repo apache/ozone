@@ -613,6 +613,7 @@ public abstract class ContainerData {
     private long blockBytes;
     private long blockCount;
     private long blockPendingDeletion;
+    private long blockPendingDeletionBytes;
 
     public synchronized long getWriteBytes() {
       return writeBytes;
@@ -628,6 +629,10 @@ public abstract class ContainerData {
 
     public synchronized long getBlockPendingDeletion() {
       return blockPendingDeletion;
+    }
+
+    public synchronized long getBlockPendingDeletionBytes() {
+      return blockPendingDeletionBytes;
     }
 
     public synchronized void incrementBlockCount() {
@@ -653,12 +658,12 @@ public abstract class ContainerData {
       blockBytes -= deletedBytes;
       blockCount -= deletedBlockCount;
       blockPendingDeletion -= processedBlockCount;
+      blockPendingDeletionBytes -= deletedBytes;
     }
 
-    public synchronized void updateBlocks(long bytes, long count, long pendingDeletionIncrement) {
+    public synchronized void updateBlocks(long bytes, long count) {
       blockBytes = bytes;
       blockCount = count;
-      blockPendingDeletion += pendingDeletionIncrement;
     }
 
     public synchronized ContainerDataProto.Builder setContainerDataProto(ContainerDataProto.Builder b) {
@@ -677,12 +682,14 @@ public abstract class ContainerData {
           .setKeyCount(blockCount);
     }
 
-    public synchronized void addBlockPendingDeletion(long count) {
+    public synchronized void addBlockPendingDeletion(long count, long bytes) {
       blockPendingDeletion += count;
+      blockPendingDeletionBytes += bytes;
     }
 
     public synchronized void resetBlockPendingDeletion() {
       blockPendingDeletion = 0;
+      blockPendingDeletionBytes = 0;
     }
 
     public synchronized void assertRead(long expectedBytes, long expectedCount) {

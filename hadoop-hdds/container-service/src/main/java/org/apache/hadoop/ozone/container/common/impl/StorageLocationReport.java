@@ -40,6 +40,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
   private final long remaining;
   private final long committed;
   private final long freeSpaceToSpare;
+  private final long pendingDeletions;
   private final StorageType storageType;
   private final String storageLocation;
 
@@ -53,6 +54,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     this.freeSpaceToSpare = builder.freeSpaceToSpare;
     this.storageType = builder.storageType;
     this.storageLocation = builder.storageLocation;
+    this.pendingDeletions = builder.pendingDeletions;
   }
 
   public long getUsableSpace() {
@@ -92,6 +94,11 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
   @Override
   public long getFreeSpaceToSpare() {
     return freeSpaceToSpare;
+  }
+
+  @Override
+  public long getPendingDeletions() {
+    return pendingDeletions;
   }
 
   @Override
@@ -179,6 +186,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
         .setFreeSpaceToSpare(getFreeSpaceToSpare())
+        .setPendingDeletions(getPendingDeletions())
         .build();
   }
 
@@ -226,6 +234,10 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
       builder.setRemaining(report.getRemaining());
     }
 
+    if (report.hasPendingDeletions()) {
+      builder.setPendingDeletions(report.getPendingDeletions());
+    }
+
     if (report.hasFailed()) {
       builder.setFailed(report.getFailed());
     }
@@ -247,6 +259,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
           .append(" used=").append(scmUsed)
           .append(" available=").append(remaining)
           .append(" minFree=").append(freeSpaceToSpare)
+          .append(" pendingDeletions=").append(pendingDeletions)
           .append(" committed=").append(committed);
     }
 
@@ -273,6 +286,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     private long remaining;
     private long committed;
     private long freeSpaceToSpare;
+    private long pendingDeletions;
     private StorageType storageType;
     private String storageLocation;
 
@@ -362,7 +376,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     }
 
     /**
-     * Sets the free space available to spare.
+     * Sets the pending deletetion bytes space available to spare.
      * (depends on datanode volume config,
      * consider 'hdds.datanode.volume.min.*' configuration properties)
      * @param freeSpaceToSpare the size of free volume space available to spare
@@ -370,6 +384,16 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
      */
     public Builder setFreeSpaceToSpare(long freeSpaceToSpare) {
       this.freeSpaceToSpare = freeSpaceToSpare;
+      return this;
+    }
+
+    /**
+     * Sets the pending deletion bytes.
+     * @param pendingDeletions the size in bytes that is pending deletion.
+     * @return StorageLocationReport.Builder
+     */
+    public Builder setPendingDeletions(long pendingDeletions) {
+      this.pendingDeletions = pendingDeletions;
       return this;
     }
 

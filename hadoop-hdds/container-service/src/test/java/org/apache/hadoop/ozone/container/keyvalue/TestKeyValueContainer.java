@@ -1037,7 +1037,7 @@ public class TestKeyValueContainer {
     OzoneConfiguration conf = new OzoneConfiguration();
     final String dir1 = dir + (schemaV3Enabled ? "/v3" : "/v2");
 
-    // create HddsVolume
+    // create HddsVolumetestImportV2ReplicaToV3HddsVolume
     HddsVolume hddsVolume1 = new HddsVolume.Builder(dir1)
         .conf(conf).datanodeUuid(datanodeId.toString()).build();
     conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, schemaV3Enabled);
@@ -1058,6 +1058,8 @@ public class TestKeyValueContainer {
       Table<String, Long> metadataTable = meta.getStore().getMetadataTable();
       metadataTable.put(data.getPendingDeleteBlockCountKey(),
           pendingDeleteBlockCount);
+      metadataTable.put(data.getPendingDeleteBlockBytesKey(),
+          pendingDeleteBlockCount * 256);
     }
     container.close();
 
@@ -1100,6 +1102,8 @@ public class TestKeyValueContainer {
         importedContainer.getContainerData().getSchemaVersion());
     assertEquals(pendingDeleteBlockCount,
         importedContainer.getContainerData().getNumPendingDeletionBlocks());
+    assertEquals(pendingDeleteBlockCount * 256,
+        importedContainer.getContainerData().getBlockPendingDeletionBytes());
   }
 
   @ContainerTestVersionInfo.ContainerTest
