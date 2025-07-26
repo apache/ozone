@@ -130,7 +130,7 @@ public abstract class BackgroundService {
    */
   public class PeriodicalTask implements Runnable {
     @Override
-    public synchronized void run() {
+    public void run() {
       // wait for previous set of tasks to complete
       try {
         future.join();
@@ -152,28 +152,30 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
-      while (!tasks.isEmpty()) {
-        BackgroundTask task = tasks.poll();
-        future = future.thenCombine(CompletableFuture.runAsync(() -> {
-          long startTime = System.nanoTime();
-          try {
-            BackgroundTaskResult result = task.call();
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("task execution result size {}", result.getSize());
+      synchronized (BackgroundService.this) {
+        while (!tasks.isEmpty()) {
+          BackgroundTask task = tasks.poll();
+          future = future.thenCombine(CompletableFuture.runAsync(() -> {
+            long startTime = System.nanoTime();
+            try {
+              BackgroundTaskResult result = task.call();
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("task execution result size {}", result.getSize());
+              }
+            } catch (Throwable e) {
+              LOG.error("Background task execution failed", e);
+              if (e instanceof Error) {
+                throw (Error) e;
+              }
+            } finally {
+              long endTime = System.nanoTime();
+              if (endTime - startTime > serviceTimeoutInNanos) {
+                LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
+                    serviceName, endTime - startTime, serviceTimeoutInNanos);
+              }
             }
-          } catch (Throwable e) {
-            LOG.error("Background task execution failed", e);
-            if (e instanceof Error) {
-              throw (Error) e;
-            }
-          } finally {
-            long endTime = System.nanoTime();
-            if (endTime - startTime > serviceTimeoutInNanos) {
-              LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
-                  serviceName, endTime - startTime, serviceTimeoutInNanos);
-            }
-          }
-        }, exec).exceptionally(e -> null), (Void1, Void) -> null);
+          }, exec).exceptionally(e -> null), (Void1, Void) -> null);
+        }
       }
     }
   }
