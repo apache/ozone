@@ -4239,6 +4239,15 @@
   </property>
 
   <property>
+    <name>ozone.om.allocate.block.cache.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enable prefetch blocks to be cached within OM.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.enable.ofs.shared.tmp.dir</name>
     <value>false</value>
     <tag>OZONE, OM</tag>
@@ -4808,4 +4817,29 @@
       warm up edek cache if none of key successful on OM start up.
     </description>
   </property>
+  <property>
+    <name>ozone.om.prefetch.blocks.max</name>
+    <value>10000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Maximum number of prefetched blocks to maintain in the OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.prefetch.blocks.min</name>
+    <value>500</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Minimum number of prefetched blocks to maintain in the OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.prefetched.blocks.periodic.expiry.interval</name>
+    <value>30s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval for periodically expiring prefetched blocks in the OM.
+    </description>
+  </property>
+
 </configuration>
