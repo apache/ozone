@@ -205,6 +205,18 @@ public class TestReconInsightsForDeletedDirectories {
       ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
           (ReconNamespaceSummaryManagerImpl) recon.getReconServer()
               .getReconNamespaceSummaryManager();
+      
+      // Wait for namespace summary to be populated
+      final Long finalDirectoryObjectId = directoryObjectId;
+      GenericTestUtils.waitFor(() -> {
+        try {
+          NSSummary summary = namespaceSummaryManager.getNSSummary(finalDirectoryObjectId);
+          return summary != null && summary.getNumOfFiles() > 0;
+        } catch (Exception e) {
+          return false;
+        }
+      }, 1000, 30000);
+      
       NSSummary summary =
           namespaceSummaryManager.getNSSummary(directoryObjectId);
       // Assert that the directory dir1 has 10 sub-files and size of 1000 bytes.
@@ -231,6 +243,17 @@ public class TestReconInsightsForDeletedDirectories {
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
             mock(GlobalStatsDao.class), reconNamespaceSummaryManager);
 
+    // Wait for deleted directory info to be available
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
+        KeyInsightInfoResponse entity = (KeyInsightInfoResponse) deletedDirInfo.getEntity();
+        return entity.getUnreplicatedDataSize() >= 10;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 30000);
+    
     // Fetch the deleted directory info from Recon OmDbInsightEndpoint.
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
@@ -320,6 +343,17 @@ public class TestReconInsightsForDeletedDirectories {
     assertTableRowCount(reconDirTable, 2, true);
     assertTableRowCount(reconDeletedDirTable, 1, true);
 
+    // Wait for deleted directory info to be available
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
+        KeyInsightInfoResponse entity = (KeyInsightInfoResponse) deletedDirInfo.getEntity();
+        return entity.getUnreplicatedDataSize() > 0;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 30000);
+    
     // Fetch the deleted directory info from Recon OmDbInsightEndpoint.
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
@@ -383,6 +417,18 @@ public class TestReconInsightsForDeletedDirectories {
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
             mock(GlobalStatsDao.class), namespaceSummaryManager);
+    
+    // Wait for deleted directory info to be available
+    GenericTestUtils.waitFor(() -> {
+      try {
+        Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
+        KeyInsightInfoResponse entity = (KeyInsightInfoResponse) deletedDirInfo.getEntity();
+        return entity.getUnreplicatedDataSize() >= 100;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 30000);
+    
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
@@ -459,7 +505,7 @@ public class TestReconInsightsForDeletedDirectories {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(
         () -> assertTableRowCount(expectedCount, table, isRecon), 1000,
-        120000); // 2 minutes
+        60000); // 1 minute - reduced from 2 minutes
   }
 
   private boolean assertTableRowCount(int expectedCount,
