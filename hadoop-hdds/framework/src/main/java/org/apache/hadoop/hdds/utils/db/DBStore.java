@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
@@ -63,6 +64,21 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
   <KEY, VALUE> TypedTable<KEY, VALUE> getTable(
       String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, TableCache.CacheType cacheType)
       throws RocksDatabaseException, CodecException;
+
+  /**
+   * Gets table store with implict key/value conversion.
+   *
+   * @param name - table name
+   * @param keyCodec - key codec
+   * @param valueCodec - value codec
+   * @param cacheType - cache type
+   * @param keyValidatorFunction - function to validate key before put/delete
+   * @return - Table Store
+   */
+  <KEY, VALUE> TypedTable<KEY, VALUE> getTable(
+      String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, TableCache.CacheType cacheType,
+      Function<KEY, Boolean> keyValidatorFunction) throws RocksDatabaseException, CodecException;
+
 
   /**
    * Lists the Known list of Tables in a DB.
