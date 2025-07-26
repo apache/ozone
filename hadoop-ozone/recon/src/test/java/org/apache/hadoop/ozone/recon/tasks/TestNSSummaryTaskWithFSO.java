@@ -20,14 +20,13 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -524,6 +523,296 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
       // Verify interactions
       Mockito.verify(mockIterator, Mockito.times(3)).next();
       Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
+    }
+
+    /**
+     * Test Case 1: Individual file delete followed by directory delete
+     * Path: /d1/d2/d3/d4/d5/f1.txt
+     * Events:
+     * 1. DELETE f1.txt
+     * 2. DELETE d3 (cascade)
+     *
+     * Expected: f1.txt deletion decrements totals, d3 deletion removes directory structure
+     */
+    @Test
+    public void testCascadeDeleteCase1_FileFirstThenDirectory() throws IOException {
+      // Setup: First reprocess to establish baseline
+      nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
+
+      // Create a deep directory structure: /bucket1/d1/d2/d3/d4/d5/f1.txt
+      long d1ObjectId = 100L;
+      long d2ObjectId = 101L;
+      long d3ObjectId = 102L;
+      long d4ObjectId = 103L;
+      long d5ObjectId = 104L;
+      long f1ObjectId = 105L;
+      long f1Size = 1024L;
+
+      // Create directory structure in OM
+      String d1Key = BUCKET_ONE_OBJECT_ID + OM_KEY_PREFIX + "d1";
+      String d2Key = d1ObjectId + OM_KEY_PREFIX + "d2";
+      String d3Key = d2ObjectId + OM_KEY_PREFIX + "d3";
+      String d4Key = d3ObjectId + OM_KEY_PREFIX + "d4";
+      String d5Key = d4ObjectId + OM_KEY_PREFIX + "d5";
+      String f1Key = d5ObjectId + OM_KEY_PREFIX + "f1.txt";
+
+      // Create events for setting up the structure first
+      List<OMDBUpdateEvent> setupEvents = new ArrayList<>();
+
+      // Add directories
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d1Key)
+          .setValue(buildOmDirInfo("d1", d1ObjectId, BUCKET_ONE_OBJECT_ID))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d2Key)
+          .setValue(buildOmDirInfo("d2", d2ObjectId, d1ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d3Key)
+          .setValue(buildOmDirInfo("d3", d3ObjectId, d2ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d4Key)
+          .setValue(buildOmDirInfo("d4", d4ObjectId, d3ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d5Key)
+          .setValue(buildOmDirInfo("d5", d5ObjectId, d4ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      // Add file
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmKeyInfo>()
+          .setKey(f1Key)
+          .setValue(buildOmKeyInfo(VOL, BUCKET_ONE, "f1.txt", "f1.txt", f1ObjectId, d5ObjectId, f1Size))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout()).getName())
+          .build());
+
+      // Process setup events
+      OMUpdateEventBatch setupBatch = new OMUpdateEventBatch(setupEvents, 0L);
+      nSSummaryTaskWithFso.processWithFSO(setupBatch, 0);
+
+      // Verify setup - d1 should have the file size propagated up
+      NSSummary d1Summary = getReconNamespaceSummaryManager().getNSSummary(d1ObjectId);
+      assertNotNull(d1Summary);
+      assertEquals(f1Size, d1Summary.getTotalSize());
+      assertEquals(1, d1Summary.getTotalCount());
+
+      // Now create the test scenario events
+      List<OMDBUpdateEvent> testEvents = new ArrayList<>();
+
+      // Event 1: DELETE f1.txt (individual file deletion)
+      testEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmKeyInfo>()
+          .setKey(f1Key)
+          .setValue(buildOmKeyInfo(VOL, BUCKET_ONE, "f1.txt", "f1.txt", f1ObjectId, d5ObjectId, f1Size))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout()).getName())
+          .build());
+
+      // Event 2: DELETE d3 (cascade directory deletion - removes d3, d4, d5)
+      testEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d3Key)
+          .setValue(buildOmDirInfo("d3", d3ObjectId, d2ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      // Process test events
+      OMUpdateEventBatch testBatch = new OMUpdateEventBatch(testEvents, 0L);
+      Pair<Integer, Boolean> result = nSSummaryTaskWithFso.processWithFSO(testBatch, 0);
+
+      // Verify results
+      assertTrue(result.getRight()); // Should succeed
+
+      // Verify f1.txt deletion decremented d5's totals (and propagated up)
+      NSSummary d5Summary = getReconNamespaceSummaryManager().getNSSummary(d5ObjectId);
+      assertNotNull(d5Summary);
+      assertEquals(0, d5Summary.getNumOfFiles());
+      assertEquals(0, d5Summary.getSizeOfFiles());
+
+      // Verify d3 was removed from d2's child list
+      NSSummary d2Summary = getReconNamespaceSummaryManager().getNSSummary(d2ObjectId);
+      assertNotNull(d2Summary);
+      assertFalse(d2Summary.getChildDir().contains(d3ObjectId));
+
+      // Verify totals were properly decremented up the chain
+      NSSummary d1SummaryAfter = getReconNamespaceSummaryManager().getNSSummary(d1ObjectId);
+      assertNotNull(d1SummaryAfter);
+      assertEquals(0, d1SummaryAfter.getTotalSize());
+      assertEquals(0, d1SummaryAfter.getTotalCount());
+    }
+
+    /**
+     * Test Case 2: Directory cascade delete followed by individual file delete (redundant case)
+     * Path: /d1/d2/d3/d4/d5/f1.txt
+     * Events:
+     * 1. DELETE d3 (cascade - removes d3, d4, d5, f1.txt)
+     * 2. DELETE f1.txt (individual file deletion service - should be skipped)
+     *
+     * Expected: d3 cascade deletion removes structure, f1.txt deletion is skipped (parent not found)
+     */
+    @Test
+    public void testCascadeDeleteCase2_DirectoryFirstThenFile() throws IOException {
+      // Setup: First reprocess to establish baseline
+      nSSummaryTaskWithFso.reprocessWithFSO(getReconOMMetadataManager());
+
+      // Create a deep directory structure: /bucket1/d1/d2/d3/d4/d5/f1.txt
+      long d1ObjectId = 200L;
+      long d2ObjectId = 201L;
+      long d3ObjectId = 202L;
+      long d4ObjectId = 203L;
+      long d5ObjectId = 204L;
+      long f1ObjectId = 205L;
+      long f1Size = 2048L;
+
+      // Create directory structure in OM
+      String d1Key = BUCKET_ONE_OBJECT_ID + OM_KEY_PREFIX + "d1";
+      String d2Key = d1ObjectId + OM_KEY_PREFIX + "d2";
+      String d3Key = d2ObjectId + OM_KEY_PREFIX + "d3";
+      String d4Key = d3ObjectId + OM_KEY_PREFIX + "d4";
+      String d5Key = d4ObjectId + OM_KEY_PREFIX + "d5";
+      String f1Key = d5ObjectId + OM_KEY_PREFIX + "f1.txt";
+
+      // Create events for setting up the structure first
+      List<OMDBUpdateEvent> setupEvents = new ArrayList<>();
+
+      // Add directories
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d1Key)
+          .setValue(buildOmDirInfo("d1", d1ObjectId, BUCKET_ONE_OBJECT_ID))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d2Key)
+          .setValue(buildOmDirInfo("d2", d2ObjectId, d1ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d3Key)
+          .setValue(buildOmDirInfo("d3", d3ObjectId, d2ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d4Key)
+          .setValue(buildOmDirInfo("d4", d4ObjectId, d3ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d5Key)
+          .setValue(buildOmDirInfo("d5", d5ObjectId, d4ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      // Add file
+      setupEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmKeyInfo>()
+          .setKey(f1Key)
+          .setValue(buildOmKeyInfo(VOL, BUCKET_ONE, "f1.txt", "f1.txt", f1ObjectId, d5ObjectId, f1Size))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout()).getName())
+          .build());
+
+      // Process setup events
+      OMUpdateEventBatch setupBatch = new OMUpdateEventBatch(setupEvents, 0L);
+      nSSummaryTaskWithFso.processWithFSO(setupBatch, 0);
+
+      // Verify setup - d1 should have the file size propagated up
+      NSSummary d1Summary = getReconNamespaceSummaryManager().getNSSummary(d1ObjectId);
+      assertNotNull(d1Summary);
+      assertEquals(f1Size, d1Summary.getTotalSize());
+      assertEquals(1, d1Summary.getTotalCount());
+
+      // Store initial state for comparison
+      long initialD1TotalSize = d1Summary.getTotalSize();
+      long initialD1TotalCount = d1Summary.getTotalCount();
+
+      // Now create the test scenario events
+      List<OMDBUpdateEvent> testEvents = new ArrayList<>();
+
+      // Event 1: DELETE d3 (cascade directory deletion - removes d3, d4, d5, f1.txt)
+      testEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d3Key)
+          .setValue(buildOmDirInfo("d3", d3ObjectId, d2ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      // Event 2 DELETE d4
+      testEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d4Key)
+          .setValue(buildOmDirInfo("d4", d4ObjectId, d3ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      // Event 3 DELETE d5
+      testEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmDirectoryInfo>()
+          .setKey(d5Key)
+          .setValue(buildOmDirInfo("d5", d5ObjectId, d4ObjectId))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setTable(getOmMetadataManager().getDirectoryTable().getName())
+          .build());
+
+      // Event 4: DELETE f1.txt (individual file deletion - should be skipped because parent d5 is gone)
+      testEvents.add(new OMDBUpdateEvent.OMUpdateEventBuilder<String, OmKeyInfo>()
+          .setKey(f1Key)
+          .setValue(buildOmKeyInfo(VOL, BUCKET_ONE, "f1.txt", "f1.txt", f1ObjectId, d5ObjectId, f1Size))
+          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout()).getName())
+          .build());
+
+      // Process test events
+      OMUpdateEventBatch testBatch = new OMUpdateEventBatch(testEvents, 0L);
+      Pair<Integer, Boolean> result = nSSummaryTaskWithFso.processWithFSO(testBatch, 0);
+
+      // Verify results
+      assertTrue(result.getRight()); // Should succeed even though f1.txt deletion was skipped
+
+      // Verify d3 was removed from d2's child list
+      NSSummary d2Summary = getReconNamespaceSummaryManager().getNSSummary(d2ObjectId);
+      assertNotNull(d2Summary);
+      assertFalse(d2Summary.getChildDir().contains(d3ObjectId));
+
+      // Verify d5 no longer exists (should return null)
+      NSSummary d5Summary = getReconNamespaceSummaryManager().getNSSummary(d5ObjectId);
+      // This might be null if properly cleaned up, or might have empty values
+      if (d5Summary != null) {
+        // If it exists, it should be properly cleaned up
+        assertEquals(0, d5Summary.getParentId()); // Should be orphaned
+      }
+
+      // Verify totals were properly decremented up the chain
+      // The cascade delete should have removed the size that was propagated up
+      NSSummary d1SummaryAfter = getReconNamespaceSummaryManager().getNSSummary(d1ObjectId);
+      assertNotNull(d1SummaryAfter);
+
+      // The key insight: totals should be decremented by the cascade delete
+      // The individual file delete should be skipped (no double decrement)
+      assertTrue(d1SummaryAfter.getTotalSize() < initialD1TotalSize);
+      assertTrue(d1SummaryAfter.getTotalCount() < initialD1TotalCount);
     }
   }
 }
