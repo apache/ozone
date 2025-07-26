@@ -205,7 +205,7 @@
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
     <snakeyaml.version>2.0</snakeyaml.version>
-    <snappy-java.version>1.1.10.7</snappy-java.version>
+    <snappy-java.version>1.1.10.8</snappy-java.version>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
