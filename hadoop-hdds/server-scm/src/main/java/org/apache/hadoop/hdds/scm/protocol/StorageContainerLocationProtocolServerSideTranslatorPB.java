@@ -93,6 +93,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
@@ -733,6 +735,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetMetricsResponse(getMetrics(request.getGetMetricsRequest()))
             .build();
+          
+      case GetVolumeFailureInfos:
+        GetVolumeInfosRequestProto getVolumeInfosRequest = request.getGetVolumeInfosRequest();
+        GetVolumeInfosResponseProto getVolumeInfosResponse = getVolumeInfos(getVolumeInfosRequest);
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetVolumeInfosResponse(getVolumeInfosResponse)
+            .build();
+      
       case ReconcileContainer:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -1359,6 +1371,22 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return GetMetricsResponseProto.newBuilder().setMetricsJson(impl.getMetrics(request.getQuery())).build();
   }
 
+  /**
+   * Get getVolumeInfos based on query conditions.
+   *
+   * @param request The request object containing the parameters to
+   * fetch volume information (GetVolumeInfosRequestProto).
+   * @return  A response object containing the volume information
+   * (GetVolumeInfosResponseProto).
+   * @throws IOException
+   * If an input/output exception occurs while processing the request.
+   */
+  public GetVolumeInfosResponseProto getVolumeInfos(
+      GetVolumeInfosRequestProto request) throws IOException {
+    // Invoke method and return result
+    return impl.getVolumeInfos();
+  }
+  
   public ReconcileContainerResponseProto reconcileContainer(ReconcileContainerRequestProto request) throws IOException {
     impl.reconcileContainer(request.getContainerID());
     return ReconcileContainerResponseProto.getDefaultInstance();
