@@ -81,7 +81,7 @@ public abstract class BackgroundService {
     return this.exec;
   }
 
-  public void setPoolSize(int size) {
+  public synchronized void setPoolSize(int size) {
     if (size <= 0) {
       throw new IllegalArgumentException("Pool size must be positive.");
     }
