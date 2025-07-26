@@ -77,7 +77,7 @@ public abstract class BackgroundService {
   }
 
   @VisibleForTesting
-  public ExecutorService getExecutorService() {
+  public synchronized ExecutorService getExecutorService() {
     return this.exec;
   }
 
