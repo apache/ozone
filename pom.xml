@@ -2731,6 +2731,8 @@
               </includes>
               <excludes>
                 <exclude>org.apache.hadoop.ozone.om.snapshot.**</exclude>
+                <!-- default excludes -->
+                <exclude>**/*$*</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2785,6 +2787,8 @@
               </includes>
               <excludes>
                 <exclude>org.apache.hadoop.hdds.scm.container.**</exclude>
+                <!-- default excludes -->
+                <exclude>**/*$*</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2809,6 +2813,8 @@
                 <exclude>org.apache.hadoop.ozone.container.**</exclude>
                 <exclude>org.apache.hadoop.ozone.om.**</exclude>
                 <exclude>org.apache.hadoop.ozone.recon.**</exclude>
+                <!-- default excludes -->
+                <exclude>**/*$*</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
