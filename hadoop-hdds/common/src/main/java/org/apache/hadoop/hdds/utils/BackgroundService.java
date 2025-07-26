@@ -108,6 +108,7 @@ public abstract class BackgroundService {
     while (!tasks.isEmpty()) {
       tasks.poll().call();
     }
+    execTaskCompletion();
   }
 
   // start service
