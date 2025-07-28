@@ -62,16 +62,16 @@ public class ContainerReplicaPendingOps {
       new ArrayList<>();
   // tracks how much data is pending to be added to a target Datanode because of pending ADD ops
   private final ConcurrentHashMap<DatanodeID, SizeAndTime> containerSizeScheduled = new ConcurrentHashMap<>();
-  private long replicationManagerEventTimeout;
+  ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   public ContainerReplicaPendingOps(Clock clock) {
     this.clock = clock;
     resetCounters();
   }
 
-  public ContainerReplicaPendingOps(Clock clock, long replicationManagerEventTimeout) {
+  public ContainerReplicaPendingOps(Clock clock, ReplicationManager.ReplicationManagerConfiguration rmConf) {
     this(clock);
-    this.replicationManagerEventTimeout = replicationManagerEventTimeout;
+    this.rmConf = rmConf;
   }
 
   /**
@@ -294,7 +294,7 @@ public class ContainerReplicaPendingOps {
     containerSizeScheduled.computeIfPresent(op.getTarget().getID(), (k, v) -> {
       long newSize = v.getSize() - op.getContainerSize();
       boolean isSizeNonPositive = newSize <= 0;
-      boolean hasOpExpired = clock.millis() - v.getLastUpdatedTime() > replicationManagerEventTimeout;
+      boolean hasOpExpired = clock.millis() - v.getLastUpdatedTime() > rmConf.getEventTimeout();
       if (isSizeNonPositive || hasOpExpired) {
         /*
         If the scheduled size is now less than or equal to 0, or if the last op has expired, implying that the ops
