@@ -383,7 +383,8 @@ public class TestKeyValueHandler {
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
         keyValueHandler.handleCloseContainer(closeContainerRequest, container);
-    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
+    // Checksum will not be generated for an invalid container.
+    assertFalse(ContainerChecksumTreeManager.getContainerChecksumFile(kvData).exists());
 
     assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
         response.getResult(),
@@ -679,7 +680,8 @@ public class TestKeyValueHandler {
 
     // Initially, container should have no checksum information.
     assertEquals(0, containerData.getDataChecksum());
-    assertFalse(checksumManager.read(containerData).isPresent());
+    assertFalse(checksumManager.read(containerData).hasContainerMerkleTree());
+    assertFalse(ContainerChecksumTreeManager.getContainerChecksumFile(containerData).exists());
     assertEquals(0, icrCount.get());
 
     // Update container with checksum information.
@@ -689,7 +691,7 @@ public class TestKeyValueHandler {
     // Check checksum in memory.
     assertEquals(updatedDataChecksum, containerData.getDataChecksum());
     // Check disk content.
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData).get();
+    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData);
     assertTreesSortedAndMatch(treeWriter.toProto(), checksumInfo.getContainerMerkleTree());
   }
 

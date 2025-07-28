@@ -65,17 +65,14 @@ public class ListInfoSubcommand extends ScmSubcommand {
   private boolean json;
 
   @CommandLine.ArgGroup(exclusive = true, multiplicity = "0..1")
-  private UsageSortingOptions usageSortingOptions;
+  private ExclusiveNodeOptions exclusiveNodeOptions;
 
   @CommandLine.Mixin
   private ListLimitOptions listLimitOptions;
 
-  @CommandLine.Mixin
-  private NodeSelectionMixin nodeSelectionMixin;
-
   private List<Pipeline> pipelines;
 
-  static class UsageSortingOptions {
+  static class ExclusiveNodeOptions extends NodeSelectionMixin {
     @CommandLine.Option(names = {"--most-used"},
         description = "Show datanodes sorted by Utilization (most to least).")
     private boolean mostUsed;
@@ -88,8 +85,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     pipelines = scmClient.listPipelines();
-    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getNodeId())) {
-      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(nodeSelectionMixin.getNodeId()));
+    if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getNodeId())) {
+      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(exclusiveNodeOptions.getNodeId()));
       BasicDatanodeInfoJson singleNodeInfo = new BasicDatanodeInfoJson(
           DatanodeDetails.getFromProtoBuf(node.getNodeID()), node.getNodeOperationalStates(0), node.getNodeStates(0));
       if (json) {
@@ -101,13 +98,13 @@ public class ListInfoSubcommand extends ScmSubcommand {
       return;
     }
     Stream<BasicDatanodeInfoJson> allNodes = getAllNodes(scmClient).stream();
-    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getIp())) {
+    if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getIp())) {
       allNodes = allNodes.filter(p -> p.getIpAddress()
-          .compareToIgnoreCase(nodeSelectionMixin.getIp()) == 0);
+          .compareToIgnoreCase(exclusiveNodeOptions.getIp()) == 0);
     }
-    if (!Strings.isNullOrEmpty(nodeSelectionMixin.getHostname())) {
+    if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getHostname())) {
       allNodes = allNodes.filter(p -> p.getHostName()
-          .compareToIgnoreCase(nodeSelectionMixin.getHostname()) == 0);
+          .compareToIgnoreCase(exclusiveNodeOptions.getHostname()) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeOperationalState)) {
       allNodes = allNodes.filter(p -> p.getOpState().toString()
@@ -134,8 +131,8 @@ public class ListInfoSubcommand extends ScmSubcommand {
       throws IOException {
 
     // If sorting is requested
-    if (usageSortingOptions != null && (usageSortingOptions.mostUsed || usageSortingOptions.leastUsed)) {
-      boolean sortByMostUsed = usageSortingOptions.mostUsed;
+    if (exclusiveNodeOptions != null && (exclusiveNodeOptions.mostUsed || exclusiveNodeOptions.leastUsed)) {
+      boolean sortByMostUsed = exclusiveNodeOptions.mostUsed;
       List<HddsProtos.DatanodeUsageInfoProto> usageInfos = scmClient.getDatanodeUsageInfo(sortByMostUsed, 
           Integer.MAX_VALUE);
 
