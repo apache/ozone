@@ -192,9 +192,6 @@ public class OzoneTokenIdentifier extends
 
     if (token.hasOmServiceId()) {
       setOmServiceId(token.getOmServiceId());
-    } else {
-      // Explicitly set to null if not present.
-      setOmServiceId(null);
     }
   }
 
@@ -230,8 +227,6 @@ public class OzoneTokenIdentifier extends
     }
     if (token.hasOmServiceId()) {
       identifier.setOmServiceId(token.getOmServiceId());
-    } else {
-      identifier.setOmServiceId(null); // Explicitly set to null if not present.
     }
     return identifier;
   }
