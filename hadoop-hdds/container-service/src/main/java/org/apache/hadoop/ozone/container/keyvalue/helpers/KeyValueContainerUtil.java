@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -320,22 +321,24 @@ public final class KeyValueContainerUtil {
     Long pendingDeleteBlockCount =
         metadataTable.get(kvContainerData
             .getPendingDeleteBlockCountKey());
-    if (pendingDeleteBlockCount != null && pendingDeletionBlockBytes != null) {
+    if (pendingDeleteBlockCount != null) {
       blockPendingDeletion = pendingDeleteBlockCount;
-      blockPendingDeletionBytes = pendingDeletionBlockBytes;
+      if (pendingDeletionBlockBytes != null) {
+        blockPendingDeletionBytes = pendingDeletionBlockBytes;
+      }
     } else {
       // Set pending deleted block count.
       LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
       MetadataKeyFilters.KeyPrefixFilter filter =
           kvContainerData.getDeletingBlockKeyFilter();
 
-      List<? extends Table.KeyValue<String, BlockData>> data = store.getBlockDataTable()
+      List<? extends Table.KeyValue<String, ChunkInfoList>> data = store.getDeletedBlocksTable()
           .getRangeKVs(kvContainerData.startKeyEmpty(),
               Integer.MAX_VALUE, kvContainerData.containerPrefix(),
               filter);
 
-      for (Table.KeyValue<String, BlockData> kv : data) {
-        blockPendingDeletionBytes += kv.getValue().getSize();
+      for (Table.KeyValue<String, ChunkInfoList> kv : data) {
+        blockPendingDeletionBytes += kv.getValueByteSize();
       }
       
       blockPendingDeletion = store.getBlockDataTable().getRangeKVs(
@@ -446,7 +449,7 @@ public final class KeyValueContainerUtil {
         usedBytes += getBlockLengthTryCatch(blockIter.nextBlock());
       }
     }
-    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0);
+    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0, 0);
   }
 
   public static long getBlockLengthTryCatch(BlockData block) {
