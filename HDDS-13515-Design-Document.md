@@ -13,19 +13,19 @@
 ## 1. Executive Summary
 
 ### Problem Statement
-Currently, when Recon falls back to full snapshot recovery (due to SequenceNumberNotFoundException from OM compaction), the `reprocess()` method of all ReconOmTask implementations truncates their existing processed data tables before rebuilding from the new snapshot. This causes Recon APIs to return empty/blank data during the reprocessing period, creating a poor user experience in the Recon UI until all tasks complete their full rebuild.
+Currently, when Recon falls back to full snapshot recovery (due to SequenceNumberNotFoundException (OM DB Compaction ?) or any other error thrown by OM), the `reprocess()` method of all ReconOmTask implementations truncates their existing processed data tables before rebuilding from the new snapshot. This causes Recon APIs to return empty/blank data during the reprocessing period, creating a poor user experience in the Recon UI until all tasks complete their full rebuild.
 
 ### Proposed Solution
 Implement a **Staged Reprocessing Architecture** that leverages the existing staging pattern (similar to TarExtractor) to maintain data availability during full snapshot recovery. The solution involves:
 
-1. **Staging Database Creation**: Create staging instances of ReconOmTask data tables
+1. **Staging Database Creation**: Create staging instances of Recon rocksDB where ReconOmTask data tables will be processed without impacting production tables.
 2. **Parallel Reprocessing**: Process full snapshot data into staging tables while production tables remain accessible
 3. **Atomic Switchover**: Atomically replace production tables with staging tables once all tasks complete successfully
-4. **Rollback Capability**: Provide rollback mechanism in case of reprocessing failures
+4. **Rollback Capability**: Provide a rollback mechanism in case of reprocessing failures
 
 ### Benefits
 - **Zero Downtime**: Recon APIs remain functional during full snapshot recovery
-- **Data Consistency**: Atomic switchover ensures consistent view across all task data
+- **Data Consistency**: Atomic switchover ensures a consistent view across all task data
 - **Failure Resilience**: Rollback capability ensures system stability during failures
 - **Performance Isolation**: Reprocessing load doesn't impact API query performance
 
