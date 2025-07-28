@@ -148,7 +148,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     if (blockDeletionResults != null) {
       long purgeStartTime = Time.monotonicNow();
       purgeResult = submitPurgeKeysRequest(blockDeletionResults,
-          keysToModify, renameEntries, snapTableKey, expectedPreviousSnapshotId);
+          keysToModify, renameEntries, snapTableKey, expectedPreviousSnapshotId, ratisByteLimit);
       int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
@@ -164,15 +164,23 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * @param results DeleteBlockGroups returned by SCM.
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
-  private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
-      Map<String, RepeatedOmKeyInfo> keysToModify,  List<String> renameEntriesToBeDeleted,
-      String snapTableKey, UUID expectedPreviousSnapshotId) throws InterruptedException {
+  @SuppressWarnings("checkstyle:MethodLength")
+  private Pair<Integer, Boolean> submitPurgeKeysRequest(
+      List<DeleteBlockGroupResult> results,
+      Map<String, RepeatedOmKeyInfo> keysToModify,
+      List<String> renameEntriesToBeDeleted,
+      String snapTableKey,
+      UUID expectedPreviousSnapshotId,
+      int ratisLimit) throws InterruptedException {
+
     List<String> purgeKeys = new ArrayList<>();
 
     // Put all keys to be purged in a list
     int deletedCount = 0;
     Set<String> failedDeletedKeys = new HashSet<>();
     boolean purgeSuccess = true;
+
+    // Step 1: Process DeleteBlockGroupResults
     for (DeleteBlockGroupResult result : results) {
       String deletedKey = result.getObjectKey();
       if (result.isSuccess()) {
@@ -198,25 +206,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
     }
 
-    PurgeKeysRequest.Builder purgeKeysRequest = PurgeKeysRequest.newBuilder();
-    if (snapTableKey != null) {
-      purgeKeysRequest.setSnapshotTableKey(snapTableKey);
-    }
-    NullableUUID.Builder expectedPreviousSnapshotNullableUUID = NullableUUID.newBuilder();
-    if (expectedPreviousSnapshotId != null) {
-      expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
-    }
-    purgeKeysRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
-    OzoneManagerProtocolProtos.DeletedKeys deletedKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
-        .setVolumeName("")
-        .setBucketName("")
-        .addAllKeys(purgeKeys)
-        .build();
-    purgeKeysRequest.addDeletedKeys(deletedKeys);
-    // Adding rename entries to be purged.
-    if (renameEntriesToBeDeleted != null) {
-      purgeKeysRequest.addAllRenamedKeys(renameEntriesToBeDeleted);
-    }
+    // Step 2: Prepare keysToUpdateList
     List<OzoneManagerProtocolProtos.SnapshotMoveKeyInfos> keysToUpdateList = new ArrayList<>();
     if (keysToModify != null) {
       for (Map.Entry<String, RepeatedOmKeyInfo> keyToModify :
@@ -234,27 +224,125 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         keyToUpdate.addAllKeyInfos(keyInfos);
         keysToUpdateList.add(keyToUpdate.build());
       }
-
-      if (!keysToUpdateList.isEmpty()) {
-        purgeKeysRequest.addAllKeysToUpdate(keysToUpdateList);
-      }
     }
 
-    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
-        .setPurgeKeysRequest(purgeKeysRequest)
-        .setClientId(getClientId().toString())
-        .build();
+    int purgeKeyIndex = 0, updateIndex = 0, renameIndex = 0;
+    int currSize = 0;
+    boolean flag = false;
 
-    // Submit PurgeKeys request to OM. Acquire bootstrap lock when processing deletes for snapshots.
-    try (BootstrapStateHandler.Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
-      OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
-      if (omResponse != null) {
-        purgeSuccess = purgeSuccess && omResponse.getSuccess();
+    while (purgeKeyIndex < purgeKeys.size() ||
+        updateIndex < keysToUpdateList.size() ||
+        (renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size())) {
+
+      int remainingRatisLimit = ratisLimit;
+      flag = false;
+      PurgeKeysRequest.Builder requestBuilder = PurgeKeysRequest.newBuilder();
+
+      if (snapTableKey != null) {
+        requestBuilder.setSnapshotTableKey(snapTableKey);
       }
-    } catch (ServiceException e) {
-      LOG.error("PurgeKey request failed. Will retry at next run.", e);
-      return Pair.of(0, false);
+      if (expectedPreviousSnapshotId != null) {
+        requestBuilder.setExpectedPreviousSnapshotID(
+            NullableUUID.newBuilder()
+                .setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId))
+                .build());
+      }
+
+      currSize = requestBuilder.build().getSerializedSize();
+      remainingRatisLimit -= currSize;
+
+      // 3.1 Add purgeKeys
+      List<String> batchPurgeKeys = new ArrayList<>();
+      int estimatedPurgeKeysSize = 0;
+
+      while (purgeKeyIndex < purgeKeys.size()) {
+        String nextKey = purgeKeys.get(purgeKeyIndex);
+
+        List<String> temp = new ArrayList<>(batchPurgeKeys);
+        temp.add(nextKey);
+
+        OzoneManagerProtocolProtos.DeletedKeys deletedKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
+            .setVolumeName("").setBucketName("").addAllKeys(temp).build();
+
+        PurgeKeysRequest.Builder tempBuilder = requestBuilder.clone();
+        tempBuilder.clearDeletedKeys().addDeletedKeys(deletedKeys);
+
+        estimatedPurgeKeysSize = tempBuilder.build().getSerializedSize();
+        if (currSize + estimatedPurgeKeysSize > remainingRatisLimit) {
+          flag = true;
+          break;
+        }
+
+        batchPurgeKeys.add(nextKey);
+        purgeKeyIndex++;
+      }
+
+      // Now actually add batchPurgeKeys
+      if (!batchPurgeKeys.isEmpty()) {
+        OzoneManagerProtocolProtos.DeletedKeys deletedKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
+            .setVolumeName("").setBucketName("")
+            .addAllKeys(batchPurgeKeys).build();
+        requestBuilder.clearDeletedKeys().addDeletedKeys(deletedKeys);
+        currSize += requestBuilder.build().getSerializedSize();
+      }
+
+      remainingRatisLimit -= currSize;
+
+      // 3.2 Add keysToUpdate
+      while (!flag && updateIndex < keysToUpdateList.size()) {
+        OzoneManagerProtocolProtos.SnapshotMoveKeyInfos nextUpdate = keysToUpdateList.get(updateIndex);
+
+        PurgeKeysRequest.Builder tempBuilder = requestBuilder.clone();
+        tempBuilder.addKeysToUpdate(nextUpdate);
+        int estimatedSize = tempBuilder.build().getSerializedSize();
+
+        if (currSize + estimatedSize > remainingRatisLimit) {
+          flag = true;
+          break;
+        }
+
+        requestBuilder.addKeysToUpdate(nextUpdate);
+        currSize += estimatedSize;
+        updateIndex++;
+      }
+
+      remainingRatisLimit -= currSize;
+
+      // 3.3 Add renamed keys
+      while (!flag && renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size()) {
+        String nextRename = renameEntriesToBeDeleted.get(renameIndex);
+
+        PurgeKeysRequest.Builder tempBuilder = requestBuilder.clone();
+        tempBuilder.addRenamedKeys(nextRename);
+        int estimatedSize = tempBuilder.build().getSerializedSize();
+
+        if (currSize + estimatedSize > remainingRatisLimit) {
+          break;
+        }
+
+        requestBuilder.addRenamedKeys(nextRename);
+        currSize += estimatedSize;
+        renameIndex++;
+      }
+
+      // Finalize and send this batch
+      OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
+          .setPurgeKeysRequest(requestBuilder.build())
+          .setClientId(getClientId().toString())
+          .build();
+
+      try (BootstrapStateHandler.Lock lock =
+          snapTableKey != null ? getBootstrapStateLock().lock() : null) {
+        OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
+        if (omResponse != null) {
+          purgeSuccess = purgeSuccess && omResponse.getSuccess();
+        }
+      } catch (ServiceException | InterruptedException e) {
+        LOG.error("PurgeKey request failed in batch. Will retry at next run.", e);
+        purgeSuccess = false;
+        // Continue to next batch instead of returning immediately
+      }
     }
 
     return Pair.of(deletedCount, purgeSuccess);
