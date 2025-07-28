@@ -42,4 +42,12 @@ start_docker_env
 
 execute_robot_test ${OM} kinit.robot
 
+echo "Creating test keys to verify om compaction"
+om_container="ozonesecure-ha-om1-1"
+docker exec "${om_container}" ozone freon ockg -n 100000 -t 20 -s 0 > /dev/null 2>&1
+echo "Test keys created"
+
+echo "Restarting OM after key creation to flush and generate sst files"
+docker restart "${om_container}"
+
 execute_robot_test ${OM} repair/om-compact.robot
