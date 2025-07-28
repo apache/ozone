@@ -62,7 +62,7 @@ public class ContainerReplicaPendingOps {
       new ArrayList<>();
   // tracks how much data is pending to be added to a target Datanode because of pending ADD ops
   private final ConcurrentHashMap<DatanodeID, SizeAndTime> containerSizeScheduled = new ConcurrentHashMap<>();
-  ReplicationManager.ReplicationManagerConfiguration rmConf;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   public ContainerReplicaPendingOps(Clock clock) {
     this.clock = clock;
