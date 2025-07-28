@@ -22,7 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 import java.net.URL;
 import java.net.URLClassLoader;
-import static java.security.AccessController.*;
+import static java.security.AccessController.doPrivileged;
 
 import java.nio.charset.StandardCharsets;
 import java.security.PrivilegedAction;
