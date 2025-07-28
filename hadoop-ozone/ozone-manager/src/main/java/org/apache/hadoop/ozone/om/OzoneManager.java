@@ -1047,6 +1047,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Set scmInfo.
+   */
+  @VisibleForTesting
+  public void setScmInfo(ScmInfo newScmInfo) {
+    this.scmInfo = newScmInfo;
+  }
+
+  /**
    * Return SecretManager for OM.
    */
   public OzoneBlockTokenSecretManager getBlockTokenSecretManager() {

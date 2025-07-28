@@ -230,7 +230,7 @@ public class TestBlockDeletionService {
 
     assertEquals(1, blockGroups.get(0).getAllDeletedBlocks().size());
     assertEquals(isIncludeBlockSize ?
-        QuotaUtil.getReplicatedSize(KEY_SIZE, replicationConfig) : 0, totalUsedBytes);
-    assertEquals(isIncludeBlockSize ? KEY_SIZE : 0, totalUnreplicatedBytes);
+        QuotaUtil.getReplicatedSize(KEY_SIZE, replicationConfig) : -1, totalUsedBytes);
+    assertEquals(isIncludeBlockSize ? KEY_SIZE : -1, totalUnreplicatedBytes);
   }
 }

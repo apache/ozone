@@ -445,7 +445,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
     scm.getPipelineManager().reinitialize(metadataStore.getPipelineTable());
     scm.getContainerManager().reinitialize(metadataStore.getContainerTable());
     scm.getScmBlockManager().getDeletedBlockLog().reinitialize(
-        metadataStore.getDeletedBlocksTXTable());
+        metadataStore.getDeletedBlocksTXTable(), metadataStore.getStatefulServiceConfigTable());
     scm.getStatefulServiceStateManager().reinitialize(
         metadataStore.getStatefulServiceConfigTable());
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
