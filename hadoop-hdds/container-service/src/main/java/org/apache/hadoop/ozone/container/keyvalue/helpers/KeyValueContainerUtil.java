@@ -320,9 +320,11 @@ public final class KeyValueContainerUtil {
     Long pendingDeleteBlockCount =
         metadataTable.get(kvContainerData
             .getPendingDeleteBlockCountKey());
-    if (pendingDeleteBlockCount != null && pendingDeletionBlockBytes != null) {
+    if (pendingDeleteBlockCount != null) {
       blockPendingDeletion = pendingDeleteBlockCount;
-      blockPendingDeletionBytes = pendingDeletionBlockBytes;
+      if (pendingDeletionBlockBytes != null) {
+        blockPendingDeletionBytes = pendingDeletionBlockBytes;
+      }
     } else {
       // Set pending deleted block count.
       LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
