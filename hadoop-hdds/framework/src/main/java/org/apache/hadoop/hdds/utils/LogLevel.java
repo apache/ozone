@@ -63,7 +63,7 @@ public final class LogLevel {
   private static final String PROTOCOL_HTTP = "http";
   private static final String PROTOCOL_HTTPS = "https";
 
-  private static final String SLF4J_LOG4J_ADAPTER_CLASS = "org.slf4j.impl.Reload4jLoggerAdapter";
+  private static final String SLF4J_LOG4J_ADAPTER_CLASS = "org.slf4j.reload4j.Reload4jLoggerAdapter";
 
   private static final String MARKER = "<!-- OUTPUT -->";
   private static final Pattern TAG = Pattern.compile("<[^>]*>");
