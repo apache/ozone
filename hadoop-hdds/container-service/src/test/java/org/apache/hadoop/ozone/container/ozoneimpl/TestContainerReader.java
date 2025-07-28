@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -719,8 +720,54 @@ public class TestContainerReader {
     assertNotSame(containerData, loadedData);
     assertEquals(0L, loadedData.getDataChecksum());
 
-    // Verify 0 checksum was stored in RocksDB
-    verifyAllDataChecksumsMatch(loadedData, conf);
+    // The checksum is not stored in rocksDB as the container merkle tree doesn't exist.
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+      assertNull(dbDataChecksum);
+    }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerLoadingWithoutMerkleTree(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+
+    KeyValueContainerData containerData = createContainerWithBlocks(13L);
+    
+    // Create an empty checksum file that exists but has no valid merkle tree
+    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(containerData);
+    ContainerProtos.ContainerChecksumInfo emptyContainerInfo = ContainerProtos.ContainerChecksumInfo
+        .newBuilder().build();
+    try (OutputStream tmpOutputStream = Files.newOutputStream(checksumFile.toPath())) {
+      emptyContainerInfo.writeTo(tmpOutputStream);
+    }
+    assertTrue(checksumFile.exists());
+    
+    // Verify no checksum in RocksDB initially
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+      assertNull(dbDataChecksum);
+    }
+    
+    ContainerCache.getInstance(conf).shutdownCache();
+
+    // Test container loading - should handle corrupted file gracefully and default to 0
+    ContainerReader containerReader = new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true);
+    containerReader.run();
+
+    // Verify container loads with default checksum of 0 when file is corrupted
+    Container<?> loadedContainer = containerSet.getContainer(13L);
+    assertNotNull(loadedContainer);
+    KeyValueContainerData loadedData = (KeyValueContainerData) loadedContainer.getContainerData();
+    assertNotSame(containerData, loadedData);
+    assertEquals(0L, loadedData.getDataChecksum());
+
+    // The checksum is not stored in rocksDB as the container merkle tree doesn't exist.
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+      assertNull(dbDataChecksum);
+    }
   }
 
   private KeyValueContainerData createContainerWithBlocks(long containerId) throws Exception {

@@ -301,7 +301,8 @@ public final class KeyValueContainerUtil {
 
     try {
       ContainerChecksumInfo containerChecksumInfo = ContainerChecksumTreeManager.readChecksumInfo(kvContainerData);
-      if (containerChecksumInfo != null && kvContainerData.needsDataChecksum()) {
+      if (containerChecksumInfo != null && containerChecksumInfo.hasContainerMerkleTree()
+          && kvContainerData.needsDataChecksum()) {
         containerDataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
         kvContainerData.setDataChecksum(containerDataChecksum);
         metadataTable.put(kvContainerData.getContainerDataChecksumKey(), containerDataChecksum);

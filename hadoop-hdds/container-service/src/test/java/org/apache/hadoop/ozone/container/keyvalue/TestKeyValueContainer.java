@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -292,6 +293,56 @@ public class TestKeyValueContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
+  public void testEmptyMerkleTreeImportExport(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    createContainer();
+    closeContainer();
+
+    KeyValueContainerData data = keyValueContainer.getContainerData();
+    // Create an empty checksum file that exists but has no valid merkle tree
+    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(data);
+    ContainerProtos.ContainerChecksumInfo emptyContainerInfo = ContainerProtos.ContainerChecksumInfo
+        .newBuilder().build();
+    try (OutputStream tmpOutputStream = Files.newOutputStream(checksumFile.toPath())) {
+      emptyContainerInfo.writeTo(tmpOutputStream);
+    }
+
+    // Check state of original container.
+    checkContainerFilesPresent(data, 0);
+
+    //destination path
+    File exportTar = Files.createFile(
+        folder.toPath().resolve("export.tar")).toFile();
+    TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
+    //export the container
+    try (OutputStream fos = Files.newOutputStream(exportTar.toPath())) {
+      keyValueContainer.exportContainerData(fos, packer);
+    }
+
+    KeyValueContainerUtil.removeContainer(
+        keyValueContainer.getContainerData(), CONF);
+    keyValueContainer.delete();
+
+    // import container.
+    try (InputStream fis = Files.newInputStream(exportTar.toPath())) {
+      keyValueContainer.importContainerData(fis, packer);
+    }
+
+    // Make sure empty chunks dir was unpacked.
+    checkContainerFilesPresent(data, 0);
+    data = keyValueContainer.getContainerData();
+    ContainerProtos.ContainerChecksumInfo checksumInfo = ContainerChecksumTreeManager.readChecksumInfo(data);
+    assertFalse(checksumInfo.hasContainerMerkleTree());
+    // The import should not fail and the checksum should be 0
+    assertEquals(0, data.getDataChecksum());
+    // The checksum is not stored in rocksDB as the container merkle tree doesn't exist.
+    try (DBHandle dbHandle = BlockUtils.getDB(data, new OzoneConfiguration())) {
+      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(data.getContainerDataChecksumKey());
+      assertNull(dbDataChecksum);
+    }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
   public void testUnhealthyContainerImportExport(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
@@ -387,6 +438,14 @@ public class TestKeyValueContainer {
           containerData.getMaxSize());
       assertEquals(keyValueContainerData.getBytesUsed(),
           containerData.getBytesUsed());
+      assertEquals(0L, keyValueContainerData.getDataChecksum());
+      // The checksum is not stored in rocksDB as the checksum file doesn't exist.
+      try (DBHandle dbHandle = BlockUtils.getDB(keyValueContainerData, new OzoneConfiguration())) {
+        Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(
+            keyValueContainerData.getContainerDataChecksumKey());
+        assertNull(dbDataChecksum);
+      }
+      assertFalse(ContainerChecksumTreeManager.getContainerChecksumFile(containerData).exists());
       assertNotNull(containerData.getContainerFileChecksum());
       assertNotEquals(containerData.ZERO_CHECKSUM, container.getContainerData().getContainerFileChecksum());
 
