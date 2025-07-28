@@ -32,6 +32,7 @@ share/ozone/lib/commons-digester.jar
 share/ozone/lib/commons-io.jar
 share/ozone/lib/commons-lang3.jar
 share/ozone/lib/commons-lang.jar
+share/ozone/lib/commons-math3.jar
 share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
