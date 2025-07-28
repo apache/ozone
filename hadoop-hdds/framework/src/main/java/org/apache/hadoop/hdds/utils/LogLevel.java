@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.log;
 
+package org.apache.hadoop.hdds.utils;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -24,55 +25,67 @@ import java.io.PrintWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
-
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.apache.hadoop.classification.VisibleForTesting;
-import org.slf4j.LoggerFactory;
-
 import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.security.authentication.client.AuthenticatedURL;
 import org.apache.hadoop.security.authentication.client.KerberosAuthenticator;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.util.GenericOptionsParser;
-import org.apache.hadoop.util.GenericsUtil;
 import org.apache.hadoop.util.ServletUtil;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Change log level in runtime.
  */
 @InterfaceStability.Evolving
-public class LogLevel {
-  public static final String USAGES = "\nUsage: Command options are:\n"
+public final class LogLevel {
+  private static final String USAGES = "\nUsage: Command options are:\n"
       + "\t[-getlevel <host:port> <classname> [-protocol (http|https)]\n"
       + "\t[-setlevel <host:port> <classname> <level> "
       + "[-protocol (http|https)]\n";
 
-  public static final String PROTOCOL_HTTP = "http";
-  public static final String PROTOCOL_HTTPS = "https";
+  private static final String PROTOCOL_HTTP = "http";
+  private static final String PROTOCOL_HTTPS = "https";
+
+  private static final String SLF4J_LOG4J_ADAPTER_CLASS = "org.slf4j.impl.Reload4jLoggerAdapter";
+
+  private static final String MARKER = "<!-- OUTPUT -->";
+  private static final Pattern TAG = Pattern.compile("<[^>]*>");
+
   /**
-   * A command line implementation
+   * Set to false only if log4j adapter class is not found in the classpath. Once set to false,
+   * the utility method should not bother re-loading class again.
+   */
+  private static final AtomicBoolean IS_LOG4J_LOGGER = new AtomicBoolean(true);
+
+  /**
+   * A command line implementation.
    * @param args input args.
    * @throws Exception exception.
    */
   public static void main(String[] args) throws Exception {
     CLI cli = new CLI(new Configuration());
     System.exit(ToolRunner.run(cli, args));
+  }
+
+  private LogLevel() {
+    // no instances
   }
 
   /**
@@ -92,6 +105,26 @@ public class LogLevel {
   public static boolean isValidProtocol(String protocol) {
     return ((protocol.equals(PROTOCOL_HTTP) ||
       protocol.equals(PROTOCOL_HTTPS)));
+  }
+
+  /**
+   * Determine whether the log of the given logger is of Log4J implementation.
+   *
+   * @param logger the logger name, usually class name as string.
+   * @return true if the logger uses Log4J implementation.
+   */
+  private static boolean isLog4jLogger(String logger) {
+    if (logger == null || !IS_LOG4J_LOGGER.get()) {
+      return false;
+    }
+    org.slf4j.Logger log = LoggerFactory.getLogger(logger);
+    try {
+      Class<?> log4jClass = Class.forName(SLF4J_LOG4J_ADAPTER_CLASS);
+      return log4jClass.isInstance(log);
+    } catch (ClassNotFoundException e) {
+      IS_LOG4J_LOGGER.set(false);
+      return false;
+    }
   }
 
   @VisibleForTesting
@@ -177,14 +210,14 @@ public class LogLevel {
             "Redundant -getlevel command");
       }
       // check number of arguments is sufficient
-      if (index+2 >= args.length) {
+      if (index + 2 >= args.length) {
         throw new HadoopIllegalArgumentException(
             "-getlevel needs two parameters");
       }
       operation = Operations.GETLEVEL;
-      hostName = args[index+1];
-      className = args[index+2];
-      return index+3;
+      hostName = args[index + 1];
+      className = args[index + 2];
+      return index + 3;
     }
 
     private int parseSetLevelArgs(String[] args, int index) throws
@@ -195,15 +228,15 @@ public class LogLevel {
             "Redundant -setlevel command");
       }
       // check number of arguments is sufficient
-      if (index+3 >= args.length) {
+      if (index + 3 >= args.length) {
         throw new HadoopIllegalArgumentException(
             "-setlevel needs three parameters");
       }
       operation = Operations.SETLEVEL;
-      hostName = args[index+1];
-      className = args[index+2];
-      level = args[index+3];
-      return index+4;
+      hostName = args[index + 1];
+      className = args[index + 2];
+      level = args[index + 3];
+      return index + 4;
     }
 
     private int parseProtocolArgs(String[] args, int index) throws
@@ -214,17 +247,17 @@ public class LogLevel {
             "Redundant -protocol command");
       }
       // check number of arguments is sufficient
-      if (index+1 >= args.length) {
+      if (index + 1 >= args.length) {
         throw new HadoopIllegalArgumentException(
             "-protocol needs one parameter");
       }
       // check protocol is valid
-      protocol = args[index+1];
+      protocol = args[index + 1];
       if (!isValidProtocol(protocol)) {
         throw new HadoopIllegalArgumentException(
             "Invalid protocol: " + protocol);
       }
-      return index+2;
+      return index + 2;
     }
 
     /**
@@ -311,20 +344,25 @@ public class LogLevel {
     }
   }
 
-  static final String MARKER = "<!-- OUTPUT -->";
-  static final Pattern TAG = Pattern.compile("<[^>]*>");
-
   /**
-   * A servlet implementation
+   * A servlet implementation.
    */
   @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
   @InterfaceStability.Unstable
   public static class Servlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
+    private static final String FORMS = "\n<br /><hr /><h3>Get / Set</h3>"
+        + "\n<form>Class Name: <input type='text' size='50' name='log' /> "
+        + "<input type='submit' value='Get Log Level' />"
+        + "</form>"
+        + "\n<form>Class Name: <input type='text' size='50' name='log' /> "
+        + "Level: <input type='text' name='level' /> "
+        + "<input type='submit' value='Set Log Level' />"
+        + "</form>";
+
     @Override
-    public void doGet(HttpServletRequest request, HttpServletResponse response
-        ) throws ServletException, IOException {
+    public void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
       // Do the authorization
       if (!HttpServer2.hasAdministratorAccess(getServletContext(), request,
@@ -343,12 +381,12 @@ public class LogLevel {
 
         org.slf4j.Logger log = LoggerFactory.getLogger(logName);
         out.println(MARKER
-            + "Log Class: <b>" + log.getClass().getName() +"</b><br />");
+            + "Log Class: <b>" + log.getClass().getName() + "</b><br />");
         if (level != null) {
           out.println(MARKER + "Submitted Level: <b>" + level + "</b><br />");
         }
 
-        if (GenericsUtil.isLog4jLogger(logName)) {
+        if (isLog4jLogger(logName)) {
           process(Logger.getLogger(logName), level, out);
         } else {
           out.println("Sorry, setting log level is only supported for log4j loggers.<br />");
@@ -358,15 +396,6 @@ public class LogLevel {
       out.println(FORMS);
       out.println(ServletUtil.HTML_TAIL);
     }
-
-    static final String FORMS = "\n<br /><hr /><h3>Get / Set</h3>"
-        + "\n<form>Class Name: <input type='text' size='50' name='log' /> "
-        + "<input type='submit' value='Get Log Level' />"
-        + "</form>"
-        + "\n<form>Class Name: <input type='text' size='50' name='log' /> "
-        + "Level: <input type='text' name='level' /> "
-        + "<input type='submit' value='Set Log Level' />"
-        + "</form>";
 
     private static void process(Logger log, String level,
         PrintWriter out) throws IOException {
