@@ -14,21 +14,19 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test checksums in case of one datanode is dead
 Library             OperatingSystem
-Resource            ../lib/os.robot
-Resource            ozone-debug.robot
-Test Timeout        5 minute
-*** Variables ***
-${PREFIX}           ${EMPTY}
-${VOLUME}           cli-debug-volume${PREFIX}
-${BUCKET}           cli-debug-bucket
-${TESTFILE}         testfile
 
-*** Test Cases ***
-Test ozone debug checksums with one datanode DEAD
-    ${directory} =                 Execute replicas verify checksums CLI tool
-    Set Test Variable    ${DIR}         ${directory}
+*** Keywords ***
+Get OM Service ID
+    ${service_id} =     Get Environment Variable    OM_SERVICE_ID    ${EMPTY}
+    RETURN    ${service_id}
 
-    ${count_files} =               Count Files In Directory    ${directory}
-    Should Be Equal As Integers    ${count_files}     1
+
+Get OM Service Param
+    ${service_id} =     Get OM Service ID
+
+    IF    '${service_id}' == ''
+        RETURN    --service-host om
+    ELSE
+        RETURN    --service-id '${service_id}'
+    END

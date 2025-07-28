@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
@@ -65,7 +64,7 @@ import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
@@ -126,7 +125,7 @@ public class OzoneContainer {
   private final XceiverServerSpi readChannel;
   private final ContainerController controller;
   private BackgroundContainerMetadataScanner metadataScanner;
-  private OnDemandContainerDataScanner onDemandScanner;
+  private OnDemandContainerScanner onDemandScanner;
   private List<BackgroundContainerDataScanner> dataScanners;
   private List<AbstractBackgroundContainerScanner> backgroundScanners;
   private final BlockDeletingService blockDeletingService;
@@ -352,10 +351,10 @@ public class OzoneContainer {
       for (Thread volumeThread : volumeThreads) {
         volumeThread.join();
       }
-      try (Table.KeyValueIterator<ContainerID, String> itr = containerSet.getContainerIdsTable().iterator(KEY_ONLY)) {
+      try (TableIterator<ContainerID, ContainerID> itr = containerSet.getContainerIdsTable().keyIterator()) {
         final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
-          containerIds.put(itr.next().getKey(), 0L);
+          containerIds.put(itr.next(), 0L);
         }
         containerSet.buildMissingContainerSetAndValidate(containerIds, ContainerID::getId);
       }
@@ -440,7 +439,7 @@ public class OzoneContainer {
           "so the on-demand container data scanner will not start.");
       return;
     }
-    onDemandScanner = new OnDemandContainerDataScanner(c, controller);
+    onDemandScanner = new OnDemandContainerScanner(c, controller);
     containerSet.registerOnDemandScanner(onDemandScanner);
   }
 

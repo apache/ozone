@@ -14,10 +14,10 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test ozone Debug CLI
+Documentation       Test ozone debug CLI
 Library             OperatingSystem
 Resource            ../lib/os.robot
-Resource            ozone-debug.robot
+Resource            ozone-debug-keywords.robot
 Test Timeout        5 minute
 Suite Setup         Write keys
 
@@ -38,9 +38,9 @@ Write keys
 *** Test Cases ***
 Test ozone debug replicas verify checksums
     ${output} =    Execute   ozone debug replicas verify --checksums --block-existence --container-state o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE}
-    ${json} =      Evaluate  json.loads('''${output}''')      json
+    ${json} =      Parse replicas verify JSON output      ${output}
 
-    # 'keys' array should be empty if all keys and their replicas passed checksum verification
+    # 'keys' array should be empty if all keys and their replicas passed
     Should Be Empty      ${json}[keys]
     Should Be True       ${json}[pass]     ${True}
 
