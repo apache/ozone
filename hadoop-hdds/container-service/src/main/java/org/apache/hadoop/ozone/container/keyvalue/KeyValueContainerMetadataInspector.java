@@ -249,7 +249,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return dBMetadata;
   }
 
-  static ObjectNode getAggregateValues(DatanodeStore store,
+  public static ObjectNode getAggregateValues(DatanodeStore store,
       KeyValueContainerData containerData, String schemaVersion)
       throws IOException {
 

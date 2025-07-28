@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
+import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerMetadataInspector.getAggregateValues;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -26,13 +28,11 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -320,28 +320,17 @@ public final class KeyValueContainerUtil {
     Long pendingDeleteBlockCount =
         metadataTable.get(kvContainerData
             .getPendingDeleteBlockCountKey());
-    if (pendingDeleteBlockCount != null && pendingDeletionBlockBytes != null) {
+    if (pendingDeleteBlockCount != null) {
       blockPendingDeletion = pendingDeleteBlockCount;
-      blockPendingDeletionBytes = pendingDeletionBlockBytes;
+      if (pendingDeletionBlockBytes != null) {
+        blockPendingDeletionBytes = pendingDeletionBlockBytes;
+      }
     } else {
       // Set pending deleted block count.
       LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
-      MetadataKeyFilters.KeyPrefixFilter filter =
-          kvContainerData.getDeletingBlockKeyFilter();
-
-      List<? extends Table.KeyValue<String, BlockData>> data = store.getBlockDataTable()
-          .getRangeKVs(kvContainerData.startKeyEmpty(),
-              Integer.MAX_VALUE, kvContainerData.containerPrefix(),
-              filter);
-
-      for (Table.KeyValue<String, BlockData> kv : data) {
-        blockPendingDeletionBytes += kv.getValue().getSize();
-      }
-      
-      blockPendingDeletion = store.getBlockDataTable().getRangeKVs(
-          kvContainerData.startKeyEmpty(), Integer.MAX_VALUE, kvContainerData.containerPrefix(), filter, true)
-          // TODO: add a count() method to avoid creating a list
-          .size();
+      ObjectNode pendingDeletions = getAggregateValues(store, kvContainerData, kvContainerData.getSchemaVersion());
+      blockPendingDeletionBytes = pendingDeletions.get("pendingDeleteBytes").asLong();
+      blockPendingDeletion = pendingDeletions.get("pendingDeleteBlocks").asLong();
     }
     // Set delete transaction id.
     Long delTxnId =
@@ -446,7 +435,7 @@ public final class KeyValueContainerUtil {
         usedBytes += getBlockLengthTryCatch(blockIter.nextBlock());
       }
     }
-    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0);
+    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0, 0);
   }
 
   public static long getBlockLengthTryCatch(BlockData block) {

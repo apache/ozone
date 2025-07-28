@@ -579,11 +579,13 @@ public abstract class ContainerData {
     private final long bytes;
     private final long count;
     private final long pendingDeletion;
+    private final long pendingDeletionBytes;
 
-    public BlockByteAndCounts(long bytes, long count, long pendingDeletion) {
+    public BlockByteAndCounts(long bytes, long count, long pendingDeletion, long pendingDeletionBytes) {
       this.bytes = bytes;
       this.count = count;
       this.pendingDeletion = pendingDeletion;
+      this.pendingDeletionBytes = pendingDeletionBytes;
     }
 
     public long getBytes() {
@@ -596,6 +598,10 @@ public abstract class ContainerData {
 
     public long getPendingDeletion() {
       return pendingDeletion;
+    }
+
+    public long getPendingDeletionBytes() {
+      return pendingDeletionBytes;
     }
   }
 
@@ -624,7 +630,7 @@ public abstract class ContainerData {
     }
 
     public synchronized BlockByteAndCounts getBlockByteAndCounts() {
-      return new BlockByteAndCounts(blockBytes, blockCount, blockPendingDeletion);
+      return new BlockByteAndCounts(blockBytes, blockCount, blockPendingDeletion, blockPendingDeletionBytes);
     }
 
     public synchronized long getBlockPendingDeletion() {
@@ -721,7 +727,8 @@ public abstract class ContainerData {
       return "Statistics{read(" + readBytes + " bytes, #" + readCount + ")"
           + ", write(" + writeBytes + " bytes, #" + writeCount + ")"
           + ", block(" + blockBytes + " bytes, #" + blockCount
-          + ", pendingDelete=" + blockPendingDeletion + ")}";
+          + ", pendingDelete=" + blockPendingDeletion
+          + ", pendingDeleteBytes=" + blockPendingDeletionBytes + ")}";
     }
   }
 }
