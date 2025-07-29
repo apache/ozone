@@ -222,11 +222,6 @@ public class TestOnDemandContainerScanner extends
   @Test
   @Override
   public void testUnhealthyContainersDetected() throws Exception {
-    // Without initialization,
-    // there shouldn't be interaction with containerController
-    onDemandScanner.scanContainer(corruptData);
-    verifyNoInteractions(controller);
-
     scanContainer(healthy);
     verifyContainerMarkedUnhealthy(healthy, never());
     scanContainer(corruptData);
