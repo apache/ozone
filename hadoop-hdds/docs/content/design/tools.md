@@ -20,7 +20,9 @@ author: Ethan Rose
 
 # Improved Layout of Ozone Tools
 
-The `ozone-tools` module currently contains utilites that can be used to troubleshoot and fix low level issues in an Ozone cluster through the `ozone debug` and `ozone repair` subcommands. These tools have traditionally been updated in an ad-hoc fashion and not well documented. As we continue to add more tools and their complexity increases, we should standardize the layout and function of these tools to make sure they are safe and easy to use.
+The `ozone-tools` module currently contains utilities that can be used to troubleshoot and fix low level issues in an Ozone cluster through the `ozone debug` and `ozone repair` subcommands. These tools have traditionally been updated in an ad-hoc fashion and not well documented. As we continue to add more tools and their complexity increases, we should standardize the layout and function of these tools to make sure they are safe and easy to use.
+
+This document proposes a migration of the Ozone tools layout, and documents the commands available at the time of writing. It may be kept as a reference for the motivation behind the layout of the tools commands, but the CLI may change in the future beyond what this doc initially covers.
 
 ## Current Layout
 
@@ -79,16 +81,19 @@ We can then apply these rules to group the existing commands:
     Currently all online debug tools fit under this category, where they get a listing from the OM and perform checks on the replica information retrieved. The help message for this subcommand should explicitly state that it runs over the network against a running cluster.
     - `ozone debug replicas chunk-info`
         This is the new location of `ozone debug chunkinfo`
-    - `ozone debug replicas verify [--checksums] [--padding] [--blocks]`
+    - `ozone debug replicas verify [--checksums] [--blocks]`
         This is the combination of `ozone debug find-missing-padding`, `ozone debug read-replicas`, and the [proposed block metadata check tool](https://github.com/apache/ozone/pull/7548). The command takes  paths in the namespace and performs checks on the objects based on the flags given:
       - No flags: Error, at least one check must be specified.
       - `--blocks` checks block existence of all replicas as proposed in [HDDS-11891](https://issues.apache.org/jira/browse/HDDS-11891).
-      - `--padding` Checks padding for EC keys only. No-op for Ratis keys.
+          - This also incorporates the `find-missing-padding` tool, which actually does a similar thing and is not EC specific.
+          - This command may support filtering by things like replication type in the future if only a certain type of key needs to be checked.
       - `--checksums` Pulls data and verifies the checksums on the client side for all replicas. This is a thorough check but it will run very slowly.
 - `ozone debug ratis`
-    This subcomand is where we can put Ratis related commands that are specific to Ozone. For bringing the Ratis shell into Ozone, see the [`ozone ratis`](#ratis) subcommand.
+    This subcommand is where we can put Ratis related commands that are specific to Ozone. For bringing the Ratis shell into Ozone, see the [`ozone ratis`](#ratis) subcommand.
     -  `ozone debug ratis parse <--role={om,scm,datanode}>`
-        Currently our only Ozone-specific subcommand, this can be used to parse any Ratis on-disk state and apply the Ozone specific schema to it if needed. The command should be able to figure out whether it is looking at a log segment, raft-meta, etc on it's own, but the user will need to specify what type of Ozone role the Ratis information came from so it can apply the proper schema.
+        - Currently our only Ozone-specific subcommand, this can be used to parse any Ratis on-disk state and apply the Ozone specific schema to it if needed. 
+        - The user will need to specify what type of Ozone role the Ratis information came from so it can apply the proper schema.
+        - This is tracked as [HDDS-13518](https://issues.apache.org/jira/browse/HDDS-13518).
 
 ### Repair
 
@@ -114,6 +119,10 @@ Invoked as `ozone repair`, these commands make modifications to an Ozone instanc
         A dedicated subcommand for all certificate related repairs on SCM we may need now or in the future.
         - `ozone repair scm cert recover`
             The new location of `ozone repair cert-recover`
+- `ozone repair scm`
+    These commands make repairs to an individual datanode instance.
+    - `ozone repair datanode upgrade-container-schema`
+        This is the new location of `ozone admin container upgrade`, which actually works offline on a single datanode instance so it does not fit with other `ozone admin container` commands.
 
 ### Ratis
 
@@ -132,5 +141,5 @@ The command is unique because it goes through the `FileSystem` interface but is 
 
 #### LDB Repair
 
-For now there are no plans to support arbitrary RocksDB modifications per [this discussion](https://github.com/apache/ozone/pull/7177).  The `ozone repair ldb`  command can be removed for now. Its existing subcommands only repair OM, so they should be moved to `ozone repair om` instead.
+For now there are no plans to support arbitrary RocksDB modifications to RocksDB data per [this discussion](https://github.com/apache/ozone/pull/7177). The current set of `ozone repair ldb` subcommands only repair OM, so they should be moved to `ozone repair om` instead. Currently the only use case for `ozone repair ldb` is a wrapper around compaction, giving us the `ozone repair ldb compact` command in [HDDS-12533](https://issues.apache.org/jira/browse/HDDS-12533).
 
