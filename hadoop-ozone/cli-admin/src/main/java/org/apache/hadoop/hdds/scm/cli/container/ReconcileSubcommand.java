@@ -57,38 +57,63 @@ public class ReconcileSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     if (status) {
-      // Automatically creates one array for the output, while allowing us to flush each object individually.
-      try (SequenceWriter arrayWriter = JsonUtils.getSequenceWriter(System.out)) {
-        // Since status is retrieved using container info, do client side validation that it is only used for Ratis
-        // containers. If EC containers are given, print a  message to stderr and eventually exit non-zero, but continue
-        // processing the remaining containers.
-        int invalidCount = 0;
-        for (String containerIdStr : containerList) {
-          long containerID = Long.parseLong(containerIdStr);
-          if (!printReconciliationStatus(scmClient, containerID, arrayWriter)) {
-            invalidCount++;
-          }
-        }
-        if (invalidCount > 0) {
-          throw new RuntimeException("Failed to process reconciliation status for " + invalidCount + " containers");
-        }
-      }
-      // Array writer will not add a newline to the end.
-      System.out.println();
+      executeStatus(scmClient);
     } else {
+      executeReconcile(scmClient);
+    }
+  }
+
+  private void executeStatus(ScmClient scmClient) throws IOException {
+    // Automatically creates one array for the output, while allowing us to flush each object individually.
+    try (SequenceWriter arrayWriter = JsonUtils.getSequenceWriter(System.out)) {
+      // Since status is retrieved using container info, do client side validation that it is only used for Ratis
+      // containers. If EC containers are given, print a  message to stderr and eventually exit non-zero, but continue
+      // processing the remaining containers.
       int invalidCount = 0;
       for (String containerIdStr : containerList) {
-        long containerID = Long.parseLong(containerIdStr);
+        long containerID;
         try {
-          executeReconciliation(scmClient, containerID);
-        } catch (Exception ex) {
-          System.err.println("Failed to send reconciliation to container " + containerID + ": " + ex.getMessage());
+          containerID = Long.parseLong(containerIdStr);
+        } catch (NumberFormatException e) {
+          System.err.println("Invalid container ID: " + containerIdStr);
+          invalidCount++;
+          continue;
+        }
+        if (containerID <= 0) {
+          System.err.println("Invalid container ID: " + containerID);
+        }
+        if (!printReconciliationStatus(scmClient, containerID, arrayWriter)) {
           invalidCount++;
         }
       }
       if (invalidCount > 0) {
-        throw new RuntimeException("Failed trigger reconciliation for " + invalidCount + " containers");
+        throw new RuntimeException("Failed to process reconciliation status for " + invalidCount + " containers");
       }
+    }
+    // Array writer will not add a newline to the end.
+    System.out.println();
+  }
+
+  private void executeReconcile(ScmClient scmClient) {
+    int invalidCount = 0;
+    for (String containerIdStr : containerList) {
+      long containerID;
+      try {
+        containerID = Long.parseLong(containerIdStr);
+      } catch (NumberFormatException e) {
+        System.err.println("Invalid container ID: " + containerIdStr);
+        invalidCount++;
+        continue;
+      }
+      try {
+        executeReconciliation(scmClient, containerID);
+      } catch (Exception ex) {
+        System.err.println("Failed to send reconciliation to container " + containerID + ": " + ex.getMessage());
+        invalidCount++;
+      }
+    }
+    if (invalidCount > 0) {
+      throw new RuntimeException("Failed trigger reconciliation for " + invalidCount + " containers");
     }
   }
 
