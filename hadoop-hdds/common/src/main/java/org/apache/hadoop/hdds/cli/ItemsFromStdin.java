@@ -25,26 +25,28 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /** Parameter for specifying list of items, reading from stdin if "-" is given as first item. */
-public abstract class ItemsFromStdin implements Iterable<String> {
+public abstract class ItemsFromStdin<T> implements Iterable<T> {
 
   protected static final String FORMAT_DESCRIPTION =
       ": one or more, separated by spaces. To read from stdin, specify '-' and supply one item per line.";
 
-  private List<String> items;
+  private List<T> items;
 
-  protected void setItems(List<String> arguments) {
-    items = readItemsFromStdinIfNeeded(arguments);
+  protected void setItems(List<String> arguments, Function<String, T> mapper) {
+    items = readItemsFromStdinIfNeeded(arguments, mapper);
   }
 
-  public List<String> getItems() {
+  public List<T> getItems() {
     return unmodifiableList(items);
   }
 
   @Nonnull
   @Override
-  public Iterator<String> iterator() {
+  public Iterator<T> iterator() {
     return items.iterator();
   }
 
@@ -52,15 +54,15 @@ public abstract class ItemsFromStdin implements Iterable<String> {
     return items.size();
   }
 
-  private static List<String> readItemsFromStdinIfNeeded(List<String> parameters) {
+  private List<T> readItemsFromStdinIfNeeded(List<String> parameters, Function<String, T> mapper) {
     if (parameters.isEmpty() || !"-".equals(parameters.iterator().next())) {
-      return parameters;
+      return parameters.stream().map(mapper).collect(Collectors.toList());
     }
 
-    List<String> items = new ArrayList<>();
+    List<T> items = new ArrayList<>();
     Scanner scanner = new Scanner(System.in, StandardCharsets.UTF_8.name());
     while (scanner.hasNextLine()) {
-      items.add(scanner.nextLine().trim());
+      items.add(mapper.apply(scanner.nextLine().trim()));
     }
     return items;
   }
