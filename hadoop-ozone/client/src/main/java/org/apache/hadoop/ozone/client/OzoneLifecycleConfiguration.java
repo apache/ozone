@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.ozone.client;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 
 /**
  * A class that encapsulates OzoneLifecycleConfiguration.
@@ -120,7 +123,7 @@ public class OzoneLifecycleConfiguration {
     private final OzoneLCFilter filter;
 
     public OzoneLCRule(String id, String prefix, String status,
-                       OzoneLCExpiration expiration, OzoneLCFilter filter) {
+        OzoneLCExpiration expiration, OzoneLCFilter filter) {
       this.id = id;
       this.prefix = prefix;
       this.status = status;
@@ -163,5 +166,37 @@ public class OzoneLifecycleConfiguration {
 
   public List<OzoneLCRule> getRules() {
     return rules;
+  }
+
+  public static OzoneLifecycleConfiguration fromOmLifecycleConfiguration(
+      OmLifecycleConfiguration lifecycleConfiguration) {
+    List<OmLCRule> omLCRules = lifecycleConfiguration.getRules();
+    List<OzoneLifecycleConfiguration.OzoneLCRule> rules = new ArrayList<>();
+
+    for (OmLCRule r: omLCRules) {
+
+      OzoneLifecycleConfiguration.OzoneLCExpiration e = null;
+      if (r.getExpiration() != null) {
+        e = new OzoneLifecycleConfiguration.OzoneLCExpiration(
+            r.getExpiration().getDays(), r.getExpiration().getDate());
+      }
+
+      OzoneLifecycleConfiguration.OzoneLCFilter f = null;
+      if (r.getFilter() != null) {
+        LifecycleAndOperator andOperator = null;
+        if (r.getFilter().getAndOperator() != null) {
+          andOperator = new LifecycleAndOperator(r.getFilter().getAndOperator().getTags(),
+              r.getFilter().getAndOperator().getPrefix());
+        }
+        f = new OzoneLifecycleConfiguration.OzoneLCFilter(r.getFilter()
+            .getPrefix(), r.getFilter().getTag(), andOperator);
+      }
+
+      rules.add(new OzoneLifecycleConfiguration.OzoneLCRule(r.getId(),
+          r.getPrefix(), (r.isEnabled() ? "Enabled" : "Disabled"), e, f));
+    }
+
+    return new OzoneLifecycleConfiguration(lifecycleConfiguration.getVolume(),
+        lifecycleConfiguration.getBucket(), lifecycleConfiguration.getCreationTime(), rules);
   }
 }

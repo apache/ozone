@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +25,7 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
@@ -251,22 +251,13 @@ public class S3LifecycleConfiguration {
     }
   }
 
-  /**
-   * Converts S3 lifecycle XML representation to Ozone internal representation.
-   *
-   * @param volumeName the Volume name
-   * @param bucketName the Bucket name
-   * @return OmLifecycleConfiguration internal representation
-   * @throws DateTimeParseException if the expiration date format is invalid
-   * @throws IllegalArgumentException if the configuration is invalid
-   * @throws OS3Exception if lifecycle is invalid
-   */
-  public OmLifecycleConfiguration toOmLifecycleConfiguration(String volumeName, String bucketName)
+  public OmLifecycleConfiguration toOmLifecycleConfiguration(OzoneBucket ozoneBucket)
       throws OS3Exception, OMException {
     try {
       OmLifecycleConfiguration.Builder builder = new OmLifecycleConfiguration.Builder()
-          .setVolume(volumeName)
-          .setBucket(bucketName);
+          .setVolume(ozoneBucket.getVolumeName())
+          .setBucketLayout(ozoneBucket.getBucketLayout())
+          .setBucket(ozoneBucket.getName());
 
       for (Rule rule : getRules()) {
         builder.addRule(convertToOmRule(rule));
@@ -275,7 +266,7 @@ public class S3LifecycleConfiguration {
       return builder.build();
     } catch (Exception ex) {
       if (ex instanceof IllegalStateException) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, bucketName, ex);
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
       }
       throw ex;
     }

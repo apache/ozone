@@ -33,12 +33,14 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.service.SnapshotDeletingService.isBlockLocationInfoSame;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDirExist;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import java.io.File;
@@ -2110,6 +2112,38 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return result;
+  }
+
+
+  /**
+   * Fetches the lifecycle configuration by bucketName.
+   *
+   * @param bucketName bucketName of the lifecycle configuration
+   * @return OmLifecycleConfiguration
+   * @throws IOException
+   */
+  @Override
+  public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException {
+    Preconditions.checkNotNull(bucketName);
+    try {
+      String bucketKey = getBucketKey(volumeName, bucketName);
+      OmLifecycleConfiguration value = getLifecycleConfigurationTable().get(bucketKey);
+
+      if (value == null) {
+        LOG.debug("lifecycle configuration of bucket /{}/{} not found.",
+            volumeName, bucketName);
+        throw new OMException("Lifecycle configuration not found",
+            LIFECYCLE_CONFIGURATION_NOT_FOUND);
+      }
+      return value;
+    } catch (IOException ex) {
+      if (!(ex instanceof OMException)) {
+        LOG.error("Exception while getting lifecycle configuration for " +
+            "bucket: /{}/{}", volumeName, bucketName, ex);
+      }
+      throw ex;
+    }
   }
 
   /**

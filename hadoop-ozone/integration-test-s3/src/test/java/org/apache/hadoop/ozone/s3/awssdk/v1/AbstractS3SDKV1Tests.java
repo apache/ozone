@@ -33,10 +33,12 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.AbortMultipartUploadRequest;
 import com.amazonaws.services.s3.model.AccessControlList;
 import com.amazonaws.services.s3.model.Bucket;
+import com.amazonaws.services.s3.model.BucketLifecycleConfiguration;
 import com.amazonaws.services.s3.model.CanonicalGrantee;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadRequest;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
+import com.amazonaws.services.s3.model.GetBucketLifecycleConfigurationRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
@@ -61,6 +63,7 @@ import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.SetBucketLifecycleConfigurationRequest;
 import com.amazonaws.services.s3.model.SetObjectAclRequest;
 import com.amazonaws.services.s3.model.Tag;
 import com.amazonaws.services.s3.model.UploadPartRequest;
@@ -924,6 +927,159 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     assertEquals(ErrorType.Client, ase.getErrorType());
     assertEquals(403, ase.getStatusCode());
     assertEquals("QuotaExceeded", ase.getErrorCode());
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationCreateSuccessfully() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+    BucketLifecycleConfiguration configuration = new BucketLifecycleConfiguration();
+    List<BucketLifecycleConfiguration.Rule> rules = new ArrayList<>();
+    BucketLifecycleConfiguration.Rule rule1 = new BucketLifecycleConfiguration.Rule()
+        .withId("expire-logs-after-365-days")
+        .withPrefix("logs/")
+        .withStatus(BucketLifecycleConfiguration.ENABLED)
+        .withExpirationInDays(365);
+    rules.add(rule1);
+
+    configuration.setRules(rules);
+
+    // Set lifecycle configuration
+    SetBucketLifecycleConfigurationRequest request =
+        new SetBucketLifecycleConfigurationRequest(bucketName, configuration);
+    s3Client.setBucketLifecycleConfiguration(request);
+
+    // Verify the configuration was set
+    BucketLifecycleConfiguration retrievedConfig =
+        s3Client.getBucketLifecycleConfiguration(bucketName);
+    assertEquals(1, retrievedConfig.getRules().size());
+
+    // Verify rule 1
+    BucketLifecycleConfiguration.Rule retrievedRule1 = retrievedConfig.getRules().get(0);
+    assertEquals("expire-logs-after-365-days", retrievedRule1.getId());
+    assertEquals("logs/", retrievedRule1.getPrefix());
+    assertEquals(BucketLifecycleConfiguration.ENABLED, retrievedRule1.getStatus());
+    assertEquals(365, retrievedRule1.getExpirationInDays());
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationCreationFailed() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    // Test 1: Invalid configuration
+    BucketLifecycleConfiguration configuration = new BucketLifecycleConfiguration();
+    List<BucketLifecycleConfiguration.Rule> rules = new ArrayList<>();
+
+    BucketLifecycleConfiguration.Rule rule = new BucketLifecycleConfiguration.Rule()
+        .withId("invalid")
+        .withStatus(BucketLifecycleConfiguration.ENABLED);
+    rules.add(rule);
+    configuration.setRules(rules);
+    SetBucketLifecycleConfigurationRequest request =
+        new SetBucketLifecycleConfigurationRequest(bucketName, configuration);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.setBucketLifecycleConfiguration(request));
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(400, ase.getStatusCode());
+
+    // Test 2: Non-existent bucket
+    final String nonExistentBucket = getBucketName("nonexistent");
+    BucketLifecycleConfiguration validConfig = new BucketLifecycleConfiguration();
+    List<BucketLifecycleConfiguration.Rule> validRules = new ArrayList<>();
+    BucketLifecycleConfiguration.Rule validRule = new BucketLifecycleConfiguration.Rule()
+        .withId("test-rule")
+        .withPrefix("test/")
+        .withStatus(BucketLifecycleConfiguration.ENABLED)
+        .withExpirationInDays(30);
+    validRules.add(validRule);
+    validConfig.setRules(validRules);
+
+    SetBucketLifecycleConfigurationRequest nonExistentRequest =
+        new SetBucketLifecycleConfigurationRequest(nonExistentBucket, validConfig);
+
+    AmazonServiceException ase2 = assertThrows(AmazonServiceException.class,
+        () -> s3Client.setBucketLifecycleConfiguration(nonExistentRequest));
+    assertEquals(ErrorType.Client, ase2.getErrorType());
+    assertEquals(404, ase2.getStatusCode());
+    assertEquals("NoSuchBucket", ase2.getErrorCode());
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationDelete() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    // First create a lifecycle configuration
+    BucketLifecycleConfiguration configuration = new BucketLifecycleConfiguration();
+    List<BucketLifecycleConfiguration.Rule> rules = new ArrayList<>();
+    BucketLifecycleConfiguration.Rule rule = new BucketLifecycleConfiguration.Rule()
+        .withId("test-rule")
+        .withPrefix("test/")
+        .withStatus(BucketLifecycleConfiguration.ENABLED)
+        .withExpirationInDays(30);
+    rules.add(rule);
+    configuration.setRules(rules);
+
+    s3Client.setBucketLifecycleConfiguration(bucketName, configuration);
+    // Verify it exists
+    BucketLifecycleConfiguration retrievedConfig =
+        s3Client.getBucketLifecycleConfiguration(bucketName);
+    assertEquals(1, retrievedConfig.getRules().size());
+    // Delete the lifecycle configuration
+    s3Client.deleteBucketLifecycleConfiguration(bucketName);
+    assertNull(s3Client.getBucketLifecycleConfiguration(bucketName));
+    // Test delete on non-existent bucket
+    final String nonExistentBucket = getBucketName("nonexistent");
+    assertThrows(AmazonServiceException.class,
+        () -> s3Client.deleteBucketLifecycleConfiguration(nonExistentBucket));
+  }
+
+  @Test
+  public void testS3LifecycleConfigurationGet() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    // Test get on bucket without lifecycle configuration
+    assertNull(s3Client.getBucketLifecycleConfiguration(bucketName));
+
+    // Create a comprehensive lifecycle configuration
+    BucketLifecycleConfiguration configuration = new BucketLifecycleConfiguration();
+    List<BucketLifecycleConfiguration.Rule> rules = new ArrayList<>();
+
+    // Rule with expiration and prefix
+    BucketLifecycleConfiguration.Rule rule1 = new BucketLifecycleConfiguration.Rule()
+        .withId("expire-old-files")
+        .withPrefix("old/")
+        .withStatus(BucketLifecycleConfiguration.ENABLED)
+        .withExpirationInDays(365);
+
+    rules.add(rule1);
+    configuration.setRules(rules);
+
+    // Set the configuration
+    s3Client.setBucketLifecycleConfiguration(bucketName, configuration);
+
+    // Get and verify the configuration
+    BucketLifecycleConfiguration retrievedConfig =
+        s3Client.getBucketLifecycleConfiguration(bucketName);
+
+    assertEquals(1, retrievedConfig.getRules().size());
+
+    // Verify first rule
+    BucketLifecycleConfiguration.Rule retrievedRule1 = retrievedConfig.getRules().get(0);
+    assertEquals("expire-old-files", retrievedRule1.getId());
+    assertEquals("old/", retrievedRule1.getPrefix());
+    assertEquals(BucketLifecycleConfiguration.ENABLED, retrievedRule1.getStatus());
+    assertEquals(365, retrievedRule1.getExpirationInDays());
+
+    // Test getting configuration using GetBucketLifecycleConfigurationRequest
+    GetBucketLifecycleConfigurationRequest getRequest =
+        new GetBucketLifecycleConfigurationRequest(bucketName);
+    BucketLifecycleConfiguration configFromRequest =
+        s3Client.getBucketLifecycleConfiguration(getRequest);
+    assertEquals(retrievedConfig.getRules().size(), configFromRequest.getRules().size());
   }
 
   private boolean isBucketEmpty(Bucket bucket) {

@@ -146,8 +146,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
             ResultCodes.BUCKET_NOT_EMPTY);
       }
 
-      // appending '/' to end to eliminate cases where 2 buckets start with same
-      // characters.
+      // appending '/' to end to eliminate cases where 2 buckets start with same characters.
       String snapshotBucketKey = bucketKey + OzoneConsts.OM_KEY_PREFIX;
 
       if (bucketContainsSnapshot(omMetadataManager, snapshotBucketKey)) {
@@ -167,10 +166,11 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
           CacheValue.get(transactionLogIndex));
-
-      omResponse.setDeleteBucketResponse(
-          DeleteBucketResponse.newBuilder().build());
-
+      // Update lifecycle configuration table as well.
+      omMetadataManager.getLifecycleConfigurationTable().addCacheEntry(
+          new CacheKey<>(bucketKey),
+          CacheValue.get(transactionLogIndex));
+      omResponse.setDeleteBucketResponse(DeleteBucketResponse.newBuilder().build());
       // update used namespace for volume
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs =

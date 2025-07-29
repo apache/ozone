@@ -1,0 +1,159 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+package org.apache.hadoop.ozone.om.response.lifecycle;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+
+import java.io.File;
+import java.util.UUID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateLifecycleConfigurationResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * This class tests OMLifecycleConfigurationCreateResponse.
+ */
+public class TestOMLifecycleConfigurationCreateResponse {
+
+  private OMMetadataManager omMetadataManager;
+  private BatchOperation batchOperation;
+
+  @TempDir
+  private File tempDir;
+
+  @BeforeEach
+  public void setup() throws Exception {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
+        tempDir.getAbsolutePath());
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
+    batchOperation = omMetadataManager.getStore().initBatchOperation();
+  }
+
+  @AfterEach
+  public void tearDown() {
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
+  }
+
+  @Test
+  public void testAddToDBBatch() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OmLifecycleConfiguration omLifecycleConfiguration =
+        new OmLifecycleConfiguration.Builder()
+            .setVolume(volumeName)
+            .setBucket(bucketName)
+            .setBucketLayout(BucketLayout.OBJECT_STORE)
+            .addRule(new OmLCRule.Builder().setPrefix("")
+                .addAction(new OmLCExpiration.Builder().setDays(30).build())
+                .build())
+            .setCreationTime(Time.now())
+            .build();
+
+    assertEquals(0, omMetadataManager.countRowsInTable(
+        omMetadataManager.getLifecycleConfigurationTable()));
+
+    CreateLifecycleConfigurationResponse createLifecycleConfigurationResponse =
+        CreateLifecycleConfigurationResponse.newBuilder()
+            .build();
+
+    OMLifecycleConfigurationCreateResponse response =
+        new OMLifecycleConfigurationCreateResponse(OMResponse.newBuilder()
+            .setCmdType(Type.CreateLifecycleConfiguration)
+            .setStatus(Status.OK)
+            .setCreateLifecycleConfigurationResponse(
+                createLifecycleConfigurationResponse).build(),
+            omLifecycleConfiguration);
+
+    response.addToDBBatch(omMetadataManager, batchOperation);
+
+    // Do manual commit and see whether addToBatch is successful or not.
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    assertEquals(1, omMetadataManager.countRowsInTable(
+        omMetadataManager.getLifecycleConfigurationTable()));
+
+    Table.KeyValue<String, OmLifecycleConfiguration> keyValue =
+        omMetadataManager.getLifecycleConfigurationTable()
+            .iterator()
+            .next();
+
+    // Lifecycle configuration keys follow bucket key format.
+    assertEquals(omMetadataManager.getBucketKey(volumeName, bucketName),
+        keyValue.getKey());
+
+    assertTrue(isSame(omLifecycleConfiguration, keyValue.getValue()));
+  }
+
+  /**
+   * Compares two lifecyce and returns false if they are not identical, as
+   * the equal and hash methods are not overridden in OmLifecycleConfiguration.
+   *
+   * @param o1 first lifecycle configuration
+   * @param o2 second lifecycle configuration
+   * @return true if both are identical false otherwise
+   */
+  private boolean isSame(OmLifecycleConfiguration o1,
+      OmLifecycleConfiguration o2) {
+    if (o1.getCreationTime() != o2.getCreationTime()) {
+      return false;
+    }
+    if (!o1.getVolume().equals(o2.getVolume())) {
+      return false;
+    }
+    if (!o1.getBucket().equals(o2.getBucket())) {
+      return false;
+    }
+    if (o1.getRules().size() != o2.getRules().size()) {
+      return false;
+    }
+    if (o1.getBucketLayout() != o2.getBucketLayout()) {
+      return false;
+    }
+    for (int i = 0; i < o1.getRules().size(); i++) {
+      if (!o1.getRules().get(i).getId().equals(o2.getRules().get(i).getId())) {
+        return false;
+      }
+    }
+    return true;
+  }
+}

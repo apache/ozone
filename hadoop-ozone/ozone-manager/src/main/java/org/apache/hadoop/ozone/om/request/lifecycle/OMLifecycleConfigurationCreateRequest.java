@@ -1,0 +1,169 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.om.request.lifecycle;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleConfigurationCreateResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateLifecycleConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateLifecycleConfigurationResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Handles CreateLifecycleConfiguration Request.
+ */
+public class OMLifecycleConfigurationCreateRequest extends OMClientRequest {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMLifecycleConfigurationCreateRequest.class);
+
+  public OMLifecycleConfigurationCreateRequest(OMRequest omRequest) {
+    super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    CreateLifecycleConfigurationRequest request =
+        getOmRequest().getCreateLifecycleConfigurationRequest();
+    LifecycleConfiguration lifecycleConfiguration =
+        request.getLifecycleConfiguration();
+
+    OmUtils.validateVolumeName(lifecycleConfiguration.getVolume(), ozoneManager.isStrictS3());
+    OmUtils.validateBucketName(lifecycleConfiguration.getBucket(), ozoneManager.isStrictS3());
+
+    CreateLifecycleConfigurationRequest.Builder newCreateRequest =
+        request.toBuilder();
+
+    LifecycleConfiguration.Builder newLifecycleConfiguration =
+        lifecycleConfiguration.toBuilder();
+
+    newLifecycleConfiguration.setCreationTime(Time.now());
+    newCreateRequest.setLifecycleConfiguration(newLifecycleConfiguration);
+
+    return getOmRequest().toBuilder().setUserInfo(getUserInfo())
+        .setCreateLifecycleConfigurationRequest(newCreateRequest.build())
+        .build();
+  }
+
+  @Override
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+
+    CreateLifecycleConfigurationRequest createLifecycleConfigurationRequest =
+        getOmRequest().getCreateLifecycleConfigurationRequest();
+
+    LifecycleConfiguration lifecycleConfiguration =
+        createLifecycleConfigurationRequest.getLifecycleConfiguration();
+
+    String volumeName = lifecycleConfiguration.getVolume();
+    String bucketName = lifecycleConfiguration.getBucket();
+
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
+
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    UserInfo userInfo = getOmRequest().getUserInfo();
+
+    String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+    IOException exception = null;
+    boolean acquiredBucketLock = false;
+    OMClientResponse omClientResponse = null;
+    Map<String, String> auditMap = new HashMap<>();
+
+    try {
+      if (ozoneManager.getAclsEnabled()) {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET, OzoneObj.StoreType.OZONE,
+            IAccessAuthorizer.ACLType.ALL, volumeName, bucketName, null);
+      }
+
+      OmLifecycleConfiguration omLifecycleConfiguration =
+          OmLifecycleConfiguration.getFromProtobuf(lifecycleConfiguration);
+      auditMap = omLifecycleConfiguration.toAuditMap();
+
+      mergeOmLockDetails(metadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
+      omLifecycleConfiguration.valid();
+
+      if (!metadataManager.getBucketTable().isExist(bucketKey)) {
+        LOG.debug("bucket: {} in volume: {} doesn't exist", bucketName,
+            volumeName);
+        throw new OMException("Bucket doesn't exist", BUCKET_NOT_FOUND);
+      }
+      omLifecycleConfiguration.setUpdateID(transactionLogIndex);
+
+      metadataManager.getLifecycleConfigurationTable().addCacheEntry(
+          new CacheKey<>(bucketKey),
+          CacheValue.get(transactionLogIndex, omLifecycleConfiguration));
+
+      omResponse.setCreateLifecycleConfigurationResponse(
+          CreateLifecycleConfigurationResponse.newBuilder().build());
+
+      omClientResponse = new OMLifecycleConfigurationCreateResponse(
+          omResponse.build(), omLifecycleConfiguration);
+    } catch (IOException ex) {
+      exception = ex;
+      omClientResponse = new OMLifecycleConfigurationCreateResponse(
+          createErrorOMResponse(omResponse, exception));
+    } finally {
+      if (acquiredBucketLock) {
+        metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+            bucketName);
+      }
+    }
+
+    // Performing audit logging outside the lock.
+    markForAudit(auditLogger, buildAuditMessage(OMAction.CREATE_LIFECYCLE_CONFIGURATION,
+        auditMap, exception, userInfo));
+
+    if (exception == null) {
+      LOG.debug("Created lifecycle configuration bucket: {} in volume: {}",
+          bucketName, volumeName);
+      return omClientResponse;
+    } else {
+      LOG.error("Lifecycle configuration creation failed for bucket:{} " +
+          "in volume:{}", bucketName, volumeName, exception);
+      return omClientResponse;
+    }
+  }
+}

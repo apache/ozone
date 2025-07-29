@@ -79,6 +79,14 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
               omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
               omVolumeArgs);
     }
+
+    // Delete lifecycle attached to that bucket.
+    try {
+      omMetadataManager.getLifecycleConfigurationTable().deleteWithBatch(
+          batchOperation, dbBucketKey);
+    } catch (IOException ex) {
+      // Do nothing if there is no lifecycle attached.
+    }
   }
 
   public String getVolumeName() {
