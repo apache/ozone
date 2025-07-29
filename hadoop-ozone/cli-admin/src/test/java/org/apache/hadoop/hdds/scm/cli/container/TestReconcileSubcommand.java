@@ -156,7 +156,7 @@ public class TestReconcileSubcommand {
     assertThat(errorOutput).contains("Invalid container ID: -");
     
     // Exception should indicate 1 failed container
-    assertThat(exception.getMessage()).contains("Failed trigger reconciliation for 1 containers");
+    assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 containers");
     
     // Should have success message for valid container 1
     String output = outContent.toString(DEFAULT_ENCODING);
@@ -268,12 +268,14 @@ public class TestReconcileSubcommand {
     cmd.execute(scmClient);
   }
 
-  private void resetStreams() {
+  private void resetStreams() throws Exception {
     if (inContent != null) {
       inContent.reset();
     }
     outContent.reset();
     errContent.reset();
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
 
   private void validateOutput(boolean replicasMatch, long... containerIDs) throws Exception {
@@ -296,6 +298,8 @@ public class TestReconcileSubcommand {
     args.remove(0);
     parseArgsAndExecute(args.toArray(new String[]{}));
     validateReconcileOutput(containerIDs);
+
+    resetStreams();
   }
 
   private void validateFromStdin(boolean replicasMatch, long... containerIDs) throws Exception {
