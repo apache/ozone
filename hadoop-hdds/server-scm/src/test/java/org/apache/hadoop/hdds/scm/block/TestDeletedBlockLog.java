@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.E
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
@@ -47,6 +48,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -84,11 +86,14 @@ import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -949,9 +954,27 @@ public class TestDeletedBlockLog {
     System.out.println(blockCount + " blocks tx without totalBlockSize size is " + tx2.getSerializedSize());
   }
 
+  public static Stream<Arguments> values() {
+    return Stream.of(
+        arguments(100, false, false),
+        arguments(100, true, false),
+        arguments(100, true, true),
+        arguments(1000, false, false),
+        arguments(1000, true, false),
+        arguments(1000, true, true),
+        arguments(1000, false, false),
+        arguments(1000, true, false),
+        arguments(1000, true, true),
+        arguments(100000, false, false),
+        arguments(100000, true, false),
+        arguments(100000, true, true)
+    );
+  }
+
   @ParameterizedTest
-  @ValueSource(ints = {100, 1000, 10000, 100000})
-  public void testAddRemoveTransactionPerformance(int txCount) throws Exception {
+  @MethodSource("values")
+  public void testAddRemoveTransactionPerformance(int txCount, boolean dataDistributionFinalized, boolean cacheEnabled)
+      throws Exception {
     Map<Long, List<DeletedBlock>> data = generateData(txCount);
     SCMHAInvocationHandler handler =
         (SCMHAInvocationHandler) Proxy.getInvocationHandler(deletedBlockLog.getDeletedBlockLogStateManager());
@@ -960,6 +983,7 @@ public class TestDeletedBlockLog {
     HddsProtos.DeletedBlocksTransactionSummary summary = deletedBlockLogStateManager.getTransactionSummary();
     assertEquals(EMPTY_SUMMARY, summary);
 
+    DeletedBlockLogStateManagerImpl.setDisableDataDistributionForTest(!dataDistributionFinalized);
     long startTime = System.nanoTime();
     deletedBlockLog.addTransactions(data);
     scmHADBTransactionBuffer.flush();
@@ -975,11 +999,29 @@ public class TestDeletedBlockLog {
      *  - 2875 ms to add 10000 txs to DB
      *  - 12446 ms to add 100000 txs to DB
      */
-    System.out.println((System.nanoTime() - startTime) / 100000 + " ms to add " + txCount + " txs to DB");
+    System.out.println((System.nanoTime() - startTime) / 100000 + " ms to add " + txCount + " txs to DB, " +
+        "dataDistributionFinalized " + dataDistributionFinalized);
     summary = deletedBlockLogStateManager.getTransactionSummary();
-    assertEquals(txCount, summary.getTotalTransactionCount());
+    if (dataDistributionFinalized) {
+      assertEquals(txCount, summary.getTotalTransactionCount());
+    } else {
+      assertEquals(0, summary.getTotalTransactionCount());
+    }
 
     ArrayList txIdList = data.keySet().stream().collect(Collectors.toCollection(ArrayList::new));
+    long initialHitFromCacheCount = metrics.getNumBlockDeletionTransactionSizeFromCache();
+    long initialHitFromDBCount = metrics.getNumBlockDeletionTransactionSizeFromDB();
+
+    if (dataDistributionFinalized && cacheEnabled) {
+      Map<Long, DeletedBlockLogImpl.TxBlockInfo> txSizeMap = deletedBlockLog.getTxSizeMap();
+      for (Map.Entry<Long, List<DeletedBlock>> entry : data.entrySet()) {
+        List<DeletedBlock> deletedBlockList = entry.getValue();
+        DeletedBlockLogImpl.TxBlockInfo txBlockInfo = new DeletedBlockLogImpl.TxBlockInfo(deletedBlockList.size(),
+            deletedBlockList.stream().map(DeletedBlock::getSize).reduce(0L, Long::sum),
+            deletedBlockList.stream().map(DeletedBlock::getReplicatedSize).reduce(0L, Long::sum));
+        txSizeMap.put(entry.getKey(), txBlockInfo);
+      }
+    }
     startTime = System.nanoTime();
     deletedBlockLogStateManager.removeTransactionsFromDB(txIdList);
     scmHADBTransactionBuffer.flush();
@@ -1000,9 +1042,19 @@ public class TestDeletedBlockLog {
      *  - 412 ms to remove 10000 txs from DB
      *  - 3499 ms to remove 100000 txs from DB
      */
-    System.out.println((System.nanoTime() - startTime) / 100000 + " ms to remove " + txCount + " txs from DB");
-    System.out.println("Cache hit: " + metrics.getNumBlockDeletionTransactionSizeFromCache());
-    System.out.println("Cache miss: " + metrics.getNumBlockDeletionTransactionSizeFromDB());
+    System.out.println((System.nanoTime() - startTime) / 100000 + " ms to remove " + txCount + " txs from DB, " +
+        "dataDistributionFinalized " + dataDistributionFinalized + ", cacheEnabled " + cacheEnabled);
+    if (dataDistributionFinalized) {
+      if (cacheEnabled) {
+        GenericTestUtils.waitFor(() ->
+            metrics.getNumBlockDeletionTransactionSizeFromCache() - initialHitFromCacheCount == txCount, 100, 5000);
+        assertEquals(0, metrics.getNumBlockDeletionTransactionSizeFromDB() - initialHitFromDBCount);
+      } else {
+        GenericTestUtils.waitFor(() ->
+            metrics.getNumBlockDeletionTransactionSizeFromDB() - initialHitFromDBCount == txCount, 100, 5000);
+        assertEquals(0, metrics.getNumBlockDeletionTransactionSizeFromCache() - initialHitFromCacheCount);
+      }
+    }
   }
 
   private void mockStandAloneContainerInfo(long containerID, DatanodeDetails dd)

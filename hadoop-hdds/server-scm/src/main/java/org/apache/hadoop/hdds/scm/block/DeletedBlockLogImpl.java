@@ -605,6 +605,11 @@ public class DeletedBlockLogImpl
     }
   }
 
+  @VisibleForTesting
+  public Map<Long, TxBlockInfo> getTxSizeMap() {
+    return txSizeMap;
+  }
+
   /**
    * Block size information of a transaction.
    */

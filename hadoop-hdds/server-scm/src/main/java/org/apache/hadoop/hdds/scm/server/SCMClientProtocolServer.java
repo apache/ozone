@@ -1013,11 +1013,11 @@ public class SCMClientProtocolServer implements
     try {
       DeletedBlocksTransactionSummary summary =
           scm.getScmBlockManager().getDeletedBlockLog().getTransactionSummary();
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_DELETED_BLOCK_SUMMARY, auditMap));
       return summary;
     } catch (Exception ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
           SCMAction.GET_DELETED_BLOCK_SUMMARY, auditMap, ex));
       throw ex;
     }

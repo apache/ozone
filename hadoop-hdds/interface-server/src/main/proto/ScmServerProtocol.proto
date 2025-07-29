@@ -180,7 +180,7 @@ message DeleteScmKeyBlocksRequestProto {
  */
 message KeyBlocks {
   required string key = 1;
-  repeated BlockID blocks = 2;
+  repeated BlockID blocks = 2; // deprecated field, use deletedBlocks instead
   repeated DeletedBlock deletedBlocks = 3;
 }
 

@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_C
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -290,8 +291,10 @@ public class TestStorageContainerManager {
       // Add 2 TXs per container.
       Map<Long, List<DeletedBlock>> deletedBlocks = new HashMap<>();
       List<DeletedBlock> blocks = new ArrayList<>();
-      blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()), -1, -1));
-      blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()), -1, -1));
+      blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+      blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);
@@ -501,10 +504,10 @@ public class TestStorageContainerManager {
       list.forEach(location -> {
         if (containerBlocks.containsKey(location.getContainerID())) {
           containerBlocks.get(location.getContainerID())
-              .add(new DeletedBlock(location.getBlockID(), -1, -1));
+              .add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
         } else {
           List<DeletedBlock> blks = Lists.newArrayList();
-          blks.add(new DeletedBlock(location.getBlockID(), -1, -1));
+          blks.add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
           containerBlocks.put(location.getContainerID(), blks);
         }
       });

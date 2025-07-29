@@ -18,17 +18,21 @@
 package org.apache.hadoop.hdds.upgrade;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.EMPTY_SUMMARY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -45,7 +49,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
@@ -69,8 +73,10 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.DeletedBlock;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -98,8 +104,7 @@ public class TestScmDataDistributionFinalization {
   private static final long BLOCKS_PER_TX = 5; // 1 MB
 
   public void init(OzoneConfiguration conf,
-      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
-      int numInactiveSCMs, boolean doFinalize) throws Exception {
+      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor, boolean doFinalize) throws Exception {
 
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setUpgradeFinalizationExecutor(executor);
@@ -109,12 +114,21 @@ public class TestScmDataDistributionFinalization {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
+        100, TimeUnit.MILLISECONDS);
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    scmConfig.setBlockDeletionInterval(Duration.ofMillis(100));
+    conf.setFromObject(scmConfig);
+    conf.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
 
-    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, "5s");
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionInterval(Duration.ofMillis(100));
+    conf.setFromObject(dnConf);
 
     MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
     clusterBuilder.setNumOfStorageContainerManagers(NUM_SCMS)
-        .setNumOfActiveSCMs(NUM_SCMS - numInactiveSCMs)
+        .setNumOfActiveSCMs(NUM_SCMS)
         .setSCMServiceId("scmservice")
         .setOMServiceId("omServiceId")
         .setNumOfOzoneManagers(1)
@@ -168,7 +182,7 @@ public class TestScmDataDistributionFinalization {
    */
   @Test
   public void testFinalizationEmptyClusterDataDistribution() throws Exception {
-    init(new OzoneConfiguration(), null, 0, true);
+    init(new OzoneConfiguration(), null, true);
 
     finalizationFuture.get();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
@@ -289,7 +303,7 @@ public class TestScmDataDistributionFinalization {
    */
   @Test
   public void testFinalizationNonEmptyClusterDataDistribution() throws Exception {
-    init(new OzoneConfiguration(), null, 0, false);
+    init(new OzoneConfiguration(), null, false);
     // stop SCMBlockDeletingService
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
       scm.getScmBlockManager().getSCMBlockDeletingService().stop();
@@ -299,7 +313,7 @@ public class TestScmDataDistributionFinalization {
     int txCount = 2;
     StorageContainerManager activeSCM = cluster.getActiveSCM();
     activeSCM.getScmBlockManager().getDeletedBlockLog().addTransactions(generateDeletedBlocks(txCount, false));
-    ((SCMHADBTransactionBuffer)activeSCM.getScmHAManager().getDBTransactionBuffer()).flush();
+    flushDBTransactionBuffer(activeSCM);
 
     finalizationFuture = Executors.newSingleThreadExecutor().submit(
         () -> {
@@ -341,6 +355,7 @@ public class TestScmDataDistributionFinalization {
     TestDataUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
     // update scmInfo in OM
     cluster.getOzoneManager().setScmInfo(activeSCM.getBlockProtocolServer().getScmInfo());
+    OzoneKeyDetails keyDetails = bucket.getKey(keyName);
     // delete the key
     bucket.deleteKey(keyName);
 
@@ -358,6 +373,31 @@ public class TestScmDataDistributionFinalization {
     assertEquals(1, summary.getTotalBlockCount());
     assertEquals(value.getBytes(UTF_8).length, summary.getTotalBlockSize());
     assertEquals(value.getBytes(UTF_8).length * 3, summary.getTotalBlockReplicatedSize());
+
+    // force close the container so that block can be deleted
+    activeSCM.getClientProtocolServer().closeContainer(
+        keyDetails.getOzoneKeyLocations().get(0).getContainerID());
+    // wait for container to be closed
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return activeSCM.getClientProtocolServer().getContainer(
+            keyDetails.getOzoneKeyLocations().get(0).getContainerID())
+            .getState() == HddsProtos.LifeCycleState.CLOSED;
+      } catch (IOException e) {
+        fail("Error while checking container state", e);
+        return false;
+      }
+    }, 100, 5000);
+
+    // flush buffer and start SCMBlockDeletingService
+    for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
+      flushDBTransactionBuffer(scm);
+      scm.getScmBlockManager().getSCMBlockDeletingService().start();
+    }
+
+    // wait for block deletion transactions to be confirmed by DN
+    GenericTestUtils.waitFor(
+        () -> deletedBlockLogStateManager.getTransactionSummary().getTotalTransactionCount() == 0, 100, 10000);
   }
 
   private Map<Long, List<DeletedBlock>> generateDeletedBlocks(int dataSize, boolean withSize) {

@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -66,6 +65,7 @@ public class DeletedBlockLogStateManagerImpl
           .setTotalBlockSize(0)
           .setTotalBlockReplicatedSize(0)
           .build();
+  private static boolean disableDataDistributionForTest = false;
 
   private Table<Long, DeletedBlocksTransaction> deletedTable;
   private Table<String, ByteString> statefulConfigTable;
@@ -188,7 +188,7 @@ public class DeletedBlockLogStateManagerImpl
           (k, v) -> v != null && v > tid ? v : tid);
       transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
       if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION) &&
-          tx.hasTotalBlockReplicatedSize()) {
+          tx.hasTotalBlockReplicatedSize() && !disableDataDistributionForTest) {
         if (!isFirstTxIdForDataDistributionSet) {
           // set the first transaction ID for data distribution
           isFirstTxIdForDataDistributionSet = true;
@@ -226,7 +226,7 @@ public class DeletedBlockLogStateManagerImpl
     for (Long txID : txIDs) {
       transactionBuffer.removeFromBuffer(deletedTable, txID);
       if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION) &&
-          txID >= firstTxIdForDataDistribution) {
+          txID >= firstTxIdForDataDistribution && !disableDataDistributionForTest) {
         DeletedBlockLogImpl.TxBlockInfo txBlockInfo = txBlockInfoMap.remove(txID);
         if (txBlockInfo != null) {
           transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME,
@@ -372,6 +372,11 @@ public class DeletedBlockLogStateManagerImpl
         .build();
   }
 
+  @VisibleForTesting
+  public static void setDisableDataDistributionForTest(boolean disabled) {
+    disableDataDistributionForTest = disabled;
+  }
+
   private void initDataDistributionData() throws IOException {
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
       DeletedBlocksTransactionSummary summary = loadDeletedBlocksSummary();
@@ -391,20 +396,19 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   private DeletedBlocksTransactionSummary loadDeletedBlocksSummary() throws IOException {
+    String propertyName =  DeletedBlocksTransactionSummary.class.getSimpleName();
     try {
       ByteString byteString = statefulConfigTable.get(SERVICE_NAME);
       if (byteString == null) {
         // for a new Ozone cluster, property not found is an expected state.
-        LOG.info("Property {} for service {} not found. ",
-            DeletedBlocksTransactionSummary.class.getSimpleName(), SERVICE_NAME);
+        LOG.info("Property {} for service {} not found. ", propertyName, SERVICE_NAME);
         return null;
       }
-      return DeletedBlocksTransactionSummary.class.cast(ReflectionUtil.getMethod(
-          DeletedBlocksTransactionSummary.class, "parseFrom", ByteString.class).invoke(null, byteString));
-    } catch (IOException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+      return DeletedBlocksTransactionSummary.parseFrom(byteString);
+    } catch (IOException e) {
       LOG.error("Failed to get property {} for service {}. DataDistribution function will be disabled.",
-          DeletedBlocksTransactionSummary.class.getSimpleName(), SERVICE_NAME, e);
-      throw new IOException("Failed to get property " + DeletedBlocksTransactionSummary.class.getSimpleName(), e);
+          propertyName, SERVICE_NAME, e);
+      throw new IOException("Failed to get property " + propertyName, e);
     }
   }
 

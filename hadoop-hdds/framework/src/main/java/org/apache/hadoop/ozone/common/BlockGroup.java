@@ -83,17 +83,19 @@ public final class BlockGroup {
    */
   public static BlockGroup getFromProto(KeyBlocks proto) {
     List<DeletedBlock> deletedBlocks = new ArrayList<>();
-    for (HddsProtos.BlockID block : proto.getBlocksList()) {
-      deletedBlocks.add(new DeletedBlock(new BlockID(block.getContainerBlockID().getContainerID(),
-          block.getContainerBlockID().getLocalID()), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
-    }
-
-    for (ScmBlockLocationProtocolProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
-      HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
-      deletedBlocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
-          containerBlockId.getLocalID()),
-          block.getSize(),
-          block.getReplicatedSize()));
+    if (proto.getBlocksCount() > 0) {
+      for (HddsProtos.BlockID block : proto.getBlocksList()) {
+        deletedBlocks.add(new DeletedBlock(new BlockID(block.getContainerBlockID().getContainerID(),
+            block.getContainerBlockID().getLocalID()), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+      }
+    } else {
+      for (ScmBlockLocationProtocolProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
+        HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
+        deletedBlocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
+            containerBlockId.getLocalID()),
+            block.getSize(),
+            block.getReplicatedSize()));
+      }
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllDeletedBlocks(deletedBlocks).build();

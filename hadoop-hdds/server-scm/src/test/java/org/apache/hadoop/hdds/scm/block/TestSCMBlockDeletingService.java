@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
-import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -97,8 +96,7 @@ public class TestSCMBlockDeletingService {
 
     service = spy(new SCMBlockDeletingService(
         mockDeletedBlockLog, nodeManager, eventPublisher, scmContext,
-        scmServiceManager, conf, mock(StatefulServiceStateManager.class),
-        conf.getObject(ScmConfig.class), metrics, Clock.system(
+        scmServiceManager, conf, conf.getObject(ScmConfig.class), metrics, Clock.system(
         ZoneOffset.UTC), mock(ReconfigurationHandler.class)));
     when(service.shouldRun()).thenReturn(true);
   }
