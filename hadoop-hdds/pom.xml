@@ -38,6 +38,7 @@
     <module>erasurecode</module>
     <module>framework</module>
     <module>hadoop-dependency-client</module>
+    <module>hadoop-metrics</module>
     <module>interface-admin</module>
     <module>interface-client</module>
     <module>interface-server</module>
