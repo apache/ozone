@@ -137,6 +137,7 @@ public class TestContainerCommandReconciliation {
   private static DNContainerOperationClient dnClient;
   private static final String KEY_NAME = "testkey";
   private static final Logger LOG = LoggerFactory.getLogger(TestContainerCommandReconciliation.class);
+  private static final String TEST_SCAN = "Test Scan";
 
   @TempDir
   private static File testDir;
@@ -389,8 +390,7 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID,
-        "OnDemand container scan triggered to detect missing blocks in container.");
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID, TEST_SCAN);
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
@@ -439,8 +439,7 @@ public class TestContainerCommandReconciliation {
       TestContainerCorruptions.CORRUPT_BLOCK.applyTo(container, blockID);
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID,
-        "OnDemand container scan triggered to detect block corruption in container.");
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID, TEST_SCAN);
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterChunkCorruption =
         readChecksumFile(container.getContainerData());
@@ -511,8 +510,7 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID,
-        "OnDemand container scan triggered to detect missing blocks in container.");
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID, TEST_SCAN);
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());

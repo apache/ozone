@@ -63,6 +63,8 @@ public class TestContainerSet {
 
   private ContainerLayoutVersion layoutVersion;
 
+  private static final String TEST_SCAN = "Test Scan";
+
   private void setLayoutVersion(ContainerLayoutVersion layoutVersion) {
     this.layoutVersion = layoutVersion;
   }
@@ -294,7 +296,7 @@ public class TestContainerSet {
     setLayoutVersion(layout);
     ContainerSet containerSet = createContainerSet();
     // Scan when no handler is registered should not throw an exception.
-    containerSet.scanContainer(FIRST_ID, "OnDemand container scan triggered when no handler is registered.");
+    containerSet.scanContainer(FIRST_ID, TEST_SCAN);
 
     AtomicLong invocationCount = new AtomicLong();
     OnDemandContainerScanner mockScanner = mock(OnDemandContainerScanner.class);
@@ -308,11 +310,11 @@ public class TestContainerSet {
     containerSet.registerOnDemandScanner(mockScanner);
 
     // Scan of an existing container when a handler is registered should trigger a scan.
-    containerSet.scanContainer(FIRST_ID, "OnDemand container scan triggered for existing container.");
+    containerSet.scanContainer(FIRST_ID, TEST_SCAN);
     assertEquals(1, invocationCount.get());
 
     // Scan of non-existent container should not throw exception or trigger an additional invocation.
-    containerSet.scanContainer(FIRST_ID - 1, "OnDemand container scan triggered for non-existing container.");
+    containerSet.scanContainer(FIRST_ID - 1, TEST_SCAN);
     assertEquals(1, invocationCount.get());
   }
 
@@ -321,7 +323,7 @@ public class TestContainerSet {
     setLayoutVersion(layout);
     ContainerSet containerSet = createContainerSet();
     // Scan when no handler is registered should not throw an exception.
-    containerSet.scanContainer(FIRST_ID, "OnDemand container scan triggered when no handler is registered.");
+    containerSet.scanContainer(FIRST_ID, TEST_SCAN);
 
     AtomicLong invocationCount = new AtomicLong();
     OnDemandContainerScanner mockScanner = mock(OnDemandContainerScanner.class);
@@ -335,11 +337,11 @@ public class TestContainerSet {
     containerSet.registerOnDemandScanner(mockScanner);
 
     // Scan of an existing container when a handler is registered should trigger a scan.
-    containerSet.scanContainerWithoutGap(FIRST_ID, "OnDemand container scan triggered for existing container.");
+    containerSet.scanContainerWithoutGap(FIRST_ID, TEST_SCAN);
     assertEquals(1, invocationCount.get());
 
     // Scan of non-existent container should not throw exception or trigger an additional invocation.
-    containerSet.scanContainerWithoutGap(FIRST_ID - 1, "OnDemand container scan triggered for non-existing container.");
+    containerSet.scanContainerWithoutGap(FIRST_ID - 1, TEST_SCAN);
     assertEquals(1, invocationCount.get());
   }
 

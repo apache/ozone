@@ -198,8 +198,7 @@ class TestContainerImporter {
     containerImporter.importContainer(containerId, tarFile.toPath(),
         targetVolume, NO_COMPRESSION);
 
-    verify(containerSet, atLeastOnce()).scanContainer(containerId,
-        "OnDemand container scan triggered for imported container.");
+    verify(containerSet, atLeastOnce()).scanContainer(containerId, "Imported container");
   }
 
   @Test

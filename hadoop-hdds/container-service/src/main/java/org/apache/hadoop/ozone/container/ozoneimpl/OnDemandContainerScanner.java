@@ -79,10 +79,10 @@ public final class OnDemandContainerScanner {
   }
 
   private Optional<Future<?>> scanContainer(Container<?> container, ContainerScanHelper helper, String reasonForScan) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Container {}: {}", container.getContainerData().getContainerID(), reasonForScan);
-    }
     if (!helper.shouldScanMetadata(container)) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skipping on-demand scan for container {}.", container.getContainerData().getContainerID());
+      }
       return Optional.empty();
     }
 
@@ -90,9 +90,13 @@ public final class OnDemandContainerScanner {
     long containerId = container.getContainerData().getContainerID();
     if (addContainerToScheduledContainers(containerId)) {
       resultFuture = scanExecutor.submit(() -> {
-        performOnDemandScan(container, helper);
+        performOnDemandScan(container, helper, reasonForScan);
         removeContainerFromScheduledContainers(containerId);
       });
+    } else {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skipping on-demand scan for container {}.", containerId);
+      }
     }
     return Optional.ofNullable(resultFuture);
   }
@@ -106,7 +110,11 @@ public final class OnDemandContainerScanner {
     containerRescheduleCheckSet.remove(containerId);
   }
 
-  private void performOnDemandScan(Container<?> container, ContainerScanHelper helper) {
+  private void performOnDemandScan(Container<?> container, ContainerScanHelper helper, String reasonForScan) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Scheduling OnDemandScan for Container {}, Reason: {}",
+          container.getContainerData().getContainerID(), reasonForScan);
+    }
     try {
       if (helper.shouldScanData(container)) {
         helper.scanData(container, throttler, canceler);
