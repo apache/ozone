@@ -342,7 +342,7 @@ public class OMDBInsightEndpoint {
    *
    * @param keysSummary A map to store the keys summary information.
    */
-  private void createKeysSummaryForOpenKey(
+  public void createKeysSummaryForOpenKey(
       Map<String, Long> keysSummary) {
     Long replicatedSizeOpenKey = getValueFromId(globalStatsDao.findById(
         OmTableInsightTask.getReplicatedSizeKeyFromTable(OPEN_KEY_TABLE)));
@@ -404,7 +404,7 @@ public class OMDBInsightEndpoint {
    *
    * @param keysSummary A map to store the keys summary information.
    */
-  private void createKeysSummaryForOpenMPUKey(Map<String, Long> keysSummary) {
+  public void createKeysSummaryForOpenMPUKey(Map<String, Long> keysSummary) {
     Long replicatedSizeOpenMPUKey = getValueFromId(globalStatsDao.findById(
         OmTableInsightTask.getReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE)));
     Long unreplicatedSizeOpenMPUKey = getValueFromId(globalStatsDao.findById(
@@ -591,7 +591,7 @@ public class OMDBInsightEndpoint {
    *
    * @param keysSummary A map to store the keys summary information.
    */
-  private void createKeysSummaryForDeletedKey(Map<String, Long> keysSummary) {
+  public void createKeysSummaryForDeletedKey(Map<String, Long> keysSummary) {
     // Fetch the necessary metrics for deleted keys
     Long replicatedSizeDeleted = getValueFromId(globalStatsDao.findById(
         OmTableInsightTask.getReplicatedSizeKeyFromTable(DELETED_TABLE)));
@@ -676,7 +676,7 @@ public class OMDBInsightEndpoint {
     }
   }
 
-  private void calculateTotalPendingDeletedDirSizes(Map<String, Long> dirSummary) {
+  public void calculateTotalPendingDeletedDirSizes(Map<String, Long> dirSummary) {
     long totalDataSize = 0L;
     long totalReplicatedDataSize = 0L;
 

@@ -60,4 +60,16 @@ public class UsedSpaceBreakDown {
     this.committedBytes = committedBytes;
     this.deletionPendingBytesByStage = deletionPendingBytesByStage;
   }
+
+  public long getOpenKeysBytes() {
+    return openKeysBytes;
+  }
+
+  public CommittedBytes getCommittedBytes() {
+    return committedBytes;
+  }
+
+  public DeletionPendingBytesByStage getDeletionPendingBytesByStage() {
+    return deletionPendingBytesByStage;
+  }
 }
