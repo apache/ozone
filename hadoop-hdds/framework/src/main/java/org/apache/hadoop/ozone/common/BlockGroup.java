@@ -31,8 +31,9 @@ public final class BlockGroup {
 
   private String groupID;
   private List<DeletedBlock> deletedBlocks;
+  public static final long SIZE_NOT_AVAILABLE = -1;
 
-  private BlockGroup(String groupID, List<BlockID> blockIDs, List<DeletedBlock> deletedBlocks) {
+  private BlockGroup(String groupID, List<DeletedBlock> deletedBlocks) {
     this.groupID = groupID;
     this.deletedBlocks = deletedBlocks == null ? new ArrayList<>() : deletedBlocks;
   }
@@ -82,17 +83,19 @@ public final class BlockGroup {
    */
   public static BlockGroup getFromProto(KeyBlocks proto) {
     List<DeletedBlock> deletedBlocks = new ArrayList<>();
-    for (HddsProtos.BlockID block : proto.getBlocksList()) {
-      deletedBlocks.add(new DeletedBlock(new BlockID(block.getContainerBlockID().getContainerID(),
-          block.getContainerBlockID().getLocalID()), 0, 0));
-    }
-
-    for (ScmBlockLocationProtocolProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
-      HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
-      deletedBlocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
-          containerBlockId.getLocalID()),
-          block.getSize(),
-          block.getReplicatedSize()));
+    if (proto.getBlocksCount() > 0) {
+      for (HddsProtos.BlockID block : proto.getBlocksList()) {
+        deletedBlocks.add(new DeletedBlock(new BlockID(block.getContainerBlockID().getContainerID(),
+            block.getContainerBlockID().getLocalID()), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+      }
+    } else {
+      for (ScmBlockLocationProtocolProtos.DeletedBlock block : proto.getDeletedBlocksList()) {
+        HddsProtos.ContainerBlockID containerBlockId = block.getBlockId().getContainerBlockID();
+        deletedBlocks.add(new DeletedBlock(new BlockID(containerBlockId.getContainerID(),
+            containerBlockId.getLocalID()),
+            block.getSize(),
+            block.getReplicatedSize()));
+      }
     }
     return BlockGroup.newBuilder().setKeyName(proto.getKey())
         .addAllDeletedBlocks(deletedBlocks).build();
@@ -116,16 +119,10 @@ public final class BlockGroup {
   public static class Builder {
 
     private String groupID;
-    private List<BlockID> blocksIDs;
     private List<DeletedBlock> blocks;
 
     public Builder setKeyName(String blockGroupID) {
       this.groupID = blockGroupID;
-      return this;
-    }
-
-    public Builder addAllBlockIDs(List<BlockID> blockIDs) {
-      this.blocksIDs = blockIDs;
       return this;
     }
 
@@ -135,8 +132,7 @@ public final class BlockGroup {
     }
 
     public BlockGroup build() {
-      return new BlockGroup(groupID, blocksIDs, blocks);
+      return new BlockGroup(groupID, blocks);
     }
   }
-
 }

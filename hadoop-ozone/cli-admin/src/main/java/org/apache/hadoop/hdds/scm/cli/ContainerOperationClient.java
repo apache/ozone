@@ -564,6 +564,11 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public HddsProtos.DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException {
+    return storageContainerLocationClient.getDeletedBlockSummary();
+  }
+
+  @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String address, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(address,
