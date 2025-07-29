@@ -125,15 +125,16 @@ public class OMFileCreateRequest extends OMKeyRequest {
     //  bucket/key/volume or not and also with out any authorization checks.
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
-        allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), repConfig,
+        allocateBlock(ozoneManager.getBlockTokenSecretManager(), repConfig,
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
               ozoneManager.getOMServiceId(),
               ozoneManager.getMetrics(),
               keyArgs.getSortDatanodes(),
-              userInfo);
+              userInfo,
+              ozoneManager.getOmBlockPrefetchClient(),
+              ozoneManager.getPerfMetrics());
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
         .setModificationTime(Time.now()).setType(type).setFactor(factor)

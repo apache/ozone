@@ -120,6 +120,7 @@ public final class OmTestManagers {
     ScmClient scmClient = new ScmClient(scmBlockClient, containerClient, conf);
     ScmTopologyClient scmTopologyClient =
         new ScmTopologyClient(scmBlockClient);
+    OMBlockPrefetchClient omBlockPrefetchClient = new OMBlockPrefetchClient(om);
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
@@ -128,6 +129,8 @@ public final class OmTestManagers {
         "secretManager", mock(OzoneBlockTokenSecretManager.class));
     HddsWhiteboxTestUtils.setInternalState(om,
         "scmTopologyClient", scmTopologyClient);
+    HddsWhiteboxTestUtils.setInternalState(om,
+        "omBlockPrefetchClient", omBlockPrefetchClient);
 
     om.start();
     waitFor(() -> om.getOmRatisServer().getLeaderStatus() == RaftServerStatus.LEADER_AND_READY,
