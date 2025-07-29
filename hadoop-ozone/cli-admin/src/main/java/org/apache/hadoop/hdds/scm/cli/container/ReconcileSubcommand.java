@@ -21,11 +21,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Scanner;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -48,12 +45,8 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class)
 public class ReconcileSubcommand extends ScmSubcommand {
 
-  @CommandLine.Parameters(description = "One or more container IDs separated by spaces. " +
-      "To read from stdin, specify '-' and supply the container IDs " +
-      "separated by newlines.",
-      arity = "1..*",
-      paramLabel = "<container ID>")
-  private List<String> containerList;
+  @CommandLine.Mixin
+  private ContainerIDParameters containerList;
 
   @CommandLine.Option(names = { "--status" },
       defaultValue = "false",
@@ -63,16 +56,6 @@ public class ReconcileSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    Iterator<String> idIterator;
-    // PicoCLI arity check guarantees at least one element will be present.
-    if (containerList.get(0).equals("-")) {
-      // Read from stdin.
-      idIterator = new Scanner(System.in, StandardCharsets.UTF_8.name());
-    } else {
-      // A list of containers was provided.
-      idIterator = containerList.iterator();
-    }
-
     if (status) {
       // Automatically creates one array for the output, while allowing us to flush each object individually.
       try (SequenceWriter arrayWriter = JsonUtils.getSequenceWriter(System.out)) {
@@ -80,8 +63,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
         // containers. If EC containers are given, print a  message to stderr and eventually exit non-zero, but continue
         // processing the remaining containers.
         int invalidCount = 0;
-        while (idIterator.hasNext()) {
-          long containerID = Long.parseLong(idIterator.next());
+        for (String containerIdStr : containerList) {
+          long containerID = Long.parseLong(containerIdStr);
           if (!printReconciliationStatus(scmClient, containerID, arrayWriter)) {
             invalidCount++;
           }
@@ -94,8 +77,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
       System.out.println();
     } else {
       int invalidCount = 0;
-      while (idIterator.hasNext()) {
-        long containerID = Long.parseLong(idIterator.next());
+      for (String containerIdStr : containerList) {
+        long containerID = Long.parseLong(containerIdStr);
         try {
           executeReconciliation(scmClient, containerID);
         } catch (Exception ex) {
