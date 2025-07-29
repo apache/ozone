@@ -51,4 +51,20 @@ public class CommittedBytes {
     this.obsKeyBytes = obsKeyBytes;
     this.legacyKeyBytes = legacyKeyBytes;
   }
+
+  public long getTotalBytes() {
+    return totalBytes;
+  }
+
+  public long getFsoKeyBytes() {
+    return fsoKeyBytes;
+  }
+
+  public long getObsKeyBytes() {
+    return obsKeyBytes;
+  }
+
+  public long getLegacyKeyBytes() {
+    return legacyKeyBytes;
+  }
 }

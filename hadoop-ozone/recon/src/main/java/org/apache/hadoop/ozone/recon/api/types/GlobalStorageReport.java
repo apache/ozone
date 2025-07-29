@@ -43,4 +43,16 @@ public class GlobalStorageReport {
     this.totalFreeSpace = totalFreeSpace;
     this.totalCapacity = totalCapacity;
   }
+
+  public long getTotalUsedSpace() {
+    return totalUsedSpace;
+  }
+
+  public long getTotalFreeSpace() {
+    return totalFreeSpace;
+  }
+
+  public long getTotalCapacity() {
+    return totalCapacity;
+  }
 }
