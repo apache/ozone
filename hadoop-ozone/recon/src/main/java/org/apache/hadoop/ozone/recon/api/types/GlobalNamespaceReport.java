@@ -41,4 +41,12 @@ public class GlobalNamespaceReport {
     this.totalUsedSpace = totalUsedSpace;
     this.totalKeys = totalKeys;
   }
+
+  public long getTotalUsedSpace() {
+    return totalUsedSpace;
+  }
+
+  public long getTotalKeys() {
+    return totalKeys;
+  }
 }

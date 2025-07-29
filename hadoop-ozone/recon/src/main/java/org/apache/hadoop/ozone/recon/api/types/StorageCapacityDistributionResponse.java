@@ -53,6 +53,22 @@ public class StorageCapacityDistributionResponse {
     this.dataNodeUsage = builder.dataNodeUsage;
   }
 
+  public GlobalStorageReport getGlobalStorage() {
+    return globalStorage;
+  }
+
+  public GlobalNamespaceReport getGlobalNamespace() {
+    return globalNamespace;
+  }
+
+  public UsedSpaceBreakDown getUsedSpaceBreakDown() {
+    return usedSpaceBreakDown;
+  }
+
+  public List<DatanodeStorageReport> getDataNodeUsage() {
+    return dataNodeUsage;
+  }
+
   public static Builder newBuilder() {
     return new Builder();
   }

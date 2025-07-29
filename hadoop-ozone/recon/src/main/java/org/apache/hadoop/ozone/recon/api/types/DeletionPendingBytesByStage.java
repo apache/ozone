@@ -39,7 +39,11 @@ public class DeletionPendingBytesByStage {
     this.byStage = byStage;
   }
 
-  public void addToByStage(Map<String, Map<String, Long>> stages) {
-    this.byStage = stages;
+  public long getTotal() {
+    return total;
+  }
+
+  public Map<String, Map<String, Long>> getByStage() {
+    return byStage;
   }
 }
