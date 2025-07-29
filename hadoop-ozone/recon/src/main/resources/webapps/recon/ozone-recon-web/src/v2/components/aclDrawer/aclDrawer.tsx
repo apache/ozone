@@ -107,7 +107,7 @@ const AclPanel: React.FC<AclDrawerProps> = ({
       >
         <Table
           dataSource={acls}
-          rowKey='name'
+          rowKey={(record: Acl) => `${record.name ?? ''}-${record.type ?? ''}-${record.scope ?? ''}`}
           locale={{ filterTitle: '' }}
           columns={COLUMNS}>
         </Table>

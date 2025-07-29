@@ -197,17 +197,33 @@ public final class KeyValueContainerUtil {
    * Parse KeyValueContainerData and verify checksum. Set block related
    * metadata like block commit sequence id, block count, bytes used and
    * pending delete block count and delete transaction id.
+   * This method will verify checksum by default.
    * @param kvContainerData
    * @param config
    * @throws IOException
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
       ConfigurationSource config) throws IOException {
+    parseKVContainerData(kvContainerData, config, false);
+  }
+
+  /**
+   * @param kvContainerData
+   * @param config
+   * @param skipVerifyChecksum checksum verification should be skipped if the state
+   * has changed to RECOVERING during container import, false otherwise
+   * @throws IOException
+   */
+  public static void parseKVContainerData(KeyValueContainerData kvContainerData,
+      ConfigurationSource config, boolean skipVerifyChecksum) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
 
     // Verify Checksum
-    ContainerUtils.verifyChecksum(kvContainerData, config);
+    // skip verify checksum if the state has changed to RECOVERING during container import
+    if (!skipVerifyChecksum) {
+      ContainerUtils.verifyChecksum(kvContainerData, config);
+    }
 
     if (kvContainerData.getSchemaVersion() == null) {
       // If this container has not specified a schema version, it is in the old
