@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getKeyValueHandler;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,7 +38,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.util.Time;
@@ -100,6 +101,7 @@ public class TestContainerReader {
 
   private ContainerLayoutVersion layout;
   private String schemaVersion;
+  private KeyValueHandler keyValueHandler;
 
   @TempDir
   private Path tempDir;
@@ -148,6 +150,7 @@ public class TestContainerReader {
     // so it does not affect the ContainerReader, which avoids using the cache
     // at startup for performance reasons.
     ContainerCache.getInstance(conf).shutdownCache();
+    keyValueHandler = getKeyValueHandler(conf, UUID.randomUUID().toString(), containerSet, volumeSet);
   }
 
   @AfterEach
@@ -624,14 +627,14 @@ public class TestContainerReader {
     setup(versionInfo);
 
     // Create a container with blocks and write MerkleTree
-    KeyValueContainerData containerData = createContainerWithBlocks(10L);
+    KeyValueContainer container = createContainer(10L);
+    KeyValueContainerData containerData = container.getContainerData();
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
-    ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
+    ContainerChecksumTreeManager checksumManager = keyValueHandler.getChecksumManager();
     List<Long> deletedBlockIds = Arrays.asList(1L, 2L, 3L);
     checksumManager.markBlocksAsDeleted(containerData, deletedBlockIds);
-    ContainerProtos.ContainerChecksumInfo checksumInfo =
-        checksumManager.writeContainerDataTree(containerData, treeWriter);
-    long expectedDataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
+    keyValueHandler.updateContainerChecksum(container, treeWriter);
+    long expectedDataChecksum = checksumManager.read(containerData).getContainerMerkleTree().getDataChecksum();
 
     // Test container loading
     ContainerCache.getInstance(conf).shutdownCache();
@@ -663,7 +666,8 @@ public class TestContainerReader {
     setLayoutAndSchemaVersion(versionInfo);
     setup(versionInfo);
 
-    KeyValueContainerData containerData = createContainerWithBlocks(11L);
+    KeyValueContainer container = createContainer(11L);
+    KeyValueContainerData containerData = container.getContainerData();
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
     ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
     ContainerProtos.ContainerChecksumInfo checksumInfo =
@@ -698,7 +702,8 @@ public class TestContainerReader {
     setLayoutAndSchemaVersion(versionInfo);
     setup(versionInfo);
 
-    KeyValueContainerData containerData = createContainerWithBlocks(12L);
+    KeyValueContainer container = createContainer(12L);
+    KeyValueContainerData containerData = container.getContainerData();
     // Verify no checksum in RocksDB
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
@@ -720,7 +725,7 @@ public class TestContainerReader {
     assertNotSame(containerData, loadedData);
     assertEquals(0L, loadedData.getDataChecksum());
 
-    // The checksum is not stored in rocksDB as the container merkle tree doesn't exist.
+    // The checksum is not stored in rocksDB as the checksum file doesn't exist.
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
       assertNull(dbDataChecksum);
@@ -733,16 +738,12 @@ public class TestContainerReader {
     setLayoutAndSchemaVersion(versionInfo);
     setup(versionInfo);
 
-    KeyValueContainerData containerData = createContainerWithBlocks(13L);
-    
+    KeyValueContainer container = createContainer(13L);
+    KeyValueContainerData containerData = container.getContainerData();
+    ContainerMerkleTreeWriter treeWriter = new ContainerMerkleTreeWriter();
+    keyValueHandler.updateContainerChecksum(container, treeWriter);
     // Create an empty checksum file that exists but has no valid merkle tree
-    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(containerData);
-    ContainerProtos.ContainerChecksumInfo emptyContainerInfo = ContainerProtos.ContainerChecksumInfo
-        .newBuilder().build();
-    try (OutputStream tmpOutputStream = Files.newOutputStream(checksumFile.toPath())) {
-      emptyContainerInfo.writeTo(tmpOutputStream);
-    }
-    assertTrue(checksumFile.exists());
+    assertTrue(ContainerChecksumTreeManager.getContainerChecksumFile(containerData).exists());
     
     // Verify no checksum in RocksDB initially
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
@@ -752,32 +753,27 @@ public class TestContainerReader {
     
     ContainerCache.getInstance(conf).shutdownCache();
 
-    // Test container loading - should handle corrupted file gracefully and default to 0
+    // Test container loading - should handle when checksum file is present without the container merkle tree and
+    // default to 0.
     ContainerReader containerReader = new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true);
     containerReader.run();
 
-    // Verify container loads with default checksum of 0 when file is corrupted
+    // Verify container loads with default checksum of 0 when checksum file doesn't have merkle tree
     Container<?> loadedContainer = containerSet.getContainer(13L);
     assertNotNull(loadedContainer);
     KeyValueContainerData loadedData = (KeyValueContainerData) loadedContainer.getContainerData();
     assertNotSame(containerData, loadedData);
     assertEquals(0L, loadedData.getDataChecksum());
-
-    // The checksum is not stored in rocksDB as the container merkle tree doesn't exist.
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
-      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
-      assertNull(dbDataChecksum);
-    }
+    verifyAllDataChecksumsMatch(loadedData, conf);
   }
 
-  private KeyValueContainerData createContainerWithBlocks(long containerId) throws Exception {
+  private KeyValueContainer createContainer(long containerId) throws Exception {
     KeyValueContainerData containerData = new KeyValueContainerData(containerId, layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(), datanodeId.toString());
     containerData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, volumeChoosingPolicy, clusterId);
-    addBlocks(container, true);
-    return containerData;
+    return container;
   }
 
   private long addDbEntry(KeyValueContainerData containerData)
