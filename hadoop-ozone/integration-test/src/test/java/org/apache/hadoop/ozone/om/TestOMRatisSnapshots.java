@@ -412,7 +412,7 @@ public class TestOMRatisSnapshots {
     SnapshotInfo snapshotInfo2 = createOzoneSnapshot(leaderOM, "snap100");
     followerOM.getConfiguration().setInt(
         OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
-        KeyManagerImpl.DISABLE_VALUE);
+        -1);
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     cluster.startInactiveOM(followerNodeId);
 
@@ -1158,7 +1158,7 @@ public class TestOMRatisSnapshots {
       // max size config.  That way next time through, we get multiple
       // tarballs.
       if (count == 1) {
-        long sstSize = getSizeOfFiles(tarball);
+        long sstSize = getSizeOfSstFiles(tarball);
         om.getConfiguration().setLong(
             OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, sstSize / 2);
         // Now empty the tarball to restart the download
@@ -1172,13 +1172,16 @@ public class TestOMRatisSnapshots {
     }
 
     // Get Size of sstfiles in tarball.
-    private long getSizeOfFiles(File tarball) throws IOException {
+    private long getSizeOfSstFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
-      List<Path> sstPaths = Files.walk(tempDir).
-          collect(Collectors.toList());
+      OmSnapshotUtils.createHardLinks(tempDir, true);
+      List<Path> sstPaths = Files.list(tempDir).collect(Collectors.toList());
       long totalFileSize = 0;
       for (Path sstPath : sstPaths) {
-        totalFileSize += Files.size(sstPath);
+        File file = sstPath.toFile();
+        if (file.isFile() && file.getName().endsWith(".sst")) {
+          totalFileSize += Files.size(sstPath);
+        }
       }
       return totalFileSize;
     }

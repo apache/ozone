@@ -222,6 +222,7 @@ public class TestReplicationManagerScenarios {
 
   private ReplicationManager createReplicationManager() throws IOException {
     return new ReplicationManager(
+        configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
         configuration,
         containerManager,
         ratisPlacementPolicy,
@@ -250,7 +251,7 @@ public class TestReplicationManagerScenarios {
     for (PendingReplica r : scenario.getPendingReplicas()) {
       if (r.getType() == ContainerReplicaOp.PendingOpType.ADD) {
         containerReplicaPendingOps.scheduleAddReplica(container.containerID(), r.getDatanodeDetails(),
-            r.getReplicaIndex(), null, Long.MAX_VALUE);
+            r.getReplicaIndex(), null, Long.MAX_VALUE, 5L, clock.millis());
       } else if (r.getType() == ContainerReplicaOp.PendingOpType.DELETE) {
         containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(), r.getDatanodeDetails(),
             r.getReplicaIndex(), null, Long.MAX_VALUE);
