@@ -1966,7 +1966,9 @@
                     <bannedImports>
                       <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
                       <bannedImport>org.apache.hadoop.thirdparty.com.google.common.**</bannedImport>
+                      <bannedImport>org.apache.hadoop.util.Lists</bannedImport>
                       <bannedImport>org.apache.hadoop.util.Preconditions</bannedImport>
+                      <bannedImport>org.apache.hadoop.util.Sets</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
