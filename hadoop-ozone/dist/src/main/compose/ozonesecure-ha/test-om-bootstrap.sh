@@ -70,6 +70,7 @@ keyPrefix="sn"
 key1="key1"
 key2="key2"
 bootstrap_om="om3"
+bootstrap_listener="om4"
 
 execute_robot_test om1 kinit.robot
 
@@ -166,4 +167,4 @@ fi
 execute_robot_test om4 kinit.robot
 
 # This test checks the disk on the node it's running. It needs to be run on om4.
-#execute_robot_test om4 -v BOOTSTRAPPED_OM:${bootstrap_om} -v VOLUME:${volume} -v BUCKET:${bucket} -v SNAP_1:${snap1} -v SNAP_2:${snap2} -v KEY_PREFIX:${keyPrefix} -v KEY_1:${key1} -v KEY_2:${key2} omha/data-validation-after-om-bootstrap.robot
+execute_robot_test om4 -v BOOTSTRAPPED_OM:${bootstrap_listener} -v IS_FOLLOWER:false -v VOLUME:${volume} -v BUCKET:${bucket} -v SNAP_1:${snap1} -v SNAP_2:${snap2} -v KEY_PREFIX:${keyPrefix} -v KEY_1:${key1} -v KEY_2:${key2} omha/data-validation-after-om-bootstrap.robot

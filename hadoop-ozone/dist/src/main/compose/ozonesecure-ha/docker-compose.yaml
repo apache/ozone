@@ -32,8 +32,7 @@ services:
     dns_search: .
     volumes:
       - ../..:/opt/hadoop
-      - ../_keytabs:/keytabs-tmp
-#      - ../_keytabs:/etc/security/keytabs
+      - ../_keytabs:/etc/security/keytabs
     command: ["/opt/hadoop/compose/common/init-kdc.sh"]
     networks:
       ozone_net:
