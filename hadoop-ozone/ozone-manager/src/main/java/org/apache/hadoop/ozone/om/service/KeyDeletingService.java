@@ -228,14 +228,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     int purgeKeyIndex = 0, updateIndex = 0, renameIndex = 0;
     int currSize = 0;
-    boolean flag = false;
+    boolean batchCapacityReached;
 
     while (purgeKeyIndex < purgeKeys.size() ||
         updateIndex < keysToUpdateList.size() ||
         (renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size())) {
 
       int remainingRatisLimit = ratisLimit;
-      flag = false;
+      batchCapacityReached = false;
       PurgeKeysRequest.Builder requestBuilder = PurgeKeysRequest.newBuilder();
 
       if (snapTableKey != null) {
@@ -269,7 +269,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
         estimatedPurgeKeysSize = tempBuilder.build().getSerializedSize();
         if (currSize + estimatedPurgeKeysSize > remainingRatisLimit) {
-          flag = true;
+          batchCapacityReached = true;
           break;
         }
 
@@ -282,14 +282,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OzoneManagerProtocolProtos.DeletedKeys deletedKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
             .setVolumeName("").setBucketName("")
             .addAllKeys(batchPurgeKeys).build();
-        requestBuilder.clearDeletedKeys().addDeletedKeys(deletedKeys);
-        currSize += requestBuilder.build().getSerializedSize();
+        requestBuilder.addDeletedKeys(deletedKeys);
+        currSize = requestBuilder.build().getSerializedSize();
       }
 
       remainingRatisLimit -= currSize;
 
       // 3.2 Add keysToUpdate
-      while (!flag && updateIndex < keysToUpdateList.size()) {
+      while (!batchCapacityReached && updateIndex < keysToUpdateList.size()) {
         OzoneManagerProtocolProtos.SnapshotMoveKeyInfos nextUpdate = keysToUpdateList.get(updateIndex);
 
         PurgeKeysRequest.Builder tempBuilder = requestBuilder.clone();
@@ -297,7 +297,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         int estimatedSize = tempBuilder.build().getSerializedSize();
 
         if (currSize + estimatedSize > remainingRatisLimit) {
-          flag = true;
+          batchCapacityReached = true;
           break;
         }
 
@@ -309,7 +309,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       remainingRatisLimit -= currSize;
 
       // 3.3 Add renamed keys
-      while (!flag && renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size()) {
+      while (!batchCapacityReached && renameEntriesToBeDeleted != null &&
+          renameIndex < renameEntriesToBeDeleted.size()) {
         String nextRename = renameEntriesToBeDeleted.get(renameIndex);
 
         PurgeKeysRequest.Builder tempBuilder = requestBuilder.clone();
