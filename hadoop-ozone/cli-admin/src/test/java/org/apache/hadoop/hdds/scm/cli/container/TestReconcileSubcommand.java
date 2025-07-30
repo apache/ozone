@@ -28,8 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -45,7 +43,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -136,11 +133,15 @@ public class TestReconcileSubcommand {
 
   @Test
   public void testNoInput() {
-    assertThrows(CommandLine.MissingParameterException.class, this::parseArgsAndExecute);
+    // PicoCLI should reject commands with no arguments.
+    assertThrows(CommandLine.MissingParameterException.class, this::executeStatusFromArgs);
+    assertThrows(CommandLine.MissingParameterException.class, this::executeReconcileFromArgs);
+    // When reading from stdin, the arguments are valid, but an empty list results in no output.
+    // TODO
   }
 
   @Test
-  public void testStdinAndArgsRejected() throws Exception {
+  public void testRejectsStdinAndArgs() throws Exception {
     // picocli should accept multiple arguments including "-", but our mixin only reads from stdin if first arg is "-"
     // So "-" followed by other args should work (stdin mode ignores the extra args)
     // But "1" followed by "-" should work too (treats both as regular container IDs)
@@ -153,18 +154,17 @@ public class TestReconcileSubcommand {
     
     // Should have error message for invalid container ID "-"
     String errorOutput = errContent.toString(DEFAULT_ENCODING);
-    assertThat(errorOutput).contains("Invalid container ID: -");
+    assertThat(errorOutput).contains("Container ID must be a positive integer, got: -");
     
     // Exception should indicate 1 failed container
     assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 containers");
     
-    // Should have success message for valid container 1
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertThat(output).contains("Reconciliation has been triggered for container 1");
+    assertThat(output).isEmpty();
   }
 
   @Test
-  public void testECContainerRejected() throws Exception {
+  public void testRejectsECContainer() throws Exception {
     // Mock an EC container
     mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
     
@@ -189,7 +189,7 @@ public class TestReconcileSubcommand {
   }
 
   @Test
-  public void testECAndRatisContainers() throws Exception {
+  public void testRejectsECAndRatisContainers() throws Exception {
     // Mock containers: EC container 1, Ratis container 2, EC container 3
     mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
     mockContainer(2, 3, RatisReplicationConfig.getInstance(THREE), true);
@@ -216,29 +216,30 @@ public class TestReconcileSubcommand {
     assertThat(output).doesNotContain("\"containerID\" : 3");
   }
 
+  /**
+   * Invalid container IDs are those that cannot be parsed because they are not positive integers.
+   * When any invalid container ID is passed, the command should fail early instead of proceeding with the valid
+   * entries. All invalid container IDs should be displayed in the error message, not just the first one.
+   */
   @Test
-  public void testInvalidContainerID() throws Exception {
-    // Mock a valid container
-    mockContainer(123);
-    when(scmClient.getContainer(anyLong())).thenThrow(IOException.class);
-    
+  public void testSomeInvalidContainerIDs() throws Exception {
     // Test with mix of valid and invalid container IDs - should throw exception due to invalid IDs
     RuntimeException exception = assertThrows(RuntimeException.class, () -> {
       parseArgsAndExecute("--status", "123", "invalid", "-1", "456");
     });
     
-    // Should have error messages for invalid container IDs
+    // Should have error messages for invalid container IDs only.
     String errorOutput = errContent.toString(DEFAULT_ENCODING);
-    assertThat(errorOutput).contains("Invalid container ID: invalid");
-    assertThat(errorOutput).contains("Invalid container ID: -1");
-    assertThat(errorOutput).contains("Unable to read container: 456");
-    
+    assertThat(errorOutput).contains("Container ID must be a positive integer, got: invalid");
+    assertThat(errorOutput).contains("Container ID must be a positive integer, got: -1");
+    assertThat(errorOutput).doesNotContain("123");
+    assertThat(errorOutput).doesNotContain("456");
+
     // Exception message should indicate 3 failed containers (invalid, -1, 456)
     assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 3 containers");
-    
-    // Should have output for only valid container 123
+
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertThat(output).contains("\"containerID\" : 123");
+    assertThat(output).isEmpty();
     
     // Test reconcile command (without --status)
     resetStreams();
@@ -279,45 +280,50 @@ public class TestReconcileSubcommand {
   }
 
   private void validateOutput(boolean replicasMatch, long... containerIDs) throws Exception {
-    validateFromArgs(replicasMatch, containerIDs);
-    validateFromStdin(replicasMatch, containerIDs);
+    // Test reconcile and status with arguments.
+    executeStatusFromArgs(containerIDs);
+    validateStatusOutput(replicasMatch, containerIDs);
+    executeReconcileFromArgs(containerIDs);
+    validateReconcileOutput(containerIDs);
+
+    // Test reconcile and status with stdin.
+    executeStatusFromStdin(containerIDs);
+    validateStatusOutput(replicasMatch, containerIDs);
+    executeReconcileFromStdin(containerIDs);
+    validateReconcileOutput(containerIDs);
   }
 
-  private void validateFromArgs(boolean replicasMatch, long... containerIDs) throws Exception {
-    // Test status output.
+  private void executeStatusFromArgs(long... containerIDs) throws Exception {
     List<String> args = Arrays.stream(containerIDs)
         .mapToObj(Long::toString)
         .collect(Collectors.toList());
     args.add(0, "--status");
     parseArgsAndExecute(args.toArray(new String[]{}));
-    validateStatusOutput(replicasMatch, containerIDs);
-
-    // Test reconcile commands and output.
-    resetStreams();
-    // Remove the status flag.
-    args.remove(0);
-    parseArgsAndExecute(args.toArray(new String[]{}));
-    validateReconcileOutput(containerIDs);
-
-    resetStreams();
   }
 
-  private void validateFromStdin(boolean replicasMatch, long... containerIDs) throws Exception {
-    // Test status output.
+  private void executeReconcileFromArgs(long... containerIDs) throws Exception {
+    List<String> args = Arrays.stream(containerIDs)
+        .mapToObj(Long::toString)
+        .collect(Collectors.toList());
+    parseArgsAndExecute(args.toArray(new String[]{}));
+  }
+
+  private void executeStatusFromStdin(long... containerIDs) throws Exception {
     String inputIDs = Arrays.stream(containerIDs)
         .mapToObj(Long::toString)
         .collect(Collectors.joining("\n"));
     inContent = new ByteArrayInputStream(inputIDs.getBytes(DEFAULT_ENCODING));
     System.setIn(inContent);
     parseArgsAndExecute("-", "--status");
-    validateStatusOutput(replicasMatch, containerIDs);
+  }
 
-    // Test reconcile commands and output.
-    resetStreams();
+  private void executeReconcileFromStdin(long... containerIDs) throws Exception {
+    String inputIDs = Arrays.stream(containerIDs)
+        .mapToObj(Long::toString)
+        .collect(Collectors.joining("\n"));
     inContent = new ByteArrayInputStream(inputIDs.getBytes(DEFAULT_ENCODING));
     System.setIn(inContent);
     parseArgsAndExecute("-");
-    validateReconcileOutput(containerIDs);
   }
 
   private void validateStatusOutput(boolean replicasMatch, long... containerIDs) throws Exception {
@@ -372,6 +378,7 @@ public class TestReconcileSubcommand {
         assertEquals(expectedDnDetails.getUuidString(), dnOutput.get("uuid"));
       }
     }
+    resetStreams();
   }
 
   private void validateReconcileOutput(long... containerIDs) throws Exception {
@@ -384,6 +391,7 @@ public class TestReconcileSubcommand {
 //      verify(scmClient, times(1)).reconcileContainer(id);
       assertThat(outputString).contains("Reconciliation has been triggered for container " + id);
     }
+    resetStreams();
   }
 
   private void mockContainer(long containerID) throws Exception {

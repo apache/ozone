@@ -69,73 +69,54 @@ public class ReconcileSubcommand extends ScmSubcommand {
       // Since status is retrieved using container info, do client side validation that it is only used for Ratis
       // containers. If EC containers are given, print a  message to stderr and eventually exit non-zero, but continue
       // processing the remaining containers.
-      int invalidCount = 0;
-      for (String containerIdStr : containerList) {
-        long containerID;
-        try {
-          containerID = Long.parseLong(containerIdStr);
-        } catch (NumberFormatException e) {
-          System.err.println("Invalid container ID: " + containerIdStr);
-          invalidCount++;
-          continue;
-        }
-        if (containerID <= 0) {
-          System.err.println("Invalid container ID: " + containerID);
-        }
+      int failureCount = 0;
+      for (Long containerID : containerList.getValidatedIDs()) {
         if (!printReconciliationStatus(scmClient, containerID, arrayWriter)) {
-          invalidCount++;
+          failureCount++;
         }
       }
-      if (invalidCount > 0) {
-        throw new RuntimeException("Failed to process reconciliation status for " + invalidCount + " containers");
+      if (failureCount > 0) {
+        throw new RuntimeException("Failed to process reconciliation status for " + failureCount + " containers");
       }
     }
     // Array writer will not add a newline to the end.
     System.out.println();
   }
 
-  private void executeReconcile(ScmClient scmClient) {
-    int invalidCount = 0;
-    for (String containerIdStr : containerList) {
-      long containerID;
-      try {
-        containerID = Long.parseLong(containerIdStr);
-      } catch (NumberFormatException e) {
-        System.err.println("Invalid container ID: " + containerIdStr);
-        invalidCount++;
-        continue;
+  private boolean printReconciliationStatus(ScmClient scmClient, long containerID, SequenceWriter arrayWriter) {
+    try {
+      ContainerInfo containerInfo = scmClient.getContainer(containerID);
+      if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
+        System.err.println("Cannot get status of container " + containerID +
+            ". Reconciliation is only supported for Ratis replicated containers");
+        return false;
       }
-      try {
-        executeReconciliation(scmClient, containerID);
-      } catch (Exception ex) {
-        System.err.println("Failed to send reconciliation to container " + containerID + ": " + ex.getMessage());
-        invalidCount++;
-      }
-    }
-    if (invalidCount > 0) {
-      throw new RuntimeException("Failed trigger reconciliation for " + invalidCount + " containers");
-    }
-  }
-
-  private boolean printReconciliationStatus(ScmClient scmClient, long containerID, SequenceWriter arrayWriter)
-      throws IOException {
-    ContainerInfo containerInfo = scmClient.getContainer(containerID);
-    if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
-      System.err.println("Cannot get status of container " + containerID +
-          ". Reconciliation is only supported for Ratis replicated containers");
+      List<ContainerReplicaInfo> replicas = scmClient.getContainerReplicas(containerID);
+      arrayWriter.write(new ContainerWrapper(containerInfo, replicas));
+      arrayWriter.flush();
+    } catch (Exception ex) {
+      System.err.println("Failed get reconciliation status of container " + containerID + ": " + ex.getMessage());
       return false;
     }
-    List<ContainerReplicaInfo> replicas = scmClient.getContainerReplicas(containerID);
-    arrayWriter.write(new ContainerWrapper(containerInfo, replicas));
-    arrayWriter.flush();
     return true;
   }
 
-  private void executeReconciliation(ScmClient scmClient, long containerID) throws IOException {
-    scmClient.reconcileContainer(containerID);
-    System.out.println("Reconciliation has been triggered for container " + containerID);
-    System.out.println("Use \"ozone admin container reconcile --status " + containerID + "\" to see the checksums of " +
-        "each container replica");
+  private void executeReconcile(ScmClient scmClient) {
+    int failureCount = 0;
+    for (Long containerID : containerList.getValidatedIDs()) {
+      try {
+        scmClient.reconcileContainer(containerID);
+        System.out.println("Reconciliation has been triggered for container " + (long) containerID);
+        System.out.println("Use \"ozone admin container reconcile --status " + containerID + "\" to see the checksums of " +
+            "each container replica");
+      } catch (Exception ex) {
+        System.err.println("Failed to trigger reconciliation for container " + containerID + ": " + ex.getMessage());
+        failureCount++;
+      }
+    }
+    if (failureCount > 0) {
+      throw new RuntimeException("Failed trigger reconciliation for " + failureCount + " containers");
+    }
   }
 
   /**
