@@ -21,8 +21,8 @@ package org.apache.hadoop.ozone.metrics.sink;
 import java.util.Calendar;
 import org.apache.commons.configuration2.SubsetConfiguration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.metrics2.MetricsException;
 
+import org.apache.hadoop.ozone.metrics.MetricsException;
 import org.apache.hadoop.ozone.metrics.impl.ConfigBuilder;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;

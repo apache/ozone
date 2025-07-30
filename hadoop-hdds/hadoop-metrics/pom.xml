@@ -39,6 +39,11 @@
       <artifactId>re2j</artifactId>
     </dependency>
     <dependency>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging</artifactId>
+      <version>1.3.0</version>
+    </dependency>
+    <dependency>
       <groupId>jakarta.annotation</groupId>
       <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
@@ -110,6 +115,15 @@
           <annotationProcessors>
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
           </annotationProcessors>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <configuration>
+          <ignoredUnusedDeclaredDependencies>
+            <ignoredUnusedDeclaredDependency>commons-logging:*</ignoredUnusedDeclaredDependency>
+          </ignoredUnusedDeclaredDependencies>
         </configuration>
       </plugin>
     </plugins>

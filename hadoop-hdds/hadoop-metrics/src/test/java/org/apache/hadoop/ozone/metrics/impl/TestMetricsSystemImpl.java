@@ -47,7 +47,6 @@ import org.mockito.stubbing.Answer;
 import static org.apache.hadoop.ozone.metrics.lib.Interns.info;
 import static org.apache.hadoop.ozone.metrics.lib.Interns.tag;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

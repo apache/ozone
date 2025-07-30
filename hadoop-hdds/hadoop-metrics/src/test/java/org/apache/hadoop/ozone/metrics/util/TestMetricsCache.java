@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.metrics.MetricsRecord;
 import org.apache.hadoop.ozone.metrics.MetricsTag;
 import org.junit.jupiter.api.Test;
 
-import static org.apache.hadoop.metrics2.lib.Interns.info;
+import static org.apache.hadoop.ozone.metrics.lib.Interns.info;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;

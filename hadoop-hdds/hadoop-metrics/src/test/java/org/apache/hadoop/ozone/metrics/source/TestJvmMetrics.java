@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.metrics.impl.MsInfo.ProcessName;
 import static org.apache.hadoop.ozone.metrics.impl.MsInfo.SessionId;
-import static org.apache.hadoop.ozone.metrics.util.TestHelper.getMetrics;
+import static org.apache.hadoop.ozone.metrics.util.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;

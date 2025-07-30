@@ -22,6 +22,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -56,6 +57,7 @@ import org.apache.hadoop.ozone.metrics.lib.MutableGaugeLong;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.rules.TestName;
@@ -79,8 +81,7 @@ public class RollingFileSystemSinkTestBase {
   /**
    * The name of the current test method.
    */
-  @RegisterExtension
-  private TestName methodName = new TestName();
+  private static final ThreadLocal<String> methodName = new ThreadLocal<>();
 
   /**
    * A sample metric class
@@ -100,7 +101,7 @@ public class RollingFileSystemSinkTestBase {
     MutableGaugeLong testMetric2;
 
     public MyMetrics1 registerWith(MetricsSystem ms) {
-      return ms.register(methodName.getMethodName() + "-m1", null, this);
+      return ms.register(methodName.get() + "-m1", null, this);
     }
   }
 
@@ -113,7 +114,7 @@ public class RollingFileSystemSinkTestBase {
     String testTag1() { return "testTagValue22"; }
 
     public MyMetrics2 registerWith(MetricsSystem ms) {
-      return ms.register(methodName.getMethodName() + "-m2", null, this);
+      return ms.register(methodName.get() + "-m2", null, this);
     }
   }
 
@@ -140,8 +141,11 @@ public class RollingFileSystemSinkTestBase {
    * @throws IOException thrown if the create fails
    */
   @BeforeEach
-  public void createMethodDir() throws IOException {
-    methodDir = new File(ROOT_TEST_DIR, methodName.getMethodName());
+  public void createMethodDir(TestInfo testInfo) throws IOException {
+    String currentTestName = testInfo.getTestMethod().map(Method::getName).orElse("unknown");
+    methodName.set(currentTestName);
+
+    methodDir = new File(ROOT_TEST_DIR, currentTestName);
 
     assertTrue(methodDir.mkdirs(), "Test directory already exists: " + methodDir);
   }
@@ -172,7 +176,7 @@ public class RollingFileSystemSinkTestBase {
       boolean allowAppend, boolean useSecureParams) {
     // If the prefix is not lower case, the metrics system won't be able to
     // read any of the properties.
-    String prefix = methodName.getMethodName().toLowerCase();
+    String prefix = methodName.get().toLowerCase();
 
     ConfigBuilder builder = new ConfigBuilder().add("*.period", 10000)
         .add(prefix + ".sink.mysink0.class", MockSink.class.getName())

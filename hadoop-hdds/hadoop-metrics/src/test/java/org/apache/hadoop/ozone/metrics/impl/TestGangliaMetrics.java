@@ -31,15 +31,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.metrics.AbstractMetric;
 import org.apache.hadoop.ozone.metrics.MetricsRecord;
 import org.apache.hadoop.ozone.metrics.MetricsTag;
 import org.apache.hadoop.ozone.metrics.annotation.Metric;
 import org.apache.hadoop.ozone.metrics.annotation.Metrics;
 import org.apache.hadoop.ozone.metrics.lib.MetricsRegistry;
+import org.apache.hadoop.ozone.metrics.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.metrics.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.metrics.lib.MutableRate;
 import org.apache.hadoop.ozone.metrics.sink.ganglia.AbstractGangliaSink;
 import org.apache.hadoop.ozone.metrics.sink.ganglia.GangliaMetricsTestHelper;
 import org.apache.hadoop.ozone.metrics.sink.ganglia.GangliaSink30;

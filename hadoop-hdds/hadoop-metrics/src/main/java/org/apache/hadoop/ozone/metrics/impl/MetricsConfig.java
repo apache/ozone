@@ -37,16 +37,13 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
-import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.security.AccessController.doPrivileged;
 
 /**
  * Metrics configuration for MetricsSystemImpl
@@ -220,7 +217,6 @@ class MetricsConfig extends SubsetConfiguration {
     return clsName;
   }
 
-  @SuppressWarnings("removal")
   ClassLoader getPluginLoader() {
     if (pluginLoader != null) {
       return pluginLoader;
@@ -246,11 +242,6 @@ class MetricsConfig extends SubsetConfiguration {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Using plugin jars: {}", Iterables.toString(jars));
       }
-      pluginLoader = doPrivileged(new PrivilegedAction<ClassLoader>() {
-        @Override public ClassLoader run() {
-          return new URLClassLoader(urls, defaultLoader);
-        }
-      });
       return pluginLoader;
     }
     if (parent instanceof MetricsConfig) {

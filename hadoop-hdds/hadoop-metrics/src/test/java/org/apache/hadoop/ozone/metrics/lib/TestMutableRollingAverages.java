@@ -30,9 +30,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.metrics.lib.Interns.info;
-import static org.apache.hadoop.ozone.metrics.util.TestHelper.getDoubleGauge;
-import static org.apache.hadoop.ozone.metrics.util.TestHelper.getMetrics;
-import static org.apache.hadoop.ozone.metrics.util.TestHelper.mockMetricsRecordBuilder;
+import static org.apache.hadoop.ozone.metrics.util.MetricsAsserts.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.eq;

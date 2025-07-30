@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import static org.apache.hadoop.metrics2.lib.Interns.info;
+import static org.apache.hadoop.ozone.metrics.lib.Interns.info;
 import static org.apache.ozone.test.MetricsAsserts.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -115,8 +115,8 @@ public class TestMetricsRegistry {
     final MetricsRegistry r = new MetricsRegistry("test");
     r.add("s1", 42);
     r.get("s1").snapshot(rb);
-    verify(rb).addCounter((MetricsInfo) info("S1NumOps", "Number of ops for s1"), 1L);
-    verify(rb).addGauge((MetricsInfo) info("S1AvgTime", "Average time for s1"), 42.0);
+    verify(rb).addCounter(info("S1NumOps", "Number of ops for s1"), 1L);
+    verify(rb).addGauge(info("S1AvgTime", "Average time for s1"), 42.0);
 
     r.newCounter("c1", "test add", 1);
     r.newGauge("g1", "test add", 1);

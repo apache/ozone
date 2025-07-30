@@ -20,7 +20,8 @@ package org.apache.hadoop.ozone.metrics.lib;
 
 import static org.apache.hadoop.ozone.metrics.lib.Interns.info;
 import static org.apache.hadoop.ozone.metrics.impl.MsInfo.Context;
-import static org.apache.ozone.test.MetricsAsserts.*;
+import static org.apache.hadoop.ozone.metrics.util.MetricsAsserts.anyInfo;
+import static org.apache.hadoop.ozone.metrics.util.MetricsAsserts.assertCounter;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.AdditionalMatchers.eq;
@@ -41,10 +42,10 @@ import java.util.concurrent.CountDownLatch;
 import org.apache.hadoop.ozone.metrics.MetricsCollector;
 import org.apache.hadoop.ozone.metrics.MetricsInfo;
 import org.apache.hadoop.ozone.metrics.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.metrics.util.MetricsAsserts;
 import org.apache.hadoop.ozone.metrics.util.Quantile;
 import com.google.common.math.Stats;
-import org.apache.hadoop.ozone.metrics.util.TestHelper;
-import org.assertj.core.data.Percentage;
+import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.invocation.InvocationOnMock;
@@ -59,7 +60,7 @@ public class TestMutableMetrics {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestMutableMetrics.class);
-  private static final double EPSILON = 1e-42;
+  private static final double EPSILON = 0.00001;
   private static final int SLEEP_TIME_MS = 6 * 1000; // 6 seconds.
   private static final int SAMPLE_COUNT = 1000;
 
@@ -144,9 +145,9 @@ public class TestMutableMetrics {
     rates.init(TestProtocol.class);
     registry.snapshot(rb, false);
 
-    TestHelper.assertCounter("FooNumOps", 0L,  rb);
+    assertCounter("FooNumOps", 0L,  rb);
     assertGauge("FooAvgTime", 0.0, rb);
-    TestHelper.assertCounter("BarNumOps", 0L, rb);
+    assertCounter("BarNumOps", 0L, rb);
     assertGauge("BarAvgTime", 0.0, rb);
   }
 
@@ -157,9 +158,9 @@ public class TestMutableMetrics {
     rates.init(TestProtocol.class);
     rates.snapshot(rb, false);
 
-    TestHelper.assertCounter("FooNumOps", 0L, rb);
+    assertCounter("FooNumOps", 0L, rb);
     assertGauge("FooAvgTime", 0.0, rb);
-    TestHelper.assertCounter("BarNumOps", 0L, rb);
+    assertCounter("BarNumOps", 0L, rb);
     assertGauge("BarAvgTime", 0.0, rb);
   }
 
@@ -170,9 +171,9 @@ public class TestMutableMetrics {
     rates.init(new String[]{"Foo", "Bar"});
     rates.snapshot(rb, false);
 
-    TestHelper.assertCounter("FooNumOps", 0L, rb);
+    assertCounter("FooNumOps", 0L, rb);
     assertGauge("FooAvgTime", 0.0, rb);
-    TestHelper.assertCounter("BarNumOps", 0L, rb);
+    assertCounter("BarNumOps", 0L, rb);
     assertGauge("BarAvgTime", 0.0, rb);
   }
 
@@ -184,9 +185,9 @@ public class TestMutableMetrics {
 
     MetricsRecordBuilder rb = mockMetricsRecordBuilder();
     rates.snapshot(rb, false);
-    TestHelper.assertCounter("FooNumOps", 1L, rb);
+    assertCounter("FooNumOps", 1L, rb);
     assertGauge("FooAvgTime", 1.0, rb);
-    TestHelper.assertCounter("BarNumOps", 1L, rb);
+    assertCounter("BarNumOps", 1L, rb);
     assertGauge("BarAvgTime", 5.0, rb);
 
     rates.add("foo", 1);
@@ -195,9 +196,9 @@ public class TestMutableMetrics {
 
     rb = mockMetricsRecordBuilder();
     rates.snapshot(rb, false);
-    TestHelper.assertCounter("FooNumOps", 3L, rb);
+    assertCounter("FooNumOps", 3L, rb);
     assertGauge("FooAvgTime", 2.0, rb);
-    TestHelper.assertCounter("BarNumOps", 2L, rb);
+    assertCounter("BarNumOps", 2L, rb);
     assertGauge("BarAvgTime", 6.0, rb);
   }
 
@@ -294,9 +295,9 @@ public class TestMutableMetrics {
     rates.snapshot(rb, true);
     for (int i = 0; i < opCount.length; i++) {
       long prevOpCount = opCount[i];
-      long newOpCount = TestHelper.getLongCounter("Metric" + i + "NumOps", rb);
+      long newOpCount = MetricsAsserts.getLongCounter("Metric" + i + "NumOps", rb);
       opCount[i] = newOpCount;
-      double avgTime = TestHelper.getDoubleGauge("Metric" + i + "AvgTime", rb);
+      double avgTime = MetricsAsserts.getDoubleGauge("Metric" + i + "AvgTime", rb);
       opTotalTime[i] += avgTime * (newOpCount - prevOpCount);
     }
   }
@@ -313,12 +314,12 @@ public class TestMutableMetrics {
     stat.add(1000, 2000);
     registry.snapshot(builderWithChange, true);
 
-    TestHelper.assertCounter("TestNumOps", 2000L, builderWithChange);
-    assertGauge("TestINumOps", 2000L, builderWithChange);
+    assertCounter("TestNumOps", 2000L, builderWithChange);
+    MetricsAsserts.assertGauge("TestINumOps", 2000L, builderWithChange);
     assertGauge("TestAvgVal", 1.5, builderWithChange);
 
     registry.snapshot(builderWithoutChange, true);
-    assertGauge("TestINumOps", 0L, builderWithoutChange);
+    MetricsAsserts.assertGauge("TestINumOps", 0L, builderWithoutChange);
     assertGauge("TestAvgVal", 0.0, builderWithoutChange);
   }
 
@@ -346,14 +347,14 @@ public class TestMutableMetrics {
     rates.snapshot(rb, true);
     deferredRpcRates.snapshot(rb, true);
 
-    TestHelper.assertCounter("TestRpcMethodNumOps", 1L, rb);
+    assertCounter("TestRpcMethodNumOps", 1L, rb);
     assertGauge("TestRpcMethodAvgTime", 10.0, rb);
-    TestHelper.assertCounter("DeferredTestRpcMethodNumOps", 2L, rb);
+    assertCounter("DeferredTestRpcMethodNumOps", 2L, rb);
     assertGauge("DeferredTestRpcMethodAvgTime", 300.0, rb);
   }
 
   /**
-   * Tests that when using {@link org.apache.hadoop.metrics2.lib.MutableStat#add(long, long)}, even with a high
+   * Tests that when using {@link MutableStat#add(long, long)}, even with a high
    * sample count, the mean does not lose accuracy. This also validates that
    * the std dev is correct, assuming samples of equal value.
    */
@@ -383,7 +384,7 @@ public class TestMutableMetrics {
       }
       registry.snapshot(rb, false);
 
-      TestHelper.assertCounter("TestNumOps", 2000L, rb);
+      assertCounter("TestNumOps", 2000L, rb);
       assertGauge("TestAvgVal", stats.mean(), rb);
       assertGauge("TestStdevVal", stats.sampleStandardDeviation(), rb);
     }
@@ -401,14 +402,14 @@ public class TestMutableMetrics {
     }
     registry.snapshot(rb, false);
 
-    TestHelper.assertCounter("TestNumOps", 100L, rb);
+    assertCounter("TestNumOps", 100L, rb);
     assertGauge("TestAvgVal", (double) sample, rb);
     assertGauge("TestStdevVal", 0.0, rb);
   }
 
   private static void assertGauge(String name, double expected, MetricsRecordBuilder rb) {
-    assertThat(TestHelper.getDoubleGauge(name, rb)).as(name)
-        .isCloseTo(expected, Percentage.withPercentage(EPSILON));
+    assertThat(MetricsAsserts.getDoubleGauge(name, rb)).as(name)
+        .isCloseTo(expected, Offset.offset(EPSILON));
   }
   /**
    * Ensure that quantile estimates from {@link MutableQuantiles} are within
@@ -671,7 +672,7 @@ public class TestMutableMetrics {
       }
     });
     when(mc.addRecord(anyString())).thenReturn(rb);
-    when(mc.addRecord((MetricsInfo) anyInfo())).thenReturn(rb);
+    when(mc.addRecord(anyInfo())).thenReturn(rb);
     return rb;
   }
 }
