@@ -23,12 +23,15 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -66,6 +69,8 @@ import picocli.CommandLine;
  */
 public class TestReconcileSubcommand {
 
+  private static final String EC_CONTAINER_MESSAGE = "Reconciliation is only supported for Ratis replicated containers";
+
   private ScmClient scmClient;
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
@@ -77,16 +82,10 @@ public class TestReconcileSubcommand {
 
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
-  // Helper method to simplify assertions on stream output
-  private AbstractStringAssert<?> assertThatOutput(ByteArrayOutputStream stream) throws Exception {
-    return assertThat(stream.toString(DEFAULT_ENCODING));
-  }
-
   @BeforeEach
   public void setup() throws IOException {
     scmClient = mock(ScmClient.class);
 
-    // Mock the reconcileContainer method to do nothing (void method)
     doNothing().when(scmClient).reconcileContainer(anyLong());
 
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
@@ -105,9 +104,7 @@ public class TestReconcileSubcommand {
     mockContainer(1);
     mockContainer(2);
     mockContainer(3);
-    
     validateOutput(true, 1, 2, 3);
-    assertEquals(0, errContent.size());
   }
 
   /**
@@ -117,7 +114,6 @@ public class TestReconcileSubcommand {
   public void testReplicasMatchWithNoReplicas() throws Exception {
     mockContainer(1, 0, RatisReplicationConfig.getInstance(THREE), true);
     validateOutput(true, 1);
-    assertEquals(0, errContent.size());
   }
 
   /**
@@ -127,7 +123,6 @@ public class TestReconcileSubcommand {
   public void testReplicasMatchWithOneReplica() throws Exception {
     mockContainer(1, 1, RatisReplicationConfig.getInstance(ONE), true);
     validateOutput(true, 1);
-    assertEquals(0, errContent.size());
   }
 
   @Test
@@ -135,7 +130,6 @@ public class TestReconcileSubcommand {
     mockContainer(1, 3, RatisReplicationConfig.getInstance(THREE), false);
     mockContainer(2, 3, RatisReplicationConfig.getInstance(THREE), false);
     validateOutput(false, 1, 2);
-    assertEquals(0, errContent.size());
   }
 
   @Test
@@ -158,38 +152,32 @@ public class TestReconcileSubcommand {
     assertThatOutput(errContent).isEmpty();
   }
 
+  /**
+   * When multiple arguments are given, they are treated as container IDs. Mixing "-" to read from stdin with
+   * ID arguments will result in "-" raising an invalid container ID error.
+   */
   @Test
   public void testRejectsStdinAndArgs() throws Exception {
-    // picocli should accept multiple arguments including "-", but our mixin only reads from stdin if first arg is "-"
-    // So "-" followed by other args should work (stdin mode ignores the extra args)
-    // But "1" followed by "-" should work too (treats both as regular container IDs)
-    
-    // Test that "1" "-" works (both treated as container IDs, "-" will cause invalid container ID error)
     mockContainer(1);
-    RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-      parseArgsAndExecute("1", "-");
-    });
-    
-    // Should have error message for invalid container ID "-"
+    // Test sending reconcile command.
+    assertThrows(RuntimeException.class, () -> parseArgsAndExecute("1", "-"));
+    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -");
+    assertThatOutput(outContent).isEmpty();
+    // Test checking status.
+    assertThrows(RuntimeException.class, () -> parseArgsAndExecute("--status", "1", "-"));
     assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -");
     assertThatOutput(outContent).isEmpty();
   }
 
   @Test
-  public void testRejectsECContainer() throws Exception {
-    // Mock an EC container
+  public void testStatusRejectsAllECContainer() throws Exception {
     mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
+
+    RuntimeException exception = assertThrows(RuntimeException.class, () -> executeStatusFromArgs(1));
     
-    // Test status output - should reject EC container and throw exception
-    RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-      parseArgsAndExecute("--status", "1");
-    });
-    
-    // Should have error message for EC container
     assertThatOutput(errContent).contains("Cannot get status of container 1");
-    assertThatOutput(errContent).contains("Reconciliation is only supported for Ratis replicated containers");
+    assertThatOutput(errContent).contains(EC_CONTAINER_MESSAGE);
     
-    // Exception message should indicate failure
     assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 1 containers");
     
     // Should have empty JSON array output since no containers were processed
@@ -200,29 +188,87 @@ public class TestReconcileSubcommand {
   }
 
   @Test
-  public void testRejectsECAndRatisContainers() throws Exception {
-    // Mock containers: EC container 1, Ratis container 2, EC container 3
+  public void testReconcileRejectsAllECContainer() throws Exception {
+    mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
+
+    // Mock reconcile to fail for EC container
+    doThrow(new IOException(EC_CONTAINER_MESSAGE)).when(scmClient).reconcileContainer(1L);
+
+    RuntimeException exception = assertThrows(RuntimeException.class, () -> executeReconcileFromArgs(1));
+
+    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + EC_CONTAINER_MESSAGE);
+
+    assertThat(exception.getMessage()).contains("Failed trigger reconciliation for 1 containers");
+
+    // Should have no successful reconcile output
+    assertThatOutput(outContent).doesNotContain("Reconciliation has been triggered for container 1");
+  }
+
+  /**
+   * When a mix of EC and Ratis containers are given to the server, it should return results for the Ratis containers
+   * and errors for the EC containers. All the output should be given to the user.
+   */
+  @Test
+  public void testStatusRejectsECNotRatisContainers() throws Exception {
     mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
     mockContainer(2, 3, RatisReplicationConfig.getInstance(THREE), true);
     mockContainer(3, 3, new ECReplicationConfig(6, 3), true);
-    
+
     // Test status output - should process Ratis container but fail due to EC containers
     RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-      parseArgsAndExecute("--status", "1", "2", "3");
+      executeStatusFromArgs(1, 2, 3);
     });
-    
+
     // Should have error messages for EC containers
     assertThatOutput(errContent).contains("Cannot get status of container 1");
     assertThatOutput(errContent).contains("Cannot get status of container 3");
-    assertThatOutput(errContent).contains("Reconciliation is only supported for Ratis replicated containers");
-    
+    assertThatOutput(errContent).contains(EC_CONTAINER_MESSAGE);
+    assertThatOutput(errContent).doesNotContain("2");
+
     // Exception message should indicate 2 failed containers
     assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 2 containers");
     
     // Should have output for only container 2 (Ratis)
-    assertThatOutput(outContent).contains("\"containerID\" : 2");
-    assertThatOutput(outContent).doesNotContain("\"containerID\" : 1");
-    assertThatOutput(outContent).doesNotContain("\"containerID\" : 3");
+    validateStatusOutput(true, 2);
+
+    // Verify that EC containers 1 and 3 are not present in JSON output
+    String output = outContent.toString(DEFAULT_ENCODING);
+    JsonNode jsonOutput = JsonUtils.readTree(output);
+    assertThat(jsonOutput.isArray()).isTrue();
+    for (JsonNode containerNode : jsonOutput) {
+      int containerID = containerNode.get("containerID").asInt();
+      assertNotEquals(1, containerID);
+      assertNotEquals(3, containerID);
+    }
+  }
+
+  @Test
+  public void testReconcileRejectsECNotRatisContainers() throws Exception {
+    mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
+    mockContainer(2, 3, RatisReplicationConfig.getInstance(THREE), true);
+    mockContainer(3, 3, new ECReplicationConfig(6, 3), true);
+
+    // Mock reconcile to fail for EC containers
+    doThrow(new IOException(EC_CONTAINER_MESSAGE)).when(scmClient).reconcileContainer(1L);
+    doThrow(new IOException(EC_CONTAINER_MESSAGE)).when(scmClient).reconcileContainer(3L);
+
+    // Test reconcile command - should process Ratis container but fail for EC containers
+    RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+      executeReconcileFromArgs(1, 2, 3);
+    });
+
+    // Should have error messages for EC containers
+    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + EC_CONTAINER_MESSAGE);
+    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 3: " + EC_CONTAINER_MESSAGE);
+    assertThatOutput(errContent).doesNotContain("Failed to trigger reconciliation for container 2");
+
+    // Exception message should indicate 2 failed containers
+    assertThat(exception.getMessage()).contains("Failed trigger reconciliation for 2 containers");
+
+    // Should have reconcile success output for container 2 (Ratis) only
+    validateReconcileOutput(2);
+    assertThatOutput(outContent).doesNotContain("container 1");
+    assertThatOutput(outContent).doesNotContain("container 3");
   }
 
   /**
@@ -232,7 +278,7 @@ public class TestReconcileSubcommand {
    */
   @Test
   public void testSomeInvalidContainerIDs() throws Exception {
-    // Test with mix of valid and invalid container IDs - should throw exception due to invalid IDs
+    // Test status command
     assertThrows(RuntimeException.class, () -> {
       parseArgsAndExecute("--status", "123", "invalid", "-1", "456");
     });
@@ -244,10 +290,8 @@ public class TestReconcileSubcommand {
     assertThatOutput(errContent).doesNotContain("456");
     assertThatOutput(outContent).isEmpty();
     
-    // Test reconcile command (without --status)
-    RuntimeException reconcileException = assertThrows(RuntimeException.class, () -> {
-      parseArgsAndExecute("123", "invalid", "-1", "456");
-    });
+    // Test reconcile command
+    assertThrows(RuntimeException.class, () -> parseArgsAndExecute("123", "invalid", "-1", "456"));
     
     // Should have error messages for invalid IDs
     assertThatOutput(errContent).contains("Container ID must be a positive integer, got: invalid");
@@ -260,11 +304,9 @@ public class TestReconcileSubcommand {
   @Test
   public void testUnreachableContainers() throws Exception {
     final String exceptionMessage = "Container not found";
-    
-    // Mock some containers as reachable
+
     mockContainer(123);
     doThrow(new IOException(exceptionMessage)).when(scmClient).getContainer(456L);
-    doThrow(new IOException(exceptionMessage)).when(scmClient).reconcileContainer(456L);
 
     // Test status command - should throw exception due to unreachable containers
     assertThrows(RuntimeException.class, () -> parseArgsAndExecute("--status", "123", "456"));
@@ -272,33 +314,21 @@ public class TestReconcileSubcommand {
     // Should have error messages for unreachable containers
     assertThatOutput(errContent).contains("Failed get reconciliation status of container 456: " + exceptionMessage);
     assertThatOutput(errContent).doesNotContain("123");
-    // Should have JSON output for reachable containers only
-    String output = outContent.toString(DEFAULT_ENCODING);
-    JsonNode jsonOutput = JsonUtils.readTree(output);
-    assertThat(jsonOutput.isArray()).isTrue();
-    assertEquals(1, jsonOutput.size());
+    validateStatusOutput(true, 123);
 
     // Test reconcile command - should also throw exception
+    doThrow(new IOException(exceptionMessage)).when(scmClient).reconcileContainer(456L);
+
     assertThrows(RuntimeException.class, () -> parseArgsAndExecute("123", "456"));
     // Should have error message for unreachable container
     assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 456: " + exceptionMessage);
     assertThatOutput(errContent).doesNotContain("123");
-    // Should have success messages for reachable containers
-    assertThatOutput(outContent).contains("Reconciliation has been triggered for container 123");
     assertThatOutput(outContent).doesNotContain("Reconciliation has been triggered for container 456");
+    validateReconcileOutput(123);
   }
 
   private void parseArgsAndExecute(String... args) throws Exception {
-    // Create a fresh command object to ensure all fields start with default values
-    // Picocli doesn't reset fields between parseArgs calls, so reusing objects
-    // can lead to stale state from previous test executions
-    resetStreams();
-    ReconcileSubcommand cmd = new ReconcileSubcommand();
-    new CommandLine(cmd).parseArgs(args);
-    cmd.execute(scmClient);
-  }
-
-  private void resetStreams() throws Exception {
+    // Create fresh streams and command objects for each execution, otherwise stale results may interfere with tests.
     if (inContent != null) {
       inContent.reset();
     }
@@ -306,6 +336,10 @@ public class TestReconcileSubcommand {
     errContent.reset();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
+
+    ReconcileSubcommand cmd = new ReconcileSubcommand();
+    new CommandLine(cmd).parseArgs(args);
+    cmd.execute(scmClient);
   }
 
   private void validateOutput(boolean replicasMatch, long... containerIDs) throws Exception {
@@ -356,10 +390,6 @@ public class TestReconcileSubcommand {
   }
 
   private void validateStatusOutput(boolean replicasMatch, long... containerIDs) throws Exception {
-    // Status flag should not have triggered reconciliation.
-//    verify(scmClient, times(0)).reconcileContainer(anyLong());
-    assertThatOutput(errContent).isEmpty();
-
     String output = outContent.toString(DEFAULT_ENCODING);
     // Output should be pretty-printed with newlines.
     assertThat(output).contains("\n");
@@ -410,14 +440,14 @@ public class TestReconcileSubcommand {
   }
 
   private void validateReconcileOutput(long... containerIDs) throws Exception {
-    // No extra commands should have been sent.
-//    verify(scmClient, times(containerIDs.length)).reconcileContainer(anyLong());
-    assertThatOutput(errContent).isEmpty();
-
     for (long id: containerIDs) {
-//      verify(scmClient, times(1)).reconcileContainer(id);
+      verify(scmClient, atLeastOnce()).reconcileContainer(id);
       assertThatOutput(outContent).contains("Reconciliation has been triggered for container " + id);
     }
+  }
+
+  private AbstractStringAssert<?> assertThatOutput(ByteArrayOutputStream stream) throws Exception {
+    return assertThat(stream.toString(DEFAULT_ENCODING));
   }
 
   private void mockContainer(long containerID) throws Exception {

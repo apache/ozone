@@ -66,7 +66,6 @@ public class ReconcileSubcommand extends ScmSubcommand {
   private void executeStatus(ScmClient scmClient) throws IOException {
     // Do validation outside the json array writer, otherwise failed validation will print an empty json array.
     List<Long> containerIDs = containerList.getValidatedIDs();
-    // Automatically creates one array for the output, while allowing us to flush each object individually.
     try (SequenceWriter arrayWriter = JsonUtils.getSequenceWriter(System.out)) {
       // Since status is retrieved using container info, do client side validation that it is only used for Ratis
       // containers. If EC containers are given, print a  message to stderr and eventually exit non-zero, but continue
