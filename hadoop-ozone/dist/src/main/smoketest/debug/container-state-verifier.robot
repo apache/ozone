@@ -26,29 +26,33 @@ ${VOLUME}               cli-debug-volume${PREFIX}
 ${BUCKET}               cli-debug-bucket
 ${TESTFILE}             testfile
 ${CHECK_TYPE}           containerState
-
-${UNHEALTHY_RULE}       /opt/hadoop/share/ozone/byteman/unhealthy-container-state.btm
-${DELETED_RULE}         /opt/hadoop/share/ozone/byteman/deleted-container-state.btm
-${INVALID_RULE}         /opt/hadoop/share/ozone/byteman/invalid-container-state.btm
+${TEMPLATE_RULE}        /opt/hadoop/share/ozone/byteman/container-state-template.btm
 
 *** Keywords ***
+Create Container State Rule
+    [Arguments]          ${state}
+    ${rule_file} =       Set Variable    /tmp/container-state-${state}.btm
+    Execute              sed 's/STATE_PLACEHOLDER/${state}/g' ${TEMPLATE_RULE} > ${rule_file}
+    Return From Keyword  ${rule_file}
+
 Verify Container State with Rule
-    [Arguments]          ${rule}   ${expected_state}
-    Add Byteman Rule     ${FAULT_INJ_DATANODE}    ${rule}
+    [Arguments]          ${expected_state}
+    ${rule_file} =       Create Container State Rule    ${expected_state}
+    Add Byteman Rule     ${FAULT_INJ_DATANODE}    ${rule_file}
     List Byteman Rules   ${FAULT_INJ_DATANODE}
 
     ${output} =           Execute replicas verify container state debug tool
     ${json} =             Parse replicas verify JSON output    ${output}
     Check to Verify Replicas    ${json}  ${CHECK_TYPE}  ${DATANODE}  Replica state is ${expected_state}
 
-    Remove Byteman Rule  ${FAULT_INJ_DATANODE}    ${rule}
+    Remove Byteman Rule  ${FAULT_INJ_DATANODE}    ${rule_file}
 
 *** Test Cases ***
 Verify Container State With Unhealthy Container Replica
-    Verify Container State with Rule      ${UNHEALTHY_RULE}   UNHEALTHY
+    Verify Container State with Rule      UNHEALTHY
 
 Verify Container State With Deleted Container Replica
-    Verify Container State with Rule      ${DELETED_RULE}     DELETED
+    Verify Container State with Rule      DELETED
 
 Verify Container State With Invalid Container Replica
-    Verify Container State with Rule      ${INVALID_RULE}     INVALID
+    Verify Container State with Rule      INVALID
