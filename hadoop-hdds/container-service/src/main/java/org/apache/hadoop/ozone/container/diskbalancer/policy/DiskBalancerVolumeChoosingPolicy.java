@@ -25,15 +25,16 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 /**
  * This interface specifies the policy for choosing volumes to balance.
  */
-public interface VolumeChoosingPolicy {
+public interface DiskBalancerVolumeChoosingPolicy {
   /**
    * Choose a pair of volumes for balancing.
    *
    * @param volumeSet - volumes to choose from.
    * @param threshold - the threshold to choose source and dest volumes.
    * @param deltaSizes - the sizes changes of inProgress balancing jobs.
+   * @param containerSize - the estimated size of container to be moved.
    * @return Source volume and Dest volume.
    */
   Pair<HddsVolume, HddsVolume> chooseVolume(MutableVolumeSet volumeSet,
-      double threshold, Map<HddsVolume, Long> deltaSizes);
+      double threshold, Map<HddsVolume, Long> deltaSizes, long containerSize);
 }

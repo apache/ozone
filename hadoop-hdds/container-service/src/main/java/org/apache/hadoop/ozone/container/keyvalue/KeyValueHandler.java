@@ -146,7 +146,6 @@ import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
@@ -1329,7 +1328,15 @@ public class KeyValueHandler extends Handler {
     ContainerLogger.logImported(container.getContainerData());
     sendICR(container);
     return container;
+  }
 
+  @Override
+  public Container importContainer(ContainerData targetTempContainerData) throws IOException {
+    KeyValueContainer container = createNewContainer(targetTempContainerData);
+    HddsVolume targetVolume = targetTempContainerData.getVolume();
+    populateContainerPathFields(container, targetVolume);
+    container.importContainerData((KeyValueContainerData) targetTempContainerData);
+    return container;
   }
 
   @Override
@@ -1555,24 +1562,6 @@ public class KeyValueHandler extends Handler {
       throws IOException {
     final KeyValueContainer kvc = (KeyValueContainer) container;
     kvc.copyContainerData(destinationPath);
-  }
-
-  @Override
-  public Container importContainer(ContainerData originalContainerData,
-      final Path containerPath) throws IOException {
-    KeyValueContainer container = createNewContainer(originalContainerData);
-
-    HddsVolume volume = HddsVolumeUtil.matchHddsVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        containerPath.toString());
-    if (volume == null ||
-        !containerPath.startsWith(volume.getVolumeRootDir())) {
-      throw new IOException("ContainerPath " + containerPath
-          + " doesn't match volume " + volume);
-    }
-    container.populatePathFields(volume, containerPath);
-    container.importContainerData(containerPath);
-    return container;
   }
 
   private KeyValueContainer createNewContainer(

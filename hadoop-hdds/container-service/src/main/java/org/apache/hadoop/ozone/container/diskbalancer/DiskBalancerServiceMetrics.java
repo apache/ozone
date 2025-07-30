@@ -89,8 +89,8 @@ public final class DiskBalancerServiceMetrics {
     this.successBytes.incr(bytes);
   }
 
-  public void incrFailureCount() {
-    this.failureCount.incr();
+  public void incrFailureCount(long count) {
+    this.failureCount.incr(count);
   }
 
   public void incrRunningLoopCount() {

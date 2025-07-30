@@ -23,7 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -40,16 +42,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -68,11 +78,16 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocat
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.ozone.test.GenericTestUtils;
+import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -100,6 +115,87 @@ public class TestDiskBalancerTask {
   private static final long CONTAINER_ID = 1L;
   private static final long CONTAINER_SIZE = 1024L * 1024L; // 1 MB
 
+  private final TestFaultInjector kvFaultInjector = new TestFaultInjector();
+
+  /**
+   * A FaultInjector that can be configured to throw an exception on a
+   * specific invocation number. This allows tests to target failure points
+   * that occur after initial checks.
+   */
+  private static class TestFaultInjector extends FaultInjector {
+    private Throwable exception;
+    private int throwOnInvocation = -1; // -1 means never throw
+    private int invocationCount = 0;
+    private CountDownLatch ready;
+    private CountDownLatch wait;
+
+    TestFaultInjector() {
+      init();
+    }
+
+    @Override
+    public void init() {
+      this.ready = new CountDownLatch(1);
+      this.wait = new CountDownLatch(1);
+    }
+
+    @Override
+    public void pause() throws IOException {
+      ready.countDown();
+      try {
+        wait.await();
+      } catch (InterruptedException e) {
+        throw new IOException(e);
+      }
+    }
+
+    @Override
+    public void resume() throws IOException {
+      // Make sure injector pauses before resuming.
+      try {
+        ready.await();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+        Assertions.assertTrue(Fail.fail("resume interrupted"));
+      }
+      wait.countDown();
+    }
+
+    /**
+     * Sets an exception to be thrown on a specific invocation.
+     * @param e The exception to throw.
+     * @param onInvocation The invocation number to throw on (e.g., 1 for the
+     * first call, 2 for the second, etc.).
+     */
+    public void setException(Throwable e, int onInvocation) {
+      this.exception = e;
+      this.throwOnInvocation = onInvocation;
+      this.invocationCount = 0; // Reset count for each new test setup
+    }
+
+    @Override
+    public void setException(Throwable e) {
+      // Default to throwing on the first invocation if no number is specified.
+      setException(e, 1);
+    }
+
+    @Override
+    public Throwable getException() {
+      invocationCount++;
+      if (exception != null && invocationCount == throwOnInvocation) {
+        return exception;
+      }
+      return null;
+    }
+
+    @Override
+    public void reset() {
+      this.exception = null;
+      this.throwOnInvocation = -1;
+      this.invocationCount = 0;
+    }
+  }
+
   @BeforeEach
   public void setup() throws Exception {
     testRoot = tmpDir.toFile();
@@ -109,15 +205,28 @@ public class TestDiskBalancerTask {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         testRoot.getAbsolutePath() + "/vol1," + testRoot.getAbsolutePath()
             + "/vol2");
+    conf.setClass(SpaceUsageCheckFactory.Conf.configKeyForClassName(),
+        MockSpaceUsageCheckFactory.HalfTera.class,
+        SpaceUsageCheckFactory.class);
     volumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
+
+    List<StorageVolume> volumes = volumeSet.getVolumesList();
+    sourceVolume = (HddsVolume) volumes.get(0);
+    destVolume = (HddsVolume) volumes.get(1);
+
+    // reset volume's usedBytes
+    sourceVolume.incrementUsedSpace(0 - sourceVolume.getCurrentUsage().getUsedSpace());
+    destVolume.incrementUsedSpace(0 - destVolume.getCurrentUsage().getUsedSpace());
+    sourceVolume.incrementUsedSpace(sourceVolume.getCurrentUsage().getCapacity() / 2);
 
     containerSet = ContainerSet.newReadOnlyContainerSet(1000);
     ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler = new KeyValueHandler(conf, datanodeUuid,
         containerSet, volumeSet, containerMetrics, c -> {
     }, new ContainerChecksumTreeManager(conf));
+    keyValueHandler.setClusterID(scmId);
 
     Map<ContainerProtos.ContainerType, Handler> handlers = new HashMap<>();
     handlers.put(ContainerProtos.ContainerType.KeyValueContainer, keyValueHandler);
@@ -129,12 +238,13 @@ public class TestDiskBalancerTask {
     when(ozoneContainer.getDispatcher())
         .thenReturn(mock(ContainerDispatcher.class));
 
+    DiskBalancerConfiguration diskBalancerConfiguration = conf.getObject(DiskBalancerConfiguration.class);
+    diskBalancerConfiguration.setDiskBalancerShouldRun(true);
+    conf.setFromObject(diskBalancerConfiguration);
     diskBalancerService = new DiskBalancerServiceTestImpl(ozoneContainer,
         100, conf, 1);
 
-    List<StorageVolume> volumes = volumeSet.getVolumesList();
-    sourceVolume = (HddsVolume) volumes.get(0);
-    destVolume = (HddsVolume) volumes.get(1);
+    KeyValueContainer.setInjector(kvFaultInjector);
   }
 
   @AfterEach
@@ -150,51 +260,81 @@ public class TestDiskBalancerTask {
     if (testRoot.exists()) {
       FileUtils.deleteDirectory(testRoot);
     }
+
+    kvFaultInjector.reset();
+    KeyValueContainer.setInjector(null);
+    DiskBalancerService.setInjector(null);
   }
 
-  @Test
-  public void moveSuccess() throws IOException {
-    Container container = createContainer(CONTAINER_ID, sourceVolume);
+  @ParameterizedTest
+  @EnumSource(names = {"CLOSED", "QUASI_CLOSED"})
+  public void moveSuccess(State containerState) throws IOException {
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
+    long initialDestCommitted = destVolume.getCommittedBytes();
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
+
+    Container container = createContainer(CONTAINER_ID, sourceVolume, containerState);
+    State originalState = container.getContainerState();
+    assertEquals(initialSourceUsed + CONTAINER_SIZE, sourceVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
+
     String oldContainerPath = container.getContainerData().getContainerPath();
-
-    DiskBalancerService.DiskBalancerTask task = getTask(container.getContainerData());
+    DiskBalancerService.DiskBalancerTask task = getTask();
     task.call();
+    assertEquals(State.DELETED, container.getContainerState());
 
+    // Asserts
     Container newContainer = containerSet.getContainer(CONTAINER_ID);
     assertNotNull(newContainer);
     assertNotEquals(container, newContainer);
+    assertEquals(originalState, newContainer.getContainerState());
     assertEquals(destVolume, newContainer.getContainerData().getVolume());
-    assertEquals(initialSourceUsed - CONTAINER_SIZE,
-        sourceVolume.getCurrentUsage().getUsedSpace());
-    assertEquals(initialDestUsed + CONTAINER_SIZE,
-        destVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(initialDestUsed + CONTAINER_SIZE, destVolume.getCurrentUsage().getUsedSpace());
     assertFalse(new File(oldContainerPath).exists());
-    assertTrue(
-        new File(newContainer.getContainerData().getContainerPath()).exists());
-    assertEquals(1,
-        diskBalancerService.getMetrics().getSuccessCount());
-    assertEquals(CONTAINER_SIZE,
-        diskBalancerService.getMetrics().getSuccessBytes());
+    assertTrue(new File(newContainer.getContainerData().getContainerPath()).exists());
+    assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
+    assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   @Test
-  public void moveFailsOnCopy() throws IOException {
-    Container container = createContainer(CONTAINER_ID, sourceVolume);
+  public void moveFailsAfterCopy() throws IOException, InterruptedException, TimeoutException, ExecutionException {
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
+    long initialDestCommitted = destVolume.getCommittedBytes();
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
     String oldContainerPath = container.getContainerData().getContainerPath();
 
-    // Use spy ContainerController to inject failure during copy
-    ContainerController spyController = spy(controller);
-    doThrow(new IOException("Mockito spy: copy failed"))
-        .when(spyController).copyContainer(any(ContainerData.class), any(Path.class));
-    when(ozoneContainer.getController()).thenReturn(spyController);
+    // verify temp container directory doesn't exist before task execution
+    Path tempContainerDir = destVolume.getTmpDir().toPath()
+        .resolve(DiskBalancerService.DISK_BALANCER_DIR).resolve(String.valueOf(CONTAINER_ID));
+    File dir = new File(String.valueOf(tempContainerDir));
+    assertFalse(dir.exists(), "Temp container directory should not exist before task starts");
 
-    DiskBalancerService.DiskBalancerTask task = getTask(container.getContainerData());
-    task.call();
+    kvFaultInjector.setException(new IOException("Fault injection: copy failed"), 1);
+    final TestFaultInjector serviceFaultInjector = new TestFaultInjector();
+    DiskBalancerService.setInjector(serviceFaultInjector);
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    CompletableFuture completableFuture = CompletableFuture.runAsync(() -> task.call());
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return Files.exists(tempContainerDir) && !FileUtils.isEmptyDirectory(tempContainerDir.toFile());
+      } catch (IOException e) {
+        fail("Failed to check temp container directory existence", e);
+      }
+      return false;
+    }, 100, 30000);
+    assertTrue(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
 
+    serviceFaultInjector.resume();
+    // wait for task to be completed
+    completableFuture.get();
     Container originalContainer = containerSet.getContainer(CONTAINER_ID);
     assertNotNull(originalContainer);
     assertEquals(container, originalContainer);
@@ -203,30 +343,58 @@ public class TestDiskBalancerTask {
     assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
     assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
     assertTrue(new File(oldContainerPath).exists());
-    Path tempDir = destVolume.getTmpDir().toPath()
-        .resolve(DiskBalancerService.DISK_BALANCER_DIR);
-    assertFalse(Files.exists(tempDir),
-        "Temp directory should be cleaned up");
+    assertFalse(Files.exists(tempContainerDir), "Temp container directory should be cleaned up");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
+    assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   @Test
-  public void moveFailsOnImportContainer() throws IOException {
-    Container container = createContainer(CONTAINER_ID, sourceVolume);
+  public void moveFailsOnAtomicMove() throws IOException, InterruptedException, TimeoutException, ExecutionException {
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
+    long initialDestCommitted = destVolume.getCommittedBytes();
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
     String oldContainerPath = container.getContainerData().getContainerPath();
+    Path tempDir = destVolume.getTmpDir().toPath()
+        .resolve(DiskBalancerService.DISK_BALANCER_DIR)
+        .resolve(String.valueOf(CONTAINER_ID));
+    assertFalse(Files.exists(tempDir), "Temp container directory should not exist");
+    Path destDirPath = Paths.get(
+        KeyValueContainerLocationUtil.getBaseContainerLocation(
+            destVolume.getHddsRootDir().toString(), scmId,
+            container.getContainerData().getContainerID()));
+    assertFalse(Files.exists(destDirPath), "Dest container directory should not exist");
 
-    // Use spy to inject failure during the atomic move
-    ContainerController spyController = spy(controller);
-    doThrow(new IOException("Mockito spy: container import failed"))
-        .when(spyController).importContainer(any(ContainerData.class), any(Path.class));
-    when(ozoneContainer.getController()).thenReturn(spyController);
+    // create dest container directory
+    assertTrue(destDirPath.toFile().mkdirs());
+    // create one file in the dest container directory
+    Path testfile = destDirPath.resolve("testfile");
+    assertTrue(testfile.toFile().createNewFile());
 
-    DiskBalancerService.DiskBalancerTask task = getTask(
-        container.getContainerData());
-    task.call();
+    GenericTestUtils.LogCapturer serviceLog = GenericTestUtils.LogCapturer.captureLogs(DiskBalancerService.class);
+    final TestFaultInjector serviceFaultInjector = new TestFaultInjector();
+    DiskBalancerService.setInjector(serviceFaultInjector);
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    CompletableFuture completableFuture = CompletableFuture.runAsync(() -> task.call());
+    // wait for temp container directory to be created
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return Files.exists(tempDir) && !FileUtils.isEmptyDirectory(tempDir.toFile());
+      } catch (IOException e) {
+        fail("Failed to check temp container directory existence", e);
+      }
+      return false;
+    }, 100, 30000);
+    assertTrue(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    serviceFaultInjector.resume();
+    completableFuture.get();
 
+    String expectedString = "Container Directory " + destDirPath + " already exists and are not empty";
+    assertTrue(serviceLog.getOutput().contains(expectedString));
     Container originalContainer = containerSet.getContainer(CONTAINER_ID);
     assertNotNull(originalContainer);
     assertEquals(container, originalContainer);
@@ -234,19 +402,31 @@ public class TestDiskBalancerTask {
     assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
     assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
     assertTrue(new File(oldContainerPath).exists());
-    Path tempDir = destVolume.getTmpDir().toPath()
-        .resolve(DiskBalancerService.DISK_BALANCER_DIR)
-        .resolve(String.valueOf(CONTAINER_ID));
     assertFalse(Files.exists(tempDir), "Temp copy should be cleaned up");
+    assertTrue(Files.exists(destDirPath), "Dest container directory should not be cleaned up");
+    assertTrue(testfile.toFile().exists(), "testfile should not be cleaned up");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
+    assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   @Test
-  public void moveFailsDuringInMemoryUpdate() throws IOException {
-    Container container = createContainer(CONTAINER_ID, sourceVolume);
+  public void moveFailsDuringInMemoryUpdate()
+      throws IOException, InterruptedException, TimeoutException, ExecutionException {
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.QUASI_CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
+    long initialDestCommitted = destVolume.getCommittedBytes();
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
     String oldContainerPath = container.getContainerData().getContainerPath();
+    Path destDirPath = Paths.get(
+        KeyValueContainerLocationUtil.getBaseContainerLocation(
+            destVolume.getHddsRootDir().toString(), scmId,
+            container.getContainerData().getContainerID()));
+    assertFalse(Files.exists(destDirPath),
+        "Destination container should not exist before task execution");
 
     ContainerSet spyContainerSet = spy(containerSet);
     doThrow(new StorageContainerException("Mockito spy: updateContainer failed",
@@ -254,10 +434,23 @@ public class TestDiskBalancerTask {
         .when(spyContainerSet).updateContainer(any(Container.class));
     when(ozoneContainer.getContainerSet()).thenReturn(spyContainerSet);
 
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    CompletableFuture completableFuture = CompletableFuture.runAsync(() -> task.call());
 
-    DiskBalancerService.DiskBalancerTask task = getTask(
-        container.getContainerData());
-    task.call();
+    final TestFaultInjector serviceFaultInjector = new TestFaultInjector();
+    DiskBalancerService.setInjector(serviceFaultInjector);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return Files.exists(destDirPath) && !FileUtils.isEmptyDirectory(destDirPath.toFile());
+      } catch (IOException e) {
+        fail("Failed to check dest container directory existence", e);
+      }
+      return false;
+    }, 100, 30000);
+    assertTrue(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    serviceFaultInjector.resume();
+    // wait for task to be completed
+    completableFuture.get();
 
     // Asserts for rollback
     // The move succeeded on disk but should be reverted by the catch block
@@ -268,23 +461,27 @@ public class TestDiskBalancerTask {
     assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
     assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
     assertTrue(new File(oldContainerPath).exists());
+    assertFalse(FileUtils.isEmptyDirectory(new File(oldContainerPath)));
+    assertEquals(State.QUASI_CLOSED, originalContainer.getContainerState(),
+        "Container state should remain QUASI_CLOSED after rollback");
 
     // Verify the partially moved container at destination is cleaned up
-    String idDir = container.getContainerData().getOriginNodeId();
-    Path finalDestPath = Paths.get(
-        KeyValueContainerLocationUtil.getBaseContainerLocation(
-            destVolume.getHddsRootDir().toString(), idDir,
-            container.getContainerData().getContainerID()));
-    assertFalse(Files.exists(finalDestPath),
+    assertFalse(Files.exists(destDirPath),
         "Moved container at destination should be cleaned up on failure");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
+    assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   @Test
   public void moveFailsDuringOldContainerRemove() throws IOException {
-    Container container = createContainer(CONTAINER_ID, sourceVolume);
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
+    long initialDestCommitted = destVolume.getCommittedBytes();
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
 
     // Use a static mock for the KeyValueContainer utility class
     try (MockedStatic<KeyValueContainerUtil> mockedUtil =
@@ -294,35 +491,77 @@ public class TestDiskBalancerTask {
               any(KeyValueContainerData.class), any(OzoneConfiguration.class)))
           .thenThrow(new IOException("Mockito: old container delete() failed"));
 
-      DiskBalancerService.DiskBalancerTask task = getTask(
-          container.getContainerData());
+      DiskBalancerService.DiskBalancerTask task = getTask();
       task.call();
+
+      // Assertions for successful move despite old container cleanup failure
+      assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
+      assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
+      assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
+
+      // Verify new container is active on the destination volume
+      Container newContainer = containerSet.getContainer(CONTAINER_ID);
+      assertNotNull(newContainer);
+      assertNotEquals(container, newContainer);
+      assertEquals(destVolume, newContainer.getContainerData().getVolume());
+      assertTrue(new File(newContainer.getContainerData().getContainerPath()).exists());
+
+      // Verify old container still exists
+      assertTrue(new File(container.getContainerData().getContainerPath()).exists());
+      assertFalse(FileUtils.isEmptyDirectory(new File(container.getContainerData().getContainerPath())));
+      assertEquals(State.DELETED, container.getContainerState());
+
+      // Verify volume usage is updated correctly
+      assertEquals(initialSourceUsed,
+          sourceVolume.getCurrentUsage().getUsedSpace());
+      assertEquals(initialDestUsed + CONTAINER_SIZE,
+          destVolume.getCurrentUsage().getUsedSpace());
+      assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
+      assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+      assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
     }
-
-    // Assertions for successful move despite old container cleanup failure
-    assertEquals(1, diskBalancerService.getMetrics().getSuccessCount());
-    assertEquals(0, diskBalancerService.getMetrics().getFailureCount());
-    assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
-
-    // Verify new container is active on the destination volume
-    Container newContainer = containerSet.getContainer(CONTAINER_ID);
-    assertNotNull(newContainer);
-    assertEquals(destVolume, newContainer.getContainerData().getVolume());
-    assertTrue(new File(newContainer.getContainerData().getContainerPath()).exists());
-
-    // Verify volume usage is updated correctly
-    assertEquals(initialSourceUsed - CONTAINER_SIZE,
-        sourceVolume.getCurrentUsage().getUsedSpace());
-    assertEquals(initialDestUsed + CONTAINER_SIZE,
-        destVolume.getCurrentUsage().getUsedSpace());
   }
 
-  private KeyValueContainer createContainer(long containerId, HddsVolume vol)
+  @Test
+  public void testDestVolumeCommittedSpaceReleased() throws IOException {
+    createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
+    long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
+    long initialDestCommitted = destVolume.getCommittedBytes();
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
+
+    GenericTestUtils.LogCapturer serviceLog = GenericTestUtils.LogCapturer.captureLogs(DiskBalancerService.class);
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    long defaultContainerSize = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    // verify committed space is reserved for destination volume
+    assertEquals(defaultContainerSize, destVolume.getCommittedBytes() - initialDestCommitted);
+
+    // delete the container from containerSet to simulate a failure
+    containerSet.removeContainer(CONTAINER_ID);
+
+    task.call();
+    String expectedString = "Container " + CONTAINER_ID + " doesn't exist in ContainerSet";
+    assertTrue(serviceLog.getOutput().contains(expectedString));
+    Container originalContainer = containerSet.getContainer(CONTAINER_ID);
+    assertNull(originalContainer);
+    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(0, destVolume.getCommittedBytes() - initialDestCommitted);
+    assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
+    assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
+  }
+
+  private KeyValueContainer createContainer(long containerId, HddsVolume vol, State state)
       throws IOException {
     KeyValueContainerData containerData = new KeyValueContainerData(
         containerId, ContainerLayoutVersion.FILE_PER_BLOCK, CONTAINER_SIZE,
         UUID.randomUUID().toString(), datanodeUuid);
-    containerData.setState(State.CLOSED);
+    containerData.setState(state);
     containerData.getStatistics().setBlockBytesForTesting(CONTAINER_SIZE);
 
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
@@ -337,8 +576,7 @@ public class TestDiskBalancerTask {
     return container;
   }
 
-  private DiskBalancerService.DiskBalancerTask getTask(ContainerData data) {
-    return diskBalancerService.createDiskBalancerTask(data, sourceVolume,
-        destVolume);
+  private DiskBalancerService.DiskBalancerTask getTask() {
+    return (DiskBalancerService.DiskBalancerTask) diskBalancerService.getTasks().poll();
   }
 }

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -52,7 +53,7 @@ import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBa
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -275,7 +276,7 @@ public class TestDiskBalancerService {
         false, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(info);
 
-    VolumeChoosingPolicy volumePolicy = mock(VolumeChoosingPolicy.class);
+    DiskBalancerVolumeChoosingPolicy volumePolicy = mock(DiskBalancerVolumeChoosingPolicy.class);
     ContainerChoosingPolicy containerPolicy = mock(ContainerChoosingPolicy.class);
     svc.setVolumeChoosingPolicy(volumePolicy);
     svc.setContainerChoosingPolicy(containerPolicy);
@@ -289,7 +290,7 @@ public class TestDiskBalancerService {
     when(containerData.getContainerID()).thenAnswer(invocation -> System.nanoTime());
     when(containerData.getBytesUsed()).thenReturn(100L);
 
-    when(volumePolicy.chooseVolume(any(), anyDouble(), any())).thenReturn(Pair.of(source, dest));
+    when(volumePolicy.chooseVolume(any(), anyDouble(), any(), anyLong())).thenReturn(Pair.of(source, dest));
     when(containerPolicy.chooseContainer(any(), any(), any())).thenReturn(containerData);
 
     // Test when no tasks are in progress, it should schedule up to the limit

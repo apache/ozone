@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
@@ -139,29 +138,5 @@ public final class HddsVolumeUtil {
     hddsVolumes.forEach(hddsVolume ->
         hddsVolume.setDbVolume(globalDbVolumeMap.getOrDefault(
             hddsVolume.getStorageID(), null)));
-  }
-
-  /**
-   * Get the HddsVolume according to the path.
-   * @param volumes volume list to match from
-   * @param pathStr path to match
-   */
-  public static HddsVolume matchHddsVolume(List<HddsVolume> volumes,
-      String pathStr) throws IOException {
-    assert pathStr != null;
-    List<HddsVolume> resList = new ArrayList<>();
-    for (HddsVolume hddsVolume: volumes) {
-      if (pathStr.startsWith(hddsVolume.getVolumeRootDir())) {
-        resList.add(hddsVolume);
-      }
-    }
-    if (resList.size() == 1) {
-      return resList.get(0);
-    } else if (resList.size() > 1) {
-      throw new IOException("Get multi volumes " +
-          resList.stream().map(HddsVolume::getVolumeRootDir).collect(
-              Collectors.joining(",")) + " matching path " + pathStr);
-    }
-    return null;
   }
 }
