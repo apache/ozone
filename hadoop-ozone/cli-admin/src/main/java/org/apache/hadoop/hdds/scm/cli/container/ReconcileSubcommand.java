@@ -108,8 +108,8 @@ public class ReconcileSubcommand extends ScmSubcommand {
       try {
         scmClient.reconcileContainer(containerID);
         System.out.println("Reconciliation has been triggered for container " + (long) containerID);
-        System.out.println("Use \"ozone admin container reconcile --status " + containerID + "\" to see the checksums of " +
-            "each container replica");
+        System.out.println("Use \"ozone admin container reconcile --status " + containerID + 
+            "\" to see the checksums of each container replica");
       } catch (Exception ex) {
         System.err.println("Failed to trigger reconciliation for container " + containerID + ": " + ex.getMessage());
         failureCount++;
