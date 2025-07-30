@@ -31,8 +31,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *    uncommitted state.
  *
  * 2. Committed bytes: Information on space occupied by keys that have been
- *    committed. This is encapsulated in the {@link CommittedBytes} object,
- *    which provides further categorization based on key types (e.g., FSO, OBS, legacy).
+ *    committed.
  *
  * 3. Deletion-pending bytes: Information on the space occupied by keys that
  *    are marked for deletion but are still occupying storage. This is organized
@@ -49,12 +48,12 @@ public class UsedSpaceBreakDown {
   private long openKeysBytes;
 
   @JsonProperty("committedBytes")
-  private CommittedBytes committedBytes;
+  private long committedBytes;
 
   @JsonProperty("deletionPendingBytes")
   private DeletionPendingBytesByStage deletionPendingBytesByStage;
 
-  public UsedSpaceBreakDown(long openKeysBytes, CommittedBytes committedBytes,
+  public UsedSpaceBreakDown(long openKeysBytes, long committedBytes,
       DeletionPendingBytesByStage deletionPendingBytesByStage) {
     this.openKeysBytes = openKeysBytes;
     this.committedBytes = committedBytes;
@@ -65,7 +64,7 @@ public class UsedSpaceBreakDown {
     return openKeysBytes;
   }
 
-  public CommittedBytes getCommittedBytes() {
+  public long getCommittedBytes() {
     return committedBytes;
   }
 
