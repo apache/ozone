@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransaction
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.recon.api.types.CommittedBytes;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DeletionPendingBytesByStage;
@@ -128,7 +127,7 @@ public class StorageDistributionEndpoint {
         .setGlobalNamespace(new GlobalNamespaceReport(namespaceMetrics.get("totalUsedNamespace"), 0))
         .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
             namespaceMetrics.get("totalOpenKeySize"),
-            new CommittedBytes(namespaceMetrics.get("totalCommittedSize"), 0, 0, 0),
+            namespaceMetrics.get("totalCommittedSize"),
             deletionPendingBytesByStage))
         .build();
   }
