@@ -21,13 +21,15 @@ Implement a **Staged Reprocessing Architecture** that leverages the existing sta
 1. **Staging Database Creation**: Create staging instance of Recon rocksDB where ReconOmTask data tables will be processed without impacting production rocksDB tables.
 2. **Parallel Reprocessing**: Process full snapshot data into staging tables while production tables remain accessible
 3. **Atomic Switchover**: Atomically replace production tables with staging tables once all respective concurrently running tasks complete successfully. 
-4  **Rollback Capability**: Provide a rollback mechanism in case of reprocessing failures
+4. **Rollback Capability**: Provide a rollback mechanism in case of reprocessing failures
+5. **Enhanced Monitoring**: Introduce metrics and health checks to monitor staging operations
 
 ### Benefits
 - **Zero Downtime**: Recon APIs remain functional even during full snapshot recovery and bootstrapping.
 - **Data Consistency**: Atomic switchover ensures a consistent view across all task data, because once all the tasks complete their reprocessing and success, then the staging tables are switched to production tables, else failure of one task which is related, may provide data inconsistency. E.g. OmTableInsightTask (Number of keys, Number of buckets etc) and NSSummary tree. This is how the current architecture works as well.
 - **Failure Resilience**: Rollback capability ensures system stability during failures
 - **Performance Isolation**: Reprocessing load doesn't impact API query performance
+- **Minimal Disk Usage**: Staging tables can be cleaned up after successful switch, minimizing disk usage. Full OM DB tar ball is already stored in the Recon OM DB, so no need to store it again in the staging area.
 
 ---
 
@@ -35,7 +37,7 @@ Implement a **Staged Reprocessing Architecture** that leverages the existing sta
 
 ### 2.1 Current Sync Flow
 
-![Recon OM DB Processing & Fallback Flow](./A_flowchart_digital_illustration_depicts_a_data_sy.png)
+![Recon OM DB Processing & Fallback Flow](flowchart.png)
 
 > **Figure:** Full‐snapshot fallback path: OM DB delta error → fetch full snapshot → concurrently trigger tasks (`OmTableInsightTask`, `NSSummaryTask`, `ContainerKeyMapperTask`, `FileSizeCountTask`) → each task clears its Recon metadata tables → API reads from those cleared tables (empty) → **User Experience Impacted**
 
