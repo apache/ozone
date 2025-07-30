@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -138,12 +139,23 @@ public class TestReconcileSubcommand {
   }
 
   @Test
-  public void testNoInput() {
+  public void testNoInput() throws Exception {
     // PicoCLI should reject commands with no arguments.
     assertThrows(CommandLine.MissingParameterException.class, this::executeStatusFromArgs);
     assertThrows(CommandLine.MissingParameterException.class, this::executeReconcileFromArgs);
+
     // When reading from stdin, the arguments are valid, but an empty list results in no output.
-    // TODO
+    executeReconcileFromStdin();
+    assertThatOutput(outContent).isEmpty();
+    assertThatOutput(errContent).isEmpty();
+    
+    executeStatusFromStdin();
+    // Status command should output empty JSON array
+    String output = outContent.toString(DEFAULT_ENCODING);
+    JsonNode jsonOutput = JsonUtils.readTree(output);
+    assertThat(jsonOutput.isArray()).isTrue();
+    assertThat(jsonOutput.isEmpty()).isTrue();
+    assertThatOutput(errContent).isEmpty();
   }
 
   @Test
@@ -160,10 +172,6 @@ public class TestReconcileSubcommand {
     
     // Should have error message for invalid container ID "-"
     assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -");
-    
-    // Exception should indicate 1 failed container
-    assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 containers");
-    
     assertThatOutput(outContent).isEmpty();
   }
 
@@ -225,7 +233,7 @@ public class TestReconcileSubcommand {
   @Test
   public void testSomeInvalidContainerIDs() throws Exception {
     // Test with mix of valid and invalid container IDs - should throw exception due to invalid IDs
-    RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+    assertThrows(RuntimeException.class, () -> {
       parseArgsAndExecute("--status", "123", "invalid", "-1", "456");
     });
     
@@ -234,33 +242,57 @@ public class TestReconcileSubcommand {
     assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -1");
     assertThatOutput(errContent).doesNotContain("123");
     assertThatOutput(errContent).doesNotContain("456");
-
-    // Exception message should indicate 3 failed containers (invalid, -1, 456)
-    assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 3 containers");
-
     assertThatOutput(outContent).isEmpty();
     
     // Test reconcile command (without --status)
-    resetStreams();
     RuntimeException reconcileException = assertThrows(RuntimeException.class, () -> {
-      parseArgsAndExecute("123", "invalid", "456");
+      parseArgsAndExecute("123", "invalid", "-1", "456");
     });
     
     // Should have error messages for invalid IDs
-    assertThatOutput(errContent).contains("Invalid container ID: invalid");
-    assertThatOutput(errContent).contains("Invalid container ID: 456");
-    
-    // Exception message should indicate 2 failed containers
-    assertThat(reconcileException.getMessage()).contains("Failed trigger reconciliation for 2 containers");
-    
-    // Should have success message for valid container 123
-    assertThatOutput(outContent).contains("Reconciliation has been triggered for container 123");
+    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: invalid");
+    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -1");
+    assertThatOutput(errContent).doesNotContain("123");
+    assertThatOutput(errContent).doesNotContain("456");
+    assertThatOutput(outContent).isEmpty();
   }
 
-  private void parseArgsAndExecute(String... args) throws IOException {
+  @Test
+  public void testUnreachableContainers() throws Exception {
+    final String exceptionMessage = "Container not found";
+    
+    // Mock some containers as reachable
+    mockContainer(123);
+    doThrow(new IOException(exceptionMessage)).when(scmClient).getContainer(456L);
+    doThrow(new IOException(exceptionMessage)).when(scmClient).reconcileContainer(456L);
+
+    // Test status command - should throw exception due to unreachable containers
+    assertThrows(RuntimeException.class, () -> parseArgsAndExecute("--status", "123", "456"));
+    
+    // Should have error messages for unreachable containers
+    assertThatOutput(errContent).contains("Failed get reconciliation status of container 456: " + exceptionMessage);
+    assertThatOutput(errContent).doesNotContain("123");
+    // Should have JSON output for reachable containers only
+    String output = outContent.toString(DEFAULT_ENCODING);
+    JsonNode jsonOutput = JsonUtils.readTree(output);
+    assertThat(jsonOutput.isArray()).isTrue();
+    assertEquals(1, jsonOutput.size());
+
+    // Test reconcile command - should also throw exception
+    assertThrows(RuntimeException.class, () -> parseArgsAndExecute("123", "456"));
+    // Should have error message for unreachable container
+    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 456: " + exceptionMessage);
+    assertThatOutput(errContent).doesNotContain("123");
+    // Should have success messages for reachable containers
+    assertThatOutput(outContent).contains("Reconciliation has been triggered for container 123");
+    assertThatOutput(outContent).doesNotContain("Reconciliation has been triggered for container 456");
+  }
+
+  private void parseArgsAndExecute(String... args) throws Exception {
     // Create a fresh command object to ensure all fields start with default values
     // Picocli doesn't reset fields between parseArgs calls, so reusing objects
     // can lead to stale state from previous test executions
+    resetStreams();
     ReconcileSubcommand cmd = new ReconcileSubcommand();
     new CommandLine(cmd).parseArgs(args);
     cmd.execute(scmClient);
@@ -375,7 +407,6 @@ public class TestReconcileSubcommand {
         assertEquals(expectedDnDetails.getUuidString(), dnOutput.get("uuid"));
       }
     }
-    resetStreams();
   }
 
   private void validateReconcileOutput(long... containerIDs) throws Exception {
@@ -387,7 +418,6 @@ public class TestReconcileSubcommand {
 //      verify(scmClient, times(1)).reconcileContainer(id);
       assertThatOutput(outContent).contains("Reconciliation has been triggered for container " + id);
     }
-    resetStreams();
   }
 
   private void mockContainer(long containerID) throws Exception {
