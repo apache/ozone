@@ -36,6 +36,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
@@ -55,7 +56,9 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
@@ -447,7 +450,7 @@ public class DiskBalancerService extends BackgroundService {
     return false;
   }
 
-  private class DiskBalancerTask implements BackgroundTask {
+  protected class DiskBalancerTask implements BackgroundTask {
 
     private HddsVolume sourceVolume;
     private HddsVolume destVolume;
@@ -468,15 +471,36 @@ public class DiskBalancerService extends BackgroundService {
       boolean destVolumeIncreased = false;
       Path diskBalancerTmpDir = null, diskBalancerDestDir = null;
       long containerSize = containerData.getBytesUsed();
+      String originalContainerChecksum = containerData.getContainerFileChecksum();
       try {
+        // Step 1: Copy container to new Volume's tmp Dir
         diskBalancerTmpDir = destVolume.getTmpDir().toPath()
             .resolve(DISK_BALANCER_DIR).resolve(String.valueOf(containerId));
-
-        // Copy container to new Volume's tmp Dir
         ozoneContainer.getController().copyContainer(containerData,
             diskBalancerTmpDir);
 
-        // Move container directory to final place on new volume
+        // Step 2: verify checksum and Transition Temp container to Temp C1-RECOVERING
+        File tempContainerFile = ContainerUtils.getContainerFile(
+            diskBalancerTmpDir.toFile());
+        if (!tempContainerFile.exists()) {
+          throw new IOException("ContainerFile for container " + containerId
+              + " doesn't exist in temp directory "
+              + tempContainerFile.getAbsolutePath());
+        }
+        ContainerData tempContainerData = ContainerDataYaml
+            .readContainerFile(tempContainerFile);
+        String copiedContainerChecksum = tempContainerData.getContainerFileChecksum();
+        if (!originalContainerChecksum.equals(copiedContainerChecksum)) {
+          throw new IOException("Container checksum mismatch for container "
+              + containerId + ". Original: " + originalContainerChecksum
+              + ", Copied: " + copiedContainerChecksum);
+        }
+        tempContainerData.setState(ContainerProtos.ContainerDataProto.State.RECOVERING);
+
+        // overwrite the .container file with the new state.
+        ContainerDataYaml.createContainerFile(tempContainerData, tempContainerFile);
+
+        // Step 3: Move container directory to final place on new volume
         String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
             destVolume, destVolume.getClusterID());
         diskBalancerDestDir =
@@ -491,7 +515,7 @@ public class DiskBalancerService extends BackgroundService {
             StandardCopyOption.ATOMIC_MOVE,
             StandardCopyOption.REPLACE_EXISTING);
 
-        // Generate a new Container based on destDir
+        // Generate a new Container based on destDir which is in C1-RECOVERING state.
         File containerFile = ContainerUtils.getContainerFile(
             diskBalancerDestDir.toFile());
         if (!containerFile.exists()) {
@@ -506,16 +530,40 @@ public class DiskBalancerService extends BackgroundService {
             .incrementUsedSpace(containerSize);
         destVolumeIncreased = true;
 
-        // Update container for containerID
+        // The import process loaded the temporary RECOVERING state from disk.
+        // Now, restore the original state and persist it to the .container file.
+        newContainer.getContainerData().setState(containerData.getState());
+        newContainer.update(newContainer.getContainerData().getMetadata(), true);
+
+        // Step 5: Update container for containerID and delete old container.
         Container oldContainer = ozoneContainer.getContainerSet()
             .getContainer(containerId);
         oldContainer.writeLock();
         try {
+          // First, update the in-memory set to point to the new replica.
           ozoneContainer.getContainerSet().updateContainer(newContainer);
-          oldContainer.delete();
+
+          // Mark old container as DELETED and persist state.
+          oldContainer.getContainerData().setState(
+              ContainerProtos.ContainerDataProto.State.DELETED);
+          oldContainer.update(oldContainer.getContainerData().getMetadata(),
+              true);
+
+          // Remove the old container from the KeyValueContainerUtil.
+          try {
+            KeyValueContainerUtil.removeContainer(
+                (KeyValueContainerData) oldContainer.getContainerData(), conf);
+            oldContainer.delete();
+          } catch (IOException ex) {
+            LOG.warn("Failed to cleanup old container {} after move. It is " +
+                    "marked DELETED and will be handled by background scanners.",
+                containerId, ex);
+          }
         } finally {
           oldContainer.writeUnlock();
         }
+
+        //The move is now successful.
         oldContainer.getContainerData().getVolume()
             .decrementUsedSpace(containerSize);
         balancedBytesInLastWindow.addAndGet(containerSize);
@@ -640,6 +688,15 @@ public class DiskBalancerService extends BackgroundService {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
+  }
+
+  @VisibleForTesting
+  public DiskBalancerTask createDiskBalancerTask(ContainerData containerData, HddsVolume source, HddsVolume dest) {
+    inProgressContainers.add(containerData.getContainerID());
+    deltaSizes.put(source, deltaSizes.getOrDefault(source, 0L)
+        - containerData.getBytesUsed());
+    dest.incCommittedBytes(containerData.getBytesUsed());
+    return new DiskBalancerTask(containerData, source, dest);
   }
 
   @VisibleForTesting
