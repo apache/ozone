@@ -121,3 +121,49 @@ execute_robot_test om3 kinit.robot
 
 # This test checks the disk on the node it's running. It needs to be run on om3.
 execute_robot_test om3 -v BOOTSTRAPPED_OM:${bootstrap_om} -v VOLUME:${volume} -v BUCKET:${bucket} -v SNAP_1:${snap1} -v SNAP_2:${snap2} -v KEY_PREFIX:${keyPrefix} -v KEY_1:${key1} -v KEY_2:${key2} omha/data-validation-after-om-bootstrap.robot
+
+echo "Check that om4 isn't running"
+om4_service=$(execute_command_in_container om4 ps aux | grep 'OzoneManagerStarter' || true)
+
+if [[ $om4_service != "" ]]
+then
+  echo "om4 is running, exiting..."
+  exit 1
+fi
+
+echo "Check that om4 has no data"
+om4_data=$(execute_command_in_container om4 ls -lah /data | grep 'metadata' || true)
+
+if [[ $om4_data != "" ]]
+then
+  echo "om4 has data, exiting..."
+  exit 1
+fi
+
+# Init om4 and start the om daemon in the background
+execute_command_in_container om4 ozone om --init
+execute_command_in_container -d om4 ozone om
+wait_for_port om4 9872 120
+
+echo "Check that om4 is running"
+om4_service=$(execute_command_in_container om4 ps aux | grep 'OzoneManagerStarter' || true)
+
+if [[ $om4_service == "" ]]
+then
+  echo "om4 isn't running, exiting..."
+  exit 1
+fi
+
+echo "Check that om4 has data"
+om4_data=$(execute_command_in_container om4 ls -lah /data | grep 'metadata' || true)
+
+if [[ $om4_data == "" ]]
+then
+  echo "om4 has no data, exiting..."
+  exit 1
+fi
+
+execute_robot_test om4 kinit.robot
+
+# This test checks the disk on the node it's running. It needs to be run on om4.
+#execute_robot_test om4 -v BOOTSTRAPPED_OM:${bootstrap_om} -v VOLUME:${volume} -v BUCKET:${bucket} -v SNAP_1:${snap1} -v SNAP_2:${snap2} -v KEY_PREFIX:${keyPrefix} -v KEY_1:${key1} -v KEY_2:${key2} omha/data-validation-after-om-bootstrap.robot

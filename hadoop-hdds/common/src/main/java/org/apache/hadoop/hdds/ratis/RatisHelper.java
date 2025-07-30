@@ -544,6 +544,12 @@ public final class RatisHelper {
           + group.getPeers().stream().map(RaftPeer::getId)
               .collect(Collectors.toList()) + ".");
     }
+    if (!group.getPeer(targetPeerId).getStartupRole().equals(RaftProtos.RaftPeerRole.FOLLOWER)) {
+      throw new IOException("Target " + targetPeerId + " not in FOLLOWER role. "
+          + group.getPeers().stream()
+          .map(p -> p.getId() + ":" + p.getStartupRole())
+          .collect(Collectors.toList()) + ".");
+    }
 
     LOG.info("Start transferring leadership to {}", targetPeerId);
     try (RaftClient client = newRaftClient(SupportedRpcType.GRPC, null,
