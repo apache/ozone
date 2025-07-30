@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
-import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
+import org.apache.hadoop.ozone.s3web.s3secret.S3SecretConfigKeys;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.

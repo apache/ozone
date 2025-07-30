@@ -150,20 +150,6 @@ public final class S3ErrorTable {
       HTTP_FORBIDDEN
   );
 
-  public static final OS3Exception MISSING_PARAMETER = new OS3Exception(
-      "MissingParameter", "A required parameter is missing from the request.",
-      HTTP_BAD_REQUEST
-  );
-
-  public static final OS3Exception INVALID_PARAMETER_VALUE = new OS3Exception(
-      "InvalidParameterValue", "The value of a parameter is invalid.",
-      HTTP_BAD_REQUEST
-  );
-
-  public static final OS3Exception INVALID_ACTION = new OS3Exception(
-      "InvalidAction", "The specified action is not valid for this resource.",
-      HTTP_BAD_REQUEST
-  );
   private static Function<Exception, OS3Exception> generateInternalError =
       e -> new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
 

@@ -1,4 +1,3 @@
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
@@ -16,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3sts;
+package org.apache.hadoop.ozone.s3web.s3secret;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
@@ -33,9 +32,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 
 /**
- * Base class for STS endpoints.
+ * Base implementation of endpoint for working with S3 secret.
  */
-public class S3STSEndpointBase implements Auditor {
+public class S3SecretEndpointBase implements Auditor {
 
   @Context
   private ContainerRequestContext context;

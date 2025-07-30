@@ -15,19 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3secret;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import javax.ws.rs.NameBinding;
-
 /**
- * Annotation to disable S3 Secure Endpoint.
+ * This package contains the top level generic classes of s3 secret gateway.
  */
-@NameBinding
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD})
-public @interface S3SecretEnabled {
-}
+package org.apache.hadoop.ozone.s3web.s3secret;

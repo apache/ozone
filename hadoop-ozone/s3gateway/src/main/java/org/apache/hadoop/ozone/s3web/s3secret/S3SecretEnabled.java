@@ -14,7 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.s3sts;
+
+package org.apache.hadoop.ozone.s3web.s3secret;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -23,12 +24,10 @@ import java.lang.annotation.Target;
 import javax.ws.rs.NameBinding;
 
 /**
- * Annotation to disable S3 STS Endpoint.
+ * Annotation to disable S3 Secure Endpoint.
  */
 @NameBinding
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
-public @interface S3STSEnabled {
+public @interface S3SecretEnabled {
 }
-
-

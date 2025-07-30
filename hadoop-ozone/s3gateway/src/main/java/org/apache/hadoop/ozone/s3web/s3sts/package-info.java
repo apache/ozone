@@ -15,19 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3secret;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import javax.ws.rs.NameBinding;
-
 /**
- * Annotation to only allow admin users to access the endpoint.
+ * This package contains the AWS STS (Security Token Service) compatible API for S3 Gateway.
  */
-@NameBinding
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD})
-public @interface S3AdminEndpoint {
-}
+package org.apache.hadoop.ozone.s3web.s3sts;

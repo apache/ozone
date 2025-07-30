@@ -14,16 +14,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.s3sts;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+package org.apache.hadoop.ozone.s3web.s3sts;
+
+import static org.apache.hadoop.ozone.s3web.s3sts.S3STSConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY;
+
+import java.io.IOException;
 import javax.inject.Inject;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.core.Response;
-import java.io.IOException;
-
-import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
  * Filter that disables all endpoints annotated with {@link S3STSEnabled}.
@@ -32,15 +33,12 @@ import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_HTTP_E
  */
 @S3STSEnabled
 
-public class S3STSEnabledEndpointRequestFilter
-  implements ContainerRequestFilter {
-
+public class S3STSEnabledEndpointRequestFilter implements ContainerRequestFilter {
   @Inject
   private OzoneConfiguration ozoneConfiguration;
 
   @Override
-  public void filter(ContainerRequestContext requestContext)
-    throws IOException {
+  public void filter(ContainerRequestContext requestContext) throws IOException {
     boolean isSTSEnabled = ozoneConfiguration.getBoolean(
         OZONE_S3G_STS_HTTP_ENABLED_KEY, false);
     if (!isSTSEnabled) {

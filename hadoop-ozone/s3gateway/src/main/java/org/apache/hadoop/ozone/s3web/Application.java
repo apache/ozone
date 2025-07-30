@@ -14,28 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.s3sts;
 
-public class S3STSConfigKeys {
-  /**
-   * This class contains constants for configuration keys used
-   * in S3 STS endpoint.
-   */
-  public static final String OZONE_S3G_STS_HTTP_ENABLED_KEY =
-      "ozone.s3g.sts.http.enabled";
-  public static final boolean OZONE_S3G_STS_HTTP_ENABLED_KEY_DEFAULT =
-      false;
-  public static final String OZONE_S3G_STS_HTTP_AUTH_CONFIG_PREFIX =
-      "ozone.s3g.secret.http.auth.";
-  public static final String OZONE_S3G_STS_HTTP_AUTH_TYPE_KEY =
-      OZONE_S3G_STS_HTTP_AUTH_CONFIG_PREFIX + "type";
-  public static final String OZONE_S3G_STS_HTTP_AUTH_TYPE_DEFAULT =
-      "kerberos";
+package org.apache.hadoop.ozone.s3web;
 
-  /**
-   * Never constructed.
-   */
-  private S3STSConfigKeys() {
+import org.glassfish.jersey.server.ResourceConfig;
 
+/**
+ * JaxRS resource definition.
+ */
+public class Application extends ResourceConfig {
+  public Application() {
+    packages(true, "org.apache.hadoop.ozone.s3web");
   }
 }

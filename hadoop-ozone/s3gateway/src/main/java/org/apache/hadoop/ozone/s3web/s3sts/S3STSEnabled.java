@@ -1,4 +1,3 @@
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
@@ -16,15 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3sts;
+package org.apache.hadoop.ozone.s3web.s3sts;
 
-import org.glassfish.jersey.server.ResourceConfig;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import javax.ws.rs.NameBinding;
 
 /**
- * JAX-RS application for the STS endpoint.
+ * Annotation to disable S3 STS Endpoint.
  */
-public class Application extends ResourceConfig {
-  public Application() {
-    packages("org.apache.hadoop.ozone.s3sts");
-  }
+@NameBinding
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface S3STSEnabled {
 }
+
+

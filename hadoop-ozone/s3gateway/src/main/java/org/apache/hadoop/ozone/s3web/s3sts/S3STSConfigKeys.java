@@ -1,4 +1,3 @@
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
@@ -16,7 +15,28 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.s3web.s3sts;
+
 /**
- * This package contains the AWS STS (Security Token Service) compatible API for S3 Gateway.
+ * This class contains constants for configuration keys used
+ * in S3 STS endpoint.
  */
-package org.apache.hadoop.ozone.s3sts;
+public final class S3STSConfigKeys {
+  public static final String OZONE_S3G_STS_HTTP_ENABLED_KEY =
+      "ozone.s3g.sts.http.enabled";
+  public static final boolean OZONE_S3G_STS_HTTP_ENABLED_KEY_DEFAULT =
+      false;
+  public static final String OZONE_S3G_STS_HTTP_AUTH_CONFIG_PREFIX =
+      "ozone.s3g.secret.http.auth.";
+  public static final String OZONE_S3G_STS_HTTP_AUTH_TYPE_KEY =
+      OZONE_S3G_STS_HTTP_AUTH_CONFIG_PREFIX + "type";
+  public static final String OZONE_S3G_STS_HTTP_AUTH_TYPE_DEFAULT =
+      "kerberos";
+
+  /**
+   * Never constructed.
+   */
+  private S3STSConfigKeys() {
+
+  }
+}

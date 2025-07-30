@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3sts;
+package org.apache.hadoop.ozone.s3web.s3sts;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -38,9 +38,6 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.getInternalError;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
-
 /**
  * AWS STS (Security Token Service) compatible endpoint for Ozone S3 Gateway.
  * <p>
@@ -52,7 +49,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
  *
  * @see <a href="https://docs.aws.amazon.com/STS/latest/APIReference/">AWS STS API Reference</a>
  */
-@Path("/")
+@Path("/sts/")
 public class S3STSEndpoint extends S3STSEndpointBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(S3STSEndpoint.class);
@@ -87,7 +84,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
    */
   @GET
   @Produces(MediaType.APPLICATION_XML)
-  public Response handleSTSGet(
+  public Response get(
       @QueryParam("Action") String action,
       @QueryParam("RoleArn") String roleArn,
       @QueryParam("RoleSessionName") String roleSessionName,
@@ -110,7 +107,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
    */
   @POST
   @Produces(MediaType.APPLICATION_XML)
-  public Response handleSTSPost(
+  public Response post(
       @FormParam("Action") String action,
       @FormParam("RoleArn") String roleArn,
       @FormParam("RoleSessionName") String roleSessionName,
@@ -122,48 +119,50 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
   private Response handleSTSRequest(String action, String roleArn, String roleSessionName,
       Integer durationSeconds, String version) throws OS3Exception {
-
     try {
-
-      // Default action if not specified (following AWS behavior)
       if (action == null) {
-        throw newError(S3ErrorTable.MISSING_PARAMETER, STS_ACTION_PARAM);
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("Missing required parameter: " + STS_ACTION_PARAM)
+            .build();
       }
-
-      // Validate and normalize duration
       int duration;
       try {
         duration = validateDuration(durationSeconds);
       } catch (IllegalArgumentException e) {
-        throw newError(S3ErrorTable.INVALID_PARAMETER_VALUE,
-            ROLE_DURATION_SECONDS_PARAM, e);
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("Invalid DurationSeconds: " + e.getMessage())
+            .build();
       }
 
-      // Handle different STS actions
       switch (action) {
-        case ASSUME_ROLE_ACTION:
-          return handleAssumeRole(roleArn, roleSessionName, duration);
-
-        // All other STS operations are not supported yet
-        case GET_SESSION_TOKEN_ACTION:
-        case ASSUME_ROLE_WITH_SAML_ACTION:
-        case ASSUME_ROLE_WITH_WEB_IDENTITY_ACTION:
-        case GET_CALLER_IDENTITY_ACTION:
-        case DECODE_AUTHORIZATION_MESSAGE_ACTION:
-        case GET_ACCESS_KEY_INFO_ACTION:
-          throw newError(S3ErrorTable.NOT_IMPLEMENTED, action);
-        default:
-          throw newError(S3ErrorTable.INVALID_ACTION, action);
+      case ASSUME_ROLE_ACTION:
+        return handleAssumeRole(roleArn, roleSessionName, duration);
+      // These operations are not supported yet
+      case GET_SESSION_TOKEN_ACTION:
+      case ASSUME_ROLE_WITH_SAML_ACTION:
+      case ASSUME_ROLE_WITH_WEB_IDENTITY_ACTION:
+      case GET_CALLER_IDENTITY_ACTION:
+      case DECODE_AUTHORIZATION_MESSAGE_ACTION:
+      case GET_ACCESS_KEY_INFO_ACTION:
+        return Response.status(Response.Status.NOT_IMPLEMENTED)
+            .entity("Operation " + action + " is not supported yet.")
+            .build();
+      default:
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("Unsupported Action: " + action)
+            .build();
       }
-
+    } catch (OS3Exception s3e) {
+      // Handle known S3 exceptions
+      LOG.error("S3 Error during STS request: {}", s3e.toXml());
+      throw s3e;
     } catch (Exception ex) {
-      OS3Exception os3Exception = getInternalError(ex);
-      os3Exception.setResource("STS Request: " + action);
-      throw os3Exception;
+      LOG.error("Unexpected error during STS request", ex);
+      return Response.serverError().build();
     }
   }
 
-  private int validateDuration(Integer durationSeconds) throws IllegalArgumentException {
+  private int validateDuration(Integer durationSeconds) throws IllegalArgumentException, OS3Exception {
     if (durationSeconds == null) {
       return DEFAULT_DURATION_SECONDS;
     }
@@ -181,24 +180,25 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       throws IOException, OS3Exception {
     // Validate required parameters for AssumeRole. RoleArn is required to pass the
     if (roleArn == null || roleArn.trim().isEmpty()) {
-      throw newError(S3ErrorTable.MISSING_PARAMETER, ROLE_ARN_PARAM);
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Missing required parameter: " + ROLE_ARN_PARAM)
+          .build();
     }
 
     if (roleSessionName == null || roleSessionName.trim().isEmpty()) {
-      OS3Exception os3Exception = newError(S3ErrorTable.MISSING_PARAMETER, roleSessionName);
-      os3Exception.setErrorMessage("RoleSessionName is required for AssumeRole operation");
-      throw os3Exception;
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Missing required parameter: RoleSessionName")
+          .build();
     }
 
     // Validate role session name format (AWS requirements)
     if (!isValidRoleSessionName(roleSessionName)) {
-      OS3Exception os3Exception = newError(S3ErrorTable.INVALID_PARAMETER_VALUE, roleSessionName);
-      os3Exception.setErrorMessage("RoleSessionName must be 2-64 characters long and contain only alphanumeric" +
-          "characters, plus signs (+), equal signs (=), commas (,), periods (.), at symbols (@), and hyphens (-)");
-      throw os3Exception;
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Invalid RoleSessionName: must be 2-64 characters long and " +
+              "contain only alphanumeric characters, +, =, ,, ., @, -")
+          .build();
     }
     // TODO: Add a validation if a user is not an admin but still allowed to call AssumeRole
-
     // TODO: Convert roleArn to a valid Ozone ACL
     // TODO: Validate requested ACLs
     // TODO: Create a new S3 credentials for this role session
@@ -213,14 +213,12 @@ public class S3STSEndpoint extends S3STSEndpointBase {
         .build();
   }
 
-
   private List<OzoneAcl> toOzoneAcls(String roleArn) {
     // TODO: Implement logic to convert roleArn (String) to Ozone ACLs
     // TODO: Throw an exception if roleArn is invalid or not found
     List<OzoneAcl> acls = new ArrayList<>();
     return acls;
   }
-
 
   private List<OzoneAcl> checkStsAclSubset(List<OzoneAcl> requestedAcls) throws IOException {
     List<OzoneAcl> validAcls = new ArrayList<>();
@@ -232,7 +230,6 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 // OzoneObject getOzoneObjectFromAcl(OzoneAcl acl); // Parses the ACL to identify the target object
 // List<OzoneAcl> getAclsForObject(OzoneObject object); // Efficiently fetches ACLs for a single object
 // boolean isUserOrGroupMatch(OzoneAcl objectAcl, String userName, Set<String> groups);
-
   private boolean isValidRoleSessionName(String roleSessionName) {
     if (roleSessionName.length() < 2 || roleSessionName.length() > 64) {
       return false;

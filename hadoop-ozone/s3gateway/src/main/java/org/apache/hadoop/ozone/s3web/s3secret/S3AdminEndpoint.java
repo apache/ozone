@@ -15,7 +15,19 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.s3web.s3secret;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import javax.ws.rs.NameBinding;
+
 /**
- * This package contains the top level generic classes of s3 secret gateway.
+ * Annotation to only allow admin users to access the endpoint.
  */
-package org.apache.hadoop.ozone.s3secret;
+@NameBinding
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface S3AdminEndpoint {
+}

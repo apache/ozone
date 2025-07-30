@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3secret;
+package org.apache.hadoop.ozone.s3web.s3sts;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
@@ -32,9 +32,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 
 /**
- * Base implementation of endpoint for working with S3 secret.
+ * Base class for STS endpoints.
  */
-public class S3SecretEndpointBase implements Auditor {
+public class S3STSEndpointBase implements Auditor {
 
   @Context
   private ContainerRequestContext context;
