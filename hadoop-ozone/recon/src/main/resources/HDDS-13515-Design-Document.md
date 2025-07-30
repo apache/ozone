@@ -37,7 +37,10 @@ Implement a **Staged Reprocessing Architecture** that leverages the existing sta
 
 ### 2.1 Current Sync Flow
 
-![Recon OM DB Processing & Fallback Flow](flowchart.png)
+<img src=".flowchart.png"
+alt="Recon flowchart"
+width="600" />
+
 
 > **Figure:** Full‐snapshot fallback path: OM DB delta error → fetch full snapshot → concurrently trigger tasks (`OmTableInsightTask`, `NSSummaryTask`, `ContainerKeyMapperTask`, `FileSizeCountTask`) → each task clears its Recon metadata tables → API reads from those cleared tables (empty) → **User Experience Impacted**
 
