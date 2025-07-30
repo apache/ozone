@@ -33,13 +33,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.BufferedReader;
@@ -59,6 +63,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,6 +72,8 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -74,6 +81,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -94,6 +102,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
@@ -169,7 +180,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     omDbCheckpointServletMock = mock(OMDBCheckpointServletInodeBasedXfer.class);
 
-    BootstrapStateHandler.Lock lock = new OMDBCheckpointServlet.Lock(om);
+    BootstrapStateHandler.Lock lock = null;
+    if (om != null) {
+      lock = new OMDBCheckpointServlet.Lock(om);
+    }
     doCallRealMethod().when(omDbCheckpointServletMock).init();
     assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getDbStore());
 
@@ -195,6 +209,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .writeDBToArchive(any(), any(), any(), any(), any(), any(), anyBoolean());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
@@ -306,6 +322,61 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(Files.exists(snapshotDbDir));
     String value = getValueFromSnapshotDeleteTable(dummyKey, snapshotDbDir.toString());
     assertNotNull(value);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testWriteDBToArchive(boolean expectOnlySstFiles) throws Exception {
+    setupMocks();
+    Path dbDir = folder.resolve("db_data");
+    Files.createDirectories(dbDir);
+    // Create dummy files: one SST, one non-SST
+    Path sstFile = dbDir.resolve("test.sst");
+    Files.write(sstFile, "sst content".getBytes(StandardCharsets.UTF_8)); // Write some content to make it non-empty
+
+    Path nonSstFile = dbDir.resolve("test.log");
+    Files.write(nonSstFile, "log content".getBytes(StandardCharsets.UTF_8));
+    Set<String> sstFilesToExclude = new HashSet<>();
+    AtomicLong maxTotalSstSize = new AtomicLong(1000000); // Sufficient size
+    Map<String, String> hardLinkFileMap = new java.util.HashMap<>();
+    Path tmpDir = folder.resolve("tmp");
+    Files.createDirectories(tmpDir);
+    TarArchiveOutputStream mockArchiveOutputStream = mock(TarArchiveOutputStream.class);
+    List<String> fileNames = new ArrayList<>();
+    try (MockedStatic<Archiver> archiverMock = mockStatic(Archiver.class)) {
+      archiverMock.when(() -> Archiver.linkAndIncludeFile(any(), any(), any(), any())).thenAnswer(invocation -> {
+        // Get the actual mockArchiveOutputStream passed from writeDBToArchive
+        TarArchiveOutputStream aos = invocation.getArgument(2);
+        File sourceFile = invocation.getArgument(0);
+        String fileId = invocation.getArgument(1);
+        fileNames.add(sourceFile.getName());
+        aos.putArchiveEntry(new TarArchiveEntry(sourceFile, fileId));
+        aos.write(new byte[100], 0, 100); // Simulate writing
+        aos.closeArchiveEntry();
+        return 100L;
+      });
+      boolean success = omDbCheckpointServletMock.writeDBToArchive(
+          sstFilesToExclude, dbDir, maxTotalSstSize, mockArchiveOutputStream,
+              tmpDir, hardLinkFileMap, expectOnlySstFiles);
+      assertTrue(success);
+      verify(mockArchiveOutputStream, times(fileNames.size())).putArchiveEntry(any());
+      verify(mockArchiveOutputStream, times(fileNames.size())).closeArchiveEntry();
+      verify(mockArchiveOutputStream, times(fileNames.size())).write(any(byte[].class), anyInt(),
+          anyInt()); // verify write was called once
+
+      boolean containsNonSstFile = false;
+      for (String fileName : fileNames) {
+        if (expectOnlySstFiles) {
+          assertTrue(fileName.endsWith(".sst"), "File is not an SST File");
+        } else {
+          containsNonSstFile = true;
+        }
+      }
+
+      if (!expectOnlySstFiles) {
+        assertTrue(containsNonSstFile, "SST File is not expected");
+      }
+    }
   }
 
   private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
