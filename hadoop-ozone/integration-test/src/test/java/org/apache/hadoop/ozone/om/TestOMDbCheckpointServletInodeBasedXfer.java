@@ -326,7 +326,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void testWriteDBToArchive(boolean isSstFile) throws Exception {
+  public void testWriteDBToArchive(boolean expectOnlySstFiles) throws Exception {
     setupMocks();
     Path dbDir = folder.resolve("db_data");
     Files.createDirectories(dbDir);
@@ -341,8 +341,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     Map<String, String> hardLinkFileMap = new java.util.HashMap<>();
     Path tmpDir = folder.resolve("tmp");
     Files.createDirectories(tmpDir);
-    TarArchiveOutputStream mockArchiveOutputStream;
-    mockArchiveOutputStream = mock(TarArchiveOutputStream.class);
+    TarArchiveOutputStream mockArchiveOutputStream = mock(TarArchiveOutputStream.class);
     List<String> fileNames = new ArrayList<>();
     try (MockedStatic<Archiver> archiverMock = mockStatic(Archiver.class)) {
       archiverMock.when(() -> Archiver.linkAndIncludeFile(any(), any(), any(), any())).thenAnswer(invocation -> {
@@ -358,7 +357,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       });
       boolean success = omDbCheckpointServletMock.writeDBToArchive(
           sstFilesToExclude, dbDir, maxTotalSstSize, mockArchiveOutputStream,
-              tmpDir, hardLinkFileMap, isSstFile);
+              tmpDir, hardLinkFileMap, expectOnlySstFiles);
       assertTrue(success);
       verify(mockArchiveOutputStream, times(fileNames.size())).putArchiveEntry(any());
       verify(mockArchiveOutputStream, times(fileNames.size())).closeArchiveEntry();
@@ -367,14 +366,14 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
       boolean containsNonSstFile = false;
       for (String fileName : fileNames) {
-        if (isSstFile) {
+        if (expectOnlySstFiles) {
           assertTrue(fileName.endsWith(".sst"), "File is not an SST File");
         } else {
           containsNonSstFile = true;
         }
       }
 
-      if (!isSstFile) {
+      if (!expectOnlySstFiles) {
         assertTrue(containsNonSstFile, "SST File is not expected");
       }
     }

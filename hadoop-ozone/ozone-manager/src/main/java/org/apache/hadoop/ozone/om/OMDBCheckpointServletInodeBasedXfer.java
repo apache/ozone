@@ -402,6 +402,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @param destDir Destination directory for the archived files. If null,
    * the archived files are not moved to this directory.
    * @param onlySstFile If true, only SST files are processed. If false, all files are processed.
+   * <p>
+   * This parameter is typically set to {@code true} for initial iterations to
+   * prioritize SST file transfer, and then set to {@code false} only for the
+   * final iteration to ensure all remaining file types are transferred.
    * @return true if processing should continue, false if size limit reached
    * @throws IOException if an I/O error occurs
    */
