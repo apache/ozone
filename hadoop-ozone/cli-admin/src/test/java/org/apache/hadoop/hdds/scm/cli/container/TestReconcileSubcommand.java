@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.assertj.core.api.AbstractStringAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,6 +75,11 @@ public class TestReconcileSubcommand {
   private final InputStream originalIn = System.in;
 
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
+
+  // Helper method to simplify assertions on stream output
+  private AbstractStringAssert<?> assertThatOutput(ByteArrayOutputStream stream) throws Exception {
+    return assertThat(stream.toString(DEFAULT_ENCODING));
+  }
 
   @BeforeEach
   public void setup() throws IOException {
@@ -153,14 +159,12 @@ public class TestReconcileSubcommand {
     });
     
     // Should have error message for invalid container ID "-"
-    String errorOutput = errContent.toString(DEFAULT_ENCODING);
-    assertThat(errorOutput).contains("Container ID must be a positive integer, got: -");
+    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -");
     
     // Exception should indicate 1 failed container
     assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 containers");
     
-    String output = outContent.toString(DEFAULT_ENCODING);
-    assertThat(output).isEmpty();
+    assertThatOutput(outContent).isEmpty();
   }
 
   @Test
@@ -174,9 +178,8 @@ public class TestReconcileSubcommand {
     });
     
     // Should have error message for EC container
-    String errorOutput = errContent.toString(DEFAULT_ENCODING);
-    assertThat(errorOutput).contains("Cannot get status of container 1");
-    assertThat(errorOutput).contains("Reconciliation is only supported for Ratis replicated containers");
+    assertThatOutput(errContent).contains("Cannot get status of container 1");
+    assertThatOutput(errContent).contains("Reconciliation is only supported for Ratis replicated containers");
     
     // Exception message should indicate failure
     assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 1 containers");
@@ -201,19 +204,17 @@ public class TestReconcileSubcommand {
     });
     
     // Should have error messages for EC containers
-    String errorOutput = errContent.toString(DEFAULT_ENCODING);
-    assertThat(errorOutput).contains("Cannot get status of container 1");
-    assertThat(errorOutput).contains("Cannot get status of container 3");
-    assertThat(errorOutput).contains("Reconciliation is only supported for Ratis replicated containers");
+    assertThatOutput(errContent).contains("Cannot get status of container 1");
+    assertThatOutput(errContent).contains("Cannot get status of container 3");
+    assertThatOutput(errContent).contains("Reconciliation is only supported for Ratis replicated containers");
     
     // Exception message should indicate 2 failed containers
     assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 2 containers");
     
     // Should have output for only container 2 (Ratis)
-    String output = outContent.toString(DEFAULT_ENCODING);
-    assertThat(output).contains("\"containerID\" : 2");
-    assertThat(output).doesNotContain("\"containerID\" : 1");
-    assertThat(output).doesNotContain("\"containerID\" : 3");
+    assertThatOutput(outContent).contains("\"containerID\" : 2");
+    assertThatOutput(outContent).doesNotContain("\"containerID\" : 1");
+    assertThatOutput(outContent).doesNotContain("\"containerID\" : 3");
   }
 
   /**
@@ -229,17 +230,15 @@ public class TestReconcileSubcommand {
     });
     
     // Should have error messages for invalid container IDs only.
-    String errorOutput = errContent.toString(DEFAULT_ENCODING);
-    assertThat(errorOutput).contains("Container ID must be a positive integer, got: invalid");
-    assertThat(errorOutput).contains("Container ID must be a positive integer, got: -1");
-    assertThat(errorOutput).doesNotContain("123");
-    assertThat(errorOutput).doesNotContain("456");
+    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: invalid");
+    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -1");
+    assertThatOutput(errContent).doesNotContain("123");
+    assertThatOutput(errContent).doesNotContain("456");
 
     // Exception message should indicate 3 failed containers (invalid, -1, 456)
     assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 3 containers");
 
-    String output = outContent.toString(DEFAULT_ENCODING);
-    assertThat(output).isEmpty();
+    assertThatOutput(outContent).isEmpty();
     
     // Test reconcile command (without --status)
     resetStreams();
@@ -248,16 +247,14 @@ public class TestReconcileSubcommand {
     });
     
     // Should have error messages for invalid IDs
-    errorOutput = errContent.toString(DEFAULT_ENCODING);
-    assertThat(errorOutput).contains("Invalid container ID: invalid");
-    assertThat(errorOutput).contains("Invalid container ID: 456");
+    assertThatOutput(errContent).contains("Invalid container ID: invalid");
+    assertThatOutput(errContent).contains("Invalid container ID: 456");
     
     // Exception message should indicate 2 failed containers
     assertThat(reconcileException.getMessage()).contains("Failed trigger reconciliation for 2 containers");
     
     // Should have success message for valid container 123
-    output = outContent.toString(DEFAULT_ENCODING);
-    assertThat(output).contains("Reconciliation has been triggered for container 123");
+    assertThatOutput(outContent).contains("Reconciliation has been triggered for container 123");
   }
 
   private void parseArgsAndExecute(String... args) throws IOException {
@@ -329,7 +326,7 @@ public class TestReconcileSubcommand {
   private void validateStatusOutput(boolean replicasMatch, long... containerIDs) throws Exception {
     // Status flag should not have triggered reconciliation.
 //    verify(scmClient, times(0)).reconcileContainer(anyLong());
-    assertThat(errContent.toString(DEFAULT_ENCODING)).isEmpty();
+    assertThatOutput(errContent).isEmpty();
 
     String output = outContent.toString(DEFAULT_ENCODING);
     // Output should be pretty-printed with newlines.
@@ -384,12 +381,11 @@ public class TestReconcileSubcommand {
   private void validateReconcileOutput(long... containerIDs) throws Exception {
     // No extra commands should have been sent.
 //    verify(scmClient, times(containerIDs.length)).reconcileContainer(anyLong());
-    assertThat(errContent.toString(DEFAULT_ENCODING)).isEmpty();
+    assertThatOutput(errContent).isEmpty();
 
-    String outputString = outContent.toString(DEFAULT_ENCODING);
     for (long id: containerIDs) {
 //      verify(scmClient, times(1)).reconcileContainer(id);
-      assertThat(outputString).contains("Reconciliation has been triggered for container " + id);
+      assertThatOutput(outContent).contains("Reconciliation has been triggered for container " + id);
     }
     resetStreams();
   }
