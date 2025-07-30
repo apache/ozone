@@ -18,29 +18,17 @@
 package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.util.List;
-import java.util.function.Function;
 import org.apache.hadoop.hdds.cli.ItemsFromStdin;
 import picocli.CommandLine;
 
 /** Parameter for specifying list of container IDs. */
 @CommandLine.Command
-public class ContainerIDParameters extends ItemsFromStdin<Long> {
+public class ContainerIDParameters extends ItemsFromStdin {
 
   @CommandLine.Parameters(description = "Container IDs" + FORMAT_DESCRIPTION,
       arity = "1..*",
       paramLabel = "<container ID>")
   public void setContainerIDs(List<String> arguments) {
-    Function<String, Long> containerIDMapper = input -> {
-      try {
-        long id = Long.parseLong(input);
-        if (id <= 0) {
-          throw new IllegalArgumentException("Container ID must be a positive integer, got: " + input);
-        }
-        return id;
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("Invalid container ID: " + input + ". Must be a positive integer.");
-      }
-    };
-    setItems(arguments, containerIDMapper);
+    setItems(arguments);
   }
 }

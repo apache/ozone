@@ -18,19 +18,18 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.util.List;
-import java.util.function.Function;
 import org.apache.hadoop.hdds.cli.ItemsFromStdin;
 import picocli.CommandLine;
 
 /** Parameter for specifying list of hostnames. */
 @CommandLine.Command
-public class HostNameParameters extends ItemsFromStdin<String> {
+public class HostNameParameters extends ItemsFromStdin {
 
   @CommandLine.Parameters(description = "Host names" + FORMAT_DESCRIPTION,
       arity = "1..*",
       paramLabel = "<host name>")
   public void setHostNames(List<String> arguments) {
-    setItems(arguments, Function.identity());
+    setItems(arguments);
   }
 
   public List<String> getHostNames() {

@@ -69,11 +69,23 @@ public class InfoSubcommand extends ScmSubcommand {
     multiContainer = containerList.size() > 1;
 
     printHeader();
-    for (long containerID : containerList) {
-      printDetails(scmClient, containerID, first);
+    for (String id : containerList) {
+      printOutput(scmClient, id, first);
       first = false;
     }
     printFooter();
+  }
+
+  private void printOutput(ScmClient scmClient, String id, boolean first)
+      throws IOException {
+    long containerID;
+    try {
+      containerID = Long.parseLong(id);
+    } catch (NumberFormatException e) {
+      printError("Invalid container ID: " + id);
+      return;
+    }
+    printDetails(scmClient, containerID, first);
   }
 
   private void printHeader() {

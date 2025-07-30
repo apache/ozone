@@ -70,14 +70,19 @@ public class ReconcileSubcommand extends ScmSubcommand {
       // containers. If EC containers are given, print a  message to stderr and eventually exit non-zero, but continue
       // processing the remaining containers.
       int invalidCount = 0;
-      for (Long containerID: containerList) {
+      for (String containerIdStr : containerList) {
+        long containerID;
         try {
-          if (!printReconciliationStatus(scmClient, containerID, arrayWriter)) {
-            invalidCount++;
-          }
-        } catch (IOException ex) {
-          System.err.println("Failed to get reconciliation status for container " + containerID + ": " +
-              ex.getMessage());
+          containerID = Long.parseLong(containerIdStr);
+        } catch (NumberFormatException e) {
+          System.err.println("Invalid container ID: " + containerIdStr);
+          invalidCount++;
+          continue;
+        }
+        if (containerID <= 0) {
+          System.err.println("Invalid container ID: " + containerID);
+        }
+        if (!printReconciliationStatus(scmClient, containerID, arrayWriter)) {
           invalidCount++;
         }
       }
@@ -91,10 +96,18 @@ public class ReconcileSubcommand extends ScmSubcommand {
 
   private void executeReconcile(ScmClient scmClient) {
     int invalidCount = 0;
-    for (Long containerID: containerList) {
+    for (String containerIdStr : containerList) {
+      long containerID;
+      try {
+        containerID = Long.parseLong(containerIdStr);
+      } catch (NumberFormatException e) {
+        System.err.println("Invalid container ID: " + containerIdStr);
+        invalidCount++;
+        continue;
+      }
       try {
         executeReconciliation(scmClient, containerID);
-      } catch (IOException ex) {
+      } catch (Exception ex) {
         System.err.println("Failed to send reconciliation to container " + containerID + ": " + ex.getMessage());
         invalidCount++;
       }
