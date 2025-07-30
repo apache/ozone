@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.scm.node;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -36,6 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -83,7 +85,7 @@ public class TestVolumeChoosingPolicy {
   public void setup() throws Exception {
     hddsVolumes = new ArrayList<>();
     createVolumes();
-    volumeChoosingPolicy = new DefaultVolumeChoosingPolicy();
+    volumeChoosingPolicy = new DefaultVolumeChoosingPolicy(new ReentrantLock());
     executor = Executors.newFixedThreadPool(NUM_THREADS);
   }
 
@@ -106,6 +108,17 @@ public class TestVolumeChoosingPolicy {
       volumeSet.shutdown();
       volumeSet = null;
     }
+  }
+
+  @Test
+  @Timeout(30)
+  public void testVolumeChoosingFailureDueToDiskFull() {
+    // update volume configure, set a huge min free space
+    CONF.set("hdds.datanode.volume.min.free.space", "990GB");
+    for (StorageVolume volume: volumeSet.getVolumesList()) {
+      volume.setConf(CONF);
+    }
+    assertNull(volumeChoosingPolicy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, 0));
   }
 
   @Test
@@ -159,7 +172,7 @@ public class TestVolumeChoosingPolicy {
 
             long threadStart = System.nanoTime();
             try {
-              Pair<HddsVolume, HddsVolume> pair = policy.chooseVolume(volumeSet, THRESHOLD, deltaSizes);
+              Pair<HddsVolume, HddsVolume> pair = policy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, 0);
 
               if (pair == null) {
                 volumeNotChosen++;
@@ -200,7 +213,7 @@ public class TestVolumeChoosingPolicy {
     System.out.println("Performance results for " + policyName);
     System.out.println("Total volumes: " + NUM_VOLUMES);
     System.out.println("Total threads: " + NUM_THREADS);
-    System.out.println("Threshold(%): " + THRESHOLD * 100.0);
+    System.out.println("Threshold(%): " + THRESHOLD);
     System.out.println("Total operations: " + totalOperations);
     System.out.println("Volume Pair Chosen operations: " + pairChosenCount.get());
     System.out.println("Volume Pair Not Chosen operations: " + pairNotChosenCount.get());

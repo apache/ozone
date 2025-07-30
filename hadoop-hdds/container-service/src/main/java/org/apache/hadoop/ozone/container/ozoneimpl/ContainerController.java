@@ -211,20 +211,16 @@ public class ContainerController {
         .importContainer(containerData, rawContainerStream, packer);
   }
 
+  public Container importContainer(final ContainerData targetTempContainerData) throws IOException {
+    return handlers.get(targetTempContainerData.getContainerType()).importContainer(targetTempContainerData);
+  }
+
   public void copyContainer(final ContainerData containerData,
       final Path destinationPath) throws IOException {
     handlers.get(containerData.getContainerType())
         .copyContainer(
             containerSet.getContainer(containerData.getContainerID()),
             destinationPath);
-  }
-
-  public Container importContainer(
-      final ContainerData containerData,
-      final Path containerPath)
-      throws IOException {
-    return handlers.get(containerData.getContainerType())
-        .importContainer(containerData, containerPath);
   }
 
   public void exportContainer(final ContainerType type,
