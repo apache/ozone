@@ -15,13 +15,5 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
-
-/**
- * OmSnapshot file system tests for FSO.
- */
-public class TestOmSnapshotFileSystemFsoWithLinkedBuckets extends TestOmSnapshotFileSystem {
-  TestOmSnapshotFileSystemFsoWithLinkedBuckets() throws Exception {
-    super(BUCKET_NAME_FSO, true);
-  }
-}
+/** Tests for Common container utils. */
+package org.apache.hadoop.ozone.container.common.utils;

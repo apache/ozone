@@ -38,6 +38,8 @@ public interface ReconNamespaceSummaryManager {
   void batchStoreNSSummaries(BatchOperation batch, long objectId,
                              NSSummary nsSummary) throws IOException;
 
+  void batchDeleteNSSummaries(BatchOperation batch, long objectId) throws IOException;
+
   void deleteNSSummary(long objectId) throws IOException;
 
   NSSummary getNSSummary(long objectId) throws IOException;

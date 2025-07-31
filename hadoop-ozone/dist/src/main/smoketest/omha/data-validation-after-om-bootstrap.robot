@@ -32,7 +32,7 @@ ${KEY_2}
 
 *** Keywords ***
 Number of checkpoints equals 2
-    ${checkpoints} =    Execute                 ls -lah /data/metadata/db.snapshots/checkpointState | grep 'om.db-' | wc -l
+    ${checkpoints} =    Execute                 ls -lah /data/metadata/db.snapshots/checkpointState | grep -v '.yaml' | grep 'om.db-' | wc -l
                         Should be true          ${checkpoints} == 2
 
 Check current leader is different than OM

@@ -15,13 +15,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.hdds.utils.db.managed;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
+
+import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.ConfigOptions;
 
 /**
- * OmSnapshot file system tests for Legacy.
+ * Managed ConfigOptions.
  */
-public class TestOmSnapshotFileSystemLegacyWithLinkedBuckets extends TestOmSnapshotFileSystem {
-  TestOmSnapshotFileSystemLegacyWithLinkedBuckets() throws Exception {
-    super(BUCKET_NAME_LEGACY, true);
+public class ManagedConfigOptions extends ConfigOptions {
+
+  private final UncheckedAutoCloseable leakTracker = track(this);
+
+  @Override
+  public void close() {
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

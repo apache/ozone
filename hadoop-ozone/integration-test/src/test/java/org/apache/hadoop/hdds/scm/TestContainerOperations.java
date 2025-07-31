@@ -191,20 +191,17 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
   @Test
   public void testDatanodeUsageInfoContainerCount() throws Exception {
-    List<? extends DatanodeDetails> dnList = cluster().getStorageContainerManager()
-            .getScmNodeManager()
-            .getAllNodes();
+    NodeManager nodeManager = cluster().getStorageContainerManager().getScmNodeManager();
+    List<? extends DatanodeDetails> dnList = nodeManager.getAllNodes();
 
     for (DatanodeDetails dn : dnList) {
-      final int expected = cluster().getStorageContainerManager().getScmNodeManager().getContainers(dn).size();
-
       List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
               storageClient.getDatanodeUsageInfo(
                       dn.getIpAddress(), dn.getUuidString());
 
       assertEquals(1, usageInfoList.size());
       assertThat(usageInfoList.get(0).getContainerCount())
-          .isGreaterThanOrEqualTo(expected);
+          .isGreaterThanOrEqualTo(nodeManager.getContainers(dn).size());
     }
   }
 

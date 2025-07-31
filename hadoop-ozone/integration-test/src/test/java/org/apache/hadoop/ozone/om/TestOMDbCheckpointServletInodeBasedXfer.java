@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
@@ -28,15 +29,21 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SN
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.BufferedReader;
@@ -54,7 +61,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -63,12 +72,16 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -77,13 +90,25 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.DBOptions;
+import org.rocksdb.RocksDB;
 
 /**
  * Class used for testing the OM DB Checkpoint provider servlet using inode based transfer logic.
@@ -106,6 +131,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   @BeforeEach
   void init() throws Exception {
     conf = new OzoneConfiguration();
+    // ensure cache entries are not evicted thereby snapshot db's are not closed
+    conf.setTimeDuration(OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
+        100, TimeUnit.MINUTES);
   }
 
   @AfterEach
@@ -152,7 +180,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     omDbCheckpointServletMock = mock(OMDBCheckpointServletInodeBasedXfer.class);
 
-    BootstrapStateHandler.Lock lock = new OMDBCheckpointServlet.Lock(om);
+    BootstrapStateHandler.Lock lock = null;
+    if (om != null) {
+      lock = new OMDBCheckpointServlet.Lock(om);
+    }
     doCallRealMethod().when(omDbCheckpointServletMock).init();
     assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getDbStore());
 
@@ -178,6 +209,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .writeDBToArchive(any(), any(), any(), any(), any(), any(), anyBoolean());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
@@ -193,33 +226,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
   @Test
   void testContentsOfTarballWithSnapshot() throws Exception {
-    setupCluster();
-    setupMocks();
-    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
     String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
     String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
-    // Create a "spy" dbstore keep track of the checkpoint.
-    writeData(volumeName, bucketName, true);
-    DBStore dbStore = om.getMetadataManager().getStore();
-    DBStore spyDbStore = spy(dbStore);
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
-    when(spyDbStore.getCheckpoint(true)).thenAnswer(b -> {
-      DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
-      // Don't delete the checkpoint, because we need to compare it
-      // with the snapshot data.
-      doNothing().when(checkpoint).cleanupCheckpoint();
-      realCheckpoint.set(checkpoint);
-      return checkpoint;
-    });
-    // Init the mock with the spyDbstore
-    doCallRealMethod().when(omDbCheckpointServletMock).initialize(any(), any(),
-        eq(false), any(), any(), eq(false));
-    omDbCheckpointServletMock.initialize(spyDbStore, om.getMetrics().getDBCheckpointMetrics(),
-        false,
-        om.getOmAdminUsernames(), om.getOmAdminGroups(), false);
-
+    setupClusterAndMocks(volumeName, bucketName, realCheckpoint);
+    DBStore dbStore = om.getMetadataManager().getStore();
     // Get the tarball.
-    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
@@ -231,7 +243,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .forEachRemaining(snapInfo -> snapshotPaths.add(getSnapshotDBPath(snapInfo.getCheckpointDir())));
     Set<String> inodesFromOmDataDir = new HashSet<>();
     Set<String> inodesFromTarball = new HashSet<>();
-    Set<Path> allPathsInTarball = new HashSet<>();
     try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
       List<Path> files = filesInTarball.collect(Collectors.toList());
       for (Path p : files) {
@@ -241,7 +252,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         }
         String inode = getInode(file.getName());
         inodesFromTarball.add(inode);
-        allPathsInTarball.add(p);
       }
     }
     Map<String, List<String>> hardLinkMapFromOmData = new HashMap<>();
@@ -252,6 +262,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       populateInodesOfFilesInDirectory(dbStore, Paths.get(snapshotPath),
           inodesFromOmDataDir, hardLinkMapFromOmData);
     }
+    populateInodesOfFilesInDirectory(dbStore, Paths.get(dbStore.getRocksDBCheckpointDiffer().getSSTBackupDir()),
+        inodesFromOmDataDir, hardLinkMapFromOmData);
     Path hardlinkFilePath =
         newDbDir.toPath().resolve(OmSnapshotManager.OM_HARDLINK_FILE);
     Map<String, List<String>> hardlinkMapFromTarball = readFileToMap(hardlinkFilePath.toString());
@@ -271,11 +283,200 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertTrue(inodesFromTarball.containsAll(inodesFromOmDataDir));
 
     // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath());
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
+    assertFalse(hardlinkFilePath.toFile().exists());
+  }
+
+  /**
+   * Verifies that a manually added entry to the snapshot's delete table
+   * is persisted and can be retrieved from snapshot db loaded from OM DB checkpoint.
+   */
+  @Test
+  public void testSnapshotDBConsistency() throws Exception {
+    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
+    setupClusterAndMocks(volumeName, bucketName, realCheckpoint);
+    List<OzoneSnapshot> snapshots = new ArrayList<>();
+    client.getObjectStore().listSnapshot(volumeName, bucketName, "", null)
+        .forEachRemaining(snapshots::add);
+    OzoneSnapshot snapshotToModify = snapshots.get(0);
+    String dummyKey = "dummyKey";
+    writeDummyKeyToDeleteTableOfSnapshotDB(snapshotToModify, bucketName, volumeName, dummyKey);
+    // Get the tarball.
+    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    String testDirName = folder.resolve("testDir").toString();
+    String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
+    File newDbDir = new File(newDbDirName);
+    assertTrue(newDbDir.mkdirs());
+    FileUtil.unTar(tempFile, newDbDir);
+    Set<Path> allPathsInTarball = getAllPathsInTarball(newDbDir);
+    // create hardlinks now
+    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), false);
     for (Path old : allPathsInTarball) {
       assertTrue(old.toFile().delete());
     }
-    assertFalse(hardlinkFilePath.toFile().exists());
+    Path snapshotDbDir = Paths.get(newDbDir.toPath().toString(), OM_SNAPSHOT_CHECKPOINT_DIR,
+        OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
+    deleteWalFiles(snapshotDbDir);
+    assertTrue(Files.exists(snapshotDbDir));
+    String value = getValueFromSnapshotDeleteTable(dummyKey, snapshotDbDir.toString());
+    assertNotNull(value);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testWriteDBToArchive(boolean expectOnlySstFiles) throws Exception {
+    setupMocks();
+    Path dbDir = folder.resolve("db_data");
+    Files.createDirectories(dbDir);
+    // Create dummy files: one SST, one non-SST
+    Path sstFile = dbDir.resolve("test.sst");
+    Files.write(sstFile, "sst content".getBytes(StandardCharsets.UTF_8)); // Write some content to make it non-empty
+
+    Path nonSstFile = dbDir.resolve("test.log");
+    Files.write(nonSstFile, "log content".getBytes(StandardCharsets.UTF_8));
+    Set<String> sstFilesToExclude = new HashSet<>();
+    AtomicLong maxTotalSstSize = new AtomicLong(1000000); // Sufficient size
+    Map<String, String> hardLinkFileMap = new java.util.HashMap<>();
+    Path tmpDir = folder.resolve("tmp");
+    Files.createDirectories(tmpDir);
+    TarArchiveOutputStream mockArchiveOutputStream = mock(TarArchiveOutputStream.class);
+    List<String> fileNames = new ArrayList<>();
+    try (MockedStatic<Archiver> archiverMock = mockStatic(Archiver.class)) {
+      archiverMock.when(() -> Archiver.linkAndIncludeFile(any(), any(), any(), any())).thenAnswer(invocation -> {
+        // Get the actual mockArchiveOutputStream passed from writeDBToArchive
+        TarArchiveOutputStream aos = invocation.getArgument(2);
+        File sourceFile = invocation.getArgument(0);
+        String fileId = invocation.getArgument(1);
+        fileNames.add(sourceFile.getName());
+        aos.putArchiveEntry(new TarArchiveEntry(sourceFile, fileId));
+        aos.write(new byte[100], 0, 100); // Simulate writing
+        aos.closeArchiveEntry();
+        return 100L;
+      });
+      boolean success = omDbCheckpointServletMock.writeDBToArchive(
+          sstFilesToExclude, dbDir, maxTotalSstSize, mockArchiveOutputStream,
+              tmpDir, hardLinkFileMap, expectOnlySstFiles);
+      assertTrue(success);
+      verify(mockArchiveOutputStream, times(fileNames.size())).putArchiveEntry(any());
+      verify(mockArchiveOutputStream, times(fileNames.size())).closeArchiveEntry();
+      verify(mockArchiveOutputStream, times(fileNames.size())).write(any(byte[].class), anyInt(),
+          anyInt()); // verify write was called once
+
+      boolean containsNonSstFile = false;
+      for (String fileName : fileNames) {
+        if (expectOnlySstFiles) {
+          assertTrue(fileName.endsWith(".sst"), "File is not an SST File");
+        } else {
+          containsNonSstFile = true;
+        }
+      }
+
+      if (!expectOnlySstFiles) {
+        assertTrue(containsNonSstFile, "SST File is not expected");
+      }
+    }
+  }
+
+  private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
+    try (Stream<Path> filesInTarball = Files.list(snapshotDbDir)) {
+      List<Path> files = filesInTarball.filter(p -> p.toString().contains(".log"))
+          .collect(Collectors.toList());
+      for (Path p : files) {
+        Files.delete(p);
+      }
+    }
+  }
+
+  private static Set<Path> getAllPathsInTarball(File newDbDir) throws IOException {
+    Set<Path> allPathsInTarball = new HashSet<>();
+    try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
+      List<Path> files = filesInTarball.collect(Collectors.toList());
+      for (Path p : files) {
+        File file = p.toFile();
+        if (file.getName().equals(OmSnapshotManager.OM_HARDLINK_FILE)) {
+          continue;
+        }
+        allPathsInTarball.add(p);
+      }
+    }
+    return allPathsInTarball;
+  }
+
+  private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,
+      String volumeName, String keyName)
+      throws IOException {
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> supplier = om.getOmSnapshotManager()
+        .getSnapshot(snapshotToModify.getSnapshotId())) {
+      OmSnapshot omSnapshot = supplier.get();
+      OmKeyInfo dummyOmKeyInfo =
+          new OmKeyInfo.Builder().setBucketName(bucketName).setVolumeName(volumeName).setKeyName(keyName)
+              .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE)).build();
+      RepeatedOmKeyInfo dummyRepeatedKeyInfo =
+          new RepeatedOmKeyInfo.Builder().setOmKeyInfos(Collections.singletonList(dummyOmKeyInfo)).build();
+      omSnapshot.getMetadataManager().getDeletedTable().put(dummyOmKeyInfo.getKeyName(), dummyRepeatedKeyInfo);
+    }
+  }
+
+  private void setupClusterAndMocks(String volumeName, String bucketName,
+      AtomicReference<DBCheckpoint> realCheckpoint) throws Exception {
+    setupCluster();
+    setupMocks();
+    om.getKeyManager().getSnapshotSstFilteringService().pause();
+    when(requestMock.getParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA)).thenReturn("true");
+    // Create a "spy" dbstore keep track of the checkpoint.
+    writeData(volumeName, bucketName, true);
+    DBStore dbStore = om.getMetadataManager().getStore();
+    DBStore spyDbStore = spy(dbStore);
+    when(spyDbStore.getCheckpoint(true)).thenAnswer(b -> {
+      DBCheckpoint checkpoint = spy(dbStore.getCheckpoint(true));
+      // Don't delete the checkpoint, because we need to compare it
+      // with the snapshot data.
+      doNothing().when(checkpoint).cleanupCheckpoint();
+      realCheckpoint.set(checkpoint);
+      return checkpoint;
+    });
+    // Init the mock with the spyDbstore
+    doCallRealMethod().when(omDbCheckpointServletMock).initialize(any(), any(),
+        eq(false), any(), any(), eq(false));
+    omDbCheckpointServletMock.initialize(spyDbStore, om.getMetrics().getDBCheckpointMetrics(),
+        false,
+        om.getOmAdminUsernames(), om.getOmAdminGroups(), false);
+    when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
+  }
+
+  String getValueFromSnapshotDeleteTable(String key, String snapshotDB) {
+    String result = null;
+    List<ColumnFamilyDescriptor> cfDescriptors = new ArrayList<>();
+    int count = 1;
+    int deletedTableCFIndex = 0;
+    cfDescriptors.add(new ColumnFamilyDescriptor("default".getBytes(StandardCharsets.UTF_8)));
+    for (String cfName : OMDBDefinition.getAllColumnFamilies()) {
+      if (cfName.equals(OMDBDefinition.DELETED_TABLE)) {
+        deletedTableCFIndex = count;
+      }
+      cfDescriptors.add(new ColumnFamilyDescriptor(cfName.getBytes(StandardCharsets.UTF_8)));
+      count++;
+    }
+    // For holding handles
+    List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
+    try (DBOptions options = new DBOptions().setCreateIfMissing(false).setCreateMissingColumnFamilies(true);
+        RocksDB db = RocksDB.openReadOnly(options, snapshotDB, cfDescriptors, cfHandles)) {
+
+      ColumnFamilyHandle deletedTableCF = cfHandles.get(deletedTableCFIndex); // 0 is default
+      byte[] value = db.get(deletedTableCF, key.getBytes(StandardCharsets.UTF_8));
+      if (value != null) {
+        result = new String(value, StandardCharsets.UTF_8);
+      }
+    } catch (Exception e) {
+      fail("Exception while reading from snapshot DB " + e.getMessage());
+    } finally {
+      for (ColumnFamilyHandle handle : cfHandles) {
+        handle.close();
+      }
+    }
+    return result;
   }
 
   public static Map<String, List<String>> readFileToMap(String filePath) throws IOException {
@@ -284,7 +485,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       String line;
       while ((line = reader.readLine()) != null) {
         String trimmedLine = line.trim();
-        if (trimmedLine.isEmpty() || !trimmedLine.contains("\t")) {
+        if (!trimmedLine.contains("\t")) {
           continue;
         }
         int tabIndex = trimmedLine.indexOf("\t");
