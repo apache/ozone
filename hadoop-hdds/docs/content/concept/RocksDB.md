@@ -44,6 +44,12 @@ RocksDB is utilized in the following Ozone components to store critical metadata
     *   `containers`: Stores information about all storage containers in the cluster.
     *   `deletedBlocks`: Tracks blocks that are marked for deletion and awaiting garbage collection.
     *   `move`: Coordinates container movements for data rebalancing.
+    *   `validCerts`: Stores certificates for validating datanodes.
+    *   `validSCMCerts`: Stores certificates for validating SCMs.
+    *   `scmTransactionInfos`: Tracks SCM transactions.
+    *   `sequenceId`: Manages sequence IDs for various SCM operations.
+    *   `meta`: Stores miscellaneous SCM metadata, like upgrade status.
+    *   `statefulServiceConfig`: Stores configurations for stateful services.
 
 *   **Datanode:** A Datanode utilizes RocksDB for two main purposes:
     1.  **Per-Volume Metadata:** It maintains one RocksDB instance per storage volume. Each of these instances manages metadata for the containers and blocks stored on that specific volume. As specified in `DatanodeSchemaThreeDBDefinition.java`, this database is structured with column families for `block_data`, `metadata`, `delete_txns`, `finalize_blocks`, and `last_chunk_info`. To optimize performance, it uses a fixed-length prefix based on the container ID, enabling efficient lookups with RocksDB's prefix seek feature.
