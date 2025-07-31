@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 @Metrics(about = "Ozone Volume Health Metrics",
     context = OzoneConsts.OZONE)
-public class VolumeHealthMetrics implements MetricsSource {
+public final class VolumeHealthMetrics implements MetricsSource {
 
   private static final String SOURCE_BASENAME =
       VolumeHealthMetrics.class.getSimpleName();
@@ -48,17 +48,19 @@ public class VolumeHealthMetrics implements MetricsSource {
 
   private final MetricsRegistry registry;
   private final String metricsSourceName;
-  private final VolumeSet volumeSet;
+  private final AtomicInteger totalVolumes;
+  private final AtomicInteger healthyVolumes;
+  private final AtomicInteger failedVolumes;
 
   /**
    * Constructor for VolumeHealthMetrics.
    *
    * @param volumeType Type of volumes (DATA_VOLUME, META_VOLUME, DB_VOLUME)
-   * @param volumeSet The volume set to track metrics for
    */
-  VolumeHealthMetrics(StorageVolume.VolumeType volumeType, VolumeSet volumeSet) {
-    this.volumeSet = volumeSet;
-
+  private VolumeHealthMetrics(StorageVolume.VolumeType volumeType) {
+    this.totalVolumes = new AtomicInteger(0);
+    this.healthyVolumes = new AtomicInteger(0);
+    this.failedVolumes = new AtomicInteger(0);
     metricsSourceName = SOURCE_BASENAME + '-' + volumeType.name();
     registry = new MetricsRegistry(metricsSourceName);
   }
@@ -67,13 +69,11 @@ public class VolumeHealthMetrics implements MetricsSource {
    * Creates and registers a new VolumeHealthMetrics instance.
    *
    * @param volumeType Type of volumes (DATA_VOLUME, META_VOLUME, DB_VOLUME)
-   * @param volumeSet  The volume set to track metrics for
    * @return The registered VolumeHealthMetrics instance
    */
-  public static VolumeHealthMetrics create(StorageVolume.VolumeType volumeType,
-      VolumeSet volumeSet) {
+  public static VolumeHealthMetrics create(StorageVolume.VolumeType volumeType) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    VolumeHealthMetrics metrics = new VolumeHealthMetrics(volumeType, volumeSet);
+    VolumeHealthMetrics metrics = new VolumeHealthMetrics(volumeType);
     return ms.register(metrics.metricsSourceName, "Volume Health Statistics", metrics);
   }
 
@@ -82,30 +82,39 @@ public class VolumeHealthMetrics implements MetricsSource {
     ms.unregisterSource(metricsSourceName);
   }
 
+  public void incrementTotalVolumes() {
+    totalVolumes.incrementAndGet();
+  }
+
+  public void incrementHealthyVolumes() {
+    healthyVolumes.incrementAndGet();
+  }
+
+  public void incrementFailedVolumes() {
+    healthyVolumes.decrementAndGet();
+    failedVolumes.incrementAndGet();
+  }
+
+  public void decrementTotalVolumes() {
+    totalVolumes.decrementAndGet();
+  }
+
+  public void decrementHealthyVolumes() {
+    healthyVolumes.decrementAndGet();
+  }
+
+  public void decrementFailedVolumes() {
+    failedVolumes.decrementAndGet();
+  }
+
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(metricsSourceName);
     registry.snapshot(builder, all);
 
-    // Get the list of volumes
-    List<StorageVolume> volumes = volumeSet.getVolumesList();
-
-    int totalVolumes = volumes.size();
-    int healthyVolumes = 0;
-    int failedVolumes = 0;
-    for (StorageVolume volume : volumes) {
-      if (volume.getStorageState() == StorageVolume.VolumeState.NORMAL) {
-        healthyVolumes++;
-      } else if (volume.getStorageState() == StorageVolume.VolumeState.FAILED) {
-        // we don't use getFailedVolumesList() because it is a private method and
-        // to maintain a consistent count of currently active volumes
-        failedVolumes++;
-      }
-    }
-
     builder
-        .addGauge(TOTAL_VOLUMES, totalVolumes)
-        .addGauge(HEALTHY_VOLUMES, healthyVolumes)
-        .addGauge(FAILED_VOLUMES, failedVolumes);
+        .addGauge(TOTAL_VOLUMES, totalVolumes.get())
+        .addGauge(HEALTHY_VOLUMES, healthyVolumes.get())
+        .addGauge(FAILED_VOLUMES, failedVolumes.get());
   }
 }
