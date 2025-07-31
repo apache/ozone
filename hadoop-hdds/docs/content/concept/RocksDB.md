@@ -93,7 +93,7 @@ Troubleshooting RocksDB issues in Ozone often involves:
 
 *   Analyzing RocksDB logs for errors and warnings.
 *   Using RocksDB's built-in tools for inspecting database files:
-    *   [**ldb**](https://github.com/facebook/rocksdb/wiki/LDB-Tool): A command-line tool for inspecting and manipulating the contents of a RocksDB database.
+    *   [**ldb**](https://github.com/facebook/rocksdb/wiki/Administration-and-Data-Access-Tool#ldb-tool): A command-line tool for inspecting and manipulating the contents of a RocksDB database.
     *   [**sst_dump**](https://github.com/facebook/rocksdb/wiki/SST-Dump): A command-line tool for inspecting the contents of SST (Static Table) files, which are the files that store the data in RocksDB.
 *   Understanding common RocksDB error codes and their implications.
 
