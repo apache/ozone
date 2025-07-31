@@ -399,6 +399,10 @@ public final class HddsConfigKeys {
   public static final String OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
       "ozone.volume.io.percentiles.intervals.seconds";
 
+  public static final String HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY =
+      "hdds.datanode.disk.balancer.enabled";
+  public static final boolean HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT = false;
+
   public static final String HDDS_DATANODE_DNS_INTERFACE_KEY =
       "hdds.datanode.dns.interface";
   public static final String HDDS_DATANODE_DNS_NAMESERVER_KEY =

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
@@ -136,7 +138,7 @@ public class OzoneContainer {
   private final StaleRecoveringContainerScrubbingService
       recoveringContainerScrubbingService;
   private final GrpcTlsConfig tlsClientConfig;
-  private final DiskBalancerService diskBalancerService;
+  private DiskBalancerService diskBalancerService;
   private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
@@ -278,14 +280,20 @@ public class OzoneContainer {
             checksumTreeManager,
             context.getParent().getReconfigurationHandler());
 
-    Duration diskBalancerSvcInterval = conf.getObject(
-        DiskBalancerConfiguration.class).getDiskBalancerInterval();
-    Duration diskBalancerSvcTimeout = conf.getObject(
-        DiskBalancerConfiguration.class).getDiskBalancerTimeout();
-    diskBalancerService =
-        new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
-            diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
-            config);
+    if (conf.getBoolean(HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY,
+        HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT)) {
+      Duration diskBalancerSvcInterval = conf.getObject(
+          DiskBalancerConfiguration.class).getDiskBalancerInterval();
+      Duration diskBalancerSvcTimeout = conf.getObject(
+          DiskBalancerConfiguration.class).getDiskBalancerTimeout();
+      diskBalancerService =
+          new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
+              diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
+              config);
+    } else {
+      diskBalancerService = null;
+      LOG.info("Disk Balancer is disabled.");
+    }
 
     Duration recoveringContainerScrubbingSvcInterval =
         dnConf.getRecoveringContainerScrubInterval();
@@ -542,7 +550,10 @@ public class OzoneContainer {
     writeChannel.start();
     readChannel.start();
     blockDeletingService.start();
-    diskBalancerService.start();
+
+    if (diskBalancerService != null) {
+      diskBalancerService.start();
+    }
     recoveringContainerScrubbingService.start();
 
     initHddsVolumeContainer();
@@ -573,7 +584,9 @@ public class OzoneContainer {
       dbCompactionExecutorService.shutdown();
     }
     blockDeletingService.shutdown();
-    diskBalancerService.shutdown();
+    if (diskBalancerService != null) {
+      diskBalancerService.shutdown();
+    }
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
@@ -703,10 +716,17 @@ public class OzoneContainer {
   }
 
   public DiskBalancerReportProto getDiskBalancerReport() {
+    // return an empty report if the service is disabled
+    if (diskBalancerService == null) {
+      return DiskBalancerReportProto.newBuilder().build();
+    }
     return diskBalancerService.getDiskBalancerReportProto();
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
+    if (diskBalancerService == null) {
+      return null;
+    }
     return diskBalancerService.getDiskBalancerInfo();
   }
 
