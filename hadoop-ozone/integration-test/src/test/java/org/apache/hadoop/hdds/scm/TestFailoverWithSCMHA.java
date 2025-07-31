@@ -112,7 +112,7 @@ public class TestFailoverWithSCMHA {
     failoverProxyProvider.changeCurrentProxy(scm.getSCMNodeId());
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
         new ScmBlockLocationProtocolClientSideTranslatorPB(
-            failoverProxyProvider);
+            failoverProxyProvider, conf);
     GenericTestUtils
         .setLogLevel(SCMBlockLocationFailoverProxyProvider.class, Level.DEBUG);
     LogCapturer logCapture = LogCapturer.captureLogs(SCMBlockLocationFailoverProxyProvider.class);
