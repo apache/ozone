@@ -69,7 +69,7 @@ We can then apply these rules to group the existing commands:
     Implemented in [HDDS-11740](https://issues.apache.org/jira/browse/HDDS-11740), this command prints the internal component versions of the Ozone instance installed on the current host. It will remain in its original location
 - `ozone debug om`
     A subcommand for all debug operations that run locally on an OM instance.
-    - `ozone debug om compaction-dag`
+    - `ozone debug om generate-compaction-dag`
         This will be the new location of `ozone debug print-log-dag`. Since it outputs a file locally to the leader OM, it should be modified to run locally as well. The current version goes over the network but does not return the result over the network. The name has been updated to better reflect its output. The command only works on the OM since we do not track RocksDB compactions for other components.
     - `ozone debug om prefix`
         The new location of `ozone debug prefix`.
