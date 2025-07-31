@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
@@ -158,7 +157,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.conf = b.conf;
       this.dnConf = conf.getObject(DatanodeConfiguration.class);
       this.ioTestCount = dnConf.getVolumeIOTestCount();
-      this.ioTestSlidingWindow = new SlidingWindow(dnConf.getVolumeIOFailureTolerance(), Duration.ofHours(1));
+      this.ioTestSlidingWindow = new SlidingWindow(dnConf.getVolumeIOFailureTolerance(),
+          dnConf.getDiskCheckSlidingWindowTimeout());
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
     } else {
       storageDir = new File(b.volumeRootStr);

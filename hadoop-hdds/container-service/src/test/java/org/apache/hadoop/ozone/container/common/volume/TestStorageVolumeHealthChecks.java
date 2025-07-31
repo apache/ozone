@@ -308,21 +308,19 @@ public class TestStorageVolumeHealthChecks {
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
     dnConf.setVolumeIOTestCount(ioTestCount);
     dnConf.setVolumeIOFailureTolerance(ioFailureTolerance);
+    dnConf.setDiskCheckSlidingWindowTimeout(Duration.ofMillis(ioTestCount));
     CONF.setFromObject(dnConf);
     builder.conf(CONF);
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
     // Sliding window protocol transitioned from count-based to a time-based system
-    // Update the default failure duration of the window from 1 hour to a shorter duration for the test
+    // Update the default failure duration of the window from 60 minutes to a shorter duration for the test
     long eventRate = 1L;
     TestClock testClock = TestClock.newInstance();
     Field clock = SlidingWindow.class.getDeclaredField("clock");
-    Field expiryDurationMillis = SlidingWindow.class.getDeclaredField("expiryDurationMillis");
     clock.setAccessible(true);
-    expiryDurationMillis.setAccessible(true);
     clock.set(volume.getIoTestSlidingWindow(), testClock);
-    expiryDurationMillis.set(volume.getIoTestSlidingWindow(), Duration.ofMillis(eventRate * ioTestCount).toMillis());
 
     for (int i = 0; i < checkResults.length; i++) {
       // Sleep to allow entries in the sliding window to eventually timeout
