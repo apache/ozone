@@ -67,6 +67,7 @@ import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -342,7 +343,7 @@ public class TestContainerCommandReconciliation {
     for (DatanodeDetails dn: datanodeDetails) {
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo =
           dnClient.getContainerChecksumInfo(containerID, dn);
-      assertTreesSortedAndMatch(tree.toProto(), containerChecksumInfo.getContainerMerkleTree());
+      assertTreesSortedAndMatch(tree.toProto(Collections.emptyList()), containerChecksumInfo.getContainerMerkleTree());
     }
   }
 
