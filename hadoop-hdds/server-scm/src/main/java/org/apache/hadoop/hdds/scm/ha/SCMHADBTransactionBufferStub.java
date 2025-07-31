@@ -19,7 +19,8 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -34,7 +35,7 @@ import org.apache.ratis.statemachine.SnapshotInfo;
 public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   private DBStore dbStore;
   private BatchOperation currentBatchOperation;
-  private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+  private final Lock rwLock = new ReentrantLock();
 
   public SCMHADBTransactionBufferStub() {
   }
@@ -57,22 +58,22 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   @Override
   public <KEY, VALUE> void addToBuffer(
       Table<KEY, VALUE> table, KEY key, VALUE value) throws IOException {
-    rwLock.readLock().lock();
+    rwLock.lock();
     try {
       table.putWithBatch(getCurrentBatchOperation(), key, value);
     } finally {
-      rwLock.readLock().unlock();
+      rwLock.unlock();
     }
   }
 
   @Override
   public <KEY, VALUE> void removeFromBuffer(Table<KEY, VALUE> table, KEY key)
       throws IOException {
-    rwLock.readLock().lock();
+    rwLock.lock();
     try {
       table.deleteWithBatch(getCurrentBatchOperation(), key);
     } finally {
-      rwLock.readLock().unlock();
+      rwLock.unlock();
     }
   }
 
@@ -103,7 +104,7 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
 
   @Override
   public void flush() throws IOException {
-    rwLock.writeLock().lock();
+    rwLock.lock();
     try {
       if (dbStore != null) {
         dbStore.commitBatchOperation(getCurrentBatchOperation());
@@ -113,7 +114,7 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
         currentBatchOperation = null;
       }
     } finally {
-      rwLock.writeLock().unlock();
+      rwLock.unlock();
     }
   }
 
