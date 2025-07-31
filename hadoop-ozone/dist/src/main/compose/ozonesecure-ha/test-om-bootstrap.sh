@@ -20,14 +20,16 @@
 # This test aims to validate the ozone snapshot data that have been
 # installed on a bootstrapped OM after a Ratis snapshot installation.
 #
+# This test starts 'om3' as FOLLOWER and 'om4' as LISTENER.
+#
 # The test
-#   * starts the docker environment with 'om3' inactive and uninitialised
+#   * starts the docker environment with 'om' inactive and uninitialised
 #   * runs a robot test that creates keys and snapshots
-#   * checks that 'om3' is inactive and has no data
-#   * initialises 'om3'
-#   * starts 'om3'
-#   * verifies that 'om3' is running and is bootstrapping
-#   * runs a robot test that validates the data on 'om3'
+#   * checks that 'om' is inactive and has no data
+#   * initialises 'om'
+#   * starts 'om'
+#   * verifies that 'om' is running and is bootstrapping
+#   * runs a robot test that validates the data on 'om'
 #
 # The data creation robot test
 #   * creates 100 metadata keys
@@ -36,11 +38,11 @@
 #   * creates the second snapshot
 #
 # The data validation robot test
-#   * checks that there have been checkpoints created on 'om3'
-#   * once checkpoints are created, the 'om3' has all the data from the leader
-#   * checks that 'om3' is not leader
-#   * transfers leadership to 'om3', so that we can perform regular leader reads
-#   * checks that the two snapshots exist on 'om3'
+#   * checks that there have been checkpoints created on 'om'
+#   * once checkpoints are created, the 'om' has all the data from the leader
+#   * checks that 'om' is not leader
+#   * transfers leadership to 'om', so that we can perform regular leader reads
+#   * checks that the two snapshots exist on 'om'
 #   * runs a snapshot diff between the two snapshots
 #   * validates that the result of the snapshot diff, contains just the two actual keys
 #   * does a 'key cat' on both snapshot keys and validates the contents
