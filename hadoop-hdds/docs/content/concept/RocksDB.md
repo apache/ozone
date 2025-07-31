@@ -22,6 +22,8 @@ menu:
   limitations under the License.
 -->
 
+> Note: This page covers advanced topics. Ozone administrators typically do not need to tinker with these settings.
+
 RocksDB is a critical component of Apache Ozone, providing a high-performance embedded key-value store. It is used by various Ozone services to persist metadata and state.
 
 ## 1. Introduction to RocksDB
@@ -44,13 +46,16 @@ RocksDB is utilized in the following Ozone components to store critical metadata
     *   `move`: Coordinates container movements for data rebalancing.
 
 *   **Datanode:** A Datanode utilizes RocksDB for two main purposes:
-    1.  **Per-Volume Metadata:** It maintains one RocksDB instance per storage volume. Each of these instances manages metadata for the containers and blocks stored on that specific volume. As specified in `DatanodeSchemaThreeDBDefinition.java`, this database is structured with column families for `block_data`, `metadata`, and `delete_txns`. To optimize performance, it uses a fixed-length prefix based on the container ID, enabling efficient lookups with RocksDB's prefix seek feature.
-    2.  **Global Container Tracking:** Additionally, each Datanode has a single, separate RocksDB instance to record the set of all containers it manages. This database, defined in `WitnessedContainerDBDefinition.java`, contains a `containerIds` table that provides a complete index of the containers hosted on that Datanode.
+    1.  **Per-Volume Metadata:** It maintains one RocksDB instance per storage volume. Each of these instances manages metadata for the containers and blocks stored on that specific volume. As specified in `DatanodeSchemaThreeDBDefinition.java`, this database is structured with column families for `block_data`, `metadata`, `delete_txns`, `finalize_blocks`, and `last_chunk_info`. To optimize performance, it uses a fixed-length prefix based on the container ID, enabling efficient lookups with RocksDB's prefix seek feature.
+    2.  **Global Container Tracking:** Additionally, each Datanode has a single, separate RocksDB instance to record the set of all containers it manages. This database, defined in `WitnessedContainerDBDefinition.java`, contains a `ContainerCreateInfoTable` table that provides a complete index of the containers hosted on that Datanode.
 
 *   **Recon:** Ozone's administration and monitoring tool, Recon, maintains its own RocksDB database to store aggregated and historical data for analysis. The `ReconDBDefinition.java` outlines tables for:
     *   `containerKeyTable`: Maps containers to the keys they contain.
     *   `namespaceSummaryTable`: Stores aggregated namespace information for quick reporting.
     *   `replica_history`: Tracks the historical locations of container replicas, which is essential for auditing and diagnostics.
+    *   `keyContainerTable`: Maps keys to the containers they are in.
+    *   `containerKeyCountTable`: Stores the number of keys in each container.
+    *   `replica_history_v2`: Tracks the historical locations of container replicas with BCSID, which is essential for auditing and diagnostics.
 
 ## 3. Tunings applicable to RocksDB
 
@@ -58,7 +63,7 @@ Effective tuning of RocksDB can significantly impact Ozone's performance. Ozone 
 
 ### General Settings
 
-Ozone provides a set of general RocksDB configurations that apply to all services (OM, SCM, and Datanodes) unless overridden by more specific settings.
+Ozone provides a set of general RocksDB configurations that apply to all services (OM, SCM, and Datanodes) unless overridden by more specific settings. With the exception of `hdds.db.profile` and `ozone.metastore.rocksdb.cf.write.buffer.size`, these properties are defined in `RocksDBConfiguration.java`.
 
 *   `hdds.db.profile`: Specifies the RocksDB profile to use, which determines the default `DBOptions` and `ColumnFamilyOptions`. Default value: `DISK`.
     *   Possible values include `SSD` and `DISK`.
@@ -66,6 +71,8 @@ Ozone provides a set of general RocksDB configurations that apply to all service
 
 *   **Write Options:**
     *   `hadoop.hdds.db.rocksdb.writeoption.sync`: If set to `true`, writes are synchronized to persistent storage, ensuring durability at the cost of performance. If `false`, writes are flushed asynchronously. Default: `false`.
+
+*   `ozone.metastore.rocksdb.cf.write.buffer.size`: The write buffer (memtable) size for each column family of the rocksdb store. Default: `128MB`.
 
 *   **Write-Ahead Log (WAL) Management:**
     *   `hadoop.hdds.db.rocksdb.WAL_ttl_seconds`: The time-to-live for WAL files in seconds. Default: `1200`.
@@ -77,23 +84,33 @@ Ozone provides a set of general RocksDB configurations that apply to all service
     *   `hadoop.hdds.db.rocksdb.max.log.file.size`: The maximum size of a single RocksDB log file. Default: `100MB`.
     *   `hadoop.hdds.db.rocksdb.keep.log.file.num`: The maximum number of RocksDB log files to retain. Default: `10`.
 
+### Ozone Manager (OM) Specific Settings
+
+These settings, defined in `ozone-default.xml`, apply specifically to the Ozone Manager.
+
+*   `ozone.om.db.max.open.files`: The total number of files that a RocksDB can open in the OM. Default: `-1` (unlimited).
+*   `ozone.compaction.service.enabled`: Enable or disable a background job that periodically compacts rocksdb tables flagged for compaction. Default: `false`.
+*   `ozone.om.compaction.service.run.interval`: The interval for the OM's compaction service. Default: `6h`.
+*   `ozone.om.compaction.service.timeout`: Timeout for the OM's compaction service. Default: `10m`.
+*   `ozone.om.compaction.service.columnfamilies`: A comma-separated list of column families to be compacted by the service. Default: `keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable`.
+
 ### DataNode-Specific Settings
 
-These settings apply specifically to Datanodes and will override the general settings where applicable.
+These settings, defined in `DatanodeConfiguration.java`, apply specifically to Datanodes and will override the general settings where applicable.
 
 Key tuning parameters for the DataNode often involve:
 
 *   **Memory usage:** Configuring block cache, write buffer manager, and other memory-related settings.
     *   `hdds.datanode.metadata.rocksdb.cache.size`: Configures the block cache size for RocksDB instances on Datanodes. Default value: `1GB`.
-*   **Compaction strategies:** Optimizing how data is merged and organized on disk.
+*   **Compaction strategies:** Optimizing how data is merged and organized on disk. For more details, refer to the [Merge Container RocksDB in DN Documentation]({{< ref "feature/dn-merge-rocksdb.md" >}}).
     *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file`: Enables or disables auto-compaction for small SST files. Default value: `true`.
     *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file-size-threshold`: Threshold for small SST file size for auto-compaction. Default value: `1MB`.
     *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file-num-threshold`: Threshold for the number of small SST files for auto-compaction. Default value: `512`.
     *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file.interval.minutes`: Auto compact small SST files interval in minutes. Default value: `120`.
     *   `hdds.datanode.rocksdb.auto-compaction-small-sst-file.threads`: Auto compact small SST files threads. Default value: `1`.
 *   **Write-ahead log (WAL) settings:** Balancing durability and write performance.
-    *   `hdds.datanode.rocksdb.log.max-file-size`: Maximum size of each RocksDB log file. Default value: `32MB`.
-    *   `hdds.datanode.rocksdb.log.max-file-num`: Maximum number of RocksDB log files. Default value: `64`.
+    *   `hdds.datanode.rocksdb.log.max-file-size`: The max size of each user log file of RocksDB. O means no size limit. Default value: `32MB`.
+    *   `hdds.datanode.rocksdb.log.max-file-num`: The max user log file number to keep for each RocksDB. Default value: `64`.
 *   **Logging:**
     *   `hdds.datanode.rocksdb.log.level`: The user log level of RocksDB(DEBUG/INFO/WARN/ERROR/FATAL)). Default: `INFO`.
 *   **Other Settings:**
@@ -112,7 +129,7 @@ Troubleshooting RocksDB issues in Ozone often involves:
 
 ## 5. Version Compatibility
 
-Apache Ozone uses RocksDB version 7.7.3. It is recommended to use this version to ensure compatibility and avoid any potential issues.
+Apache Ozone uses RocksDB version 7.7.3. It is recommended to use RocksDB tools of this version to ensure compatibility and avoid any potential issues.
 
 ## 6. Monitoring and Metrics
 
@@ -127,7 +144,7 @@ Properly sizing the storage for RocksDB instances is essential to prevent perfor
 
 *   **Ozone Manager (OM):**
   *   **Baseline:** A minimum of **100 GB** should be reserved for the OM's RocksDB instance. The OM stores the entire namespace metadata (volumes, buckets, keys), so this is the most critical database in the cluster.
-  *   **With Snapshots:** Enabling Ozone Snapshots will substantially increase storage needs. Each snapshot preserves a view of the metadata, and the underlying data files (SSTs) cannot be deleted by compaction until a snapshot is removed. The exact requirement depends on the number of retained snapshots and the rate of change (creations/deletions) in the namespace. Monitor disk usage closely after enabling snapshots.
+  *   **With Snapshots:** Enabling Ozone Snapshots will substantially increase storage needs. Each snapshot preserves a view of the metadata, and the underlying data files (SSTs) cannot be deleted by compaction until a snapshot is removed. The exact requirement depends on the number of retained snapshots and the rate of change (creations/deletions) in the namespace. Monitor disk usage closely after enabling snapshots. For more details, refer to the [Ozone Snapshot Documentation]({{< ref "feature/Snapshot.md" >}}).
 
 *   **Storage Container Manager (SCM):**
   *   SCM's metadata footprint (pipelines, containers, Datanode heartbeats) is much smaller than the OM's. A baseline of **20-50 GB** is typically sufficient for its RocksDB instance.
