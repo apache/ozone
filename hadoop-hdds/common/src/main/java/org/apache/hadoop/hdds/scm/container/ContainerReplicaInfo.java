@@ -17,16 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
-
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.JsonUtils;
 
 /**
  * Class which stores ContainerReplica details on the client.
@@ -41,7 +36,7 @@ public final class ContainerReplicaInfo {
   private long keyCount;
   private long bytesUsed;
   private int replicaIndex = -1;
-  @JsonSerialize(using = LongToHexJsonSerializer.class)
+  @JsonSerialize(using = JsonUtils.ChecksumSerializer.class)
   private long dataChecksum;
 
   public static ContainerReplicaInfo fromProto(
@@ -98,13 +93,6 @@ public final class ContainerReplicaInfo {
 
   public long getDataChecksum() {
     return dataChecksum;
-  }
-
-  private static class LongToHexJsonSerializer extends JsonSerializer<Long> {
-    @Override
-    public void serialize(Long value, JsonGenerator gen, SerializerProvider provider) throws IOException {
-      gen.writeString(checksumToString(value));
-    }
   }
 
   /**
