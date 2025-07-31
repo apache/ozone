@@ -775,16 +775,6 @@ public class KeyManagerImpl implements KeyManager {
                   .addAllBlockIDs(blockIDS).build();
               int keyBlockSerializedSize = keyBlocks.getProto().getSerializedSize();
               serializedSize += keyBlockSerializedSize;
-              if (serializedSize > ratisByteLimit) {
-                maxReqSizeExceeded = true;
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug(
-                      "Total size of cumulative keys and rename entries in the snapshotRenamedTable in a cycle " +
-                          "crossed 90% ratis limit, serialized size of keys: {}",
-                      serializedSize);
-                }
-                break;
-              }
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {
