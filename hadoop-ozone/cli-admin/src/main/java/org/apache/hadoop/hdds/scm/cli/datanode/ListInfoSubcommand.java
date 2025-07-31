@@ -87,17 +87,17 @@ public class ListInfoSubcommand extends ScmSubcommand {
     pipelines = scmClient.listPipelines();
     if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getNodeId())) {
       HddsProtos.Node node = scmClient.queryNode(UUID.fromString(exclusiveNodeOptions.getNodeId()));
-      BasicDatanodeInfoJson singleNodeInfo = new BasicDatanodeInfoJson(
-          DatanodeDetails.getFromProtoBuf(node.getNodeID()), node.getNodeOperationalStates(0), node.getNodeStates(0));
+      BasicDatanodeInfo singleNodeInfo = new BasicDatanodeInfo(DatanodeDetails.getFromProtoBuf(node.getNodeID()),
+          node.getNodeOperationalStates(0), node.getNodeStates(0));
       if (json) {
-        List<BasicDatanodeInfoJson> dtoList = Collections.singletonList(singleNodeInfo);
+        List<BasicDatanodeInfo> dtoList = Collections.singletonList(singleNodeInfo);
         System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dtoList));
       } else {
         printDatanodeInfo(singleNodeInfo);
       }
       return;
     }
-    Stream<BasicDatanodeInfoJson> allNodes = getAllNodes(scmClient).stream();
+    Stream<BasicDatanodeInfo> allNodes = getAllNodes(scmClient).stream();
     if (exclusiveNodeOptions != null && !Strings.isNullOrEmpty(exclusiveNodeOptions.getIp())) {
       allNodes = allNodes.filter(p -> p.getIpAddress()
           .compareToIgnoreCase(exclusiveNodeOptions.getIp()) == 0);
@@ -120,14 +120,14 @@ public class ListInfoSubcommand extends ScmSubcommand {
     }
     
     if (json) {
-      List<BasicDatanodeInfoJson> datanodeList = allNodes.collect(Collectors.toList());
+      List<BasicDatanodeInfo> datanodeList = allNodes.collect(Collectors.toList());
       System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(datanodeList));
     } else {
       allNodes.forEach(this::printDatanodeInfo);
     }
   }
 
-  private List<BasicDatanodeInfoJson> getAllNodes(ScmClient scmClient)
+  private List<BasicDatanodeInfo> getAllNodes(ScmClient scmClient)
       throws IOException {
 
     // If sorting is requested
@@ -146,7 +146,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
               long capacity = p.getCapacity();
               long used = capacity - p.getRemaining();
               double percentUsed = (capacity > 0) ? (used * 100.0) / capacity : 0.0;
-              return new BasicDatanodeInfoJson(
+              return new BasicDatanodeInfo(
                   DatanodeDetails.getFromProtoBuf(node.getNodeID()),
                   node.getNodeOperationalStates(0),
                   node.getNodeStates(0),
@@ -165,14 +165,14 @@ public class ListInfoSubcommand extends ScmSubcommand {
         null, HddsProtos.QueryScope.CLUSTER, "");
 
     return nodes.stream()
-        .map(p -> new BasicDatanodeInfoJson(
+        .map(p -> new BasicDatanodeInfo(
             DatanodeDetails.getFromProtoBuf(p.getNodeID()),
             p.getNodeOperationalStates(0), p.getNodeStates(0)))
         .sorted((o1, o2) -> o1.getHealthState().compareTo(o2.getHealthState()))
         .collect(Collectors.toList());
   }
 
-  private void printDatanodeInfo(BasicDatanodeInfoJson dn) {
+  private void printDatanodeInfo(BasicDatanodeInfo dn) {
     StringBuilder pipelineListInfo = new StringBuilder();
     DatanodeDetails datanode = dn.getDatanodeDetails();
     int relatedPipelineNum = 0;
