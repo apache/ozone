@@ -256,9 +256,8 @@ public abstract class Handler {
       throws IOException;
 
   /**
-   * Imports container from a container path.
+   * Imports container from a container which is under the temp directory.
    */
-  public abstract Container importContainer(
-      ContainerData containerData, Path containerPath) throws IOException;
+  public abstract Container importContainer(ContainerData targetTempContainerData) throws IOException;
 }
 
