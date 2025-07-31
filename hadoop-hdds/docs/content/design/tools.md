@@ -81,7 +81,7 @@ We can then apply these rules to group the existing commands:
     Currently all online debug tools fit under this category, where they get a listing from the OM and perform checks on the replica information retrieved. The help message for this subcommand should explicitly state that it runs over the network against a running cluster.
     - `ozone debug replicas chunk-info`
         This is the new location of `ozone debug chunkinfo`
-    - `ozone debug replicas verify [--checksums] [--blocks]`
+    - `ozone debug replicas verify [--checksums] [--block-existence] [--container-state]`
         This is the combination of `ozone debug find-missing-padding`, `ozone debug read-replicas`, and the [proposed block metadata check tool](https://github.com/apache/ozone/pull/7548). The command takes  paths in the namespace and performs checks on the objects based on the flags given:
       - No flags: Error, at least one check must be specified.
       - `--blocks` checks block existence of all replicas as proposed in [HDDS-11891](https://issues.apache.org/jira/browse/HDDS-11891).
