@@ -241,9 +241,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     File newDbDir = new File(newDbDirName);
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
-    long totalSize = 0;
-    for (File f : newDbDir.listFiles()) {
-      totalSize += f.length();
+    long totalSize;
+    try (Stream<Path> list = Files.list(newDbDir.toPath())) {
+      totalSize = list.mapToLong(path -> path.toFile().length()).sum();
     }
     boolean obtainedFilesUnderMaxLimit = totalSize < maxFileSizeLimit;
     if (!includeSnapshots) {
