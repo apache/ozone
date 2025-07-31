@@ -63,6 +63,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -760,14 +761,33 @@ public class KeyValueHandler extends Handler {
     try {
       checksumTree = checksumManager.getContainerChecksumInfo(containerData);
     } catch (IOException ex) {
-      // For file not found or other inability to read the file, return an error to the client.
-      LOG.error("Error occurred when reading checksum file for container {}", containerData.getContainerID(), ex);
-      return ContainerCommandResponseProto.newBuilder()
-          .setCmdType(request.getCmdType())
-          .setTraceID(request.getTraceID())
-          .setResult(IO_EXCEPTION)
-          .setMessage(ex.getMessage())
-          .build();
+      // Only build from metadata if the file doesn't exist
+      if (ex instanceof FileNotFoundException) {
+        try {
+          LOG.info("Checksum tree file not found for container {}. Building from merkle tree from metadata.",
+              containerData.getContainerID());
+          ContainerProtos.ContainerChecksumInfo checksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
+          checksumTree = checksumInfo.toByteString();
+        } catch (IOException metadataEx) {
+          LOG.error("Failed to build merkle tree from metadata for container {}",
+              containerData.getContainerID(), metadataEx);
+          return ContainerCommandResponseProto.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setTraceID(request.getTraceID())
+              .setResult(IO_EXCEPTION)
+              .setMessage("Failed to get or build merkle tree: " + metadataEx.getMessage())
+              .build();
+        }
+      } else {
+        // For other inability to read the file, return an error to the client.
+        LOG.error("Error occurred when reading checksum file for container {}", containerData.getContainerID(), ex);
+        return ContainerCommandResponseProto.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setTraceID(request.getTraceID())
+            .setResult(IO_EXCEPTION)
+            .setMessage(ex.getMessage())
+            .build();
+      }
     }
 
     return getGetContainerMerkleTreeResponse(request, checksumTree);
