@@ -119,7 +119,7 @@ Invoked as `ozone repair`, these commands make modifications to an Ozone instanc
         A dedicated subcommand for all certificate related repairs on SCM we may need now or in the future.
         - `ozone repair scm cert recover`
             The new location of `ozone repair cert-recover`
-- `ozone repair scm`
+- `ozone repair datanode`
     These commands make repairs to an individual datanode instance.
     - `ozone repair datanode upgrade-container-schema`
         This is the new location of `ozone admin container upgrade`, which actually works offline on a single datanode instance so it does not fit with other `ozone admin container` commands.
