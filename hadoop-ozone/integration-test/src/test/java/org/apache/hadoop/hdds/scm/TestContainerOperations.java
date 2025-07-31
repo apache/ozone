@@ -54,11 +54,14 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class tests container operations (TODO currently only supports create)
@@ -67,6 +70,7 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class TestContainerOperations implements NonHATests.TestCase {
 
+  private static final Logger LOG = LoggerFactory.getLogger(TestContainerOperations.class);
   private static final int CONTAINER_LIST_LIMIT = 1;
 
   private ScmClient storageClient;
@@ -195,13 +199,23 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     List<? extends DatanodeDetails> dnList = nodeManager.getAllNodes();
 
     for (DatanodeDetails dn : dnList) {
-      List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
-              storageClient.getDatanodeUsageInfo(
-                      dn.getIpAddress(), dn.getUuidString());
+      GenericTestUtils.waitFor(() -> {
+        try {
+          List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
+              storageClient.getDatanodeUsageInfo(dn.getIpAddress(), dn.getUuidString());
 
-      assertEquals(1, usageInfoList.size());
-      assertThat(usageInfoList.get(0).getContainerCount())
-          .isGreaterThanOrEqualTo(nodeManager.getContainers(dn).size());
+          assertEquals(1, usageInfoList.size());
+
+          long expected = nodeManager.getContainers(dn).size();
+          long actual = usageInfoList.get(0).getContainerCount();
+          LOG.info("Container count expected: {}, actual: {}", expected, actual);
+
+          return expected == actual;
+        } catch (Exception e) {
+          LOG.info("Failed to get container count", e);
+          return false;
+        }
+      }, 1000, 30_000);
     }
   }
 
