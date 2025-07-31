@@ -426,15 +426,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             getMetrics().incrNumKeysProcessed(keyBlocksList.size());
             getMetrics().incrNumKeysSentForPurge(purgeResult.getKey().getKey());
 
-            if (currentSnapshotInfo == null) {
-              aosDeletionStats.updateDeletionStats(purgeResult.getKey().getKey(), purgeResult.getKey().getValue(),
-                  keyBlocksList.size() + pendingKeysDeletion.getNotReclaimableKeyCount(),
-                  pendingKeysDeletion.getNotReclaimableKeyCount());
-            } else {
-              snapshotDeletionStats.updateDeletionStats(purgeResult.getKey().getKey(), purgeResult.getKey().getValue(),
-                  keyBlocksList.size() + pendingKeysDeletion.getNotReclaimableKeyCount(),
-                  pendingKeysDeletion.getNotReclaimableKeyCount());
-            }
+            DeletionStats statsToUpdate = currentSnapshotInfo == null ? aosDeletionStats : snapshotDeletionStats;
+            statsToUpdate.updateDeletionStats(purgeResult.getKey().getKey(), purgeResult.getKey().getValue(),
+                keyBlocksList.size() + pendingKeysDeletion.getNotReclaimableKeyCount(),
+                pendingKeysDeletion.getNotReclaimableKeyCount()
+            );
             if (successStatus) {
               deletedKeyCount.addAndGet(purgeResult.getKey().getKey());
             }
