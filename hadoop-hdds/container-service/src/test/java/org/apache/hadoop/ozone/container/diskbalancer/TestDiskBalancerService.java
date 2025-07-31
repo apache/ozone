@@ -92,7 +92,6 @@ public class TestDiskBalancerService {
       FileUtils.cleanDirectory(testRoot);
     }
     scmId = UUID.randomUUID().toString();
-    conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY, true);
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         generateVolumeLocation(testRoot.getAbsolutePath(), 2));
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());

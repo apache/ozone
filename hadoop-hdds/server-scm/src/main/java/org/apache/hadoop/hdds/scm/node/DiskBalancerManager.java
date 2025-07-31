@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
@@ -60,7 +58,6 @@ public class DiskBalancerManager {
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
   private final NodeManager nodeManager;
-  private final OzoneConfiguration conf;
   private Map<DatanodeDetails, DiskBalancerStatus> statusMap;
   private Map<DatanodeDetails, Long> balancedBytesMap;
   private boolean useHostnames;
@@ -72,7 +69,6 @@ public class DiskBalancerManager {
                         EventPublisher eventPublisher,
                         SCMContext scmContext,
                         NodeManager nodeManager) {
-    this.conf = conf;
     this.scmNodeEventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.nodeManager = nodeManager;
@@ -81,18 +77,8 @@ public class DiskBalancerManager {
     this.balancedBytesMap = new ConcurrentHashMap<>();
   }
 
-  private void checkDiskBalancerEnabled() throws IOException {
-    // Read the raw key directly from the configuration
-    if (!conf.getBoolean(HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY,
-        HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT)) {
-      throw new IOException("Disk Balancer service is not enabled. Please set '" +
-          HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY + "' to true to use this service.");
-    }
-  }
-
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
       int count, int clientVersion) throws IOException {
-    checkDiskBalancerEnabled();
 
     List<HddsProtos.DatanodeDiskBalancerInfoProto> reportList =
         new ArrayList<>();
@@ -120,8 +106,6 @@ public class DiskBalancerManager {
       Optional<List<String>> hosts,
       Optional<HddsProtos.DiskBalancerRunningStatus> status,
       int clientVersion) throws IOException {
-    checkDiskBalancerEnabled();
-
     List<DatanodeDetails> filterDns = null;
     if (hosts.isPresent() && !hosts.get().isEmpty()) {
       filterDns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
@@ -173,8 +157,6 @@ public class DiskBalancerManager {
       Optional<Double> threshold, Optional<Long> bandwidthInMB,
       Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven,
       Optional<List<String>> hosts) throws IOException {
-    checkDiskBalancerEnabled();
-
     List<DatanodeDetails> dns;
     if (hosts.isPresent()) {
       dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
@@ -213,8 +195,6 @@ public class DiskBalancerManager {
    * */
   public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
       throws IOException {
-    checkDiskBalancerEnabled();
-
     List<DatanodeDetails> dns;
     if (hosts.isPresent()) {
       dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
@@ -250,8 +230,6 @@ public class DiskBalancerManager {
       Optional<Double> threshold, Optional<Long> bandwidthInMB,
       Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
       throws IOException {
-    checkDiskBalancerEnabled();
-
     List<DatanodeDetails> dns;
     if (hosts.isPresent()) {
       dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),

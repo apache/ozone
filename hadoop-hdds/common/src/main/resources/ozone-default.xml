@@ -213,7 +213,7 @@
     <value>false</value>
     <tag>OZONE, DATANODE, DISKBALANCER</tag>
     <description>If this property is set to true, then the Disk Balancer
-      service is enabled on SCM and Datanodes, and users can use
+      feature is enabled on SCM and Datanodes, and users can use
       this service. By default, this is disabled.
     </description>
   </property>
