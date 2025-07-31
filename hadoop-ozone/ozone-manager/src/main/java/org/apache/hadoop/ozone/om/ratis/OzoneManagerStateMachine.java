@@ -237,7 +237,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .append("), "));
     logBuilder.append("New Listener list: ");
     newListeners.forEach(peer -> logBuilder.append(peer.getId().toStringUtf8())
-        .append("(")
+        .append('(')
         .append(peer.getAddress())
         .append("), "));
     LOG.info(logBuilder.substring(0, logBuilder.length() - 2));
