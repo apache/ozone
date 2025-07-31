@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -492,6 +493,15 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   String getMetrics(String query) throws IOException;
 
+  /**
+   * Retrieves volume information based on the specified query parameters.
+   *
+   * @return Volume Information List.
+   * @throws IOException
+   * I/O exceptions that may occur during the process of querying the volume.
+   */
+  GetVolumeInfosResponseProto getVolumeInfos() throws IOException;
+  
   /**
    * Trigger a reconcile command to datanodes for the current container ID.
    *
