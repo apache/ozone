@@ -80,9 +80,6 @@ public final class OnDemandContainerScanner {
 
   private Optional<Future<?>> scanContainer(Container<?> container, ContainerScanHelper helper, String reasonForScan) {
     if (!helper.shouldScanMetadata(container)) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Skipping on-demand scan for container {}.", container.getContainerData().getContainerID());
-      }
       return Optional.empty();
     }
 
@@ -95,7 +92,7 @@ public final class OnDemandContainerScanner {
       });
     } else {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Skipping on-demand scan for container {}.", containerId);
+        LOG.debug("Skipping OnDemandScan for Container {}, Reason: {}", containerId, "Already scheduled.");
       }
     }
     return Optional.ofNullable(resultFuture);
