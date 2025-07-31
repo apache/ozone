@@ -98,6 +98,11 @@ public class ContainerSet implements Iterable<Container<?>> {
     return clock.millis();
   }
 
+  @Nullable
+  public WitnessedContainerMetadataStore getContainerMetadataStore() {
+    return containerMetadataStore;
+  }
+
   @VisibleForTesting
   public void setRecoveringTimeout(long recoveringTimeout) {
     this.recoveringTimeout = recoveringTimeout;
@@ -192,7 +197,7 @@ public class ContainerSet implements Iterable<Container<?>> {
         LOG.debug("Container with container Id {} is added to containerMap",
             containerId);
       }
-      updateContainerIdTable(containerId, containerState);
+      updateContainerIdTable(containerId, container.getContainerData());
       missingContainerSet.remove(containerId);
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(
@@ -207,11 +212,11 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
   }
 
-  private void updateContainerIdTable(long containerId, State containerState) throws StorageContainerException {
+  private void updateContainerIdTable(long containerId, ContainerData containerData) throws StorageContainerException {
     if (null != containerMetadataStore) {
       try {
         containerMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(containerId),
-            ContainerCreateInfo.valueOf(containerState));
+            ContainerCreateInfo.valueOf(containerData.getState(), containerData.getReplicaIndex()));
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }

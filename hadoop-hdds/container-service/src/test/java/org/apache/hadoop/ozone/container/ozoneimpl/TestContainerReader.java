@@ -46,6 +46,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -67,7 +69,9 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.util.FileUtils;
@@ -82,6 +86,7 @@ public class TestContainerReader {
   private MutableVolumeSet volumeSet;
   private HddsVolume hddsVolume;
   private ContainerSet containerSet;
+  WitnessedContainerMetadataStore mockMetadataStore;
   private OzoneConfiguration conf;
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
@@ -102,7 +107,9 @@ public class TestContainerReader {
         Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     this.conf = new OzoneConfiguration();
     volumeSet = mock(MutableVolumeSet.class);
-    containerSet = newContainerSet();
+    mockMetadataStore = mock(WitnessedContainerMetadataStore.class);
+    when(mockMetadataStore.getContainerCreateInfoTable()).thenReturn(new InMemoryTestTable<>());
+    containerSet = newContainerSet(1000, mockMetadataStore);
 
     datanodeId = UUID.randomUUID();
     hddsVolume = new HddsVolume.Builder(volumeDir
@@ -429,6 +436,10 @@ public class TestContainerReader {
     KeyValueContainer conflict22 = null;
     KeyValueContainer ec1 = null;
     KeyValueContainer ec2 = null;
+    KeyValueContainer ec3 = null;
+    KeyValueContainer ec4 = null;
+    KeyValueContainer ec5 = null;
+    KeyValueContainer ec6 = null;
     long baseBCSID = 10L;
 
     for (int i = 0; i < containerCount; i++) {
@@ -454,6 +465,20 @@ public class TestContainerReader {
       } else if (i == 3) {
         ec1 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
         ec2 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
+      } else if (i == 4) {
+        ec3 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
+        ec4 = createContainerWithId(i, volumeSets, policy, baseBCSID, 2);
+        ec3.close();
+        ec4.close();
+        mockMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(i), ContainerCreateInfo.valueOf(
+            ContainerProtos.ContainerDataProto.State.CLOSED, 1));
+      } else if (i == 5) {
+        ec5 = createContainerWithId(i, volumeSets, policy, baseBCSID, 1);
+        ec6 = createContainerWithId(i, volumeSets, policy, baseBCSID, 2);
+        ec6.close();
+        ec5.close();
+        mockMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(i), ContainerCreateInfo.valueOf(
+            ContainerProtos.ContainerDataProto.State.CLOSED, 2));
       } else {
         createContainerWithId(i, volumeSets, policy, baseBCSID, 0);
       }
@@ -520,6 +545,13 @@ public class TestContainerReader {
     assertTrue(Files.exists(Paths.get(ec1.getContainerData().getContainerPath())));
     assertTrue(Files.exists(Paths.get(ec2.getContainerData().getContainerPath())));
     assertNotNull(containerSet.getContainer(3));
+
+    // For EC conflict with different replica index, one with matching db replica should exist
+    assertTrue(Files.exists(Paths.get(ec3.getContainerData().getContainerPath())));
+    assertTrue(!Files.exists(Paths.get(ec4.getContainerData().getContainerPath())));
+
+    assertTrue(!Files.exists(Paths.get(ec5.getContainerData().getContainerPath())));
+    assertTrue(Files.exists(Paths.get(ec6.getContainerData().getContainerPath())));
 
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
