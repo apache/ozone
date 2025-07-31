@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -57,21 +59,28 @@ public class NSSummaryTaskDbEventHandler {
     return reconOMMetadataManager;
   }
 
-  protected void writeNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap)
+  private void updateNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap, Collection<Long> objectIdsToBeDeleted)
       throws IOException {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
-          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
-              entry.getKey(), entry.getValue());
+          reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, entry.getKey(), entry.getValue());
         } catch (IOException e) {
-          LOG.error("Unable to write Namespace Summary data in Recon DB.",
-              e);
+          LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+          throw e;
+        }
+      }
+      for (Long objectId : objectIdsToBeDeleted) {
+        try {
+          reconNamespaceSummaryManager.batchDeleteNSSummaries(rdbBatchOperation, objectId);
+        } catch (IOException e) {
+          LOG.error("Unable to delete Namespace Summary data from Recon DB.", e);
           throw e;
         }
       }
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
     }
+    LOG.debug("Successfully updated Namespace Summary data in Recon DB.");
   }
 
   protected void handlePutKeyEvent(OmKeyInfo keyInfo, Map<Long,
@@ -190,7 +199,27 @@ public class NSSummaryTaskDbEventHandler {
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
-      writeNSSummariesToDB(nsSummaryMap);
+      updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
+    } catch (IOException e) {
+      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      return false;
+    } finally {
+      nsSummaryMap.clear();
+    }
+    return true;
+  }
+
+  /**
+   * Flush and commit updated NSSummary to DB. This includes deleted objects of OM metadata also.
+   *
+   * @param nsSummaryMap Map of objectId to NSSummary
+   * @param objectIdsToBeDeleted list of objectids to be deleted
+   * @return true if successful, false otherwise
+   */
+  protected boolean flushAndCommitUpdatedNSToDB(Map<Long, NSSummary> nsSummaryMap,
+                                                Collection<Long> objectIdsToBeDeleted) {
+    try {
+      updateNSSummariesToDB(nsSummaryMap, objectIdsToBeDeleted);
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
       return false;

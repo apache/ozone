@@ -36,7 +36,7 @@ public class OzoneManagerHttpServer extends BaseHttpServer {
     addServlet("serviceList", OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT,
         ServiceListJSONServlet.class);
     addServlet("dbCheckpoint", OZONE_DB_CHECKPOINT_HTTP_ENDPOINT,
-        OMDBCheckpointServlet.class);
+        OMDBCheckpointServletInodeBasedXfer.class);
     getWebAppContext().setAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE, om);
   }
 
