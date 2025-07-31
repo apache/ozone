@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.container;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -70,6 +72,38 @@ public interface ContainerManager {
    * @return a list of container.
    */
   List<ContainerInfo> getContainers(ContainerID startID, int count);
+
+  /**
+   * Returns the containers iterator with startID.
+   *
+   * @param startID start containerID, >=0,
+   * start searching at the head if 0.
+   *
+   * @return an iterator of container.
+   */
+  Iterator<ContainerInfo> getContainerInfoIterator(ContainerID startID);
+
+  /**
+   * Returns the containers iterator with startID and filters the values in iterator.
+   *
+   * @param startID start containerID, >=0,
+   * start searching at the head if 0.
+   * @param filter predicate value
+   *
+   * @return an iterator of container.
+   */
+  Iterator<ContainerInfo> getContainerInfoIterator(ContainerID startID, Predicate<ContainerInfo> filter);
+
+  /**
+   * Returns the containers iterator in a certain state with startID.
+   *
+   * @param state LifeCycleState of the container.
+   * @param startID start containerID, >=0,
+   * start searching at the head if 0.
+   *
+   * @return an iterator of container.
+   */
+  Iterator<ContainerInfo> getContainerInfoIterator(LifeCycleState state, ContainerID startID);
 
   List<ContainerInfo> getContainers(ReplicationType type);
 
@@ -180,7 +214,7 @@ public interface ContainerManager {
       throws IOException;
 
   default ContainerInfo getMatchingContainer(long size, String owner,
-                                     Pipeline pipeline) {
+                                             Pipeline pipeline) {
     return getMatchingContainer(size, owner, pipeline, Collections.emptySet());
   }
 
