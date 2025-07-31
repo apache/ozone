@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -366,11 +367,22 @@ public final class ContainerMerkleTreeTestUtils {
         .readChecksumInfo(containerData);
     assertNotNull(containerChecksumInfo);
     long dataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
-    assertEquals(containerData.getDataChecksum(), dataChecksum, "In-memory data checksum should match " +
-        "the one in the checksum file.");
+    Long dbDataChecksum;
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
-      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
-      assertEquals(containerData.getDataChecksum(), dbDataChecksum, "DB should have the updated data checksum.");
+      dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+    }
+
+    if (containerData.getDataChecksum() == 0) {
+      assertEquals(containerData.getDataChecksum(), dataChecksum);
+      // RocksDB checksum can be null if the file doesn't exist or when the file is created by
+      // the block deleting service. 0 checksum will be stored when the container is loaded without
+      // merkle tree.
+      assertThat(dbDataChecksum).isIn(0L, null);
+    } else {
+      // In-Memory, Container Merkle Tree file, RocksDB checksum should be equal
+      assertEquals(containerData.getDataChecksum(), dataChecksum, "In-memory data checksum should match " +
+          "the one in the checksum file.");
+      assertEquals(dbDataChecksum, dataChecksum);
     }
   }
 }

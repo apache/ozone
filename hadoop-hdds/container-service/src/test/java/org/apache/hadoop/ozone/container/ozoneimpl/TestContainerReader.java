@@ -726,10 +726,7 @@ public class TestContainerReader {
     assertEquals(0L, loadedData.getDataChecksum());
 
     // The checksum is not stored in rocksDB as the checksum file doesn't exist.
-    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
-      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
-      assertNull(dbDataChecksum);
-    }
+    verifyAllDataChecksumsMatch(loadedData, conf);
   }
 
   @ContainerTestVersionInfo.ContainerTest
