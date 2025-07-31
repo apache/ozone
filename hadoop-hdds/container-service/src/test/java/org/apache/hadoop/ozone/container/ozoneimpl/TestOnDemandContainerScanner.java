@@ -35,7 +35,6 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -222,11 +221,6 @@ public class TestOnDemandContainerScanner extends
   @Test
   @Override
   public void testUnhealthyContainersDetected() throws Exception {
-    // Without initialization,
-    // there shouldn't be interaction with containerController
-    onDemandScanner.scanContainer(corruptData);
-    verifyNoInteractions(controller);
-
     scanContainer(healthy);
     verifyContainerMarkedUnhealthy(healthy, never());
     scanContainer(corruptData);

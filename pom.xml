@@ -52,7 +52,7 @@
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-configuration2.version>2.12.0</commons-configuration2.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
-    <commons-fileupload.version>1.5</commons-fileupload.version>
+    <commons-fileupload.version>1.6.0</commons-fileupload.version>
     <commons-io.version>2.18.0</commons-io.version>
     <commons-lang3.version>3.17.0</commons-lang3.version>
     <commons-math3.version>3.6.1</commons-math3.version>
@@ -1966,7 +1966,9 @@
                     <bannedImports>
                       <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
                       <bannedImport>org.apache.hadoop.thirdparty.com.google.common.**</bannedImport>
+                      <bannedImport>org.apache.hadoop.util.Lists</bannedImport>
                       <bannedImport>org.apache.hadoop.util.Preconditions</bannedImport>
+                      <bannedImport>org.apache.hadoop.util.Sets</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
@@ -2731,6 +2733,8 @@
               </includes>
               <excludes>
                 <exclude>org.apache.hadoop.ozone.om.snapshot.**</exclude>
+                <!-- default excludes -->
+                <exclude>**/*$*</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2785,6 +2789,8 @@
               </includes>
               <excludes>
                 <exclude>org.apache.hadoop.hdds.scm.container.**</exclude>
+                <!-- default excludes -->
+                <exclude>**/*$*</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2809,6 +2815,8 @@
                 <exclude>org.apache.hadoop.ozone.container.**</exclude>
                 <exclude>org.apache.hadoop.ozone.om.**</exclude>
                 <exclude>org.apache.hadoop.ozone.recon.**</exclude>
+                <!-- default excludes -->
+                <exclude>**/*$*</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
