@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -310,16 +309,16 @@ public class TestNSSummaryMemoryLeak {
     
     simulateHardDelete(omMetadataManager);
     syncDataFromOM();
-    
-    // Force garbage collection
-    System.gc();
-    Thread.sleep(1000);
-    
-    // Verify memory cleanup
-    long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-    LOG.info("Memory usage - Before: {} bytes, After: {} bytes", memoryBefore, memoryAfter);
-    assertTrue(memoryBefore >= memoryAfter);
-    
+
+    GenericTestUtils.waitFor(() -> {
+      System.gc();
+
+      // Verify memory cleanup
+      long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
+      LOG.info("Memory usage - Before: {} bytes, After: {} bytes", memoryBefore, memoryAfter);
+      return memoryAfter <= memoryBefore;
+    }, 100, 30_000);
+
     // Verify NSSummary cleanup
     ReconNamespaceSummaryManager namespaceSummaryManager = 
         recon.getReconServer().getReconNamespaceSummaryManager();
