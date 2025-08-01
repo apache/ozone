@@ -744,6 +744,9 @@ public class KeyManagerImpl implements KeyManager {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
     long serializedSize = 0;
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
+    Map<String, Long> keyBlockReplicatedSize = new HashMap<>();
+    int notReclaimableKeyCount = 0;
+
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
@@ -785,6 +788,7 @@ public class KeyManagerImpl implements KeyManager {
                 }
                 break;
               }
+              keyBlockReplicatedSize.put(keyBlocks.getGroupID(), info.getReplicatedSize());
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {
@@ -803,10 +807,11 @@ public class KeyManagerImpl implements KeyManager {
             keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
           }
           keyBlocksList.addAll(blockGroupList);
+          notReclaimableKeyCount += notReclaimableKeyInfoList.size();
         }
       }
     }
-    return new PendingKeysDeletion(keyBlocksList, keysToModify);
+    return new PendingKeysDeletion(keyBlocksList, keysToModify, keyBlockReplicatedSize, notReclaimableKeyCount);
   }
 
   private <V, R> List<KeyValue<String, R>> getTableEntries(String startKey,
