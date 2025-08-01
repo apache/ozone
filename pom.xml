@@ -1311,6 +1311,12 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-server</artifactId>
+        <version>${ratis.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ratis</groupId>
         <artifactId>ratis-server-api</artifactId>
         <version>${ratis.version}</version>
       </dependency>

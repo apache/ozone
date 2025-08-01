@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.RaftTestUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -309,15 +311,14 @@ public class TestNSSummaryMemoryLeak {
     
     simulateHardDelete(omMetadataManager);
     syncDataFromOM();
+    
+    // Force garbage collection
+    RaftTestUtil.gc();
 
-    GenericTestUtils.waitFor(() -> {
-      System.gc();
-
-      // Verify memory cleanup
-      long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
-      LOG.info("Memory usage - Before: {} bytes, After: {} bytes", memoryBefore, memoryAfter);
-      return memoryAfter <= memoryBefore;
-    }, 100, 30_000);
+    // Verify memory cleanup
+    long memoryAfter = runtime.totalMemory() - runtime.freeMemory();
+    LOG.info("Memory usage - Before: {} bytes, After: {} bytes", memoryBefore, memoryAfter);
+    assertThat(memoryAfter).isLessThanOrEqualTo(memoryBefore);
 
     // Verify NSSummary cleanup
     ReconNamespaceSummaryManager namespaceSummaryManager = 
