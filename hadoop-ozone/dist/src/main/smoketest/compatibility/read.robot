@@ -160,10 +160,10 @@ Key Info File Flag Should Be Set Correctly
     Pass Execution If    '${CLUSTER_VERSION}' <= '${EC_VERSION}'   Cluster does not support 'file' flag
     Pass Execution If    '${CLIENT_VERSION}' <= '${EC_VERSION}'    Client does not support 'file' flag
 
-    ${keypath} =      Set Variable    /vol1/bucket1/dir-${DATA_VERSION}/file-${DATA_VERSION}
-    ${dirpath} =      Set Variable    /vol1/bucket1/dir-${DATA_VERSION}/
+    ${dirpath} =      Set Variable    /vol1/fso-bucket-${DATA_VERSION}/dir/subdir/
+    ${filepath} =     Set Variable    ${dirpath}file
 
-    ${key_info} =     Execute    ozone sh key info ${keypath}
+    ${key_info} =     Execute    ozone sh key info ${filepath}
     Should Contain    ${key_info}    \"file\" : true
 
     ${dir_info} =     Execute    ozone sh key info ${dirpath}
