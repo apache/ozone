@@ -114,7 +114,7 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
       if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
         this.containerIdsTable = dbStore.getTable(CONTAINER_IDS_STR_VAL_TABLE, ContainerID.getCodec(),
             new DelegatedCodec<>(StringCodec.get(),
-                (strVal) -> ContainerCreateInfo.valueOf(ContainerProtos.ContainerDataProto.State.valueOf(strVal)),
+                (strVal) -> ContainerCreateInfo.valueOf(ContainerProtos.ContainerDataProto.State.valueOf(strVal), -1),
                 (obj) -> obj.getState().name(), ContainerCreateInfo.class));
       }
     }
