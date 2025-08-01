@@ -122,6 +122,8 @@ public class TestContainerReconciliationWithMockDatanodes {
   private static final int CHUNKS_PER_BLOCK = 4;
   private static final int NUM_DATANODES = 3;
 
+  private static final String TEST_SCAN = "Test Scan";
+
   /**
    * Number of corrupt blocks and chunks.
    *
@@ -424,7 +426,8 @@ public class TestContainerReconciliationWithMockDatanodes {
      * Triggers a synchronous scan of the container. This method will block until the scan completes.
      */
     public void scanContainer(long containerID) {
-      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID));
+      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID),
+          TEST_SCAN);
       assertTrue(scanFuture.isPresent());
 
       try {
