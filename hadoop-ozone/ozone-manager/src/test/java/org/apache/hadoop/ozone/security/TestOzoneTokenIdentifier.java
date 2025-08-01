@@ -55,6 +55,8 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -282,10 +284,13 @@ public class TestOzoneTokenIdentifier {
     assertEquals(idEncode, idDecode);
   }
 
-  @Test
-  void testTokenPersistence() throws IOException {
+  @ParameterizedTest
+  @CsvSource({"true", "false"})
+  void testTokenPersistence(boolean isOMServiceIdGiven) throws IOException {
     OzoneTokenIdentifier idWrite = getIdentifierInst();
-    idWrite.setOmServiceId("defaultServiceId");
+    if (isOMServiceIdGiven) {
+      idWrite.setOmServiceId("defaultServiceId");
+    }
 
     byte[] oldIdBytes = idWrite.getBytes();
     Codec<OzoneTokenIdentifier> idCodec = TokenIdentifierCodec.get();
