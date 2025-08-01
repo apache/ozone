@@ -245,7 +245,7 @@ public class TestListInfoSubcommand {
       Collections.reverse(usageList); // For most-used only
     }
 
-    when(scmClient.getDatanodeUsageInfo(mostUsed, Integer.MAX_VALUE)).thenReturn(usageList);
+    when(scmClient.getDatanodeUsageInfo(mostUsed, 100)).thenReturn(usageList);
     when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
 
     // ----- JSON output test -----

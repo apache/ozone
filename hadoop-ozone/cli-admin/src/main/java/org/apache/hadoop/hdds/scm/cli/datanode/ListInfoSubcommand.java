@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -114,10 +115,6 @@ public class ListInfoSubcommand extends ScmSubcommand {
       allNodes = allNodes.filter(p -> p.getHealthState().toString()
           .compareToIgnoreCase(nodeState) == 0);
     }
-
-    if (!listLimitOptions.isAll()) {
-      allNodes = allNodes.limit(listLimitOptions.getLimit());
-    }
     
     if (json) {
       List<BasicDatanodeInfo> datanodeList = allNodes.collect(Collectors.toList());
@@ -129,19 +126,24 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
   private List<BasicDatanodeInfo> getAllNodes(ScmClient scmClient)
       throws IOException {
+    int limit = listLimitOptions.getLimit();
 
     // If sorting is requested
     if (exclusiveNodeOptions != null && (exclusiveNodeOptions.mostUsed || exclusiveNodeOptions.leastUsed)) {
       boolean sortByMostUsed = exclusiveNodeOptions.mostUsed;
-      List<HddsProtos.DatanodeUsageInfoProto> usageInfos = scmClient.getDatanodeUsageInfo(sortByMostUsed, 
-          Integer.MAX_VALUE);
+      List<HddsProtos.DatanodeUsageInfoProto> usageInfos;
+      try {
+        usageInfos = scmClient.getDatanodeUsageInfo(sortByMostUsed, limit);
+      } catch (Exception e) {
+        System.err.println("Failed to get datanode usage info: " + e.getMessage());
+        return Collections.emptyList();
+      }
 
       return usageInfos.stream()
           .map(p -> {
-            String uuidStr = p.getNode().getUuid();
-            UUID parsedUuid = UUID.fromString(uuidStr);
-
             try {
+              String uuidStr = p.getNode().getUuid();
+              UUID parsedUuid = UUID.fromString(uuidStr);
               HddsProtos.Node node = scmClient.queryNode(parsedUuid);
               long capacity = p.getCapacity();
               long used = capacity - p.getRemaining();
@@ -153,7 +155,12 @@ public class ListInfoSubcommand extends ScmSubcommand {
                   used,
                   capacity,
                   percentUsed);
-            } catch (IOException e) {
+            } catch (Exception e) {
+              String reason = "Could not process info for an unknown datanode";
+              if (p != null && p.getNode() != null && !Strings.isNullOrEmpty(p.getNode().getUuid())) {
+                reason = "Could not process node info for " + p.getNode().getUuid();
+              }
+              System.err.printf("Error: %s: %s%n", reason, e.getMessage());
               return null;
             }
           })
@@ -165,10 +172,11 @@ public class ListInfoSubcommand extends ScmSubcommand {
         null, HddsProtos.QueryScope.CLUSTER, "");
 
     return nodes.stream()
+        .limit(limit)
         .map(p -> new BasicDatanodeInfo(
             DatanodeDetails.getFromProtoBuf(p.getNodeID()),
             p.getNodeOperationalStates(0), p.getNodeStates(0)))
-        .sorted((o1, o2) -> o1.getHealthState().compareTo(o2.getHealthState()))
+        .sorted(Comparator.comparing(BasicDatanodeInfo::getHealthState))
         .collect(Collectors.toList());
   }
 

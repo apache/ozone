@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -27,26 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 /**
  * Represents filtered Datanode information for json use.
  */
-@JsonPropertyOrder({
-    "id",
-    "hostName",
-    "ipAddress",
-    "ports",
-    "setupTime",
-    "currentVersion",
-    "persistedOpState",
-    "opState",
-    "persistedOpStateExpiryEpochSec",
-    "healthState",
-    "decommissioned",
-    "maintenance",
-    "level",
-    "cost",
-    "numOfLeaves",
-    "networkFullPath",
-    "networkLocation",
-    "networkName"
-})
 public class BasicDatanodeInfo {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private Long used = null;
@@ -73,86 +53,107 @@ public class BasicDatanodeInfo {
     this.percentUsed = percentUsed;
   }
   
+  @JsonProperty(index = 5)
   public String getId() {
     return dn.getUuidString();
   }
   
-  public List<DatanodeDetails.Port> getPorts() {
-    return dn.getPorts();
-  }
-  
-  public HddsProtos.NodeOperationalState getPersistedOpState() {
-    return dn.getPersistedOpState();
-  }
-
-  public HddsProtos.NodeOperationalState getOpState() {
-    return opState;
-  }
-  
-  public HddsProtos.NodeState getHealthState() {
-    return healthState;
-  }
-  
+  @JsonProperty(index = 10)
   public String getHostName() {
     return dn.getHostName();
   }
   
+  @JsonProperty(index = 15)
   public String getIpAddress() {
     return dn.getIpAddress();
   }
   
+  @JsonProperty(index = 20)
+  public List<DatanodeDetails.Port> getPorts() {
+    return dn.getPorts();
+  }
+
+  @JsonProperty(index = 25)
+  public long getSetupTime() {
+    return dn.getSetupTime();
+  }
+
+  @JsonProperty(index = 30)
+  public int getCurrentVersion() {
+    return dn.getCurrentVersion();
+  }
+
+  @JsonProperty(index = 35)
+  public HddsProtos.NodeOperationalState getOpState() {
+    return opState;
+  }
+
+  @JsonProperty(index = 40)
+  public HddsProtos.NodeOperationalState getPersistedOpState() {
+    return dn.getPersistedOpState();
+  }
+
+  @JsonProperty(index = 45)
   public long getPersistedOpStateExpiryEpochSec() {
     return dn.getPersistedOpStateExpiryEpochSec();
   }
   
+  @JsonProperty(index = 50)
+  public HddsProtos.NodeState getHealthState() {
+    return healthState;
+  }
+
+  @JsonProperty(index = 55)
   public boolean isDecommissioned() {
     return dn.isDecommissioned();
   }
   
+  @JsonProperty(index = 60)
   public boolean isMaintenance() {
     return dn.isMaintenance();
   }
   
+  @JsonProperty(index = 65)
   public int getLevel() {
     return dn.getLevel();
   }
   
+  @JsonProperty(index = 70)
   public int getCost() {
     return dn.getCost();
   }
   
+  @JsonProperty(index = 75)
   public int getNumOfLeaves() {
     return dn.getNumOfLeaves();
   }
   
+  @JsonProperty(index = 80)
   public String getNetworkFullPath() {
     return dn.getNetworkFullPath();
   }
   
+  @JsonProperty(index = 85)
   public String getNetworkLocation() {
     return dn.getNetworkLocation();
   }
   
+  @JsonProperty(index = 90)
   public String getNetworkName() {
     return dn.getNetworkName();
   }
   
-  public long getSetupTime() {
-    return dn.getSetupTime();
-  }
-  
-  public int getCurrentVersion() {
-    return dn.getCurrentVersion();
-  }
-  
+  @JsonProperty(index = 95)
   public Long getUsed() {
     return used;
   }
 
+  @JsonProperty(index = 100)
   public Long getCapacity() {
     return capacity;
   }
 
+  @JsonProperty(index = 105)
   public Double getPercentUsed() {
     return percentUsed;
   }
