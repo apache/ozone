@@ -115,6 +115,10 @@ public class ListInfoSubcommand extends ScmSubcommand {
       allNodes = allNodes.filter(p -> p.getHealthState().toString()
           .compareToIgnoreCase(nodeState) == 0);
     }
+
+    if (!listLimitOptions.isAll()) {
+      allNodes = allNodes.limit(listLimitOptions.getLimit());
+    }
     
     if (json) {
       List<BasicDatanodeInfo> datanodeList = allNodes.collect(Collectors.toList());
@@ -126,14 +130,13 @@ public class ListInfoSubcommand extends ScmSubcommand {
 
   private List<BasicDatanodeInfo> getAllNodes(ScmClient scmClient)
       throws IOException {
-    int limit = listLimitOptions.getLimit();
 
     // If sorting is requested
     if (exclusiveNodeOptions != null && (exclusiveNodeOptions.mostUsed || exclusiveNodeOptions.leastUsed)) {
       boolean sortByMostUsed = exclusiveNodeOptions.mostUsed;
       List<HddsProtos.DatanodeUsageInfoProto> usageInfos;
       try {
-        usageInfos = scmClient.getDatanodeUsageInfo(sortByMostUsed, limit);
+        usageInfos = scmClient.getDatanodeUsageInfo(sortByMostUsed, Integer.MAX_VALUE);
       } catch (Exception e) {
         System.err.println("Failed to get datanode usage info: " + e.getMessage());
         return Collections.emptyList();
@@ -171,9 +174,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     List<HddsProtos.Node> nodes = scmClient.queryNode(null,
         null, HddsProtos.QueryScope.CLUSTER, "");
 
-    return nodes.stream()
-        .limit(limit)
-        .map(p -> new BasicDatanodeInfo(
+    return nodes.stream().map(p -> new BasicDatanodeInfo(
             DatanodeDetails.getFromProtoBuf(p.getNodeID()),
             p.getNodeOperationalStates(0), p.getNodeStates(0)))
         .sorted(Comparator.comparing(BasicDatanodeInfo::getHealthState))
