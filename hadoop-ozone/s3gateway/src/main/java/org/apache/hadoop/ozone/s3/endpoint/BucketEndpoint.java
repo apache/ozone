@@ -281,7 +281,7 @@ public class BucketEndpoint extends EndpointBase {
 
     if (count < maxKeys) {
       response.setTruncated(false);
-    } else if (ozoneKeyIterator.hasNext()) {
+    } else if (ozoneKeyIterator.hasNext() && lastKey != null) {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());

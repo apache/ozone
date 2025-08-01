@@ -524,7 +524,7 @@ public class TestBucketList {
 
   @Test
   public void testListObjectsWithNegativeMaxKeys() throws Exception {
-    OzoneClient client = createClientWithKeys("file1");
+    OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("bucket");
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
@@ -540,7 +540,7 @@ public class TestBucketList {
 
   @Test
   public void testListObjectsWithZeroMaxKeys() throws Exception {
-    OzoneClient client = createClientWithKeys("file1");
+    OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("bucket");
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
@@ -553,6 +553,27 @@ public class TestBucketList {
 
     assertEquals(0, response.getContents().size());
     assertFalse(response.isTruncated());
+  }
+
+  @Test
+  public void testListObjectsWithZeroMaxKeysInNonEmptyBucket() throws Exception {
+    OzoneClient client = createClientWithKeys("file1", "file2", "file3", "file4", "file5");
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get(
+        "b1", null, null, null, 0, null,
+        null, null, null, null, null, null, 1000).getEntity();
+
+    // Should return empty list and not throw.
+    assertEquals(0, response.getContents().size());
+    assertFalse(response.isTruncated());
+
+    ListObjectResponse fullResponse = (ListObjectResponse) bucketEndpoint.get(
+        "b1", null, null, null, 1000, null,
+        null, null, null, null, null, null, 1000).getEntity();
+    assertEquals(5, fullResponse.getContents().size());
   }
 
   @Test
