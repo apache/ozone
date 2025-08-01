@@ -440,6 +440,7 @@ public class TestContainerReader {
     KeyValueContainer ec4 = null;
     KeyValueContainer ec5 = null;
     KeyValueContainer ec6 = null;
+    KeyValueContainer ec7 = null;
     long baseBCSID = 10L;
 
     for (int i = 0; i < containerCount; i++) {
@@ -479,6 +480,11 @@ public class TestContainerReader {
         ec5.close();
         mockMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(i), ContainerCreateInfo.valueOf(
             ContainerProtos.ContainerDataProto.State.CLOSED, 2));
+      } else if (i == 6) {
+        ec7 = createContainerWithId(i, volumeSets, policy, baseBCSID, 3);
+        ec7.close();
+        mockMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(i), ContainerCreateInfo.valueOf(
+            ContainerProtos.ContainerDataProto.State.CLOSED, -1));
       } else {
         createContainerWithId(i, volumeSets, policy, baseBCSID, 0);
       }
@@ -552,6 +558,11 @@ public class TestContainerReader {
 
     assertTrue(!Files.exists(Paths.get(ec5.getContainerData().getContainerPath())));
     assertTrue(Files.exists(Paths.get(ec6.getContainerData().getContainerPath())));
+
+    // for EC container whose entry in DB with replica index -1, is allowed to be loaded
+    assertTrue(Files.exists(Paths.get(ec7.getContainerData().getContainerPath())));
+    assertTrue(mockMetadataStore.getContainerCreateInfoTable().get(
+        ContainerID.valueOf(ec7.getContainerData().getContainerID())).getReplicaIndex() == 3);
 
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
