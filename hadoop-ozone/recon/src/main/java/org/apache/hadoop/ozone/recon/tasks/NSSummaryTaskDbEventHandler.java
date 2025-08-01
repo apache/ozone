@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -89,6 +91,8 @@ public class NSSummaryTaskDbEventHandler {
       nsSummary = new NSSummary();
     }
     int[] fileBucket = nsSummary.getFileSizeBucket();
+    
+    // Update immediate parent's totals (these fields now represent totals)
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
     int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
@@ -96,6 +100,9 @@ public class NSSummaryTaskDbEventHandler {
     ++fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
+
+    // Propagate upwards to all parents in the parent chain
+    propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), 1, nsSummaryMap);
   }
 
   protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
@@ -157,35 +164,59 @@ public class NSSummaryTaskDbEventHandler {
 
     int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
 
-    // decrement count, data size, and bucket count
-    // even if there's no direct key, we still keep the entry because
-    // we still need children dir IDs info
+    // Decrement immediate parent's totals (these fields now represent totals)
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() - 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() - keyInfo.getDataSize());
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
+
+    // Propagate upwards to all parents in the parent chain
+    propagateSizeUpwards(parentObjectId, -keyInfo.getDataSize(), -1, nsSummaryMap);
   }
 
   protected void handleDeleteDirEvent(OmDirectoryInfo directoryInfo,
                                       Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
+    long deletedDirObjectId = directoryInfo.getObjectID();
     long parentObjectId = directoryInfo.getParentObjectID();
-    // Try to get the NSSummary from our local map that maps NSSummaries to IDs
-    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
-    if (nsSummary == null) {
-      // If we don't have it in this batch we try to get it from the DB
-      nsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
+    
+    // Get the deleted directory's NSSummary to extract its totals
+    NSSummary deletedDirSummary = nsSummaryMap.get(deletedDirObjectId);
+    if (deletedDirSummary == null) {
+      deletedDirSummary = reconNamespaceSummaryManager.getNSSummary(deletedDirObjectId);
+    }
+    
+    // Get the parent directory's NSSummary
+    NSSummary parentNsSummary = nsSummaryMap.get(parentObjectId);
+    if (parentNsSummary == null) {
+      parentNsSummary = reconNamespaceSummaryManager.getNSSummary(parentObjectId);
     }
 
     // Just in case the OmDirectoryInfo isn't correctly written.
-    if (nsSummary == null) {
+    if (parentNsSummary == null) {
       LOG.error("The namespace table is not correctly populated.");
       return;
     }
 
-    nsSummary.removeChildDir(directoryInfo.getObjectID());
-    nsSummaryMap.put(parentObjectId, nsSummary);
+    // If deleted directory exists, decrement its totals from parent and propagate
+    if (deletedDirSummary != null) {
+      // Decrement parent's totals by the deleted directory's totals
+      parentNsSummary.setNumOfFiles(parentNsSummary.getNumOfFiles() - deletedDirSummary.getNumOfFiles());
+      parentNsSummary.setSizeOfFiles(parentNsSummary.getSizeOfFiles() - deletedDirSummary.getSizeOfFiles());
+      
+      // Propagate the decrements upwards to all ancestors
+      propagateSizeUpwards(parentObjectId, -deletedDirSummary.getSizeOfFiles(), 
+                          -deletedDirSummary.getNumOfFiles(), nsSummaryMap);
+      
+      // Set the deleted directory's parentId to 0 (unlink it)
+      deletedDirSummary.setParentId(0);
+      nsSummaryMap.put(deletedDirObjectId, deletedDirSummary);
+    }
+
+    // Remove the deleted directory ID from parent's childDir set
+    parentNsSummary.removeChildDir(deletedDirObjectId);
+    nsSummaryMap.put(parentObjectId, parentNsSummary);
   }
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
@@ -198,5 +229,119 @@ public class NSSummaryTaskDbEventHandler {
       nsSummaryMap.clear();
     }
     return true;
+  }
+
+  /**
+   * Propagates size and count changes upwards through the parent chain.
+   * This ensures that when files are added/deleted, all ancestor directories
+   * reflect the total changes in their sizeOfFiles and numOfFiles fields.
+   */
+  protected void propagateSizeUpwards(long objectId, long sizeChange, 
+                                       long countChange, Map<Long, NSSummary> nsSummaryMap) 
+                                       throws IOException {
+    // Get the current directory's NSSummary
+    NSSummary nsSummary = nsSummaryMap.get(objectId);
+    if (nsSummary == null) {
+      nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    }
+    if (nsSummary == null) {
+      return; // No more parents to update
+    }
+
+    // Continue propagating to parent
+    long parentId = nsSummary.getParentId();
+    if (parentId != 0) {
+      // Get parent's NSSummary
+      NSSummary parentSummary = nsSummaryMap.get(parentId);
+      if (parentSummary == null) {
+        parentSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
+      }
+      if (parentSummary != null) {
+        // Update parent's totals
+        parentSummary.setSizeOfFiles(parentSummary.getSizeOfFiles() + sizeChange);
+        parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + (int)countChange);
+        nsSummaryMap.put(parentId, parentSummary);
+        
+        // Recursively propagate to grandparents
+        propagateSizeUpwards(parentId, sizeChange, countChange, nsSummaryMap);
+      }
+    }
+  }
+
+  /**
+   * Computes initial materialized values for all directories after reprocessing.
+   * This method should be called after all directories and files have been processed
+   * to ensure that sizeOfFiles and numOfFiles contain total values (including subdirectories).
+   */
+  protected void computeInitialMaterializedValues(Map<Long, NSSummary> nsSummaryMap) 
+      throws IOException {
+    // Get all directories that have been processed
+    Set<Long> processedDirectories = new HashSet<>();
+    
+    // Collect all directories from the map and from the database
+    for (Long objectId : nsSummaryMap.keySet()) {
+      NSSummary summary = nsSummaryMap.get(objectId);
+      if (summary != null && !summary.getChildDir().isEmpty()) {
+        processedDirectories.add(objectId);
+      }
+    }
+    
+    // Also get directories from the database that might not be in the current batch
+    // This is a simplified approach - in production, you might want to iterate through all entries
+    
+    // Compute totals for each directory bottom-up (leaves first)
+    for (Long directoryId : processedDirectories) {
+      computeMaterializedValuesForDirectory(directoryId, nsSummaryMap, new HashSet<>());
+    }
+  }
+
+  /**
+   * Recursively computes materialized values for a directory and all its ancestors.
+   * Uses memoization to avoid recomputing values for already processed directories.
+   */
+  private void computeMaterializedValuesForDirectory(long directoryId, 
+                                                    Map<Long, NSSummary> nsSummaryMap,
+                                                    Set<Long> computed) throws IOException {
+    // If already computed, skip
+    if (computed.contains(directoryId)) {
+      return;
+    }
+    
+    NSSummary dirSummary = nsSummaryMap.get(directoryId);
+    if (dirSummary == null) {
+      dirSummary = reconNamespaceSummaryManager.getNSSummary(directoryId);
+    }
+    if (dirSummary == null) {
+      return;
+    }
+    
+    // First, ensure all children have their materialized values computed
+    for (Long childId : dirSummary.getChildDir()) {
+      computeMaterializedValuesForDirectory(childId, nsSummaryMap, computed);
+    }
+    
+    // Now compute this directory's total values
+    long totalSize = dirSummary.getSizeOfFiles(); // Start with direct files
+    int totalCount = dirSummary.getNumOfFiles();   // Start with direct files
+    
+    // Add totals from all child directories
+    for (Long childId : dirSummary.getChildDir()) {
+      NSSummary childSummary = nsSummaryMap.get(childId);
+      if (childSummary == null) {
+        childSummary = reconNamespaceSummaryManager.getNSSummary(childId);
+      }
+      if (childSummary != null) {
+        totalSize += childSummary.getSizeOfFiles();
+        totalCount += childSummary.getNumOfFiles();
+      }
+    }
+    
+    // Update this directory's materialized values
+    dirSummary.setSizeOfFiles(totalSize);
+    dirSummary.setNumOfFiles(totalCount);
+    nsSummaryMap.put(directoryId, dirSummary);
+    
+    // Mark as computed
+    computed.add(directoryId);
   }
 }

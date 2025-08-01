@@ -115,8 +115,8 @@ public abstract class AbstractNSSummaryTaskTest {
   private OzoneConfiguration ozoneConfiguration;
   private OzoneConfiguration omConfiguration;
   private OMMetadataManager omMetadataManager;
-  private ReconOMMetadataManager reconOMMetadataManager;
-  private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  public ReconOMMetadataManager reconOMMetadataManager;
+  public ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   // Helper Methods
   protected void commonSetup(File tmpDir, OMConfigParameter configParameter) throws Exception {
