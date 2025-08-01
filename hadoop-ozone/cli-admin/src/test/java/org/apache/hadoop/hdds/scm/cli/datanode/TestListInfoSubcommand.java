@@ -207,9 +207,8 @@ public class TestListInfoSubcommand {
     assertEquals(1, root.size(), "Expected 1 node in JSON output");
 
     JsonNode node = root.get(0);
-    assertTrue(node.has("datanodeDetails"), "Missing datanodeDetails");
     String opState = node.get("opState").asText();
-    String uuid = node.get("datanodeDetails").get("uuid").asText();
+    String uuid = node.get("id").asText();
 
     assertEquals("IN_SERVICE", opState, "Expected opState IN_SERVICE but got: " + opState);
     assertEquals(nodes.get(0).getNodeID().getUuid(), uuid,
@@ -365,8 +364,6 @@ public class TestListInfoSubcommand {
       dnd.setIpAddress("1.2.3." + i + 1);
       dnd.setNetworkLocation("/default");
       dnd.setNetworkName("host" + i);
-      dnd.addPorts(HddsProtos.Port.newBuilder()
-          .setName("ratis").setValue(5678).build());
       dnd.setUuid(UUID.randomUUID().toString());
 
       HddsProtos.Node.Builder builder  = HddsProtos.Node.newBuilder();
