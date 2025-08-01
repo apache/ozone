@@ -523,26 +523,57 @@ public class TestBucketList {
   }
 
   @Test
-  public void testListObjectsWithInvalidMaxKeys() throws Exception {
-    OzoneClient client = createClientWithKeys("file1");
+  public void testListObjectsWithNegativeMaxKeys() throws Exception {
+    OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("bucket");
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
-    // maxKeys < 0
+    // maxKeys < 0 should throw InvalidArgument
     OS3Exception e1 = assertThrows(OS3Exception.class, () ->
         bucketEndpoint.get("bucket", null, null, null, -1, null,
             null, null, null, null, null, null, 1000)
     );
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e1.getCode());
+  }
 
-    // maxKeys == 0
-    OS3Exception e2 = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.get("bucket", null, null, null, 0, null,
-            null, null, null, null, null, null, 1000)
-    );
-    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), e2.getCode());
+  @Test
+  public void testListObjectsWithZeroMaxKeys() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("bucket");
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    // maxKeys = 0, should return empty list and not throw.
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get(
+        "bucket", null, null, null, 0, null,
+        null, null, null, null, null, null, 1000).getEntity();
+
+    assertEquals(0, response.getContents().size());
+    assertFalse(response.isTruncated());
+  }
+
+  @Test
+  public void testListObjectsWithZeroMaxKeysInNonEmptyBucket() throws Exception {
+    OzoneClient client = createClientWithKeys("file1", "file2", "file3", "file4", "file5");
+    BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get(
+        "b1", null, null, null, 0, null,
+        null, null, null, null, null, null, 1000).getEntity();
+
+    // Should return empty list and not throw.
+    assertEquals(0, response.getContents().size());
+    assertFalse(response.isTruncated());
+
+    ListObjectResponse fullResponse = (ListObjectResponse) bucketEndpoint.get(
+        "b1", null, null, null, 1000, null,
+        null, null, null, null, null, null, 1000).getEntity();
+    assertEquals(5, fullResponse.getContents().size());
   }
 
   @Test
