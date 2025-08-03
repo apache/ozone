@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +105,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
         taskStatusUpdater.recordRunStart();
         // events passed to process method is no longer filtered
-        tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.reprocess(omMetadataManager)));
+        tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.process(events, Collections.emptyMap())));
       }
       processTasks(tasks, events, failedTasks);
 
@@ -115,7 +116,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         for (ReconOmTask.TaskResult taskResult : failedTasks) {
           ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
           // events passed to process method is no longer filtered
-          tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.reprocess(omMetadataManager)));
+          tasks.add(new NamedCallableTask<>(task.getTaskName(),
+              () -> task.process(events, taskResult.getSubTaskSeekPositions())));
         }
         processTasks(tasks, events, retryFailedTasks);
       }

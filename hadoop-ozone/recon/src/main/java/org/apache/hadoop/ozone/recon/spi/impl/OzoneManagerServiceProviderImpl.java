@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort.Type;
 import org.apache.hadoop.ozone.recon.ReconContext;
@@ -139,7 +140,6 @@ public class OzoneManagerServiceProviderImpl
   private ReconContext reconContext;
   private ReconTaskStatusUpdaterManager taskStatusUpdaterManager;
   private TarExtractor tarExtractor;
-  private final AtomicBoolean reInitializeTasksCalled = new AtomicBoolean(false);
 
   /**
    * OM Snapshot related task names.
@@ -248,6 +248,8 @@ public class OzoneManagerServiceProviderImpl
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
       LOG.error("Error starting Recon OM Metadata Manager.", ioEx);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.INTERNAL_ERROR);
     } catch (RuntimeException runtimeException) {
       LOG.warn("Unexpected runtime error starting Recon OM Metadata Manager.", runtimeException);
       LOG.warn("Trying to delete existing recon OM snapshot DB and fetch new one.");
@@ -310,6 +312,7 @@ public class OzoneManagerServiceProviderImpl
     }
     reconTaskController.reInitializeTasks(omMetadataManager, reconOmTaskMap);
     startSyncDataFromOM(initialDelay);
+    LOG.info("Ozone Manager Service Provider is started.");
   }
 
   private void startSyncDataFromOM(long initialDelay) {
@@ -321,17 +324,17 @@ public class OzoneManagerServiceProviderImpl
         TimeUnit.MILLISECONDS);
     LOG.debug("Started the OM DB sync scheduler.");
     scheduler.scheduleWithFixedDelay(() -> {
-          try {
-            LOG.info("Last known sequence number before sync: {}", getCurrentOMDBSequenceNumber());
-            boolean isSuccess = syncDataFromOM();
-            if (!isSuccess) {
-              LOG.debug("OM DB sync is already running, or encountered an error while trying to sync data.");
-            }
-            LOG.info("Sequence number after sync: {}", getCurrentOMDBSequenceNumber());
-          } catch (Throwable t) {
-            LOG.error("Unexpected exception while syncing data from OM.", t);
-          }
-        },
+      try {
+        LOG.info("Last known sequence number before sync: {}", getCurrentOMDBSequenceNumber());
+        boolean isSuccess = syncDataFromOM();
+        if (!isSuccess) {
+          LOG.debug("OM DB sync is already running, or encountered an error while trying to sync data.");
+        }
+        LOG.info("Sequence number after sync: {}", getCurrentOMDBSequenceNumber());
+      } catch (Throwable t) {
+        LOG.error("Unexpected exception while syncing data from OM.", t);
+      }
+    },
         initialDelay,
         interval,
         TimeUnit.MILLISECONDS);
@@ -445,6 +448,7 @@ public class OzoneManagerServiceProviderImpl
         try (InputStream inputStream = reconUtils.makeHttpCall(
             connectionFactory, getOzoneManagerSnapshotUrl(), isOmSpnegoEnabled()).getInputStream()) {
           tarExtractor.extractTar(inputStream, untarredDbDir);
+          OmSnapshotUtils.createHardLinks(untarredDbDir, true);
         } catch (IOException | InterruptedException e) {
           reconContext.updateHealthStatus(new AtomicBoolean(false));
           reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
@@ -620,141 +624,133 @@ public class OzoneManagerServiceProviderImpl
       try {
         long currentSequenceNumber = getCurrentOMDBSequenceNumber();
         LOG.info("Seq number of Recon's OM DB : {}", currentSequenceNumber);
-        boolean fullSnapshot = true;
+        boolean fullSnapshot = false;
 
-
-        if (reInitializeTasksCalled.compareAndSet(false, true)) {
-          LOG.info("Calling reprocess on Recon tasks.");
-          reconTaskController.reInitializeTasks(omMetadataManager, null);
+        if (currentSequenceNumber <= 0) {
+          fullSnapshot = true;
         } else {
-          LOG.info("reInitializeTasks already called once; skipping.");
+          // Get updates from OM and apply to local Recon OM DB and update task status in table
+          deltaReconTaskStatusUpdater.recordRunStart();
+          int loopCount = 0;
+          long fromSequenceNumber = currentSequenceNumber;
+          long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
+          /**
+           * This loop will continue to fetch and apply OM DB updates and with every
+           * OM DB fetch request, it will fetch {@code deltaUpdateLimit} count of DB updates.
+           * It continues to fetch from OM till the lag, between OM DB WAL sequence number
+           * and Recon OM DB snapshot WAL sequence number, is less than this lag threshold value.
+           * In high OM write TPS cluster, this simulates continuous pull from OM without any delay.
+           */
+          while (diffBetweenOMDbAndReconDBSeqNumber > omDBLagThreshold) {
+            try (OMDBUpdatesHandler omdbUpdatesHandler =
+                     new OMDBUpdatesHandler(omMetadataManager)) {
+
+              // If interrupt was previously signalled,
+              // we should check for it before starting delta update sync.
+              if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException("Thread interrupted during delta update.");
+              }
+              diffBetweenOMDbAndReconDBSeqNumber =
+                  getAndApplyDeltaUpdatesFromOM(currentSequenceNumber, omdbUpdatesHandler);
+              deltaReconTaskStatusUpdater.setLastTaskRunStatus(0);
+              // Keeping last updated sequence number for both full and delta tasks to be same
+              // because sequence number of DB denotes and points to same OM DB copy of Recon,
+              // even though two different tasks are updating the DB at different conditions, but
+              // it tells the sync state with actual OM DB for the same Recon OM DB copy.
+              deltaReconTaskStatusUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+              fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+              deltaReconTaskStatusUpdater.recordRunCompletion();
+              fullSnapshotReconTaskUpdater.updateDetails();
+              // Pass on DB update events to tasks that are listening.
+              reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
+                  omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
+              currentSequenceNumber = getCurrentOMDBSequenceNumber();
+              LOG.debug("Updated current sequence number: {}", currentSequenceNumber);
+              loopCount++;
+            } catch (InterruptedException intEx) {
+              LOG.error("OM DB Delta update sync thread was interrupted and delta sync failed.");
+              // We are updating the table even if it didn't run i.e. got interrupted beforehand
+              // to indicate that a task was supposed to run, but it didn't.
+              deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
+              deltaReconTaskStatusUpdater.recordRunCompletion();
+              Thread.currentThread().interrupt();
+              // Since thread is interrupted, we do not fall back to snapshot sync.
+              // Return with sync failed status.
+              return false;
+            } catch (Exception e) {
+              metrics.incrNumDeltaRequestsFailed();
+              deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
+              deltaReconTaskStatusUpdater.recordRunCompletion();
+              LOG.warn("Unable to get and apply delta updates from OM: {}, falling back to full snapshot",
+                  e.getMessage());
+              fullSnapshot = true;
+            }
+            if (fullSnapshot) {
+              break;
+            }
+          }
+          LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
+              getCurrentOMDBSequenceNumber() - fromSequenceNumber);
         }
 
-//        if (currentSequenceNumber <= 0) {
-//          fullSnapshot = true;
-//        } else {
-//          // Get updates from OM and apply to local Recon OM DB and update task status in table
-//          deltaReconTaskStatusUpdater.recordRunStart();
-//          int loopCount = 0;
-//          long fromSequenceNumber = currentSequenceNumber;
-//          long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
-//          /**
-//           * This loop will continue to fetch and apply OM DB updates and with every
-//           * OM DB fetch request, it will fetch {@code deltaUpdateLimit} count of DB updates.
-//           * It continues to fetch from OM till the lag, between OM DB WAL sequence number
-//           * and Recon OM DB snapshot WAL sequence number, is less than this lag threshold value.
-//           * In high OM write TPS cluster, this simulates continuous pull from OM without any delay.
-//           */
-//          while (diffBetweenOMDbAndReconDBSeqNumber > omDBLagThreshold) {
-//            try (OMDBUpdatesHandler omdbUpdatesHandler =
-//                     new OMDBUpdatesHandler(omMetadataManager)) {
-//
-//              // If interrupt was previously signalled,
-//              // we should check for it before starting delta update sync.
-//              if (Thread.currentThread().isInterrupted()) {
-//                throw new InterruptedException("Thread interrupted during delta update.");
-//              }
-//              diffBetweenOMDbAndReconDBSeqNumber =
-//                  getAndApplyDeltaUpdatesFromOM(currentSequenceNumber, omdbUpdatesHandler);
-//              deltaReconTaskStatusUpdater.setLastTaskRunStatus(0);
-//              // Keeping last updated sequence number for both full and delta tasks to be same
-//              // because sequence number of DB denotes and points to same OM DB copy of Recon,
-//              // even though two different tasks are updating the DB at different conditions, but
-//              // it tells the sync state with actual OM DB for the same Recon OM DB copy.
-//              deltaReconTaskStatusUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-//              fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-//              deltaReconTaskStatusUpdater.recordRunCompletion();
-//              fullSnapshotReconTaskUpdater.updateDetails();
-//              // Pass on DB update events to tasks that are listening.
-//              reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
-//                  omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
-//              currentSequenceNumber = getCurrentOMDBSequenceNumber();
-//              LOG.debug("Updated current sequence number: {}", currentSequenceNumber);
-//              loopCount++;
-//            } catch (InterruptedException intEx) {
-//              LOG.error("OM DB Delta update sync thread was interrupted and delta sync failed.");
-//              // We are updating the table even if it didn't run i.e. got interrupted beforehand
-//              // to indicate that a task was supposed to run, but it didn't.
-//              deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
-//              deltaReconTaskStatusUpdater.recordRunCompletion();
-//              Thread.currentThread().interrupt();
-//              // Since thread is interrupted, we do not fall back to snapshot sync.
-//              // Return with sync failed status.
-//              return false;
-//            } catch (Exception e) {
-//              metrics.incrNumDeltaRequestsFailed();
-//              deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
-//              deltaReconTaskStatusUpdater.recordRunCompletion();
-//              LOG.warn("Unable to get and apply delta updates from OM: {}, falling back to full snapshot",
-//                  e.getMessage());
-//              fullSnapshot = true;
-//            }
-//            if (fullSnapshot) {
-//              break;
-//            }
-//          }
-//          LOG.info("Delta updates received from OM : {} loops, {} records", loopCount,
-//              getCurrentOMDBSequenceNumber() - fromSequenceNumber);
-//        }
+        if (fullSnapshot) {
+          try {
+            metrics.incrNumSnapshotRequests();
+            LOG.info("Obtaining full snapshot from Ozone Manager");
 
-//        if (fullSnapshot) {
-//          try {
-//            metrics.incrNumSnapshotRequests();
-//            LOG.info("Obtaining full snapshot from Ozone Manager");
-//
-//            // Similarly if the interrupt was signalled in between,
-//            // we should check before starting snapshot sync.
-//            if (Thread.currentThread().isInterrupted()) {
-//              throw new InterruptedException("Thread interrupted during snapshot sync.");
-//            }
-//
-//            // Update local Recon OM DB to new snapshot.
-//            fullSnapshotReconTaskUpdater.recordRunStart();
-//            boolean success = true;
-//            // Update timestamp of successful delta updates query.
-//            if (success) {
-//              // Keeping last updated sequence number for both full and delta tasks to be same
-//              // because sequence number of DB denotes and points to same OM DB copy of Recon,
-//              // even though two different tasks are updating the DB at different conditions, but
-//              // it tells the sync state with actual OM DB for the same Recon OM DB copy.
-//              fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-//              deltaReconTaskStatusUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-//              fullSnapshotReconTaskUpdater.setLastTaskRunStatus(0);
-//              fullSnapshotReconTaskUpdater.recordRunCompletion();
-//              deltaReconTaskStatusUpdater.updateDetails();
-//
-//              // Reinitialize tasks that are listening.
-//              LOG.info("Calling reprocess on Recon tasks.");
-//              reconTaskController.reInitializeTasks(omMetadataManager, null);
-//
-//              // Update health status in ReconContext
-//              reconContext.updateHealthStatus(new AtomicBoolean(true));
-//              reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-//            } else {
-//              metrics.incrNumSnapshotRequestsFailed();
-//              fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
-//              fullSnapshotReconTaskUpdater.recordRunCompletion();
-//              // Update health status in ReconContext
-//              reconContext.updateHealthStatus(new AtomicBoolean(false));
-//              reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-//            }
-//          } catch (InterruptedException intEx) {
-//            LOG.error("OM DB Snapshot update sync thread was interrupted.");
-//            fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
-//            fullSnapshotReconTaskUpdater.recordRunCompletion();
-//            Thread.currentThread().interrupt();
-//            // Mark sync status as failed.
-//            return false;
-//          } catch (Exception e) {
-//            metrics.incrNumSnapshotRequestsFailed();
-//            fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
-//            fullSnapshotReconTaskUpdater.recordRunCompletion();
-//            LOG.error("Unable to update Recon's metadata with new OM DB. ", e);
-//            // Update health status in ReconContext
-//            reconContext.updateHealthStatus(new AtomicBoolean(false));
-//            reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-//          }
-//        }
+            // Similarly if the interrupt was signalled in between,
+            // we should check before starting snapshot sync.
+            if (Thread.currentThread().isInterrupted()) {
+              throw new InterruptedException("Thread interrupted during snapshot sync.");
+            }
+
+            // Update local Recon OM DB to new snapshot.
+            fullSnapshotReconTaskUpdater.recordRunStart();
+            boolean success = updateReconOmDBWithNewSnapshot();
+            // Update timestamp of successful delta updates query.
+            if (success) {
+              // Keeping last updated sequence number for both full and delta tasks to be same
+              // because sequence number of DB denotes and points to same OM DB copy of Recon,
+              // even though two different tasks are updating the DB at different conditions, but
+              // it tells the sync state with actual OM DB for the same Recon OM DB copy.
+              fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+              deltaReconTaskStatusUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+              fullSnapshotReconTaskUpdater.setLastTaskRunStatus(0);
+              fullSnapshotReconTaskUpdater.recordRunCompletion();
+              deltaReconTaskStatusUpdater.updateDetails();
+
+              // Reinitialize tasks that are listening.
+              LOG.info("Calling reprocess on Recon tasks.");
+              reconTaskController.reInitializeTasks(omMetadataManager, null);
+
+              // Update health status in ReconContext
+              reconContext.updateHealthStatus(new AtomicBoolean(true));
+              reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+            } else {
+              metrics.incrNumSnapshotRequestsFailed();
+              fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+              fullSnapshotReconTaskUpdater.recordRunCompletion();
+              // Update health status in ReconContext
+              reconContext.updateHealthStatus(new AtomicBoolean(false));
+              reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+            }
+          } catch (InterruptedException intEx) {
+            LOG.error("OM DB Snapshot update sync thread was interrupted.");
+            fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+            fullSnapshotReconTaskUpdater.recordRunCompletion();
+            Thread.currentThread().interrupt();
+            // Mark sync status as failed.
+            return false;
+          } catch (Exception e) {
+            metrics.incrNumSnapshotRequestsFailed();
+            fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+            fullSnapshotReconTaskUpdater.recordRunCompletion();
+            LOG.error("Unable to update Recon's metadata with new OM DB. ", e);
+            // Update health status in ReconContext
+            reconContext.updateHealthStatus(new AtomicBoolean(false));
+            reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+          }
+        }
         printOMDBMetaInfo();
       } finally {
         isSyncDataFromOMRunning.set(false);
