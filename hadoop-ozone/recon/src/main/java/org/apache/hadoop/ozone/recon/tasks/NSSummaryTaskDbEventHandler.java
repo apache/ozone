@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -260,6 +260,11 @@ public class NSSummaryTaskDbEventHandler {
         // Update parent's totals
         parentSummary.setSizeOfFiles(parentSummary.getSizeOfFiles() + sizeChange);
         parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + (int)countChange);
+        int[] fileBucket = parentSummary.getFileSizeBucket();
+        int binIndex = ReconUtils.getFileSizeBinIndex(Math.abs(sizeChange));
+        ++fileBucket[binIndex];
+        parentSummary.setFileSizeBucket(fileBucket);
+
         nsSummaryMap.put(parentId, parentSummary);
         
         // Recursively propagate to grandparents
