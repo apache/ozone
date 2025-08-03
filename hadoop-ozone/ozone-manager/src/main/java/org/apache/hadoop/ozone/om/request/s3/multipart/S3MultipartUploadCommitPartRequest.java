@@ -252,16 +252,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
       final OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
-      if (pseudoKeyInfo != null) {
-        long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
-        String delKeyName = omMetadataManager.getOzoneDeletePathKey(
-            pseudoObjId, ozoneKey);
-        if (null == keyVersionsToDeleteMap) {
-          keyVersionsToDeleteMap = new HashMap<>();
-        }
-        keyVersionsToDeleteMap.computeIfAbsent(delKeyName,
-            key -> new RepeatedOmKeyInfo()).addOmKeyInfo(pseudoKeyInfo);
-      }
+      keyVersionsToDeleteMap = addKeyInfoToDeleteMap(ozoneManager, trxnLogIndex, ozoneKey,
+          pseudoKeyInfo, keyVersionsToDeleteMap);
 
       MultipartCommitUploadPartResponse.Builder commitResponseBuilder = MultipartCommitUploadPartResponse.newBuilder()
           .setPartName(partName);
