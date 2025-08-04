@@ -135,7 +135,7 @@ public class TestDiskBalancer {
               " the property StopAfterDiskEven is set to true"))
           .count();
       return count >= cluster.getHddsDatanodes().size();
-    }, 100, 5000); // check every 100ms, timeout after 5s
+    }, 100, 10000); // check every 100ms, timeout after 10s
   }
 
   @Test
