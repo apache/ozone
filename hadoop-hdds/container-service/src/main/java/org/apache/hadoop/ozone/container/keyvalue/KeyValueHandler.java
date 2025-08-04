@@ -1709,7 +1709,8 @@ public class KeyValueHandler extends Handler {
     }
 
     // Trigger on demand scanner, which will build the merkle tree based on the newly ingested data.
-    containerSet.scanContainerWithoutGap(containerID);
+    containerSet.scanContainerWithoutGap(containerID,
+        "Container reconciliation");
     sendICR(container);
   }
 
