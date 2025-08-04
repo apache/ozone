@@ -554,9 +554,9 @@ public class TestContainerReader {
 
     // For EC conflict with different replica index, one with matching db replica should exist
     assertTrue(Files.exists(Paths.get(ec3.getContainerData().getContainerPath())));
-    assertTrue(!Files.exists(Paths.get(ec4.getContainerData().getContainerPath())));
+    assertFalse(Files.exists(Paths.get(ec4.getContainerData().getContainerPath())));
 
-    assertTrue(!Files.exists(Paths.get(ec5.getContainerData().getContainerPath())));
+    assertFalse(Files.exists(Paths.get(ec5.getContainerData().getContainerPath())));
     assertTrue(Files.exists(Paths.get(ec6.getContainerData().getContainerPath())));
 
     // for EC container whose entry in DB with replica index -1, is allowed to be loaded

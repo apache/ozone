@@ -52,7 +52,7 @@ public final class ContainerCreateInfo {
     this.state = state;
     this.replicaIndex = replicaIndex;
     this.proto = MemoizedSupplier.valueOf(
-        () -> ContainerProtos.ContainerCreateInfo.newBuilder().setState(state).build());
+        () -> ContainerProtos.ContainerCreateInfo.newBuilder().setState(state).setReplicaIndex(replicaIndex).build());
   }
 
   /**
