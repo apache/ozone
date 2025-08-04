@@ -43,9 +43,6 @@ public class TestSTS {
   private S3STSEndpoint endpoint;
   private HttpHeaders httpHeaders;
 
-  private static final String USER_NAME = "test-user";
-  private static final String USER_SECRET = "test-secret";
-
   @Mock
   private ContainerRequestContext context;
 
@@ -101,6 +98,7 @@ public class TestSTS {
     String errorMessage = (String) response.getEntity();
     assertTrue(errorMessage.contains("Invalid DurationSeconds"));
   }
+
   @Test
   public void testStsUnsupportedAction() throws Exception {
     String roleArn = "arn:aws:iam::123456789012:role/test-role";

@@ -20,9 +20,8 @@ package org.apache.hadoop.ozone.s3web.s3sts;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Base64;
-import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -32,9 +31,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,7 +127,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
         duration = validateDuration(durationSeconds);
       } catch (IllegalArgumentException e) {
         return Response.status(Response.Status.BAD_REQUEST)
-            .entity("Invalid DurationSeconds: " + e.getMessage())
+            .entity(e.getMessage())
             .build();
       }
 
@@ -169,7 +166,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
     if (durationSeconds < MIN_DURATION_SECONDS || durationSeconds > MAX_DURATION_SECONDS) {
       throw new IllegalArgumentException(
-          "DurationSeconds must be between " + MIN_DURATION_SECONDS +
+          "Invalid Value: " + ROLE_DURATION_SECONDS_PARAM + " must be between " + MIN_DURATION_SECONDS +
               " and " + MAX_DURATION_SECONDS + " seconds");
     }
 
@@ -179,13 +176,13 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private Response handleAssumeRole(String roleArn, String roleSessionName, int duration)
       throws IOException, OS3Exception {
     // Validate required parameters for AssumeRole. RoleArn is required to pass the
-    if (roleArn == null || roleArn.trim().isEmpty()) {
+    if (roleArn == null || roleArn.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity("Missing required parameter: " + ROLE_ARN_PARAM)
           .build();
     }
 
-    if (roleSessionName == null || roleSessionName.trim().isEmpty()) {
+    if (roleSessionName == null || roleSessionName.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity("Missing required parameter: RoleSessionName")
           .build();
@@ -213,23 +210,9 @@ public class S3STSEndpoint extends S3STSEndpointBase {
         .build();
   }
 
-  private List<OzoneAcl> toOzoneAcls(String roleArn) {
-    // TODO: Implement logic to convert roleArn (String) to Ozone ACLs
-    // TODO: Throw an exception if roleArn is invalid or not found
-    List<OzoneAcl> acls = new ArrayList<>();
-    return acls;
-  }
+  // TODO: implement private List<OzoneAcl> toOzoneAcls(String roleArn) to convert roleArn to Ozone ACLs
+  // TODO: implement private List<OzoneAcl> checkAclSubset(List<OzoneAcl> requestedAcls) to validate requested ACLs
 
-  private List<OzoneAcl> checkStsAclSubset(List<OzoneAcl> requestedAcls) throws IOException {
-    List<OzoneAcl> validAcls = new ArrayList<>();
-    // TODO: Implement logic to check if requested ACLs are a valid subset of the user's ACLs
-    return validAcls;
-  }
-
-// Helper methods to implement:
-// OzoneObject getOzoneObjectFromAcl(OzoneAcl acl); // Parses the ACL to identify the target object
-// List<OzoneAcl> getAclsForObject(OzoneObject object); // Efficiently fetches ACLs for a single object
-// boolean isUserOrGroupMatch(OzoneAcl objectAcl, String userName, Set<String> groups);
   private boolean isValidRoleSessionName(String roleSessionName) {
     if (roleSessionName.length() < 2 || roleSessionName.length() > 64) {
       return false;
@@ -254,23 +237,23 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     String requestId = UUID.randomUUID().toString();
 
     return String.format(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-            "<AssumeRoleResponse xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\">\n" +
-            "  <AssumeRoleResult>\n" +
-            "    <Credentials>\n" +
-            "      <AccessKeyId>%s</AccessKeyId>\n" +
-            "      <SecretAccessKey>%s</SecretAccessKey>\n" +
-            "      <SessionToken>%s</SessionToken>\n" +
-            "      <Expiration>%s</Expiration>\n" +
-            "    </Credentials>\n" +
-            "    <AssumedRoleUser>\n" +
-            "      <AssumedRoleId>%s</AssumedRoleId>\n" +
-            "      <Arn>%s</Arn>\n" +
-            "    </AssumedRoleUser>\n" +
-            "  </AssumeRoleResult>\n" +
-            "  <ResponseMetadata>\n" +
-            "    <RequestId>%s</RequestId>\n" +
-            "  </ResponseMetadata>\n" +
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>%n" +
+            "<AssumeRoleResponse xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\">%n" +
+            "  <AssumeRoleResult>%n" +
+            "    <Credentials>%n" +
+            "      <AccessKeyId>%s</AccessKeyId>%n" +
+            "      <SecretAccessKey>%s</SecretAccessKey>%n" +
+            "      <SessionToken>%s</SessionToken>%n" +
+            "      <Expiration>%s</Expiration>%n" +
+            "    </Credentials>%n" +
+            "    <AssumedRoleUser>%n" +
+            "      <AssumedRoleId>%s</AssumedRoleId>%n" +
+            "      <Arn>%s</Arn>%n" +
+            "    </AssumedRoleUser>%n" +
+            "  </AssumeRoleResult>%n" +
+            "  <ResponseMetadata>%n" +
+            "    <RequestId>%s</RequestId>%n" +
+            "  </ResponseMetadata>%n" +
             "</AssumeRoleResponse>",
         accessKeyId, secretAccessKey, sessionToken, expiration,
         assumedRoleId, roleArn, requestId);
@@ -281,8 +264,9 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private String generateRandomAlphanumeric(int length) {
     String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     StringBuilder sb = new StringBuilder();
+    Random random = new Random();
     for (int i = 0; i < length; i++) {
-      sb.append(chars.charAt((int) (Math.random() * chars.length())));
+      sb.append(chars.charAt(random.nextInt(chars.length())));
     }
     return sb.toString();
   }
@@ -290,17 +274,18 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private String generateRandomBase64(int length) {
     String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     StringBuilder sb = new StringBuilder();
+    Random random = new Random();
     for (int i = 0; i < length; i++) {
-      sb.append(chars.charAt((int) (Math.random() * chars.length())));
+      sb.append(chars.charAt((random.nextInt(chars.length()))));
     }
     return sb.toString();
   }
 
   private String generateSessionToken() {
-    // Generate a realistic-looking session token (base64 encoded)
-    byte[] tokenBytes = new byte[128]; // Longer session tokens like AWS
+    byte[] tokenBytes = new byte[128];
+    Random random = new Random();
     for (int i = 0; i < tokenBytes.length; i++) {
-      tokenBytes[i] = (byte) (Math.random() * 256);
+      tokenBytes[i] = (byte) random.nextInt(256);
     }
     return Base64.getEncoder().encodeToString(tokenBytes);
   }
