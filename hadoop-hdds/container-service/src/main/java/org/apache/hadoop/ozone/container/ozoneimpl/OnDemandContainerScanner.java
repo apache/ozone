@@ -92,7 +92,8 @@ public final class OnDemandContainerScanner {
       });
     } else {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Skipping OnDemandScan for Container {}, Reason: {}", containerId, "Already scheduled.");
+        LOG.debug("Skipping OnDemandScan for Container {} triggered due to '{}'. Reason: Already scheduled.",
+            containerId, reasonForScan);
       }
     }
     return Optional.ofNullable(resultFuture);
