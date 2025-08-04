@@ -562,8 +562,8 @@ public class TestContainerReader {
 
     // for EC container whose entry in DB with replica index -1, is allowed to be loaded
     assertTrue(Files.exists(Paths.get(ec7.getContainerData().getContainerPath())));
-    assertTrue(mockMetadataStore.getContainerCreateInfoTable().get(
-        ContainerID.valueOf(ec7.getContainerData().getContainerID())).getReplicaIndex() == 3);
+    assertEquals(3, mockMetadataStore.getContainerCreateInfoTable().get(
+        ContainerID.valueOf(ec7.getContainerData().getContainerID())).getReplicaIndex());
 
     // There should be no open containers cached by the ContainerReader as it
     // opens and closed them avoiding the cache.
