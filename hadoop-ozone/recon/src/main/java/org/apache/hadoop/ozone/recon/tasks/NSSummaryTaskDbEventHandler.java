@@ -262,7 +262,11 @@ public class NSSummaryTaskDbEventHandler {
         parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + (int)countChange);
         int[] fileBucket = parentSummary.getFileSizeBucket();
         int binIndex = ReconUtils.getFileSizeBinIndex(Math.abs(sizeChange));
-        ++fileBucket[binIndex];
+        if (countChange > 0) {
+          ++fileBucket[binIndex];      // PUT event: increment
+        } else {
+          --fileBucket[binIndex];      // DELETE event: decrement
+        }
         parentSummary.setFileSizeBucket(fileBucket);
 
         nsSummaryMap.put(parentId, parentSummary);
