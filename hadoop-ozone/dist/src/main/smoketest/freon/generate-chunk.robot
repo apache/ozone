@@ -16,7 +16,9 @@
 *** Settings ***
 Documentation       Test freon chunk generation commands
 Resource            ../ozone-lib/freon.robot
+Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${PREFIX}    ${EMPTY}

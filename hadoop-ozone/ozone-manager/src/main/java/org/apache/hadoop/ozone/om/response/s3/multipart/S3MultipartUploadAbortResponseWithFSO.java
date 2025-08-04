@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
@@ -32,7 +33,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * Response for Multipart Abort Request - prefix layout.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, DELETED_TABLE,
-    MULTIPART_INFO_TABLE})
+    MULTIPART_INFO_TABLE, BUCKET_TABLE})
 public class S3MultipartUploadAbortResponseWithFSO
     extends S3MultipartUploadAbortResponse {
 

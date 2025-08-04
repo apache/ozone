@@ -202,6 +202,15 @@ public final class OzoneConsts {
 
   public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
 
+  // YAML field constants for OmSnapshotLocalData (thus the OM_SLD_ prefix) YAML files
+  public static final String OM_SLD_VERSION = "version";
+  public static final String OM_SLD_CHECKSUM = "checksum";
+  public static final String OM_SLD_IS_SST_FILTERED = "isSSTFiltered";
+  public static final String OM_SLD_UNCOMPACTED_SST_FILE_LIST = "uncompactedSSTFileList";
+  public static final String OM_SLD_LAST_COMPACTION_TIME = "lastCompactionTime";
+  public static final String OM_SLD_NEEDS_COMPACTION = "needsCompaction";
+  public static final String OM_SLD_COMPACTED_SST_FILE_LIST = "compactedSSTFileList";
+
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
   public static final String CONTAINER_TYPE = "containerType";
@@ -532,6 +541,12 @@ public final class OzoneConsts {
    * S3G multipart upload request's ETag header key.
    */
   public static final String ETAG = "ETag";
+
+  /**
+   * A constant string used as a separator in various contexts within
+   * the OMDBCheckpoint functions.
+   */
+  public static final String OM_SNAPSHOT_SEPARATOR = "-";
 
   private OzoneConsts() {
     // Never Constructed

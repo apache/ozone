@@ -71,3 +71,18 @@ Delete object tagging
                          Should contain             ${result}   TagSet
      ${tagCount} =       Execute and checkrc        echo '${result}' | jq '.TagSet | length'    0
                          Should Be Equal            ${tagCount}    0
+
+Check Bucket Ownership Verification
+    #Create object
+    Execute                                                         echo "Randomtext" > /tmp/testfile
+    Execute AWSS3APICli                                             put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile
+    ${correct_owner} =    Get bucket owner    ${BUCKET}
+
+    #Create tagging
+    Execute AWSS3APICli with bucket owner check                     put-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --tagging '{"TagSet": [{ "Key": "tag-key1", "Value": "tag-value1" }]}'  ${correct_owner}
+
+    #Get object tagging
+    Execute AWSS3APICli with bucket owner check                     get-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  ${correct_owner}
+
+    #Delete object tagging
+    Execute AWSS3APICli with bucket owner check                     delete-object-tagging --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1  ${correct_owner}

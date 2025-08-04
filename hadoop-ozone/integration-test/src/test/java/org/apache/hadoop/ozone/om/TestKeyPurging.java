@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -56,6 +57,7 @@ public class TestKeyPurging {
   private static final int NUM_KEYS = 10;
   private static final int KEY_SIZE = 100;
   private OzoneClient client;
+  private int ratisLimit;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -74,6 +76,11 @@ public class TestKeyPurging {
     client = OzoneClientFactory.getRpcClient(conf);
     store = client.getObjectStore();
     om = cluster.getOzoneManager();
+    int limit = (int) conf.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    ratisLimit = (int) (limit * 0.9);
   }
 
   @AfterEach
@@ -126,7 +133,7 @@ public class TestKeyPurging {
     GenericTestUtils.waitFor(
         () -> {
           try {
-            return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
+            return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit)
                 .getKeyBlocksList().isEmpty();
           } catch (IOException e) {
             return false;

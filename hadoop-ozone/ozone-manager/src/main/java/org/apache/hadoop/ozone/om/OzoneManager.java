@@ -49,6 +49,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
@@ -82,6 +83,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
@@ -191,6 +193,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
@@ -522,6 +525,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
             .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
+            .register(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+                this::reconfOzoneSnapshotSSTFilteringServiceInterval)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
                 this::reconfOzoneKeyDeletingLimitPerTask)
             .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval)
@@ -955,7 +960,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         metadataManager.getLock()
     );
     if (secConfig.isSecurityEnabled() || testSecureOmFlag) {
-      delegationTokenMgr = createDelegationTokenSecretManager(configuration);
+      try {
+        delegationTokenMgr = createDelegationTokenSecretManager(configuration);
+      } catch (IllegalArgumentException e) {
+        if (metadataManager != null) {
+          // to avoid the unit test leak report failure
+          try {
+            metadataManager.stop();
+          } catch (Exception ex) {
+            LOG.warn("Failed to stop metadataManager", e);
+          }
+        }
+        throw e;
+      }
     }
 
     prefixManager = new PrefixManagerImpl(this, metadataManager, true);
@@ -1170,17 +1187,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         conf.getTimeDuration(OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
             OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
-    long certificateGracePeriod = Duration.parse(
-        conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
-            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
-    boolean tokenSanityChecksEnabled = conf.getBoolean(
-        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
-        HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
-    if (tokenSanityChecksEnabled && tokenMaxLifetime > certificateGracePeriod) {
-      throw new IllegalArgumentException("Certificate grace period " +
-          HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
-          " should be greater than maximum delegation token lifetime " +
-          OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY);
+
+    if (versionManager.isAllowed(OMLayoutFeature.DELEGATION_TOKEN_SYMMETRIC_SIGN)) {
+      // verify the configuration dependency between dt and secret key
+      SecretKeyConfig secretKeyConfig = new SecretKeyConfig(conf, SCM_CA_CERT_STORAGE_DIR);
+      long skExpiryDuration = secretKeyConfig.getExpiryDuration().toMillis();
+      long skRotationDuration = secretKeyConfig.getRotateDuration().toMillis();
+      if ((skRotationDuration + tokenMaxLifetime + tokenRemoverScanInterval) > skExpiryDuration) {
+        throw new IllegalArgumentException("Secret key expiry duration " +
+            HddsConfigKeys.HDDS_SECRET_KEY_EXPIRY_DURATION +
+            " should be greater than value of (" + OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY + " + " +
+            OMConfigKeys.DELEGATION_REMOVER_SCAN_INTERVAL_KEY + " + " +
+            HddsConfigKeys.HDDS_SECRET_KEY_ROTATE_DURATION);
+      }
+    } else {
+      long certificateGracePeriod = Duration.parse(
+          conf.get(HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION,
+              HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION_DEFAULT)).toMillis();
+      boolean tokenSanityChecksEnabled = conf.getBoolean(
+          HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
+          HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED_DEFAULT);
+      if (tokenSanityChecksEnabled && tokenMaxLifetime > certificateGracePeriod) {
+        throw new IllegalArgumentException("Certificate grace period " +
+            HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION +
+            " should be greater than maximum delegation token lifetime " +
+            OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY);
+      }
     }
 
     return new OzoneDelegationTokenSecretManager.Builder()
@@ -3951,7 +3983,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     TermIndex termIndex = null;
     try {
       // Install hard links.
-      OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation());
+      OmSnapshotUtils.createHardLinks(omDBCheckpoint.getCheckpointLocation(), false);
       termIndex = installCheckpoint(leaderId, omDBCheckpoint);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
@@ -5174,6 +5206,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
         OZONE_THREAD_NUMBER_DIR_DELETION + " cannot be negative.");
     getConfiguration().set(OZONE_THREAD_NUMBER_DIR_DELETION, newVal);
+    return newVal;
+  }
+
+  private String reconfOzoneSnapshotSSTFilteringServiceInterval(String newVal) {
+    boolean wasSstFilteringSvcEnabled = ((KeyManagerImpl) keyManager).isSstFilteringSvcEnabled();
+    getConfiguration().set(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
+
+    if (this.isFilesystemSnapshotEnabled()) {
+      if (wasSstFilteringSvcEnabled) {
+        // Sanity check
+        Preconditions.checkNotNull(keyManager.getSnapshotSstFilteringService(),
+            "sstFilteringService should not be null when SST filtering service is enabled.");
+        ((KeyManagerImpl) keyManager).stopSnapshotSstFilteringService();
+      }
+      // Note startSnapshotSstFilteringService checks whether the config is set to a value that enables the service
+      ((KeyManagerImpl) keyManager).startSnapshotSstFilteringService(getConfiguration());
+    } else {
+      LOG.warn("Ozone filesystem snapshot is not enabled. {} is reconfigured but will not make any difference.",
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL);
+    }
     return newVal;
   }
 

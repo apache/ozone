@@ -63,8 +63,8 @@ public class MetadataScanResult implements ScanResult {
   }
 
   @Override
-  public boolean isHealthy() {
-    return errors.isEmpty();
+  public boolean hasErrors() {
+    return !errors.isEmpty();
   }
 
   @Override

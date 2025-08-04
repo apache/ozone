@@ -55,11 +55,13 @@ perl -wpl -i \
   -e 's@^CUSTOM_USER=ozone@CUSTOM_USER=hadoop@;' \
   "${RANGER_OZONE_PLUGIN_DIR}/install.properties"
 
+echo 'machine ranger login admin password rangerR0cks!' > ../../.netrc
+
 start_docker_env
 wait_for_port ranger 6080 120
 
-execute_robot_test s3g -v testuser:hdfs kinit.robot
+execute_robot_test s3g -v USER:hdfs kinit.robot
 execute_robot_test s3g freon/generate.robot
 execute_robot_test s3g freon/validate.robot
 
-# execute_robot_test scm security/ozone-secure-tenant.robot
+execute_robot_test s3g -v RANGER_ENDPOINT_URL:"http://ranger:6080" -v USER:hdfs security/ozone-secure-tenant.robot

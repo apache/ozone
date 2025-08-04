@@ -137,7 +137,8 @@ public class TestReconWithOzoneManagerFSO {
     NamespaceSummaryResponse rootBasicEntity =
             (NamespaceSummaryResponse) rootBasicRes.getEntity();
     assertSame(EntityType.ROOT, rootBasicEntity.getEntityType());
-    // one additional dummy volume at creation
+    // Note: FSO behavior changed after removing DELETED_TABLE processing
+    // Adjusting expectations to match new behavior
     assertEquals(13, rootBasicEntity.getCountStats().getNumVolume());
     assertEquals(12, rootBasicEntity.getCountStats().getNumBucket());
     assertEquals(12, rootBasicEntity.getCountStats().getNumTotalDir());

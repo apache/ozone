@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -83,8 +84,7 @@ public class RDBStore implements DBStore {
                   boolean createCheckpointDirs,
                   ConfigurationSource configuration,
                   boolean enableRocksDBMetrics)
-
-      throws IOException {
+      throws RocksDatabaseException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
     Preconditions.checkArgument(!families.isEmpty());
@@ -93,7 +93,6 @@ public class RDBStore implements DBStore {
     this.dbOptions = dbOptions;
     this.statistics = statistics;
 
-    Exception exception = null;
     try {
       if (enableCompactionDag) {
         rocksDBCheckpointDiffer = RocksDBCheckpointDifferHolder.getInstance(
@@ -169,21 +168,13 @@ public class RDBStore implements DBStore {
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
-
-    } catch (RuntimeException e) {
-      exception = e;
-      throw new IllegalStateException("Failed to create RDBStore from " + dbFile, e);
-    } catch (Exception e) {
-      exception = e;
-      throw new IOException("Failed to create RDBStore from " + dbFile, e);
-    } finally {
-      if (exception != null) {
-        try {
-          close();
-        } catch (IOException e) {
-          exception.addSuppressed(e);
-        }
+    } catch (IOException | RuntimeException e) {
+      try {
+        close();
+      } catch (Exception suppressed) {
+        e.addSuppressed(suppressed);
       }
+      throw new RocksDatabaseException("Failed to create RDBStore from " + dbFile, e);
     }
 
     if (LOG.isDebugEnabled()) {
@@ -215,7 +206,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void compactDB() throws IOException {
+  public void compactDB() throws RocksDatabaseException {
     try (ManagedCompactRangeOptions options =
              new ManagedCompactRangeOptions()) {
       db.compactDB(options);
@@ -223,23 +214,23 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void compactTable(String tableName) throws IOException {
+  public void compactTable(String tableName) throws RocksDatabaseException {
     try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
       compactTable(tableName, options);
     }
   }
 
   @Override
-  public void compactTable(String tableName, ManagedCompactRangeOptions options) throws IOException {
+  public void compactTable(String tableName, ManagedCompactRangeOptions options) throws RocksDatabaseException {
     RocksDatabase.ColumnFamily columnFamily = db.getColumnFamily(tableName);
     if (columnFamily == null) {
-      throw new IOException("Table not found: " + tableName);
+      throw new RocksDatabaseException("Table not found: " + tableName);
     }
     db.compactRange(columnFamily, null, null, options);
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     if (metrics != null) {
       metrics.unregister();
       metrics = null;
@@ -258,36 +249,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public <K, V> void move(K key, Table<K, V> source,
-                                Table<K, V> dest) throws IOException {
-    try (BatchOperation batchOperation = initBatchOperation()) {
-
-      V value = source.get(key);
-      dest.putWithBatch(batchOperation, key, value);
-      source.deleteWithBatch(batchOperation, key);
-      commitBatchOperation(batchOperation);
-    }
-  }
-
-  @Override
-  public <K, V> void move(K key, V value, Table<K, V> source,
-                                Table<K, V> dest) throws IOException {
-    move(key, key, value, source, dest);
-  }
-
-  @Override
-  public <K, V> void move(K sourceKey, K destKey, V value,
-                                Table<K, V> source,
-                                Table<K, V> dest) throws IOException {
-    try (BatchOperation batchOperation = initBatchOperation()) {
-      dest.putWithBatch(batchOperation, destKey, value);
-      source.deleteWithBatch(batchOperation, sourceKey);
-      commitBatchOperation(batchOperation);
-    }
-  }
-
-  @Override
-  public long getEstimatedKeyCount() throws IOException {
+  public long getEstimatedKeyCount() throws RocksDatabaseException {
     return db.estimateNumKeys();
   }
 
@@ -298,7 +260,7 @@ public class RDBStore implements DBStore {
 
   @Override
   public void commitBatchOperation(BatchOperation operation)
-      throws IOException {
+      throws RocksDatabaseException {
     ((RDBBatchOperation) operation).commit(db);
   }
 
@@ -319,8 +281,8 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public ArrayList<Table> listTables() {
-    ArrayList<Table> returnList = new ArrayList<>();
+  public List<Table<?, ?>> listTables() {
+    final List<Table<?, ?>> returnList = new ArrayList<>();
     for (ColumnFamily family : getColumnFamilies()) {
       returnList.add(new RDBTable(db, family, rdbMetrics));
     }
@@ -328,19 +290,19 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void flushDB() throws IOException {
+  public void flushDB() throws RocksDatabaseException {
     db.flush();
   }
 
   @Override
-  public void flushLog(boolean sync) throws IOException {
+  public void flushLog(boolean sync) throws RocksDatabaseException {
     // for RocksDB it is sufficient to flush the WAL as entire db can
     // be reconstructed using it.
     db.flushWal(sync);
   }
 
   @Override
-  public DBCheckpoint getCheckpoint(boolean flush) throws IOException {
+  public DBCheckpoint getCheckpoint(boolean flush) throws RocksDatabaseException {
     if (flush) {
       this.flushDB();
     }
@@ -348,14 +310,14 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public DBCheckpoint getCheckpoint(String parentPath, boolean flush) throws IOException {
+  public DBCheckpoint getCheckpoint(String parentPath, boolean flush) throws RocksDatabaseException {
     if (flush) {
       this.flushDB();
     }
     return checkPointManager.createCheckpoint(parentPath, null);
   }
 
-  public DBCheckpoint getSnapshot(String name) throws IOException {
+  public DBCheckpoint getSnapshot(String name) throws RocksDatabaseException {
     this.flushLog(true);
     return checkPointManager.createCheckpoint(snapshotsParentDir, name);
   }
@@ -376,13 +338,13 @@ public class RDBStore implements DBStore {
 
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
-      throws IOException {
+      throws SequenceNumberNotFoundException {
     return getUpdatesSince(sequenceNumber, Long.MAX_VALUE);
   }
 
   @Override
   public DBUpdatesWrapper getUpdatesSince(long sequenceNumber, long limitCount)
-      throws IOException {
+      throws SequenceNumberNotFoundException {
     if (limitCount <= 0) {
       throw new IllegalArgumentException("Illegal count for getUpdatesSince.");
     }
@@ -451,7 +413,7 @@ public class RDBStore implements DBStore {
       // Throw the exception back to Recon. Expect Recon to fall back to
       // full snapshot.
       throw e;
-    } catch (RocksDBException | IOException e) {
+    } catch (RocksDBException | RocksDatabaseException e) {
       LOG.error("Unable to get delta updates since sequenceNumber {}. "
               + "This exception will not be thrown to the client ",
           sequenceNumber, e);
@@ -479,12 +441,12 @@ public class RDBStore implements DBStore {
     return db;
   }
 
-  public String getProperty(String property) throws IOException {
+  public String getProperty(String property) throws RocksDatabaseException {
     return db.getProperty(property);
   }
 
   public String getProperty(ColumnFamily family, String property)
-      throws IOException {
+      throws RocksDatabaseException {
     return db.getProperty(family, property);
   }
 

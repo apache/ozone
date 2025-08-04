@@ -140,9 +140,9 @@ public abstract class AbstractTestChunkManager {
    */
   public static boolean isFileNotInUse(String filePath) {
     try {
-      Process process = new ProcessBuilder("fuser", filePath).start();
+      Process process = new ProcessBuilder("lsof", "-f", "--", filePath).start();
       try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), UTF_8))) {
-        String output = reader.readLine();  // If fuser returns no output, the file is not in use
+        String output = reader.readLine();  // If lsof returns no output, the file is not in use
         if (output == null) {
           return true;
         }

@@ -21,10 +21,11 @@ Library             Collections
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
 
+Suite Setup         Get Security Enabled From Config
+
 Test Timeout        20 minutes
 
 *** Variables ***
-${SECURITY_ENABLED}                 false
 ${HOST}                             datanode1
 ${VOLUME}                           volume1
 ${BUCKET}                           bucket1

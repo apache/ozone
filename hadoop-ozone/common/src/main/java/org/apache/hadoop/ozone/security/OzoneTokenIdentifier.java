@@ -225,7 +225,9 @@ public class OzoneTokenIdentifier extends
     if (token.hasSecretKeyId()) {
       identifier.setSecretKeyId(token.getSecretKeyId());
     }
-    identifier.setOmServiceId(token.getOmServiceId());
+    if (token.hasOmServiceId()) {
+      identifier.setOmServiceId(token.getOmServiceId());
+    }
     return identifier;
   }
 

@@ -25,7 +25,7 @@ ${port}        9859
 
 *** Keywords ***
 Setup Test
-    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+    Kinit test user     testuser     testuser.keytab
 
 Basic key generation and validation
     ${random} =   Generate Random String    10

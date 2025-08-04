@@ -532,12 +532,14 @@ public class TestHddsVolume {
     volume.createTmpDirs(CLUSTER_ID);
 
     VolumeCheckResult result = volume.check(false);
+    assertEquals(1, volume.getVolumeInfoStats().getNumScans());
     assertEquals(VolumeCheckResult.HEALTHY, result);
 
     File dbFile = new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
     FileUtils.deleteDirectory(dbFile);
 
     result = volume.check(false);
+    assertEquals(2, volume.getVolumeInfoStats().getNumScans());
     assertEquals(VolumeCheckResult.FAILED, result);
 
     volume.shutdown();

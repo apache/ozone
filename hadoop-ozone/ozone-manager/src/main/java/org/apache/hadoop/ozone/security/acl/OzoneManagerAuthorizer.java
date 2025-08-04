@@ -15,13 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.security.acl;
+
+import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.PrefixManager;
 
 /**
- * OmSnapshot file system tests for FSO.
+ * A subinterface of {@link IAccessAuthorizer} specifically for Ozone Manager.
  */
-public class TestOmSnapshotFileSystemFso extends TestOmSnapshotFileSystem {
-  TestOmSnapshotFileSystemFso() throws Exception {
-    super(BUCKET_NAME_FSO, false);
-  }
+public interface OzoneManagerAuthorizer extends IAccessAuthorizer {
+  /** Configure this authorizer. */
+  OzoneManagerAuthorizer configure(OzoneManager om, KeyManager km, PrefixManager pm);
 }

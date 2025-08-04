@@ -49,13 +49,13 @@ OM maintains a list of volumes, buckets, and keys.
 For each user, it maintains a list of volumes.
 For each volume, the list of buckets and for each bucket the list of keys.
 
-Ozone Manager will use Apache Ratis(A Raft protocol implementation) to
-replicate Ozone Manager state. This will ensure High Availability for Ozone.
+Ozone Manager will use [Apache Ratis](https://ratis.apache.org/)(A Raft protocol implementation) to
+replicate Ozone Manager state. This will ensure [High Availability for Ozone Manager]({{< ref "feature/OM-HA.md" >}}).
 
 
 ## Ozone Manager and Storage Container Manager
 
-The relationship between Ozone Manager and Storage Container Manager is best
+The relationship between Ozone Manager and [Storage Container Manager (SCM)]({{< ref "concept/StorageContainerManager.md" >}}) is best
 understood if we trace what happens during a key write and key read.
 
 ### Key Write
@@ -68,12 +68,12 @@ Manager determines that you are allowed to write a key to the specified bucket,
 OM needs to allocate a block for the client to write data.
 
 * To allocate a block, Ozone Manager sends a request to Storage Container
-Manager (SCM); SCM is the manager of data nodes. SCM picks three data nodes
+Manager (SCM); SCM is the manager of [data nodes]({{< ref "concept/Datanodes.md" >}}). SCM picks three data nodes
 into which client can write data. SCM allocates the block and returns the
-block ID to Ozone Manager.
+[block ID]({{< ref "concept/Datanodes.md" >}}) to Ozone Manager.
 
 * Ozone manager records this block information in its metadata and returns the
-block and a block token (a security permission to write data to the block)
+block and a [block token]({{< ref "security/SecureOzone.md" >}}) (a security permission to write data to the block)
 to the client.
 
 * The client uses the block token to prove that it is allowed to write data to
@@ -108,12 +108,12 @@ Ozone provides a network service for the client and for administration commands.
    * GetFileStatus, CreateDirectory, CreateFile, LookupFile
  * ACL related
    * Managing ACLs if [internal ACLs]({{< ref "security/SecurityAcls.md" >}}) are used instead of [Ranger]({{< ref "security/SecurityWithRanger.md" >}}) 
- * Delegation token (Get / Renew / Cancel)
+ * [Delegation token]({{< ref "security/SecureOzone.md" >}}) (Get / Renew / Cancel)
   * For security
  * Admin APIs
    * Get S3 secret 
    * ServiceList (used for service discovery)
-   * DBUpdates (used by [Recon]({{< ref "feature/Recon.md" >}}) downloads snapshots)
+   * DBUpdates (used by [Recon]({{< ref "concept/Recon.md" >}}) downloads snapshots)
 
 ### Persisted state
 

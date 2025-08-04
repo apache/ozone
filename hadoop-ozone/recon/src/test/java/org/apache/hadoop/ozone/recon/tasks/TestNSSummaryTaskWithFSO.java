@@ -509,9 +509,10 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
       Mockito.when(mockIterator.hasNext()).thenReturn(true, true, true, true, false);
       Mockito.when(mockIterator.next()).thenReturn(event1, event2, event3, event4);
 
-      // Mock the flushAndCommitNSToDB method to fail on the last flush
+      // Mock the flushAndCommitUpdatedNSToDB method to fail on the last flush
       NSSummaryTaskWithFSO taskSpy = Mockito.spy(task);
-      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy).flushAndCommitNSToDB(Mockito.anyMap());
+      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy)
+          .flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
 
       // Call the method under test
       Pair<Integer, Boolean> result1 = taskSpy.processWithFSO(events, 0);
@@ -522,7 +523,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
       // Verify interactions
       Mockito.verify(mockIterator, Mockito.times(3)).next();
-      Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitNSToDB(Mockito.anyMap());
+      Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
     }
   }
 }

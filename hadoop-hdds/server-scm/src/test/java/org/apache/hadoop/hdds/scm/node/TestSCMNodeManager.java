@@ -95,6 +95,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -196,8 +197,9 @@ public class TestSCMNodeManager {
   SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
     scm = HddsTestUtils.getScm(config);
-    scmContext = new SCMContext.Builder().setIsInSafeMode(true)
-        .setLeader(true).setIsPreCheckComplete(true)
+    scmContext = new SCMContext.Builder()
+        .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.PRE_CHECKS_PASSED)
+        .setLeader(true)
         .setSCM(scm).build();
     PipelineManagerImpl pipelineManager =
         (PipelineManagerImpl) scm.getPipelineManager();

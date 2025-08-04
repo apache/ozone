@@ -453,7 +453,6 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
-  @Flaky("HDDS-6935")
   public void testApplyTransactionFailure() throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -628,6 +627,7 @@ public class TestContainerStateMachineFailures {
   // not be marked unhealthy and pipeline should not fail if container gets
   // closed here.
   @Test
+  @Flaky("HDDS-13482")
   void testWriteStateMachineDataIdempotencyWithClosedContainer()
       throws Exception {
     OzoneOutputStream key =

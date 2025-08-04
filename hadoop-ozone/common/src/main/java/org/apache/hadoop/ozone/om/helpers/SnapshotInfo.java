@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -57,7 +58,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       SnapshotInfo::getProtobuf,
       SnapshotInfo.class);
 
-  private static final String SEPARATOR = "-";
   private static final long INVALID_TIMESTAMP = -1;
   private static final UUID INITIAL_SNAPSHOT_ID = UUID.randomUUID();
 
@@ -548,7 +548,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   public static String getCheckpointDirName(UUID snapshotId) {
     Objects.requireNonNull(snapshotId,
         "SnapshotId is needed to create checkpoint directory");
-    return SEPARATOR + snapshotId;
+    return OM_SNAPSHOT_SEPARATOR + snapshotId;
   }
 
   /**

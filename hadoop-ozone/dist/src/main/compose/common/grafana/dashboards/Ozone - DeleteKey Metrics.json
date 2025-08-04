@@ -2498,7 +2498,7 @@
             {
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "om_performance_metrics_delete_key_success_latency_ns_avg_time",
+              "expr": "scm_performance_metrics_delete_key_success_latency_ns_avg_time",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "legendFormat": "{{hostname}}",

@@ -90,6 +90,10 @@ When creating a new jira for any kind of new feature, improvement or bug, please
      * If it is follow up of another issue, please link the previous jira to it so that context is preserve.
   3. **Jira examples:** [HDDS-9272](https://issues.apache.org/jira/browse/HDDS-9272), [HDDS-9322](https://issues.apache.org/jira/browse/HDDS-9322), [HDDS-9291](https://issues.apache.org/jira/browse/HDDS-9291), [HDDS-8940](https://issues.apache.org/jira/browse/HDDS-8940), [HDDS-9282](https://issues.apache.org/jira/browse/HDDS-9282)
 
+## New feature development
+
+For large feature development changes, we use a process called "Ozone Enhancement Proposals" (OEP). This process is designed to ensure that major changes to Ozone are well-designed and have community consensus. If you are planning to propose a significant change, please read the [Ozone Enhancement Proposals](https://ozone.apache.org/docs/edge/design/ozone-enhancement-proposals.html) documentation and create a design document before you start coding. Please note that we only accept design documents in Markdown format; PDF or Google Docs are no longer accepted.
+
 ## Contribute your modifications
 
 We use GitHub pull requests for contributing changes to the repository. The main workflow is as follows:

@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
-
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -30,14 +28,12 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Base class for responses that need to move keys from an arbitrary table to
  * the deleted table.
  */
-@CleanupTableInfo(cleanupTables = {DELETED_TABLE})
 public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
 
   public AbstractOMKeyDeleteResponse(

@@ -24,7 +24,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
  * Encapsulates the result of a container scan.
  */
 public interface ScanResult {
-  boolean isHealthy();
+  boolean hasErrors();
 
   boolean isDeleted();
 

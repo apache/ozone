@@ -114,7 +114,6 @@ class TestDatanodeHddsVolumeFailureDetection {
 
           // should trigger checkVolumeAsync and
           // a failed volume should be detected
-          DatanodeTestUtils.waitForCheckVolume(volSet, 1L);
           DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
         } finally {
           // restore for cleanup
@@ -162,7 +161,6 @@ class TestDatanodeHddsVolumeFailureDetection {
 
         // should trigger CheckVolumeAsync and
         // a failed volume should be detected
-        DatanodeTestUtils.waitForCheckVolume(volSet, 1L);
         DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
       } finally {
         // restore for cleanup
@@ -226,7 +224,6 @@ class TestDatanodeHddsVolumeFailureDetection {
 
           // should trigger CheckVolumeAsync and
           // a failed volume should be detected
-          DatanodeTestUtils.waitForCheckVolume(volSet, 1L);
           DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
         } finally {
           // restore all
