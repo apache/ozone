@@ -118,6 +118,17 @@ and is not already being moved by another balancing operation. To optimize perfo
 containers repeatedly, it caches the list of containers for each volume which auto expires after one hour of its last 
 used time or if the container iterator for that is invalidated on full utilisation.
 
+## Feature Flag
+
+The Disk Balancer feature is introduced with a feature flag. By default, this feature is disabled to prevent it from 
+running until it has undergone thorough testing.
+
+The feature can be enabled by setting the following property to `true` in the `ozone-site.xml` configuration file:
+`hdds.datanode.disk.balancer.enabled = false`
+
+Developers who wish to test or use the Disk Balancer must explicitly enable it. Once the feature is 
+considered stable, the default value may be changed to `true` in a future release.
+
 ## DiskBalancer Metrics
 
 The DiskBalancer service exposes JMX metrics on each Datanode for real-time monitoring. These metrics provide insights

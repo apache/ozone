@@ -716,9 +716,8 @@ public class OzoneContainer {
   }
 
   public DiskBalancerReportProto getDiskBalancerReport() {
-    // return an empty report if the service is disabled
     if (diskBalancerService == null) {
-      return DiskBalancerReportProto.newBuilder().build();
+      return null;
     }
     return diskBalancerService.getDiskBalancerReportProto();
   }
