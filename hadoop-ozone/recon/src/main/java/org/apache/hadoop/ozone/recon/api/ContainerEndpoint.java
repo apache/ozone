@@ -51,6 +51,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -581,50 +582,59 @@ public class ContainerEndpoint {
 
     List<ContainerDiscrepancyInfo> containerDiscrepancyInfoList =
         new ArrayList<>();
-    Long minContainerID = prevKey + 1;
-    Iterator<ContainerInfo> scmNonDeletedContainers =
-            containerManager.getContainers().stream()
-                    .filter(containerInfo -> (containerInfo.getContainerID() >= minContainerID))
-                    .filter(containerInfo -> containerInfo.getState() != HddsProtos.LifeCycleState.DELETED)
-                    .sorted(Comparator.comparingLong(ContainerInfo::getContainerID)).iterator();
-    ContainerInfo scmContainerInfo = scmNonDeletedContainers.hasNext() ?
-            scmNonDeletedContainers.next() : null;
     DataFilter dataFilter = DataFilter.fromValue(missingIn.toUpperCase());
     try (SeekableIterator<Long, ContainerMetadata> omContainers =
                  reconContainerMetadataManager.getContainersIterator()) {
-      omContainers.seek(minContainerID);
-      ContainerMetadata containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
       switch (dataFilter) {
       case SCM:
-        List<ContainerMetadata> notSCMContainers = new ArrayList<>();
-        while (containerMetadata != null && notSCMContainers.size() < limit) {
-          Long omContainerID = containerMetadata.getContainerID();
-          Long scmContainerID = scmContainerInfo == null ? null : scmContainerInfo.getContainerID();
-          if (omContainerID.equals(scmContainerID)) {
-            containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
-            scmContainerInfo = scmNonDeletedContainers.hasNext() ? scmNonDeletedContainers.next() : null;
-          } else if (scmContainerID == null || omContainerID.compareTo(scmContainerID) < 0) {
-            notSCMContainers.add(containerMetadata);
-            containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
-          } else {
-            scmContainerInfo = scmNonDeletedContainers.hasNext() ? scmNonDeletedContainers.next() : null;
+        // Optimized approach: Iterate through OM containers and check existence in SCM
+        // Start from prevKey + 1 if specified
+        if (prevKey > 0) {
+          omContainers.seek(prevKey + 1);
+        }
+        
+        while (omContainers.hasNext() && containerDiscrepancyInfoList.size() < limit) {
+          ContainerMetadata omContainer = omContainers.next();
+          Long omContainerID = omContainer.getContainerID();
+          
+          // Check if container exists in SCM and is not deleted
+          boolean existsInSCM = false;
+          try {
+            ContainerInfo scmContainerInfo = containerManager.getContainer(ContainerID.valueOf(omContainerID));
+            // Container exists in SCM, check if it's not deleted
+            existsInSCM = (scmContainerInfo != null && 
+                          scmContainerInfo.getState() != HddsProtos.LifeCycleState.DELETED);
+          } catch (ContainerNotFoundException e) {
+            // Container doesn't exist in SCM
+            existsInSCM = false;
+          }
+
+          // If container doesn't exist in SCM, add to discrepancy list
+          if (!existsInSCM) {
+            ContainerDiscrepancyInfo containerDiscrepancyInfo = new ContainerDiscrepancyInfo();
+            containerDiscrepancyInfo.setContainerID(omContainerID);
+            containerDiscrepancyInfo.setNumberOfKeys(omContainer.getNumberOfKeys());
+            containerDiscrepancyInfo.setPipelines(omContainer.getPipelines());
+            containerDiscrepancyInfo.setExistsAt("OM");
+            containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
           }
         }
-
-        notSCMContainers.forEach(nonSCMContainer -> {
-          ContainerDiscrepancyInfo containerDiscrepancyInfo =
-              new ContainerDiscrepancyInfo();
-          containerDiscrepancyInfo.setContainerID(nonSCMContainer.getContainerID());
-          containerDiscrepancyInfo.setNumberOfKeys(
-              nonSCMContainer.getNumberOfKeys());
-          containerDiscrepancyInfo.setPipelines(
-              nonSCMContainer.getPipelines());
-          containerDiscrepancyInfo.setExistsAt("OM");
-          containerDiscrepancyInfoList.add(containerDiscrepancyInfo);
-        });
         break;
 
       case OM:
+        // Initialize variables needed for OM case dual-iterator approach
+        Long minContainerID = prevKey + 1;
+        Iterator<ContainerInfo> scmNonDeletedContainers =
+                containerManager.getContainers().stream()
+                        .filter(containerInfo -> (containerInfo.getContainerID() >= minContainerID))
+                        .filter(containerInfo -> containerInfo.getState() != HddsProtos.LifeCycleState.DELETED)
+                        .sorted(Comparator.comparingLong(ContainerInfo::getContainerID)).iterator();
+        ContainerInfo scmContainerInfo = scmNonDeletedContainers.hasNext() ?
+                scmNonDeletedContainers.next() : null;
+        
+        omContainers.seek(minContainerID);
+        ContainerMetadata containerMetadata = omContainers.hasNext() ? omContainers.next() : null;
+        
         List<ContainerInfo> nonOMContainers = new ArrayList<>();
         while (scmContainerInfo != null && nonOMContainers.size() < limit) {
           Long omContainerID = containerMetadata == null ? null : containerMetadata.getContainerID();
