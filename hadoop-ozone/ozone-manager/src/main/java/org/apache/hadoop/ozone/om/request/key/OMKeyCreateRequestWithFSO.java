@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.util.Time;
 
 /**
  * Handles CreateKey request layout version1.
@@ -91,6 +93,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     Result result;
     List<OmDirectoryInfo> missingParentInfos;
     int numKeysCreated = 0;
+    final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
+    long startNanos = Time.monotonicNowNanos();
     try {
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
@@ -174,9 +178,11 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       long preAllocatedSpace =
           newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
               .getRequiredNodes();
+      long startTime = Time.monotonicNowNanos();
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
+      perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - startTime);
       omBucketInfo.incrUsedNamespace(numKeysCreated);
 
       // Add to cache entry can be done outside of lock for this openKey.
@@ -206,6 +212,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;
+      long endNanosCreateKeySuccessLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setCreateKeySuccessLatencyNs(endNanosCreateKeySuccessLatencyNs - startNanos);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
@@ -213,6 +221,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(
               createErrorOMResponse(omResponse, exception), getBucketLayout());
+      long endNanosCreateKeyFailureLatencyNs = Time.monotonicNowNanos();
+      perfMetrics.setCreateKeyFailureLatencyNs(endNanosCreateKeyFailureLatencyNs - startNanos);
     } finally {
       if (acquireLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
