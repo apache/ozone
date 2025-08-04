@@ -86,7 +86,7 @@ public class TestContainerReader {
   private MutableVolumeSet volumeSet;
   private HddsVolume hddsVolume;
   private ContainerSet containerSet;
-  WitnessedContainerMetadataStore mockMetadataStore;
+  private WitnessedContainerMetadataStore mockMetadataStore;
   private OzoneConfiguration conf;
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
@@ -392,6 +392,7 @@ public class TestContainerReader {
     assertThat(dnLogs.getOutput()).contains("Container DB file is missing");
   }
 
+  @SuppressWarnings("checkstyle:MethodLength")
   @ContainerTestVersionInfo.ContainerTest
   public void testMultipleContainerReader(ContainerTestVersionInfo versionInfo)
       throws Exception {
