@@ -501,8 +501,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmNodeManager, containerManager, scmContext);
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, scmContext);
-    DiskBalancerReportHandler diskBalancerReportHandler =
-        new DiskBalancerReportHandler(diskBalancerManager);
 
     ReplicationManagerEventHandler replicationManagerEventHandler =
         new ReplicationManagerEventHandler(replicationManager, scmContext);
@@ -588,8 +586,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmNodeManager.registerSendCommandNotify(
         SCMCommandProto.Type.deleteBlocksCommand,
         scmBlockManager.getDeletedBlockLog()::onSent);
-    eventQueue.addHandler(SCMEvents.DISK_BALANCER_REPORT,
-        diskBalancerReportHandler);
+
+    if (diskBalancerManager != null) {
+      DiskBalancerReportHandler diskBalancerReportHandler =
+          new DiskBalancerReportHandler(diskBalancerManager);
+      eventQueue.addHandler(SCMEvents.DISK_BALANCER_REPORT,
+          diskBalancerReportHandler);
+    }
   }
 
   private void initializeCertificateClient() throws IOException {
@@ -857,8 +860,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         .setSCMDBTransactionBuffer(scmHAManager.getDBTransactionBuffer())
         .setRatisServer(scmHAManager.getRatisServer())
         .build();
-    diskBalancerManager = new DiskBalancerManager(conf, eventQueue, scmContext,
-        scmNodeManager);
+    if (conf.getBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY,
+        HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT)) {
+      diskBalancerManager = new DiskBalancerManager(conf, eventQueue, scmContext,
+          scmNodeManager);
+    } else {
+      diskBalancerManager = null;
+      LOG.info("Disk Balancer is disabled.");
+    }
   }
 
   /**

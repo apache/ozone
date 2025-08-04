@@ -259,7 +259,9 @@ public class HeartbeatEndpointTask
 
   private void addDiskBalancerReport(SCMHeartbeatRequestProto.Builder requestBuilder) {
     DiskBalancerInfo info = context.getParent().getContainer().getDiskBalancerInfo();
-    requestBuilder.setDiskBalancerReport(info.toDiskBalancerReportProto());
+    if (info != null) {
+      requestBuilder.setDiskBalancerReport(info.toDiskBalancerReportProto());
+    }
   }
 
   /**

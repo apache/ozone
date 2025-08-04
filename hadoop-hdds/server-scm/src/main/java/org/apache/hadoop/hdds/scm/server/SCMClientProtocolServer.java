@@ -51,6 +51,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -1522,6 +1523,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
       int count, int clientVersion) throws IOException {
+    checkDiskBalancerEnabled();
     return scm.getDiskBalancerManager().getDiskBalancerReport(count,
         clientVersion);
   }
@@ -1531,6 +1533,7 @@ public class SCMClientProtocolServer implements
       Optional<List<String>> hosts,
       Optional<HddsProtos.DiskBalancerRunningStatus> status,
       int clientVersion) throws IOException {
+    checkDiskBalancerEnabled();
     return scm.getDiskBalancerManager().getDiskBalancerStatus(hosts, status,
         clientVersion);
   }
@@ -1540,6 +1543,8 @@ public class SCMClientProtocolServer implements
       Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
       Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
       throws IOException {
+    checkDiskBalancerEnabled();
+
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
     } catch (IOException e) {
@@ -1554,6 +1559,8 @@ public class SCMClientProtocolServer implements
   @Override
   public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
       throws IOException {
+    checkDiskBalancerEnabled();
+
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
     } catch (IOException e) {
@@ -1568,6 +1575,8 @@ public class SCMClientProtocolServer implements
       Optional<Double> threshold, Optional<Long> bandwidthInMB,
       Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
       throws IOException {
+    checkDiskBalancerEnabled();
+
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
     } catch (IOException e) {
@@ -1577,6 +1586,14 @@ public class SCMClientProtocolServer implements
 
     return scm.getDiskBalancerManager().updateDiskBalancerConfiguration(
         threshold, bandwidthInMB, parallelThread, stopAfterDiskEven, hosts);
+  }
+
+  private void checkDiskBalancerEnabled() throws SCMException {
+    if (scm.getDiskBalancerManager() == null) {
+      throw new SCMException("Disk Balancer is not enabled. Please enable " +
+          "the '" + HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY +
+          "' configuration key.");
+    }
   }
 
   /**

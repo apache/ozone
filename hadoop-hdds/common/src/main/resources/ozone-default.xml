@@ -209,6 +209,15 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.disk.balancer.enabled</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE, DISKBALANCER</tag>
+    <description>If this property is set to true, then the Disk Balancer
+      feature is enabled on SCM and Datanodes, and users can use
+      this service. By default, this is disabled.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.volume.choosing.policy</name>
     <value>org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>

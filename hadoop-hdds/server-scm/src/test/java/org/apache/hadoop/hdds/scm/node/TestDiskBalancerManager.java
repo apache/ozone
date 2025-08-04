@@ -55,6 +55,7 @@ public class TestDiskBalancerManager {
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY, true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     nodeManager = new MockNodeManager(true, 3);
     diskBalancerManager = new DiskBalancerManager(conf, new EventQueue(),
