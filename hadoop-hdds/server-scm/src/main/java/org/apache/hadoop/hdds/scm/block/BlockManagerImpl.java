@@ -98,7 +98,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     deletedBlockLog = new DeletedBlockLogImpl(conf,
         scm,
         scm.getContainerManager(),
-        scm.getScmHAManager().getDBTransactionBuffer(),
+        scm.getScmHAManager().asSCMHADBTransactionBuffer(),
         metrics);
 
 

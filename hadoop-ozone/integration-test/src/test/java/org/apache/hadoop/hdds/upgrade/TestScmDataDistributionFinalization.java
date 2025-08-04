@@ -23,7 +23,7 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
-import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.EMPTY_SUMMARY;
+import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.EMPTY_SUMMARY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -51,9 +50,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
-import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl;
+import org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
@@ -197,11 +195,9 @@ public class TestScmDataDistributionFinalization {
         cluster.getHddsDatanodes(), 0, CLOSED);
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
       DeletedBlockLogImpl deletedBlockLog = (DeletedBlockLogImpl) scm.getScmBlockManager().getDeletedBlockLog();
-      SCMHAInvocationHandler handler =
-          (SCMHAInvocationHandler) Proxy.getInvocationHandler(deletedBlockLog.getDeletedBlockLogStateManager());
-      DeletedBlockLogStateManagerImpl deletedBlockLogStateManager =
-          (DeletedBlockLogStateManagerImpl) handler.getLocalHandler();
-      HddsProtos.DeletedBlocksTransactionSummary summary = deletedBlockLogStateManager.getTransactionSummary();
+      SCMDeletedBlockTransactionStatusManager statusManager =
+          deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+      HddsProtos.DeletedBlocksTransactionSummary summary = statusManager.getTransactionSummary();
       assertEquals(EMPTY_SUMMARY, summary);
     }
 
@@ -216,13 +212,11 @@ public class TestScmDataDistributionFinalization {
     ArrayList<Long> txIdList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
     assertEquals(txCount, txIdList.size());
     DeletedBlockLogImpl deletedBlockLog = (DeletedBlockLogImpl) activeSCM.getScmBlockManager().getDeletedBlockLog();
-    SCMHAInvocationHandler handler =
-        (SCMHAInvocationHandler) Proxy.getInvocationHandler(deletedBlockLog.getDeletedBlockLogStateManager());
-    DeletedBlockLogStateManagerImpl deletedBlockLogStateManager =
-        (DeletedBlockLogStateManagerImpl) handler.getLocalHandler();
-    HddsProtos.DeletedBlocksTransactionSummary summary = deletedBlockLogStateManager.getTransactionSummary();
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+    HddsProtos.DeletedBlocksTransactionSummary summary = statusManager.getTransactionSummary();
     assertEquals(EMPTY_SUMMARY, summary);
-    deletedBlockLogStateManager.removeTransactionsFromDB(txIdList);
+    statusManager.removeTransactions(txIdList);
 
     // generate new deletion tx, summary should be updated, total DB tx 4
     lastTxId = findLastTx();
@@ -231,7 +225,7 @@ public class TestScmDataDistributionFinalization {
     ArrayList<Long> txWithSizeList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
     assertEquals(txCount, txWithSizeList.size());
 
-    summary = deletedBlockLogStateManager.getTransactionSummary();
+    summary = statusManager.getTransactionSummary();
     assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(txCount, summary.getTotalTransactionCount());
     assertEquals(txCount * BLOCKS_PER_TX, summary.getTotalBlockCount());
@@ -241,11 +235,11 @@ public class TestScmDataDistributionFinalization {
     // delete first half of txs and verify summary, total DB tx 2
     txIdList = txWithSizeList.stream().limit(txCount / 2).collect(Collectors.toCollection(ArrayList::new));
     assertEquals(txCount / 2, txIdList.size());
-    deletedBlockLogStateManager.removeTransactionsFromDB(txIdList);
+    statusManager.removeTransactions(txIdList);
     flushDBTransactionBuffer(activeSCM);
     txWithSizeList = getRowsInTable(activeSCM.getScmMetadataStore().getDeletedBlocksTXTable());
     assertEquals(txCount / 2, txWithSizeList.size());
-    summary = deletedBlockLogStateManager.getTransactionSummary();
+    summary = statusManager.getTransactionSummary();
     assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(txCount / 2, summary.getTotalTransactionCount());
     assertEquals(txCount * BLOCKS_PER_TX / 2, summary.getTotalBlockCount());
@@ -260,7 +254,7 @@ public class TestScmDataDistributionFinalization {
     txIdList.removeAll(txWithSizeList);
     ArrayList<Long> txWithoutSizeList = txIdList;
 
-    summary = deletedBlockLogStateManager.getTransactionSummary();
+    summary = statusManager.getTransactionSummary();
     assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(txCount / 2, summary.getTotalTransactionCount());
     assertEquals(txCount * BLOCKS_PER_TX / 2, summary.getTotalBlockCount());
@@ -268,9 +262,9 @@ public class TestScmDataDistributionFinalization {
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE * 3 / 2, summary.getTotalBlockReplicatedSize());
 
     // delete old format deletion tx, summary should keep the same
-    deletedBlockLogStateManager.removeTransactionsFromDB(txWithoutSizeList);
+    statusManager.removeTransactions(txWithoutSizeList);
     flushDBTransactionBuffer(activeSCM);
-    summary = deletedBlockLogStateManager.getTransactionSummary();
+    summary = statusManager.getTransactionSummary();
     assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(txCount / 2, summary.getTotalTransactionCount());
     assertEquals(txCount * BLOCKS_PER_TX / 2, summary.getTotalBlockCount());
@@ -278,9 +272,9 @@ public class TestScmDataDistributionFinalization {
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE * 3 / 2, summary.getTotalBlockReplicatedSize());
 
     // delete remaining txs, summary should become nearly empty
-    deletedBlockLogStateManager.removeTransactionsFromDB(txWithSizeList);
+    statusManager.removeTransactions(txWithSizeList);
     flushDBTransactionBuffer(activeSCM);
-    summary = deletedBlockLogStateManager.getTransactionSummary();
+    summary = statusManager.getTransactionSummary();
     assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(0, summary.getTotalTransactionCount());
     assertEquals(0, summary.getTotalBlockCount());
@@ -288,9 +282,9 @@ public class TestScmDataDistributionFinalization {
     assertEquals(0, summary.getTotalBlockReplicatedSize());
 
     // delete remaining txs twice, summary should keep the same
-    deletedBlockLogStateManager.removeTransactionsFromDB(txWithSizeList);
+    statusManager.removeTransactions(txWithSizeList);
     flushDBTransactionBuffer(activeSCM);
-    summary = deletedBlockLogStateManager.getTransactionSummary();
+    summary = statusManager.getTransactionSummary();
     assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(0, summary.getTotalTransactionCount());
     assertEquals(0, summary.getTotalBlockCount());
@@ -338,11 +332,9 @@ public class TestScmDataDistributionFinalization {
 
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
       DeletedBlockLogImpl deletedBlockLog = (DeletedBlockLogImpl) scm.getScmBlockManager().getDeletedBlockLog();
-      SCMHAInvocationHandler handler =
-          (SCMHAInvocationHandler) Proxy.getInvocationHandler(deletedBlockLog.getDeletedBlockLogStateManager());
-      DeletedBlockLogStateManagerImpl deletedBlockLogStateManager =
-          (DeletedBlockLogStateManagerImpl) handler.getLocalHandler();
-      HddsProtos.DeletedBlocksTransactionSummary summary = deletedBlockLogStateManager.getTransactionSummary();
+      SCMDeletedBlockTransactionStatusManager statusManager =
+          deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+      HddsProtos.DeletedBlocksTransactionSummary summary = statusManager.getTransactionSummary();
       assertEquals(EMPTY_SUMMARY, summary);
     }
 
@@ -360,14 +352,11 @@ public class TestScmDataDistributionFinalization {
     bucket.deleteKey(keyName);
 
     DeletedBlockLogImpl deletedBlockLog = (DeletedBlockLogImpl) activeSCM.getScmBlockManager().getDeletedBlockLog();
-    SCMHAInvocationHandler handler =
-        (SCMHAInvocationHandler) Proxy.getInvocationHandler(deletedBlockLog.getDeletedBlockLogStateManager());
-    DeletedBlockLogStateManagerImpl deletedBlockLogStateManager =
-        (DeletedBlockLogStateManagerImpl) handler.getLocalHandler();
-
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
     GenericTestUtils.waitFor(
-        () -> !EMPTY_SUMMARY.equals(deletedBlockLogStateManager.getTransactionSummary()), 100, 5000);
-    HddsProtos.DeletedBlocksTransactionSummary summary = deletedBlockLogStateManager.getTransactionSummary();
+        () -> !EMPTY_SUMMARY.equals(statusManager.getTransactionSummary()), 100, 5000);
+    HddsProtos.DeletedBlocksTransactionSummary summary = statusManager.getTransactionSummary();
     assertEquals(lastTxId + 1, summary.getFirstTxID());
     assertEquals(1, summary.getTotalTransactionCount());
     assertEquals(1, summary.getTotalBlockCount());
@@ -397,7 +386,7 @@ public class TestScmDataDistributionFinalization {
 
     // wait for block deletion transactions to be confirmed by DN
     GenericTestUtils.waitFor(
-        () -> deletedBlockLogStateManager.getTransactionSummary().getTotalTransactionCount() == 0, 100, 10000);
+        () -> statusManager.getTransactionSummary().getTotalTransactionCount() == 0, 100, 10000);
   }
 
   private Map<Long, List<DeletedBlock>> generateDeletedBlocks(int dataSize, boolean withSize) {

@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
-import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.EMPTY_SUMMARY;
+import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.EMPTY_SUMMARY;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,7 +33,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -67,6 +66,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.TxBlockInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -75,7 +75,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
-import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -456,15 +455,15 @@ public class TestDeletedBlockLog {
   public void testAddTransactionsIsBatched() throws Exception {
     conf.setStorageSize(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT, 1, StorageUnit.KB);
 
-    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    SCMDeletedBlockTransactionStatusManager mockStatusManager = mock(SCMDeletedBlockTransactionStatusManager.class);
     DeletedBlockLogImpl log = new DeletedBlockLogImpl(conf, scm, containerManager, scmHADBTransactionBuffer, metrics);
 
-    log.setDeletedBlockLogStateManager(mockStateManager);
+    log.setSCMDeletedBlockTransactionStatusManager(mockStatusManager);
 
     Map<Long, List<DeletedBlock>> containerBlocksMap = generateData(100);
     log.addTransactions(containerBlocksMap);
 
-    verify(mockStateManager, atLeast(2)).addTransactionsToDB(any());
+    verify(mockStatusManager, atLeast(2)).addTransactions(any());
   }
 
   @Test
@@ -976,14 +975,12 @@ public class TestDeletedBlockLog {
   public void testAddRemoveTransactionPerformance(int txCount, boolean dataDistributionFinalized, boolean cacheEnabled)
       throws Exception {
     Map<Long, List<DeletedBlock>> data = generateData(txCount);
-    SCMHAInvocationHandler handler =
-        (SCMHAInvocationHandler) Proxy.getInvocationHandler(deletedBlockLog.getDeletedBlockLogStateManager());
-    DeletedBlockLogStateManagerImpl deletedBlockLogStateManager =
-        (DeletedBlockLogStateManagerImpl) handler.getLocalHandler();
-    HddsProtos.DeletedBlocksTransactionSummary summary = deletedBlockLogStateManager.getTransactionSummary();
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        deletedBlockLog.getSCMDeletedBlockTransactionStatusManager();
+    HddsProtos.DeletedBlocksTransactionSummary summary = statusManager.getTransactionSummary();
     assertEquals(EMPTY_SUMMARY, summary);
 
-    DeletedBlockLogStateManagerImpl.setDisableDataDistributionForTest(!dataDistributionFinalized);
+    SCMDeletedBlockTransactionStatusManager.setDisableDataDistributionForTest(!dataDistributionFinalized);
     long startTime = System.nanoTime();
     deletedBlockLog.addTransactions(data);
     scmHADBTransactionBuffer.flush();
@@ -1001,7 +998,7 @@ public class TestDeletedBlockLog {
      */
     System.out.println((System.nanoTime() - startTime) / 100000 + " ms to add " + txCount + " txs to DB, " +
         "dataDistributionFinalized " + dataDistributionFinalized);
-    summary = deletedBlockLogStateManager.getTransactionSummary();
+    summary = statusManager.getTransactionSummary();
     if (dataDistributionFinalized) {
       assertEquals(txCount, summary.getTotalTransactionCount());
     } else {
@@ -1013,17 +1010,17 @@ public class TestDeletedBlockLog {
     long initialHitFromDBCount = metrics.getNumBlockDeletionTransactionSizeFromDB();
 
     if (dataDistributionFinalized && cacheEnabled) {
-      Map<Long, DeletedBlockLogImpl.TxBlockInfo> txSizeMap = deletedBlockLog.getTxSizeMap();
+      Map<Long, TxBlockInfo> txSizeMap = statusManager.getTxSizeMap();
       for (Map.Entry<Long, List<DeletedBlock>> entry : data.entrySet()) {
         List<DeletedBlock> deletedBlockList = entry.getValue();
-        DeletedBlockLogImpl.TxBlockInfo txBlockInfo = new DeletedBlockLogImpl.TxBlockInfo(deletedBlockList.size(),
+        TxBlockInfo txBlockInfo = new TxBlockInfo(deletedBlockList.size(),
             deletedBlockList.stream().map(DeletedBlock::getSize).reduce(0L, Long::sum),
             deletedBlockList.stream().map(DeletedBlock::getReplicatedSize).reduce(0L, Long::sum));
         txSizeMap.put(entry.getKey(), txBlockInfo);
       }
     }
     startTime = System.nanoTime();
-    deletedBlockLogStateManager.removeTransactionsFromDB(txIdList);
+    statusManager.removeTransactions(txIdList);
     scmHADBTransactionBuffer.flush();
     /**
      * Before DataDistribution is enabled

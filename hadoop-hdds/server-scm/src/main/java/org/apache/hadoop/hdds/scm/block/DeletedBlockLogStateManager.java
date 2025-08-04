@@ -31,7 +31,14 @@ import org.apache.hadoop.hdds.utils.db.Table;
  */
 public interface DeletedBlockLogStateManager {
   @Replicate
-  void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
+  void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
+      DeletedBlocksTransactionSummary summary) throws IOException;
+
+  @Replicate
+  void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs) throws IOException;
+
+  @Replicate
+  void removeTransactionsFromDB(ArrayList<Long> txIDs, DeletedBlocksTransactionSummary summary)
       throws IOException;
 
   @Replicate
@@ -49,10 +56,10 @@ public interface DeletedBlockLogStateManager {
   Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator()
       throws IOException;
 
+  ArrayList<DeletedBlocksTransaction> getTransactionsFromDB(ArrayList<Long> txIDs) throws IOException;
+
   void onFlush();
 
   void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
       Table<String, ByteString> statefulConfigTable);
-
-  DeletedBlocksTransactionSummary getTransactionSummary();
 }

@@ -146,7 +146,7 @@ public interface DeletedBlockLog extends Closeable {
    * @param statefulConfigTable stateful service config table
    */
   void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
-      Table<String, ByteString> statefulConfigTable);
+      Table<String, ByteString> statefulConfigTable) throws IOException;
 
   int getTransactionToDNsCommitMapSize();
 

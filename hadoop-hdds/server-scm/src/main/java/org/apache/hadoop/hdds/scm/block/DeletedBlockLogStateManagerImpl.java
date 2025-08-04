@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
@@ -28,22 +27,18 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,47 +51,25 @@ public class DeletedBlockLogStateManagerImpl
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DeletedBlockLogStateManagerImpl.class);
-  public static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
-  public static final HddsProtos.DeletedBlocksTransactionSummary EMPTY_SUMMARY =
-      HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
-          .setFirstTxID(Long.MAX_VALUE)
-          .setTotalTransactionCount(0)
-          .setTotalBlockCount(0)
-          .setTotalBlockSize(0)
-          .setTotalBlockReplicatedSize(0)
-          .build();
-  private static boolean disableDataDistributionForTest = false;
 
   private Table<Long, DeletedBlocksTransaction> deletedTable;
   private Table<String, ByteString> statefulConfigTable;
   private ContainerManager containerManager;
-  private final DBTransactionBuffer transactionBuffer;
+  private final SCMHADBTransactionBuffer transactionBuffer;
   private final Set<Long> deletingTxIDs;
   private final Set<Long> skippingRetryTxIDs;
-  private final AtomicLong totalTxCount = new AtomicLong(0);
-  private final AtomicLong totalBlockCount = new AtomicLong(0);
-  private final AtomicLong totalBlocksSize = new AtomicLong(0);
-  private final AtomicLong totalReplicatedBlocksSize = new AtomicLong(0);
-  private final Map<Long, DeletedBlockLogImpl.TxBlockInfo> txBlockInfoMap;
-  private long firstTxIdForDataDistribution = Long.MAX_VALUE;
-  private final ScmBlockDeletingServiceMetrics metrics;
-  private boolean isFirstTxIdForDataDistributionSet = false;
+  public static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
 
   public DeletedBlockLogStateManagerImpl(ConfigurationSource conf,
              Table<Long, DeletedBlocksTransaction> deletedTable,
              Table<String, ByteString> statefulServiceConfigTable,
-             ContainerManager containerManager, DBTransactionBuffer txBuffer,
-             Map<Long, DeletedBlockLogImpl.TxBlockInfo> txBlockInfoMap,
-             ScmBlockDeletingServiceMetrics metrics) throws IOException {
+             ContainerManager containerManager, SCMHADBTransactionBuffer txBuffer) {
     this.deletedTable = deletedTable;
     this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
     this.deletingTxIDs = ConcurrentHashMap.newKeySet();
     this.skippingRetryTxIDs = ConcurrentHashMap.newKeySet();
     this.statefulConfigTable = statefulServiceConfigTable;
-    this.txBlockInfoMap = txBlockInfoMap;
-    this.metrics = metrics;
-    this.initDataDistributionData();
   }
 
   @Override
@@ -179,101 +152,61 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
-  public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
-      throws IOException {
+  public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
+      DeletedBlocksTransactionSummary summary) throws IOException {
+    Map<ContainerID, Long> containerIdToTxnIdMap = new HashMap<>();
+    transactionBuffer.pauseAutoFlush();
+    try {
+      for (DeletedBlocksTransaction tx : txs) {
+        long tid = tx.getTxID();
+        containerIdToTxnIdMap.compute(ContainerID.valueOf(tx.getContainerID()),
+            (k, v) -> v != null && v > tid ? v : tid);
+        transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
+      }
+      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+    } finally {
+      transactionBuffer.resumeAutoFlush();
+    }
+    containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
+  }
+
+  @Override
+  public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs) throws IOException {
     Map<ContainerID, Long> containerIdToTxnIdMap = new HashMap<>();
     for (DeletedBlocksTransaction tx : txs) {
       long tid = tx.getTxID();
       containerIdToTxnIdMap.compute(ContainerID.valueOf(tx.getContainerID()),
           (k, v) -> v != null && v > tid ? v : tid);
       transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION) &&
-          tx.hasTotalBlockReplicatedSize() && !disableDataDistributionForTest) {
-        if (!isFirstTxIdForDataDistributionSet) {
-          // set the first transaction ID for data distribution
-          isFirstTxIdForDataDistributionSet = true;
-          firstTxIdForDataDistribution = tx.getTxID();
-        }
-        transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME,
-            incrDeletedBlocksSummary(tx).toByteString());
-      }
     }
-
     containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
   }
 
-  private DeletedBlocksTransactionSummary incrDeletedBlocksSummary(DeletedBlocksTransaction tx) {
-    totalTxCount.addAndGet(1);
-    totalBlockCount.addAndGet(tx.getLocalIDCount());
-    totalBlocksSize.addAndGet(tx.getTotalBlockSize());
-    totalReplicatedBlocksSize.addAndGet(tx.getTotalBlockReplicatedSize());
-    return DeletedBlocksTransactionSummary.newBuilder()
-        .setFirstTxID(firstTxIdForDataDistribution)
-        .setTotalTransactionCount(totalTxCount.get())
-        .setTotalBlockCount(totalBlockCount.get())
-        .setTotalBlockSize(totalBlocksSize.get())
-        .setTotalBlockReplicatedSize(totalReplicatedBlocksSize.get())
-        .build();
-  }
-
   @Override
-  public void removeTransactionsFromDB(ArrayList<Long> txIDs)
+  public void removeTransactionsFromDB(ArrayList<Long> txIDs, DeletedBlocksTransactionSummary summary)
       throws IOException {
     if (deletingTxIDs != null) {
       deletingTxIDs.addAll(txIDs);
     }
-
-    for (Long txID : txIDs) {
-      transactionBuffer.removeFromBuffer(deletedTable, txID);
-      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION) &&
-          txID >= firstTxIdForDataDistribution && !disableDataDistributionForTest) {
-        DeletedBlockLogImpl.TxBlockInfo txBlockInfo = txBlockInfoMap.remove(txID);
-        if (txBlockInfo != null) {
-          transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME,
-              descDeletedBlocksSummary(txBlockInfo).toByteString());
-          metrics.incrBlockDeletionTransactionSizeFromCache();
-        } else {
-          // Fetch the transaction from DB to get the size. This happens during
-          // 1. SCM leader transfer, deletion command send by one SCM,
-          //    while the deletion ack received by a different SCM
-          // 2. SCM restarts, txBlockInfoMap is empty, while receiving the deletion ack from DN
-          DeletedBlocksTransaction tx = deletedTable.get(txID);
-          if (tx != null && tx.hasTotalBlockReplicatedSize()) {
-            transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME,
-                descDeletedBlocksSummary(tx).toByteString());
-          }
-          metrics.incrBlockDeletionTransactionSizeFromDB();
-        }
+    transactionBuffer.pauseAutoFlush();
+    try {
+      for (Long txID : txIDs) {
+        transactionBuffer.removeFromBuffer(deletedTable, txID);
       }
+      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+    } finally {
+      transactionBuffer.resumeAutoFlush();
     }
   }
 
-  private DeletedBlocksTransactionSummary descDeletedBlocksSummary(DeletedBlocksTransaction tx) {
-    totalTxCount.addAndGet(-1);
-    totalBlockCount.addAndGet(-tx.getLocalIDCount());
-    totalBlocksSize.addAndGet(-tx.getTotalBlockSize());
-    totalReplicatedBlocksSize.addAndGet(-tx.getTotalBlockReplicatedSize());
-    return DeletedBlocksTransactionSummary.newBuilder()
-        .setFirstTxID(firstTxIdForDataDistribution)
-        .setTotalTransactionCount(totalTxCount.get())
-        .setTotalBlockCount(totalBlockCount.get())
-        .setTotalBlockSize(totalBlocksSize.get())
-        .setTotalBlockReplicatedSize(totalReplicatedBlocksSize.get())
-        .build();
-  }
-
-  private DeletedBlocksTransactionSummary descDeletedBlocksSummary(DeletedBlockLogImpl.TxBlockInfo txBlockInfo) {
-    totalTxCount.addAndGet(-1);
-    totalBlockCount.addAndGet(-txBlockInfo.getTotalBlockCount());
-    totalBlocksSize.addAndGet(-txBlockInfo.getTotalBlockSize());
-    totalReplicatedBlocksSize.addAndGet(-txBlockInfo.getTotalReplicatedBlockSize());
-    return DeletedBlocksTransactionSummary.newBuilder()
-        .setFirstTxID(firstTxIdForDataDistribution)
-        .setTotalTransactionCount(totalTxCount.get())
-        .setTotalBlockCount(totalBlockCount.get())
-        .setTotalBlockSize(totalBlocksSize.get())
-        .setTotalBlockReplicatedSize(totalReplicatedBlocksSize.get())
-        .build();
+  @Override
+  public void removeTransactionsFromDB(ArrayList<Long> txIDs) throws IOException {
+    if (deletingTxIDs != null) {
+      deletingTxIDs.addAll(txIDs);
+    }
+    for (Long txID : txIDs) {
+      transactionBuffer.removeFromBuffer(deletedTable, txID);
+    }
   }
 
   @Override
@@ -335,6 +268,27 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
+  public ArrayList<DeletedBlocksTransaction> getTransactionsFromDB(ArrayList<Long> txIDs) throws IOException {
+    Objects.requireNonNull(txIDs, "txIds cannot be null.");
+    ArrayList<DeletedBlocksTransaction> transactions = new ArrayList<>();
+    for (long txId: txIDs) {
+      try {
+        DeletedBlocksTransaction transaction = deletedTable.get(txId);
+        if (transaction == null) {
+          LOG.warn("txId {} is not found in deletedTable.", txId);
+          continue;
+        }
+        transactions.add(transaction);
+      } catch (IOException ex) {
+        LOG.error("Could not get deleted block transaction {}.", txId, ex);
+        throw ex;
+      }
+    }
+    LOG.debug("Get {} DeletedBlocksTransactions for {} input txIDs", transactions.size(), txIDs.size());
+    return transactions;
+  }
+
+  @Override
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
     Preconditions.checkNotNull(deletingTxIDs);
@@ -361,57 +315,6 @@ public class DeletedBlockLogStateManagerImpl
     return new Builder();
   }
 
-  @Override
-  public DeletedBlocksTransactionSummary getTransactionSummary() {
-    return DeletedBlocksTransactionSummary.newBuilder()
-        .setFirstTxID(firstTxIdForDataDistribution)
-        .setTotalTransactionCount(totalTxCount.get())
-        .setTotalBlockCount(totalBlockCount.get())
-        .setTotalBlockSize(totalBlocksSize.get())
-        .setTotalBlockReplicatedSize(totalReplicatedBlocksSize.get())
-        .build();
-  }
-
-  @VisibleForTesting
-  public static void setDisableDataDistributionForTest(boolean disabled) {
-    disableDataDistributionForTest = disabled;
-  }
-
-  private void initDataDistributionData() throws IOException {
-    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
-      DeletedBlocksTransactionSummary summary = loadDeletedBlocksSummary();
-      if (summary != null) {
-        isFirstTxIdForDataDistributionSet = true;
-        firstTxIdForDataDistribution = summary.getFirstTxID();
-        totalTxCount.set(summary.getTotalTransactionCount());
-        totalBlockCount.set(summary.getTotalBlockCount());
-        totalBlocksSize.set(summary.getTotalBlockSize());
-        totalReplicatedBlocksSize.set(summary.getTotalBlockReplicatedSize());
-        LOG.info("Data distribution is enabled with totalBlockCount {} totalBlocksSize {} lastTxIdBeforeUpgrade {}",
-            totalBlockCount.get(), totalBlocksSize.get(), firstTxIdForDataDistribution);
-      }
-    } else {
-      LOG.info(HDDSLayoutFeature.DATA_DISTRIBUTION + " is not finalized");
-    }
-  }
-
-  private DeletedBlocksTransactionSummary loadDeletedBlocksSummary() throws IOException {
-    String propertyName =  DeletedBlocksTransactionSummary.class.getSimpleName();
-    try {
-      ByteString byteString = statefulConfigTable.get(SERVICE_NAME);
-      if (byteString == null) {
-        // for a new Ozone cluster, property not found is an expected state.
-        LOG.info("Property {} for service {} not found. ", propertyName, SERVICE_NAME);
-        return null;
-      }
-      return DeletedBlocksTransactionSummary.parseFrom(byteString);
-    } catch (IOException e) {
-      LOG.error("Failed to get property {} for service {}. DataDistribution function will be disabled.",
-          propertyName, SERVICE_NAME, e);
-      throw new IOException("Failed to get property " + propertyName, e);
-    }
-  }
-
   /**
    * Builder for ContainerStateManager.
    */
@@ -419,11 +322,9 @@ public class DeletedBlockLogStateManagerImpl
     private ConfigurationSource conf;
     private SCMRatisServer scmRatisServer;
     private Table<Long, DeletedBlocksTransaction> deletedBlocksTransactionTable;
-    private DBTransactionBuffer transactionBuffer;
+    private SCMHADBTransactionBuffer transactionBuffer;
     private ContainerManager containerManager;
-    private Map<Long, DeletedBlockLogImpl.TxBlockInfo> txBlockInfoMap;
     private Table<String, ByteString> statefulServiceConfigTable;
-    private ScmBlockDeletingServiceMetrics scmBlockDeletingServiceMetrics;
 
     public Builder setConfiguration(final ConfigurationSource config) {
       conf = config;
@@ -441,7 +342,7 @@ public class DeletedBlockLogStateManagerImpl
       return this;
     }
 
-    public Builder setSCMDBTransactionBuffer(DBTransactionBuffer buffer) {
+    public Builder setSCMDBTransactionBuffer(SCMHADBTransactionBuffer buffer) {
       this.transactionBuffer = buffer;
       return this;
     }
@@ -451,18 +352,8 @@ public class DeletedBlockLogStateManagerImpl
       return this;
     }
 
-    public Builder setTxBlockInfoMap(Map<Long, DeletedBlockLogImpl.TxBlockInfo> map) {
-      this.txBlockInfoMap = map;
-      return this;
-    }
-
     public Builder setStatefulConfigTable(final Table<String, ByteString> table) {
       this.statefulServiceConfigTable = table;
-      return this;
-    }
-
-    public Builder setMetrics(ScmBlockDeletingServiceMetrics metrics) {
-      this.scmBlockDeletingServiceMetrics = metrics;
       return this;
     }
 
@@ -471,8 +362,7 @@ public class DeletedBlockLogStateManagerImpl
       Preconditions.checkNotNull(deletedBlocksTransactionTable);
 
       final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
-          conf, deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer,
-          txBlockInfoMap, scmBlockDeletingServiceMetrics);
+          conf, deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer);
 
       return scmRatisServer.getProxyHandler(RequestType.BLOCK,
           DeletedBlockLogStateManager.class, impl);
