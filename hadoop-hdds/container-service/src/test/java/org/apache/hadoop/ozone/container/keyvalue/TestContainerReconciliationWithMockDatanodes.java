@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -88,6 +89,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -211,7 +213,7 @@ public class TestContainerReconciliationWithMockDatanodes {
           .map(MockDatanode::getDnDetails)
           .filter(other -> !current.getDnDetails().equals(other))
           .collect(Collectors.toList());
-      current.reconcileContainer(dnClient, peers, CONTAINER_ID);
+      current.reconcileContainerSuccess(dnClient, peers, CONTAINER_ID);
     }
     // Reconciliation should have triggered a second on-demand scan for each replica. Wait for them to finish before
     // checking the results.
@@ -219,6 +221,31 @@ public class TestContainerReconciliationWithMockDatanodes {
     // After reconciliation, checksums should be the same for all containers.
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
+  }
+
+  @Test
+  public void testContainerReconciliationFailureContainerScan()
+      throws Exception {
+    containerProtocolMock.when(() -> ContainerProtocolCalls.getContainerChecksumInfo(any(), anyLong(), any()))
+        .thenThrow(new IOException("Simulated failure to get container checksum info"));
+
+    // Use synchronous on-demand scans to re-build the merkle trees after corruption.
+    datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
+
+    // Each datanode should have had one on-demand scan during test setup, and a second one after corruption was
+    // introduced.
+    waitForExpectedScanCount(1);
+
+    for (MockDatanode current : datanodes) {
+      List<DatanodeDetails> peers = datanodes.stream()
+          .map(MockDatanode::getDnDetails)
+          .filter(other -> !current.getDnDetails().equals(other))
+          .collect(Collectors.toList());
+      // Reconciliation should fail for each datanode, since the checksum info cannot be retrieved.
+      assertThrows(IOException.class, () -> current.reconcileContainer(dnClient, peers, CONTAINER_ID));
+    }
+    // Even failure of Reconciliation should have triggered a second on-demand scan for each replica.
+    waitForExpectedScanCount(2);
   }
 
   /**
@@ -438,14 +465,19 @@ public class TestContainerReconciliationWithMockDatanodes {
       onDemandScanner.getMetrics().resetNumContainersScanned();
     }
 
-    public void reconcileContainer(DNContainerOperationClient client, Collection<DatanodeDetails> peers,
+    public void reconcileContainerSuccess(DNContainerOperationClient client, Collection<DatanodeDetails> peers,
         long containerID) {
-      log.info("Beginning reconciliation on this mock datanode");
       try {
-        handler.reconcileContainer(client, containerSet.getContainer(containerID), peers);
+        reconcileContainer(client, peers, containerID);
       } catch (IOException ex) {
         fail("Container reconciliation failed", ex);
       }
+    }
+
+    public void reconcileContainer(DNContainerOperationClient client, Collection<DatanodeDetails> peers,
+        long containerID) throws IOException {
+      log.info("Beginning reconciliation on this mock datanode");
+      handler.reconcileContainer(client, containerSet.getContainer(containerID), peers);
     }
 
     /**
