@@ -259,10 +259,10 @@ public final class KeyValueContainerUtil {
     DatanodeStore store = null;
     try {
       try {
-        boolean readOnly = ContainerInspectorUtil.isReadOnly(
-            ContainerProtos.ContainerType.KeyValueContainer);
-        store = BlockUtils.getUncachedDatanodeStore(
-            kvContainerData, config, readOnly);
+        // Open RocksDB in write mode, as it is required for container checksum updates and inspector repair operations.
+        // The method KeyValueContainerMetadataInspector.buildErrorAndRepair will determine if write access to the DB
+        // is permitted based on the mode.
+        store = BlockUtils.getUncachedDatanodeStore(kvContainerData, config, false);
       } catch (IOException e) {
         // If an exception is thrown, then it may indicate the RocksDB is
         // already open in the container cache. As this code is only executed at
@@ -288,7 +288,7 @@ public final class KeyValueContainerUtil {
   }
 
   private static void loadAndSetContainerDataChecksum(KeyValueContainerData kvContainerData,
-                                                      Table<String, Long> metadataTable) throws IOException {
+                                                      Table<String, Long> metadataTable) {
     if (kvContainerData.isOpen()) {
       return;
     }

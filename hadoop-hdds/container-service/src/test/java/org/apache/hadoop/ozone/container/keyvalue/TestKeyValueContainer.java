@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
@@ -336,10 +338,7 @@ public class TestKeyValueContainer {
     // The import should not fail and the checksum should be 0
     assertEquals(0, data.getDataChecksum());
     // The checksum is not stored in rocksDB as the container merkle tree doesn't exist.
-    try (DBHandle dbHandle = BlockUtils.getDB(data, new OzoneConfiguration())) {
-      Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(data.getContainerDataChecksumKey());
-      assertNull(dbDataChecksum);
-    }
+    verifyAllDataChecksumsMatch(data, CONF);
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -391,6 +390,18 @@ public class TestKeyValueContainer {
     closeContainer();
     populate(numberOfKeysToWrite);
 
+    // Create merkle tree and set data checksum to simulate actual key value container.
+    File checksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(
+        keyValueContainer.getContainerData());
+    ContainerProtos.ContainerMerkleTree containerMerkleTreeWriterProto = buildTestTree(CONF).toProto();
+    keyValueContainerData.setDataChecksum(containerMerkleTreeWriterProto.getDataChecksum());
+    ContainerProtos.ContainerChecksumInfo containerInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerID(containerId)
+        .setContainerMerkleTree(containerMerkleTreeWriterProto).build();
+    try (OutputStream tmpOutputStream = Files.newOutputStream(checksumFile.toPath())) {
+      containerInfo.writeTo(tmpOutputStream);
+    }
+
     //destination path
     File folderToExport = Files.createFile(
         folder.toPath().resolve("export.tar")).toFile();
@@ -438,14 +449,9 @@ public class TestKeyValueContainer {
           containerData.getMaxSize());
       assertEquals(keyValueContainerData.getBytesUsed(),
           containerData.getBytesUsed());
-      assertEquals(0L, keyValueContainerData.getDataChecksum());
-      // The checksum is not stored in rocksDB as the checksum file doesn't exist.
-      try (DBHandle dbHandle = BlockUtils.getDB(keyValueContainerData, new OzoneConfiguration())) {
-        Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(
-            keyValueContainerData.getContainerDataChecksumKey());
-        assertNull(dbDataChecksum);
-      }
-      assertFalse(ContainerChecksumTreeManager.getContainerChecksumFile(containerData).exists());
+      assertEquals(keyValueContainerData.getDataChecksum(), containerData.getDataChecksum());
+      verifyAllDataChecksumsMatch(containerData, CONF);
+
       assertNotNull(containerData.getContainerFileChecksum());
       assertNotEquals(containerData.ZERO_CHECKSUM, container.getContainerData().getContainerFileChecksum());
 
