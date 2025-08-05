@@ -1580,6 +1580,7 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     long containerID = containerData.getContainerID();
+
     // Obtain the original checksum info before reconciling with any peers.
     ContainerProtos.ContainerChecksumInfo originalChecksumInfo = checksumManager.read(containerData);
     if (!originalChecksumInfo.hasContainerMerkleTree()) {
