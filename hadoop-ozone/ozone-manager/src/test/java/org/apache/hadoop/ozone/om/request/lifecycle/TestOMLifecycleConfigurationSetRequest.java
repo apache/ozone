@@ -47,6 +47,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
     String bucketName = UUID.randomUUID().toString();
     doPreExecute(volumeName, bucketName);
 
+   // Volume name and bucket name length should be greater than OZONE_MIN_BUCKET_NAME_LENGTH
     assertThrows(OMException.class, () -> doPreExecute("v1", "bucket1"));
     assertThrows(OMException.class, () -> doPreExecute("volume1", "b1"));
   }
@@ -95,18 +96,18 @@ public class TestOMLifecycleConfigurationSetRequest extends
         OmLifecycleConfiguration.getFromProtobuf(
             lifecycleConfigurationRequestProto);
 
-    OmLifecycleConfiguration lifecycleConfigurationTable = omMetadataManager
+    OmLifecycleConfiguration lifecycleConfiguration = omMetadataManager
         .getLifecycleConfigurationTable().get(lifecycleKey);
 
-    assertNotNull(lifecycleConfigurationTable);
+    assertNotNull(lifecycleConfiguration);
     assertEquals(lifecycleConfigurationRequest.getVolume(),
-        lifecycleConfigurationTable.getVolume());
+        lifecycleConfiguration.getVolume());
     assertEquals(lifecycleConfigurationRequest.getBucket(),
-        lifecycleConfigurationTable.getBucket());
+        lifecycleConfiguration.getBucket());
     assertEquals(lifecycleConfigurationRequest.getBucket(),
-        lifecycleConfigurationTable.getBucket());
+        lifecycleConfiguration.getBucket());
     assertEquals(lifecycleConfigurationRequest.getCreationTime(),
-        lifecycleConfigurationTable.getCreationTime());
+        lifecycleConfiguration.getCreationTime());
   }
 
   @Test

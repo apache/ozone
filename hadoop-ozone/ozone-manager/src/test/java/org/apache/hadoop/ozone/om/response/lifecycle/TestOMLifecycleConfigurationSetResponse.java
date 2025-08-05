@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.response.lifecycle;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import java.io.File;
@@ -121,39 +120,6 @@ public class TestOMLifecycleConfigurationSetResponse {
     assertEquals(omMetadataManager.getBucketKey(volumeName, bucketName),
         keyValue.getKey());
 
-    assertTrue(isSame(omLifecycleConfiguration, keyValue.getValue()));
-  }
-
-  /**
-   * Compares two lifecyce and returns false if they are not identical, as
-   * the equal and hash methods are not overridden in OmLifecycleConfiguration.
-   *
-   * @param o1 first lifecycle configuration
-   * @param o2 second lifecycle configuration
-   * @return true if both are identical false otherwise
-   */
-  private boolean isSame(OmLifecycleConfiguration o1,
-      OmLifecycleConfiguration o2) {
-    if (o1.getCreationTime() != o2.getCreationTime()) {
-      return false;
-    }
-    if (!o1.getVolume().equals(o2.getVolume())) {
-      return false;
-    }
-    if (!o1.getBucket().equals(o2.getBucket())) {
-      return false;
-    }
-    if (o1.getRules().size() != o2.getRules().size()) {
-      return false;
-    }
-    if (o1.getBucketLayout() != o2.getBucketLayout()) {
-      return false;
-    }
-    for (int i = 0; i < o1.getRules().size(); i++) {
-      if (!o1.getRules().get(i).getId().equals(o2.getRules().get(i).getId())) {
-        return false;
-      }
-    }
-    return true;
+    assertEquals(omLifecycleConfiguration.getProtobuf(), keyValue.getValue().getProtobuf().toBuilder());
   }
 }

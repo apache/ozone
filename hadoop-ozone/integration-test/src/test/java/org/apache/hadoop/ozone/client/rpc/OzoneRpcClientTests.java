@@ -5298,17 +5298,26 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertThat(tagsRetrieved).containsAllEntriesOf(tags);
   }
 
-  @Test
-  public void testSetLifecycleConfiguration() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testSetLifecycleConfiguration(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    store.getVolume(volumeName).createBucket(bucketName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    store.getVolume(volumeName).createBucket(bucketName, bucketArgs);
     ClientProtocol proxy = store.getClientProxy();
 
     OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
         bucketName, true);
     proxy.setLifecycleConfiguration(lcc1);
+
+    // No such volume
+    OmLifecycleConfiguration lcc2 = createOmLifecycleConfiguration("nonexistentvolume",
+        "nonexistentbucket", true);
+    OzoneTestUtils.expectOmException(ResultCodes.VOLUME_NOT_FOUND,
+        () -> proxy.setLifecycleConfiguration(lcc2));
 
     // No such bucket
     OmLifecycleConfiguration lcc3 = createOmLifecycleConfiguration(volumeName,
@@ -5329,12 +5338,15 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         () -> proxy.setLifecycleConfiguration(lcc5));
   }
 
-  @Test
-  public void testDeleteLifecycleConfiguration() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteLifecycleConfiguration(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    store.getVolume(volumeName).createBucket(bucketName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    store.getVolume(volumeName).createBucket(bucketName, bucketArgs);
     ClientProtocol proxy = store.getClientProxy();
 
     // No such lifecycle configuration
@@ -5375,12 +5387,15 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         () -> proxy.getLifecycleConfiguration(volumeName, bucketName));
   }
 
-  @Test
-  public void testGetLifecycleConfiguration() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testGetLifecycleConfiguration(BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    store.getVolume(volumeName).createBucket(bucketName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    store.getVolume(volumeName).createBucket(bucketName, bucketArgs);
     ClientProtocol proxy = store.getClientProxy();
 
     // No such lifecycle configuration

@@ -147,13 +147,13 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (acquiredBucketLock) {
-        metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+            bucketName));
       }
     }
 
     // Performing audit logging outside the lock.
-    markForAudit(auditLogger, buildAuditMessage(OMAction.CREATE_LIFECYCLE_CONFIGURATION,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.SET_LIFECYCLE_CONFIGURATION,
         auditMap, exception, userInfo));
 
     if (exception == null) {

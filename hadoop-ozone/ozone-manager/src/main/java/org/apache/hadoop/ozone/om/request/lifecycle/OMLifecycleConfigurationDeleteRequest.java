@@ -128,8 +128,8 @@ public class OMLifecycleConfigurationDeleteRequest extends OMClientRequest {
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (acquiredBucketLock) {
-        metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+            bucketName));
       }
     }
 

@@ -77,6 +77,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -982,7 +983,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
         () -> s3Client.setBucketLifecycleConfiguration(request));
     assertEquals(ErrorType.Client, ase.getErrorType());
-    assertEquals(400, ase.getStatusCode());
+    assertEquals(HttpURLConnection.HTTP_BAD_REQUEST, ase.getStatusCode());
 
     // Test 2: Non-existent bucket
     final String nonExistentBucket = getBucketName("nonexistent");
@@ -1002,7 +1003,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     AmazonServiceException ase2 = assertThrows(AmazonServiceException.class,
         () -> s3Client.setBucketLifecycleConfiguration(nonExistentRequest));
     assertEquals(ErrorType.Client, ase2.getErrorType());
-    assertEquals(404, ase2.getStatusCode());
+    assertEquals(HttpURLConnection.HTTP_NOT_FOUND, ase2.getStatusCode());
     assertEquals("NoSuchBucket", ase2.getErrorCode());
   }
 
@@ -1010,6 +1011,11 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   public void testS3LifecycleConfigurationDelete() {
     final String bucketName = getBucketName();
     s3Client.createBucket(bucketName);
+
+    // Test delete lifecycle for a bucket, while doesn't have lifecycle
+    assertNull(s3Client.getBucketLifecycleConfiguration(bucketName));
+    assertThrows(AmazonServiceException.class,
+        () -> s3Client.deleteBucketLifecycleConfiguration(bucketName));
 
     // First create a lifecycle configuration
     BucketLifecycleConfiguration configuration = new BucketLifecycleConfiguration();

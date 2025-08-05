@@ -3132,18 +3132,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volumeName);
     auditMap.put(OzoneConsts.BUCKET, bucketName);
-
+    metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
+        bucketName);
     try {
       return metadataManager.getLifecycleConfiguration(volumeName, bucketName);
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(
-          OMAction.READ_LIFECYCLE_CONFIGURATION, auditMap, ex));
+          OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap, ex));
       throw ex;
     } finally {
+      metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+          bucketName);
       if (auditSuccess) {
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-            OMAction.READ_LIFECYCLE_CONFIGURATION, auditMap));
+            OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap));
       }
     }
   }
