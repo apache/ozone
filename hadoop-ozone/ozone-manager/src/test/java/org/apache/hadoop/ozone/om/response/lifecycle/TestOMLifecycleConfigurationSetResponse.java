@@ -35,8 +35,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
@@ -48,7 +48,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * This class tests OMLifecycleConfigurationCreateResponse.
  */
-public class TestOMLifecycleConfigurationCreateResponse {
+public class TestOMLifecycleConfigurationSetResponse {
 
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
@@ -92,16 +92,16 @@ public class TestOMLifecycleConfigurationCreateResponse {
     assertEquals(0, omMetadataManager.countRowsInTable(
         omMetadataManager.getLifecycleConfigurationTable()));
 
-    CreateLifecycleConfigurationResponse createLifecycleConfigurationResponse =
-        CreateLifecycleConfigurationResponse.newBuilder()
+    SetLifecycleConfigurationResponse setLifecycleConfigurationResponse =
+        SetLifecycleConfigurationResponse.newBuilder()
             .build();
 
-    OMLifecycleConfigurationCreateResponse response =
-        new OMLifecycleConfigurationCreateResponse(OMResponse.newBuilder()
-            .setCmdType(Type.CreateLifecycleConfiguration)
+    OMLifecycleConfigurationSetResponse response =
+        new OMLifecycleConfigurationSetResponse(OMResponse.newBuilder()
+            .setCmdType(Type.SetLifecycleConfiguration)
             .setStatus(Status.OK)
-            .setCreateLifecycleConfigurationResponse(
-                createLifecycleConfigurationResponse).build(),
+            .setSetLifecycleConfigurationResponse(
+                setLifecycleConfigurationResponse).build(),
             omLifecycleConfiguration);
 
     response.addToDBBatch(omMetadataManager, batchOperation);

@@ -1357,10 +1357,12 @@ public interface ClientProtocol {
 
   /**
    * Creates a new lifecycle configuration.
+   * This operation will completely overwrite any existing lifecycle configuration on the bucket.
+   * If the bucket already has a lifecycle configuration, it will be replaced with the new one.
    * @param lifecycleConfiguration - lifecycle configuration info.
    * @throws IOException
    */
-  void createLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
+  void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
       throws IOException;
 
   /**

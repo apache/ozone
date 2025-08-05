@@ -797,7 +797,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public void createLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
+  public void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
     getBucket(lifecycleConfiguration.getVolume(), lifecycleConfiguration.getBucket())
         .setLifecycleConfiguration(lifecycleConfiguration);
   }

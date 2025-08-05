@@ -36,12 +36,12 @@ import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleConfigurationCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateLifecycleConfigurationRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateLifecycleConfigurationResponse;
+import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleConfigurationSetResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -50,27 +50,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles CreateLifecycleConfiguration Request.
+ * Handles SetLifecycleConfiguration Request.
  */
-public class OMLifecycleConfigurationCreateRequest extends OMClientRequest {
+public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMLifecycleConfigurationCreateRequest.class);
+      LoggerFactory.getLogger(OMLifecycleConfigurationSetRequest.class);
 
-  public OMLifecycleConfigurationCreateRequest(OMRequest omRequest) {
+  public OMLifecycleConfigurationSetRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CreateLifecycleConfigurationRequest request =
-        getOmRequest().getCreateLifecycleConfigurationRequest();
+    SetLifecycleConfigurationRequest request =
+        getOmRequest().getSetLifecycleConfigurationRequest();
     LifecycleConfiguration lifecycleConfiguration =
         request.getLifecycleConfiguration();
 
     OmUtils.validateVolumeName(lifecycleConfiguration.getVolume(), ozoneManager.isStrictS3());
     OmUtils.validateBucketName(lifecycleConfiguration.getBucket(), ozoneManager.isStrictS3());
 
-    CreateLifecycleConfigurationRequest.Builder newCreateRequest =
+    SetLifecycleConfigurationRequest.Builder newCreateRequest =
         request.toBuilder();
 
     LifecycleConfiguration.Builder newLifecycleConfiguration =
@@ -80,7 +80,7 @@ public class OMLifecycleConfigurationCreateRequest extends OMClientRequest {
     newCreateRequest.setLifecycleConfiguration(newLifecycleConfiguration);
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())
-        .setCreateLifecycleConfigurationRequest(newCreateRequest.build())
+        .setSetLifecycleConfigurationRequest(newCreateRequest.build())
         .build();
   }
 
@@ -89,11 +89,11 @@ public class OMLifecycleConfigurationCreateRequest extends OMClientRequest {
     final long transactionLogIndex = context.getIndex();
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
 
-    CreateLifecycleConfigurationRequest createLifecycleConfigurationRequest =
-        getOmRequest().getCreateLifecycleConfigurationRequest();
+    SetLifecycleConfigurationRequest setLifecycleConfigurationRequest =
+        getOmRequest().getSetLifecycleConfigurationRequest();
 
     LifecycleConfiguration lifecycleConfiguration =
-        createLifecycleConfigurationRequest.getLifecycleConfiguration();
+        setLifecycleConfigurationRequest.getLifecycleConfiguration();
 
     String volumeName = lifecycleConfiguration.getVolume();
     String bucketName = lifecycleConfiguration.getBucket();
@@ -136,14 +136,14 @@ public class OMLifecycleConfigurationCreateRequest extends OMClientRequest {
           new CacheKey<>(bucketKey),
           CacheValue.get(transactionLogIndex, omLifecycleConfiguration));
 
-      omResponse.setCreateLifecycleConfigurationResponse(
-          CreateLifecycleConfigurationResponse.newBuilder().build());
+      omResponse.setSetLifecycleConfigurationResponse(
+          SetLifecycleConfigurationResponse.newBuilder().build());
 
-      omClientResponse = new OMLifecycleConfigurationCreateResponse(
+      omClientResponse = new OMLifecycleConfigurationSetResponse(
           omResponse.build(), omLifecycleConfiguration);
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMLifecycleConfigurationCreateResponse(
+      omClientResponse = new OMLifecycleConfigurationSetResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (acquiredBucketLock) {

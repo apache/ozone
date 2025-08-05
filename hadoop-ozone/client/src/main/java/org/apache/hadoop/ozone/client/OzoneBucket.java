@@ -1113,7 +1113,7 @@ public class OzoneBucket extends WithMetadata {
    */
   public void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
       throws IOException {
-    proxy.createLifecycleConfiguration(lifecycleConfiguration);
+    proxy.setLifecycleConfiguration(lifecycleConfiguration);
   }
 
   /**

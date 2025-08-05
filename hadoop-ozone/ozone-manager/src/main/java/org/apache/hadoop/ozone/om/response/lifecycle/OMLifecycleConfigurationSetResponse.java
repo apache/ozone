@@ -30,21 +30,21 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Response for CreateLifecycleConfiguration request.
+ * Response for SetLifecycleConfiguration request.
  */
 @CleanupTableInfo(cleanupTables = {LIFECYCLE_CONFIGURATION_TABLE})
-public class OMLifecycleConfigurationCreateResponse extends OMClientResponse  {
+public class OMLifecycleConfigurationSetResponse extends OMClientResponse  {
 
   private final OmLifecycleConfiguration omLifecycleConfiguration;
 
-  public OMLifecycleConfigurationCreateResponse(
+  public OMLifecycleConfigurationSetResponse(
       @Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
     this.omLifecycleConfiguration = null;
   }
 
-  public OMLifecycleConfigurationCreateResponse(@Nonnull OMResponse omResponse,
+  public OMLifecycleConfigurationSetResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmLifecycleConfiguration omLifecycleConfiguration) {
     super(omResponse);
     this.omLifecycleConfiguration = omLifecycleConfiguration;

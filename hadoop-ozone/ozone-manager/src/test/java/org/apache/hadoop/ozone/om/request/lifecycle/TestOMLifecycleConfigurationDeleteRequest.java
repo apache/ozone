@@ -100,11 +100,11 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
 
   private void addLifecycleConfigurationToDB(String volumeName,
       String bucketName, String ownerName) throws IOException {
-    OMRequest originalRequest = createLifecycleConfigurationRequest(volumeName,
+    OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName,
         bucketName, ownerName);
 
-    OMLifecycleConfigurationCreateRequest request =
-        new OMLifecycleConfigurationCreateRequest(originalRequest);
+    OMLifecycleConfigurationSetRequest request =
+        new OMLifecycleConfigurationSetRequest(originalRequest);
 
     OMRequest modifiedRequest = request.preExecute(ozoneManager);
 
@@ -114,7 +114,7 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
     assertNull(omMetadataManager.getLifecycleConfigurationTable().get(
         lifecycleKey));
 
-    request = new OMLifecycleConfigurationCreateRequest(modifiedRequest);
+    request = new OMLifecycleConfigurationSetRequest(modifiedRequest);
     long txLogIndex = 1;
 
     request.validateAndUpdateCache(ozoneManager, txLogIndex);

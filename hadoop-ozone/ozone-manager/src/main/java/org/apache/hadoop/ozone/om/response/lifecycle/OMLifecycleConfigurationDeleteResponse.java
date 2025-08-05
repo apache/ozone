@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Response for CreateLifecycleConfiguration request.
+ * Response for SetLifecycleConfiguration request.
  */
 @CleanupTableInfo(cleanupTables = {LIFECYCLE_CONFIGURATION_TABLE})
 public class OMLifecycleConfigurationDeleteResponse extends OMClientResponse  {

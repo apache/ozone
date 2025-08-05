@@ -277,7 +277,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
-    case InfoLifecycleConfiguration:
+    case GetLifecycleConfiguration:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -339,7 +339,7 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
-    case CreateLifecycleConfiguration:
+    case SetLifecycleConfiguration:
     case DeleteLifecycleConfiguration:
     case UnknownCommand:
       return false;

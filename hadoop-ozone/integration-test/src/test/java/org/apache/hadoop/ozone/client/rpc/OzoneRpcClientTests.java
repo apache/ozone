@@ -5299,7 +5299,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
-  public void testCreateLifecycleConfiguration() throws Exception {
+  public void testSetLifecycleConfiguration() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -5308,25 +5308,25 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
         bucketName, true);
-    proxy.createLifecycleConfiguration(lcc1);
+    proxy.setLifecycleConfiguration(lcc1);
 
     // No such bucket
     OmLifecycleConfiguration lcc3 = createOmLifecycleConfiguration(volumeName,
         "nonexistentbucket", true);
     OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
-        () -> proxy.createLifecycleConfiguration(lcc3));
+        () -> proxy.setLifecycleConfiguration(lcc3));
 
     // Invalid volumeName
     OmLifecycleConfiguration lcc4 = createOmLifecycleConfiguration("VOLUMENAME",
         bucketName, true);
     OzoneTestUtils.expectOmException(ResultCodes.INVALID_VOLUME_NAME,
-        () -> proxy.createLifecycleConfiguration(lcc4));
+        () -> proxy.setLifecycleConfiguration(lcc4));
 
     // Invalid bucketName
     OmLifecycleConfiguration lcc5 = createOmLifecycleConfiguration(volumeName,
         "BUCKETNAME", true);
     OzoneTestUtils.expectOmException(ResultCodes.INVALID_BUCKET_NAME,
-        () -> proxy.createLifecycleConfiguration(lcc5));
+        () -> proxy.setLifecycleConfiguration(lcc5));
   }
 
   @Test
@@ -5344,7 +5344,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
         bucketName, true);
-    proxy.createLifecycleConfiguration(lcc1);
+    proxy.setLifecycleConfiguration(lcc1);
     proxy.deleteLifecycleConfiguration(volumeName, bucketName);
   }
 
@@ -5359,7 +5359,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // Create a new lifecycle configuration and make sure verify it.
     OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
         bucketName, true);
-    proxy.createLifecycleConfiguration(lcc1);
+    proxy.setLifecycleConfiguration(lcc1);
     OzoneLifecycleConfiguration lcc2 =
         proxy.getLifecycleConfiguration(volumeName, bucketName);
     assertEquals(lcc1.getVolume(), lcc2.getVolume());
@@ -5390,7 +5390,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
         bucketName, true);
-    proxy.createLifecycleConfiguration(lcc1);
+    proxy.setLifecycleConfiguration(lcc1);
 
     OzoneLifecycleConfiguration lcc2 =
         proxy.getLifecycleConfiguration(volumeName, bucketName);

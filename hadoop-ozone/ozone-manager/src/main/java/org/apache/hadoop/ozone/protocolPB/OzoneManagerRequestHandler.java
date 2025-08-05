@@ -114,13 +114,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoLifecycleConfigurationRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -395,12 +395,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getObjectTagging(request.getGetObjectTaggingRequest());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
-      case InfoLifecycleConfiguration:
-        InfoLifecycleConfigurationResponse infoLifecycleConfigurationResponse =
+      case GetLifecycleConfiguration:
+        GetLifecycleConfigurationResponse getLifecycleConfigurationResponse =
             infoLifecycleConfiguration(
-                request.getInfoLifecycleConfigurationRequest());
-        responseBuilder.setInfoLifecycleConfigurationResponse(
-            infoLifecycleConfigurationResponse);
+                request.getGetLifecycleConfigurationRequest());
+        responseBuilder.setGetLifecycleConfigurationResponse(
+            getLifecycleConfigurationResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -1390,11 +1390,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setCurrentTxnIndex(prepareState.getIndex()).build();
   }
 
-  private InfoLifecycleConfigurationResponse infoLifecycleConfiguration(
-      InfoLifecycleConfigurationRequest request) throws IOException {
+  private GetLifecycleConfigurationResponse infoLifecycleConfiguration(
+      GetLifecycleConfigurationRequest request) throws IOException {
 
-    InfoLifecycleConfigurationResponse.Builder resp =
-        InfoLifecycleConfigurationResponse.newBuilder();
+    GetLifecycleConfigurationResponse.Builder resp =
+        GetLifecycleConfigurationResponse.newBuilder();
 
     String volume = request.getVolumeName();
     String bucket = request.getBucketName();

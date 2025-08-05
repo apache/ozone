@@ -2800,14 +2800,14 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void createLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
+  public void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
     Preconditions.checkNotNull(lifecycleConfiguration);
     verifyVolumeName(lifecycleConfiguration.getVolume());
     verifyBucketName(lifecycleConfiguration.getBucket());
 
     LOG.info("Creating lifecycle configuration for: {}/{}", lifecycleConfiguration.getVolume(),
         lifecycleConfiguration.getBucket());
-    ozoneManagerClient.createLifecycleConfiguration(lifecycleConfiguration);
+    ozoneManagerClient.setLifecycleConfiguration(lifecycleConfiguration);
   }
 
   @Override

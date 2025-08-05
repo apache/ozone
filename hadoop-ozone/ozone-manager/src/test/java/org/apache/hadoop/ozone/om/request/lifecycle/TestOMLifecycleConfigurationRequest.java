@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketLayoutProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
@@ -44,6 +43,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,13 +105,13 @@ public class TestOMLifecycleConfigurationRequest {
     OMRequestTestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
   }
 
-  public OMRequest createLifecycleConfigurationRequest(String volumeName,
+  public OMRequest setLifecycleConfigurationRequest(String volumeName,
       String bucketName, String ownerName) {
-    return createLifecycleConfigurationRequest(volumeName, bucketName,
+    return setLifecycleConfigurationRequest(volumeName, bucketName,
         ownerName, true);
   }
 
-  public OMRequest createLifecycleConfigurationRequest(String volumeName,
+  public OMRequest setLifecycleConfigurationRequest(String volumeName,
       String bucketName, String ownerName, boolean addRules) {
     String prefix = "prefix/";
     LifecycleConfiguration.Builder builder = LifecycleConfiguration.newBuilder()
@@ -131,14 +131,14 @@ public class TestOMLifecycleConfigurationRequest {
 
     LifecycleConfiguration lcc = builder.build();
 
-    CreateLifecycleConfigurationRequest createLifecycleConfigurationRequest =
-        CreateLifecycleConfigurationRequest.newBuilder()
+    SetLifecycleConfigurationRequest setLifecycleConfigurationRequest =
+        SetLifecycleConfigurationRequest.newBuilder()
             .setLifecycleConfiguration(lcc)
             .build();
 
-    return OMRequest.newBuilder().setCreateLifecycleConfigurationRequest(
-            createLifecycleConfigurationRequest)
-        .setCmdType(Type.CreateLifecycleConfiguration)
+    return OMRequest.newBuilder().setSetLifecycleConfigurationRequest(
+            setLifecycleConfigurationRequest)
+        .setCmdType(Type.SetLifecycleConfiguration)
         .setClientId(UUID.randomUUID().toString())
         .build();
   }

@@ -156,8 +156,8 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
-  CreateLifecycleConfiguration = 150;
-  InfoLifecycleConfiguration   = 151;
+  SetLifecycleConfiguration = 150;
+  GetLifecycleConfiguration   = 151;
   DeleteLifecycleConfiguration = 152;
 }
 
@@ -307,8 +307,8 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
 
-  optional CreateLifecycleConfigurationRequest createLifecycleConfigurationRequest = 150;
-  optional InfoLifecycleConfigurationRequest   infoLifecycleConfigurationRequest   = 151;
+  optional SetLifecycleConfigurationRequest setLifecycleConfigurationRequest = 150;
+  optional GetLifecycleConfigurationRequest   getLifecycleConfigurationRequest   = 151;
   optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 152;
 }
 
@@ -444,8 +444,8 @@ message OMResponse {
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
 
-  optional CreateLifecycleConfigurationResponse createLifecycleConfigurationResponse = 150;
-  optional InfoLifecycleConfigurationResponse   infoLifecycleConfigurationResponse   = 151;
+  optional SetLifecycleConfigurationResponse setLifecycleConfigurationResponse = 150;
+  optional GetLifecycleConfigurationResponse   getLifecycleConfigurationResponse   = 151;
   optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 152;
 }
 
@@ -2396,20 +2396,20 @@ message LifecycleConfiguration {
   optional uint64 updateID = 7;
 }
 
-message CreateLifecycleConfigurationRequest {
+message SetLifecycleConfigurationRequest {
   required LifecycleConfiguration lifecycleConfiguration = 1;
 }
 
-message CreateLifecycleConfigurationResponse {
+message SetLifecycleConfigurationResponse {
 
 }
 
-message InfoLifecycleConfigurationRequest {
+message GetLifecycleConfigurationRequest {
   required string volumeName = 1;
   required string bucketName = 2;
 }
 
-message InfoLifecycleConfigurationResponse {
+message GetLifecycleConfigurationResponse {
   required LifecycleConfiguration lifecycleConfiguration = 1;
 }
 

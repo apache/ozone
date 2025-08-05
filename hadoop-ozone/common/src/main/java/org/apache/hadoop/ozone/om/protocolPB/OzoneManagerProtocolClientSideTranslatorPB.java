@@ -111,7 +111,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateF
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
@@ -140,6 +139,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFile
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
@@ -148,8 +149,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3Vo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoLifecycleConfigurationRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -219,6 +218,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetS3SecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
@@ -2675,34 +2675,34 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
       String bucketName) throws IOException {
-    InfoLifecycleConfigurationRequest.Builder req =
-        InfoLifecycleConfigurationRequest.newBuilder();
+    GetLifecycleConfigurationRequest.Builder req =
+        GetLifecycleConfigurationRequest.newBuilder();
     req.setVolumeName(volumeName);
     req.setBucketName(bucketName);
 
-    OMRequest omRequest = createOMRequest(Type.InfoLifecycleConfiguration)
-        .setInfoLifecycleConfigurationRequest(req)
+    OMRequest omRequest = createOMRequest(Type.GetLifecycleConfiguration)
+        .setGetLifecycleConfigurationRequest(req)
         .build();
 
-    InfoLifecycleConfigurationResponse resp = handleError(submitRequest(
-        omRequest)).getInfoLifecycleConfigurationResponse();
+    GetLifecycleConfigurationResponse resp = handleError(submitRequest(
+        omRequest)).getGetLifecycleConfigurationResponse();
 
     return OmLifecycleConfiguration.getFromProtobuf(
         resp.getLifecycleConfiguration());
   }
 
   @Override
-  public void createLifecycleConfiguration(
+  public void setLifecycleConfiguration(
       OmLifecycleConfiguration omLifecycleConfiguration) throws IOException {
-    CreateLifecycleConfigurationRequest.Builder req =
-        CreateLifecycleConfigurationRequest.newBuilder();
+    SetLifecycleConfigurationRequest.Builder req =
+        SetLifecycleConfigurationRequest.newBuilder();
     LifecycleConfiguration lifecycleConfiguration =
         omLifecycleConfiguration.getProtobuf();
     req.setLifecycleConfiguration(lifecycleConfiguration);
 
     OMRequest omRequest =
-        createOMRequest(Type.CreateLifecycleConfiguration)
-            .setCreateLifecycleConfigurationRequest(req)
+        createOMRequest(Type.SetLifecycleConfiguration)
+            .setSetLifecycleConfigurationRequest(req)
             .build();
 
     OMResponse omResponse = submitRequest(omRequest);

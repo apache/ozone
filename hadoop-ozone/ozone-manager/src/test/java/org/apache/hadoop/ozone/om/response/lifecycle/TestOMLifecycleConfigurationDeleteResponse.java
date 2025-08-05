@@ -32,9 +32,9 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
 import org.apache.hadoop.ozone.om.helpers.OmLCRule;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
@@ -85,16 +85,16 @@ public class TestOMLifecycleConfigurationDeleteResponse {
             .setCreationTime(Time.now())
             .build();
 
-    CreateLifecycleConfigurationResponse createLifecycleConfigurationResponse =
-        CreateLifecycleConfigurationResponse.newBuilder()
+    SetLifecycleConfigurationResponse setLifecycleConfigurationResponse =
+        SetLifecycleConfigurationResponse.newBuilder()
             .build();
 
-    OMLifecycleConfigurationCreateResponse createResponse =
-        new OMLifecycleConfigurationCreateResponse(OMResponse.newBuilder()
-            .setCmdType(Type.CreateLifecycleConfiguration)
+    OMLifecycleConfigurationSetResponse createResponse =
+        new OMLifecycleConfigurationSetResponse(OMResponse.newBuilder()
+            .setCmdType(Type.SetLifecycleConfiguration)
             .setStatus(Status.OK)
-            .setCreateLifecycleConfigurationResponse(
-                createLifecycleConfigurationResponse).build(),
+            .setSetLifecycleConfigurationResponse(
+                setLifecycleConfigurationResponse).build(),
             omLifecycleConfiguration);
 
     OMLifecycleConfigurationDeleteResponse deleteResponse =

@@ -1209,7 +1209,7 @@ public interface OzoneManagerProtocol
    * @param lifecycleConfiguration - lifecycle configuration info.
    * @throws IOException
    */
-  default void createLifecycleConfiguration(
+  default void setLifecycleConfiguration(
       OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");

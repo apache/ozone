@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test class for create Lifecycle configuration request.
  */
-public class TestOMLifecycleConfigurationCreateRequest extends
+public class TestOMLifecycleConfigurationSetRequest extends
     TestOMLifecycleConfigurationRequest {
   @Test
   public void testPreExecute() throws Exception {
@@ -60,11 +60,11 @@ public class TestOMLifecycleConfigurationCreateRequest extends
     addVolumeAndBucketToTable(volumeName, bucketName, ownerName,
         omMetadataManager);
 
-    OMRequest originalRequest = createLifecycleConfigurationRequest(volumeName,
+    OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName,
         bucketName, ownerName);
 
-    OMLifecycleConfigurationCreateRequest request =
-        new OMLifecycleConfigurationCreateRequest(originalRequest);
+    OMLifecycleConfigurationSetRequest request =
+        new OMLifecycleConfigurationSetRequest(originalRequest);
 
     OMRequest modifiedRequest = request.preExecute(ozoneManager);
 
@@ -74,21 +74,21 @@ public class TestOMLifecycleConfigurationCreateRequest extends
     assertNull(omMetadataManager.getLifecycleConfigurationTable().get(
         lifecycleKey));
 
-    request = new OMLifecycleConfigurationCreateRequest(modifiedRequest);
+    request = new OMLifecycleConfigurationSetRequest(modifiedRequest);
     long txLogIndex = 2;
 
     OMClientResponse omClientResponse = request.validateAndUpdateCache(ozoneManager, txLogIndex);
     OMResponse omResponse = omClientResponse.getOMResponse();
 
-    assertNotNull(omResponse.getCreateLifecycleConfigurationResponse());
+    assertNotNull(omResponse.getSetLifecycleConfigurationResponse());
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
-    assertEquals(Type.CreateLifecycleConfiguration,
+    assertEquals(Type.SetLifecycleConfiguration,
         omResponse.getCmdType());
 
     LifecycleConfiguration lifecycleConfigurationRequestProto =
         request.getOmRequest()
-            .getCreateLifecycleConfigurationRequest()
+            .getSetLifecycleConfigurationRequest()
             .getLifecycleConfiguration();
 
     OmLifecycleConfiguration lifecycleConfigurationRequest =
@@ -117,11 +117,11 @@ public class TestOMLifecycleConfigurationCreateRequest extends
 
     OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
-    OMRequest originalRequest = createLifecycleConfigurationRequest(volumeName,
+    OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName,
         bucketName, ownerName);
 
-    OMLifecycleConfigurationCreateRequest request =
-        new OMLifecycleConfigurationCreateRequest(originalRequest);
+    OMLifecycleConfigurationSetRequest request =
+        new OMLifecycleConfigurationSetRequest(originalRequest);
 
     OMRequest modifiedRequest = request.preExecute(ozoneManager);
 
@@ -131,7 +131,7 @@ public class TestOMLifecycleConfigurationCreateRequest extends
     assertNull(omMetadataManager.getLifecycleConfigurationTable().get(
         lifecycleKey));
 
-    request = new OMLifecycleConfigurationCreateRequest(modifiedRequest);
+    request = new OMLifecycleConfigurationSetRequest(modifiedRequest);
     long txLogIndex = 2;
 
     OMClientResponse omClientResponse = request.validateAndUpdateCache(ozoneManager, txLogIndex);
@@ -149,11 +149,11 @@ public class TestOMLifecycleConfigurationCreateRequest extends
 
     OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
-    OMRequest originalRequest = createLifecycleConfigurationRequest(volumeName,
+    OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName,
         bucketName, ownerName, false);
 
-    OMLifecycleConfigurationCreateRequest request =
-        new OMLifecycleConfigurationCreateRequest(originalRequest);
+    OMLifecycleConfigurationSetRequest request =
+        new OMLifecycleConfigurationSetRequest(originalRequest);
 
     OMRequest modifiedRequest = request.preExecute(ozoneManager);
 
@@ -163,7 +163,7 @@ public class TestOMLifecycleConfigurationCreateRequest extends
     assertNull(omMetadataManager.getLifecycleConfigurationTable().get(
         lifecycleKey));
 
-    request = new OMLifecycleConfigurationCreateRequest(modifiedRequest);
+    request = new OMLifecycleConfigurationSetRequest(modifiedRequest);
     long txLogIndex = 2;
 
     OMClientResponse omClientResponse = request.validateAndUpdateCache(ozoneManager, txLogIndex);
@@ -176,11 +176,11 @@ public class TestOMLifecycleConfigurationCreateRequest extends
   private void doPreExecute(String volumeName, String bucketName)
       throws Exception {
 
-    OMRequest originalRequest = createLifecycleConfigurationRequest(volumeName,
+    OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName,
         bucketName, "ownername");
 
-    OMLifecycleConfigurationCreateRequest request =
-        new OMLifecycleConfigurationCreateRequest(originalRequest);
+    OMLifecycleConfigurationSetRequest request =
+        new OMLifecycleConfigurationSetRequest(originalRequest);
 
     OMRequest modifiedRequest = request.preExecute(ozoneManager);
     verifyRequest(modifiedRequest, originalRequest);
@@ -195,11 +195,11 @@ public class TestOMLifecycleConfigurationCreateRequest extends
       OMRequest originalRequest) {
 
     LifecycleConfiguration original =
-        originalRequest.getCreateLifecycleConfigurationRequest()
+        originalRequest.getSetLifecycleConfigurationRequest()
             .getLifecycleConfiguration();
 
     LifecycleConfiguration updated =
-        modifiedRequest.getCreateLifecycleConfigurationRequest()
+        modifiedRequest.getSetLifecycleConfigurationRequest()
             .getLifecycleConfiguration();
 
     assertEquals(original.getVolume(), updated.getVolume());
