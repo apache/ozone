@@ -249,6 +249,31 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     verify(mockIcrSender, atMostOnce()).send(any());
   }
 
+  @Test
+  public void testMarkContainerUnhealthyTriggersOnDemandScan() throws IOException {
+    ContainerSet mockContainerSet = mock(ContainerSet.class);
+    KeyValueHandler handler = getDummyHandlerWithContainerSet(mockContainerSet);
+    KeyValueContainerData kvData = new KeyValueContainerData(1L,
+        ContainerLayoutVersion.FILE_PER_BLOCK,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+    kvData.setMetadataPath(tempDir.toString());
+    kvData.setDbFile(dbFile.toFile());
+    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString()).conf(conf)
+        .clusterID(UUID.randomUUID().toString()).datanodeUuid(UUID.randomUUID().toString())
+        .volumeSet(mock(MutableVolumeSet.class))
+        .build();
+    kvData.setVolume(hddsVolume);
+    KeyValueContainer container = new KeyValueContainer(kvData, conf);
+
+    // When container is marked unhealthy, on-demand scan should be triggered
+    handler.markContainerUnhealthy(container, ContainerTestUtils.getUnhealthyDataScanResult());
+    
+    // Verify that scanContainerWithoutGap was called with the correct container ID and reason
+    verify(mockContainerSet).scanContainerWithoutGap(1L, "Unhealthy container scan");
+    verify(mockIcrSender, atMostOnce()).send(any());
+  }
+
   // -- Helper methods below.
 
   private KeyValueHandler getDummyHandler() {
@@ -264,6 +289,23 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         conf,
         stateMachine.getDatanodeDetails().getUuidString(),
         mock(ContainerSet.class),
+        mock(MutableVolumeSet.class),
+        mock(ContainerMetrics.class), mockIcrSender, new ContainerChecksumTreeManager(conf));
+  }
+
+  private KeyValueHandler getDummyHandlerWithContainerSet(ContainerSet containerSet) {
+    DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
+        .setUuid(UUID.fromString(DATANODE_UUID))
+        .setHostName("dummyHost")
+        .setIpAddress("1.2.3.4")
+        .build();
+    DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
+    when(stateMachine.getDatanodeDetails()).thenReturn(dnDetails);
+
+    return new KeyValueHandler(
+        conf,
+        stateMachine.getDatanodeDetails().getUuidString(),
+        containerSet,
         mock(MutableVolumeSet.class),
         mock(ContainerMetrics.class), mockIcrSender, new ContainerChecksumTreeManager(conf));
   }

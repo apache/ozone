@@ -1461,7 +1461,7 @@ public class KeyValueHandler extends Handler {
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
     container.writeLock();
-    long containerID = 0L;
+    long containerID = container.getContainerData().getContainerID();
     try {
       if (container.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
@@ -1485,6 +1485,10 @@ public class KeyValueHandler extends Handler {
       container.writeUnlock();
     }
     updateContainerChecksumFromMetadataIfNeeded(container);
+    // For unhealthy containers, trigger an async on-demand scan to build container merkle tree,
+    // as the metadata-based tree may not be reliable due to potential data corruption.
+    containerSet.scanContainerWithoutGap(containerID, "Unhealthy container scan");
+    
     // Even if the container file is corrupted/missing and the unhealthy
     // update fails, the unhealthy state is kept in memory and sent to
     // SCM. Write a corresponding entry to the container log as well.
