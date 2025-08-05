@@ -764,7 +764,7 @@ public class KeyValueHandler extends Handler {
       // Only build from metadata if the file doesn't exist
       if (ex instanceof FileNotFoundException) {
         try {
-          LOG.info("Checksum tree file not found for container {}. Building from merkle tree from metadata.",
+          LOG.info("Checksum tree file not found for container {}. Building merkle tree from container metadata.",
               containerData.getContainerID());
           ContainerProtos.ContainerChecksumInfo checksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
           checksumTree = checksumInfo.toByteString();
