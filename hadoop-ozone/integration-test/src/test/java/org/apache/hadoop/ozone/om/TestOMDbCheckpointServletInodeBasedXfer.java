@@ -144,11 +144,11 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
   private void setupCluster() throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+    conf.setBoolean(OZONE_ACL_ENABLED, false);
+    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     om = cluster.getOzoneManager();
-    conf.setBoolean(OZONE_ACL_ENABLED, false);
-    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
   }
 
   private void setupMocks() throws Exception {
@@ -241,9 +241,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     File newDbDir = new File(newDbDirName);
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
-    long totalSize = 0;
-    for (File f : newDbDir.listFiles()) {
-      totalSize += f.length();
+    long totalSize;
+    try (Stream<Path> list = Files.list(newDbDir.toPath())) {
+      totalSize = list.mapToLong(path -> path.toFile().length()).sum();
     }
     boolean obtainedFilesUnderMaxLimit = totalSize < maxFileSizeLimit;
     if (!includeSnapshots) {
