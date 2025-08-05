@@ -24,7 +24,7 @@ import { DUSubpath } from '@/v2/types/diskUsage.types';
 
 //-------Types--------//
 type PieChartProps = {
-  path: string;
+  path: string | null;
   limit: number;
   size: number;
   subPaths: DUSubpath[];
@@ -48,7 +48,6 @@ const DUPieChart: React.FC<PieChartProps> = ({
   sizeWithReplica,
   loading
 }) => {
-
   const [subpathSize, setSubpathSize]  = React.useState<number>(0);
 
   function getSubpathSize(subpaths: DUSubpath[]): number {
@@ -96,7 +95,7 @@ const DUPieChart: React.FC<PieChartProps> = ({
 
     if (subPathCount === 0 || subpaths.length === 0) {
       // No more subpaths available
-      pathLabels = [path.split('/').pop() ?? ''];
+      pathLabels = [(path ?? '/').split('/').pop() ?? ''];
       valuesWithMinBlockSize = [0.1];
       percentage = ['100.00'];
       sizeStr = [byteToSize(size, 1)];

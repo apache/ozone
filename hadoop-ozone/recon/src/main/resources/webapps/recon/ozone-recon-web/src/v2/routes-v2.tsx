@@ -51,7 +51,7 @@ export const routesV2 = [
     component: Pipelines
   },
   {
-    path: '/DiskUsage',
+    path: '/NamespaceUsage',
     component: DiskUsage
   },
   {
