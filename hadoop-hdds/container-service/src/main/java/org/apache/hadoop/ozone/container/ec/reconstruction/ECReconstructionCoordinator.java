@@ -190,7 +190,8 @@ public class ECReconstructionCoordinator implements Closeable {
       metrics.incReconstructionTotal();
       metrics.incBlockGroupReconstructionTotal(blockLocationInfoMap.size());
       // Trigger a container scan after successful reconstruction
-      context.getParent().getContainer().getContainerSet().scanContainer(containerID);
+      context.getParent().getContainer().getContainerSet().scanContainer(containerID,
+          "EC reconstruction");
     } catch (Exception e) {
       // Any exception let's delete the recovering containers.
       metrics.incReconstructionFailsTotal();

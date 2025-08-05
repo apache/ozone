@@ -218,7 +218,7 @@ public class ContainerController {
           containerSet.getContainer(containerId), outputStream, packer);
     } catch (IOException e) {
       // If export fails, then trigger a scan for the container
-      containerSet.scanContainer(containerId);
+      containerSet.scanContainer(containerId, "Export failed");
       throw e;
     }
   }

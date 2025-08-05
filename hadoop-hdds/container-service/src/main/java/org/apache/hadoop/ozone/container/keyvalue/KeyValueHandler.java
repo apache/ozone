@@ -1578,7 +1578,7 @@ public class KeyValueHandler extends Handler {
   private void reconcileContainerInternal(DNContainerOperationClient dnClient, Container<?> container,
       Collection<DatanodeDetails> peers) throws IOException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
-    KeyValueContainerData containerData = kvContainer.getContainerData();
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     long containerID = containerData.getContainerID();
     // Obtain the original checksum info before reconciling with any peers.
     ContainerProtos.ContainerChecksumInfo originalChecksumInfo = checksumManager.read(containerData);
@@ -1597,8 +1597,7 @@ public class KeyValueHandler extends Handler {
       long numMissingBlocksRepaired = 0;
       long numCorruptChunksRepaired = 0;
       long numMissingChunksRepaired = 0;
-      // This will be updated as we do repairs with this peer,
-      // then used to write the updated tree for the diff with the
+      // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with the
       // next peer.
       ContainerMerkleTreeWriter updatedTreeWriter =
           new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
@@ -1709,8 +1708,7 @@ public class KeyValueHandler extends Handler {
     long originalDataChecksum = ContainerChecksumTreeManager.getDataChecksum(originalChecksumInfo);
     long latestDataChecksum = ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo);
     if (originalDataChecksum == latestDataChecksum) {
-      LOG.info("Completed reconciliation for container {} with {}/{} peers. " +
-              "Original data checksum {} was not updated",
+      LOG.info("Completed reconciliation for container {} with {}/{} peers. Original data checksum {} was not updated",
           containerID, successfulPeerCount, peers.size(), checksumToString(latestDataChecksum));
     } else {
       LOG.warn("Completed reconciliation for container {} with {}/{} peers. {} blocks were updated. Data checksum " +
