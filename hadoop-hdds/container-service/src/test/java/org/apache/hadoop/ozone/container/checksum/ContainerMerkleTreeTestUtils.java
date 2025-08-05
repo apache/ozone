@@ -145,6 +145,7 @@ public final class ContainerMerkleTreeTestUtils {
     ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
     byte byteValue = 1;
     for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
+      tree.addBlock(blockIndex, 0);
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
         tree.addChunks(blockIndex, true,
             buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));

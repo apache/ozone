@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -89,6 +90,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -224,6 +226,62 @@ public class TestContainerReconciliationWithMockDatanodes {
     // After reconciliation, checksums should be the same for all containers.
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
+  }
+
+  /**
+   * Test that during reconciliation, the BCSID is taken from the peer's merkle tree instead of getting it from the
+   * peer block data.
+   */
+  @Test
+  public void testReconciliationUsesBcsIdFromPeerMerkleTree() throws Exception {
+    MockDatanode sourceDatanode = datanodes.get(0);
+    MockDatanode targetDatanode = datanodes.get(1);
+    
+    // Delete a few blocks from the target datanode to create missing blocks scenario
+    targetDatanode.introduceCorruption(CONTAINER_ID, 2, 0, false);
+    
+    // Get a reference block that exists in source but not in target
+    KeyValueContainer sourceContainer = sourceDatanode.getContainer(CONTAINER_ID);
+    KeyValueContainer targetContainer = targetDatanode.getContainer(CONTAINER_ID);
+    
+    List<BlockData> sourceBlocks = sourceDatanode.getSortedBlocks(sourceContainer);
+    List<BlockData> targetBlocks = targetDatanode.getSortedBlocks(targetContainer);
+    
+    Set<Long> targetBlockIds = targetBlocks.stream()
+        .map(BlockData::getLocalID)
+        .collect(Collectors.toSet());
+
+    // Find a block that exists in source but is missing in target
+    BlockData testBlock = sourceBlocks.stream()
+        .filter(block -> !targetBlockIds.contains(block.getLocalID()))
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("Should have a missing block for testing"));
+    
+    long originalBcsId = testBlock.getBlockCommitSequenceId();
+    long modifiedBcsId = originalBcsId + 100; // Different BCSID for block data
+
+    // Build the merkle tree with original BCSID values before modifying block data
+    sourceDatanode.scanContainer(CONTAINER_ID);
+    targetDatanode.scanContainer(CONTAINER_ID);
+    
+    // Now modify the block data's BCSID in the source datanode's metadata to be different
+    // This simulates a scenario where block data and merkle tree have different BCSIDs
+    sourceDatanode.modifyBlockBcsId(CONTAINER_ID, testBlock.getLocalID(), modifiedBcsId);
+    
+    // Perform reconciliation - target will pull missing blocks from source
+    // The reconciliation should use the BCSID from the peer's merkle tree (originalBcsId)
+    // NOT the BCSID from peer's block data (modifiedBcsId)
+    List<DatanodeDetails> peers = Collections.singletonList(sourceDatanode.getDnDetails());
+    targetDatanode.reconcileContainer(dnClient, peers, CONTAINER_ID);
+    
+    // Verify the reconciled block has the BCSID from peer's merkle tree
+    List<BlockData> blocksAfterReconciliation = targetDatanode.getSortedBlocks(targetContainer);
+    BlockData reconciledBlock = blocksAfterReconciliation.stream()
+        .filter(block -> block.getLocalID() == testBlock.getLocalID())
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("Reconciled block should be present in target"));
+    
+    assertEquals(originalBcsId, reconciledBlock.getBlockCommitSequenceId());
   }
 
   /**
@@ -453,6 +511,22 @@ public class TestContainerReconciliationWithMockDatanodes {
     }
 
     /**
+     * Helper method to modify a block's BCSID in the container metadata.
+     * This is used for testing scenarios where block data and merkle tree have different BCSIDs.
+     */
+    public void modifyBlockBcsId(long containerID, long blockID, long newBcsId) {
+      KeyValueContainer container = getContainer(containerID);
+      try {
+        BlockData blockData = handler.getBlockManager().getBlock(container, 
+            new BlockID(containerID, blockID));
+        blockData.setBlockCommitSequenceId(newBcsId);
+        handler.getBlockManager().putBlock(container, blockData);
+      } catch (IOException ex) {
+        fail("Failed to modify block BCSID", ex);
+      }
+    }
+
+    /**
      * Create a container with the specified number of blocks. Block data is human-readable so the block files can be
      * inspected when debugging the test.
      */
@@ -535,7 +609,7 @@ public class TestContainerReconciliationWithMockDatanodes {
      * For example, the unsorted list would have the first blocks as 1, 10, 11...
      * The list returned by this method would have the first blocks as 1, 2, 3...
      */
-    private List<BlockData> getSortedBlocks(KeyValueContainer container) throws IOException {
+    public List<BlockData> getSortedBlocks(KeyValueContainer container) throws IOException {
       List<BlockData> blockDataList = handler.getBlockManager().listBlock(container, -1, 100);
       blockDataList.sort(Comparator.comparingLong(BlockData::getLocalID));
       return blockDataList;
