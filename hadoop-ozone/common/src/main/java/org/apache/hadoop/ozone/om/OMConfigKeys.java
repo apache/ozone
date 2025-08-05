@@ -183,7 +183,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_SEGMENT_SIZE_KEY
       = "ozone.om.ratis.segment.size";
   public static final String OZONE_OM_RATIS_SEGMENT_SIZE_DEFAULT
-      = "4MB";
+      = "64MB";
   public static final String OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
       = "ozone.om.ratis.segment.preallocated.size";
   public static final String OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT

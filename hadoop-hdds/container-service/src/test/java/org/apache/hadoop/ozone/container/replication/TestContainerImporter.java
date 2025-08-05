@@ -202,7 +202,7 @@ class TestContainerImporter {
     containerImporter.importContainer(containerId, tarFile.toPath(),
         targetVolume, NO_COMPRESSION);
 
-    verify(containerSet, atLeastOnce()).scanContainer(containerId);
+    verify(containerSet, atLeastOnce()).scanContainer(containerId, "Imported container");
   }
 
   @Test

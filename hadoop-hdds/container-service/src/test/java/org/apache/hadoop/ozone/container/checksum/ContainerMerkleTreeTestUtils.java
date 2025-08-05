@@ -161,7 +161,7 @@ public final class ContainerMerkleTreeTestUtils {
                                   int numCorruptChunks) {
 
     ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto().toBuilder();
-    ContainerDiffReport diff = new ContainerDiffReport();
+    ContainerDiffReport diff = new ContainerDiffReport(1);
 
     introduceMissingBlocks(treeBuilder, numMissingBlocks, diff);
     introduceMissingChunks(treeBuilder, numMissingChunks, diff);
@@ -323,12 +323,12 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   /**
-   * This function checks whether the container checksum file exists.
+   * This function checks whether the container checksum file exists for a container in a given datanode.
    */
   public static boolean containerChecksumFileExists(HddsDatanodeService hddsDatanode, long containerID) {
     OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
     Container<?> container = ozoneContainer.getController().getContainer(containerID);
-    return ContainerChecksumTreeManager.checksumFileExist(container);
+    return getContainerChecksumFile(container.getContainerData()).exists();
   }
 
   public static void writeContainerDataTreeProto(ContainerData data, ContainerProtos.ContainerMerkleTree tree)
