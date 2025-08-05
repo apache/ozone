@@ -297,6 +297,13 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         om.getOmSnapshotManager().invalidateCacheEntry(UUID.fromString(snapshotId));
         writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir,
             hardLinkFileMap, false);
+        Path snapshotLocalPropertyYaml = snapshotDir.getParent().resolve(
+            snapshotDir.getFileName().toString() + ".yaml");
+        if (Files.exists(snapshotLocalPropertyYaml)) {
+          File yamlFile = snapshotLocalPropertyYaml.toFile();
+          hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());
+          linkAndIncludeFile(yamlFile, yamlFile.getName(), archiveOutputStream, tmpdir);
+        }
       } finally {
         omMetadataManager.getLock().releaseReadLock(SNAPSHOT_DB_LOCK, snapshotId);
       }
