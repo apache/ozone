@@ -371,29 +371,6 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
     assertEquals(expectedChildrenBucket1, nsSummaryBucket1.getChildDir(),
         "customBucket1 should contain dirA and dirD.");
     assertEquals(0L, nsSummaryBucket1.getParentId(), "customBucket1 parent ID should be 0L (root).");
-
-    // Verify the file size buckets for customBucket1
-    int[] fileSizeDistBucket1 = nsSummaryBucket1.getFileSizeBucket();
-    assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS, fileSizeDistBucket1.length);
-
-    // Check specific bins based on file sizes:
-    // FILE_X_SIZE = 1000L -> bin 0
-    // FILE_Y_SIZE = 2000L -> bin 1
-    // FILE_Z_SIZE = 500L  -> bin 0
-    // FILE_P_SIZE = 1500L -> bin 1
-    // FILE_Q_SIZE = 2500L -> bin 2
-
-    // Bin 0 (0-1024 bytes): fileX (1000), fileZ (500) -> 2 files
-    assertEquals(2, fileSizeDistBucket1[0]);
-    // Bin 1 (1024-2048 bytes): fileY (2000), fileP (1500) -> 2 files
-    assertEquals(2, fileSizeDistBucket1[1]);
-    // Bin 2 (2048-4096 bytes): fileQ (2500) -> 1 file
-    assertEquals(1, fileSizeDistBucket1[2]);
-
-    // All other bins should be 0
-    for (int i = 3; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
-      assertEquals(0, fileSizeDistBucket1[i], "Bin " + i + " should be 0.");
-    }
   }
 
   @Test
@@ -589,33 +566,6 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
     assertNotNull(nsSummaryBucket1, "NSSummary for customBucket1 should not be null.");
     assertEquals(4, nsSummaryBucket1.getNumOfFiles(), "customBucket1 should have 4 files after propagation.");
     assertEquals(7500L - FILE_X_SIZE, nsSummaryBucket1.getSizeOfFiles(), "customBucket1 size should be updated.");
-
-    // --- New assertions for file size distribution after deletion ---
-
-    // FILE_X (1000L) is in bin 0. We expect the bin 0 count to decrement by 1 for dirA and its ancestors.
-    int[] fileSizeDistDirA = nsSummaryDirA.getFileSizeBucket();
-    assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS, fileSizeDistDirA.length);
-
-    // Initially, dirA has fileX (1000L) and files in dirB (fileY 2000L, fileZ 500L).
-    // The file size distribution for dirA before deletion:
-    // bin 0: fileX (1000L) + fileZ (500L) = 2 files
-    // bin 1: fileY (2000L) = 1 file
-    // After deleting fileX (1000L), bin 0 should have 1 file.
-    assertEquals(1, fileSizeDistDirA[ReconUtils.getFileSizeBinIndex(FILE_Z_SIZE)], "Bin for 500L size should be 1.");
-    assertEquals(1, fileSizeDistDirA[ReconUtils.getFileSizeBinIndex(FILE_Y_SIZE)], "Bin for 2000L size should be 1.");
-
-    int[] fileSizeDistBucket1 = nsSummaryBucket1.getFileSizeBucket();
-    assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS, fileSizeDistBucket1.length);
-
-    // Initially, customBucket1 has:
-    // dirA (fileX, fileY, fileZ), dirD (fileP), and fileQ.
-    // bin 0: fileX (1000L), fileZ (500L) -> 2 files
-    // bin 1: fileY (2000L), fileP (1500L) -> 2 files
-    // bin 2: fileQ (2500L) -> 1 file
-    // After deleting fileX (1000L), bin 0 should decrement by 1.
-    assertEquals(1, fileSizeDistBucket1[ReconUtils.getFileSizeBinIndex(FILE_Z_SIZE)], "Bin for 500L should be 1 after deleting 1000L file.");
-    assertEquals(2, fileSizeDistBucket1[ReconUtils.getFileSizeBinIndex(FILE_Y_SIZE)], "Bin for 2000L should remain 2.");
-    assertEquals(1, fileSizeDistBucket1[ReconUtils.getFileSizeBinIndex(FILE_Q_SIZE)], "Bin for 2500L should remain 1.");
   }
 
   @Test
@@ -670,36 +620,6 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
     assertEquals(4, nsSummaryBucket1.getNumOfFiles(), "customBucket1 should have 4 files after propagation.");
     assertEquals(FILE_X_SIZE + FILE_Y_SIZE + FILE_P_SIZE + FILE_Q_SIZE, nsSummaryBucket1.getSizeOfFiles(),
         "customBucket1 size should be updated.");
-
-    // FILE_Z (500L) is in bin 0. We expect the bin 0 count to decrement by 1 for dirB and its ancestors.
-    // Initial bin distribution of dirB:
-    // bin 0: fileZ (500L) = 1 file
-    // bin 1: fileY (2000L) = 1 file
-    // After deleting dirC (which contains fileZ), bin 0 should be 0.
-    int[] fileSizeDistDirB = nsSummaryDirB.getFileSizeBucket();
-    assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS, fileSizeDistDirB.length);
-    assertEquals(0, fileSizeDistDirB[ReconUtils.getFileSizeBinIndex(FILE_Z_SIZE)], "Bin for 500L size should be 0 after deleting dirC.");
-    assertEquals(1, fileSizeDistDirB[ReconUtils.getFileSizeBinIndex(FILE_Y_SIZE)], "Bin for 2000L size should remain 1.");
-
-    // Initial bin distribution of dirA:
-    // bin 0: fileX (1000L) + fileZ (500L) = 2 files
-    // bin 1: fileY (2000L) = 1 file
-    // After deleting dirC (which contains fileZ), bin 0 should decrement by 1.
-    int[] fileSizeDistDirA = nsSummaryDirA.getFileSizeBucket();
-    assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS, fileSizeDistDirA.length);
-    assertEquals(1, fileSizeDistDirA[ReconUtils.getFileSizeBinIndex(FILE_Z_SIZE)], "Bin for 500L size should be 1 after deleting dirC.");
-    assertEquals(1, fileSizeDistDirA[ReconUtils.getFileSizeBinIndex(FILE_Y_SIZE)], "Bin for 2000L size should remain 1.");
-
-    // Initial bin distribution of customBucket1:
-    // bin 0: fileX (1000L), fileZ (500L) -> 2 files
-    // bin 1: fileY (2000L), fileP (1500L) -> 2 files
-    // bin 2: fileQ (2500L) -> 1 file
-    // After deleting dirC (which contains fileZ), bin 0 should decrement by 1.
-    int[] fileSizeDistBucket1 = nsSummaryBucket1.getFileSizeBucket();
-    assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS, fileSizeDistBucket1.length);
-    assertEquals(1, fileSizeDistBucket1[ReconUtils.getFileSizeBinIndex(FILE_Z_SIZE)], "Bin for 500L size should be 1 after deleting dirC.");
-    assertEquals(2, fileSizeDistBucket1[ReconUtils.getFileSizeBinIndex(FILE_Y_SIZE)], "Bin for 2000L size should remain 2.");
-    assertEquals(1, fileSizeDistBucket1[ReconUtils.getFileSizeBinIndex(FILE_Q_SIZE)], "Bin for 2500L size should remain 1.");
   }
 
   /**

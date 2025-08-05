@@ -118,6 +118,12 @@ public class NSSummaryTaskDbEventHandler {
       // If we don't have it in this batch we try to get it from the DB
       curNSSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
     }
+
+    // Check if this directory already has content (files/subdirs) that need propagation
+    boolean directoryAlreadyExists = (curNSSummary != null);
+    long existingSizeOfFiles = directoryAlreadyExists ? curNSSummary.getSizeOfFiles() : 0;
+    long existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
+
     if (curNSSummary == null) {
       // If we don't have it locally and in the DB we create a new instance
       // as this is a new ID
@@ -142,6 +148,11 @@ public class NSSummaryTaskDbEventHandler {
     }
     nsSummary.addChildDir(objectId);
     nsSummaryMap.put(parentObjectId, nsSummary);
+
+    // If the directory already existed with content, propagate its totals upward
+    if (directoryAlreadyExists && (existingSizeOfFiles > 0 || existingNumOfFiles > 0)) {
+      propagateSizeUpwards(parentObjectId, existingSizeOfFiles, existingNumOfFiles, nsSummaryMap);
+    }
   }
 
   protected void handleDeleteKeyEvent(OmKeyInfo keyInfo,
@@ -260,15 +271,6 @@ public class NSSummaryTaskDbEventHandler {
         // Update parent's totals
         parentSummary.setSizeOfFiles(parentSummary.getSizeOfFiles() + sizeChange);
         parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + (int)countChange);
-        int[] fileBucket = parentSummary.getFileSizeBucket();
-        int binIndex = ReconUtils.getFileSizeBinIndex(Math.abs(sizeChange));
-        if (countChange > 0) {
-          ++fileBucket[binIndex];      // PUT event: increment
-        } else {
-          --fileBucket[binIndex];      // DELETE event: decrement
-        }
-        parentSummary.setFileSizeBucket(fileBucket);
-
         nsSummaryMap.put(parentId, parentSummary);
         
         // Recursively propagate to grandparents
