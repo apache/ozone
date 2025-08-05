@@ -41,38 +41,38 @@ public class RatisLogParser extends BaseLogParser implements Callable<Void> {
       description = "Component role for parsing. Values: om, scm, datanode, generic")
   private String role;
 
-  @Override
-  public Void call() throws Exception {
-    switch (role.toLowerCase()) {
-      case "om":
-        System.out.println("Dumping OM Ratis Log");
-        parseRatisLogs(OMRatisHelper::smProtoToString);
-        break;
-      case "scm":
-        System.out.println("Dumping SCM Ratis Log");
-        parseRatisLogs(SCMRatisRequest::smProtoToString);
-        break;
-      case "datanode":
-        System.out.println("Dumping Datanode Ratis Log");
-        System.out.println("Using Dummy PipelineID:" + DUMMY_PIPELINE_ID + "\n\n");
-        parseRatisLogs(RatisLogParser::smToContainerLogString);
-        break;
-      case "generic":
-        System.out.println("Dumping Generic Ratis Log");
-        parseRatisLogs(null);
-        break;
-      default:
-        System.err.println("Invalid role: " + role + ". Supported roles are: om, scm, datanode, generic");
-        return null;
-    }
-    return null;
-  }
-
   private static final RaftGroupId DUMMY_PIPELINE_ID =
       RaftGroupId.valueOf(ByteString.copyFromUtf8("ADummyRatisGroup"));
 
   public static String smToContainerLogString(
       StateMachineLogEntryProto logEntryProto) {
     return ContainerStateMachine.smProtoToString(DUMMY_PIPELINE_ID, null, logEntryProto);
+  }
+
+  @Override
+  public Void call() throws Exception {
+    switch (role.toLowerCase()) {
+    case "om":
+      System.out.println("Dumping OM Ratis Log");
+      parseRatisLogs(OMRatisHelper::smProtoToString);
+      break;
+    case "scm":
+      System.out.println("Dumping SCM Ratis Log");
+      parseRatisLogs(SCMRatisRequest::smProtoToString);
+      break;
+    case "datanode":
+      System.out.println("Dumping Datanode Ratis Log");
+      System.out.println("Using Dummy PipelineID:" + DUMMY_PIPELINE_ID + "\n\n");
+      parseRatisLogs(RatisLogParser::smToContainerLogString);
+      break;
+    case "generic":
+      System.out.println("Dumping Generic Ratis Log");
+      parseRatisLogs(null);
+      break;
+    default:
+      System.err.println("Invalid role: " + role + ". Supported roles are: om, scm, datanode, generic");
+      return null;
+    }
+    return null;
   }
 }
