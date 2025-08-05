@@ -300,7 +300,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         Path snapshotDirParent = snapshotDir.getParent();
         if (snapshotDirParent != null) {
           Path snapshotLocalPropertyYaml = snapshotDirParent.resolve(
-              snapshotDir.getFileName().toString() + ".yaml");
+              snapshotDir.getFileName() + ".yaml");
           if (Files.exists(snapshotLocalPropertyYaml)) {
             File yamlFile = snapshotLocalPropertyYaml.toFile();
             hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());
