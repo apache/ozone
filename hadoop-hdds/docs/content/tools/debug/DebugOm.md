@@ -24,9 +24,8 @@ weight: 2
 
 Debug commands related to OM.
 It has the following subcommands:
-## generate-compaction-dag** 
-Create an image of the current compaction log  DAG. 
-This command is an offline command. i.e., it can run on any instance of om.db and does not require OM to be up.
+## generate-compaction-dag 
+Creates a DAG image of the current compaction log of an om.db instance. It is downloaded to the specified location.
 ```bash
 Usage: ozone debug om generate-compaction-dag [-hV] [--verbose] --db=<dbPath>
        -o=<imageLocation>
@@ -44,7 +43,7 @@ be up.
 ```
 
 ## prefix
-Parse prefix contents
+Parses the contents of a prefix.
 ```bash
 Usage: ozone debug om prefix [--verbose] --bucket=<bucket> --db=<dbPath>
                              --path=<filePath> --volume=<volume>

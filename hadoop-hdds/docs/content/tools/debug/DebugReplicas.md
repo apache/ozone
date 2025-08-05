@@ -22,8 +22,7 @@ weight: 4
   limitations under the License.
 -->
 
-Debug commands for replica-related issues, retrieving replica information from the OM and 
-performing checks over the network against a running cluster.
+Debug commands for retrieving information and performing various checks on the replicas in datanodes.
 
 ```bash
 Usage: ozone debug replicas [--verbose] [COMMAND]
@@ -67,8 +66,7 @@ Returns chunk location information about an existing key
 ```
 
 ## verify
-Runs a set of checks to verify data across replicas. By default, it prints only the keys with failed checks. 
-There are multiple checks available, which can be seleted using the command line options:
+Verify data across replicas. There are multiple checks available, which can be selected using the command line options:
 
 ```bash 
 Usage: ozone debug replicas verify [-hV] [--all-results] [--verbose]
