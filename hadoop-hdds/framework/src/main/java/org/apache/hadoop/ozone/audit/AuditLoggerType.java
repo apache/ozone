@@ -25,8 +25,7 @@ public enum AuditLoggerType {
   OMLOGGER("OMAudit"),
   SCMLOGGER("SCMAudit"),
   S3GLOGGER("S3GAudit"),
-  OMSYSTEMLOGGER("OMSystemAudit"),
-  BGDELETIONLOGGER("BackgroundDeletionAudit");
+  OMSYSTEMLOGGER("OMSystemAudit");
 
   private String type;
 

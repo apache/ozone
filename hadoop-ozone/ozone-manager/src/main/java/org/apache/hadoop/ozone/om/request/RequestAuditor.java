@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
-import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
@@ -44,15 +43,6 @@ public interface RequestAuditor {
    * @param userInfo
    */
   OMAuditLogger.Builder buildAuditMessage(
-      AuditAction op, Map<String, String> auditMap, Throwable throwable, UserInfo userInfo);
-
-  /**
-   * Build AuditMessage for OM Background Deletion Requests.
-   * @param op
-   * @param auditMap
-   * @param throwable
-   */
-  AuditMessage buildAuditMessageForBGD(
       AuditAction op, Map<String, String> auditMap, Throwable throwable, UserInfo userInfo);
 
   /**

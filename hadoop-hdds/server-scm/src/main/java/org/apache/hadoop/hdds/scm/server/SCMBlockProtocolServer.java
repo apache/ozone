@@ -77,7 +77,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
-import org.apache.hadoop.ozone.audit.BackgroundDeletionAction;
 import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
@@ -96,9 +95,6 @@ public class SCMBlockProtocolServer implements
 
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.SCMLOGGER);
-  
-  private static final AuditLogger BG_DELETION_AUDIT =
-      new AuditLogger(AuditLoggerType.BGDELETIONLOGGER);
 
   private final StorageContainerManager scm;
   private final RPC.Server blockRpcServer;
@@ -322,17 +318,12 @@ public class SCMBlockProtocolServer implements
       results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
     }
     auditMap.put("KeyBlockToDelete", keyBlocksInfoList.toString());
-    auditMap.put("NumOfKeyBlocksToDelete", String.valueOf(keyBlocksInfoList.size()));
     if (e == null) {
       AUDIT.logWriteSuccess(
           buildAuditMessageForSuccess(SCMAction.DELETE_KEY_BLOCK, auditMap));
-      BG_DELETION_AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(BackgroundDeletionAction.SCMBLOCK_DELETION, auditMap));
     } else {
       AUDIT.logWriteFailure(
           buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap, e));
-      BG_DELETION_AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(BackgroundDeletionAction.SCMBLOCK_DELETION, auditMap, e));
     }
     return results;
   }
