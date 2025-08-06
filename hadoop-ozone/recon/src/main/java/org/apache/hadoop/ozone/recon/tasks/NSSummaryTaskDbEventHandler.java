@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
