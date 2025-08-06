@@ -288,6 +288,27 @@ public class SstFileSetReader {
       }
       return result;
     }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (obj == null || getClass() != obj.getClass()) {
+        return false;
+      }
+
+      HeapEntryWithFileIdx<T> other = (HeapEntryWithFileIdx<T>) obj;
+
+      if (this.current == null && other.current == null) {
+        return this.fileIndex == other.fileIndex;
+      }
+      if (this.current == null || other.current == null) {
+        return false;
+      }
+
+      return this.current.equals(other.current) && this.fileIndex == other.fileIndex;
+    }
   }
 
   private abstract static class MultipleSstFileIterator<T extends Comparable<T>> implements ClosableIterator<T> {
@@ -391,16 +412,12 @@ public class SstFileSetReader {
     }
 
     @Override
-    public void close() throws UncheckedIOException {
-      try {
-        for (HeapEntryWithFileIdx<T> entry : allIterators) {
-          entry.close();
-        }
-        allIterators.clear();
-        minHeap.clear();
-      } catch (Exception e) {
-        throw new UncheckedIOException(new IOException("Failed to close iterators", e));
+    public void close() {
+      minHeap.clear();
+      for (HeapEntryWithFileIdx<T> entry : allIterators) {
+        entry.close();
       }
+      allIterators.clear();
     }
   }
 

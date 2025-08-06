@@ -231,7 +231,7 @@ class TestSstFileSetReader {
 
   /**
    * Test MinHeap implementation with overlapping SST files.
-   * Verifies that same-key entries from multiple SST files are handled correctly,
+   * Verifies that duplicate entries from multiple SST files are handled correctly,
    * with the entry from the SST file with the highest index (latest in collection) being returned.
    */
   @ParameterizedTest
