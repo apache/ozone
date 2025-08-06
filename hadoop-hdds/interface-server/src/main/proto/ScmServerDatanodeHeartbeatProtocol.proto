@@ -368,6 +368,8 @@ message DeletedBlocksTransaction {
   repeated int64 localID = 3;
   // the retry time of sending deleting command to datanode.
   required int32 count = 4;
+  optional uint64 totalBlockSize = 5;
+  optional uint64 totalBlockReplicatedSize = 6;
 }
 
 // ACK message datanode sent to SCM, contains the result of

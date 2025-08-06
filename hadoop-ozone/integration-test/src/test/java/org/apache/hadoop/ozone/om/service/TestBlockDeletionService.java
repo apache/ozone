@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATA_DISTRIBUTION;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -230,7 +231,7 @@ public class TestBlockDeletionService {
 
     assertEquals(1, blockGroups.get(0).getAllDeletedBlocks().size());
     assertEquals(isIncludeBlockSize ?
-        QuotaUtil.getReplicatedSize(KEY_SIZE, replicationConfig) : 0, totalUsedBytes);
-    assertEquals(isIncludeBlockSize ? KEY_SIZE : 0, totalUnreplicatedBytes);
+        QuotaUtil.getReplicatedSize(KEY_SIZE, replicationConfig) : SIZE_NOT_AVAILABLE, totalUsedBytes);
+    assertEquals(isIncludeBlockSize ? KEY_SIZE : SIZE_NOT_AVAILABLE, totalUnreplicatedBytes);
   }
 }

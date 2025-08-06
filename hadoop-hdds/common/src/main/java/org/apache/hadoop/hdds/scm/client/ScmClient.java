@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
@@ -431,6 +432,12 @@ public interface ScmClient extends Closeable {
    * @throws IOException
    */
   int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
+
+  /**
+   * Get deleted block summary.
+   * @throws IOException
+   */
+  DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException;
 
   /**
    * Get usage information of datanode by address or uuid.
