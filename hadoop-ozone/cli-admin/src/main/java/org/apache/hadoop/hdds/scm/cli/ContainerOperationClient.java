@@ -551,6 +551,23 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
+      long startTxId) throws IOException {
+    return storageContainerLocationClient.getFailedDeletedBlockTxn(count,
+        startTxId);
+  }
+
+  @Override
+  public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
+    return storageContainerLocationClient.resetDeletedBlockRetryCount(txIDs);
+  }
+
+  @Override
+  public HddsProtos.DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException {
+    return storageContainerLocationClient.getDeletedBlockSummary();
+  }
+
+  @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String address, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(address,

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,12 +27,13 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -50,17 +52,23 @@ public class DeletedBlockLogStateManagerImpl
       LoggerFactory.getLogger(DeletedBlockLogStateManagerImpl.class);
 
   private Table<Long, DeletedBlocksTransaction> deletedTable;
+  private Table<String, ByteString> statefulConfigTable;
   private ContainerManager containerManager;
-  private final DBTransactionBuffer transactionBuffer;
+  private final SCMHADBTransactionBuffer transactionBuffer;
   private final Set<Long> deletingTxIDs;
+  private final Set<Long> skippingRetryTxIDs;
+  public static final String SERVICE_NAME = DeletedBlockLogStateManager.class.getSimpleName();
 
   public DeletedBlockLogStateManagerImpl(ConfigurationSource conf,
              Table<Long, DeletedBlocksTransaction> deletedTable,
-             ContainerManager containerManager, DBTransactionBuffer txBuffer) {
+             Table<String, ByteString> statefulServiceConfigTable,
+             ContainerManager containerManager, SCMHADBTransactionBuffer txBuffer) {
     this.deletedTable = deletedTable;
     this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
     this.deletingTxIDs = ConcurrentHashMap.newKeySet();
+    this.skippingRetryTxIDs = ConcurrentHashMap.newKeySet();
+    this.statefulConfigTable = statefulServiceConfigTable;
   }
 
   @Override
@@ -139,8 +147,26 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
-  public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs)
-      throws IOException {
+  public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
+      DeletedBlocksTransactionSummary summary) throws IOException {
+    Map<ContainerID, Long> containerIdToTxnIdMap = new HashMap<>();
+    transactionBuffer.pauseAutoFlush();
+    try {
+      for (DeletedBlocksTransaction tx : txs) {
+        long tid = tx.getTxID();
+        containerIdToTxnIdMap.compute(ContainerID.valueOf(tx.getContainerID()),
+            (k, v) -> v != null && v > tid ? v : tid);
+        transactionBuffer.addToBuffer(deletedTable, tx.getTxID(), tx);
+      }
+      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+    } finally {
+      transactionBuffer.resumeAutoFlush();
+    }
+    containerManager.updateDeleteTransactionId(containerIdToTxnIdMap);
+  }
+
+  @Override
+  public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs) throws IOException {
     Map<ContainerID, Long> containerIdToTxnIdMap = new HashMap<>();
     for (DeletedBlocksTransaction tx : txs) {
       long tid = tx.getTxID();
@@ -152,8 +178,24 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
-  public void removeTransactionsFromDB(ArrayList<Long> txIDs)
+  public void removeTransactionsFromDB(ArrayList<Long> txIDs, DeletedBlocksTransactionSummary summary)
       throws IOException {
+    if (deletingTxIDs != null) {
+      deletingTxIDs.addAll(txIDs);
+    }
+    transactionBuffer.pauseAutoFlush();
+    try {
+      for (Long txID : txIDs) {
+        transactionBuffer.removeFromBuffer(deletedTable, txID);
+      }
+      transactionBuffer.addToBuffer(statefulConfigTable, SERVICE_NAME, summary.toByteString());
+    } finally {
+      transactionBuffer.resumeAutoFlush();
+    }
+  }
+
+  @Override
+  public void removeTransactionsFromDB(ArrayList<Long> txIDs) throws IOException {
     if (deletingTxIDs != null) {
       deletingTxIDs.addAll(txIDs);
     }
@@ -182,6 +224,27 @@ public class DeletedBlockLogStateManagerImpl
   }
 
   @Override
+  public ArrayList<DeletedBlocksTransaction> getTransactionsFromDB(ArrayList<Long> txIDs) throws IOException {
+    Objects.requireNonNull(txIDs, "txIds cannot be null.");
+    ArrayList<DeletedBlocksTransaction> transactions = new ArrayList<>();
+    for (long txId: txIDs) {
+      try {
+        DeletedBlocksTransaction transaction = deletedTable.get(txId);
+        if (transaction == null) {
+          LOG.debug("txId {} is not found in deletedTable.", txId);
+          continue;
+        }
+        transactions.add(transaction);
+      } catch (IOException ex) {
+        LOG.error("Could not get deleted block transaction {}.", txId, ex);
+        throw ex;
+      }
+    }
+    LOG.debug("Get {} DeletedBlocksTransactions for {} input txIDs", transactions.size(), txIDs.size());
+    return transactions;
+  }
+
+  @Override
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
     Preconditions.checkNotNull(deletingTxIDs);
@@ -190,7 +253,7 @@ public class DeletedBlockLogStateManagerImpl
 
   @Override
   public void reinitialize(
-      Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable) {
+      Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable, Table<String, ByteString> configTable) {
     // Before Reinitialization, flush will be called from Ratis StateMachine.
     // Just the DeletedDb will be loaded here.
 
@@ -199,6 +262,7 @@ public class DeletedBlockLogStateManagerImpl
     // before reinitialization. Just update deletedTable here.
     Preconditions.checkArgument(deletingTxIDs.isEmpty());
     this.deletedTable = deletedBlocksTXTable;
+    this.statefulConfigTable = configTable;
   }
 
   public static Builder newBuilder() {
@@ -211,9 +275,10 @@ public class DeletedBlockLogStateManagerImpl
   public static class Builder {
     private ConfigurationSource conf;
     private SCMRatisServer scmRatisServer;
-    private Table<Long, DeletedBlocksTransaction> table;
-    private DBTransactionBuffer transactionBuffer;
+    private Table<Long, DeletedBlocksTransaction> deletedBlocksTransactionTable;
+    private SCMHADBTransactionBuffer transactionBuffer;
     private ContainerManager containerManager;
+    private Table<String, ByteString> statefulServiceConfigTable;
 
     public Builder setConfiguration(final ConfigurationSource config) {
       conf = config;
@@ -227,11 +292,11 @@ public class DeletedBlockLogStateManagerImpl
 
     public Builder setDeletedBlocksTable(
         final Table<Long, DeletedBlocksTransaction> deletedBlocksTable) {
-      table = deletedBlocksTable;
+      deletedBlocksTransactionTable = deletedBlocksTable;
       return this;
     }
 
-    public Builder setSCMDBTransactionBuffer(DBTransactionBuffer buffer) {
+    public Builder setSCMDBTransactionBuffer(SCMHADBTransactionBuffer buffer) {
       this.transactionBuffer = buffer;
       return this;
     }
@@ -241,12 +306,17 @@ public class DeletedBlockLogStateManagerImpl
       return this;
     }
 
-    public DeletedBlockLogStateManager build() {
+    public Builder setStatefulConfigTable(final Table<String, ByteString> table) {
+      this.statefulServiceConfigTable = table;
+      return this;
+    }
+
+    public DeletedBlockLogStateManager build() throws IOException {
       Preconditions.checkNotNull(conf);
-      Preconditions.checkNotNull(table);
+      Preconditions.checkNotNull(deletedBlocksTransactionTable);
 
       final DeletedBlockLogStateManager impl = new DeletedBlockLogStateManagerImpl(
-          conf, table, containerManager, transactionBuffer);
+          conf, deletedBlocksTransactionTable, statefulServiceConfigTable, containerManager, transactionBuffer);
 
       return scmRatisServer.getProxyHandler(RequestType.BLOCK,
           DeletedBlockLogStateManager.class, impl);

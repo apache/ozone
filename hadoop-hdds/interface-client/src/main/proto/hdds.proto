@@ -514,6 +514,14 @@ message DeletedBlocksTransactionInfo {
     optional int32 count = 4;
 }
 
+message DeletedBlocksTransactionSummary {
+    optional int64 firstTxID = 1; // starting ID of transaction to be counted into summary
+    optional uint64 totalTransactionCount = 2;
+    optional uint64 totalBlockCount = 3;
+    optional uint64 totalBlockSize = 4;
+    optional uint64 totalBlockReplicatedSize = 5;
+}
+
 message CompactionFileInfoProto {
     optional string fileName = 1;
     optional string startKey = 2;
