@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -55,7 +54,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private final AtomicLong txFlushPending = new AtomicLong(0);
   private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
-  private final AtomicBoolean autoFlushEnabled = new AtomicBoolean(true);
+  private boolean autoFlushEnabled = true;
 
   public SCMHADBTransactionBufferImpl(StorageContainerManager scm)
       throws IOException {
@@ -127,7 +126,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   public void pauseAutoFlush() {
     rwLock.writeLock().lock();
     try {
-      autoFlushEnabled.set(false);
+      autoFlushEnabled = false;
       LOG.debug("Auto flush is paused for SCM HA DB transaction buffer.");
     } finally {
       rwLock.writeLock().unlock();
@@ -138,7 +137,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   public void resumeAutoFlush() {
     rwLock.writeLock().lock();
     try {
-      autoFlushEnabled.set(true);
+      autoFlushEnabled = true;
       LOG.debug("Auto flush is resumed for SCM HA DB transaction buffer.");
     } finally {
       rwLock.writeLock().unlock();
@@ -203,7 +202,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     rwLock.readLock().lock();
     try {
       long timeDiff = scm.getSystemClock().millis() - lastSnapshotTimeMs;
-      return autoFlushEnabled.get() && txFlushPending.get() > 0 && timeDiff > snapshotWaitTime;
+      return autoFlushEnabled && txFlushPending.get() > 0 && timeDiff > snapshotWaitTime;
     } finally {
       rwLock.readLock().unlock();
     }
