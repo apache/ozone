@@ -43,7 +43,7 @@ import org.apache.ratis.protocol.ClientId;
  */
 public abstract class AbstractKeyDeletingService extends BackgroundService
     implements BootstrapStateHandler {
-  public static final Logger LOG = LogManager.getLogger("OMGCLogger");
+  public static final Logger LOG = LogManager.getLogger("OMDeletionLogger");
 
   private final OzoneManager ozoneManager;
   private final DeletingServiceMetrics metrics;
