@@ -295,17 +295,16 @@ class TestSstFileSetReader {
         .sorted()
         .collect(Collectors.toList());
     assertEquals(expectedKeysList, actualKeys, "Keys should be in sorted order without duplicates");
-
-    // Verify that we get distinct keys (no duplicates)
-    assertEquals(expectedKeys.size(), actualKeys.size(), "Should have no duplicate keys");
   }
 
   /**
    * Test that tombstones (deleted entries) are correctly skipped while reading SST files.
    */
+  @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
   @ParameterizedTest
   @ValueSource(ints = {2, 3, 4})
   public void testTombstoneSkipping(int numberOfFiles) throws RocksDBException {
+    assumeTrue(ManagedRawSSTFileReader.tryLoadLibrary());
     assumeTrue(numberOfFiles >= 2);
 
     List<String> files = new ArrayList<>();
@@ -369,7 +368,7 @@ class TestSstFileSetReader {
 
     // Test with regular getKeyStream (should skip tombstones)
     List<String> actualKeys = new ArrayList<>();
-    try (Stream<String> keyStream = new SstFileSetReader(files).getKeyStream(null, null)) {
+    try (Stream<String> keyStream = new SstFileSetReader(files).getKeyStreamWithTombstone(null, null)) {
       keyStream.forEach(actualKeys::add);
     }
 
