@@ -1594,11 +1594,19 @@ public class KeyValueHandler extends Handler {
           containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
       // Data checksum updated after each peer reconciles.
       long start = Instant.now().toEpochMilli();
-      ContainerProtos.ContainerChecksumInfo peerChecksumInfo = dnClient.getContainerChecksumInfo(
-          containerID, peer);
-      if (peerChecksumInfo == null) {
-        LOG.warn("Cannot reconcile container {} with peer {} which has not yet generated a checksum",
-            containerID, peer);
+      ContainerProtos.ContainerChecksumInfo peerChecksumInfo;
+      
+      try {
+        // Data checksum updated after each peer reconciles.
+        peerChecksumInfo = dnClient.getContainerChecksumInfo(containerID, peer);
+        if (peerChecksumInfo == null) {
+          LOG.warn("Cannot reconcile container {} with peer {} which has not yet generated a checksum",
+              containerID, peer);
+          continue;
+        }
+      } catch (Exception e) {
+        LOG.error("Failed to connect to peer {} for container {} reconciliation. Skipping to next peer.",
+            peer, containerID, e);
         continue;
       }
 

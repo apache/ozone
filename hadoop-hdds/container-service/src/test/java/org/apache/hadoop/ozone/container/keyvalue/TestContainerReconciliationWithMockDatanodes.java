@@ -89,6 +89,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -226,6 +227,66 @@ public class TestContainerReconciliationWithMockDatanodes {
     // After reconciliation, checksums should be the same for all containers.
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
+  }
+
+  @Test
+  public void testContainerReconciliationWithPeerFailure() throws Exception {
+    LOG.info("Testing container reconciliation with peer failure for container {}", CONTAINER_ID);
+    // Introduce corruption in the first datanode
+    MockDatanode corruptedNode = datanodes.get(0);
+    MockDatanode healthyNode1 = datanodes.get(1);
+    MockDatanode healthyNode2 = datanodes.get(2);
+    corruptedNode.introduceCorruption(CONTAINER_ID, 1, 1, false);
+    
+    // Use synchronous on-demand scans to re-build the merkle trees after corruption.
+    datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
+    
+    // Without reconciliation, checksums should be different.
+    assertUniqueChecksumCount(CONTAINER_ID, datanodes, 2);
+    waitForExpectedScanCount(1);
+    
+    // Create a failing peer - we'll make the second datanode fail during getContainerChecksumInfo
+    DatanodeDetails failingPeerDetails = healthyNode1.getDnDetails();
+    Map<DatanodeDetails, MockDatanode> dnMap = datanodes.stream()
+        .collect(Collectors.toMap(MockDatanode::getDnDetails, Function.identity()));
+        
+    containerProtocolMock.when(() -> ContainerProtocolCalls.getContainerChecksumInfo(any(), anyLong(), any()))
+        .thenAnswer(inv -> {
+          XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
+          long containerID = inv.getArgument(1);
+          Pipeline pipeline = xceiverClientSpi.getPipeline();
+          assertEquals(1, pipeline.size());
+          DatanodeDetails dn = pipeline.getFirstNode();
+          
+          // Throw exception for the specific failing peer
+          if (dn.equals(failingPeerDetails)) {
+            throw new IOException("Simulated peer failure for testing");
+          }
+          
+          return dnMap.get(dn).getChecksumInfo(containerID);
+        });
+    
+    // Now reconcile the corrupted node with its peers (including the failing one)
+    List<DatanodeDetails> peers = Arrays.asList(failingPeerDetails, healthyNode2.getDnDetails());
+    corruptedNode.reconcileContainer(dnClient, peers, CONTAINER_ID);
+    
+    // Wait for scan to complete - but this time we only expect the corrupted node to have a scan
+    // triggered by reconciliation, so we wait specifically for that one
+    try {
+      GenericTestUtils.waitFor(() -> corruptedNode.getOnDemandScanCount() == 2, 100, 5_000);
+    } catch (TimeoutException ex) {
+      LOG.warn("Timed out waiting for on-demand scan after reconciliation. Current count: {}", 
+          corruptedNode.getOnDemandScanCount());
+    }
+    
+    // The corrupted node should still be repaired because it was able to reconcile with the healthy peer
+    // even though one peer failed
+    long corruptedChecksum = corruptedNode.checkAndGetDataChecksum(CONTAINER_ID);
+    long healthyChecksum = healthyNode2.checkAndGetDataChecksum(CONTAINER_ID);
+    assertEquals(healthyChecksum, corruptedChecksum);
+    
+    // Restore the original mock behavior for other tests
+    mockContainerProtocolCalls();
   }
 
   /**
