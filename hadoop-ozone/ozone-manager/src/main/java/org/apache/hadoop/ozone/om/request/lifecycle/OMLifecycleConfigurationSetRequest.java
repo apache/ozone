@@ -85,6 +85,13 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
           resolvedBucket.realBucket(), null);
     }
 
+    if (resolvedBucket.bucketLayout().toProto() != request.getLifecycleConfiguration().getBucketLayout()) {
+      throw new OMException("Bucket layout mismatch: requested lifecycle configuration " +
+          "has bucket layout " + request.getLifecycleConfiguration().getBucketLayout() + 
+          " but the actual bucket has layout " + resolvedBucket.bucketLayout().toProto(),
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
     SetLifecycleConfigurationRequest.Builder newCreateRequest =
         request.toBuilder();
 

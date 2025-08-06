@@ -68,7 +68,7 @@ public class TestOMLifecycleConfigurationSetRequest extends
     when(ozoneManager.resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
         .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), 
             Pair.of(resolvedVolumeName, resolvedBucketName),
-            "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
+            "owner", BucketLayout.OBJECT_STORE));
     OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName, bucketName, "ownername");
     OMLifecycleConfigurationSetRequest request = new OMLifecycleConfigurationSetRequest(originalRequest);
     OMRequest modifiedRequest = request.preExecute(ozoneManager);

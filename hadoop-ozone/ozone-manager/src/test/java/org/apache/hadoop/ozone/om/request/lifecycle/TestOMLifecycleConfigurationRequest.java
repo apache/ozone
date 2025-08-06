@@ -80,7 +80,7 @@ public class TestOMLifecycleConfigurationRequest {
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
     when(ozoneManager.resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
         .thenAnswer(i -> new ResolvedBucket(i.getArgument(0),
-            i.getArgument(0), "dummyBucketOwner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
+            i.getArgument(0), "dummyBucketOwner", BucketLayout.OBJECT_STORE));
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
