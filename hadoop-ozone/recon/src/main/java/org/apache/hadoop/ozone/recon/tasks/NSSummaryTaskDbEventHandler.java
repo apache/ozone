@@ -122,7 +122,7 @@ public class NSSummaryTaskDbEventHandler {
     // Check if this directory already has content (files/subdirs) that need propagation
     boolean directoryAlreadyExists = (curNSSummary != null);
     long existingSizeOfFiles = directoryAlreadyExists ? curNSSummary.getSizeOfFiles() : 0;
-    long existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
+    int existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
 
     if (curNSSummary == null) {
       // If we don't have it locally and in the DB we create a new instance
@@ -247,8 +247,8 @@ public class NSSummaryTaskDbEventHandler {
    * This ensures that when files are added/deleted, all ancestor directories
    * reflect the total changes in their sizeOfFiles and numOfFiles fields.
    */
-  protected void propagateSizeUpwards(long objectId, long sizeChange, 
-                                       long countChange, Map<Long, NSSummary> nsSummaryMap) 
+  protected void propagateSizeUpwards(long objectId, long sizeChange,
+                                       int countChange, Map<Long, NSSummary> nsSummaryMap) 
                                        throws IOException {
     // Get the current directory's NSSummary
     NSSummary nsSummary = nsSummaryMap.get(objectId);
@@ -261,7 +261,7 @@ public class NSSummaryTaskDbEventHandler {
 
     // Continue propagating to parent
     long parentId = nsSummary.getParentId();
-    if (parentId != 0) {
+    if (parentId > 0) {
       // Get parent's NSSummary
       NSSummary parentSummary = nsSummaryMap.get(parentId);
       if (parentSummary == null) {
@@ -270,7 +270,7 @@ public class NSSummaryTaskDbEventHandler {
       if (parentSummary != null) {
         // Update parent's totals
         parentSummary.setSizeOfFiles(parentSummary.getSizeOfFiles() + sizeChange);
-        parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + (int)countChange);
+        parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + countChange);
         nsSummaryMap.put(parentId, parentSummary);
         
         // Recursively propagate to grandparents
