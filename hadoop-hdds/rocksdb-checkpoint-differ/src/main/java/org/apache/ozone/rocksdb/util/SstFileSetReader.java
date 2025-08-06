@@ -309,6 +309,11 @@ public class SstFileSetReader {
 
       return this.current.equals(other.current) && this.fileIndex == other.fileIndex;
     }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(iterator, current, fileIndex);
+    }
   }
 
   private abstract static class MultipleSstFileIterator<T extends Comparable<T>> implements ClosableIterator<T> {
