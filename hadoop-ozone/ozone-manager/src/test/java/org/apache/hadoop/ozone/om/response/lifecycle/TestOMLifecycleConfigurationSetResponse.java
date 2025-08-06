@@ -120,6 +120,6 @@ public class TestOMLifecycleConfigurationSetResponse {
     assertEquals(omMetadataManager.getBucketKey(volumeName, bucketName),
         keyValue.getKey());
 
-    assertEquals(omLifecycleConfiguration.getProtobuf(), keyValue.getValue().getProtobuf().toBuilder());
+    assertEquals(omLifecycleConfiguration.getProtobuf(), keyValue.getValue().getProtobuf());
   }
 }
