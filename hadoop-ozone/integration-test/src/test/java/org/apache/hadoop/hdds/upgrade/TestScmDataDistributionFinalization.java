@@ -28,6 +28,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
@@ -181,6 +183,7 @@ public class TestScmDataDistributionFinalization {
   @Test
   public void testFinalizationEmptyClusterDataDistribution() throws Exception {
     init(new OzoneConfiguration(), null, true);
+    assertNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     finalizationFuture.get();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
@@ -193,6 +196,8 @@ public class TestScmDataDistributionFinalization {
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
+    assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
+
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
       DeletedBlockLogImpl deletedBlockLog = (DeletedBlockLogImpl) scm.getScmBlockManager().getDeletedBlockLog();
       SCMDeletedBlockTransactionStatusManager statusManager =
@@ -308,6 +313,7 @@ public class TestScmDataDistributionFinalization {
     StorageContainerManager activeSCM = cluster.getActiveSCM();
     activeSCM.getScmBlockManager().getDeletedBlockLog().addTransactions(generateDeletedBlocks(txCount, false));
     flushDBTransactionBuffer(activeSCM);
+    assertNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     finalizationFuture = Executors.newSingleThreadExecutor().submit(
         () -> {
@@ -329,6 +335,7 @@ public class TestScmDataDistributionFinalization {
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
+    assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
       DeletedBlockLogImpl deletedBlockLog = (DeletedBlockLogImpl) scm.getScmBlockManager().getDeletedBlockLog();

@@ -553,11 +553,6 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public boolean isTransactionSummarySupported() {
-    return VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION);
-  }
-
-  @Override
   public void onDatanodeDead(DatanodeID dnId) {
     getSCMDeletedBlockTransactionStatusManager().onDatanodeDead(dnId);
   }

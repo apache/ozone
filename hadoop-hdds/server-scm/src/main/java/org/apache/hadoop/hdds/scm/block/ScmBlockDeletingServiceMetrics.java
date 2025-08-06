@@ -296,8 +296,21 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     numProcessedTransactions.snapshot(builder, all);
     numBlockDeletionTransactionDataNodes.snapshot(builder, all);
     numBlockAddedForDeletionToDN.snapshot(builder, all);
-    numBlockDeletionTransactionSizeFromCache.snapshot(builder, all);
-    numBlockDeletionTransactionSizeFromDB.snapshot(builder, all);
+
+    // add metrics for deleted block transaction summary
+    HddsProtos.DeletedBlocksTransactionSummary summary = blockManager.getDeletedBlockLog().getTransactionSummary();
+    if (summary != null) {
+      numBlockDeletionTransactionSizeFromCache.snapshot(builder, all);
+      numBlockDeletionTransactionSizeFromDB.snapshot(builder, all);
+      builder = builder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(NUM_BLOCK_DELETION_TRANSACTIONS, summary.getTotalTransactionCount());
+      builder = builder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(NUM_BLOCK_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockCount());
+      builder = builder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockSize());
+      builder = builder.endRecord().addRecord(SOURCE_NAME)
+          .addGauge(REPLICATED_BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockReplicatedSize());
+    }
 
     MetricsRecordBuilder recordBuilder = builder;
     for (Map.Entry<DatanodeID, DatanodeCommandDetails> e : numCommandsDatanode.entrySet()) {
@@ -314,19 +327,6 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
               e.getValue().getCommandsTimeout())
           .addGauge(DatanodeCommandDetails.BLOCKS_SENT_TO_DN_COMMAND,
           e.getValue().getBlocksSent());
-    }
-
-    // add metrics for deleted block transaction summary
-    if (blockManager.getDeletedBlockLog().isTransactionSummarySupported()) {
-      HddsProtos.DeletedBlocksTransactionSummary summary = blockManager.getDeletedBlockLog().getTransactionSummary();
-      recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
-          .addGauge(NUM_BLOCK_DELETION_TRANSACTIONS, summary.getTotalTransactionCount());
-      recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
-          .addGauge(NUM_BLOCK_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockCount());
-      recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
-          .addGauge(BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockSize());
-      recordBuilder = recordBuilder.endRecord().addRecord(SOURCE_NAME)
-          .addGauge(REPLICATED_BLOCK_SIZE_OF_ALL_DELETION_TRANSACTIONS, summary.getTotalBlockReplicatedSize());
     }
     recordBuilder.endRecord();
   }

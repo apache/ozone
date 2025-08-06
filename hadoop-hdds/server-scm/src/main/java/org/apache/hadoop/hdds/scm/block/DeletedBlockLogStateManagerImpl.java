@@ -275,7 +275,7 @@ public class DeletedBlockLogStateManagerImpl
       try {
         DeletedBlocksTransaction transaction = deletedTable.get(txId);
         if (transaction == null) {
-          LOG.warn("txId {} is not found in deletedTable.", txId);
+          LOG.debug("txId {} is not found in deletedTable.", txId);
           continue;
         }
         transactions.add(transaction);
