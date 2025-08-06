@@ -106,6 +106,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
 /**
  * Test Key Lifecycle Service.
@@ -192,7 +193,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     @AfterAll
     void cleanup() {
-      if (om.stop()) {
+      if (om != null) {
+        om.stop();
         om.join();
       }
     }
@@ -1168,6 +1170,46 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(0, metrics.getNumDirIterated().value() - initialDirIterated);
       assertEquals(0, metrics.getNumDirDeleted().value() - initialDirDeleted);
       deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters1")
+    void testListMaxSize(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
+        TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String prefix = "key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(bucketLayout);
+      final int keyCount = 10001;
+      // create keys
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, prefix, null);
+      // check there are keys in keyTable
+      Thread.sleep(SERVICE_INTERVAL);
+      assertEquals(keyCount, keyList.size());
+      assertEquals(keyCount, getKeyCount(bucketLayout) - initialKeyCount);
+
+      GenericTestUtils.setLogLevel(KeyLifecycleService.getLog(), Level.DEBUG);
+      GenericTestUtils.LogCapturer log =
+          GenericTestUtils.LogCapturer.captureLogs(
+              LoggerFactory.getLogger(KeyLifecycleService.class));
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      if (createPrefix) {
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
+      } else {
+        OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
+        createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
+      }
+
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == keyCount, SERVICE_INTERVAL, 10000);
+      assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
+      deleteLifecyclePolicy(volumeName, bucketName);
+      assertTrue(log.getOutput().contains("LimitedSizeList reached maximum size 10000"));
+      GenericTestUtils.setLogLevel(KeyLifecycleService.getLog(), Level.INFO);
     }
   }
 
