@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
