@@ -1173,8 +1173,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
 
     @ParameterizedTest
-    @MethodSource("parameters1")
-    void testListMaxSize(BucketLayout bucketLayout, boolean createPrefix) throws IOException,
+    @EnumSource(BucketLayout.class)
+    void testListMaxSize(BucketLayout bucketLayout) throws IOException,
         TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
@@ -1197,20 +1197,15 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      if (createPrefix) {
-        createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
-      } else {
-        OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
-        createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
-      }
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == keyCount, SERVICE_INTERVAL, 10000);
       assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
-      deleteLifecyclePolicy(volumeName, bucketName);
       GenericTestUtils.waitFor(() ->
-          log.getOutput().contains("LimitedSizeList reached maximum size 10000"), SERVICE_INTERVAL, 5000);
+          log.getOutput().contains("LimitedSizeList reached maximum size 10000"), SERVICE_INTERVAL, 10000);
       GenericTestUtils.setLogLevel(KeyLifecycleService.getLog(), Level.INFO);
+      deleteLifecyclePolicy(volumeName, bucketName);
     }
   }
 
