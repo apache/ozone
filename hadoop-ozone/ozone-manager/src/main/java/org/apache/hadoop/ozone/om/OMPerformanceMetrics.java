@@ -319,11 +319,11 @@ public class OMPerformanceMetrics {
     return createKeyAllocateBlockLatencyNs;
   }
 
-  public void setCreateKeyFailureLatencyNs(long latencyInNs) {
+  public void addCreateKeyFailureLatencyNs(long latencyInNs) {
     createKeyFailureLatencyNs.add(latencyInNs);
   }
 
-  public void setCreateKeySuccessLatencyNs(long latencyInNs) {
+  public void addCreateKeySuccessLatencyNs(long latencyInNs) {
     createKeySuccessLatencyNs.add(latencyInNs);
   }
     

@@ -94,7 +94,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     List<OmDirectoryInfo> missingParentInfos;
     int numKeysCreated = 0;
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
-    long startNanos = Time.monotonicNowNanos();
+    long createKeyStartTime = Time.monotonicNowNanos();
     try {
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
@@ -178,11 +178,11 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       long preAllocatedSpace =
           newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
               .getRequiredNodes();
-      long startTime = Time.monotonicNowNanos();
+      long quotaCheckStartTime = Time.monotonicNowNanos();
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
-      perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - startTime);
+      perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       omBucketInfo.incrUsedNamespace(numKeysCreated);
 
       // Add to cache entry can be done outside of lock for this openKey.
@@ -213,7 +213,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
       result = Result.SUCCESS;
       long endNanosCreateKeySuccessLatencyNs = Time.monotonicNowNanos();
-      perfMetrics.setCreateKeySuccessLatencyNs(endNanosCreateKeySuccessLatencyNs - startNanos);
+      perfMetrics.addCreateKeySuccessLatencyNs(endNanosCreateKeySuccessLatencyNs - createKeyStartTime);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
@@ -222,7 +222,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       omClientResponse = new OMKeyCreateResponseWithFSO(
               createErrorOMResponse(omResponse, exception), getBucketLayout());
       long endNanosCreateKeyFailureLatencyNs = Time.monotonicNowNanos();
-      perfMetrics.setCreateKeyFailureLatencyNs(endNanosCreateKeyFailureLatencyNs - startNanos);
+      perfMetrics.addCreateKeyFailureLatencyNs(endNanosCreateKeyFailureLatencyNs - createKeyStartTime);
     } finally {
       if (acquireLock) {
         mergeOmLockDetails(omMetadataManager.getLock()

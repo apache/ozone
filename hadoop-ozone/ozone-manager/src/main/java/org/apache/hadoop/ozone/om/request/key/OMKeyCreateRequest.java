@@ -220,7 +220,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     List<OmKeyInfo> missingParentInfos = null;
     int numMissingParents = 0;
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
-    long startNanos = Time.monotonicNowNanos();
+    long createKeyStartTime = Time.monotonicNowNanos();
     try {
 
       mergeOmLockDetails(
@@ -311,11 +311,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           * ozoneManager.getScmBlockSize()
           * replicationConfig.getRequiredNodes();
       // check bucket and volume quota
-      long startTime = Time.monotonicNowNanos();
+      long quotaCheckStartTime = Time.monotonicNowNanos();
       checkBucketQuotaInBytes(omMetadataManager, bucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(bucketInfo, numMissingParents + 1L);
-      perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - startTime);
+      perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       bucketInfo.incrUsedNamespace(numMissingParents);
 
       if (numMissingParents > 0) {
@@ -344,7 +344,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       result = Result.SUCCESS;
       long endNanosCreateKeySuccessLatencyNs = Time.monotonicNowNanos();
-      perfMetrics.setCreateKeySuccessLatencyNs(endNanosCreateKeySuccessLatencyNs - startNanos);
+      perfMetrics.addCreateKeySuccessLatencyNs(endNanosCreateKeySuccessLatencyNs - createKeyStartTime);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
@@ -353,7 +353,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omClientResponse = new OMKeyCreateResponse(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
       long endNanosCreateKeyFailureLatencyNs = Time.monotonicNowNanos();
-      perfMetrics.setCreateKeyFailureLatencyNs(endNanosCreateKeyFailureLatencyNs - startNanos);
+      perfMetrics.addCreateKeyFailureLatencyNs(endNanosCreateKeyFailureLatencyNs - createKeyStartTime);
     } finally {
       if (acquireLock) {
         mergeOmLockDetails(ozoneLockStrategy
