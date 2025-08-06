@@ -33,6 +33,8 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.ratis.protocol.ClientId;
 
 /**
@@ -41,6 +43,7 @@ import org.apache.ratis.protocol.ClientId;
  */
 public abstract class AbstractKeyDeletingService extends BackgroundService
     implements BootstrapStateHandler {
+  public static final Logger LOG = LogManager.getLogger("OMGCLogger");
 
   private final OzoneManager ozoneManager;
   private final DeletingServiceMetrics metrics;

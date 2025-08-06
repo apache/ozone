@@ -71,9 +71,6 @@ import org.slf4j.LoggerFactory;
  * Background Service to clean-up deleted snapshot and reclaim space.
  */
 public class SnapshotDeletingService extends AbstractKeyDeletingService {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(SnapshotDeletingService.class);
-
   // Use only a single thread for Snapshot Deletion. Multiple threads would read
   // from the same table and can send deletion requests for same snapshot
   // multiple times.
