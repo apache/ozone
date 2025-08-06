@@ -370,7 +370,10 @@ public class SstFileSetReader {
         }
 
         // Skip this duplicate entry
-        skipCurrentEntry();
+        HeapEntryWithFileIdx<T> entry = minHeap.poll();
+        if (entry != null && entry.advance()) {
+          minHeap.offer(entry);
+        }
       }
 
       return false;
@@ -382,24 +385,14 @@ public class SstFileSetReader {
         throw new NoSuchElementException("No more elements found.");
       }
 
-      // Find the entry with the highest file index (latest in collection) for the current key
+      assert minHeap.peek() != null;
+      // Get current key from heap
       T currentKey = minHeap.peek().getCurrent();
-      HeapEntryWithFileIdx<T> entryToReturn = null;
-      List<HeapEntryWithFileIdx<T>> duplicateEntries = new ArrayList<>();
 
-      // Collect all entries with the same key
+      // Advance all entries with the same key (from different files)
+      // and keep the one with the highest file index
       while (!minHeap.isEmpty() && Objects.equals(minHeap.peek().getCurrent(), currentKey)) {
         HeapEntryWithFileIdx<T> entry = minHeap.poll();
-        duplicateEntries.add(entry);
-
-        // Keep track of the entry with the highest file index
-        if (entryToReturn == null || entry.fileIndex > entryToReturn.fileIndex) {
-          entryToReturn = entry;
-        }
-      }
-
-      // Advance all duplicate entries and re-add them to the heap if they have more values
-      for (HeapEntryWithFileIdx<T> entry : duplicateEntries) {
         if (entry.advance()) {
           minHeap.offer(entry);
         }
@@ -407,13 +400,6 @@ public class SstFileSetReader {
 
       lastReturnedValue = currentKey;
       return currentKey;
-    }
-
-    private void skipCurrentEntry() {
-      HeapEntryWithFileIdx<T> entry = minHeap.poll();
-      if (entry != null && entry.advance()) {
-        minHeap.offer(entry);
-      }
     }
 
     @Override
