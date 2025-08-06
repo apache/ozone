@@ -4693,7 +4693,7 @@
   </property>
   <property>
     <name>ozone.lifecycle.service.delete.batch-size</name>
-    <value>200</value>
+    <value>1000</value>
     <tag>OZONE</tag>
     <description>Max numbers of objects allowed for deletion in a batch for a lifecycle evaluating task.</description>
   </property>
