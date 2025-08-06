@@ -23,10 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.when;
 
 import java.util.UUID;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -50,6 +56,28 @@ public class TestOMLifecycleConfigurationSetRequest extends
    // Volume name and bucket name length should be greater than OZONE_MIN_BUCKET_NAME_LENGTH
     assertThrows(OMException.class, () -> doPreExecute("v1", "bucket1"));
     assertThrows(OMException.class, () -> doPreExecute("volume1", "b1"));
+  }
+
+  @Test
+  public void testPreExecuteWithLinkedBucket() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String resolvedBucketName = bucketName + "-resolved";
+    String resolvedVolumeName = volumeName + "-resolved";
+    // Mock the bucket link resolution
+    when(ozoneManager.resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
+        .thenAnswer(i -> new ResolvedBucket(i.getArgument(0), 
+            Pair.of(resolvedVolumeName, resolvedBucketName),
+            "owner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
+    OMRequest originalRequest = setLifecycleConfigurationRequest(volumeName, bucketName, "ownername");
+    OMLifecycleConfigurationSetRequest request = new OMLifecycleConfigurationSetRequest(originalRequest);
+    OMRequest modifiedRequest = request.preExecute(ozoneManager);
+
+    // Verify that the resolved volume and bucket names are used in the lifecycle configuration
+    LifecycleConfiguration lifecycleConfig =
+        modifiedRequest.getSetLifecycleConfigurationRequest().getLifecycleConfiguration();
+    assertEquals(resolvedVolumeName, lifecycleConfig.getVolume());
+    assertEquals(resolvedBucketName, lifecycleConfig.getBucket());
   }
 
   @Test

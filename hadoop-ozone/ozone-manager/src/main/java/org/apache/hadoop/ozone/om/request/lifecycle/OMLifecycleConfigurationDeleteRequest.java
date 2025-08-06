@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 
 import java.io.IOException;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -58,10 +60,32 @@ public class OMLifecycleConfigurationDeleteRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    return getOmRequest().toBuilder()
+    OMRequest request = super.preExecute(ozoneManager);
+    DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest =
+        request.getDeleteLifecycleConfigurationRequest();
+
+    String volumeName = deleteLifecycleConfigurationRequest.getVolumeName();
+    String bucketName = deleteLifecycleConfigurationRequest.getBucketName();
+
+    // Resolve bucket link and check ACLs
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+        Pair.of(volumeName, bucketName), this);
+
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET, OzoneObj.StoreType.OZONE,
+          IAccessAuthorizer.ACLType.ALL, resolvedBucket.realVolume(), 
+          resolvedBucket.realBucket(), null);
+    }
+
+    // Update the request with resolved volume and bucket names
+    DeleteLifecycleConfigurationRequest.Builder newRequest = 
+        deleteLifecycleConfigurationRequest.toBuilder()
+            .setVolumeName(resolvedBucket.realVolume())
+            .setBucketName(resolvedBucket.realBucket());
+
+    return request.toBuilder()
         .setUserInfo(getUserInfo())
-        .setDeleteLifecycleConfigurationRequest(getOmRequest()
-            .getDeleteLifecycleConfigurationRequest())
+        .setDeleteLifecycleConfigurationRequest(newRequest.build())
         .build();
   }
 
@@ -91,11 +115,6 @@ public class OMLifecycleConfigurationDeleteRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
 
     try {
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET, OzoneObj.StoreType.OZONE,
-            IAccessAuthorizer.ACLType.ALL, volumeName, bucketName, null);
-      }
-
       mergeOmLockDetails(metadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
@@ -131,6 +150,9 @@ public class OMLifecycleConfigurationDeleteRequest extends OMClientRequest {
         mergeOmLockDetails(metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName));
       }
+    }
+    if (omClientResponse != null) {
+      omClientResponse.setOmLockDetails(getOmLockDetails());
     }
 
     // Performing audit logging outside the lock.

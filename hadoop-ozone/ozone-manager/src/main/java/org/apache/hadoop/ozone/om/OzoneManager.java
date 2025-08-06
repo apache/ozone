@@ -3124,26 +3124,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
       String bucketName) throws IOException {
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    auditMap = buildAuditMap(resolvedBucket.realVolume());
+    auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
+
     if (isAclEnabled) {
-      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, volumeName,
-          bucketName, null);
+      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
+          resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
     }
 
     boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(volumeName);
-    auditMap.put(OzoneConsts.BUCKET, bucketName);
-    metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
-        bucketName);
+    OMLockDetails omLockDetails = metadataManager.getLock().acquireReadLock(BUCKET_LOCK,
+        resolvedBucket.realVolume(), resolvedBucket.realBucket());
+    boolean lockAcquired = omLockDetails.isLockAcquired();
     try {
-      return metadataManager.getLifecycleConfiguration(volumeName, bucketName);
+      return metadataManager.getLifecycleConfiguration(
+          resolvedBucket.realVolume(), resolvedBucket.realBucket());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(buildAuditMessageForFailure(
           OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap, ex));
       throw ex;
     } finally {
-      metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-          bucketName);
+      if (lockAcquired) {
+        metadataManager.getLock().releaseReadLock(BUCKET_LOCK,
+            resolvedBucket.realVolume(), resolvedBucket.realBucket());
+      }
       if (auditSuccess) {
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap));

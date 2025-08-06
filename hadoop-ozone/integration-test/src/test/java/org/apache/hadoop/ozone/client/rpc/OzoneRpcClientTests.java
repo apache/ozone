@@ -5310,30 +5310,30 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     ClientProtocol proxy = store.getClientProxy();
 
     OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
-        bucketName, true);
+        bucketName, true, bucketLayout);
     proxy.setLifecycleConfiguration(lcc1);
 
     // No such volume
     OmLifecycleConfiguration lcc2 = createOmLifecycleConfiguration("nonexistentvolume",
-        "nonexistentbucket", true);
+        "nonexistentbucket", true, bucketLayout);
     OzoneTestUtils.expectOmException(ResultCodes.VOLUME_NOT_FOUND,
         () -> proxy.setLifecycleConfiguration(lcc2));
 
     // No such bucket
     OmLifecycleConfiguration lcc3 = createOmLifecycleConfiguration(volumeName,
-        "nonexistentbucket", true);
+        "nonexistentbucket", true, bucketLayout);
     OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
         () -> proxy.setLifecycleConfiguration(lcc3));
 
     // Invalid volumeName
     OmLifecycleConfiguration lcc4 = createOmLifecycleConfiguration("VOLUMENAME",
-        bucketName, true);
+        bucketName, true, bucketLayout);
     OzoneTestUtils.expectOmException(ResultCodes.INVALID_VOLUME_NAME,
         () -> proxy.setLifecycleConfiguration(lcc4));
 
     // Invalid bucketName
     OmLifecycleConfiguration lcc5 = createOmLifecycleConfiguration(volumeName,
-        "BUCKETNAME", true);
+        "BUCKETNAME", true, bucketLayout);
     OzoneTestUtils.expectOmException(ResultCodes.INVALID_BUCKET_NAME,
         () -> proxy.setLifecycleConfiguration(lcc5));
   }
@@ -5355,7 +5355,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         () -> proxy.deleteLifecycleConfiguration(volumeName, bucketName));
 
     OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
-        bucketName, true);
+        bucketName, true, bucketLayout);
     proxy.setLifecycleConfiguration(lcc1);
     proxy.deleteLifecycleConfiguration(volumeName, bucketName);
   }
@@ -5370,7 +5370,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     // Create a new lifecycle configuration and make sure verify it.
     OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
-        bucketName, true);
+        bucketName, true, BucketLayout.OBJECT_STORE);
     proxy.setLifecycleConfiguration(lcc1);
     OzoneLifecycleConfiguration lcc2 =
         proxy.getLifecycleConfiguration(volumeName, bucketName);
@@ -5404,7 +5404,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         () -> proxy.getLifecycleConfiguration(volumeName, bucketName));
 
     OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
-        bucketName, true);
+        bucketName, true, bucketLayout);
     proxy.setLifecycleConfiguration(lcc1);
 
     OzoneLifecycleConfiguration lcc2 =
@@ -5417,14 +5417,68 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertNotEquals(lcc1.getCreationTime(), lcc2.getCreationTime());
   }
 
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testLifecycleConfigurationWithLinkedBucket(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String sourceBucketName = UUID.randomUUID().toString();
+    String linkedBucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    
+    // Create source bucket nand linked bucket
+    BucketArgs bucketArgs = BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(sourceBucketName, bucketArgs);
+    OzoneBucket sourceBucket = volume.getBucket(sourceBucketName);
+    assertNotNull(sourceBucket);
+    volume.createBucket(linkedBucketName,
+        BucketArgs.newBuilder()
+            .setSourceBucket(sourceBucketName)
+            .setSourceVolume(volumeName)
+            .build());
+    OzoneBucket linkedBucket = volume.getBucket(linkedBucketName);
+    assertNotNull(linkedBucket);
+    
+    ClientProtocol proxy = store.getClientProxy();
+    OzoneTestUtils.expectOmException(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, sourceBucketName));
+    OzoneTestUtils.expectOmException(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, linkedBucketName));
+
+    OmLifecycleConfiguration lccThroughLinked = createOmLifecycleConfiguration(volumeName,
+        linkedBucketName, true, bucketLayout);
+    proxy.setLifecycleConfiguration(lccThroughLinked);
+
+    OzoneLifecycleConfiguration lccFromSource = 
+        proxy.getLifecycleConfiguration(volumeName, sourceBucketName);
+    // The actual stored configuration should be for the source bucket
+    assertEquals(volumeName, lccFromSource.getVolume());
+    assertEquals(sourceBucketName, lccFromSource.getBucket());
+    
+    // Delete lifecycle configuration through linked bucket
+    proxy.deleteLifecycleConfiguration(volumeName, linkedBucketName);
+    
+    // Verify lifecycle configuration is deleted for both buckets
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, linkedBucketName));
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, sourceBucketName));
+    
+    volume.deleteBucket(linkedBucketName);
+    volume.deleteBucket(sourceBucketName);
+    store.deleteVolume(volumeName);
+  }
+
   private OmLifecycleConfiguration createOmLifecycleConfiguration(String volume,
-      String bucket, boolean hasRules) throws OMException {
+      String bucket, boolean hasRules, BucketLayout bucketLayout) throws OMException {
 
     OmLifecycleConfiguration.Builder builder =
         new OmLifecycleConfiguration.Builder()
             .setVolume(volume)
             .setBucket(bucket)
-            .setBucketLayout(BucketLayout.OBJECT_STORE);
+            .setBucketLayout(bucketLayout);
 
     if (hasRules) {
       builder.setRules(Collections.singletonList(new OmLCRule.Builder()
