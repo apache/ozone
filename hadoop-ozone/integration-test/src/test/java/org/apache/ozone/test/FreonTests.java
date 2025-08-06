@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.freon.TestHsyncGenerator;
 import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteFileOps;
 import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteKeyOps;
 import org.apache.hadoop.ozone.freon.TestRandomKeyGenerator;
+import org.apache.hadoop.ozone.freon.TestSnapshotGenerator;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.TestInstance;
 
@@ -79,6 +80,14 @@ public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class HsyncGenerator extends TestHsyncGenerator {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class SnapshotGenerator extends TestSnapshotGenerator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();
