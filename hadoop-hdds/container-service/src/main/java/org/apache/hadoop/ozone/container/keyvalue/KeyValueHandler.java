@@ -1602,7 +1602,8 @@ public class KeyValueHandler extends Handler {
         continue;
       }
 
-      ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
+      ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo, 
+          kvContainer.getContainerData());
       Pipeline pipeline = createSingleNodePipeline(peer);
 
       // Handle missing blocks
