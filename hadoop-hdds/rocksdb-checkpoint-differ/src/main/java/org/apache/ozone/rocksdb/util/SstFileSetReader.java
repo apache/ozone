@@ -19,6 +19,7 @@ package org.apache.ozone.rocksdb.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -238,12 +239,12 @@ public class SstFileSetReader {
   /**
    * A wrapper class that holds an iterator and its current value for heap operations.
    */
-  private static class IteratorEntry<T extends Comparable<T>> implements Comparable<IteratorEntry<T>> {
+  private static class IteratorEntryWithFileIndex<T extends Comparable<T>> implements Comparable<IteratorEntryWithFileIndex<T>> {
     private final ClosableIterator<T> iterator;
-    private final int fileIndex; // To ensure stable ordering for identical keys
+    private final int fileIndex; // To ensure stable ordering for identical keys - made package private
     private T currentValue;
 
-    IteratorEntry(ClosableIterator<T> iterator, int fileIndex) {
+    IteratorEntryWithFileIndex(ClosableIterator<T> iterator, int fileIndex) {
       this.iterator = iterator;
       this.fileIndex = fileIndex;
       advance();
@@ -271,10 +272,7 @@ public class SstFileSetReader {
     }
 
     @Override
-    public int compareTo(IteratorEntry<T> other) {
-      if (other == null) {
-        return -1;
-      }
+    public int compareTo(@Nonnull IteratorEntryWithFileIndex<T> other) {
       if (this.currentValue == null && other.currentValue == null) {
         return 0;
       }
@@ -296,8 +294,8 @@ public class SstFileSetReader {
 
   private abstract static class MultipleSstFileIterator<T extends Comparable<T>> implements ClosableIterator<T> {
     private final Collection<String> files;
-    private final PriorityQueue<IteratorEntry<T>> minHeap;
-    private final List<IteratorEntry<T>> allIterators;
+    private final PriorityQueue<IteratorEntryWithFileIndex<T>> minHeap;
+    private final List<IteratorEntryWithFileIndex<T>> allIterators;
     private T lastReturnedValue;
     private boolean initialized = false;
 
@@ -323,7 +321,7 @@ public class SstFileSetReader {
         int fileIndex = 0;
         for (String file : files) {
           ClosableIterator<T> iterator = getKeyIteratorForFile(file);
-          IteratorEntry<T> entry = new IteratorEntry<>(iterator, fileIndex++);
+          IteratorEntryWithFileIndex<T> entry = new IteratorEntryWithFileIndex<>(iterator, fileIndex++);
           allIterators.add(entry);
 
           if (entry.hasValue()) {
@@ -345,7 +343,7 @@ public class SstFileSetReader {
 
       // Skip duplicates - keep advancing until we find a different key or run out of entries
       while (!minHeap.isEmpty()) {
-        IteratorEntry<T> topEntry = minHeap.peek();
+        IteratorEntryWithFileIndex<T> topEntry = minHeap.peek();
         if (topEntry == null) {
           break;
         }
@@ -369,27 +367,35 @@ public class SstFileSetReader {
         throw new NoSuchElementException("No more elements found.");
       }
 
-      IteratorEntry<T> topEntry = minHeap.peek();
-      if (topEntry == null) {
-        throw new NoSuchElementException("No more elements found.");
-      }
-      T result = topEntry.getCurrentValue();
-      lastReturnedValue = result;
+      // Find the entry with the highest file index (latest in collection) for the current key
+      T currentKey = minHeap.peek().getCurrentValue();
+      IteratorEntryWithFileIndex<T> entryToReturn = null;
+      List<IteratorEntryWithFileIndex<T>> duplicateEntries = new ArrayList<>();
 
-      // Skip all entries with the same key (including the one we just returned)
-      while (!minHeap.isEmpty()) {
-        IteratorEntry<T> currentEntry = minHeap.peek();
-        if (currentEntry == null || !Objects.equals(currentEntry.getCurrentValue(), result)) {
-          break;
+      // Collect all entries with the same key
+      while (!minHeap.isEmpty() && Objects.equals(minHeap.peek().getCurrentValue(), currentKey)) {
+        IteratorEntryWithFileIndex<T> entry = minHeap.poll();
+        duplicateEntries.add(entry);
+
+        // Keep track of the entry with the highest file index
+        if (entryToReturn == null || entry.fileIndex > entryToReturn.fileIndex) {
+          entryToReturn = entry;
         }
-        skipCurrentEntry();
       }
 
-      return result;
+      // Advance all duplicate entries and re-add them to the heap if they have more values
+      for (IteratorEntryWithFileIndex<T> entry : duplicateEntries) {
+        if (entry.advance()) {
+          minHeap.offer(entry);
+        }
+      }
+
+      lastReturnedValue = currentKey;
+      return currentKey;
     }
 
     private void skipCurrentEntry() {
-      IteratorEntry<T> entry = minHeap.poll();
+      IteratorEntryWithFileIndex<T> entry = minHeap.poll();
       if (entry != null && entry.advance()) {
         minHeap.offer(entry);
       }
@@ -398,7 +404,7 @@ public class SstFileSetReader {
     @Override
     public void close() throws UncheckedIOException {
       try {
-        for (IteratorEntry<T> entry : allIterators) {
+        for (IteratorEntryWithFileIndex<T> entry : allIterators) {
           entry.close();
         }
         allIterators.clear();
