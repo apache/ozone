@@ -550,3 +550,8 @@ message InnerNode {
     optional uint32 numOfLeaves = 2;
     repeated ChildrenMap childrenMap = 3;
 }
+
+message FlushedTransactionInfo {
+  required uint64 termIndex = 1;
+  required uint64 transactionId = 2;
+}
