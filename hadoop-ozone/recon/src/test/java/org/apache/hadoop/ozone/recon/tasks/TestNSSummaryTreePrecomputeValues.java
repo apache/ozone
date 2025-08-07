@@ -17,6 +17,17 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -27,29 +38,12 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils;
-import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.Set;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Test for NSSummaryTaskWithFSO to verify materialized totals after reprocessing
@@ -63,7 +57,6 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
   private static final long CUSTOM_BUCKET_ONE_OBJECT_ID = 5001L;
   private static final String CUSTOM_VOL = "customVol";
   private static final String CUSTOM_BUCKET_ONE = "customBucket1";
-
 
   private static final String DIR_A = "dirA";
   private static final String DIR_B = "dirB";
@@ -99,7 +92,6 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
   private static final long FILE_Q_SIZE = 2500L;
   private static final long FILE_NEW_SIZE = 750L; // New file size
   private static final long FILE_E1_SIZE = 1200L; // File in new directory size
-
 
   private NSSummaryTaskWithFSO nSSummaryTaskWithFso;
 
@@ -169,7 +161,6 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
     getOmMetadataManager().getBucketTable().put(bucketKey1, bucketInfo1);
   }
 
-
   /**
    * Populates a complex directory tree structure for testing materialized totals.
    * <p>
@@ -207,24 +198,24 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
 
 
     // Create directories
-    writeDirToOm(reconOMMetadataManager, DIR_A_OBJECT_ID,
+    writeDirToOm(getReconOMMetadataManager(), DIR_A_OBJECT_ID,
         CUSTOM_BUCKET_ONE_OBJECT_ID, CUSTOM_BUCKET_ONE_OBJECT_ID,
         CUSTOM_VOL_OBJECT_ID, DIR_A);
 
-    writeDirToOm(reconOMMetadataManager, DIR_B_OBJECT_ID,
+    writeDirToOm(getReconOMMetadataManager(), DIR_B_OBJECT_ID,
         DIR_A_OBJECT_ID, CUSTOM_BUCKET_ONE_OBJECT_ID,
         CUSTOM_VOL_OBJECT_ID, DIR_B);
 
-    writeDirToOm(reconOMMetadataManager, DIR_C_OBJECT_ID,
+    writeDirToOm(getReconOMMetadataManager(), DIR_C_OBJECT_ID,
         DIR_B_OBJECT_ID, CUSTOM_BUCKET_ONE_OBJECT_ID,
         CUSTOM_VOL_OBJECT_ID, DIR_C);
 
-    writeDirToOm(reconOMMetadataManager, DIR_D_OBJECT_ID,
+    writeDirToOm(getReconOMMetadataManager(), DIR_D_OBJECT_ID,
         CUSTOM_BUCKET_ONE_OBJECT_ID, CUSTOM_BUCKET_ONE_OBJECT_ID,
         CUSTOM_VOL_OBJECT_ID, DIR_D);
 
     // Create files
-    writeKeyToOm(reconOMMetadataManager,
+    writeKeyToOm(getReconOMMetadataManager(),
         FILE_X,
         CUSTOM_BUCKET_ONE,
         CUSTOM_VOL,
@@ -236,7 +227,7 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
         FILE_X_SIZE,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    writeKeyToOm(reconOMMetadataManager,
+    writeKeyToOm(getReconOMMetadataManager(),
         FILE_Y,
         CUSTOM_BUCKET_ONE,
         CUSTOM_VOL,
@@ -248,7 +239,7 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
         FILE_Y_SIZE,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    writeKeyToOm(reconOMMetadataManager,
+    writeKeyToOm(getReconOMMetadataManager(),
         FILE_Z,
         CUSTOM_BUCKET_ONE,
         CUSTOM_VOL,
@@ -260,7 +251,7 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
         FILE_Z_SIZE,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    writeKeyToOm(reconOMMetadataManager,
+    writeKeyToOm(getReconOMMetadataManager(),
         FILE_P,
         CUSTOM_BUCKET_ONE,
         CUSTOM_VOL,
@@ -272,7 +263,7 @@ public class TestNSSummaryTreePrecomputeValues extends AbstractNSSummaryTaskTest
         FILE_P_SIZE,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    writeKeyToOm(reconOMMetadataManager,
+    writeKeyToOm(getReconOMMetadataManager(),
         FILE_Q,
         CUSTOM_BUCKET_ONE,
         CUSTOM_VOL,

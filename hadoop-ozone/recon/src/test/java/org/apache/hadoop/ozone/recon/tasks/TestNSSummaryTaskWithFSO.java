@@ -82,6 +82,8 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
         threshold);
   }
 
+
+
   /**
    * Nested class for testing NSSummaryTaskWithFSO reprocess.
    */
@@ -112,7 +114,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
       assertEquals(2, nsSummaryForBucket1.getNumOfFiles());
       assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
 
-      assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
+      assertEquals(KEY_ONE_SIZE + KEY_THREE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
       assertEquals(KEY_TWO_OLD_SIZE + KEY_FOUR_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
     }
@@ -128,7 +130,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
       assertEquals(1, fileDistBucket1[0]);
       for (int i = 1; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
-        assertEquals(1, fileDistBucket1[i]);
+        assertEquals(0, fileDistBucket1[i]);
       }
       assertEquals(1, fileDistBucket2[1]);
       assertEquals(1, fileDistBucket2[2]);
@@ -136,7 +138,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
         if (i == 1 || i == 2) {
           continue;
         }
-        assertEquals(1, fileDistBucket2[i]);
+        assertEquals(0, fileDistBucket2[i]);
       }
     }
 
