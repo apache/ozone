@@ -140,7 +140,7 @@ class TestPushReplicator {
 
     when(
         uploader.startUpload(eq(containerID), eq(target),
-            futureArgument.capture(), compressionArgument.capture()
+            futureArgument.capture(), compressionArgument.capture(), any(Long.class)
         ))
         .thenReturn(outputStream);
 

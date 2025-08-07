@@ -173,7 +173,7 @@ class TestGrpcReplicationService {
     Path result = downloader.getContainerDataFromReplicas(
         CONTAINER_ID,
         Collections.singletonList(datanode), downloadDir,
-        CopyContainerCompression.NO_COMPRESSION);
+        CopyContainerCompression.NO_COMPRESSION).getLeft();
 
     assertTrue(result.toString().startsWith(downloadDir.toString()));
 

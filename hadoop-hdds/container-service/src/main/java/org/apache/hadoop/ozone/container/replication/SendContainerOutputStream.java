@@ -27,22 +27,28 @@ import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
 
   private final CopyContainerCompression compression;
+  private final Long containerSize;
 
   SendContainerOutputStream(
       CallStreamObserver<SendContainerRequest> streamObserver,
-      long containerId, int bufferSize, CopyContainerCompression compression) {
+      long containerId, int bufferSize, CopyContainerCompression compression, Long containerSize) {
     super(streamObserver, containerId, bufferSize);
     this.compression = compression;
+    this.containerSize = containerSize;
   }
 
   @Override
   protected void sendPart(boolean eof, int length, ByteString data) {
-    SendContainerRequest request = SendContainerRequest.newBuilder()
+    SendContainerRequest.Builder requestBuilder = SendContainerRequest.newBuilder()
         .setContainerID(getContainerId())
         .setData(data)
         .setOffset(getWrittenBytes())
-        .setCompression(compression.toProto())
-        .build();
-    getStreamObserver().onNext(request);
+        .setCompression(compression.toProto());
+
+    // Include container size in first request
+    if (getWrittenBytes() == 0 && containerSize != null) {
+      requestBuilder.setActualContainerSize(containerSize);
+    }
+    getStreamObserver().onNext(requestBuilder.build());
   }
 }

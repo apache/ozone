@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -71,18 +72,35 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     LOG.info("Starting replication of container {} from {} using {}",
         containerID, sourceDatanodes, compression);
     HddsVolume targetVolume = null;
+    long spaceReserved = containerImporter.getDefaultReplicationSpace();
 
     try {
       targetVolume = containerImporter.chooseNextVolume();
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.
-      Path tarFilePath =
+      Pair<Path, Long> downloadResult =
           downloader.getContainerDataFromReplicas(containerID, sourceDatanodes,
               ContainerImporter.getUntarDirectory(targetVolume), compression);
-      if (tarFilePath == null) {
+      if (downloadResult == null || downloadResult.getLeft() == null) {
         task.setStatus(Status.FAILED);
         return;
       }
+
+      Path tarFilePath = downloadResult.getLeft();
+      Long actualContainerSize = downloadResult.getRight();
+
+      if (actualContainerSize != null) {
+        long actualSpaceNeeded = containerImporter.getRequiredReplicationSpace(actualContainerSize);
+        long spaceAdjustment = actualSpaceNeeded - spaceReserved;
+
+        if (spaceAdjustment > 0) {
+          targetVolume.incCommittedBytes(spaceAdjustment);
+          spaceReserved = actualSpaceNeeded;
+          LOG.info("Container {} space adjusted by {} bytes (actual size: {} bytes)",
+              containerID, spaceAdjustment, actualContainerSize);
+        }
+      }
+
       long bytes = Files.size(tarFilePath);
       LOG.info("Container {} is downloaded with size {}, starting to import.",
               containerID, bytes);
@@ -98,7 +116,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       task.setStatus(Status.FAILED);
     } finally {
       if (targetVolume != null) {
-        targetVolume.incCommittedBytes(-containerImporter.getDefaultReplicationSpace());
+        targetVolume.incCommittedBytes(-spaceReserved);
       }
     }
   }

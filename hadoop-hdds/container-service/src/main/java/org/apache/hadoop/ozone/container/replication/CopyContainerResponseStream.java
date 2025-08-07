@@ -27,22 +27,36 @@ import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 class CopyContainerResponseStream
     extends GrpcOutputStream<CopyContainerResponseProto> {
 
+  private final Long containerSize;
+
   CopyContainerResponseStream(
       CallStreamObserver<CopyContainerResponseProto> streamObserver,
       long containerId, int bufferSize) {
+    this(streamObserver, containerId, bufferSize, null);
+  }
+
+  CopyContainerResponseStream(
+      CallStreamObserver<CopyContainerResponseProto> streamObserver,
+      long containerId, int bufferSize, Long containerSize) {
     super(streamObserver, containerId, bufferSize);
+    this.containerSize = containerSize;
   }
 
   @Override
   protected void sendPart(boolean eof, int length, ByteString data) {
-    CopyContainerResponseProto response =
+    CopyContainerResponseProto.Builder responseBuilder =
         CopyContainerResponseProto.newBuilder()
             .setContainerID(getContainerId())
             .setData(data)
             .setEof(eof)
             .setReadOffset(getWrittenBytes())
-            .setLen(length)
-            .build();
-    getStreamObserver().onNext(response);
+            .setLen(length);
+
+    // Include container size in first response
+    if (getWrittenBytes() == 0 && containerSize != null) {
+      responseBuilder.setActualContainerSize(containerSize);
+    }
+
+    getStreamObserver().onNext(responseBuilder.build());
   }
 }

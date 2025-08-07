@@ -32,6 +32,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -56,7 +57,7 @@ public class TestSimpleContainerDownloader {
 
     //WHEN
     Path result = downloader.getContainerDataFromReplicas(1L, datanodes,
-        tempDir, NO_COMPRESSION);
+        tempDir, NO_COMPRESSION).getLeft();
 
     //THEN
     assertEquals(datanodes.get(0).getUuidString(),
@@ -77,7 +78,7 @@ public class TestSimpleContainerDownloader {
     //WHEN
     final Path result =
         downloader.getContainerDataFromReplicas(1L, datanodes,
-            tempDir, NO_COMPRESSION);
+            tempDir, NO_COMPRESSION).getLeft();
 
     //THEN
     //first datanode is failed, second worked
@@ -98,7 +99,7 @@ public class TestSimpleContainerDownloader {
     //WHEN
     final Path result =
         downloader.getContainerDataFromReplicas(1L, datanodes,
-            tempDir, NO_COMPRESSION);
+            tempDir, NO_COMPRESSION).getLeft();
 
     //THEN
     //first datanode is failed, second worked
@@ -123,7 +124,7 @@ public class TestSimpleContainerDownloader {
     //returned.
     for (int i = 0; i < 10000; i++) {
       Path path = downloader.getContainerDataFromReplicas(1L, datanodes,
-          tempDir, NO_COMPRESSION);
+          tempDir, NO_COMPRESSION).getLeft();
       if (path.toString().equals(datanodes.get(1).getUuidString())) {
         return;
       }
@@ -206,7 +207,7 @@ public class TestSimpleContainerDownloader {
     }
 
     @Override
-    protected CompletableFuture<Path> downloadContainer(
+    protected CompletableFuture<Pair<Path, Long>> downloadContainer(
         GrpcReplicationClient client,
         long containerId, Path downloadPath) {
 
@@ -225,7 +226,7 @@ public class TestSimpleContainerDownloader {
 
         //path includes the dn id to make it possible to assert.
         return CompletableFuture.completedFuture(
-            Paths.get(datanode.getUuidString()));
+            Pair.of(Paths.get(datanode.getUuidString()), null));
       }
 
     }
