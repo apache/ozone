@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.container;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.ItemsFromStdin;
 import picocli.CommandLine;
@@ -30,5 +31,35 @@ public class ContainerIDParameters extends ItemsFromStdin {
       paramLabel = "<container ID>")
   public void setContainerIDs(List<String> arguments) {
     setItems(arguments);
+  }
+
+  public List<Long> getValidatedIDs() {
+    List<Long> containerIDs = new ArrayList<>(size());
+    boolean allValid = true;
+
+    for (String input: this) {
+      boolean idValid = true;
+      try {
+        long id = Long.parseLong(input);
+        if (id <= 0) {
+          idValid = false;
+        } else {
+          containerIDs.add(id);
+        }
+      } catch (NumberFormatException e) {
+        idValid = false;
+      }
+
+      if (!idValid) {
+        allValid = false;
+        System.err.println("Container ID must be a positive integer, got: " + input);
+      }
+    }
+
+    // After errors have been printed for all invalid containers, exit PicoCLI with a non-zero result.
+    if (!allValid) {
+      throw new IllegalArgumentException();
+    }
+    return containerIDs;
   }
 }
