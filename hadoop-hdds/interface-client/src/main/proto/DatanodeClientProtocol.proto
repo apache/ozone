@@ -541,6 +541,7 @@ message CopyContainerResponseProto {
   required bool eof = 4;
   required bytes data = 5;
   optional int64 checksum = 6;
+  optional uint64 actualContainerSize = 7;
 }
 
 message SendContainerRequest {
@@ -549,6 +550,7 @@ message SendContainerRequest {
   required bytes data = 3;
   optional int64 checksum = 4;
   optional CopyContainerCompressProto compression = 5;
+  optional int64 actualContainerSize = 6;
 }
 
 message SendContainerResponse {
