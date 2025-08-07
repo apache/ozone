@@ -96,7 +96,7 @@ public class TestSTS {
 
     assertEquals(400, response.getStatus());
     String errorMessage = (String) response.getEntity();
-    assertTrue(errorMessage.contains("Invalid DurationSeconds"));
+    assertTrue(errorMessage.contains("Invalid Value: DurationSeconds"));
   }
 
   @Test
