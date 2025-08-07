@@ -194,7 +194,7 @@ public final class OMConfigKeys {
   public static final boolean OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT = false;
   public static final String OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE =
       "ozone.lifecycle.service.delete.batch-size";
-  public static final int OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT = 100000;
+  public static final int OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT = 1000;
 
   /**
    * OM Ratis related configurations.
