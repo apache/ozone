@@ -17,42 +17,33 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
+
 /**
- * Metadata object that contains storage report of a Datanode.
+ * This class represents the metadata related to deletion stages and the
+ * corresponding bytes pending to be deleted. It encapsulates the total
+ * pending deletion byte count and provides structured data to represent
+ * pending bytes categorized by different stages.
  */
-public class DatanodeStorageReport {
-  private long capacity;
-  private long used;
-  private long remaining;
-  private long committed;
-  private long pendingDeletions;
+public class DeletionPendingBytesByStage {
 
-  public DatanodeStorageReport(long capacity, long used, long remaining,
-                               long committed, long pendingDeletions) {
-    this.capacity = capacity;
-    this.used = used;
-    this.remaining = remaining;
-    this.committed = committed;
-    this.pendingDeletions = pendingDeletions;
+  @JsonProperty("total")
+  private long total;
+
+  @JsonProperty("byStage")
+  private Map<String, Map<String, Long>> byStage;
+
+  public DeletionPendingBytesByStage(long total, Map<String, Map<String, Long>> byStage) {
+    this.total = total;
+    this.byStage = byStage;
   }
 
-  public long getCapacity() {
-    return capacity;
+  public long getTotal() {
+    return total;
   }
 
-  public long getUsed() {
-    return used;
-  }
-
-  public long getRemaining() {
-    return remaining;
-  }
-
-  public long getCommitted() {
-    return committed;
-  }
-
-  public long getPendingDeletions() {
-    return pendingDeletions;
+  public Map<String, Map<String, Long>> getByStage() {
+    return byStage;
   }
 }
