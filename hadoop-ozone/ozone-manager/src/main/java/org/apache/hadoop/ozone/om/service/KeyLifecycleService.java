@@ -705,6 +705,11 @@ public class KeyLifecycleService extends BackgroundService {
     return LOG;
   }
 
+  @VisibleForTesting
+  public void setListMaxSize(int size) {
+    this.listMaxSize = size;
+  }
+
   /**
    * An in-memory list with a maximum size.
    */
