@@ -121,6 +121,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
@@ -2675,5 +2676,111 @@ public abstract class TestOmSnapshot {
       // TODO: if any APIs are implemented the diff list should not be empty.
       assertEquals(0, diff.getDiffList().size());
     }
+  }
+
+  @Test
+  public void testSnapshotdiffWithObjectTagModification() throws Exception {
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String snap1 = "snap1";
+    String key1 = "k1";
+    key1 = createFileKeyWithPrefix(bucket, key1);
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("environment", "test");
+    tags.put("owner", "testuser");
+    bucket.putObjectTagging(key1, tags);
+
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+    SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
+        snap1, snap2);
+
+    List<DiffReportEntry> diffEntries = Lists.newArrayList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.MODIFY,
+            key1));
+    assertEquals(diffEntries, diff.getDiffList());
+  }
+
+  @Test
+  public void testSnapdiffWithMultipleTagOperations() throws Exception {
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String key1 = "k1";
+    key1 = createFileKeyWithPrefix(bucket, key1);
+
+    Map<String, String> initialTags = new HashMap<>();
+    initialTags.put("version", "1.0");
+    initialTags.put("team", "dev");
+
+    bucket.putObjectTagging(key1, initialTags);
+
+    String snap1 = "snap1";
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    Map<String, String> updatedTags = new HashMap<>();
+    updatedTags.put("version", "2.0");
+    updatedTags.put("team", "dev");
+    updatedTags.put("priority", "high");
+
+    bucket.putObjectTagging(key1, updatedTags);
+
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+    SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
+        snap1, snap2);
+
+    List<DiffReportEntry> diffEntries = Lists.newArrayList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.MODIFY,
+            key1));
+    assertEquals(diffEntries, diff.getDiffList());
+  }
+
+  @Test
+  public void testSnapdiffWithTagRemoval() throws Exception {
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String key1 = "k1";
+    key1 = createFileKeyWithPrefix(bucket, key1);
+
+    Map<String, String> initialTags = new HashMap<>();
+    initialTags.put("env", "staging");
+    initialTags.put("cost-center", "engineering");
+    initialTags.put("backup", "daily");
+
+    bucket.putObjectTagging(key1, initialTags);
+
+    String snap1 = "snap1";
+    createSnapshot(testVolumeName, testBucketName, snap1);
+    bucket.deleteObjectTagging(key1);
+
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+    SnapshotDiffReport diff = getSnapDiffReport(testVolumeName, testBucketName,
+        snap1, snap2);
+
+    List<DiffReportEntry> diffEntries = Lists.newArrayList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.MODIFY,
+            key1));
+    assertEquals(diffEntries, diff.getDiffList());
   }
 }
