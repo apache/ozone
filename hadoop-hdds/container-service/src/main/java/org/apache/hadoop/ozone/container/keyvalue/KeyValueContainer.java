@@ -975,6 +975,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } catch (Exception e) {
       LOG.error("Got exception when copying container {} to {}",
           containerData.getContainerID(), destination, e);
+      throw e;
     } finally {
       if (lock.isWriteLockedByCurrentThread()) {
         writeUnlock();
