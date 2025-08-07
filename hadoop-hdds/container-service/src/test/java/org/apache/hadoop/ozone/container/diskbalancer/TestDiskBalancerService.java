@@ -52,7 +52,7 @@ import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBa
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -275,7 +275,7 @@ public class TestDiskBalancerService {
         false, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(info);
 
-    VolumeChoosingPolicy volumePolicy = mock(VolumeChoosingPolicy.class);
+    DiskBalancerVolumeChoosingPolicy volumePolicy = mock(DiskBalancerVolumeChoosingPolicy.class);
     ContainerChoosingPolicy containerPolicy = mock(ContainerChoosingPolicy.class);
     svc.setVolumeChoosingPolicy(volumePolicy);
     svc.setContainerChoosingPolicy(containerPolicy);

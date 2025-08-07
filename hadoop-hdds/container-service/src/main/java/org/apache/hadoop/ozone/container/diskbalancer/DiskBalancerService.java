@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -109,7 +109,7 @@ public class DiskBalancerService extends BackgroundService {
   private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
 
-  private VolumeChoosingPolicy volumeChoosingPolicy;
+  private DiskBalancerVolumeChoosingPolicy volumeChoosingPolicy;
   private ContainerChoosingPolicy containerChoosingPolicy;
   private final File diskBalancerInfoFile;
 
@@ -158,7 +158,7 @@ public class DiskBalancerService extends BackgroundService {
     volumeSet = ozoneContainer.getVolumeSet();
 
     try {
-      volumeChoosingPolicy = (VolumeChoosingPolicy)
+      volumeChoosingPolicy = (DiskBalancerVolumeChoosingPolicy)
           conf.getObject(DiskBalancerConfiguration.class)
           .getVolumeChoosingPolicyClass().newInstance();
       containerChoosingPolicy = (ContainerChoosingPolicy)
@@ -686,7 +686,7 @@ public class DiskBalancerService extends BackgroundService {
     return containerChoosingPolicy;
   }
 
-  public VolumeChoosingPolicy getVolumeChoosingPolicy() {
+  public DiskBalancerVolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
   }
 
@@ -700,7 +700,7 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   @VisibleForTesting
-  public void setVolumeChoosingPolicy(VolumeChoosingPolicy volumeChoosingPolicy) {
+  public void setVolumeChoosingPolicy(DiskBalancerVolumeChoosingPolicy volumeChoosingPolicy) {
     this.volumeChoosingPolicy = volumeChoosingPolicy;
   }
 

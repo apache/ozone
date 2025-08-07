@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 /**
  * This interface specifies the policy for choosing volumes to balance.
  */
-public interface VolumeChoosingPolicy {
+public interface DiskBalancerVolumeChoosingPolicy {
   /**
    * Choose a pair of volumes for balancing.
    *

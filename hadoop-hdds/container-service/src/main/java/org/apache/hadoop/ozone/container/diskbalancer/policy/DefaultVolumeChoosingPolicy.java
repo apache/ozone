@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * Destination volumes use committedBytes to account for space already reserved.
  * Both deltaMap and committedBytes are considered to calculate usage.
  */
-public class DefaultVolumeChoosingPolicy implements VolumeChoosingPolicy {
+public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPolicy {
 
   public static final Logger LOG = LoggerFactory.getLogger(
       DefaultVolumeChoosingPolicy.class);
@@ -44,6 +44,8 @@ public class DefaultVolumeChoosingPolicy implements VolumeChoosingPolicy {
       double threshold, Map<HddsVolume, Long> deltaMap) {
     double idealUsage = volumeSet.getIdealUsage();
 
+    // Threshold is given as a percentage
+    double normalizedThreshold = threshold / 100;
     List<HddsVolume> volumes = StorageVolumeUtil
         .getHddsVolumesList(volumeSet.getVolumesList())
         .stream()
@@ -51,7 +53,7 @@ public class DefaultVolumeChoosingPolicy implements VolumeChoosingPolicy {
             Math.abs(
                 ((double)((volume.getCurrentUsage().getCapacity() - volume.getCurrentUsage().getAvailable())
                     + deltaMap.getOrDefault(volume, 0L) + volume.getCommittedBytes()))
-                    / volume.getCurrentUsage().getCapacity() - idealUsage) >= threshold)
+                    / volume.getCurrentUsage().getCapacity() - idealUsage) >= normalizedThreshold)
         .sorted((v1, v2) ->
             Double.compare(
                 (double) ((v2.getCurrentUsage().getCapacity() - v2.getCurrentUsage().getAvailable())
