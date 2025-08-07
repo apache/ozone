@@ -247,7 +247,7 @@ public class TestContainerCommandReconciliation {
     File treeFile = getContainerChecksumFile(container.getContainerData());
     // Closing the container should have generated the tree file.
     ContainerProtos.ContainerChecksumInfo srcChecksumInfo = ContainerChecksumTreeManager.readChecksumInfo(
-        container.getContainerData()).get();
+        container.getContainerData());
     assertTrue(treeFile.exists());
     assertTrue(treeFile.delete());
 
