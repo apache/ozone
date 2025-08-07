@@ -221,6 +221,10 @@ public abstract class TestContainerScannerIntegrationAbstract {
         keyName, RATIS, ONE, 0, store, volumeName, bucketName);
   }
 
+  protected OzoneConfiguration getConf() {
+    return cluster.getConf();
+  }
+
   protected MiniOzoneCluster getMiniOzoneCluster() {
     return cluster;
   }

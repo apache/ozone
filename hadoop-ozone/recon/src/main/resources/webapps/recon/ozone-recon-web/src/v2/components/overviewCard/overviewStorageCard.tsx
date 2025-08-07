@@ -239,7 +239,7 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
 
   return (
     <OverviewCardWrapper
-      linkToUrl={'/DiskUsage'}
+      linkToUrl={'/NamespaceUsage'}
       title='Report'
       children={cardChildren} />
   )

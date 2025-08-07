@@ -63,6 +63,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -760,14 +761,33 @@ public class KeyValueHandler extends Handler {
     try {
       checksumTree = checksumManager.getContainerChecksumInfo(containerData);
     } catch (IOException ex) {
-      // For file not found or other inability to read the file, return an error to the client.
-      LOG.error("Error occurred when reading checksum file for container {}", containerData.getContainerID(), ex);
-      return ContainerCommandResponseProto.newBuilder()
-          .setCmdType(request.getCmdType())
-          .setTraceID(request.getTraceID())
-          .setResult(IO_EXCEPTION)
-          .setMessage(ex.getMessage())
-          .build();
+      // Only build from metadata if the file doesn't exist
+      if (ex instanceof FileNotFoundException) {
+        try {
+          LOG.info("Checksum tree file not found for container {}. Building merkle tree from container metadata.",
+              containerData.getContainerID());
+          ContainerProtos.ContainerChecksumInfo checksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
+          checksumTree = checksumInfo.toByteString();
+        } catch (IOException metadataEx) {
+          LOG.error("Failed to build merkle tree from metadata for container {}",
+              containerData.getContainerID(), metadataEx);
+          return ContainerCommandResponseProto.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setTraceID(request.getTraceID())
+              .setResult(IO_EXCEPTION)
+              .setMessage("Failed to get or build merkle tree: " + metadataEx.getMessage())
+              .build();
+        }
+      } else {
+        // For other inability to read the file, return an error to the client.
+        LOG.error("Error occurred when reading checksum file for container {}", containerData.getContainerID(), ex);
+        return ContainerCommandResponseProto.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setTraceID(request.getTraceID())
+            .setResult(IO_EXCEPTION)
+            .setMessage(ex.getMessage())
+            .build();
+      }
     }
 
     return getGetContainerMerkleTreeResponse(request, checksumTree);
@@ -1407,7 +1427,8 @@ public class KeyValueHandler extends Handler {
    * This method does not send an ICR with the updated checksum info.
    * @param container - Container for which the container merkle tree needs to be updated.
    */
-  private ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksumFromMetadata(
+  @VisibleForTesting
+  public ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksumFromMetadata(
       KeyValueContainer container) throws IOException {
     ContainerMerkleTreeWriter merkleTree = new ContainerMerkleTreeWriter();
     try (DBHandle dbHandle = BlockUtils.getDB(container.getContainerData(), conf);
@@ -1427,7 +1448,7 @@ public class KeyValueHandler extends Handler {
 
   private ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksum(Container container,
       ContainerMerkleTreeWriter treeWriter, boolean sendICR) throws IOException {
-    ContainerData containerData = container.getContainerData();
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
 
     // Attempt to write the new data checksum to disk. If persisting this fails, keep using the original data
     // checksum to prevent divergence from what SCM sees in the ICR vs what datanode peers will see when pulling the
@@ -1440,6 +1461,17 @@ public class KeyValueHandler extends Handler {
 
     if (updatedDataChecksum != originalDataChecksum) {
       containerData.setDataChecksum(updatedDataChecksum);
+      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+        // This value is only used during the datanode startup. If the update fails, then it's okay as the merkle tree
+        // and in-memory checksum will still be the same. This will be updated the next time we update the tree.
+        // Either scanner or reconciliation will update the checksum.
+        dbHandle.getStore().getMetadataTable().put(containerData.getContainerDataChecksumKey(), updatedDataChecksum);
+      } catch (IOException e) {
+        LOG.error("Failed to update container data checksum in RocksDB for container {}. " +
+                "Leaving the original checksum in RocksDB: {}", containerData.getContainerID(),
+            checksumToString(originalDataChecksum), e);
+      }
+
       if (sendICR) {
         sendICR(container);
       }
