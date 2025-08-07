@@ -53,13 +53,13 @@ public class TestCapacityPipelineChoosePolicy {
     // used       0   10    20    30
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodeStat(datanodes.get(0)))
-        .thenReturn(new SCMNodeMetric(100L, 0, 100L, 0, 0));
+        .thenReturn(new SCMNodeMetric(100L, 0, 100L, 0, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(1)))
-        .thenReturn(new SCMNodeMetric(100L, 10L, 90L, 0, 0));
+        .thenReturn(new SCMNodeMetric(100L, 10L, 90L, 0, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(100L, 20L, 80L, 0, 0));
+        .thenReturn(new SCMNodeMetric(100L, 20L, 80L, 0, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(100L, 30L, 70L, 0, 0));
+        .thenReturn(new SCMNodeMetric(100L, 30L, 70L, 0, 0, 0));
 
     PipelineChoosePolicy policy = new CapacityPipelineChoosePolicy().init(mockNodeManager);
 
