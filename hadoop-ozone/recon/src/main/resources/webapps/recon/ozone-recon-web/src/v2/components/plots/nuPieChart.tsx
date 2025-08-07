@@ -20,14 +20,14 @@ import React from 'react';
 
 import EChart from '@/v2/components/eChart/eChart';
 import { byteToSize } from '@/utils/common';
-import { DUSubpath } from '@/v2/types/diskUsage.types';
+import { NUSubpath } from '@/v2/types/namespaceUsage.types';
 
 //-------Types--------//
 type PieChartProps = {
-  path: string | null;
+  path?: string | null;
   limit: number;
   size: number;
-  subPaths: DUSubpath[];
+  subPaths: NUSubpath[];
   subPathCount: number;
   sizeWithReplica: number;
   loading: boolean;
@@ -39,7 +39,7 @@ const MIN_BLOCK_SIZE = 0.05;
 
 
 //----------Component---------//
-const DUPieChart: React.FC<PieChartProps> = ({
+const NUPieChart: React.FC<PieChartProps> = ({
   path,
   limit,
   size,
@@ -50,7 +50,7 @@ const DUPieChart: React.FC<PieChartProps> = ({
 }) => {
   const [subpathSize, setSubpathSize]  = React.useState<number>(0);
 
-  function getSubpathSize(subpaths: DUSubpath[]): number {
+  function getSubpathSize(subpaths: NUSubpath[]): number {
     const subpathSize = subpaths
       .map((subpath) => subpath.size)
       .reduce((acc, curr) => acc + curr, 0);
@@ -69,7 +69,7 @@ const DUPieChart: React.FC<PieChartProps> = ({
      *     but we can't check on that, as the response will always have
      *     30 subpaths, but from the total size and the subpaths size we can calculate it).
      */
-    let subpaths: DUSubpath[] = subPaths;
+    let subpaths: NUSubpath[] = subPaths;
 
     let pathLabels: string[] = [];
     let percentage: string[] = [];
@@ -120,7 +120,6 @@ const DUPieChart: React.FC<PieChartProps> = ({
           ? val + MIN_BLOCK_SIZE
           : val
       );
-
       percentage = values.map(value => (value * 100).toFixed(2));
       sizeStr = subpaths.map((subpath) => byteToSize(subpath.size, 1));
     }
@@ -207,4 +206,4 @@ const DUPieChart: React.FC<PieChartProps> = ({
   );
 }
 
-export default DUPieChart;
+export default NUPieChart;
