@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
@@ -297,15 +298,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         om.getOmSnapshotManager().invalidateCacheEntry(UUID.fromString(snapshotId));
         writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir,
             hardLinkFileMap, false);
-        Path snapshotDirParent = snapshotDir.getParent();
-        if (snapshotDirParent != null) {
-          Path snapshotLocalPropertyYaml = snapshotDirParent.resolve(
-              snapshotDir.getFileName() + ".yaml");
-          if (Files.exists(snapshotLocalPropertyYaml)) {
-            File yamlFile = snapshotLocalPropertyYaml.toFile();
-            hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());
-            linkAndIncludeFile(yamlFile, yamlFile.getName(), archiveOutputStream, tmpdir);
-          }
+        Path snapshotLocalPropertyYaml = Paths.get(
+            OmSnapshotManager.getSnapshotLocalPropertyYamlPath(getConf(), snapshotDir.toFile().getName()));
+        if (Files.exists(snapshotLocalPropertyYaml)) {
+          File yamlFile = snapshotLocalPropertyYaml.toFile();
+          hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());
+          linkAndIncludeFile(yamlFile, yamlFile.getName(), archiveOutputStream, tmpdir);
         }
       } finally {
         omMetadataManager.getLock().releaseReadLock(SNAPSHOT_DB_LOCK, snapshotId);
