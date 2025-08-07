@@ -2969,4 +2969,199 @@ public abstract class TestOmSnapshot {
             SnapshotDiffReport.DiffType.CREATE, streamKey2));
     assertEquals(expectedDiffs, diff.getDiffList());
   }
+
+  private String createStreamFileWithPrefix(OzoneBucket bucket, String filePrefix)
+      throws Exception {
+    String file = filePrefix + counter.incrementAndGet();
+    return createStreamFile(bucket, file, false);
+  }
+
+  private String createStreamFile(OzoneBucket bucket, String fileName, boolean overWrite)
+      throws Exception {
+    byte[] value = RandomStringUtils.secure().nextAscii(10240).getBytes(UTF_8);
+    OzoneDataStreamOutput streamFile = bucket.createStreamFile(
+        fileName, value.length, bucket.getReplicationConfig(), overWrite, true);
+    streamFile.write(value);
+    streamFile.close();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        getOmKeyInfo(bucket.getVolumeName(), bucket.getName(), fileName);
+      } catch (IOException e) {
+        return false;
+      }
+      return true;
+    }, 300, 10000);
+    return fileName;
+  }
+
+  @Test
+  public void testSnapDiffWithStreamFileModification() throws Exception {
+    assumeTrue(!bucketLayout.isObjectStore(enabledFileSystemPaths));
+
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String file1 = "stream-file-1";
+    file1 = createStreamFileWithPrefix(bucket, file1);
+    String snap1 = "snap1";
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    String file2 = "stream-file-2";
+    file2 = createStreamFileWithPrefix(bucket, file2);
+    bucket.deleteKey(file1);
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
+        testBucketName, snap1, snap2);
+    assertEquals(2, diff.getDiffList().size());
+    assertEquals(Arrays.asList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.DELETE, file1),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.CREATE, file2)),
+        diff.getDiffList());
+  }
+
+  @Test
+  public void testSnapDiffWithStreamFileRewrite() throws Exception {
+    assumeTrue(!bucketLayout.isObjectStore(enabledFileSystemPaths));
+
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String file1 = "stream-file-1";
+    file1 = createStreamFileWithPrefix(bucket, file1);
+    String snap1 = "snap1";
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    createStreamFile(bucket, file1, true);
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
+        testBucketName, snap1, snap2);
+    assertEquals(1, diff.getDiffList().size());
+    assertEquals(Collections.singletonList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.MODIFY, file1)),
+        diff.getDiffList());
+  }
+
+  @Test
+  public void testSnapDiffWithStreamFileRename() throws Exception {
+    assumeTrue(!bucketLayout.isObjectStore(enabledFileSystemPaths));
+
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String file1 = "stream-file-1";
+    file1 = createStreamFileWithPrefix(bucket, file1);
+    String snap1 = "snap1";
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    String renamedFile = file1 + "_renamed";
+    bucket.renameKey(file1, renamedFile);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        getOmKeyInfo(testVolumeName, testBucketName, renamedFile);
+      } catch (IOException e) {
+        return false;
+      }
+      return true;
+    }, 1000, 30000);
+
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
+        testBucketName, snap1, snap2);
+    assertEquals(1, diff.getDiffList().size());
+    assertEquals(Collections.singletonList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.RENAME, file1, renamedFile)),
+        diff.getDiffList());
+  }
+
+  @Test
+  public void testSnapDiffWithStreamFileRecreation() throws Exception {
+    assumeTrue(!bucketLayout.isObjectStore(enabledFileSystemPaths));
+
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String file1 = "stream-file-1";
+    file1 = createStreamFileWithPrefix(bucket, file1);
+    String snap1 = "snap1";
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    getOmKeyInfo(testVolumeName, testBucketName, file1);
+    bucket.deleteKey(file1);
+    file1 = createStreamFile(bucket, file1, true);
+    getOmKeyInfo(testVolumeName, testBucketName, file1);
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
+        testBucketName, snap1, snap2);
+    assertEquals(2, diff.getDiffList().size());
+    assertEquals(Arrays.asList(
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.DELETE, file1),
+            SnapshotDiffReportOzone.getDiffReportEntry(
+                SnapshotDiffReport.DiffType.CREATE, file1)),
+        diff.getDiffList());
+  }
+
+  @Test
+  public void testSnapDiffWithStreamFileAndDirectoryOperations() throws Exception {
+    assumeTrue(bucketLayout.isFileSystemOptimized());
+    String testVolumeName = "vol" + counter.incrementAndGet();
+    String testBucketName = "bucket1";
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    bucket.createDirectory("dir1/dir2");
+    String file1 = "dir1/dir2/stream-file-1";
+    createStreamFile(bucket, file1, false);
+    String snap1 = "snap1";
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    String file2 = "dir1/dir2/stream-file-2";
+    createStreamFile(bucket, file2, false);
+    bucket.renameKey("dir1/dir2", "dir1/dir3");
+    String snap2 = "snap2";
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName,
+        testBucketName, snap1, snap2);
+    assertEquals(3, diff.getDiffList().size());
+
+    List<SnapshotDiffReport.DiffReportEntry> expectedDiffs = Arrays.asList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.RENAME, "dir1/dir2", "dir1/dir3"),
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.CREATE, "dir1/dir3/stream-file-2"),
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.MODIFY, "dir1"));
+    assertEquals(expectedDiffs, diff.getDiffList());
+  }
 }
