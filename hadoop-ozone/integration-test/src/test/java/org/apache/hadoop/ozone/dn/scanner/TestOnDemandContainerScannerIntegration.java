@@ -25,19 +25,25 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandScannerMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -176,6 +182,59 @@ class TestOnDemandContainerScannerIntegration
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeReplicaState(openContainerID, UNHEALTHY);
     corruption.assertLogged(openContainerID, 1, logCapturer);
+  }
+
+  /**
+   * Test that {@link OnDemandContainerScanner} is triggered when the HddsDispatcher
+   * detects write failures and automatically triggers on-demand scans.
+   */
+  @Test
+  void testOnDemandScanTriggeredByUnhealthyContainer() throws Exception {
+    long containerID = writeDataToOpenContainer();
+    Container<?> container = getDnContainer(containerID);
+    assertEquals(State.OPEN, container.getContainerState());
+
+    Optional<Instant> initialScanTime = container.getContainerData().lastDataScanTime();
+    HddsDatanodeService dn = getMiniOzoneCluster().getHddsDatanodes().get(0);
+    HddsDispatcher dispatcher = (HddsDispatcher) dn.getDatanodeStateMachine().getContainer().getDispatcher();
+    OnDemandScannerMetrics scannerMetrics = dn.getDatanodeStateMachine().getContainer()
+        .getOnDemandScanner().getMetrics();
+    int initialScannedCount = scannerMetrics.getNumContainersScanned();
+
+    // Create a PutBlock request with malformed block data to trigger internal error
+    ContainerProtos.ContainerCommandRequestProto writeFailureRequest =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.PutBlock)
+            .setContainerID(containerID)
+            .setDatanodeUuid(dn.getDatanodeDetails().getUuidString())
+            .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
+                .setBlockData(ContainerProtos.BlockData.newBuilder()
+                    .setBlockID(ContainerProtos.DatanodeBlockID.newBuilder()
+                        .setContainerID(containerID)
+                        .setLocalID(999L)
+                        .setBlockCommitSequenceId(1)
+                        .build())
+                    .setSize(1024) // Size mismatch with chunks
+                    .build())
+                .build())
+            .build();
+
+    ContainerProtos.ContainerCommandResponseProto response = dispatcher.dispatch(writeFailureRequest, null);
+    assertNotEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+    assertEquals(State.UNHEALTHY, container.getContainerState());
+
+    // The dispatcher should have called containerSet.scanContainerWithoutGap due to the failure
+    GenericTestUtils.waitFor(() -> {
+      Optional<Instant> currentScanTime = container.getContainerData().lastDataScanTime();
+      return currentScanTime.isPresent() && currentScanTime.get().isAfter(initialScanTime.orElse(Instant.EPOCH));
+    }, 500, 5000);
+
+    // Verify scan timestamp was updated
+    Optional<Instant> finalScanTime = container.getContainerData().lastDataScanTime();
+    assertTrue(finalScanTime.isPresent());
+    assertTrue(finalScanTime.get().isAfter(initialScanTime.orElse(Instant.EPOCH)));
+    int finalScannedCount = scannerMetrics.getNumContainersScanned();
+    assertTrue(finalScannedCount > initialScannedCount);
   }
 
 }

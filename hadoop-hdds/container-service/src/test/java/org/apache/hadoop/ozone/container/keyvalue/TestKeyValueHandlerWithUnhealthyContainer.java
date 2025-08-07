@@ -31,20 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atMostOnce;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -53,23 +47,16 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -262,64 +249,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     verify(mockIcrSender, atMostOnce()).send(any());
   }
 
-  @Test
-  public void testDispatcherTriggersOnDemandScanForUnhealthyContainer() throws IOException {
-    ContainerSet mockContainerSet = mock(ContainerSet.class);
-    KeyValueHandler realHandler = getDummyHandlerWithContainerSet(mockContainerSet);
-    ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
-    StateContext mockStateContext = mock(StateContext.class);
-    DatanodeStateMachine mockDatanodeStateMachine = mock(DatanodeStateMachine.class);
-    when(mockStateContext.getParent()).thenReturn(mockDatanodeStateMachine);
-    
-    // Create a container that will be marked unhealthy
-    KeyValueContainerData kvData = new KeyValueContainerData(1L,
-        ContainerLayoutVersion.FILE_PER_BLOCK,
-        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
-        UUID.randomUUID().toString());
-    kvData.setMetadataPath(tempDir.toString());
-    kvData.setDbFile(dbFile.toFile());
-    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString()).conf(conf)
-        .clusterID(UUID.randomUUID().toString()).datanodeUuid(UUID.randomUUID().toString())
-        .volumeSet(mock(MutableVolumeSet.class))
-        .build();
-    kvData.setVolume(hddsVolume);
-    KeyValueContainer container = new KeyValueContainer(kvData, conf);
-    kvData.setState(ContainerProtos.ContainerDataProto.State.OPEN);
-    when(mockContainerSet.getContainer(1L)).thenReturn((Container) container);
-    KeyValueHandler spyHandler = spy(realHandler);
-    
-    Map<ContainerType, Handler> handlers = new HashMap<>();
-    handlers.put(ContainerType.KeyValueContainer, spyHandler);
-    HddsDispatcher dispatcher = new HddsDispatcher(conf, mockContainerSet,
-        mock(MutableVolumeSet.class), handlers, mockStateContext, mockMetrics, null);
-    
-    // Mock the handler to fail and then properly mark container unhealthy
-    ContainerCommandResponseProto failureResponse = ContainerCommandResponseProto.newBuilder()
-        .setCmdType(ContainerProtos.Type.WriteChunk)
-        .setResult(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR)
-        .setMessage("Simulated write failure")
-        .build();
-    doReturn(failureResponse).when(spyHandler).handle(any(), any(), any());
-    doAnswer(invocation -> {
-      Container<?> containerArg = invocation.getArgument(0);
-      containerArg.getContainerData().setState(ContainerProtos.ContainerDataProto.State.UNHEALTHY);
-      return null;
-    }).when(spyHandler).markContainerUnhealthy(any(), any());
-    
-    // Create a write request that will fail
-    BlockID blockID = getTestBlockID(1L);
-    ContainerCommandRequestProto writeRequest = ContainerTestHelper.getWriteChunkRequest(
-        MockPipeline.createSingleNodePipeline(), blockID, 123);
-    
-    // Dispatch the request which should trigger the unhealthy marking and scan
-    ContainerCommandResponseProto response = dispatcher.dispatch(writeRequest, null);
-    assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, response.getResult());
-    
-    // Verify that scanContainerWithoutGap was called for the unhealthy container
-    verify(mockContainerSet).scanContainerWithoutGap(1L, "Unhealthy container scan");
-    verify(spyHandler).markContainerUnhealthy(eq(container), any());
-  }
-
   // -- Helper methods below.
 
   private KeyValueHandler getDummyHandler() {
@@ -335,23 +264,6 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
         conf,
         stateMachine.getDatanodeDetails().getUuidString(),
         mock(ContainerSet.class),
-        mock(MutableVolumeSet.class),
-        mock(ContainerMetrics.class), mockIcrSender, new ContainerChecksumTreeManager(conf));
-  }
-
-  private KeyValueHandler getDummyHandlerWithContainerSet(ContainerSet containerSet) {
-    DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
-        .setUuid(UUID.fromString(DATANODE_UUID))
-        .setHostName("dummyHost")
-        .setIpAddress("1.2.3.4")
-        .build();
-    DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
-    when(stateMachine.getDatanodeDetails()).thenReturn(dnDetails);
-
-    return new KeyValueHandler(
-        conf,
-        stateMachine.getDatanodeDetails().getUuidString(),
-        containerSet,
         mock(MutableVolumeSet.class),
         mock(ContainerMetrics.class), mockIcrSender, new ContainerChecksumTreeManager(conf));
   }

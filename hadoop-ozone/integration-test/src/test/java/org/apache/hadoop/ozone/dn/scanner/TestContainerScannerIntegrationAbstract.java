@@ -220,4 +220,8 @@ public abstract class TestContainerScannerIntegrationAbstract {
     return TestHelper.createKey(
         keyName, RATIS, ONE, 0, store, volumeName, bucketName);
   }
+
+  protected MiniOzoneCluster getMiniOzoneCluster() {
+    return cluster;
+  }
 }
