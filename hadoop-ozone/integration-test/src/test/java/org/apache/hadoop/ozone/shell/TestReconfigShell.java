@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.service.AbstractKeyDeletingService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -91,7 +92,7 @@ public abstract class TestReconfigShell implements NonHATests.TestCase {
       InterruptedException, TimeoutException {
     OzoneManager om = cluster().getOzoneManager();
     InetSocketAddress socket = om.getOmRpcServerAddr();
-    LogCapturer dirDeletingServiceLog = LogCapturer.captureLogs(DirectoryDeletingService.class);
+    LogCapturer dirDeletingServiceLog = LogCapturer.log4j2(AbstractKeyDeletingService.LOG.getName());
     LogCapturer reconfigHandlerLog = LogCapturer.captureLogs(ReconfigurationHandler.class);
 
     String initialInterval = "1m";
