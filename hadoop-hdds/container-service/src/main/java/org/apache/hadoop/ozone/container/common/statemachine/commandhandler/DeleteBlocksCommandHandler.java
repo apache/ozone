@@ -621,26 +621,34 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       Table<String, Long> metadataTable =
           containerDB.getStore().getMetadataTable();
 
-      // In memory is updated only when existing delete transactionID is
-      // greater.
-      if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
-        // Update in DB pending delete key count and delete transaction ID.
+      // Synchronize on containerData to prevent concurrent updates
+      synchronized (containerData) {
+        // In memory is updated only when existing delete transactionID is
+        // greater.
+        if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
+          // Update in DB pending delete key count and delete transaction ID.
+          metadataTable
+              .putWithBatch(batchOperation,
+                  containerData.getLatestDeleteTxnKey(), delTX.getTxID());
+        }
+
+        long pendingDeleteBlocks =
+            containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
         metadataTable
             .putWithBatch(batchOperation,
-                containerData.getLatestDeleteTxnKey(), delTX.getTxID());
+                containerData.getPendingDeleteBlockCountKey(),
+                pendingDeleteBlocks);
+
+        // update pending deletion blocks count and delete transaction ID in
+        // in-memory container status
+        long pendingBytes = delTX.getTotalBlockSize();
+        containerData.updateDeleteTransactionId(delTX.getTxID());
+        containerData.incrPendingDeletionBlocks(newDeletionBlocks, pendingBytes);
+        metadataTable
+            .putWithBatch(batchOperation,
+                containerData.getPendingDeleteBlockBytesKey(),
+                pendingBytes);
       }
-
-      long pendingDeleteBlocks =
-          containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
-      metadataTable
-          .putWithBatch(batchOperation,
-              containerData.getPendingDeleteBlockCountKey(),
-              pendingDeleteBlocks);
-
-      // update pending deletion blocks count and delete transaction ID in
-      // in-memory container status
-      containerData.updateDeleteTransactionId(delTX.getTxID());
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
     }
   }
 

@@ -1058,6 +1058,8 @@ public class TestKeyValueContainer {
       Table<String, Long> metadataTable = meta.getStore().getMetadataTable();
       metadataTable.put(data.getPendingDeleteBlockCountKey(),
           pendingDeleteBlockCount);
+      metadataTable.put(data.getPendingDeleteBlockBytesKey(),
+          pendingDeleteBlockCount * 256);
     }
     container.close();
 
@@ -1100,6 +1102,8 @@ public class TestKeyValueContainer {
         importedContainer.getContainerData().getSchemaVersion());
     assertEquals(pendingDeleteBlockCount,
         importedContainer.getContainerData().getNumPendingDeletionBlocks());
+    assertEquals(pendingDeleteBlockCount * 256,
+        importedContainer.getContainerData().getBlockPendingDeletionBytes());
   }
 
   @ContainerTestVersionInfo.ContainerTest
