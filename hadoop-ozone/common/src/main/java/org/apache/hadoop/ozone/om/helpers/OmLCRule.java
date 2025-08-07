@@ -89,6 +89,10 @@ public final class OmLCRule {
     return id;
   }
 
+  public String getPrefix() {
+    return prefix;
+  }
+
   @Nullable
   public String getEffectivePrefix() {
     return prefix != null ? prefix :

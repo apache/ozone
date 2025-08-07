@@ -89,6 +89,10 @@ public final class OmLifecycleConfiguration extends WithObjectID
     return creationTime;
   }
 
+  public BucketLayout getBucketLayout() {
+    return bucketLayout;
+  }
+
   /**
    * Validates the lifecycle configuration.
    * - Volume and Bucket cannot be blank
@@ -141,6 +145,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     return new Builder(this)
         .setVolume(this.volume)
         .setBucket(this.bucket)
+        .setBucketLayout(bucketLayout)
         .setCreationTime(this.creationTime)
         .setRules(this.rules);
   }

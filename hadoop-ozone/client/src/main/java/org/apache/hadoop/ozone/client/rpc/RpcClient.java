@@ -2790,17 +2790,33 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneLifecycleConfiguration getLifecycleConfiguration(String volumeName, String bucketName)
       throws IOException {
-    throw new UnsupportedOperationException("Lifecycle configuration operations are not yet supported");
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+
+    OmLifecycleConfiguration lifecycleConfiguration =
+        ozoneManagerClient.getLifecycleConfiguration(volumeName, bucketName);
+    return OzoneLifecycleConfiguration.fromOmLifecycleConfiguration(
+        lifecycleConfiguration);
   }
 
   @Override
-  public void createLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
-    throw new UnsupportedOperationException("Lifecycle configuration operations are not yet supported");
+  public void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration) throws IOException {
+    Preconditions.checkNotNull(lifecycleConfiguration);
+    verifyVolumeName(lifecycleConfiguration.getVolume());
+    verifyBucketName(lifecycleConfiguration.getBucket());
+
+    LOG.info("Creating lifecycle configuration for: {}/{}", lifecycleConfiguration.getVolume(),
+        lifecycleConfiguration.getBucket());
+    ozoneManagerClient.setLifecycleConfiguration(lifecycleConfiguration);
   }
 
   @Override
   public void deleteLifecycleConfiguration(String volumeName, String bucketName) throws IOException {
-    throw new UnsupportedOperationException("Lifecycle configuration operations are not yet supported");
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+
+    LOG.info("Deleting lifecycle Configuration for : {}/{}", volumeName, bucketName);
+    ozoneManagerClient.deleteLifecycleConfiguration(volumeName, bucketName);
   }
 
   private static ExecutorService createThreadPoolExecutor(

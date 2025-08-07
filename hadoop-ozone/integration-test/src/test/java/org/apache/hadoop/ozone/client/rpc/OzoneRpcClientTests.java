@@ -147,6 +147,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
+import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -175,6 +176,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLCRule;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -5292,5 +5296,198 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     assertEquals(tags.size(), tagsRetrieved.size());
     assertThat(tagsRetrieved).containsAllEntriesOf(tags);
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testSetLifecycleConfiguration(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    store.getVolume(volumeName).createBucket(bucketName, bucketArgs);
+    ClientProtocol proxy = store.getClientProxy();
+
+    OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
+        bucketName, true, bucketLayout);
+    proxy.setLifecycleConfiguration(lcc1);
+
+    // No such volume
+    OmLifecycleConfiguration lcc2 = createOmLifecycleConfiguration("nonexistentvolume",
+        "nonexistentbucket", true, bucketLayout);
+    OzoneTestUtils.expectOmException(ResultCodes.VOLUME_NOT_FOUND,
+        () -> proxy.setLifecycleConfiguration(lcc2));
+
+    // No such bucket
+    OmLifecycleConfiguration lcc3 = createOmLifecycleConfiguration(volumeName,
+        "nonexistentbucket", true, bucketLayout);
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> proxy.setLifecycleConfiguration(lcc3));
+
+    // Invalid volumeName
+    OmLifecycleConfiguration lcc4 = createOmLifecycleConfiguration("VOLUMENAME",
+        bucketName, true, bucketLayout);
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_VOLUME_NAME,
+        () -> proxy.setLifecycleConfiguration(lcc4));
+
+    // Invalid bucketName
+    OmLifecycleConfiguration lcc5 = createOmLifecycleConfiguration(volumeName,
+        "BUCKETNAME", true, bucketLayout);
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_BUCKET_NAME,
+        () -> proxy.setLifecycleConfiguration(lcc5));
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteLifecycleConfiguration(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    store.getVolume(volumeName).createBucket(bucketName, bucketArgs);
+    ClientProtocol proxy = store.getClientProxy();
+
+    // No such lifecycle configuration
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.deleteLifecycleConfiguration(volumeName, bucketName));
+
+    OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
+        bucketName, true, bucketLayout);
+    proxy.setLifecycleConfiguration(lcc1);
+    proxy.deleteLifecycleConfiguration(volumeName, bucketName);
+  }
+
+  @Test
+  public void testDeleteBucketWithAttachedLifecycleConfiguration()
+      throws Exception {
+    String bucketName = UUID.randomUUID().toString();
+    store.createS3Bucket(bucketName);
+    String volumeName = store.getS3Bucket(bucketName).getVolumeName();
+    ClientProtocol proxy = store.getClientProxy();
+
+    // Create a new lifecycle configuration and make sure verify it.
+    OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
+        bucketName, true, BucketLayout.OBJECT_STORE);
+    proxy.setLifecycleConfiguration(lcc1);
+    OzoneLifecycleConfiguration lcc2 =
+        proxy.getLifecycleConfiguration(volumeName, bucketName);
+    assertEquals(lcc1.getVolume(), lcc2.getVolume());
+    assertEquals(lcc1.getBucket(), lcc2.getBucket());
+    assertEquals(lcc1.getRules().get(0).getId(), lcc2.getRules()
+        .get(0).getId());
+    // CreationTime is added when being created.
+    assertNotEquals(lcc1.getCreationTime(), lcc2.getCreationTime());
+
+    store.deleteS3Bucket(bucketName);
+
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, bucketName));
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testGetLifecycleConfiguration(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    BucketArgs bucketArgs =
+        BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    store.getVolume(volumeName).createBucket(bucketName, bucketArgs);
+    ClientProtocol proxy = store.getClientProxy();
+
+    // No such lifecycle configuration
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, bucketName));
+
+    OmLifecycleConfiguration lcc1 = createOmLifecycleConfiguration(volumeName,
+        bucketName, true, bucketLayout);
+    proxy.setLifecycleConfiguration(lcc1);
+
+    OzoneLifecycleConfiguration lcc2 =
+        proxy.getLifecycleConfiguration(volumeName, bucketName);
+    assertEquals(lcc1.getVolume(), lcc2.getVolume());
+    assertEquals(lcc1.getBucket(), lcc2.getBucket());
+    assertEquals(lcc1.getRules().get(0).getId(), lcc2.getRules()
+        .get(0).getId());
+    // CreationTime is added when being created.
+    assertNotEquals(lcc1.getCreationTime(), lcc2.getCreationTime());
+  }
+
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testLifecycleConfigurationWithLinkedBucket(BucketLayout bucketLayout) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String sourceBucketName = UUID.randomUUID().toString();
+    String linkedBucketName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    
+    // Create source bucket nand linked bucket
+    BucketArgs bucketArgs = BucketArgs.newBuilder().setBucketLayout(bucketLayout).build();
+    volume.createBucket(sourceBucketName, bucketArgs);
+    OzoneBucket sourceBucket = volume.getBucket(sourceBucketName);
+    assertNotNull(sourceBucket);
+    volume.createBucket(linkedBucketName,
+        BucketArgs.newBuilder()
+            .setSourceBucket(sourceBucketName)
+            .setSourceVolume(volumeName)
+            .build());
+    OzoneBucket linkedBucket = volume.getBucket(linkedBucketName);
+    assertNotNull(linkedBucket);
+    
+    ClientProtocol proxy = store.getClientProxy();
+    OzoneTestUtils.expectOmException(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, sourceBucketName));
+    OzoneTestUtils.expectOmException(ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, linkedBucketName));
+
+    OmLifecycleConfiguration lccThroughLinked = createOmLifecycleConfiguration(volumeName,
+        linkedBucketName, true, bucketLayout);
+    proxy.setLifecycleConfiguration(lccThroughLinked);
+
+    OzoneLifecycleConfiguration lccFromSource = 
+        proxy.getLifecycleConfiguration(volumeName, sourceBucketName);
+    // The actual stored configuration should be for the source bucket
+    assertEquals(volumeName, lccFromSource.getVolume());
+    assertEquals(sourceBucketName, lccFromSource.getBucket());
+    
+    // Delete lifecycle configuration through linked bucket
+    proxy.deleteLifecycleConfiguration(volumeName, linkedBucketName);
+    
+    // Verify lifecycle configuration is deleted for both buckets
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, linkedBucketName));
+    OzoneTestUtils.expectOmException(
+        ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND,
+        () -> proxy.getLifecycleConfiguration(volumeName, sourceBucketName));
+    
+    volume.deleteBucket(linkedBucketName);
+    volume.deleteBucket(sourceBucketName);
+    store.deleteVolume(volumeName);
+  }
+
+  private OmLifecycleConfiguration createOmLifecycleConfiguration(String volume,
+      String bucket, boolean hasRules, BucketLayout bucketLayout) throws OMException {
+
+    OmLifecycleConfiguration.Builder builder =
+        new OmLifecycleConfiguration.Builder()
+            .setVolume(volume)
+            .setBucket(bucket)
+            .setBucketLayout(bucketLayout);
+
+    if (hasRules) {
+      builder.setRules(Collections.singletonList(new OmLCRule.Builder()
+          .setEnabled(true)
+          .setPrefix("")
+          .addAction(new OmLCExpiration.Builder().setDays(30).build())
+          .build()));
+    }
+
+    return builder.build();
   }
 }

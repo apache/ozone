@@ -252,6 +252,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -3110,6 +3111,51 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_SNAPSHOT,
           auditMap, ex));
       throw ex;
+    }
+  }
+
+  /**
+   * Gets the lifecycle configuration information.
+   * @param volumeName - Volume name.
+   * @param bucketName - Bucket name.
+   * @return OmLifecycleConfiguration or exception is thrown.
+   * @throws IOException
+   */
+  @Override
+  public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException {
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName));
+    auditMap = buildAuditMap(resolvedBucket.realVolume());
+    auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
+
+    if (isAclEnabled) {
+      omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
+          resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
+    }
+
+    boolean auditSuccess = true;
+    OMLockDetails omLockDetails = metadataManager.getLock().acquireReadLock(BUCKET_LOCK,
+        resolvedBucket.realVolume(), resolvedBucket.realBucket());
+    boolean lockAcquired = omLockDetails.isLockAcquired();
+    try {
+      return metadataManager.getLifecycleConfiguration(
+          resolvedBucket.realVolume(), resolvedBucket.realBucket());
+    } catch (Exception ex) {
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap, ex));
+      throw ex;
+    } finally {
+      if (lockAcquired) {
+        metadataManager.getLock().releaseReadLock(BUCKET_LOCK,
+            resolvedBucket.realVolume(), resolvedBucket.realBucket());
+      }
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+            OMAction.GET_LIFECYCLE_CONFIGURATION, auditMap));
+      }
     }
   }
 
