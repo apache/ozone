@@ -2034,6 +2034,7 @@
                     <allowedImports>
                       <allowedImport>org.junit.jupiter.**</allowedImport>
                       <allowedImport>org.junit.platform.**</allowedImport>
+                      <allowedImport>org.junit.rules.TestName</allowedImport>
                     </allowedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
