@@ -60,21 +60,23 @@ public class ChunkKeyHandler extends KeyHandler {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:methodlength")
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException {
     try (ContainerOperationClient containerOperationClient = new ContainerOperationClient(getOzoneConf());
         XceiverClientManager xceiverClientManager = containerOperationClient.getXceiverClientManager()) {
       OzoneManagerProtocol ozoneManagerClient = client.getObjectStore().getClientProxy().getOzoneManagerClient();
       address.ensureKeyAddress();
-      ObjectNode result = JsonUtils.createObjectNode(null);
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
       String keyName = address.getKeyName();
 
-      result.put("volumeName", volumeName);
-      result.put("bucketName", bucketName);
-      result.put("name", keyName);
-
+      // Print the file header immediately
+      ObjectNode headerResult = JsonUtils.createObjectNode(null);
+      headerResult.put("volumeName", volumeName);
+      headerResult.put("bucketName", bucketName);
+      headerResult.put("name", keyName);
+      
       OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
           .setBucketName(bucketName).setKeyName(keyName).build();
       OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
@@ -95,8 +97,23 @@ public class ChunkKeyHandler extends KeyHandler {
       }
       ContainerLayoutVersion containerLayoutVersion = ContainerLayoutVersion
           .getConfiguredVersion(getConf());
-      ArrayNode responseArrayList = result.putArray("keyLocations");
+      
+      // Print opening JSON structure
+      System.out.println("{");
+      System.out.printf("  \"volumeName\": \"%s\",%n", volumeName);
+      System.out.printf("  \"bucketName\": \"%s\",%n", bucketName);
+      System.out.printf("  \"name\": \"%s\",%n", keyName);
+      System.out.println("  \"keyLocations\": [");
+      
+      boolean isFirstBlock = true;
+      
       for (OmKeyLocationInfo keyLocation : locationInfos) {
+        // Print comma separator for blocks after the first one
+        if (!isFirstBlock) {
+          System.out.print(",");
+        }
+        isFirstBlock = false;
+        
         Pipeline keyPipeline = keyLocation.getPipeline();
         boolean isECKey =
             keyPipeline.getReplicationConfig().getReplicationType() ==
@@ -117,7 +134,9 @@ public class ChunkKeyHandler extends KeyHandler {
           Map<DatanodeDetails, ContainerProtos.ReadContainerResponseProto> readContainerResponses =
               containerOperationClient.readContainerFromAllNodes(
                   keyLocation.getContainerID(), pipeline);
-          ArrayNode responseFromAllNodes = responseArrayList.addArray();
+          
+          // Create JSON for one block at a time
+          ArrayNode blockResponseArray = JsonUtils.createArrayNode();
           for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto> entry : responses.entrySet()) {
             DatanodeDetails datanodeDetails = entry.getKey();
             GetBlockResponseProto blockResponse = entry.getValue();
@@ -142,7 +161,7 @@ public class ChunkKeyHandler extends KeyHandler {
                   chunkInfo.getChunkName()).toString();
             }
 
-            ObjectNode jsonObj = responseFromAllNodes.addObject();
+            ObjectNode jsonObj = blockResponseArray.addObject();
             ObjectNode dnObj = jsonObj.putObject("datanode");
             dnObj.put("hostname", datanodeDetails.getHostName());
             dnObj.put("ip", datanodeDetails.getIpAddress());
@@ -194,14 +213,26 @@ public class ChunkKeyHandler extends KeyHandler {
               jsonObj.put("replicaIndex", replicaIndex);
             }
           }
+          
+          // Print this block's data immediately, with proper indentation
+          String blockJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(blockResponseArray);
+          // Remove the outer array brackets and indent properly
+          String[] lines = blockJson.split("\n");
+          for (int i = 1; i < lines.length - 1; i++) {
+            System.out.println("    " + lines[i]);
+          }
+          
         } catch (InterruptedException e) {
           throw new RuntimeException(e);
         } finally {
           xceiverClientManager.releaseClientForReadData(xceiverClient, false);
         }
       }
-      String prettyJson = JsonUtils.toJsonStringWithDefaultPrettyPrinter(result);
-      System.out.println(prettyJson);
+      
+      // Close the JSON structure
+      System.out.println();
+      System.out.println("  ]");
+      System.out.println("}");
     }
   }
 }
