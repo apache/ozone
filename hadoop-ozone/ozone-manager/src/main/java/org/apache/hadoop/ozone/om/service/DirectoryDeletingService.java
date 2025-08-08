@@ -80,8 +80,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePa
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  Background service responsible for purging deleted directories and files
@@ -144,9 +142,6 @@ import org.slf4j.LoggerFactory;
  * @see org.apache.hadoop.ozone.om.SnapshotChainManager
  */
 public class DirectoryDeletingService extends AbstractKeyDeletingService {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DirectoryDeletingService.class);
-
   // Using multi thread for DirDeletion. Multiple threads would read
   // from parent directory info from deleted directory table concurrently
   // and send deletion requests.
