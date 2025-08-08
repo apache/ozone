@@ -242,7 +242,7 @@ public class SstFileSetReader {
   private static class HeapEntryWithFileIdx<T extends Comparable<T>>
       implements Comparable<HeapEntryWithFileIdx<T>> {
     private final ClosableIterator<T> iterator;
-    private T current;
+    private T currentKey;
     // To ensure stable ordering for identical keys
     private final int fileIndex;
 
@@ -258,32 +258,33 @@ public class SstFileSetReader {
 
     boolean advance() {
       if (iterator.hasNext()) {
-        current = iterator.next();
+        currentKey = iterator.next();
         return true;
       } else {
-        current = null;
+        currentKey = null;
         return false;
       }
     }
 
-    T getCurrent() {
-      return current;
+    T getCurrentKey() {
+      return currentKey;
     }
 
     @Override
     public int compareTo(@Nonnull HeapEntryWithFileIdx<T> other) {
-      if (this.current == null && other.current == null) {
+      if (this.currentKey == null && other.currentKey == null) {
         return 0;
       }
-      if (this.current == null) {
+      if (this.currentKey == null) {
         return 1;
       }
-      if (other.current == null) {
+      if (other.currentKey == null) {
         return -1;
       }
 
-      int result = this.current.compareTo(other.current);
+      int result = this.currentKey.compareTo(other.currentKey);
       if (result == 0) {
+        // For identical keys, prefer the one from the file with the higher index
         return -Integer.compare(this.fileIndex, other.fileIndex);
       }
       return result;
@@ -300,19 +301,19 @@ public class SstFileSetReader {
 
       HeapEntryWithFileIdx<T> other = (HeapEntryWithFileIdx<T>) obj;
 
-      if (this.current == null && other.current == null) {
+      if (this.currentKey == null && other.currentKey == null) {
         return this.fileIndex == other.fileIndex;
       }
-      if (this.current == null || other.current == null) {
+      if (this.currentKey == null || other.currentKey == null) {
         return false;
       }
 
-      return this.current.equals(other.current) && this.fileIndex == other.fileIndex;
+      return this.currentKey.equals(other.currentKey) && this.fileIndex == other.fileIndex;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(iterator, current, fileIndex);
+      return Objects.hash(iterator, currentKey, fileIndex);
     }
   }
 
@@ -343,7 +344,7 @@ public class SstFileSetReader {
           HeapEntryWithFileIdx<T> entry = new HeapEntryWithFileIdx<>(iterator, fileIndex++);
           allIterators.add(entry);
 
-          if (entry.getCurrent() != null) {
+          if (entry.getCurrentKey() != null) {
             minHeap.offer(entry);
           }
         }
@@ -362,7 +363,7 @@ public class SstFileSetReader {
         if (topEntry == null) {
           break;
         }
-        T currentValue = topEntry.getCurrent();
+        T currentValue = topEntry.getCurrentKey();
 
         // If this is a new value (different from last returned), we have a next element
         if (lastReturnedValue == null || !Objects.equals(currentValue, lastReturnedValue)) {
@@ -387,11 +388,11 @@ public class SstFileSetReader {
 
       assert minHeap.peek() != null;
       // Get current key from heap
-      T currentKey = minHeap.peek().getCurrent();
+      T currentKey = minHeap.peek().getCurrentKey();
 
       // Advance all entries with the same key (from different files)
       // and keep the one with the highest file index
-      while (!minHeap.isEmpty() && Objects.equals(minHeap.peek().getCurrent(), currentKey)) {
+      while (!minHeap.isEmpty() && Objects.equals(minHeap.peek().getCurrentKey(), currentKey)) {
         HeapEntryWithFileIdx<T> entry = minHeap.poll();
         if (entry.advance()) {
           minHeap.offer(entry);
