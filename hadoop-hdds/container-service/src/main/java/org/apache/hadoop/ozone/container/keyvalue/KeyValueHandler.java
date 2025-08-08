@@ -1586,10 +1586,6 @@ public class KeyValueHandler extends Handler {
         long numMissingBlocksRepaired = 0;
         long numCorruptChunksRepaired = 0;
         long numMissingChunksRepaired = 0;
-        // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with
-        // the next peer.
-        ContainerMerkleTreeWriter updatedTreeWriter =
-            new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
 
         LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
             containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
@@ -1606,6 +1602,10 @@ public class KeyValueHandler extends Handler {
           continue;
         }
 
+        // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with
+        // the next peer.
+        ContainerMerkleTreeWriter updatedTreeWriter =
+            new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
         ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
         Pipeline pipeline = createSingleNodePipeline(peer);
 
