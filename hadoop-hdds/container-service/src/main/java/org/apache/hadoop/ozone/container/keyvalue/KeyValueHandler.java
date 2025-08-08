@@ -1596,6 +1596,19 @@ public class KeyValueHandler extends Handler {
   @Override
   public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
       Collection<DatanodeDetails> peers) throws IOException {
+    long containerID = container.getContainerData().getContainerID();
+    try {
+      reconcileContainerInternal(dnClient, container, peers);
+    } finally {
+      // Trigger on demand scanner, which will build the merkle tree based on the newly ingested data.
+      containerSet.scanContainerWithoutGap(containerID,
+          "Container reconciliation");
+      sendICR(container);
+    }
+  }
+
+  private void reconcileContainerInternal(DNContainerOperationClient dnClient, Container<?> container,
+      Collection<DatanodeDetails> peers) throws IOException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     long containerID = containerData.getContainerID();
@@ -1739,11 +1752,6 @@ public class KeyValueHandler extends Handler {
             successfulPeerCount, allBlocksUpdated);
       }
     }
-
-    // Trigger on demand scanner, which will build the merkle tree based on the newly ingested data.
-    containerSet.scanContainerWithoutGap(containerID,
-        "Container reconciliation");
-    sendICR(container);
   }
 
   /**
