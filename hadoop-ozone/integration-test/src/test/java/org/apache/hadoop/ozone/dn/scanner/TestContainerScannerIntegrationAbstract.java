@@ -225,7 +225,8 @@ public abstract class TestContainerScannerIntegrationAbstract {
     return cluster.getConf();
   }
 
-  protected MiniOzoneCluster getMiniOzoneCluster() {
-    return cluster;
+  protected HddsDatanodeService getDatanode() {
+    assertEquals(1, cluster.getHddsDatanodes().size());
+    return cluster.getHddsDatanodes().get(0);
   }
 }

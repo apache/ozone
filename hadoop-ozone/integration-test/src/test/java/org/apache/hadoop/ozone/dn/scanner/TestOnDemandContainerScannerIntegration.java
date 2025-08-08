@@ -35,8 +35,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
@@ -199,8 +199,8 @@ class TestOnDemandContainerScannerIntegration
     assertEquals(State.OPEN, container.getContainerState());
 
     Optional<Instant> initialScanTime = container.getContainerData().lastDataScanTime();
-    HddsDatanodeService dn = getMiniOzoneCluster().getHddsDatanodes().get(0);
-    HddsDispatcher dispatcher = (HddsDispatcher) dn.getDatanodeStateMachine().getContainer().getDispatcher();
+    HddsDatanodeService dn = getDatanode();
+    ContainerDispatcher dispatcher = dn.getDatanodeStateMachine().getContainer().getDispatcher();
     OnDemandScannerMetrics scannerMetrics = dn.getDatanodeStateMachine().getContainer()
         .getOnDemandScanner().getMetrics();
     int initialScannedCount = scannerMetrics.getNumContainersScanned();
@@ -233,10 +233,6 @@ class TestOnDemandContainerScannerIntegration
       return currentScanTime.isPresent() && currentScanTime.get().isAfter(initialScanTime.orElse(Instant.EPOCH));
     }, 500, 5000);
 
-    // Verify scan timestamp was updated
-    Optional<Instant> finalScanTime = container.getContainerData().lastDataScanTime();
-    assertTrue(finalScanTime.isPresent());
-    assertTrue(finalScanTime.get().isAfter(initialScanTime.orElse(Instant.EPOCH)));
     int finalScannedCount = scannerMetrics.getNumContainersScanned();
     assertTrue(finalScannedCount > initialScannedCount);
   }
