@@ -268,7 +268,6 @@ public class TestContainerReconciliationWithMockDatanodes {
     MockDatanode corruptedNode = datanodes.get(0);
     MockDatanode healthyNode1 = datanodes.get(1);
     MockDatanode healthyNode2 = datanodes.get(2);
-    healthyDataChecksum = healthyNode1.checkAndGetDataChecksum(CONTAINER_ID);
     corruptedNode.introduceCorruption(CONTAINER_ID, 1, 1, false);
     
     // Use synchronous on-demand scans to re-build the merkle trees after corruption.

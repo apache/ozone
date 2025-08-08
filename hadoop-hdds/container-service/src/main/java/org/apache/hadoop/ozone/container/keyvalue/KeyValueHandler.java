@@ -1694,9 +1694,9 @@ public class KeyValueHandler extends Handler {
 
         ContainerLogger.logReconciled(container.getContainerData(), previousDataChecksum, peer);
         successfulPeerCount++;
-      } catch (Exception e) {
+      } catch (IOException ex) {
         LOG.error("Failed to reconcile with peer {} for container #{}. Skipping to next peer.",
-            peer, containerID, e);
+            peer, containerID, ex);
       }
     }
 
