@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -800,7 +801,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     if (isListener) {
       String listenerOmNodesKey = ConfUtils.addKeySuffixes(
           OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY, omServiceId);
-      newConf.set(listenerOmNodesKey, newConf.get(listenerOmNodesKey) + "," + omNodeId);
+      String existingListenerNodes = newConf.get(listenerOmNodesKey);
+      if (!StringUtils.isEmpty(existingListenerNodes)) {
+        newConf.set(listenerOmNodesKey, existingListenerNodes + "," + omNodeId);
+      }
     }
     return newConf;
   }

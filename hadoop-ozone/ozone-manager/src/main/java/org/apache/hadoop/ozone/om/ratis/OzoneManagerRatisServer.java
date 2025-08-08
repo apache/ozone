@@ -435,7 +435,7 @@ public final class OzoneManagerRatisServer {
 
   public List<String> getListenerIds() {
     return raftPeerMap.entrySet().stream()
-        .filter(entry -> entry.getValue().getStartupRole() == RaftPeerRole.FOLLOWER)
+        .filter(entry -> entry.getValue().getStartupRole() == RaftPeerRole.LISTENER)
         .map(Map.Entry::getKey)
         .collect(Collectors.toList());
   }
