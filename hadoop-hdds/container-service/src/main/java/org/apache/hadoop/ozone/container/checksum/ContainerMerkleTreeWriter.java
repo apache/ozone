@@ -63,7 +63,8 @@ public class ContainerMerkleTreeWriter {
     id2Block = new TreeMap<>();
     for (ContainerProtos.BlockMerkleTree blockTree: fromTree.getBlockMerkleTreeList()) {
       long blockID = blockTree.getBlockID();
-      addBlock(blockID);
+      long bcsid = blockTree.hasBlockCommitSequenceId() ? blockTree.getBlockCommitSequenceId() : 0;
+      addBlock(blockID, bcsid);
       for (ContainerProtos.ChunkMerkleTree chunkTree: blockTree.getChunkMerkleTreeList()) {
         addChunks(blockID, chunkTree);
       }
@@ -98,17 +99,22 @@ public class ContainerMerkleTreeWriter {
   }
 
   private void addChunks(long blockID, ChunkMerkleTreeWriter chunkWriter) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new).addChunks(chunkWriter);
+    BlockMerkleTreeWriter blockWriter = id2Block.get(blockID);
+    if (blockWriter == null) {
+      throw new IllegalStateException("Block " + blockID + " must be added before adding chunks to it");
+    }
+    blockWriter.addChunks(chunkWriter);
   }
 
   /**
-   * Adds an empty block to the tree. This method is not a pre-requisite to {@code addChunks}.
+   * Adds an empty block to the tree with the specified BCSID. This method is not a pre-requisite to {@code addChunks}.
    * If the block entry already exists, it will not be modified.
    *
    * @param blockID The ID of the empty block to add to the tree
+   * @param bcsid The block commit sequence ID for this block
    */
-  public void addBlock(long blockID) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new);
+  public void addBlock(long blockID, long bcsid) {
+    id2Block.computeIfAbsent(blockID, id -> new BlockMerkleTreeWriter(id, bcsid));
   }
 
   /**
@@ -145,9 +151,11 @@ public class ContainerMerkleTreeWriter {
     // Chunk order in the checksum is determined by their offset.
     private final SortedMap<Long, ChunkMerkleTreeWriter> offset2Chunk;
     private final long blockID;
+    private final long blockCommitSequenceId;
 
-    BlockMerkleTreeWriter(long blockID) {
+    BlockMerkleTreeWriter(long blockID, long blockCommitSequenceId) {
       this.blockID = blockID;
+      this.blockCommitSequenceId = blockCommitSequenceId;
       this.offset2Chunk = new TreeMap<>();
     }
 
@@ -193,6 +201,7 @@ public class ContainerMerkleTreeWriter {
       return blockTreeBuilder
           .setBlockID(blockID)
           .setDataChecksum(checksumImpl.getValue())
+          .setBlockCommitSequenceId(blockCommitSequenceId)
           .build();
     }
   }

@@ -566,6 +566,7 @@ message BlockMerkleTree {
   optional int64 blockID = 1;
   optional int64 dataChecksum = 2;
   repeated ChunkMerkleTree chunkMerkleTree = 3;
+  optional uint64 blockCommitSequenceId = 4;
 }
 
 message ContainerMerkleTree {
