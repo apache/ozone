@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.admin.om;
 import static org.apache.hadoop.ozone.admin.om.OMAdmin.createOmClient;
 
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.cli.AbstractMixin;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import picocli.CommandLine;
@@ -44,6 +45,11 @@ public final class OmAddressOptions {
           null,
           true);
     }
+
+    @Override
+    public String toString() {
+      return Objects.toString(addressOptions(), "");
+    }
   }
 
   /** Adds host to mixin. */
@@ -64,15 +70,6 @@ public final class OmAddressOptions {
           getServiceID(),
           getHost(),
           false);
-    }
-
-    @Override
-    public String toString() {
-      final String serviceOpt = super.toString();
-      final String host = getHost();
-      return (host != null && !host.isEmpty())
-          ? serviceOpt + " --service-host " + host
-          : serviceOpt;
     }
   }
 
@@ -173,6 +170,15 @@ public final class OmAddressOptions {
 
     public String getHost() {
       return host != null ? host : deprecatedHost;
+    }
+
+    @Override
+    public String toString() {
+      final String serviceOpt = super.toString();
+      final String hostValue = getHost();
+      return (hostValue != null && !hostValue.isEmpty())
+          ? serviceOpt + " --service-host " + hostValue
+          : serviceOpt;
     }
   }
 
