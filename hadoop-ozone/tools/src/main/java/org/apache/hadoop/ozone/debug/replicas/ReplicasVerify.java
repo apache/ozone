@@ -17,13 +17,23 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -38,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Shell;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import picocli.CommandLine;
 
 /**
@@ -72,22 +83,70 @@ public class ReplicasVerify extends Handler {
 
   private List<ReplicaVerifier> replicaVerifiers;
 
+  private static final String DURATION_FORMAT = "HH:mm:ss,SSS";
+  private long startTime;
+  private long endTime;
+  private String verificationScope;
+  private final List<String> verificationTypes = new ArrayList<>();
+  private final AtomicInteger volumesProcessed = new AtomicInteger(0);
+  private final AtomicInteger bucketsProcessed = new AtomicInteger(0);
+  private final AtomicInteger keysProcessed = new AtomicInteger(0);
+  private final AtomicInteger keysPassed = new AtomicInteger(0);
+  private final AtomicInteger keysFailed = new AtomicInteger(0);
+  private final Map<String, AtomicInteger> failuresByType = new ConcurrentHashMap<>();
+  private volatile Throwable exception;
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
+    startTime = System.nanoTime();
+
+    if (!address.getKeyName().isEmpty()) {
+      verificationScope = "Key";
+    } else if (!address.getBucketName().isEmpty()) {
+      verificationScope = "Bucket";
+    } else if (!address.getVolumeName().isEmpty()) {
+      verificationScope = "Volume";
+    } else {
+      verificationScope = "All Volumes";
+    }
+    
     replicaVerifiers = new ArrayList<>();
 
     if (verification.doExecuteChecksums) {
-      replicaVerifiers.add(new ChecksumVerifier(getConf()));
+      ChecksumVerifier checksumVerifier = new ChecksumVerifier(getConf());
+      replicaVerifiers.add(checksumVerifier);
+      String checksumType = checksumVerifier.getType();
+      verificationTypes.add(checksumType);
+      failuresByType.put(checksumType, new AtomicInteger(0));
     }
 
     if (verification.doExecuteBlockExistence) {
-      replicaVerifiers.add(new BlockExistenceVerifier(getConf()));
-    }
-    if (verification.doExecuteReplicaState) {
-      replicaVerifiers.add(new ContainerStateVerifier(getConf(), containerCacheSize));
+      BlockExistenceVerifier blockVerifier = new BlockExistenceVerifier(getConf());
+      replicaVerifiers.add(blockVerifier);
+      String blockType = blockVerifier.getType();
+      verificationTypes.add(blockType);
+      failuresByType.put(blockType, new AtomicInteger(0));
     }
 
-    findCandidateKeys(client, address);
+    if (verification.doExecuteReplicaState) {
+      ContainerStateVerifier stateVerifier = new ContainerStateVerifier(getConf(), containerCacheSize);
+      replicaVerifiers.add(stateVerifier);
+      String stateType = stateVerifier.getType();
+      verificationTypes.add(stateType);
+      failuresByType.put(stateType, new AtomicInteger(0));
+    }
+
+    // Add shutdown hook to ensure summary is printed even if interrupted
+    addShutdownHook();
+
+    try {
+      findCandidateKeys(client, address);
+      endTime = System.nanoTime();
+    } catch (Exception e) {
+      exception = e;
+      endTime = System.nanoTime();
+      throw e;
+    }
   }
 
   @Override
@@ -126,6 +185,7 @@ public class ReplicasVerify extends Handler {
 
   void checkVolume(OzoneClient ozoneClient, OzoneVolume volume, ArrayNode keysArray, AtomicBoolean allKeysPassed)
       throws IOException {
+    volumesProcessed.incrementAndGet();
     for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext();) {
       OzoneBucket bucket = it.next();
       checkBucket(ozoneClient, bucket, keysArray, allKeysPassed);
@@ -134,6 +194,7 @@ public class ReplicasVerify extends Handler {
 
   void checkBucket(OzoneClient ozoneClient, OzoneBucket bucket, ArrayNode keysArray, AtomicBoolean allKeysPassed)
       throws IOException {
+    bucketsProcessed.incrementAndGet();
     for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
       OzoneKey key = it.next();
       // TODO: Remove this check once HDDS-12094 is fixed
@@ -145,6 +206,7 @@ public class ReplicasVerify extends Handler {
 
   void processKey(OzoneClient ozoneClient, String volumeName, String bucketName, String keyName,
       ArrayNode keysArray, AtomicBoolean allKeysPassed) throws IOException {
+    keysProcessed.incrementAndGet();
     OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
         volumeName, bucketName, keyName, false);
 
@@ -155,6 +217,7 @@ public class ReplicasVerify extends Handler {
 
     ArrayNode blocksArray = keyNode.putArray("blocks");
     boolean keyPass = true;
+    Set<String> failedVerificationTypes = new HashSet<>();
 
     for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
       long containerID = keyLocation.getContainerID();
@@ -193,6 +256,7 @@ public class ReplicasVerify extends Handler {
 
           if (!result.passed()) {
             replicaPass = false;
+            failedVerificationTypes.add(verifier.getType());
           }
         }
 
@@ -207,13 +271,93 @@ public class ReplicasVerify extends Handler {
     }
 
     keyNode.put("pass", keyPass);
-    if (!keyPass) {
+    if (keyPass) {
+      keysPassed.incrementAndGet();
+    } else {
+      keysFailed.incrementAndGet();
       allKeysPassed.set(false);
+      
+      for (String failedType : failedVerificationTypes) {
+        AtomicInteger counter = failuresByType.get(failedType);
+        if (counter != null) {
+          counter.incrementAndGet();
+        } else {
+          failuresByType.computeIfAbsent(failedType, k -> new AtomicInteger(0)).incrementAndGet();
+        }
+      }
     }
 
     if (!keyPass || allResults) {
       keysArray.add(keyNode);
     }
+  }
+
+  /**
+   * Adds ShutdownHook to print summary statistics.
+   */
+  private void addShutdownHook() {
+    ShutdownHookManager.get().addShutdownHook(() -> {
+      if (endTime == 0) {
+        endTime = System.nanoTime();
+      }
+      printSummary(System.out);
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+  }
+
+  /**
+   * Prints summary of replica verification run.
+   *
+   * @param out PrintStream
+   */
+  void printSummary(PrintStream out) {
+    if (endTime == 0) {
+      endTime = System.nanoTime();
+    }
+    
+    long execTimeNanos = endTime - startTime;
+    String execTime = DurationFormatUtils.formatDuration(TimeUnit.NANOSECONDS.toMillis(execTimeNanos), DURATION_FORMAT);
+
+    long totalKeysProcessed = keysProcessed.get();
+    long totalKeysPassed = keysPassed.get();
+    long totalKeysFailed = keysFailed.get();
+
+    out.println();
+    out.println("***************************************************");
+    out.println("REPLICA VERIFICATION SUMMARY");
+    out.println("***************************************************");
+    out.println("Status: " + (exception != null ? "Failed" :
+        (totalKeysFailed == 0 ? "Success" : "Completed with failures")));
+    out.println("Verification Scope: " + verificationScope);
+    out.println("Verification Types: " + String.join(", ", verificationTypes));
+    out.println("URI: " + uri);
+    out.println();
+    out.println("Number of Volumes processed: " + volumesProcessed.get());
+    out.println("Number of Buckets processed: " + bucketsProcessed.get());
+    out.println("Number of Keys processed: " + totalKeysProcessed);
+    out.println();
+    out.println("Keys passed verification: " + totalKeysPassed);
+    out.println("Keys failed verification: " + totalKeysFailed);
+    
+    if (!failuresByType.isEmpty() && totalKeysFailed > 0) {
+      out.println();
+      for (String verificationType : verificationTypes) {
+        long typeFailures = failuresByType.get(verificationType).get();
+        if (typeFailures > 0) {
+          out.println("Keys failed " + verificationType + " verification: " + typeFailures);
+        }
+      }
+      out.println("Note: A key may fail multiple verification types, so total may exceed overall failures.");
+    }
+    
+    out.println();
+    out.println("Total Execution time: " + execTime);
+    
+    if (exception != null) {
+      out.println();
+      out.println("Exception: " + exception.getClass().getSimpleName() + ": " + exception.getMessage());
+    }
+    
+    out.println("***************************************************");
   }
 
   static class Verification {
