@@ -42,7 +42,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "decommission",
-    customSynopsis = "ozone admin om decommission -id=<om-service-id> " +
+    customSynopsis = "ozone admin om decommission --service-id=<om-service-id> " +
         "-nodeid=<decommission-om-node-id> " +
         "-hostname=<decommission-om-node-address> [options]",
     description = "Decommission an OzoneManager. Ensure that the node being " +
