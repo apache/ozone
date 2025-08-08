@@ -843,9 +843,20 @@ public final class OmSnapshotManager implements AutoCloseable {
     return getSnapshotPath(omMetadataManager, snapshotInfo) + ".yaml";
   }
 
+  /**
+   * Returns the path to the YAML file that stores local properties for the given snapshot.
+   *
+   * @param conf ozone configuration object
+   * @param checkpointDirName name of the snapshot checkpoint dir
+   * @return the path to the snapshot's local property YAML file
+   */
   public static String getSnapshotLocalPropertyYamlPath(OzoneConfiguration conf,
-      SnapshotInfo snapshotInfo) {
-    return getSnapshotPath(conf, snapshotInfo) + ".yaml";
+       String checkpointDirName) {
+    String checkpointName = checkpointDirName;
+    if (checkpointDirName.startsWith(OM_DB_NAME)) {
+      checkpointName = checkpointDirName.substring(OM_DB_NAME.length());
+    }
+    return getSnapshotPath(conf, checkpointName) + ".yaml";
   }
 
   public static boolean isSnapshotKey(String[] keyParts) {
