@@ -54,7 +54,7 @@ public class PrepareSubCommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Mixin
-  private OmServiceOption omServiceOption;
+  private OmAddressOptions.MandatoryServiceIdMixin omServiceOption;
 
   @CommandLine.Option(
       names = {"-tawt", "--transaction-apply-wait-timeout"},

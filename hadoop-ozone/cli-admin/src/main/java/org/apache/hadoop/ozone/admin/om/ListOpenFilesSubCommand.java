@@ -49,7 +49,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Mixin
-  private OmAddressOptions omAddressOptions;
+  private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",

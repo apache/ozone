@@ -44,7 +44,7 @@ import picocli.CommandLine;
 public class GetServiceRolesSubcommand implements Callable<Void> {
 
   @CommandLine.Mixin
-  private OmServiceOption omServiceOption;
+  private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
 
   @CommandLine.Option(names = { "--json" },
       defaultValue = "false",

@@ -65,7 +65,7 @@ public class DecommissionOMSubcommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Mixin
-  private OmServiceOption omServiceOption;
+  private OmAddressOptions.MandatoryServiceIdMixin omServiceOption;
 
   @CommandLine.Option(names = {"-nodeid", "--nodeid"},
       description = "NodeID of the OM to be decommissioned.",

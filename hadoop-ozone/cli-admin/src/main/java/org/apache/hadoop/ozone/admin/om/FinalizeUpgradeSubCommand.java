@@ -57,7 +57,7 @@ import picocli.CommandLine;
 public class FinalizeUpgradeSubCommand implements Callable<Void> {
 
   @CommandLine.Mixin
-  private OmAddressOptions omAddressOptions;
+  private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @CommandLine.Option(
       names = {"--takeover"},

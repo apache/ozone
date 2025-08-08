@@ -36,7 +36,7 @@ import picocli.CommandLine;
 public class FetchKeySubCommand implements Callable<Void> {
 
   @CommandLine.Mixin
-  private OmServiceOption omServiceOption;
+  private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
 
   @Override
   public Void call() throws Exception {

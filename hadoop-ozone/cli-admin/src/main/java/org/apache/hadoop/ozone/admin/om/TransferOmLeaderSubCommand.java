@@ -34,7 +34,7 @@ import picocli.CommandLine;
 public class TransferOmLeaderSubCommand implements Callable<Void> {
 
   @CommandLine.Mixin
-  private OmServiceOption omServiceOption;
+  private OmAddressOptions.OptionalServiceIdMixin omServiceOption;
 
   @CommandLine.ArgGroup(multiplicity = "1")
   private TransferOption configGroup;
