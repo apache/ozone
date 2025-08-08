@@ -438,6 +438,95 @@
         </plugins>
       </build>
     </profile>
+    <profile>
+      <id>rpm</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>rpm-maven-plugin</artifactId>
+            <version>2.2.0</version>
+            <configuration>
+              <name>ozone</name>
+              <version>${project.version}</version>
+              <release>1</release>
+              <license>Apache License, Version 2.0</license>
+              <summary>Ozone RPM package</summary>
+              <group>Development/Tools</group>
+              <needarch>noarch</needarch>
+              <targetArch>noarch</targetArch>
+              <targetOS>linux</targetOS>
+              <requires>
+                <require>java-1.8.0-openjdk &gt;= 1.8.0</require>
+              </requires>
+
+              <defaultDirmode>500</defaultDirmode>
+              <defaultFilemode>644</defaultFilemode>
+              <defaultUsername>root</defaultUsername>
+              <defaultGroupname>root</defaultGroupname>
+
+              <mappings>
+                <mapping>
+                  <directory>/opt/ozone/bin</directory>
+                  <filemode>755</filemode>
+                  <username>root</username>
+                  <groupname>root</groupname>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/bin/ozone</location>
+                    </source>
+                  </sources>
+                </mapping>
+
+                <mapping>
+                  <directory>/opt/ozone/sbin</directory>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/sbin</location>
+                    </source>
+                  </sources>
+                </mapping>
+
+                <mapping>
+                  <directory>/opt/ozone/etc</directory>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/etc</location>
+                    </source>
+                  </sources>
+                </mapping>
+
+                <mapping>
+                  <directory>/opt/ozone/libexec</directory>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/libexec</location>
+                    </source>
+                  </sources>
+                </mapping>
+
+                <mapping>
+                  <directory>/opt/ozone/share</directory>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/share</location>
+                    </source>
+                  </sources>
+                </mapping>
+              </mappings>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>rpm</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
 </project>
