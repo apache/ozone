@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.scm.node;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -119,6 +120,7 @@ public class TestVolumeChoosingPolicy {
       volume.setConf(CONF);
     }
     assertNull(volumeChoosingPolicy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, 0));
+    assertEquals(NUM_VOLUMES, volumeSet.getVolumesList().size());
   }
 
   @Test

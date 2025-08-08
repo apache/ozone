@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
 import static java.util.concurrent.TimeUnit.HOURS;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.util.Iterator;
@@ -42,6 +43,9 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
       ThreadLocal.withInitial(
           () -> CacheBuilder.newBuilder().recordStats().expireAfterAccess(1, HOURS).build());
 
+  // for test
+  private static boolean test = false;
+
   @Override
   public ContainerData chooseContainer(OzoneContainer ozoneContainer,
       HddsVolume hddsVolume, Set<Long> inProgressContainerIDs) {
@@ -57,7 +61,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
       if (!inProgressContainerIDs.contains(
-          containerData.getContainerID()) && (containerData.isClosed() || containerData.isQuasiClosed())) {
+          containerData.getContainerID()) && (containerData.isClosed() || (test && containerData.isQuasiClosed()))) {
         return containerData;
       }
     }
@@ -66,5 +70,10 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
       CACHE.get().invalidate(hddsVolume);
     }
     return null;
+  }
+
+  @VisibleForTesting
+  public static void setTest(boolean isTest) {
+    test = isTest;
   }
 }
