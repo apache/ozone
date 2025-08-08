@@ -284,7 +284,7 @@ public class SstFileSetReader {
 
       int result = this.current.compareTo(other.current);
       if (result == 0) {
-        return Integer.compare(this.fileIndex, other.fileIndex);
+        return -Integer.compare(this.fileIndex, other.fileIndex);
       }
       return result;
     }
