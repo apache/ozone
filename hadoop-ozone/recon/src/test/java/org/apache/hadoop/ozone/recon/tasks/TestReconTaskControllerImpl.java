@@ -63,7 +63,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
           return new ReconTaskStatusUpdater(reconTaskStatusDao, taskName);
         });
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
-        reconTaskStatusUpdaterManagerMock);
+        reconTaskStatusUpdaterManagerMock, null, null, null);
     reconTaskController.start();
   }
 

@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TA
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -35,12 +36,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.types.NamedCallableTask;
 import org.apache.hadoop.ozone.recon.tasks.types.TaskExecutionException;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
@@ -55,6 +60,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconTaskControllerImpl.class);
+  private final ReconDBProvider reconDBProvider;
+  private final ReconContainerMetadataManager reconContainerMetadataManager;
+  private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
 
   private Map<String, ReconOmTask> reconOmTasks;
   private ExecutorService executorService;
@@ -66,7 +74,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
                                  Set<ReconOmTask> tasks,
-                                 ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
+                                 ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
+                                 ReconDBProvider reconDBProvider,
+                                 ReconContainerMetadataManager reconContainerMetadataManager,
+                                 ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
+    this.reconDBProvider = reconDBProvider;
+    this.reconContainerMetadataManager = reconContainerMetadataManager;
+    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     reconOmTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
@@ -178,12 +192,29 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     }
     ReconConstants.resetTableTruncatedFlags();
 
+    String reconDBName = reconDBProvider.getDbStore().getDbLocation().getPath() + ".staged";
+    ReconDBProvider stagedReconDBProvider;
+    try {
+      stagedReconDBProvider = reconDBProvider.getStagedReconDBProvider(reconDBName);
+    } catch (IOException e) {
+      LOG.error("Failed to get staged Recon DB provider for reinitialization of tasks.", e);
+      localReconOmTaskMap.values().forEach(task -> {
+        ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
+        taskStatusUpdater.setLastTaskRunStatus(-1);
+        taskStatusUpdater.recordRunCompletion();
+      });
+      return;
+    }
+
     localReconOmTaskMap.values().forEach(task -> {
       ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
       taskStatusUpdater.recordRunStart();
-      tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.reprocess(omMetadataManager)));
+      tasks.add(new NamedCallableTask<>(task.getTaskName(),
+          () -> task.getStagedTask(omMetadataManager, stagedReconDBProvider.getDbStore())
+              .reprocess(omMetadataManager)));
     });
 
+    AtomicBoolean isRunSuccessful = new AtomicBoolean(true);
     try {
       CompletableFuture.allOf(tasks.stream()
           .map(task -> CompletableFuture.supplyAsync(() -> {
@@ -202,6 +233,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
                 taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
             if (!result.isTaskSuccess()) {
               LOG.error("Init failed for task {}.", taskName);
+              isRunSuccessful.set(false);
               taskStatusUpdater.setLastTaskRunStatus(-1);
             } else {
               taskStatusUpdater.setLastTaskRunStatus(0);
@@ -211,6 +243,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             taskStatusUpdater.recordRunCompletion();
           }).exceptionally(ex -> {
             LOG.error("Task failed with exception: ", ex);
+            isRunSuccessful.set(false);
             if (ex.getCause() instanceof TaskExecutionException) {
               TaskExecutionException taskEx = (TaskExecutionException) ex.getCause();
               String taskName = taskEx.getTaskName();
@@ -226,6 +259,24 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       LOG.error("Completing all tasks failed with exception ", ce);
     } catch (CancellationException ce) {
       LOG.error("Some tasks were cancelled with exception", ce);
+    }
+
+    if (isRunSuccessful.get()) {
+      try {
+        reconDBProvider.replaceStagedDb(stagedReconDBProvider);
+        reconNamespaceSummaryManager.reinitialize(reconDBProvider);
+        reconContainerMetadataManager.reinitialize(reconDBProvider);
+        LOG.info("Re-initialization of tasks completed successfully.");
+      } catch (Exception e) {
+        LOG.error("Re-initialization of tasks failed.", e);
+        // reinitialize the Recon OM tasks with the original DB provider
+        try {
+          reconNamespaceSummaryManager.reinitialize(reconDBProvider);
+          reconContainerMetadataManager.reinitialize(reconDBProvider);
+        } catch (IOException ex) {
+          LOG.error("Re-initialization of task manager failed.", e);
+        }
+      }
     }
   }
 

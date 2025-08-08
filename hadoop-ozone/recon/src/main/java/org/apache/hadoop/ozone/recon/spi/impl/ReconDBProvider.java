@@ -25,6 +25,7 @@ import com.google.inject.ProvisionException;
 import java.io.File;
 import java.io.IOException;
 import javax.inject.Inject;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -52,6 +53,18 @@ public class ReconDBProvider {
     this.configuration = configuration;
     this.reconUtils = reconUtils;
     this.dbStore = provideReconDB();
+  }
+
+  private ReconDBProvider(OzoneConfiguration configuration, ReconUtils reconUtils, DBStore dbStore) {
+    this.configuration = configuration;
+    this.reconUtils = reconUtils;
+    this.dbStore = dbStore;
+  }
+
+  public ReconDBProvider getStagedReconDBProvider(String dbName) throws IOException {
+    FileUtils.deleteDirectory(new File(dbName));
+    DBStore db = initializeDBStore(configuration, dbName);
+    return new ReconDBProvider(configuration, reconUtils, db);
   }
 
   public DBStore provideReconDB() {
@@ -113,6 +126,27 @@ public class ReconDBProvider {
     if (this.dbStore != null) {
       dbStore.close();
       dbStore = null;
+    }
+  }
+
+  public void replaceStagedDb(ReconDBProvider stagedReconDBProvider) throws Exception {
+    File dbPath = dbStore.getDbLocation();
+    File stagedDbPath = stagedReconDBProvider.getDbStore().getDbLocation();
+    File backupPath = new File(dbPath.getAbsolutePath() + ".backup");
+    stagedReconDBProvider.close();
+    try {
+      FileUtils.deleteDirectory(backupPath);
+      FileUtils.moveDirectory(dbPath, backupPath);
+      close();
+      FileUtils.moveDirectory(stagedDbPath, backupPath);
+      dbStore = initializeDBStore(configuration, dbPath.getName());
+    } catch (Exception e) {
+      if (dbStore == null) {
+        FileUtils.moveDirectory(dbPath, stagedDbPath);
+        FileUtils.moveDirectory(backupPath, dbPath);
+        dbStore = initializeDBStore(configuration, dbPath.getName());
+      }
+      throw e;
     }
   }
 }

@@ -102,8 +102,8 @@ public class TestNSSummaryTaskControllerIntegration {
     ReconTaskStatusUpdater mockTaskStatusUpdater = mock(ReconTaskStatusUpdater.class);
     when(mockTaskStatusUpdaterManager.getTaskStatusUpdater(any())).thenReturn(mockTaskStatusUpdater);
 
-    taskController =
-        new ReconTaskControllerImpl(ozoneConfiguration, java.util.Collections.emptySet(), mockTaskStatusUpdaterManager);
+    taskController = new ReconTaskControllerImpl(ozoneConfiguration, java.util.Collections.emptySet(),
+        mockTaskStatusUpdaterManager, null, null, null);
     taskController.start(); // Initialize the executor service
     taskController.registerTask(nsSummaryTask);
     taskController.registerTask(mockOtherTask);
