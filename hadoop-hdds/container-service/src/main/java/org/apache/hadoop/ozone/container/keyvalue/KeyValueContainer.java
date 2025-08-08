@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.nativeio.NativeIO;
@@ -120,6 +121,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private Set<Long> pendingPutBlockCache;
 
   private boolean bCheckChunksFilePath;
+  private static FaultInjector faultInjector;
 
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource ozoneConfig) {
@@ -934,7 +936,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void copyContainerData(Path destination) throws IOException {
-    writeLock();
+    readLock();
     try {
       // Closed/ Quasi closed containers are considered for replication by
       // replication manager if they are under-replicated.
@@ -948,16 +950,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
                 " is in state " + state);
       }
 
-      try {
-        if (!containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
-          compactDB();
-          // Close DB (and remove from cache) to avoid concurrent modification
-          // while copying it.
-          BlockUtils.removeDB(containerData, config);
-        }
-      } finally {
-        readLock();
-        writeUnlock();
+      if (!containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+        compactDB();
+        // Close DB (and remove from cache) to avoid concurrent modification
+        // while copying it.
+        BlockUtils.removeDB(containerData, config);
       }
 
       if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
@@ -972,17 +969,26 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       } else {
         copyContainerToDestination(destination);
       }
-    } catch (Exception e) {
+      if (getInjector() != null && getInjector().getException() != null) {
+        throw new IOException("Fault injection", getInjector().getException());
+      }
+    } catch (IOException e) {
       LOG.error("Got exception when copying container {} to {}",
           containerData.getContainerID(), destination, e);
       throw e;
     } finally {
-      if (lock.isWriteLockedByCurrentThread()) {
-        writeUnlock();
-      } else {
-        readUnlock();
-      }
+      readUnlock();
     }
+  }
+
+  @VisibleForTesting
+  public static FaultInjector getInjector() {
+    return faultInjector;
+  }
+
+  @VisibleForTesting
+  public static void setInjector(FaultInjector instance) {
+    faultInjector = instance;
   }
 
   /**

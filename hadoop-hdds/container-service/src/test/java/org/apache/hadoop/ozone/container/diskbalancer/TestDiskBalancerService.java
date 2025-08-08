@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -289,7 +290,7 @@ public class TestDiskBalancerService {
     when(containerData.getContainerID()).thenAnswer(invocation -> System.nanoTime());
     when(containerData.getBytesUsed()).thenReturn(100L);
 
-    when(volumePolicy.chooseVolume(any(), anyDouble(), any())).thenReturn(Pair.of(source, dest));
+    when(volumePolicy.chooseVolume(any(), anyDouble(), any(), anyLong())).thenReturn(Pair.of(source, dest));
     when(containerPolicy.chooseContainer(any(), any(), any())).thenReturn(containerData);
 
     // Test when no tasks are in progress, it should schedule up to the limit
