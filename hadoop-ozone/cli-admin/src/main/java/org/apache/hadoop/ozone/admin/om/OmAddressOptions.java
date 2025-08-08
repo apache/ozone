@@ -154,6 +154,7 @@ public final class OmAddressOptions {
   protected static class ServiceIdAndHostOptions extends ServiceIdOptions {
     @CommandLine.Option(
         names = {"--service-host"},
+        description = "Ozone Manager Host.",
         required = true
     )
     private String host;
