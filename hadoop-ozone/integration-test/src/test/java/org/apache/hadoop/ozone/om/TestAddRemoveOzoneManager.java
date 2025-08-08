@@ -486,4 +486,165 @@ public class TestAddRemoveOzoneManager {
     // Wait for new leader election if required
     cluster.waitForLeaderOM();
   }
+
+  /**
+   * Test that listener OMs cannot become leaders even when all voting OMs are
+   * down.
+   * This test verifies the core safety property of listener nodes.
+   */
+  @Test
+  public void testListenerCannotBecomeLeader() throws Exception {
+    // Setup cluster with 2 voting OMs
+    setupCluster(2);
+    user = UserGroupInformation.getCurrentUser();
+
+    // Add 2 listener OMs
+    List<String> listenerNodeIds = testBootstrapListenerOMs(2);
+
+    // Verify all listeners are running
+    for (String omId : listenerNodeIds) {
+      OzoneManager listenerOM = cluster.getOzoneManager(omId);
+      assertTrue(listenerOM.isRunning());
+      // Verify the node is actually a listener
+      assertTrue(listenerOM.getOmRatisServer()
+          .getCurrentListenersFromRaftConf().contains(omId));
+    }
+
+    // Stop all voting OMs
+    List<String> votingOMs = new ArrayList<>();
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      if (!listenerNodeIds.contains(om.getOMNodeId())) {
+        votingOMs.add(om.getOMNodeId());
+        cluster.stopOzoneManager(om.getOMNodeId());
+      }
+    }
+
+    // Wait for election timeout
+    Thread.sleep(OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT
+        .toLong(TimeUnit.MILLISECONDS) * 3);
+
+    // Verify no listener became leader (cluster should have no leader)
+    for (String listenerId : listenerNodeIds) {
+      OzoneManager listenerOM = cluster.getOzoneManager(listenerId);
+      assertFalse(listenerOM.isLeaderReady(),
+          "Listener OM " + listenerId + " should not become leader");
+    }
+  }
+
+  /**
+   * Test mixed cluster behavior with both followers and listeners.
+   * Verifies that the cluster operates correctly with mixed node types.
+   */
+  @Test
+  public void testMixedFollowersAndListeners() throws Exception {
+    // Setup cluster with 3 voting OMs
+    setupCluster(3);
+    user = UserGroupInformation.getCurrentUser();
+
+    // Add 1 voting OM and 2 listener OMs
+    List<String> newVotingOMs = testBootstrapOMs(1);
+    List<String> listenerOMs = testBootstrapListenerOMs(2);
+
+    // Verify total cluster size
+    assertEquals(6, cluster.getOzoneManagersList().size(),
+        "Cluster should have 6 OMs total (4 voting + 2 listeners)");
+
+    // Verify listeners are in the listener list
+    for (String listenerId : listenerOMs) {
+      for (OzoneManager om : cluster.getOzoneManagersList()) {
+        if (om.isRunning()) {
+          List<String> listeners = om.getOmRatisServer()
+              .getCurrentListenersFromRaftConf();
+          assertTrue(listeners.contains(listenerId),
+              "OM " + om.getOMNodeId() + " should have " + listenerId +
+                  " in its listener list");
+        }
+      }
+    }
+
+    // Verify voting OMs are NOT in the listener list
+    for (String votingId : newVotingOMs) {
+      for (OzoneManager om : cluster.getOzoneManagersList()) {
+        if (om.isRunning()) {
+          List<String> listeners = om.getOmRatisServer()
+              .getCurrentListenersFromRaftConf();
+          assertFalse(listeners.contains(votingId),
+              "Voting OM " + votingId + " should not be in listener list");
+        }
+      }
+    }
+
+    // Perform operations to ensure cluster works
+    OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
+    OzoneBucket bucket = volume.getBucket(BUCKET_NAME);
+    String key = createKey(bucket);
+    assertNotNull(bucket.getKey(key));
+
+    // Verify listeners are receiving updates by checking their last applied index
+    long leaderLastIndex = cluster.getOMLeader().getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex();
+    for (String listenerId : listenerOMs) {
+      OzoneManager listenerOM = cluster.getOzoneManager(listenerId);
+      GenericTestUtils.waitFor(() -> {
+        long listenerIndex = listenerOM.getOmRatisServer()
+            .getLastAppliedTermIndex().getIndex();
+        // Listener should be close to leader's index (allowing some lag)
+        return listenerIndex == leaderLastIndex;
+      }, 500, 10000);
+    }
+  }
+
+  /**
+   * Test removing a listener OM from the cluster.
+   * Verifies that listeners can be safely removed.
+   */
+  @Test
+  public void testRemoveListenerOM() throws Exception {
+    // Setup cluster with 3 voting OMs
+    setupCluster(3);
+    user = UserGroupInformation.getCurrentUser();
+
+    // Add 2 listener OMs
+    List<String> listenerNodeIds = testBootstrapListenerOMs(2);
+    String listenerToRemove = listenerNodeIds.get(0);
+
+    // Verify listener is present in all OMs
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      if (om.isRunning()) {
+        assertTrue(om.getOmRatisServer()
+            .getCurrentListenersFromRaftConf().contains(listenerToRemove));
+      }
+    }
+
+    // Decommission the listener OM
+    decommissionOM(listenerToRemove);
+
+    // Verify listener is removed from all OMs
+    GenericTestUtils.waitFor(() -> {
+      for (OzoneManager om : cluster.getOzoneManagersList()) {
+        if (om.isRunning() && !om.getOMNodeId().equals(listenerToRemove)) {
+          try {
+            if (om.getOmRatisServer()
+                .getCurrentListenersFromRaftConf().contains(listenerToRemove)) {
+              return false;
+            }
+          } catch (IOException e) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }, 100, 30000);
+
+    // Verify remaining listener is still functioning
+    String remainingListener = listenerNodeIds.get(1);
+    OzoneManager remainingListenerOM = cluster.getOzoneManager(remainingListener);
+    assertTrue(remainingListenerOM.isRunning());
+
+    // Verify cluster still works
+    OzoneVolume volume = objectStore.getVolume(VOLUME_NAME);
+    OzoneBucket bucket = volume.getBucket(BUCKET_NAME);
+    String key = createKey(bucket);
+    assertNotNull(bucket.getKey(key));
+  }
 }
