@@ -802,7 +802,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       String listenerOmNodesKey = ConfUtils.addKeySuffixes(
           OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY, omServiceId);
       String existingListenerNodes = newConf.get(listenerOmNodesKey);
-      if (!StringUtils.isEmpty(existingListenerNodes)) {
+      if (existingListenerNodes != null && !existingListenerNodes.isEmpty()) {
         newConf.set(listenerOmNodesKey, existingListenerNodes + "," + omNodeId);
       }
     }
