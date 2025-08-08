@@ -224,4 +224,9 @@ public abstract class TestContainerScannerIntegrationAbstract {
   protected OzoneConfiguration getConf() {
     return cluster.getConf();
   }
+
+  protected HddsDatanodeService getDatanode() {
+    assertEquals(1, cluster.getHddsDatanodes().size());
+    return cluster.getHddsDatanodes().get(0);
+  }
 }
