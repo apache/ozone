@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerReplicaHistoryProto;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 
 /**
  * A ContainerReplica timestamp class that tracks first and last seen time.
@@ -39,16 +40,16 @@ public class ContainerReplicaHistory {
 
   private long bcsId;
   private String state;
-  private long dataChecksum;
+  private ContainerChecksums checksums;
 
   public ContainerReplicaHistory(UUID id, Long firstSeenTime,
-      Long lastSeenTime, long bcsId, String state, long dataChecksum) {
+      Long lastSeenTime, long bcsId, String state, ContainerChecksums checksums) {
     this.uuid = id;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
     this.bcsId = bcsId;
     this.state = state;
-    this.dataChecksum = dataChecksum;
+    this.checksums = checksums;
   }
 
   public long getBcsId() {
@@ -84,23 +85,29 @@ public class ContainerReplicaHistory {
   }
 
   public long getDataChecksum() {
-    return dataChecksum;
+    return getChecksums().getDataChecksum();
   }
 
-  public void setDataChecksum(long dataChecksum) {
-    this.dataChecksum = dataChecksum;
+  public ContainerChecksums getChecksums() {
+    return checksums;
+  }
+
+  public void setChecksums(ContainerChecksums checksums) {
+    this.checksums = checksums;
   }
 
   public static ContainerReplicaHistory fromProto(
       ContainerReplicaHistoryProto proto) {
     return new ContainerReplicaHistory(UUID.fromString(proto.getUuid()),
         proto.getFirstSeenTime(), proto.getLastSeenTime(), proto.getBcsId(),
-        proto.getState(), proto.getDataChecksum());
+        proto.getState(), ContainerChecksums.of(proto.getDataChecksum(), 0L));
   }
 
   public ContainerReplicaHistoryProto toProto() {
     return ContainerReplicaHistoryProto.newBuilder().setUuid(uuid.toString())
         .setFirstSeenTime(firstSeenTime).setLastSeenTime(lastSeenTime)
-        .setBcsId(bcsId).setState(state).setDataChecksum(dataChecksum).build();
+        .setBcsId(bcsId).setState(state)
+        .setDataChecksum(checksums != null ? checksums.getDataChecksum() : 0L)
+        .build();
   }
 }
