@@ -125,8 +125,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
 
-  //number of buffers used before doing a flush/putBlock.
-  private int flushPeriod;
   private final Token<? extends TokenIdentifier> token;
   private final String tokenString;
   private final DataStreamOutput out;
@@ -172,8 +170,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream(pipeline);
     this.bufferList = bufferList;
-    flushPeriod = (int) (config.getStreamBufferFlushSize() / config
-        .getStreamBufferSize());
+
+    //number of buffers used before doing a flush/putBlock.
+    int flushPeriod = (int) (config.getStreamBufferFlushSize() / config.getStreamBufferSize());
 
     Preconditions
         .checkArgument(

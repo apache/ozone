@@ -85,8 +85,6 @@ public abstract class BaseHttpServer {
 
   private boolean prometheusSupport;
 
-  private boolean profilerSupport;
-
   public BaseHttpServer(MutableConfigurationSource conf, String name)
       throws IOException {
     this.name = name;
@@ -152,8 +150,8 @@ public abstract class BaseHttpServer {
       prometheusSupport = addDefaultApps &&
           conf.getBoolean(HddsConfigKeys.HDDS_PROMETHEUS_ENABLED, true);
 
-      profilerSupport = addDefaultApps &&
-          conf.getBoolean(HddsConfigKeys.HDDS_PROFILER_ENABLED, false);
+      boolean profilerSupport = addDefaultApps &&
+                                    conf.getBoolean(HddsConfigKeys.HDDS_PROFILER_ENABLED, false);
 
       if (prometheusSupport) {
         prometheusMetricsSink = new PrometheusMetricsSink(name);
