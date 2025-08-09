@@ -76,6 +76,7 @@ public class OMInterServiceProtocolClientSideImpl implements
         .setNodeId(newOMNode.getNodeId())
         .setHostAddress(newOMNode.getHostAddress())
         .setRatisPort(newOMNode.getRatisPort())
+        .setIsListener(newOMNode.isRatisListener())
         .build();
 
     BootstrapOMResponse response;
