@@ -114,6 +114,103 @@ class TestContainerMerkleTreeWriter {
   }
 
   @Test
+  public void testBlockIdIncludedInChecksum() {
+    // Create a set of chunks to be used in different blocks with identical content.
+    ContainerProtos.ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo chunk2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
+
+    // Create two blocks with different IDs but identical chunk data
+    final long blockID1 = 1;
+    final long blockID2 = 2;
+
+    ContainerMerkleTreeWriter tree1 = new ContainerMerkleTreeWriter();
+    tree1.addChunks(blockID1, true, chunk1, chunk2);
+
+    ContainerMerkleTreeWriter tree2 = new ContainerMerkleTreeWriter();
+    tree2.addChunks(blockID2, true, chunk1, chunk2);
+
+    ContainerProtos.ContainerMerkleTree tree1Proto = tree1.toProto();
+    ContainerProtos.ContainerMerkleTree tree2Proto = tree2.toProto();
+
+    // Even though the chunks are identical, the block checksums should be different
+    // because the block IDs are different
+    ContainerProtos.BlockMerkleTree block1 = tree1Proto.getBlockMerkleTree(0);
+    ContainerProtos.BlockMerkleTree block2 = tree2Proto.getBlockMerkleTree(0);
+
+    assertEquals(blockID1, block1.getBlockID());
+    assertEquals(blockID2, block2.getBlockID());
+    assertNotEquals(block1.getDataChecksum(), block2.getDataChecksum(),
+        "Blocks with identical chunks but different IDs should have different checksums");
+
+    // Consequently, the container checksums should also be different
+    assertNotEquals(tree1Proto.getDataChecksum(), tree2Proto.getDataChecksum(),
+        "Containers with blocks having identical chunks but different IDs should have different checksums");
+  }
+
+  @Test
+  public void testIdenticalBlocksHaveSameChecksum() {
+    // Create a set of chunks to be used in different blocks with identical content.
+    ContainerProtos.ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo chunk2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
+
+    // Create two blocks with the same ID and identical chunk data
+    final long blockID = 1;
+
+    ContainerMerkleTreeWriter tree1 = new ContainerMerkleTreeWriter();
+    tree1.addChunks(blockID, true, chunk1, chunk2);
+
+    ContainerMerkleTreeWriter tree2 = new ContainerMerkleTreeWriter();
+    tree2.addChunks(blockID, true, chunk1, chunk2);
+
+    ContainerProtos.ContainerMerkleTree tree1Proto = tree1.toProto();
+    ContainerProtos.ContainerMerkleTree tree2Proto = tree2.toProto();
+
+    // Blocks with same ID and identical chunks should have same checksums
+    ContainerProtos.BlockMerkleTree block1 = tree1Proto.getBlockMerkleTree(0);
+    ContainerProtos.BlockMerkleTree block2 = tree2Proto.getBlockMerkleTree(0);
+
+    assertEquals(blockID, block1.getBlockID());
+    assertEquals(blockID, block2.getBlockID());
+    assertEquals(block1.getDataChecksum(), block2.getDataChecksum(),
+        "Blocks with same ID and identical chunks should have same checksums");
+
+    // Container checksums should also be the same
+    assertEquals(tree1Proto.getDataChecksum(), tree2Proto.getDataChecksum(),
+        "Containers with identical blocks should have same checksums");
+  }
+
+  @Test
+  public void testContainerReplicasWithDifferentMissingBlocksHaveDifferentChecksums() {
+    // Create identical chunk data that will be used across all blocks
+    ContainerProtos.ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo chunk2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
+    
+    // Scenario: Container has 5 identical blocks, but different replicas are missing different blocks
+    // Replica 1 is missing block 1 (has blocks 2,3,4,5)
+    ContainerMerkleTreeWriter replica1 = new ContainerMerkleTreeWriter();
+    replica1.addChunks(2, true, chunk1, chunk2);
+    replica1.addChunks(3, true, chunk1, chunk2);
+    replica1.addChunks(4, true, chunk1, chunk2);
+    replica1.addChunks(5, true, chunk1, chunk2);
+    
+    // Replica 2 is missing block 5 (has blocks 1,2,3,4)
+    ContainerMerkleTreeWriter replica2 = new ContainerMerkleTreeWriter();
+    replica2.addChunks(1, true, chunk1, chunk2);
+    replica2.addChunks(2, true, chunk1, chunk2);
+    replica2.addChunks(3, true, chunk1, chunk2);
+    replica2.addChunks(4, true, chunk1, chunk2);
+    
+    ContainerProtos.ContainerMerkleTree replica1Proto = replica1.toProto();
+    ContainerProtos.ContainerMerkleTree replica2Proto = replica2.toProto();
+    assertNotEquals(replica1Proto.getDataChecksum(), replica2Proto.getDataChecksum(),
+        "Container replicas with identical blocks but different missing blocks should have different checksums");
+    
+    // Verify both replicas have the same number of blocks
+    assertEquals(4, replica1Proto.getBlockMerkleTreeCount());
+    assertEquals(4, replica2Proto.getBlockMerkleTreeCount());
+  }
+
+  @Test
   public void testBuildTreeWithEmptyBlock() {
     final long blockID = 1;
     ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID, Collections.emptyList());
@@ -274,12 +371,12 @@ class TestContainerMerkleTreeWriter {
 
   private ContainerProtos.BlockMerkleTree buildExpectedBlockTree(long blockID,
       List<ContainerProtos.ChunkMerkleTree> chunks) {
+    List<Long> itemsToChecksum = chunks.stream().map(ContainerProtos.ChunkMerkleTree::getDataChecksum)
+        .collect(Collectors.toList());
+    itemsToChecksum.add(0, blockID);
     return ContainerProtos.BlockMerkleTree.newBuilder()
         .setBlockID(blockID)
-        .setDataChecksum(computeExpectedChecksum(
-            chunks.stream()
-                .map(ContainerProtos.ChunkMerkleTree::getDataChecksum)
-                .collect(Collectors.toList())))
+        .setDataChecksum(computeExpectedChecksum(itemsToChecksum))
         .addAllChunkMerkleTree(chunks)
         .build();
   }

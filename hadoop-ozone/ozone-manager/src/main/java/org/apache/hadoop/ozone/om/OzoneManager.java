@@ -83,6 +83,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
@@ -524,6 +525,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins)
             .register(OZONE_OM_VOLUME_LISTALL_ALLOWED, this::reconfigureAllowListAllVolumes)
+            .register(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+                this::reconfOzoneSnapshotSSTFilteringServiceInterval)
             .register(OZONE_KEY_DELETING_LIMIT_PER_TASK,
                 this::reconfOzoneKeyDeletingLimitPerTask)
             .register(OZONE_DIR_DELETING_SERVICE_INTERVAL, this::reconfOzoneDirDeletingServiceInterval)
@@ -5204,6 +5207,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
         OZONE_THREAD_NUMBER_DIR_DELETION + " cannot be negative.");
     getConfiguration().set(OZONE_THREAD_NUMBER_DIR_DELETION, newVal);
+    return newVal;
+  }
+
+  private String reconfOzoneSnapshotSSTFilteringServiceInterval(String newVal) {
+    boolean wasSstFilteringSvcEnabled = ((KeyManagerImpl) keyManager).isSstFilteringSvcEnabled();
+    getConfiguration().set(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, newVal);
+
+    if (this.isFilesystemSnapshotEnabled()) {
+      if (wasSstFilteringSvcEnabled) {
+        // Sanity check
+        Preconditions.checkNotNull(keyManager.getSnapshotSstFilteringService(),
+            "sstFilteringService should not be null when SST filtering service is enabled.");
+        ((KeyManagerImpl) keyManager).stopSnapshotSstFilteringService();
+      }
+      // Note startSnapshotSstFilteringService checks whether the config is set to a value that enables the service
+      ((KeyManagerImpl) keyManager).startSnapshotSstFilteringService(getConfiguration());
+    } else {
+      LOG.warn("Ozone filesystem snapshot is not enabled. {} is reconfigured but will not make any difference.",
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL);
+    }
     return newVal;
   }
 

@@ -434,7 +434,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // Create a specific exception that signals for on demand scanning
         // and move this general scan to where it is more appropriate.
         // Add integration tests to test the full functionality.
-        containerSet.scanContainer(containerID);
+        containerSet.scanContainer(containerID, result.name());
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
