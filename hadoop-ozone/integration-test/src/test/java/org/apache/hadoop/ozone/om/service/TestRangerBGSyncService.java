@@ -120,16 +120,12 @@ public class TestRangerBGSyncService {
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
-  private OMMultiTenantManager omMultiTenantManager;
-  private AuditLogger auditLogger;
 
-  private Tenant tenant;
   private static final String TENANT_ID = "tenant1";
 
   // UGI-related vars
   private static final String USER_ALICE = "alice@EXAMPLE.COM";
   private static final String USER_ALICE_SHORT = "alice";
-  private UserGroupInformation ugiAlice;
   private static final String USER_BOB_SHORT = "bob";
   private RangerUserRequest rangerUserRequest;
 
@@ -170,7 +166,7 @@ public class TestRangerBGSyncService {
         "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
             "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
             "DEFAULT");
-    ugiAlice = UserGroupInformation.createRemoteUser(USER_ALICE);
+    UserGroupInformation ugiAlice = UserGroupInformation.createRemoteUser(USER_ALICE);
     assertEquals(USER_ALICE_SHORT, ugiAlice.getShortUserName());
 
     ozoneManager = mock(OzoneManager.class);
@@ -189,13 +185,13 @@ public class TestRangerBGSyncService {
     omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    auditLogger = mock(AuditLogger.class);
+    AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     // Multi-tenant related initializations
-    omMultiTenantManager = mock(OMMultiTenantManager.class);
-    tenant = mock(Tenant.class);
+    OMMultiTenantManager omMultiTenantManager = mock(OMMultiTenantManager.class);
+    Tenant tenant = mock(Tenant.class);
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     when(ozoneManager.isLeaderReady()).thenReturn(true);

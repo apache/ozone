@@ -45,7 +45,6 @@ import picocli.CommandLine;
 public class TestFreonWithPipelineDestroy {
 
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -55,7 +54,7 @@ public class TestFreonWithPipelineDestroy {
    */
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
             1, TimeUnit.SECONDS);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,

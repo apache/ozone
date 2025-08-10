@@ -89,7 +89,6 @@ public final class TestBlockTokensCLI {
   private static OzoneConfiguration conf;
   private static File ozoneKeytab;
   private static File spnegoKeytab;
-  private static String host;
   private static String omServiceId;
   private static String scmServiceId;
   private static MiniOzoneHAClusterImpl cluster;
@@ -154,8 +153,8 @@ public final class TestBlockTokensCLI {
 
   private static void setSecureConfig() throws IOException {
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
+    String host = InetAddress.getLocalHost().getCanonicalHostName()
+                      .toLowerCase();
 
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
 
