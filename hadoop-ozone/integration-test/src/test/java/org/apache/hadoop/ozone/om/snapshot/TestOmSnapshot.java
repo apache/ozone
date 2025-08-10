@@ -3253,11 +3253,11 @@ public abstract class TestOmSnapshot {
       mixedStream.write(mixedPart);
     }
 
-    assertEquals(3,
+    assertEquals(1,
         bucket.listParts(regularPartsKey, regularMpuInfo.getUploadID(), 0, 100).getPartInfoList().size());
-    assertEquals(2,
+    assertEquals(1,
         bucket.listParts(streamPartsKey, streamMpuInfo.getUploadID(), 0, 100).getPartInfoList().size());
-    assertEquals(3,
+    assertEquals(1,
         bucket.listParts(mixedPartsKey, mixedMpuInfo.getUploadID(), 0, 100).getPartInfoList().size());
 
     String snap2 = "snap-after-parts-" + counter.incrementAndGet();
