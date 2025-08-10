@@ -203,7 +203,7 @@ public class TestPipelinePlacementPolicy {
           MockDatanodeDetails.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
-    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+    MockNodeManager localNodeManager = new MockNodeManager(cluster,
         datanodes, false, datanodes.size());
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
@@ -240,7 +240,7 @@ public class TestPipelinePlacementPolicy {
           MockDatanodeDetails.randomDatanodeDetails(), node);
       datanodes.add(datanode);
     }
-    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+    MockNodeManager localNodeManager = new MockNodeManager(cluster,
         datanodes, false, datanodes.size());
 
     PipelineStateManager tempPipelineStateManager = PipelineStateManagerImpl
@@ -459,7 +459,6 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicyOK() {
-    cluster = initTopology();
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
@@ -512,7 +511,6 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicySingleRackInCluster() {
-    cluster = initTopology();
     nodeManager = new MockNodeManager(cluster, new ArrayList<>(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
@@ -591,8 +589,6 @@ public class TestPipelinePlacementPolicy {
   }
 
   private List<DatanodeDetails> setupSkewedRacks() {
-    cluster = initTopology();
-
     List<DatanodeDetails> dns = new ArrayList<>();
     dns.add(MockDatanodeDetails
         .createDatanodeDetails("host1", "/rack1"));
