@@ -3458,7 +3458,8 @@ public abstract class TestOmSnapshot {
     bucket.completeMultipartUpload(keyName, uploadId, partsMap);
   }
 
-  private void completeMultiplePartMPU(OzoneBucket bucket, String keyName, List<String> partDataList) throws IOException {
+  private void completeMultiplePartMPU(
+      OzoneBucket bucket, String keyName, List<String> partDataList) throws IOException {
     OmMultipartInfo mpuInfo = bucket.initiateMultipartUpload(keyName, getDefaultReplication());
     String uploadId = mpuInfo.getUploadID();
 
@@ -3472,7 +3473,8 @@ public abstract class TestOmSnapshot {
       }
     }
 
-    OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, partDataList.size());
+    OzoneMultipartUploadPartListParts partsList = bucket.
+        listParts(keyName, uploadId, 0, partDataList.size());
     Map<Integer, String> partsMap = new HashMap<>();
 
     for (OzoneMultipartUploadPartListParts.PartInfo partInfo : partsList.getPartInfoList()) {
@@ -3482,7 +3484,8 @@ public abstract class TestOmSnapshot {
     bucket.completeMultipartUpload(keyName, uploadId, partsMap);
   }
 
-  private void completeMixedPartMPU(OzoneBucket bucket, String keyName, String regularData, String streamData) throws IOException {
+  private void completeMixedPartMPU(
+      OzoneBucket bucket, String keyName, String regularData, String streamData) throws IOException {
     OmMultipartInfo mpuInfo = bucket.initiateMultipartUpload(keyName, getDefaultReplication());
     String uploadId = mpuInfo.getUploadID();
 
@@ -3508,7 +3511,8 @@ public abstract class TestOmSnapshot {
     bucket.completeMultipartUpload(keyName, uploadId, partsMap);
   }
 
-  private void completeMPUWithReplication(OzoneBucket bucket, String keyName, ReplicationConfig replicationConfig) throws IOException {
+  private void completeMPUWithReplication(
+      OzoneBucket bucket, String keyName, ReplicationConfig replicationConfig) throws IOException {
     OmMultipartInfo mpuInfo;
     if (replicationConfig != null) {
       mpuInfo = bucket.initiateMultipartUpload(keyName, replicationConfig);
@@ -3655,7 +3659,7 @@ public abstract class TestOmSnapshot {
   }
 
   @Test
-  public void testSnapshotDiffMPU_CreateWithMetadataAndTags() throws Exception {
+  public void testSnapshotDiffMPUCreateWithMetadataAndTags() throws Exception {
     String testVolumeName = "vol-create-meta-" + counter.incrementAndGet();
     String testBucketName = "bucket-create-meta-" + counter.incrementAndGet();
 
@@ -3695,7 +3699,7 @@ public abstract class TestOmSnapshot {
   }
 
   @Test
-  public void testSnapshotDiffMPU_CreateWithDifferentReplication() throws Exception {
+  public void testSnapshotDiffMPUCreateWithDifferentReplication() throws Exception {
     String testVolumeName = "vol-create-repl-" + counter.incrementAndGet();
     String testBucketName = "bucket-create-repl-" + counter.incrementAndGet();
 
