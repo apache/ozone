@@ -139,6 +139,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -3438,5 +3439,287 @@ public abstract class TestOmSnapshot {
     assertThrows(OMException.class, () -> bucket.getKey(mpuKey1));
     assertThrows(OMException.class, () -> bucket.getKey(mpuKey2));
     assertThrows(OMException.class, () -> bucket.getKey(mpuKey3));
+  }
+
+  private static final int MIN_PART_SIZE = 5 * 1024 * 1024;
+
+  private void completeSinglePartMPU(OzoneBucket bucket, String keyName, String data) throws IOException {
+    OmMultipartInfo mpuInfo = bucket.initiateMultipartUpload(keyName, getDefaultReplication());
+    String uploadId = mpuInfo.getUploadID();
+
+    byte[] partData = createLargePartData(data, MIN_PART_SIZE);
+    OzoneOutputStream partStream = bucket.createMultipartKey(keyName, partData.length, 1, uploadId);
+    partStream.write(partData);
+    partStream.close();
+
+    OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 100);
+    String realETag = partsList.getPartInfoList().get(0).getPartName();
+
+    Map<Integer, String> partsMap = Collections.singletonMap(1, realETag);
+    bucket.completeMultipartUpload(keyName, uploadId, partsMap);
+  }
+
+  private void completeMultiplePartMPU(OzoneBucket bucket, String keyName, List<String> partDataList) throws IOException {
+    OmMultipartInfo mpuInfo = bucket.initiateMultipartUpload(keyName, getDefaultReplication());
+    String uploadId = mpuInfo.getUploadID();
+
+    for (int i = 0; i < partDataList.size(); i++) {
+      int partNum = i + 1;
+      byte[] partData = createLargePartData(partDataList.get(i), MIN_PART_SIZE);
+
+      try (OzoneOutputStream partStream = bucket.createMultipartKey(
+          keyName, partData.length, partNum, uploadId)) {
+        partStream.write(partData);
+      }
+    }
+
+    OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, partDataList.size());
+    Map<Integer, String> partsMap = new HashMap<>();
+
+    for (OzoneMultipartUploadPartListParts.PartInfo partInfo : partsList.getPartInfoList()) {
+      partsMap.put(partInfo.getPartNumber(), partInfo.getPartName());
+    }
+
+    bucket.completeMultipartUpload(keyName, uploadId, partsMap);
+  }
+
+  private void completeMixedPartMPU(OzoneBucket bucket, String keyName, String regularData, String streamData) throws IOException {
+    OmMultipartInfo mpuInfo = bucket.initiateMultipartUpload(keyName, getDefaultReplication());
+    String uploadId = mpuInfo.getUploadID();
+
+    byte[] part1Data = createLargePartData(regularData, MIN_PART_SIZE);
+    try (OzoneOutputStream partStream = bucket.createMultipartKey(
+        keyName, part1Data.length, 1, uploadId)) {
+      partStream.write(part1Data);
+    }
+
+    byte[] part2Data = createLargePartData(streamData, MIN_PART_SIZE);
+    try (OzoneDataStreamOutput partStream = bucket.createMultipartStreamKey(
+        keyName, part2Data.length, 2, uploadId)) {
+      partStream.write(part2Data);
+    }
+
+    OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 2);
+    Map<Integer, String> partsMap = new HashMap<>();
+
+    for (OzoneMultipartUploadPartListParts.PartInfo partInfo : partsList.getPartInfoList()) {
+      partsMap.put(partInfo.getPartNumber(), partInfo.getPartName());
+    }
+
+    bucket.completeMultipartUpload(keyName, uploadId, partsMap);
+  }
+
+  private void completeMPUWithReplication(OzoneBucket bucket, String keyName, ReplicationConfig replicationConfig) throws IOException {
+    OmMultipartInfo mpuInfo;
+    if (replicationConfig != null) {
+      mpuInfo = bucket.initiateMultipartUpload(keyName, replicationConfig);
+    } else {
+      mpuInfo = bucket.initiateMultipartUpload(keyName);
+    }
+
+    String uploadId = mpuInfo.getUploadID();
+
+    byte[] partData = createLargePartData("Replication test data for " + keyName, MIN_PART_SIZE);
+    try (OzoneOutputStream partStream = bucket.createMultipartKey(
+        keyName, partData.length, 1, uploadId)) {
+      partStream.write(partData);
+    }
+
+    OzoneMultipartUploadPartListParts partsList = bucket.listParts(keyName, uploadId, 0, 1);
+    String realETag = partsList.getPartInfoList().get(0).getPartName();
+
+    Map<Integer, String> partsMap = Collections.singletonMap(1, realETag);
+    bucket.completeMultipartUpload(keyName, uploadId, partsMap);
+  }
+
+  private byte[] createLargePartData(String baseContent, int targetSize) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(baseContent);
+
+    String padding = " - padding data";
+    while (sb.length() < targetSize) {
+      sb.append(padding);
+      if (sb.length() + padding.length() > targetSize) {
+        // Add partial padding to reach exact size
+        int remaining = targetSize - sb.length();
+        sb.append(padding.substring(0, Math.min(remaining, padding.length())));
+      }
+    }
+
+    String result = sb.toString();
+    if (result.length() > targetSize) {
+      result = result.substring(0, targetSize);
+    }
+
+    return result.getBytes(UTF_8);
+  }
+
+  @Test
+  public void testSnapshotDiffMPU_CreateNewKey() throws Exception {
+    String testVolumeName = "vol-create-new-" + counter.incrementAndGet();
+    String testBucketName = "bucket-create-new-" + counter.incrementAndGet();
+
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String existingKey = "existing-baseline-" + counter.incrementAndGet();
+    createFileKey(bucket, existingKey);
+
+    String snap1 = "snap-before-create-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    String mpuKey1 = "multi-mpu-1-" + counter.incrementAndGet();
+    String mpuKey2 = "multi-mpu-2-" + counter.incrementAndGet();
+    String mpuKey3 = "multi-mpu-3-" + counter.incrementAndGet();
+
+    completeSinglePartMPU(bucket, mpuKey1, "Single part MPU data");
+
+    completeMultiplePartMPU(bucket, mpuKey2,
+        Arrays.asList("Multi part 1", "Multi part 2", "Multi part 3"));
+
+    completeMixedPartMPU(bucket, mpuKey3,
+        "Mixed regular part", "Mixed stream part");
+
+    String regularKey = "regular-compare-" + counter.incrementAndGet();
+    createFileKey(bucket, regularKey);
+
+    String snap2 = "snap-multiple-final-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+
+    List<SnapshotDiffReport.DiffReportEntry> expectedDiffs = Arrays.asList(
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, mpuKey1),
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, mpuKey2),
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, mpuKey3),
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, regularKey));
+    assertEquals(expectedDiffs, diff.getDiffList());
+  }
+
+  @Test
+  public void testSnapshotDiffMPU_CreateMultipleKeys() throws Exception {
+    String testVolumeName = "vol-create-multiple-" + counter.incrementAndGet();
+    String testBucketName = "bucket-create-multiple-" + counter.incrementAndGet();
+
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String snap1 = "snap-multiple-baseline-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    String mpuKey1 = "multi-mpu-1-" + counter.incrementAndGet();
+    String mpuKey2 = "multi-mpu-2-" + counter.incrementAndGet();
+    String mpuKey3 = "multi-mpu-3-" + counter.incrementAndGet();
+
+    completeSinglePartMPU(bucket, mpuKey1, "Single part MPU data");
+    completeMultiplePartMPU(bucket, mpuKey2,
+        Arrays.asList("Multi part 1", "Multi part 2", "Multi part 3"));
+    completeMixedPartMPU(bucket, mpuKey3,
+        "Mixed regular part", "Mixed stream part");
+
+    String regularKey = "regular-compare-" + counter.incrementAndGet();
+    createFileKey(bucket, regularKey);
+
+    String snap2 = "snap-multiple-final-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+
+    List<SnapshotDiffReport.DiffReportEntry> expectedDiffs = Arrays.asList(
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, mpuKey1),
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, mpuKey2),
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, mpuKey3),
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, regularKey));
+    assertEquals(expectedDiffs, diff.getDiffList());
+  }
+
+  @Test
+  public void testSnapshotDiffMPU_CreateWithMetadataAndTags() throws Exception {
+    String testVolumeName = "vol-create-meta-" + counter.incrementAndGet();
+    String testBucketName = "bucket-create-meta-" + counter.incrementAndGet();
+
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String snap1 = "snap-meta-baseline-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    String mpuKeyWithMeta = "mpu-with-metadata-" + counter.incrementAndGet();
+
+    Map<String, String> richMetadata = new HashMap<>();
+    richMetadata.put("content-type", "application/octet-stream");
+    richMetadata.put("content-encoding", "gzip");
+    richMetadata.put("cache-control", "no-cache");
+    richMetadata.put("custom-header", "test-value");
+
+    Map<String, String> richTags = new HashMap<>();
+    richTags.put("project", "ozone-testing");
+    richTags.put("environment", "integration");
+    richTags.put("cost-center", "engineering");
+    richTags.put("backup-policy", "daily");
+
+    OmMultipartInfo mpuInfo = bucket.initiateMultipartUpload(
+        mpuKeyWithMeta, getDefaultReplication(), richMetadata, richTags);
+    String uploadId = mpuInfo.getUploadID();
+
+    byte[] partData = createLargePartData("MPU with rich metadata and tags", 1024);
+    OzoneDataStreamOutput partStream = bucket.
+        createMultipartStreamKey(mpuKeyWithMeta, partData.length, 1, uploadId);
+    partStream.write(partData);
+    partStream.close();
+
+    OzoneMultipartUploadPartListParts partsList = bucket.
+        listParts(mpuKeyWithMeta, uploadId, 0, 100);
+    String realETag = partsList.getPartInfoList().get(0).getPartName();
+    Map<Integer, String> partsMap = Collections.singletonMap(1, realETag);
+    bucket.completeMultipartUpload(mpuKeyWithMeta, uploadId, partsMap);
+
+    String snap2 = "snap-meta-final-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+
+    List<SnapshotDiffReport.DiffReportEntry> expectedDiffs = Arrays.asList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.CREATE, mpuKeyWithMeta));
+    assertEquals(expectedDiffs, diff.getDiffList());
+  }
+
+  @Test
+  public void testSnapshotDiffMPU_CreateWithDifferentReplication() throws Exception {
+    String testVolumeName = "vol-create-repl-" + counter.incrementAndGet();
+    String testBucketName = "bucket-create-repl-" + counter.incrementAndGet();
+
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String snap1 = "snap-repl-baseline-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    String standaloneKey = "standalone-mpu-" + counter.incrementAndGet();
+    String defaultKey = "default-mpu-" + counter.incrementAndGet();
+
+    ReplicationConfig standaloneConfig = StandaloneReplicationConfig.getInstance(
+        HddsProtos.ReplicationFactor.ONE);
+    completeMPUWithReplication(bucket, standaloneKey, standaloneConfig);
+    completeMPUWithReplication(bucket, defaultKey, null);
+
+    String snap2 = "snap-repl-final-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+
+    List<SnapshotDiffReport.DiffReportEntry> expectedDiffs = Arrays.asList(
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, standaloneKey),
+        SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, defaultKey));
+    assertEquals(expectedDiffs, diff.getDiffList());
   }
 }
