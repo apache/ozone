@@ -259,7 +259,7 @@ public class NSSummaryTaskDbEventHandler {
 
     // Continue propagating to parent
     long parentId = nsSummary.getParentId();
-    if (parentId > 0) {
+    if (parentId != 0) {
       // Get parent's NSSummary
       NSSummary parentSummary = nsSummaryMap.get(parentId);
       if (parentSummary == null) {
