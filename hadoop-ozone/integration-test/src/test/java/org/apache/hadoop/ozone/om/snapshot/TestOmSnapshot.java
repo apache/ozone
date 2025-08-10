@@ -93,6 +93,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -118,6 +119,8 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -135,6 +138,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -3163,5 +3167,276 @@ public abstract class TestOmSnapshot {
         SnapshotDiffReportOzone.getDiffReportEntry(
             SnapshotDiffReport.DiffType.MODIFY, "dir1"));
     assertEquals(expectedDiffs, diff.getDiffList());
+  }
+
+  private ReplicationConfig getDefaultReplication() {
+    return StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+  }
+
+  @Test
+  public void testSnapshotDiffWithInitiateMultipartUpload() throws Exception {
+    String testVolumeName = "vol-initiate" + counter.incrementAndGet();
+    String testBucketName = "bucket-initiate-" + counter.incrementAndGet();
+
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String snap1 = "snap-before-initiate-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    String mpuKey1 = "mpu-key-1" + counter.incrementAndGet();
+    String mpuKey2 = "mpu-key-2" + counter.incrementAndGet();
+
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put("test-metadata", "initiate-test");
+
+    Map<String, String> tags = new HashMap<>();
+    tags.put("environment", "test");
+    tags.put("operation", "initiate");
+
+    OmMultipartInfo mpuInfo1 = bucket.initiateMultipartUpload(mpuKey1);
+    OmMultipartInfo mpuInfo2 = bucket.initiateMultipartUpload(mpuKey2, getDefaultReplication(), metadata, tags);
+
+    String snap2 = "snap-after-initiate-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+    assertEquals(0, diff.getDiffList().size());
+
+    OzoneMultipartUploadList mpuList = bucket.
+        listMultipartUploads("", null, null, 100);
+    assertEquals(2, mpuList.getUploads().size());
+
+    bucket.abortMultipartUpload(mpuKey1, mpuInfo1.getUploadID());
+    bucket.abortMultipartUpload(mpuKey2, mpuInfo2.getUploadID());
+  }
+
+  @Test
+  public void testSnapshotDiffWithCreateMultipartKeys() throws Exception {
+    String testVolumeName = "vol-create-part-" + counter.incrementAndGet();
+    String testBucketName = "bucket-create-part-" + counter.incrementAndGet();
+
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String regularPartsKey = "regular-parts-key" + counter.incrementAndGet();
+    String streamPartsKey = "stream-parts-key" + counter.incrementAndGet();
+    String mixedPartsKey = "mixed-parts-key" + counter.incrementAndGet();
+
+    OmMultipartInfo regularMpuInfo = bucket.initiateMultipartUpload(regularPartsKey, getDefaultReplication());
+    OmMultipartInfo streamMpuInfo = bucket.initiateMultipartUpload(streamPartsKey, getDefaultReplication());
+    OmMultipartInfo mixedMpuInfo = bucket.initiateMultipartUpload(mixedPartsKey, getDefaultReplication());
+
+    String snap1 = "snap-before-parts-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    byte[] regularPart = "regular multipart key".getBytes(UTF_8);
+    try (OzoneOutputStream stream = bucket.createMultipartKey(
+        regularPartsKey, regularPart.length, 1, regularMpuInfo.getUploadID())) {
+      stream.write(regularPart);
+    }
+
+    byte[] streamPart = "stream data".getBytes(UTF_8);
+    try (OzoneDataStreamOutput streamOut = bucket.createMultipartStreamKey(
+        streamPartsKey, streamPart.length, 1, streamMpuInfo.getUploadID())) {
+      streamOut.write(streamPart);
+    }
+
+    byte[] mixedPart = "mixed data".getBytes(UTF_8);
+    try (OzoneOutputStream mixedStream = bucket.createMultipartKey(
+        mixedPartsKey, mixedPart.length, 1, mixedMpuInfo.getUploadID())) {
+      mixedStream.write(mixedPart);
+    }
+
+    assertEquals(3,
+        bucket.listParts(regularPartsKey, regularMpuInfo.getUploadID(), 0, 100).getPartInfoList().size());
+    assertEquals(2,
+        bucket.listParts(streamPartsKey, streamMpuInfo.getUploadID(), 0, 100).getPartInfoList().size());
+    assertEquals(3,
+        bucket.listParts(mixedPartsKey, mixedMpuInfo.getUploadID(), 0, 100).getPartInfoList().size());
+
+    String snap2 = "snap-after-parts-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+    assertEquals(Collections.emptyList(), diff.getDiffList());
+
+    bucket.abortMultipartUpload(regularPartsKey, regularMpuInfo.getUploadID());
+    bucket.abortMultipartUpload(streamPartsKey, streamMpuInfo.getUploadID());
+    bucket.abortMultipartUpload(mixedPartsKey, mixedMpuInfo.getUploadID());
+  }
+
+  @Test
+  public void testSnapshotDiffWithAbortMultipartUpload() throws Exception {
+    String testVolumeName = "vol-abort-" + counter.incrementAndGet();
+    String testBucketName = "bucket-abort-" + counter.incrementAndGet();
+
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String snap1 = "snap-before-abort-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    // Abort immediately after initiate
+    String immediateAbortKey = "immediate-abort-" + counter.incrementAndGet();
+    OmMultipartInfo immediateInfo = bucket.initiateMultipartUpload(immediateAbortKey, getDefaultReplication());
+    bucket.abortMultipartUpload(immediateAbortKey, immediateInfo.getUploadID());
+
+    // Abort after uploading some parts
+    String partialAbortKey = "partial-abort-" + counter.incrementAndGet();
+    OmMultipartInfo partialInfo = bucket.initiateMultipartUpload(partialAbortKey, getDefaultReplication());
+
+    byte[] part1Data = "Part 1 - will be aborted".getBytes(UTF_8);
+    byte[] part2Data = "Part 2 - will be aborted".getBytes(UTF_8);
+    byte[] part3Data = "Part 3 - stream part, will be aborted".getBytes(UTF_8);
+
+    try (OzoneOutputStream part1Stream = bucket.createMultipartKey(
+        partialAbortKey, part1Data.length, 1, partialInfo.getUploadID())) {
+      part1Stream.write(part1Data);
+    }
+    try (OzoneOutputStream part2Stream = bucket.createMultipartKey(
+        partialAbortKey, part2Data.length, 2, partialInfo.getUploadID())) {
+      part2Stream.write(part2Data);
+    }
+    try (OzoneDataStreamOutput part3Stream = bucket.createMultipartStreamKey(
+        partialAbortKey, part3Data.length, 3, partialInfo.getUploadID())) {
+      part3Stream.write(part3Data);
+    }
+
+    OzoneMultipartUploadPartListParts partsList = bucket.listParts(
+        partialAbortKey, partialInfo.getUploadID(), 0, 100);
+    assertEquals(3, partsList.getPartInfoList().size());
+
+    bucket.abortMultipartUpload(partialAbortKey, partialInfo.getUploadID());
+
+    // Multiple aborts in same snapshot window
+    String multiAbortKey1 = "multi-abort-1-" + counter.incrementAndGet();
+    String multiAbortKey2 = "multi-abort-2-" + counter.incrementAndGet();
+
+    OmMultipartInfo multiInfo1 = bucket.initiateMultipartUpload(multiAbortKey1, getDefaultReplication());
+    OmMultipartInfo multiInfo2 = bucket.initiateMultipartUpload(multiAbortKey2, getDefaultReplication());
+
+    try (OzoneOutputStream stream = bucket.createMultipartKey(
+        multiAbortKey1, part1Data.length, 1, multiInfo1.getUploadID())) {
+      stream.write(part1Data);
+    }
+    try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
+        multiAbortKey2, part2Data.length, 1, multiInfo2.getUploadID())) {
+      stream.write(part2Data);
+    }
+
+    bucket.abortMultipartUpload(multiAbortKey1, multiInfo1.getUploadID());
+    bucket.abortMultipartUpload(multiAbortKey2, multiInfo2.getUploadID());
+
+    String snap2 = "snap-after-aborts-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+    assertEquals(Collections.emptyList(), diff.getDiffList());
+
+    OzoneMultipartUploadList finalMpuList = bucket.listMultipartUploads("", null, null, 100);
+    assertEquals(0, finalMpuList.getUploads().size());
+  }
+
+  @Test
+  public void testSnapshotDiffWithCompleteInvisibleMPULifecycle() throws Exception {
+    String testVolumeName = "vol-invisible-" + counter.incrementAndGet();
+    String testBucketName = "bucket-invisible-" + counter.incrementAndGet();
+
+    store.createVolume(testVolumeName);
+    OzoneVolume volume = store.getVolume(testVolumeName);
+    createBucket(volume, testBucketName);
+    OzoneBucket bucket = volume.getBucket(testBucketName);
+
+    String regularKey1 = "regular-before-" + counter.incrementAndGet();
+    String regularKey2 = "regular-after-" + counter.incrementAndGet();
+    createFileKey(bucket, regularKey1);
+
+    String snap1 = "snap-invisible-baseline-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap1);
+
+    String mpuKey1 = "invisible-mpu-1-" + counter.incrementAndGet();
+    String mpuKey2 = "invisible-mpu-2-" + counter.incrementAndGet();
+    String mpuKey3 = "invisible-mpu-3-" + counter.incrementAndGet();
+
+    OmMultipartInfo mpuInfo1 = bucket.initiateMultipartUpload(mpuKey1, getDefaultReplication());
+    OmMultipartInfo mpuInfo2 = bucket.initiateMultipartUpload(mpuKey2, getDefaultReplication());
+    OmMultipartInfo mpuInfo3 = bucket.initiateMultipartUpload(mpuKey3, getDefaultReplication());
+
+    byte[] regularData1 = "Regular multipart data 1".getBytes(UTF_8);
+    byte[] regularData2 = "Regular multipart data 2".getBytes(UTF_8);
+
+    try (OzoneOutputStream stream = bucket.createMultipartKey(
+        mpuKey1, regularData1.length, 1, mpuInfo1.getUploadID())) {
+      stream.write(regularData1);
+    }
+    try (OzoneOutputStream stream = bucket.createMultipartKey(
+        mpuKey1, regularData2.length, 2, mpuInfo1.getUploadID())) {
+      stream.write(regularData2);
+    }
+
+    byte[] streamData1 = "Stream multipart data 1".getBytes(UTF_8);
+    byte[] streamData2 = "Stream multipart data 2".getBytes(UTF_8);
+
+    try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
+        mpuKey2, streamData1.length, 1, mpuInfo2.getUploadID())) {
+      stream.write(streamData1);
+    }
+    try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
+        mpuKey2, streamData2.length, 2, mpuInfo2.getUploadID())) {
+      stream.write(streamData2);
+    }
+
+
+    byte[] mixedRegular = "Mixed - regular part".getBytes(UTF_8);
+    byte[] mixedStream = "Mixed - stream part".getBytes(UTF_8);
+
+    try (OzoneOutputStream stream = bucket.createMultipartKey(
+        mpuKey3, mixedRegular.length, 1, mpuInfo3.getUploadID())) {
+      stream.write(mixedRegular);
+    }
+    try (OzoneDataStreamOutput stream = bucket.createMultipartStreamKey(
+        mpuKey3, mixedStream.length, 2, mpuInfo3.getUploadID())) {
+      stream.write(mixedStream);
+    }
+
+    assertEquals(2,
+        bucket.listParts(mpuKey1, mpuInfo1.getUploadID(), 0, 100).getPartInfoList().size());
+    assertEquals(2,
+        bucket.listParts(mpuKey2, mpuInfo2.getUploadID(), 0, 100).getPartInfoList().size());
+    assertEquals(2,
+        bucket.listParts(mpuKey3, mpuInfo3.getUploadID(), 0, 100).getPartInfoList().size());
+
+    createFileKey(bucket, regularKey2);
+
+    bucket.abortMultipartUpload(mpuKey1, mpuInfo1.getUploadID());
+    bucket.abortMultipartUpload(mpuKey2, mpuInfo2.getUploadID());
+    bucket.abortMultipartUpload(mpuKey3, mpuInfo3.getUploadID());
+
+    String snap2 = "snap-after-invisible-lifecycle-" + counter.incrementAndGet();
+    createSnapshot(testVolumeName, testBucketName, snap2);
+
+    SnapshotDiffReportOzone diff = getSnapDiffReport(testVolumeName, testBucketName, snap1, snap2);
+
+    List<SnapshotDiffReport.DiffReportEntry> expectedDiffs = Arrays.asList(
+        SnapshotDiffReportOzone.getDiffReportEntry(
+            SnapshotDiffReport.DiffType.CREATE, regularKey2));
+    assertEquals(expectedDiffs, diff.getDiffList());
+
+    OzoneMultipartUploadList finalMpuList = bucket.listMultipartUploads("", null, null, 100);
+    assertEquals(0, finalMpuList.getUploads().size());
+
+    assertDoesNotThrow(() -> bucket.getKey(regularKey1));
+    assertDoesNotThrow(() -> bucket.getKey(regularKey2));
+
+    assertThrows(OMException.class, () -> bucket.getKey(mpuKey1));
+    assertThrows(OMException.class, () -> bucket.getKey(mpuKey2));
+    assertThrows(OMException.class, () -> bucket.getKey(mpuKey3));
   }
 }
