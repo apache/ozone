@@ -641,11 +641,7 @@ public class OMDBInsightEndpoint {
     if (nsSummary == null) {
       return 0L;
     }
-    long totalSize = nsSummary.getSizeOfFiles();
-    for (long childId : nsSummary.getChildDir()) {
-      totalSize += fetchSizeForDeletedDirectory(childId);
-    }
-    return totalSize;
+    return nsSummary.getSizeOfFiles();
   }
 
   /** This method retrieves set of directories pending for deletion.
