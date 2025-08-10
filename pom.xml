@@ -1824,13 +1824,6 @@
             <doclint>none</doclint>
             <notimestamp>true</notimestamp>
           </configuration>
-          <dependencies>
-            <dependency>
-              <groupId>com.google.protobuf</groupId>
-              <artifactId>protobuf-java</artifactId>
-              <version>${grpc.protobuf-compile.version}</version>
-            </dependency>
-          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
