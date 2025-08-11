@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.checksum;
 
 import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.getContainerChecksumFile;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,6 +39,7 @@ import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -45,6 +47,9 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
@@ -357,5 +362,39 @@ public final class ContainerMerkleTreeTestUtils {
       blockMerkleTrees.add(blockMerkleTree);
     }
     return blockMerkleTrees;
+  }
+
+  /**
+   * This function verifies that the in-memory data checksum matches the one stored in the container data and
+   * the RocksDB.
+   *
+   * @param containerData The container data to verify.
+   * @param conf          The Ozone configuration.
+   * @throws IOException If an error occurs while reading the checksum info or RocksDB.
+   */
+  public static void verifyAllDataChecksumsMatch(KeyValueContainerData containerData, OzoneConfiguration conf)
+      throws IOException {
+    assertNotNull(containerData, "Container data should not be null");
+    ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerChecksumTreeManager
+        .readChecksumInfo(containerData);
+    assertNotNull(containerChecksumInfo);
+    long dataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+    Long dbDataChecksum;
+    try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+      dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
+    }
+
+    if (containerData.getDataChecksum() == 0) {
+      assertEquals(containerData.getDataChecksum(), dataChecksum);
+      // RocksDB checksum can be null if the file doesn't exist or when the file is created by
+      // the block deleting service. 0 checksum will be stored when the container is loaded without
+      // merkle tree.
+      assertThat(dbDataChecksum).isIn(0L, null);
+    } else {
+      // In-Memory, Container Merkle Tree file, RocksDB checksum should be equal
+      assertEquals(containerData.getDataChecksum(), dataChecksum, "In-memory data checksum should match " +
+          "the one in the checksum file.");
+      assertEquals(dbDataChecksum, dataChecksum);
+    }
   }
 }

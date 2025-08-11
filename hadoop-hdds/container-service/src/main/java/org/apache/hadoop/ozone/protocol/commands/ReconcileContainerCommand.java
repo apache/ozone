@@ -94,12 +94,11 @@ public class ReconcileContainerCommand extends SCMCommand<ReconcileContainerComm
       return false;
     }
     ReconcileContainerCommand that = (ReconcileContainerCommand) o;
-    return getContainerID() == that.getContainerID() &&
-        Objects.equals(peerDatanodes, that.peerDatanodes);
+    return getContainerID() == that.getContainerID();
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getContainerID(), peerDatanodes);
+    return Objects.hash(getContainerID());
   }
 }

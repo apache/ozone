@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.repair.om;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,6 +38,7 @@ import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -48,8 +50,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
-import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.DBOptions;
+import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.RocksIterator;
@@ -70,6 +73,7 @@ public class TestSnapshotChainRepair {
 
   private MockedStatic<ManagedRocksDB> mockedDB;
   private MockedStatic<RocksDBUtils> mockedUtils;
+  private MockedStatic<OptionsUtil> mockedOptionsUtil;
 
   private GenericTestUtils.PrintStreamCapturer out;
   private GenericTestUtils.PrintStreamCapturer err;
@@ -82,11 +86,12 @@ public class TestSnapshotChainRepair {
     // Initialize static mocks
     mockedDB = mockStatic(ManagedRocksDB.class);
     mockedUtils = mockStatic(RocksDBUtils.class);
+    mockedOptionsUtil = mockStatic(OptionsUtil.class);
   }
 
   @AfterEach
   public void tearDown() {
-    IOUtils.closeQuietly(out, err, mockedDB, mockedUtils);
+    IOUtils.closeQuietly(out, err, mockedDB, mockedUtils, mockedOptionsUtil);
   }
 
   private void setupMockDB(SnapshotInfo snapshotInfo,
@@ -98,15 +103,9 @@ public class TestSnapshotChainRepair {
 
     when(managedRocksDB.get()).thenReturn(rocksDB);
 
-    // Mock column family descriptors
-    List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
-    cfDescList.add(new ColumnFamilyDescriptor(new byte[] {1}));
-
-    mockedUtils.when(() -> RocksDBUtils.getColumnFamilyDescriptors(eq(DB_PATH)))
-        .thenReturn(cfDescList);
-
     // Mock DB open
-    mockedDB.when(() -> ManagedRocksDB.open(eq(DB_PATH), eq(cfDescList), eq(new ArrayList<>())))
+    mockedDB.when(() -> ManagedRocksDB.openWithLatestOptions(any(ManagedConfigOptions.class),
+            any(DBOptions.class), eq(DB_PATH), eq(new ArrayList<>()), eq(new ArrayList<>())))
         .thenReturn(managedRocksDB);
 
     // Mock column family handle

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.checksum;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM_EXTENSION;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -29,13 +30,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -101,7 +100,7 @@ public class ContainerChecksumTreeManager {
 
       // Get existing deleted blocks to include in checksum calculation
       List<ContainerProtos.BlockMerkleTree> deletedBlocks = checksumInfoBuilder.getDeletedBlocksList();
-      
+
       ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
           () -> tree.toProto(deletedBlocks));
       checksumInfoBuilder
@@ -224,11 +223,11 @@ public class ContainerChecksumTreeManager {
 
     List<ContainerProtos.BlockMerkleTree> thisBlockMerkleTreeList = thisMerkleTree.getBlockMerkleTreeList();
     List<ContainerProtos.BlockMerkleTree> peerBlockMerkleTreeList = peerMerkleTree.getBlockMerkleTreeList();
-    
+
     // Create a set of all block IDs that we have (either in tree or deleted)
     Set<Long> thisAllBlockIDs = new HashSet<>(thisDeletedBlockSet);
     thisBlockMerkleTreeList.forEach(block -> thisAllBlockIDs.add(block.getBlockID()));
-    
+
     int thisIdx = 0, peerIdx = 0;
 
     // Step 1: Process both lists while elements are present in both
@@ -243,10 +242,10 @@ public class ContainerChecksumTreeManager {
         //    block and the peer's BG service hasn't run yet. We can ignore comparing them.
         // 3) If the block is only deleted in peer merkle tree, we can't reconcile for this block. It might be
         //    deleted by peer's BG service. We can ignore comparing them.
-        
+
         boolean thisBlockDeleted = thisDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID());
         boolean peerBlockDeleted = peerDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID());
-        
+
         if (thisBlockDeleted && peerBlockDeleted) {
           // Both blocks are deleted - check for checksum mismatch and log warning if different
           if (thisBlockMerkleTree.getDataChecksum() != peerBlockMerkleTree.getDataChecksum()) {
@@ -287,7 +286,7 @@ public class ContainerChecksumTreeManager {
 
     // If we have remaining block in thisMerkleTree, we can skip these blocks. The peers will pick this block from
     // us when they reconcile.
-    
+
     // Check for peer deleted blocks that we don't have (either in our tree or our deleted list)
     // These blocks were deleted before upgrading to reconciliation and need to be added to our deleted list
     List<ContainerProtos.BlockMerkleTree> peerDeletedBlocksToAdd = new ArrayList<>();
@@ -298,7 +297,7 @@ public class ContainerChecksumTreeManager {
             peerDeletedBlock.getBlockID(), containerData.getContainerID());
       }
     }
-    
+
     // Directly add peer deleted blocks to our container's deleted block list
     if (!peerDeletedBlocksToAdd.isEmpty()) {
       try {
@@ -307,7 +306,7 @@ public class ContainerChecksumTreeManager {
         LOG.info("Added {} peer deleted blocks to container {} deleted block list to converge checksums",
             peerDeletedBlocksToAdd.size(), containerData.getContainerID());
       } catch (IOException e) {
-        LOG.error("Failed to add peer deleted blocks to container {} deleted block list", 
+        LOG.error("Failed to add peer deleted blocks to container {} deleted block list",
             containerData.getContainerID(), e);
       }
     }
@@ -378,14 +377,13 @@ public class ContainerChecksumTreeManager {
   /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
-  @VisibleForTesting
   public static File getContainerChecksumFile(ContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+    return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION);
   }
 
   @VisibleForTesting
   public static File getTmpContainerChecksumFile(ContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree.tmp");
+    return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION + ".tmp");
   }
 
   private Lock getLock(long containerID) {
@@ -400,8 +398,7 @@ public class ContainerChecksumTreeManager {
    */
   public ContainerProtos.ContainerChecksumInfo read(ContainerData data) throws IOException {
     try {
-      return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () ->
-          readChecksumInfo(data).orElse(ContainerProtos.ContainerChecksumInfo.newBuilder().build()));
+      return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () -> readChecksumInfo(data));
     } catch (IOException ex) {
       metrics.incrementMerkleTreeReadFailures();
       throw ex;
@@ -466,7 +463,7 @@ public class ContainerChecksumTreeManager {
   public ByteString getContainerChecksumInfo(KeyValueContainerData data) throws IOException {
     File checksumFile = getContainerChecksumFile(data);
     if (!checksumFile.exists()) {
-      throw new NoSuchFileException("Checksum file does not exist for container #" + data.getContainerID());
+      throw new FileNotFoundException("Checksum file does not exist for container #" + data.getContainerID());
     }
 
     try (InputStream inStream = Files.newInputStream(checksumFile.toPath())) {
@@ -479,17 +476,18 @@ public class ContainerChecksumTreeManager {
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(ContainerData data)
+  public static ContainerProtos.ContainerChecksumInfo readChecksumInfo(ContainerData data)
       throws IOException {
     long containerID = data.getContainerID();
     File checksumFile = getContainerChecksumFile(data);
     try {
       if (!checksumFile.exists()) {
         LOG.debug("No checksum file currently exists for container {} at the path {}", containerID, checksumFile);
-        return Optional.empty();
+        return ContainerProtos.ContainerChecksumInfo.newBuilder().build();
       }
+
       try (InputStream inStream = Files.newInputStream(checksumFile.toPath())) {
-        return Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
+        return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
       }
     } catch (IOException ex) {
       throw new IOException("Error occurred when reading container merkle tree for containerID "

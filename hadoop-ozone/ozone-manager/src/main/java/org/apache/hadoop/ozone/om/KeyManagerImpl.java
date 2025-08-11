@@ -80,6 +80,7 @@ import static org.apache.hadoop.util.Time.monotonicNow;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -173,7 +174,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -744,6 +744,9 @@ public class KeyManagerImpl implements KeyManager {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
     long serializedSize = 0;
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
+    Map<String, Long> keyBlockReplicatedSize = new HashMap<>();
+    int notReclaimableKeyCount = 0;
+
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
@@ -785,6 +788,7 @@ public class KeyManagerImpl implements KeyManager {
                 }
                 break;
               }
+              keyBlockReplicatedSize.put(keyBlocks.getGroupID(), info.getReplicatedSize());
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {
@@ -803,10 +807,11 @@ public class KeyManagerImpl implements KeyManager {
             keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
           }
           keyBlocksList.addAll(blockGroupList);
+          notReclaimableKeyCount += notReclaimableKeyInfoList.size();
         }
       }
     }
-    return new PendingKeysDeletion(keyBlocksList, keysToModify);
+    return new PendingKeysDeletion(keyBlocksList, keysToModify, keyBlockReplicatedSize, notReclaimableKeyCount);
   }
 
   private <V, R> List<KeyValue<String, R>> getTableEntries(String startKey,

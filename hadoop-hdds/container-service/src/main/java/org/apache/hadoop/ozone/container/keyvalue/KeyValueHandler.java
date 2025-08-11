@@ -63,6 +63,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -760,14 +761,33 @@ public class KeyValueHandler extends Handler {
     try {
       checksumTree = checksumManager.getContainerChecksumInfo(containerData);
     } catch (IOException ex) {
-      // For file not found or other inability to read the file, return an error to the client.
-      LOG.error("Error occurred when reading checksum file for container {}", containerData.getContainerID(), ex);
-      return ContainerCommandResponseProto.newBuilder()
-          .setCmdType(request.getCmdType())
-          .setTraceID(request.getTraceID())
-          .setResult(IO_EXCEPTION)
-          .setMessage(ex.getMessage())
-          .build();
+      // Only build from metadata if the file doesn't exist
+      if (ex instanceof FileNotFoundException) {
+        try {
+          LOG.info("Checksum tree file not found for container {}. Building merkle tree from container metadata.",
+              containerData.getContainerID());
+          ContainerProtos.ContainerChecksumInfo checksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
+          checksumTree = checksumInfo.toByteString();
+        } catch (IOException metadataEx) {
+          LOG.error("Failed to build merkle tree from metadata for container {}",
+              containerData.getContainerID(), metadataEx);
+          return ContainerCommandResponseProto.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setTraceID(request.getTraceID())
+              .setResult(IO_EXCEPTION)
+              .setMessage("Failed to get or build merkle tree: " + metadataEx.getMessage())
+              .build();
+        }
+      } else {
+        // For other inability to read the file, return an error to the client.
+        LOG.error("Error occurred when reading checksum file for container {}", containerData.getContainerID(), ex);
+        return ContainerCommandResponseProto.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setTraceID(request.getTraceID())
+            .setResult(IO_EXCEPTION)
+            .setMessage(ex.getMessage())
+            .build();
+      }
     }
 
     return getGetContainerMerkleTreeResponse(request, checksumTree);
@@ -1407,7 +1427,8 @@ public class KeyValueHandler extends Handler {
    * This method does not send an ICR with the updated checksum info.
    * @param container - Container for which the container merkle tree needs to be updated.
    */
-  private ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksumFromMetadata(
+  @VisibleForTesting
+  public ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksumFromMetadata(
       KeyValueContainer container) throws IOException {
     ContainerMerkleTreeWriter merkleTree = new ContainerMerkleTreeWriter();
     try (DBHandle dbHandle = BlockUtils.getDB(container.getContainerData(), conf);
@@ -1427,7 +1448,7 @@ public class KeyValueHandler extends Handler {
 
   private ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksum(Container container,
       ContainerMerkleTreeWriter treeWriter, boolean sendICR) throws IOException {
-    ContainerData containerData = container.getContainerData();
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
 
     // Attempt to write the new data checksum to disk. If persisting this fails, keep using the original data
     // checksum to prevent divergence from what SCM sees in the ICR vs what datanode peers will see when pulling the
@@ -1440,6 +1461,17 @@ public class KeyValueHandler extends Handler {
 
     if (updatedDataChecksum != originalDataChecksum) {
       containerData.setDataChecksum(updatedDataChecksum);
+      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+        // This value is only used during the datanode startup. If the update fails, then it's okay as the merkle tree
+        // and in-memory checksum will still be the same. This will be updated the next time we update the tree.
+        // Either scanner or reconciliation will update the checksum.
+        dbHandle.getStore().getMetadataTable().put(containerData.getContainerDataChecksumKey(), updatedDataChecksum);
+      } catch (IOException e) {
+        LOG.error("Failed to update container data checksum in RocksDB for container {}. " +
+                "Leaving the original checksum in RocksDB: {}", containerData.getContainerID(),
+            checksumToString(originalDataChecksum), e);
+      }
+
       if (sendICR) {
         sendICR(container);
       }
@@ -1461,7 +1493,7 @@ public class KeyValueHandler extends Handler {
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
     container.writeLock();
-    long containerID = 0L;
+    long containerID = container.getContainerData().getContainerID();
     try {
       if (container.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
@@ -1582,115 +1614,123 @@ public class KeyValueHandler extends Handler {
     ByteBuffer chunkByteBuffer = ByteBuffer.allocate(chunkSize);
 
     for (DatanodeDetails peer : peers) {
-      long numMissingBlocksRepaired = 0;
-      long numCorruptChunksRepaired = 0;
-      long numMissingChunksRepaired = 0;
-      // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with the
-      // next peer.
-      ContainerMerkleTreeWriter updatedTreeWriter =
-          new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
+      try {
+        long numMissingBlocksRepaired = 0;
+        long numCorruptChunksRepaired = 0;
+        long numMissingChunksRepaired = 0;
 
-      LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
-          containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
-      // Data checksum updated after each peer reconciles.
-      long start = Instant.now().toEpochMilli();
-      ContainerProtos.ContainerChecksumInfo peerChecksumInfo = dnClient.getContainerChecksumInfo(
-          containerID, peer);
-      if (peerChecksumInfo == null) {
-        LOG.warn("Cannot reconcile container {} with peer {} which has not yet generated a checksum",
-            containerID, peer);
-        continue;
-      }
+        LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
+            containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
+        // Data checksum updated after each peer reconciles.
+        long start = Instant.now().toEpochMilli();
+        ContainerProtos.ContainerChecksumInfo peerChecksumInfo;
 
-      ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo, 
-          kvContainer.getContainerData());
-      Pipeline pipeline = createSingleNodePipeline(peer);
 
-      // Handle missing blocks
-      for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
-        long localID = missingBlock.getBlockID();
-        BlockID blockID = new BlockID(containerID, localID);
-        if (getBlockManager().blockExists(container, blockID)) {
-          LOG.warn("Cannot reconcile block {} in container {} which was previously reported missing but is now " +
-              "present. Our container merkle tree is stale.", localID, containerID);
-        } else {
+        // Data checksum updated after each peer reconciles.
+        peerChecksumInfo = dnClient.getContainerChecksumInfo(containerID, peer);
+        if (peerChecksumInfo == null) {
+          LOG.warn("Cannot reconcile container {} with peer {} which has not yet generated a checksum",
+              containerID, peer);
+          continue;
+        }
+
+        // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with
+        // the next peer.
+        ContainerMerkleTreeWriter updatedTreeWriter =
+            new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
+        ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo,
+            kvContainer.getContainerData());
+        Pipeline pipeline = createSingleNodePipeline(peer);
+
+        // Handle missing blocks
+        for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
           try {
-            long chunksInBlockRetrieved = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
-                missingBlock.getChunkMerkleTreeList(), updatedTreeWriter, chunkByteBuffer);
-            if (chunksInBlockRetrieved != 0) {
-              allBlocksUpdated.add(localID);
-              numMissingBlocksRepaired++;
+            long localID = missingBlock.getBlockID();
+            BlockID blockID = new BlockID(containerID, localID);
+            if (getBlockManager().blockExists(container, blockID)) {
+              LOG.warn("Cannot reconcile block {} in container {} which was previously reported missing but is now " +
+                  "present. Our container merkle tree is stale.", localID, containerID);
+            } else {
+              long chunksInBlockRetrieved = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
+                  missingBlock.getChunkMerkleTreeList(), updatedTreeWriter, chunkByteBuffer);
+              if (chunksInBlockRetrieved != 0) {
+                allBlocksUpdated.add(localID);
+                numMissingBlocksRepaired++;
+              }
             }
           } catch (IOException e) {
             LOG.error("Error while reconciling missing block for block {} in container {}", missingBlock.getBlockID(),
+                  containerID, e);
+          }
+        }
+
+        // Handle missing chunks
+        for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
+          long localID = entry.getKey();
+          try {
+            long missingChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
+                entry.getValue(), updatedTreeWriter, chunkByteBuffer);
+            if (missingChunksRepaired != 0) {
+              allBlocksUpdated.add(localID);
+              numMissingChunksRepaired += missingChunksRepaired;
+            }
+          } catch (IOException e) {
+            LOG.error("Error while reconciling missing chunk for block {} in container {}", entry.getKey(),
                 containerID, e);
           }
         }
-      }
 
-      // Handle missing chunks
-      for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
-        long localID = entry.getKey();
-        try {
-          long missingChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
-              entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-          if (missingChunksRepaired != 0) {
-            allBlocksUpdated.add(localID);
-            numMissingChunksRepaired += missingChunksRepaired;
+        // Handle corrupt chunks
+        for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
+          long localID = entry.getKey();
+          try {
+            long corruptChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
+                entry.getValue(), updatedTreeWriter, chunkByteBuffer);
+            if (corruptChunksRepaired != 0) {
+              allBlocksUpdated.add(localID);
+              numCorruptChunksRepaired += corruptChunksRepaired;
+            }
+          } catch (IOException e) {
+            LOG.error("Error while reconciling corrupt chunk for block {} in container {}", entry.getKey(),
+                containerID, e);
           }
-        } catch (IOException e) {
-          LOG.error("Error while reconciling missing chunk for block {} in container {}", entry.getKey(),
-              containerID, e);
         }
-      }
 
-      // Handle corrupt chunks
-      for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
-        long localID = entry.getKey();
-        try {
-          long corruptChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
-              entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-          if (corruptChunksRepaired != 0) {
-            allBlocksUpdated.add(localID);
-            numCorruptChunksRepaired += corruptChunksRepaired;
+        // Based on repaired done with this peer, write the updated merkle tree to the container.
+        // This updated tree will be used when we reconcile with the next peer.
+        ContainerProtos.ContainerChecksumInfo previousChecksumInfo = latestChecksumInfo;
+        latestChecksumInfo = updateAndGetContainerChecksum(container, updatedTreeWriter, false);
+
+        // Log the results of reconciliation with this peer.
+        long duration = Instant.now().toEpochMilli() - start;
+        long previousDataChecksum = ContainerChecksumTreeManager.getDataChecksum(previousChecksumInfo);
+        long latestDataChecksum = ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo);
+        if (previousDataChecksum == latestDataChecksum) {
+          if (numCorruptChunksRepaired != 0 || numMissingBlocksRepaired != 0 || numMissingChunksRepaired != 0) {
+            // This condition should never happen.
+            LOG.error("Checksum of container was not updated but blocks were repaired.");
           }
-        } catch (IOException e) {
-          LOG.error("Error while reconciling corrupt chunk for block {} in container {}", entry.getKey(),
-              containerID, e);
+          LOG.info("Container {} reconciled with peer {}. Data checksum {} was not updated. Time taken: {} ms",
+              containerID, peer, checksumToString(previousDataChecksum), duration);
+        } else {
+          LOG.warn("Container {} reconciled with peer {}. Data checksum updated from {} to {}" +
+                  ".\nMissing blocks repaired: {}/{}\n" +
+                  "Missing chunks repaired: {}/{}\n" +
+                  "Corrupt chunks repaired:  {}/{}\n" +
+                  "Time taken: {} ms",
+              containerID, peer, checksumToString(previousDataChecksum), checksumToString(latestDataChecksum),
+              numMissingBlocksRepaired, diffReport.getMissingBlocks().size(),
+              numMissingChunksRepaired, diffReport.getMissingChunks().size(),
+              numCorruptChunksRepaired, diffReport.getCorruptChunks().size(),
+              duration);
         }
+
+        ContainerLogger.logReconciled(container.getContainerData(), previousDataChecksum, peer);
+        successfulPeerCount++;
+      } catch (IOException ex) {
+        LOG.error("Failed to reconcile with peer {} for container #{}. Skipping to next peer.",
+            peer, containerID, ex);
       }
-
-      // Based on repaired done with this peer, write the updated merkle tree to the container.
-      // This updated tree will be used when we reconcile with the next peer.
-      ContainerProtos.ContainerChecksumInfo previousChecksumInfo = latestChecksumInfo;
-      latestChecksumInfo = updateAndGetContainerChecksum(container, updatedTreeWriter, false);
-
-      // Log the results of reconciliation with this peer.
-      long duration = Instant.now().toEpochMilli() - start;
-      long previousDataChecksum = ContainerChecksumTreeManager.getDataChecksum(previousChecksumInfo);
-      long latestDataChecksum = ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo);
-      if (previousDataChecksum == latestDataChecksum) {
-        if (numCorruptChunksRepaired != 0 || numMissingBlocksRepaired != 0 || numMissingChunksRepaired != 0) {
-          // This condition should never happen.
-          LOG.error("Checksum of container was not updated but blocks were repaired.");
-        }
-        LOG.info("Container {} reconciled with peer {}. Data checksum {} was not updated. Time taken: {} ms",
-            containerID, peer, checksumToString(previousDataChecksum), duration);
-      } else {
-        LOG.warn("Container {} reconciled with peer {}. Data checksum updated from {} to {}" +
-                ".\nMissing blocks repaired: {}/{}\n" +
-                "Missing chunks repaired: {}/{}\n" +
-                "Corrupt chunks repaired:  {}/{}\n" +
-                "Time taken: {} ms",
-            containerID, peer, checksumToString(previousDataChecksum), checksumToString(latestDataChecksum),
-            numMissingBlocksRepaired, diffReport.getMissingBlocks().size(),
-            numMissingChunksRepaired, diffReport.getMissingChunks().size(),
-            numCorruptChunksRepaired, diffReport.getCorruptChunks().size(),
-            duration);
-      }
-
-      ContainerLogger.logReconciled(container.getContainerData(), previousDataChecksum, peer);
-      successfulPeerCount++;
     }
 
     // Log a summary after reconciling with all peers.
@@ -1710,7 +1750,7 @@ public class KeyValueHandler extends Handler {
     }
 
     // Trigger on demand scanner, which will build the merkle tree based on the newly ingested data.
-    containerSet.scanContainerWithoutGap(containerID);
+    containerSet.scanContainerWithoutGap(containerID, "Container reconciliation");
     sendICR(container);
   }
 
@@ -1823,6 +1863,10 @@ public class KeyValueHandler extends Handler {
           chunkInfo.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
           writeChunkForClosedContainer(chunkInfo, blockID, chunkBuffer, container);
           localOffset2Chunk.put(chunkOffset, chunkInfoProto);
+          // Update the treeWriter to reflect the current state of blocks and chunks on disk after successful
+          // chunk writes. If putBlockForClosedContainer fails, the container scanner will later update the
+          // Merkle tree to resolve any discrepancies.
+          treeWriter.addChunks(localID, true, chunkInfoProto);
           if (LOG.isDebugEnabled()) {
             LOG.debug("Successfully ingested chunk at offset {} into block {} of container {} from peer {}",
                 chunkOffset, localID, containerID, peer);
@@ -1846,7 +1890,6 @@ public class KeyValueHandler extends Handler {
         List<ContainerProtos.ChunkInfo> allChunks = new ArrayList<>(localOffset2Chunk.values());
         localBlockData.setChunks(allChunks);
         putBlockForClosedContainer(container, localBlockData, maxBcsId, allChunksSuccessful);
-        treeWriter.addChunks(localID, true, allChunks);
         // Invalidate the file handle cache, so new read requests get the new file if one was created.
         chunkManager.finishWriteChunks(container, localBlockData);
       }
