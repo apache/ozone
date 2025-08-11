@@ -21,6 +21,7 @@ import java.io.IOException;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 
 /**
  * REST APIs for namespace metadata summary.
@@ -192,6 +194,44 @@ public class NSSummaryEndpoint {
     distResponse = handler.getDistResponse();
 
     return Response.ok(distResponse).build();
+  }
+
+  /**
+   * Endpoint to trigger a namespace summary rebuild operation.
+   * This will clear the existing namespace summary data and rebuild it from OM data.
+   * @return Response indicating the rebuild status
+   */
+  @POST
+  @Path("/rebuild")
+  public Response triggerNamespaceRebuild() {
+    if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
+      return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+          .entity("{\"status\":\"RECON_INITIALIZING\",\"message\":\"Recon is being initialized. Please wait a moment\"}")
+          .build();
+    }
+
+    // Check current rebuild state
+    NSSummaryTask.RebuildState currentState = ReconUtils.getNSSummaryRebuildState();
+    
+    if (currentState == NSSummaryTask.RebuildState.RUNNING) {
+      return Response.ok()
+          .entity("{\"status\":\"IN_PROGRESS\",\"message\":\"Namespace Summary rebuild is already in progress\"}")
+          .build();
+    }
+    
+    // Trigger the async rebuild
+    boolean triggered = ReconUtils.triggerAsyncNSSummaryRebuild(
+        reconNamespaceSummaryManager, omMetadataManager);
+    
+    if (triggered) {
+      return Response.accepted()
+          .entity("{\"status\":\"STARTED\",\"message\":\"Namespace Summary rebuild has been initiated\"}")
+          .build();
+    } else {
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("{\"status\":\"FAILED\",\"message\":\"Failed to trigger namespace rebuild\"}")
+          .build();
+    }
   }
 
 }
