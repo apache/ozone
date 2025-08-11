@@ -285,7 +285,7 @@ public class SstFileSetReader {
       int result = this.currentKey.compareTo(other.currentKey);
       if (result == 0) {
         // For identical keys, prefer the one from the file with the higher index
-        return -Integer.compare(this.fileIndex, other.fileIndex);
+        return Integer.compare(other.fileIndex, this.fileIndex);
       }
       return result;
     }
