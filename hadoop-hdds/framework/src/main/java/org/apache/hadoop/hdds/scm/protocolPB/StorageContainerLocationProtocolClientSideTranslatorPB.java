@@ -27,6 +27,7 @@ import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -789,31 +790,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         builder -> builder.setTransferScmLeadershipRequest(reqBuilder.build()));
   }
 
+  @Deprecated
   @Override
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
       long startTxId) throws IOException {
-    GetFailedDeletedBlocksTxnRequestProto request =
-        GetFailedDeletedBlocksTxnRequestProto.newBuilder()
-            .setCount(count)
-            .setStartTxId(startTxId)
-            .build();
-    GetFailedDeletedBlocksTxnResponseProto resp = submitRequest(
-        Type.GetFailedDeletedBlocksTransaction,
-        builder -> builder.setGetFailedDeletedBlocksTxnRequest(request)).
-        getGetFailedDeletedBlocksTxnResponse();
-    return resp.getDeletedBlocksTransactionsList();
+    return Collections.emptyList();
   }
 
+  @Deprecated
   @Override
   public int resetDeletedBlockRetryCount(List<Long> txIDs)
       throws IOException {
-    ResetDeletedBlockRetryCountRequestProto request =
-        ResetDeletedBlockRetryCountRequestProto.newBuilder()
-            .addAllTransactionId(txIDs)
-            .build();
-    return submitRequest(Type.ResetDeletedBlockRetryCount,
-        builder -> builder.setResetDeletedBlockRetryCountRequest(request)).
-        getResetDeletedBlockRetryCountResponse().getResetCount();
+    return 0;
   }
 
   /**

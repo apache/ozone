@@ -413,26 +413,6 @@ public interface ScmClient extends Closeable {
   void transferLeadership(String newLeaderId) throws IOException;
 
   /**
-   * Return the failed transactions of the Deleted blocks. A transaction is
-   * considered to be failed if it has been sent more than MAX_RETRY limit
-   * and its count is reset to -1.
-   *
-   * @param count Maximum num of returned transactions, if {@literal < 0}. return all.
-   * @param startTxId The least transaction id to start with.
-   * @return a list of failed deleted block transactions.
-   * @throws IOException
-   */
-  List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
-      long startTxId) throws IOException;
-
-  /**
-   * Reset the failed deleted block retry count.
-   * @param txIDs transactionId list to be reset
-   * @throws IOException
-   */
-  int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
-
-  /**
    * Get usage information of datanode by address or uuid.
    *
    * @param address datanode address String

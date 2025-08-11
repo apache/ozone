@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
@@ -111,7 +110,6 @@ public class TestDeletedBlockLog {
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     replicationManager = mock(ReplicationManager.class);
     SCMConfigurator configurator = new SCMConfigurator();
@@ -234,19 +232,6 @@ public class TestDeletedBlockLog {
     }
   }
 
-  private void incrementCount(List<Long> txIDs) throws IOException {
-    deletedBlockLog.incrementCount(txIDs);
-    scmHADBTransactionBuffer.flush();
-    // mock scmHADBTransactionBuffer does not flush deletedBlockLog
-    deletedBlockLog.onFlush();
-  }
-
-  private void resetCount(List<Long> txIDs) throws IOException {
-    deletedBlockLog.resetCount(txIDs);
-    scmHADBTransactionBuffer.flush();
-    deletedBlockLog.onFlush();
-  }
-
   private void commitTransactions(
       List<DeleteBlockTransactionResult> transactionResults,
       DatanodeDetails... dns) throws IOException {
@@ -337,45 +322,6 @@ public class TestDeletedBlockLog {
     }
   }
 
-  @Test
-  public void testIncrementCount() throws Exception {
-    int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
-
-    // Create 30 TXs in the log.
-    addTransactions(generateData(30), true);
-    mockContainerHealthResult(true);
-
-    // This will return all TXs, total num 30.
-    List<DeletedBlocksTransaction> blocks = getAllTransactions();
-    List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
-        .distinct().collect(Collectors.toList());
-    assertEquals(30, txIDs.size());
-
-    for (DeletedBlocksTransaction block : blocks) {
-      assertEquals(0, block.getCount());
-    }
-
-    for (int i = 0; i < maxRetry; i++) {
-      incrementCount(txIDs);
-    }
-    blocks = getAllTransactions();
-    for (DeletedBlocksTransaction block : blocks) {
-      assertEquals(maxRetry, block.getCount());
-    }
-
-    // Increment another time so it exceed the maxRetry.
-    // On this call, count will be set to -1 which means TX eventually fails.
-    incrementCount(txIDs);
-    blocks = getAllTransactions();
-    for (DeletedBlocksTransaction block : blocks) {
-      assertEquals(-1, block.getCount());
-    }
-
-    // If all TXs are failed, getTransactions call will always return nothing.
-    blocks = getAllTransactions();
-    assertEquals(0, blocks.size());
-  }
-
   private void mockContainerHealthResult(Boolean healthy) {
     ContainerInfo containerInfo = mock(ContainerInfo.class);
     ContainerHealthResult healthResult =
@@ -385,55 +331,6 @@ public class TestDeletedBlockLog {
     }
     doReturn(healthResult).when(replicationManager)
         .getContainerReplicationHealth(any(), any());
-  }
-
-  @Test
-  public void testResetCount() throws Exception {
-    int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
-
-    // Create 30 TXs in the log.
-    addTransactions(generateData(30), true);
-    mockContainerHealthResult(true);
-
-    // This will return all TXs, total num 30.
-    List<DeletedBlocksTransaction> blocks = getAllTransactions();
-    List<Long> txIDs = blocks.stream().map(DeletedBlocksTransaction::getTxID)
-        .distinct().collect(Collectors.toList());
-
-    for (int i = 0; i < maxRetry; i++) {
-      incrementCount(txIDs);
-    }
-
-    // Increment another time so it exceed the maxRetry.
-    // On this call, count will be set to -1 which means TX eventually fails.
-    incrementCount(txIDs);
-    blocks = getAllTransactions();
-    for (DeletedBlocksTransaction block : blocks) {
-      assertEquals(-1, block.getCount());
-    }
-
-    // If all TXs are failed, getTransactions call will always return nothing.
-    blocks = getAllTransactions();
-    assertEquals(0, blocks.size());
-
-    // Reset the retry count, these transactions should be accessible.
-    resetCount(txIDs);
-    blocks = getAllTransactions();
-    for (DeletedBlocksTransaction block : blocks) {
-      assertEquals(0, block.getCount());
-    }
-
-    // Increment for the reset transactions.
-    // Lets the SCM delete the transaction and wait for the DN reply
-    // to timeout, thus allowing the transaction to resend the
-    deletedBlockLog.setScmCommandTimeoutMs(-1L);
-    incrementCount(txIDs);
-    blocks = getAllTransactions();
-    for (DeletedBlocksTransaction block : blocks) {
-      assertEquals(1, block.getCount());
-    }
-
-    assertEquals(30 * THREE, blocks.size());
   }
 
   @Test
@@ -453,9 +350,7 @@ public class TestDeletedBlockLog {
 
   @Test
   public void testSCMDelIteratorProgress() throws Exception {
-    int maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
 
-    // CASE1: When all transactions are valid and available
     // Create 8 TXs in the log.
     int noOfTransactions = 8;
     addTransactions(generateData(noOfTransactions), true);
@@ -474,49 +369,12 @@ public class TestDeletedBlockLog {
       assertEquals(blocks.get(0).getTxID(), i++);
       assertEquals(blocks.get(1).getTxID(), i++);
     }
+    // After iterating through all the transactions, the getTransactions call should circle back
+    // and start from the beginning.
+    blocks = getTransactions(2 * BLOCKS_PER_TXN * THREE);
+    assertEquals(1, blocks.get(0).getTxID());
+    assertEquals(2, blocks.get(1).getTxID());
 
-    // CASE2: When some transactions are not available for delete in the current iteration,
-    // either due to max retry reach or some other issue.
-    // New transactions Id is { 9, 10, 11, 12, 13, 14, 15, 16}
-    addTransactions(generateData(noOfTransactions), true);
-    mockContainerHealthResult(true);
-
-    // Mark transaction Id 11 as reached max retry count so that it will be ignored
-    // by scm deleting service while fetching transaction for delete
-    int ignoreTransactionId = 11;
-    txIDs.add((long) ignoreTransactionId);
-    for (i = 0; i < maxRetry; i++) {
-      incrementCount(txIDs);
-    }
-    incrementCount(txIDs);
-
-    i = 9;
-    while (true) {
-      // In each iteration read two transaction.
-      // If any transaction which is not available for delete in the current iteration,
-      // it will be ignored and will be re-checked again only after complete table is read.
-      // 1st iteration: {9, 10}
-      // 2nd iteration: {12, 13} Transaction 11 is ignored here
-      // 3rd iteration: {14, 15} Transaction 11 is available here,
-      // but it will be read only when all db records are read till the end.
-      // 4th iteration: {16, 11} Since iterator reached at the end of table after reading transaction 16,
-      // Iterator starts from beginning again, and it returns transaction 11 as well
-      blocks = getTransactions(2 * BLOCKS_PER_TXN * THREE);
-      if (i == ignoreTransactionId) {
-        i++;
-      }
-      assertEquals(blocks.get(0).getTxID(), i++);
-      if (i == 17) {
-        assertEquals(blocks.get(1).getTxID(), ignoreTransactionId);
-        break;
-      }
-      assertEquals(blocks.get(1).getTxID(), i++);
-
-      if (i == 14) {
-        // Reset transaction 11 so that it will be available in scm key deleting service in the subsequent iterations.
-        resetCount(txIDs);
-      }
-    }
   }
 
   @Test
@@ -776,7 +634,6 @@ public class TestDeletedBlockLog {
         for (DeletedBlocksTransaction block : blocks) {
           txIDs.add(block.getTxID());
         }
-        incrementCount(txIDs);
       } else if (state == 2) {
         commitTransactions(blocks);
         committed += blocks.size() / THREE;

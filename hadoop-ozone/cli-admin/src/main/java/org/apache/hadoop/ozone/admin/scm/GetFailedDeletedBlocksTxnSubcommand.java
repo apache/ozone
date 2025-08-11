@@ -36,9 +36,11 @@ import picocli.CommandLine;
 /**
  * Handler of getting expired deleted blocks from SCM side.
  */
+@Deprecated
 @CommandLine.Command(
     name = "ls",
-    description = "Print the failed DeletedBlocksTransaction(retry count = -1)",
+    description = "DEPRECATED: Now we always retry the DeletedBlocksTxn." +
+        " There is no concept of failed transactions.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
@@ -56,19 +58,10 @@ public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
       description = "Print transactions into file in JSON format.")
   private String fileName;
 
-  private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
 
   @Override
   public void execute(ScmClient client) throws IOException {
-    List<DeletedBlocksTransactionInfo> response;
-    int count = group.getAll ? LIST_ALL_FAILED_TRANSACTIONS : group.count;
-    response = client.getFailedDeletedBlockTxn(count, startTxId);
-    List<DeletedBlocksTransactionInfoWrapper> txns = response.stream()
-        .map(DeletedBlocksTransactionInfoWrapper::fromProtobuf)
-        .filter(Objects::nonNull)
-        .collect(Collectors.toList());
-
-    String result = JsonUtils.toJsonStringWithDefaultPrettyPrinter(txns);
+    String result = "";
     if (fileName != null) {
       try (OutputStream f = Files.newOutputStream(Paths.get(fileName))) {
         f.write(result.getBytes(StandardCharsets.UTF_8));

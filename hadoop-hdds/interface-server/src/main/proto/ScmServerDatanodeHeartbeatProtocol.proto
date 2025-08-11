@@ -367,7 +367,8 @@ message DeletedBlocksTransaction {
   required int64 containerID = 2;
   repeated int64 localID = 3;
   // the retry time of sending deleting command to datanode.
-  required int32 count = 4;
+  // We don't have to store the retry count in DB.
+  optional int32 count = 4 [deprecated=true];
 }
 
 // ACK message datanode sent to SCM, contains the result of

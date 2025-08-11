@@ -38,9 +38,11 @@ import picocli.CommandLine;
 /**
  * Handler of resetting expired deleted blocks from SCM side.
  */
+@Deprecated
 @CommandLine.Command(
     name = "reset",
-    description = "Reset the retry count of failed DeletedBlocksTransaction",
+    description = "DEPRECATED: Now we always retry the DeletedBlocksTxn." +
+    " There is no concept of failed transactions, there is no need to reset delete block retry count.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
@@ -69,42 +71,5 @@ public class ResetDeletedBlockRetryCountSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient client) throws IOException {
-    int count;
-    if (group.resetAll) {
-      count = client.resetDeletedBlockRetryCount(new ArrayList<>());
-    } else if (group.fileName != null) {
-      List<Long> txIDs;
-      try (InputStream in = Files.newInputStream(Paths.get(group.fileName));
-           Reader fileReader = new InputStreamReader(in,
-               StandardCharsets.UTF_8)) {
-        DeletedBlocksTransactionInfoWrapper[] txns = JsonUtils.readFromReader(fileReader,
-            DeletedBlocksTransactionInfoWrapper[].class);
-        txIDs = Arrays.stream(txns)
-            .map(DeletedBlocksTransactionInfoWrapper::getTxID)
-            .sorted()
-            .distinct()
-            .collect(Collectors.toList());
-        System.out.println("Num of loaded txIDs: " + txIDs.size());
-        if (!txIDs.isEmpty()) {
-          System.out.println("The first loaded txID: " + txIDs.get(0));
-          System.out.println("The last loaded txID: " +
-              txIDs.get(txIDs.size() - 1));
-        }
-      } catch (IOException ex) {
-        final String message = "Failed to parse the file " + group.fileName + ": " + ex.getMessage();
-        System.out.println(message);
-        throw new IOException(message, ex);
-      }
-
-      count = client.resetDeletedBlockRetryCount(txIDs);
-    } else {
-      if (group.txList == null || group.txList.isEmpty()) {
-        System.out.println("TransactionId list should not be empty");
-        return;
-      }
-      count = client.resetDeletedBlockRetryCount(group.txList);
-    }
-    System.out.println("Reset " + count + " deleted block transactions in" +
-        " SCM.");
   }
 }
