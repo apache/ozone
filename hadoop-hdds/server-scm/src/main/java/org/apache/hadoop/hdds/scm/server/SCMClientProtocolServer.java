@@ -82,7 +82,6 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerStatusInfo
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransactionInfoWrapper;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.EligibilityResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;

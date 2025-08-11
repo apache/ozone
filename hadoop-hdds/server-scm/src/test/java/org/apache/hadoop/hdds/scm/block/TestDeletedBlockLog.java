@@ -357,7 +357,6 @@ public class TestDeletedBlockLog {
     mockContainerHealthResult(true);
     List<DeletedBlocksTransaction> blocks;
 
-    List<Long> txIDs = new ArrayList<>();
     int i = 1;
     while (i < noOfTransactions) {
       // In each iteration read two transaction, API returns all the transactions in order.

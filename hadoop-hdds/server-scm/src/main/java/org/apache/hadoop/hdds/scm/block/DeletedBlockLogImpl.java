@@ -23,14 +23,12 @@ import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusM
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -89,7 +87,6 @@ public class DeletedBlockLogImpl
       transactionStatusManager;
   private long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
-  private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
   private long lastProcessedTransactionId = -1;
   private final int logAppenderQueueByteLimit;
   private int deletionFactorPerDatanode;

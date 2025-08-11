@@ -22,15 +22,9 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransactionInfoWrapper;
-import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 /**
@@ -57,7 +51,6 @@ public class GetFailedDeletedBlocksTxnSubcommand extends ScmSubcommand {
   @CommandLine.Option(names = {"-o", "--out"},
       description = "Print transactions into file in JSON format.")
   private String fileName;
-
 
   @Override
   public void execute(ScmClient client) throws IOException {
