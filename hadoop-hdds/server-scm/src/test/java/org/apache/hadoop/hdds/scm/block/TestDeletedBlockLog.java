@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.block;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
@@ -359,7 +360,7 @@ public class TestDeletedBlockLog {
 
     int i = 1;
     while (i < noOfTransactions) {
-      // In each iteration read two transaction, API returns all the transactions in order.
+      // In each iteration read two transactions, API returns all the transactions in order.
       // 1st iteration: {1, 2}
       // 2nd iteration: {3, 4}
       // 3rd iteration: {5, 6}
@@ -368,12 +369,10 @@ public class TestDeletedBlockLog {
       assertEquals(blocks.get(0).getTxID(), i++);
       assertEquals(blocks.get(1).getTxID(), i++);
     }
-    // After iterating through all the transactions, the getTransactions call should circle back
-    // and start from the beginning.
-    blocks = getTransactions(2 * BLOCKS_PER_TXN * THREE);
-    assertEquals(1, blocks.get(0).getTxID());
-    assertEquals(2, blocks.get(1).getTxID());
 
+    // Since all the transactions are in-flight, the getTransaction should return empty list.
+    blocks = getTransactions(2 * BLOCKS_PER_TXN * THREE);
+    assertTrue(blocks.isEmpty());
   }
 
   @Test
