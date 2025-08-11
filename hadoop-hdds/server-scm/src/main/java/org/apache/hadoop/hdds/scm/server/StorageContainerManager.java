@@ -775,8 +775,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     finalizationManager.buildUpgradeContext(scmNodeManager, pipelineManager,
         scmContext);
 
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(systemClock);
+        new ContainerReplicaPendingOps(systemClock, rmConf);
 
     long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
         ScmConfigKeys
@@ -829,6 +831,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       replicationManager = configurator.getReplicationManager();
     }  else {
       replicationManager = new ReplicationManager(
+          rmConf,
           conf,
           containerManager,
           containerPlacementPolicy,
@@ -838,7 +841,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmNodeManager,
           systemClock,
           containerReplicaPendingOps);
-      reconfigurationHandler.register(replicationManager.getConfig());
+      reconfigurationHandler.register(rmConf);
     }
     serviceManager.register(replicationManager);
     // RM gets notified of expired pending delete from containerReplicaPendingOps by subscribing to it

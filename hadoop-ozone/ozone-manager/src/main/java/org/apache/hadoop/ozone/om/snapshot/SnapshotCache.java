@@ -139,6 +139,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         LOG.warn("SnapshotId: '{}' does not exist in snapshot cache.", k);
       } else {
         try {
+          v.get().getMetadataManager().getStore().flushDB();
           v.get().close();
         } catch (IOException e) {
           throw new IllegalStateException("Failed to close snapshotId: " + key, e);

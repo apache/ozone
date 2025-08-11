@@ -110,8 +110,8 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
-import org.apache.hadoop.ozone.s3.S3GatewayService;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
@@ -194,7 +194,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
    * @throws Exception exception thrown when waiting for the cluster to be ready.
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
-    S3GatewayService s3g = new S3GatewayService();
+    MultiS3GatewayService s3g = new MultiS3GatewayService(5);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .addService(s3g)
         .setNumDatanodes(5)
@@ -1029,6 +1029,62 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
              content.getBytes(StandardCharsets.UTF_8).length)) {
       IOUtils.copy(s3is, bos);
       assertEquals(content, bos.toString("UTF-8"));
+    }
+  }
+
+  @Test
+  public void testPresignedUrlHead() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+
+    // Set the presigned URL to expire after one hour.
+    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+
+    // Test HeadObject presigned URL
+    GeneratePresignedUrlRequest generatePresignedUrlRequest =
+        new GeneratePresignedUrlRequest(bucketName, keyName)
+            .withMethod(HttpMethod.HEAD)
+            .withExpiration(expiration);
+    URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+    URL presignedUrl = new URL(url.toExternalForm());
+    HttpURLConnection connection = null;
+    try {
+      connection = (HttpURLConnection) presignedUrl.openConnection();
+      connection.setRequestMethod("HEAD");
+
+      int responseCode = connection.getResponseCode();
+      assertEquals(200, responseCode, "HeadObject presigned URL should return 200 OK");
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
+
+    // Test HeadBucket presigned URL
+    GeneratePresignedUrlRequest generateBucketPresignedUrlRequest =
+        new GeneratePresignedUrlRequest(bucketName, null)
+            .withMethod(HttpMethod.HEAD)
+            .withExpiration(expiration);
+    URL bucketUrl = s3Client.generatePresignedUrl(generateBucketPresignedUrlRequest);
+
+    URL presignedBucketUrl = new URL(bucketUrl.toExternalForm());
+    HttpURLConnection bucketConnection = null;
+    try {
+      bucketConnection = (HttpURLConnection) presignedBucketUrl.openConnection();
+      bucketConnection.setRequestMethod("HEAD");
+
+      int bucketResponseCode = bucketConnection.getResponseCode();
+      assertEquals(200, bucketResponseCode, "HeadBucket presigned URL should return 200 OK");
+    } finally {
+      if (bucketConnection != null) {
+        bucketConnection.disconnect();
+      }
     }
   }
 

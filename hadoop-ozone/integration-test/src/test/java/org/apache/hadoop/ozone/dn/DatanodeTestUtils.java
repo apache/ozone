@@ -220,20 +220,6 @@ public final class DatanodeTestUtils {
   }
 
   /**
-   * Wait for detect volume failure.
-   *
-   * @param volSet
-   * @param numOfChecks target number of checks
-   * @throws Exception
-   */
-  public static void waitForCheckVolume(MutableVolumeSet volSet,
-                                        long numOfChecks) throws Exception {
-    GenericTestUtils.waitFor(
-        () -> numOfChecks == volSet.getVolumeChecker().getNumVolumeChecks(),
-        100, 10000);
-  }
-
-  /**
    * Wait for failed volume to be handled.
    * @param volSet
    * @param numOfFailedVolumes

@@ -592,3 +592,7 @@ service IntraDatanodeProtocolService {
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
   rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
 }
+
+message ContainerCreateInfo {
+    required ContainerDataProto.State state = 1;
+}

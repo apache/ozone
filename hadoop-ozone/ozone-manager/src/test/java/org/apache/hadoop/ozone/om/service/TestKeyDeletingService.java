@@ -65,14 +65,17 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -133,6 +136,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyDeletingService.class);
   private static final AtomicInteger OBJECT_COUNTER = new AtomicInteger();
+  private static final long DATA_SIZE = 1000L;
 
   private OzoneConfiguration conf;
   private OzoneManagerProtocol writeClient;
@@ -142,6 +146,8 @@ class TestKeyDeletingService extends OzoneTestBase {
   private KeyDeletingService keyDeletingService;
   private DirectoryDeletingService directoryDeletingService;
   private ScmBlockLocationTestingClient scmBlockTestingClient;
+  private int ratisLimit;
+  private DeletingServiceMetrics metrics;
 
   @BeforeAll
   void setup() {
@@ -149,15 +155,19 @@ class TestKeyDeletingService extends OzoneTestBase {
   }
 
   private void createConfig(File testDir) {
+    createConfig(testDir, 100);
+  }
+
+  private void createConfig(File testDir, int delintervalMs) {
     conf = new OzoneConfiguration();
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(conf, testDir.toString());
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-        100, TimeUnit.MILLISECONDS);
+        delintervalMs, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
-        100, TimeUnit.MILLISECONDS);
+        delintervalMs, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL,
-        100, TimeUnit.MILLISECONDS);
+        delintervalMs, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
         1, TimeUnit.SECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
@@ -175,6 +185,12 @@ class TestKeyDeletingService extends OzoneTestBase {
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
+    int limit = (int) conf.getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    ratisLimit = (int) (limit * 0.9);
+    metrics = keyDeletingService.getMetrics();
   }
 
   /**
@@ -226,7 +242,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertThat(getRunCount()).isGreaterThan(initialRunCount);
       assertThat(keyManager.getPendingDeletionKeys(new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
               ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
-              keyManager, om.getMetadataManager().getLock()), Integer.MAX_VALUE).getKeyBlocksList())
+              keyManager, om.getMetadataManager().getLock()), Integer.MAX_VALUE, ratisLimit).getKeyBlocksList())
           .isEmpty();
     }
 
@@ -255,7 +271,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 10000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
-      assertThat(keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE).getKeyBlocksList())
+      assertThat(keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit).getKeyBlocksList())
           .isEmpty();
 
       // The 1st version of the key has 1 block and the 2nd version has 2
@@ -300,7 +316,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertThat(keyManager.getPendingDeletionKeys(new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
               ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
               keyManager, om.getMetadataManager().getLock()),
-          Integer.MAX_VALUE).getKeyBlocksList())
+          Integer.MAX_VALUE, ratisLimit).getKeyBlocksList())
           .isEmpty();
 
       // deletedTable should have deleted key of the snapshot bucket
@@ -408,7 +424,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           Assertions.assertNotEquals(deletePathKey[0], group.getGroupID());
         }
         return pendingKeysDeletion;
-      }).when(km).getPendingDeletionKeys(any(), anyInt());
+      }).when(km).getPendingDeletionKeys(any(), anyInt(), anyInt());
       service.runPeriodicalTaskNow();
       service.runPeriodicalTaskNow();
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
@@ -780,7 +796,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
     @Test
     @DisplayName("Should not update keys when purge request times out during key deletion")
-    public void testFailingModifiedKeyPurge() throws IOException {
+    public void testFailingModifiedKeyPurge() throws IOException, InterruptedException {
 
       try (MockedStatic<OzoneManagerRatisUtils> mocked =  mockStatic(OzoneManagerRatisUtils.class,
           CALLS_REAL_METHODS)) {
@@ -806,7 +822,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             .build();
         Map<String, RepeatedOmKeyInfo> keysToModify = Collections.singletonMap("key1",
             new RepeatedOmKeyInfo(Collections.singletonList(omKeyInfo)));
-        keyDeletingService.processKeyDeletes(blockGroups, keysToModify, renameEntriesToBeDeleted, null, null);
+        keyDeletingService.processKeyDeletes(blockGroups, keysToModify, renameEntriesToBeDeleted, null, null, null);
         assertTrue(purgeRequest.get().getPurgeKeysRequest().getKeysToUpdateList().isEmpty());
         assertEquals(renameEntriesToBeDeleted, purgeRequest.get().getPurgeKeysRequest().getRenamedKeysList());
       }
@@ -878,6 +894,155 @@ class TestKeyDeletingService extends OzoneTestBase {
       // the blockClient is set to fail the deletion of key blocks, hence no keys
       // will be deleted
       assertEquals(0, getDeletedKeyCount());
+    }
+  }
+
+  /**
+   * Tests Metrics.
+   */
+  @Nested
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  class Metrics {
+
+    @BeforeAll
+    void setup(@TempDir File testDir) throws Exception {
+      scmBlockTestingClient = new ScmBlockLocationTestingClient(null, null, 0);
+      createConfig(testDir, 3600_000);
+      createSubject();
+    }
+
+    @AfterAll
+    void cleanup() {
+      if (om.stop()) {
+        om.join();
+      }
+    }
+
+    /*
+     * Suspend DeletingService so that keys are not reclaimed.
+     * Create 10 keys
+     * Create Snap1
+     * Create 5 keys
+     * Delete all 15 keys
+     * Create snap2
+     * Create 5 keys
+     * Delete 5 keys
+     * Resume DeletingService
+     * wait for AOS deleted keys to be reclaimed -> Deleted 5. Not reclaimed 0.
+     * wait for snap3 to be deepCleaned -> Deleted 5. Not reclaimed 10.
+     * delete snap1 -> Wait for snap2 to be deep cleaned. -> Deleted 10. Not reclaimed 0.
+     */
+    @Test
+    void testLastRunAnd24hMetrics() throws Exception {
+      // Suspend DeletingService
+      keyDeletingService.suspend();
+      directoryDeletingService.suspend();
+
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      createVolumeAndBucket(volumeName, bucketName, false);
+
+      // Create 10 keys
+      List<OmKeyArgs> createdKeys = new ArrayList<>();
+      for (int i = 1; i <= 10; i++) {
+        OmKeyArgs args = createAndCommitKey(volumeName, bucketName, uniqueObjectName("key"), 1);
+        createdKeys.add(args);
+      }
+
+      // Create Snap1
+      String snap1 = uniqueObjectName("snap");
+      writeClient.createSnapshot(volumeName, bucketName, snap1);
+
+      // Create 5 Keys
+      for (int i = 11; i <= 15; i++) {
+        OmKeyArgs args = createAndCommitKey(volumeName, bucketName, uniqueObjectName("key"), 1);
+        createdKeys.add(args);
+      }
+
+      // Delete all 15 keys.
+      for (int i = 0; i < 15; i++) {
+        writeClient.deleteKey(createdKeys.get(i));
+      }
+
+      // Create Snap2, traps all the deleted keys.
+      String snap2 = uniqueObjectName("snap");
+      writeClient.createSnapshot(volumeName, bucketName, snap2);
+
+      // Create and delete 5 more keys.
+      for (int i = 16; i <= 20; i++) {
+        OmKeyArgs args = createAndCommitKey(volumeName, bucketName, uniqueObjectName("key"), 1);
+        createdKeys.add(args);
+      }
+      for (int i = 15; i < 20; i++) {
+        writeClient.deleteKey(createdKeys.get(i));
+      }
+
+      // Wait for snap2 to be flushed.
+      GenericTestUtils.waitFor(
+          () -> {
+            try {
+              SnapshotInfo snapshotInfo = writeClient.getSnapshotInfo(volumeName, bucketName, snap2);
+              return OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }, 1000, 100000);
+
+      // Resume DeletingService
+      keyDeletingService.resume();
+      directoryDeletingService.resume();
+
+      // wait for AOS deleted keys to be reclaimed and
+      // snap2 to be deep cleaned.
+      directoryDeletingService.runPeriodicalTaskNow();
+      keyDeletingService.runPeriodicalTaskNow();
+      GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 10, 100, 10000);
+      // Verify last run AOS deletion metrics.
+      assertEquals(5, metrics.getAosKeysReclaimedLast());
+      assertEquals(5 * DATA_SIZE * 3, metrics.getAosReclaimedSizeLast());
+      assertEquals(5, metrics.getAosKeysIteratedLast());
+      assertEquals(0, metrics.getAosKeysNotReclaimableLast());
+      // Verify last run Snapshot deletion metrics.
+      assertEquals(5, metrics.getSnapKeysReclaimedLast());
+      assertEquals(5 * DATA_SIZE * 3, metrics.getSnapReclaimedSizeLast());
+      assertEquals(15, metrics.getSnapKeysIteratedLast());
+      assertEquals(10, metrics.getSnapKeysNotReclaimableLast());
+      // Verify 24h deletion metrics.
+      assertEquals(10, metrics.getKeysReclaimedInInterval());
+      assertEquals(10 * DATA_SIZE * 3, metrics.getReclaimedSizeInInterval());
+
+      // Delete snap1. Which also sets the snap2 to be deep cleaned.
+      writeClient.deleteSnapshot(volumeName, bucketName, snap1);
+      keyManager.getSnapshotDeletingService().runPeriodicalTaskNow();
+      // Wait for changes to the snap2 to be flushed.
+      GenericTestUtils.waitFor(
+          () -> {
+            try {
+              SnapshotInfo snapshotInfo = writeClient.getSnapshotInfo(volumeName, bucketName, snap2);
+              return OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }, 1000, 100000);
+
+      // wait for snap2 to be deep cleaned.
+      directoryDeletingService.runPeriodicalTaskNow();
+      keyDeletingService.runPeriodicalTaskNow();
+      GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 20, 100, 10000);
+
+      // Verify last run AOS deletion metrics.
+      assertEquals(0, metrics.getAosKeysReclaimedLast());
+      assertEquals(0, metrics.getAosReclaimedSizeLast());
+      assertEquals(0, metrics.getAosKeysIteratedLast());
+      assertEquals(0, metrics.getAosKeysNotReclaimableLast());
+      // Verify last run Snapshot deletion metrics.
+      assertEquals(10, metrics.getSnapKeysReclaimedLast());
+      assertEquals(10 * DATA_SIZE * 3, metrics.getSnapReclaimedSizeLast());
+      assertEquals(10, metrics.getSnapKeysIteratedLast());
+      assertEquals(0, metrics.getSnapKeysNotReclaimableLast());
+      // Verify 24h deletion metrics.
+      assertEquals(20, metrics.getKeysReclaimedInInterval());
+      assertEquals(20 * DATA_SIZE * 3, metrics.getReclaimedSizeInInterval());
     }
   }
 
@@ -999,7 +1164,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             .setKeyName(keyName)
             .setAcls(Collections.emptyList())
             .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-            .setDataSize(1000L)
+            .setDataSize(DATA_SIZE)
             .setLocationInfoList(new ArrayList<>())
             .setOwnerName("user" + RandomStringUtils.secure().nextNumeric(5))
             .build();
@@ -1052,7 +1217,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private int countKeysPendingDeletion() {
     try {
-      final int count = keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
+      final int count = keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit)
           .getKeyBlocksList().size();
       LOG.debug("KeyManager keys pending deletion: {}", count);
       return count;
@@ -1063,7 +1228,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private long countBlocksPendingDeletion() {
     try {
-      return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
+      return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit)
           .getKeyBlocksList()
           .stream()
           .map(BlockGroup::getBlockIDList)
