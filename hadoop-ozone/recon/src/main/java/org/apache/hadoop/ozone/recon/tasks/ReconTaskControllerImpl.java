@@ -60,6 +60,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconTaskControllerImpl.class);
+  private static final String REPROCESS_STAGING = "REPROCESS_STAGING";
   private final ReconDBProvider reconDBProvider;
   private final ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
@@ -192,9 +193,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     }
     ReconConstants.resetTableTruncatedFlags();
 
+    ReconTaskStatusUpdater reprocessTaskStatus = taskStatusUpdaterManager.getTaskStatusUpdater(REPROCESS_STAGING);
     String reconDBName = reconDBProvider.getDbStore().getDbLocation().getPath() + ".staged";
     ReconDBProvider stagedReconDBProvider;
     try {
+      reprocessTaskStatus.recordRunStart();
       stagedReconDBProvider = reconDBProvider.getStagedReconDBProvider(reconDBName);
     } catch (IOException e) {
       LOG.error("Failed to get staged Recon DB provider for reinitialization of tasks.", e);
@@ -203,6 +206,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         taskStatusUpdater.setLastTaskRunStatus(-1);
         taskStatusUpdater.recordRunCompletion();
       });
+      reprocessTaskStatus.setLastTaskRunStatus(-1);
+      reprocessTaskStatus.recordRunCompletion();
       return;
     }
 
@@ -266,9 +271,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         reconDBProvider.replaceStagedDb(stagedReconDBProvider);
         reconNamespaceSummaryManager.reinitialize(reconDBProvider);
         reconContainerMetadataManager.reinitialize(reconDBProvider);
+        reprocessTaskStatus.setLastTaskRunStatus(0);
+        reprocessTaskStatus.recordRunCompletion();
         LOG.info("Re-initialization of tasks completed successfully.");
       } catch (Exception e) {
         LOG.error("Re-initialization of tasks failed.", e);
+        reprocessTaskStatus.setLastTaskRunStatus(-1);
+        reprocessTaskStatus.recordRunCompletion();
         // reinitialize the Recon OM tasks with the original DB provider
         try {
           reconNamespaceSummaryManager.reinitialize(reconDBProvider);
@@ -277,6 +286,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           LOG.error("Re-initialization of task manager failed.", e);
         }
       }
+    } else {
+      LOG.error("Reprocess of task has failed.");
+      reprocessTaskStatus.setLastTaskRunStatus(-1);
+      reprocessTaskStatus.recordRunCompletion();
     }
   }
 

@@ -24,6 +24,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.ProvisionException;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -136,14 +138,18 @@ public class ReconDBProvider {
     stagedReconDBProvider.close();
     try {
       FileUtils.deleteDirectory(backupPath);
-      FileUtils.moveDirectory(dbPath, backupPath);
       close();
-      FileUtils.moveDirectory(stagedDbPath, backupPath);
+      Files.move(dbPath.toPath(), backupPath.toPath(), StandardCopyOption.ATOMIC_MOVE,
+          StandardCopyOption.REPLACE_EXISTING);
+      Files.move(stagedDbPath.toPath(), dbPath.toPath(), StandardCopyOption.ATOMIC_MOVE,
+          StandardCopyOption.REPLACE_EXISTING);
       dbStore = initializeDBStore(configuration, dbPath.getName());
     } catch (Exception e) {
       if (dbStore == null) {
-        FileUtils.moveDirectory(dbPath, stagedDbPath);
-        FileUtils.moveDirectory(backupPath, dbPath);
+        Files.move(dbPath.toPath(), stagedDbPath.toPath(), StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
+        Files.move(backupPath.toPath(), dbPath.toPath(), StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
         dbStore = initializeDBStore(configuration, dbPath.getName());
       }
       throw e;
