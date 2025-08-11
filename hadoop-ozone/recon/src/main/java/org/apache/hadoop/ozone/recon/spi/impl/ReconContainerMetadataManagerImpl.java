@@ -102,12 +102,14 @@ public class ReconContainerMetadataManagerImpl
     initializeTables();
   }
 
+  @Override
   public ReconContainerMetadataManager getStagedReconContainerMetadataManager(
       DBStore stagedReconDbStore) {
     return new ReconContainerMetadataManagerImpl(stagedReconDbStore,
         sqlConfiguration);
   }
 
+  @Override
   public void reinitialize(ReconDBProvider reconDBProvider) {
     containerDbStore = reconDBProvider.getDbStore();
     initializeTables();

@@ -115,6 +115,7 @@ public class NSSummaryTask implements ReconOmTask {
         reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold);
   }
 
+  @Override
   public NSSummaryTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
       throws IOException {
     ReconNamespaceSummaryManager stagedNsSummaryManager =
