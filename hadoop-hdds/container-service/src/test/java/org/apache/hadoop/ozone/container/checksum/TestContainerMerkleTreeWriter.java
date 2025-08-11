@@ -70,6 +70,7 @@ class TestContainerMerkleTreeWriter {
 
     // Use the ContainerMerkleTreeWriter to build the same tree.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
+    actualTree.addBlock(blockID, 0);
     actualTree.addChunks(blockID, true, chunk);
 
     // Ensure the trees match.
@@ -106,6 +107,7 @@ class TestContainerMerkleTreeWriter {
 
     // Use the ContainerMerkleTree to build the same tree.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
+    actualTree.addBlock(blockID, 0);
     actualTree.addChunks(blockID, true, chunk1, chunk3);
 
     // Ensure the trees match.
@@ -124,9 +126,11 @@ class TestContainerMerkleTreeWriter {
     final long blockID2 = 2;
 
     ContainerMerkleTreeWriter tree1 = new ContainerMerkleTreeWriter();
+    tree1.addBlock(blockID1, 0);
     tree1.addChunks(blockID1, true, chunk1, chunk2);
 
     ContainerMerkleTreeWriter tree2 = new ContainerMerkleTreeWriter();
+    tree2.addBlock(blockID2, 0);
     tree2.addChunks(blockID2, true, chunk1, chunk2);
 
     ContainerProtos.ContainerMerkleTree tree1Proto = tree1.toProto();
@@ -157,9 +161,11 @@ class TestContainerMerkleTreeWriter {
     final long blockID = 1;
 
     ContainerMerkleTreeWriter tree1 = new ContainerMerkleTreeWriter();
+    tree1.addBlock(blockID, 0);
     tree1.addChunks(blockID, true, chunk1, chunk2);
 
     ContainerMerkleTreeWriter tree2 = new ContainerMerkleTreeWriter();
+    tree2.addBlock(blockID, 0);
     tree2.addChunks(blockID, true, chunk1, chunk2);
 
     ContainerProtos.ContainerMerkleTree tree1Proto = tree1.toProto();
@@ -188,16 +194,24 @@ class TestContainerMerkleTreeWriter {
     // Scenario: Container has 5 identical blocks, but different replicas are missing different blocks
     // Replica 1 is missing block 1 (has blocks 2,3,4,5)
     ContainerMerkleTreeWriter replica1 = new ContainerMerkleTreeWriter();
+    replica1.addBlock(2, 0);
     replica1.addChunks(2, true, chunk1, chunk2);
+    replica1.addBlock(3, 0);
     replica1.addChunks(3, true, chunk1, chunk2);
+    replica1.addBlock(4, 0);
     replica1.addChunks(4, true, chunk1, chunk2);
+    replica1.addBlock(5, 0);
     replica1.addChunks(5, true, chunk1, chunk2);
     
     // Replica 2 is missing block 5 (has blocks 1,2,3,4)
     ContainerMerkleTreeWriter replica2 = new ContainerMerkleTreeWriter();
+    replica2.addBlock(1, 0);
     replica2.addChunks(1, true, chunk1, chunk2);
+    replica2.addBlock(2, 0);
     replica2.addChunks(2, true, chunk1, chunk2);
+    replica2.addBlock(3, 0);
     replica2.addChunks(3, true, chunk1, chunk2);
+    replica2.addBlock(4, 0);
     replica2.addChunks(4, true, chunk1, chunk2);
     
     ContainerProtos.ContainerMerkleTree replica1Proto = replica1.toProto();
@@ -218,7 +232,7 @@ class TestContainerMerkleTreeWriter {
 
     // Use the ContainerMerkleTree to build the same tree.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
-    actualTree.addBlock(blockID);
+    actualTree.addBlock(blockID, 0);
 
     // Ensure the trees match.
     ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
@@ -236,10 +250,10 @@ class TestContainerMerkleTreeWriter {
 
     // Use the ContainerMerkleTree to build the same tree, calling addBlock in between adding chunks.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
-    actualTree.addBlock(blockID);
+    actualTree.addBlock(blockID, 0);
     actualTree.addChunks(blockID, true, chunk1);
     // This should not overwrite the chunk already added to the block.
-    actualTree.addBlock(blockID);
+    actualTree.addBlock(blockID, 0);
 
     // Ensure the trees match.
     ContainerProtos.ContainerMerkleTree actualTreeProto = actualTree.toProto();
@@ -270,6 +284,8 @@ class TestContainerMerkleTreeWriter {
     // Use the ContainerMerkleTree to build the same tree.
     // Add blocks and chunks out of order to test sorting.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
+    actualTree.addBlock(blockID3, 0);
+    actualTree.addBlock(blockID1, 0);
     actualTree.addChunks(blockID3, true, b3c2, b3c1);
     actualTree.addChunks(blockID1, true, b1c1, b1c2);
 
@@ -305,6 +321,10 @@ class TestContainerMerkleTreeWriter {
     // Use the ContainerMerkleTree to build the same tree.
     // Test building by adding chunks to the blocks individually and out of order.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
+    // Add all blocks first
+    actualTree.addBlock(blockID1, 0);
+    actualTree.addBlock(blockID2, 0);
+    actualTree.addBlock(blockID3, 0);
     // Add all of block 2 first.
     actualTree.addChunks(blockID2, true, b2c1, b2c2);
     // Then add block 1 in multiple steps wth chunks out of order.
@@ -349,7 +369,7 @@ class TestContainerMerkleTreeWriter {
     // Modifying the tree writer created from the proto should also succeed.
     ContainerProtos.ChunkInfo b3c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1}));
     treeWriter.addChunks(blockID3, false, b3c1);
-    treeWriter.addBlock(blockID4);
+    treeWriter.addBlock(blockID4, 0);
 
     blockTree3 = buildExpectedBlockTree(blockID3, Collections.singletonList(buildExpectedChunkTree(b3c1, false)));
     ContainerProtos.BlockMerkleTree blockTree4 = buildExpectedBlockTree(blockID4, Collections.emptyList());
@@ -357,6 +377,37 @@ class TestContainerMerkleTreeWriter {
         Arrays.asList(blockTree1, blockTree2, blockTree3, blockTree4));
 
     assertTreesSortedAndMatch(expectedUpdatedTree, treeWriter.toProto());
+  }
+
+  /**
+   * Test that BCSID is preserved when adding chunks to existing blocks.
+   */
+  @Test
+  public void testBCSIDPreservedWhenAddingChunks() {
+    final long blockID = 1;
+    final long bcsid = 100;
+    
+    ContainerProtos.ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    ContainerProtos.ChunkInfo chunk2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{4, 5, 6}));
+
+    ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
+    
+    // Add block with BCSID first
+    tree.addBlock(blockID, bcsid);
+    
+    // Add chunks in separate calls
+    tree.addChunks(blockID, true, chunk1);
+    tree.addChunks(blockID, true, chunk2);
+    
+    // Call addBlock again - should not change BCSID
+    tree.addBlock(blockID, bcsid + 50);
+
+    ContainerProtos.ContainerMerkleTree treeProto = tree.toProto();
+    ContainerProtos.BlockMerkleTree blockTree = treeProto.getBlockMerkleTree(0);
+    
+    assertEquals(blockID, blockTree.getBlockID());
+    assertEquals(bcsid, blockTree.getBlockCommitSequenceId()); // Should be original BCSID
+    assertEquals(2, blockTree.getChunkMerkleTreeCount());
   }
 
   private ContainerProtos.ContainerMerkleTree buildExpectedContainerTree(List<ContainerProtos.BlockMerkleTree> blocks) {
