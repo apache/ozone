@@ -1493,7 +1493,7 @@ public class KeyValueHandler extends Handler {
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
     container.writeLock();
-    long containerID = 0L;
+    long containerID = container.getContainerData().getContainerID();
     try {
       if (container.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
