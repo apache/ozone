@@ -1611,23 +1611,23 @@ public class KeyValueHandler extends Handler {
 
         // Handle missing blocks
         for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
-          long localID = missingBlock.getBlockID();
-          BlockID blockID = new BlockID(containerID, localID);
-          if (getBlockManager().blockExists(container, blockID)) {
-            LOG.warn("Cannot reconcile block {} in container {} which was previously reported missing but is now " +
-                "present. Our container merkle tree is stale.", localID, containerID);
-          } else {
-            try {
+          try {
+            long localID = missingBlock.getBlockID();
+            BlockID blockID = new BlockID(containerID, localID);
+            if (getBlockManager().blockExists(container, blockID)) {
+              LOG.warn("Cannot reconcile block {} in container {} which was previously reported missing but is now " +
+                  "present. Our container merkle tree is stale.", localID, containerID);
+            } else {
               long chunksInBlockRetrieved = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
                   missingBlock.getChunkMerkleTreeList(), updatedTreeWriter, chunkByteBuffer);
               if (chunksInBlockRetrieved != 0) {
                 allBlocksUpdated.add(localID);
                 numMissingBlocksRepaired++;
               }
-            } catch (IOException e) {
-              LOG.error("Error while reconciling missing block for block {} in container {}", missingBlock.getBlockID(),
-                  containerID, e);
             }
+          } catch (IOException e) {
+            LOG.error("Error while reconciling missing block for block {} in container {}", missingBlock.getBlockID(),
+                  containerID, e);
           }
         }
 
