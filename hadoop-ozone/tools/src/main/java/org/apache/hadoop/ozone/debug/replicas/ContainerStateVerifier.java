@@ -99,11 +99,17 @@ public class ContainerStateVerifier implements ReplicaVerifier {
 
   private boolean areContainerAndReplicasInGoodState(ContainerDataProto.State replicaState,
       HddsProtos.LifeCycleState containerState) {
-    return (replicaState != ContainerDataProto.State.UNHEALTHY &&
-        replicaState != ContainerDataProto.State.INVALID &&
-        replicaState != ContainerDataProto.State.DELETED &&
-        containerState != HddsProtos.LifeCycleState.DELETING &&
-        containerState != HddsProtos.LifeCycleState.DELETED);
+    boolean replicaInGoodState = (replicaState == ContainerDataProto.State.OPEN ||
+        replicaState == ContainerDataProto.State.CLOSING ||
+        replicaState == ContainerDataProto.State.QUASI_CLOSED ||
+        replicaState == ContainerDataProto.State.CLOSED);
+    
+    boolean containerInGoodState = (containerState == HddsProtos.LifeCycleState.OPEN ||
+        containerState == HddsProtos.LifeCycleState.CLOSING ||
+        containerState == HddsProtos.LifeCycleState.QUASI_CLOSED ||
+        containerState == HddsProtos.LifeCycleState.CLOSED);
+    
+    return replicaInGoodState && containerInGoodState;
   }
 
   private ContainerDataProto fetchContainerDataFromDatanode(DatanodeDetails dn, long containerId,
