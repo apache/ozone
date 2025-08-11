@@ -33,6 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
@@ -96,6 +97,16 @@ public class ReplicasVerify extends Handler {
   private final Map<String, AtomicInteger> failuresByType = new ConcurrentHashMap<>();
   private volatile Throwable exception;
 
+  private void addVerifier(boolean condition, Supplier<ReplicaVerifier> verifierSupplier) {
+    if (condition) {
+      ReplicaVerifier verifier = verifierSupplier.get();
+      replicaVerifiers.add(verifier);
+      String verifierType = verifier.getType();
+      verificationTypes.add(verifierType);
+      failuresByType.put(verifierType, new AtomicInteger(0));
+    }
+  }
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
     startTime = System.nanoTime();
@@ -112,40 +123,40 @@ public class ReplicasVerify extends Handler {
     
     replicaVerifiers = new ArrayList<>();
 
-    if (verification.doExecuteChecksums) {
-      ChecksumVerifier checksumVerifier = new ChecksumVerifier(getConf());
-      replicaVerifiers.add(checksumVerifier);
-      String checksumType = checksumVerifier.getType();
-      verificationTypes.add(checksumType);
-      failuresByType.put(checksumType, new AtomicInteger(0));
-    }
+    addVerifier(verification.doExecuteChecksums, () -> {
+      try {
+        return new ChecksumVerifier(getConf());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
 
-    if (verification.doExecuteBlockExistence) {
-      BlockExistenceVerifier blockVerifier = new BlockExistenceVerifier(getConf());
-      replicaVerifiers.add(blockVerifier);
-      String blockType = blockVerifier.getType();
-      verificationTypes.add(blockType);
-      failuresByType.put(blockType, new AtomicInteger(0));
-    }
+    addVerifier(verification.doExecuteBlockExistence, () -> {
+      try {
+        return new BlockExistenceVerifier(getConf());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
 
-    if (verification.doExecuteReplicaState) {
-      ContainerStateVerifier stateVerifier = new ContainerStateVerifier(getConf(), containerCacheSize);
-      replicaVerifiers.add(stateVerifier);
-      String stateType = stateVerifier.getType();
-      verificationTypes.add(stateType);
-      failuresByType.put(stateType, new AtomicInteger(0));
-    }
+    addVerifier(verification.doExecuteReplicaState, () -> {
+      try {
+        return new ContainerStateVerifier(getConf(), containerCacheSize);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
 
     // Add shutdown hook to ensure summary is printed even if interrupted
     addShutdownHook();
 
     try {
       findCandidateKeys(client, address);
-      endTime = System.nanoTime();
     } catch (Exception e) {
       exception = e;
-      endTime = System.nanoTime();
       throw e;
+    } finally {
+      endTime = System.nanoTime();
     }
   }
 
@@ -276,15 +287,10 @@ public class ReplicasVerify extends Handler {
     } else {
       keysFailed.incrementAndGet();
       allKeysPassed.set(false);
-      
-      for (String failedType : failedVerificationTypes) {
-        AtomicInteger counter = failuresByType.get(failedType);
-        if (counter != null) {
-          counter.incrementAndGet();
-        } else {
-          failuresByType.computeIfAbsent(failedType, k -> new AtomicInteger(0)).incrementAndGet();
-        }
-      }
+      failedVerificationTypes.forEach(failedType -> failuresByType
+          .computeIfAbsent(failedType, k -> new AtomicInteger(0))
+          .incrementAndGet()
+      );
     }
 
     if (!keyPass || allResults) {
@@ -300,7 +306,7 @@ public class ReplicasVerify extends Handler {
       if (endTime == 0) {
         endTime = System.nanoTime();
       }
-      printSummary(System.out);
+      printSummary(System.err);
     }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
   }
 
