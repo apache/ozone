@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 /**
  * Verifies the state of a replica from the DN.
- * [DELETED, UNHEALTHY, INVALID] are considered bad states.
+ * [OPEN, CLOSING, QUASI_CLOSED, CLOSED] are considered good states.
  */
 public class ContainerStateVerifier implements ReplicaVerifier {
   private static final String CHECK_TYPE = "containerState";
