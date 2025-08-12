@@ -29,10 +29,10 @@ It includes the following tools:
    * **ldb** - Tools to debug RocksDB related issues.
    * **om** - Debug commands related to OM.
    * **datanode** - Debug commands related to Datanode.
-   * **replicas** - Debug commands for replica-related issues.
+   * **replicas** - Debug commands for key replica related issues.
    * **ratislogparser** - Shell of printing Ratis Log in understandable text
    * **auditparser** - A tool to parse and query Ozone audit logs.
-   * **container log parse** - A tool to parse the dn-container logs and provide insights.
+   * **log** - A tool to parse and provide insights on logs, currently supports only the datanode's container logs.
    * **checknative** - Checks if native libraries are loaded
    * **version** - Show internal version of Ozone components
      

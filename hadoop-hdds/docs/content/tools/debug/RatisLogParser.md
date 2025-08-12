@@ -22,7 +22,7 @@ weight: 5
   limitations under the License.
 -->
 
-The Ratis log parser tool takes a segment file as input, and give the output in a human understandable format.
+The Ratis log parser tool takes a segment file as input, and give the output in a human-readable format.
 It has the following subcommands, which can be used to parse the Ratis logs of different components:
 
 ```bash

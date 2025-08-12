@@ -22,7 +22,7 @@ weight: 4
   limitations under the License.
 -->
 
-Debug commands for retrieving information and performing various checks on the replicas in datanodes.
+Debug commands for retrieving information and performing various checks on the key replicas in datanodes.
 
 ```bash
 Usage: ozone debug replicas [--verbose] [COMMAND]
