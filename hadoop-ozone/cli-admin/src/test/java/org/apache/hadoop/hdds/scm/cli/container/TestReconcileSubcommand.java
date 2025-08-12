@@ -198,7 +198,7 @@ public class TestReconcileSubcommand {
 
     assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + EC_CONTAINER_MESSAGE);
 
-    assertThat(exception.getMessage()).contains("Failed trigger reconciliation for 1 containers");
+    assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 containers");
 
     // Should have no successful reconcile output
     assertThatOutput(outContent).doesNotContain("Reconciliation has been triggered for container 1");
@@ -263,7 +263,7 @@ public class TestReconcileSubcommand {
     assertThatOutput(errContent).doesNotContain("Failed to trigger reconciliation for container 2");
 
     // Exception message should indicate 2 failed containers
-    assertThat(exception.getMessage()).contains("Failed trigger reconciliation for 2 containers");
+    assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 2 containers");
 
     // Should have reconcile success output for container 2 (Ratis) only
     validateReconcileOutput(2);
@@ -312,7 +312,7 @@ public class TestReconcileSubcommand {
     assertThrows(RuntimeException.class, () -> parseArgsAndExecute("--status", "123", "456"));
     
     // Should have error messages for unreachable containers
-    assertThatOutput(errContent).contains("Failed get reconciliation status of container 456: " + exceptionMessage);
+    assertThatOutput(errContent).contains("Failed to get reconciliation status of container 456: " + exceptionMessage);
     assertThatOutput(errContent).doesNotContain("123");
     validateStatusOutput(true, 123);
 

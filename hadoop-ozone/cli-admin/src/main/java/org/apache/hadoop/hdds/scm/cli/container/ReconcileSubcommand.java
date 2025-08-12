@@ -96,7 +96,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
       arrayWriter.write(new ContainerWrapper(containerInfo, replicas));
       arrayWriter.flush();
     } catch (Exception ex) {
-      System.err.println("Failed get reconciliation status of container " + containerID + ": " + ex.getMessage());
+      System.err.println("Failed to get reconciliation status of container " + containerID + ": " + ex.getMessage());
       return false;
     }
     return true;
@@ -116,7 +116,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
       }
     }
     if (failureCount > 0) {
-      throw new RuntimeException("Failed trigger reconciliation for " + failureCount + " containers");
+      throw new RuntimeException("Failed to trigger reconciliation for " + failureCount + " containers");
     }
   }
 
