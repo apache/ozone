@@ -67,6 +67,7 @@ public class RebuildSubCommand implements Callable<Void> {
           connectionFactory.openConnection(new URL(url.toString()),
               parent.isHTTPSEnabled());
       httpURLConnection.setRequestMethod("POST");
+      httpURLConnection.setRequestProperty("X-Requested-With", "OzoneAdminCLI");
       httpURLConnection.setDoOutput(true);
       httpURLConnection.connect();
       
@@ -114,6 +115,9 @@ public class RebuildSubCommand implements Callable<Void> {
             break;
           case "RECON_INITIALIZING":
             System.out.println("Recon is being initialized. Please wait a moment.");
+            break;
+          case "FORBIDDEN":
+            System.err.println("Access denied: " + message);
             break;
           default:
             System.err.println("Unexpected response: " + message);

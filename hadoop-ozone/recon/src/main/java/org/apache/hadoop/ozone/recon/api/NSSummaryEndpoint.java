@@ -21,6 +21,7 @@ import java.io.IOException;
 import javax.inject.Inject;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -199,11 +200,20 @@ public class NSSummaryEndpoint {
   /**
    * Endpoint to trigger a namespace summary rebuild operation.
    * This will clear the existing namespace summary data and rebuild it from OM data.
+   * Requires X-Requested-With header to prevent CSRF attacks and browser access.
+   * @param requestedWith The X-Requested-With header value
    * @return Response indicating the rebuild status
    */
   @POST
   @Path("/rebuild")
-  public Response triggerNamespaceRebuild() {
+  public Response triggerNamespaceRebuild(@HeaderParam("X-Requested-With") String requestedWith) {
+    // Require specific header to prevent browser-based requests
+    if (!"OzoneAdminCLI".equals(requestedWith)) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("{\"status\":\"FORBIDDEN\",\"message\":\"This endpoint requires OzoneAdminCLI access\"}")
+          .build();
+    }
+    
     if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
       return Response.status(Response.Status.SERVICE_UNAVAILABLE)
           .entity("{\"status\":\"RECON_INITIALIZING\",\"message\":\"Recon is being initialized. Please wait a moment\"}")
