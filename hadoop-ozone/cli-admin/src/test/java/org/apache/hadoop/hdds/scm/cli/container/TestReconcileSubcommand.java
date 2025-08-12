@@ -434,7 +434,10 @@ public class TestReconcileSubcommand {
         DatanodeDetails expectedDnDetails = expectedReplica.getDatanodeDetails();
 
         assertEquals(expectedDnDetails.getHostName(), dnOutput.get("hostname"));
-        assertEquals(expectedDnDetails.getUuidString(), dnOutput.get("uuid"));
+        assertEquals(expectedDnDetails.getUuidString(), dnOutput.get("id"));
+        assertEquals(expectedDnDetails.getIpAddress(), dnOutput.get("ipAddress"));
+        // Datanode output should be brief and only contain the above three identifiers.
+        assertEquals(3, dnOutput.size());
       }
     }
   }
@@ -469,6 +472,7 @@ public class TestReconcileSubcommand {
       DatanodeDetails dn = DatanodeDetails.newBuilder()
           .setHostName("dn")
           .setUuid(UUID.randomUUID())
+          .setIpAddress("127.0.0.1")
           .build();
 
       ContainerReplicaInfo.Builder replicaBuilder = new ContainerReplicaInfo.Builder()

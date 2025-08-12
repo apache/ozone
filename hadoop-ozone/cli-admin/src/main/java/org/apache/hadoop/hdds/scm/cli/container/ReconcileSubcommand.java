@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.container;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.io.IOException;
@@ -208,20 +209,26 @@ public class ReconcileSubcommand extends ScmSubcommand {
   }
 
   private static class DatanodeWrapper {
-    private final String hostname;
-    private final String uuid;
+    private final DatanodeDetails dnDetails;
 
     DatanodeWrapper(DatanodeDetails dnDetails) {
-      this.hostname = dnDetails.getHostName();
-      this.uuid = dnDetails.getUuidString();
+      this.dnDetails = dnDetails;
     }
 
+    @JsonProperty(index = 5)
+    public String getID() {
+      return dnDetails.getUuidString();
+    }
+
+    @JsonProperty(index = 10)
     public String getHostname() {
-      return hostname;
+      return dnDetails.getHostName();
     }
 
-    public String getUuid() {
-      return uuid;
+    // Without specifying a value, Jackson will try to serialize this as "ipaddress".
+    @JsonProperty(index = 15, value = "ipAddress")
+    public String getIPAddress() {
+      return dnDetails.getIpAddress();
     }
   }
 }
