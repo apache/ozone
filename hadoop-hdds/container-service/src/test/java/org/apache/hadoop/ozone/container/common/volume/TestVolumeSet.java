@@ -263,11 +263,6 @@ public class TestVolumeSet {
       assertThat(volume.getVolumeUsage()).isPresent();
       volume.getCurrentUsage();
     }
-
-    metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 0, metricsRecords);
-    assertGauge("NumHealthyVolumes", 0, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
   }
 
   @Test
@@ -289,11 +284,6 @@ public class TestVolumeSet {
     assertGauge("NumHealthyVolumes", 1, metricsRecords);
     assertGauge("NumFailedVolumes", 1, metricsRecords);
     volSet.shutdown();
-
-    metricsRecords = getMetrics(volSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 1, metricsRecords);
-    assertGauge("NumHealthyVolumes", 0, metricsRecords);
-    assertGauge("NumFailedVolumes", 1, metricsRecords);
   }
 
   @Test

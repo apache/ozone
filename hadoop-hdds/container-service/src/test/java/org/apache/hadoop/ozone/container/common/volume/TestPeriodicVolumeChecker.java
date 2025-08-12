@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.HEALTHY;
 import static org.apache.hadoop.ozone.container.common.volume.TestStorageVolumeChecker.makeVolumes;
+import static org.apache.ozone.test.MetricsAsserts.assertGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
@@ -29,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.util.FakeTimer;
@@ -79,6 +82,8 @@ public class TestPeriodicVolumeChecker {
 
     StorageVolumeChecker volumeChecker = new StorageVolumeChecker(conf, timer, "");
     StorageVolumeScannerMetrics metrics = volumeChecker.getMetrics();
+    MetricsRecordBuilder volumeHealthMetrics = getMetrics(volumeSet.getVolumeHealthMetrics());
+    MetricsRecordBuilder metaVolumeHealthMetrics = getMetrics(metaVolumeSet.getVolumeHealthMetrics());
 
     try {
       volumeChecker.registerVolumeSet(new ImmutableVolumeSet(makeVolumes(2, HEALTHY)));
@@ -91,6 +96,12 @@ public class TestPeriodicVolumeChecker {
       assertEquals(0, metrics.getNumDataVolumeScans());
       assertEquals(0, metrics.getNumMetadataVolumeScans());
       assertEquals(0, metrics.getNumVolumesScannedInLastIteration());
+      assertGauge("TotalVolumes", 1, volumeHealthMetrics);
+      assertGauge("NumHealthyVolumes", 1, volumeHealthMetrics);
+      assertGauge("NumFailedVolumes", 0, volumeHealthMetrics);
+      assertGauge("TotalVolumes", 1, metaVolumeHealthMetrics);
+      assertGauge("NumHealthyVolumes", 1, metaVolumeHealthMetrics);
+      assertGauge("NumFailedVolumes", 0, metaVolumeHealthMetrics);
 
       // first round
       timer.advance(gap.toMillis() / 3);
@@ -101,6 +112,12 @@ public class TestPeriodicVolumeChecker {
       assertEquals(1, metrics.getNumMetadataVolumeScans());
       assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
       assertEquals(0, metrics.getNumIterationsSkipped());
+      assertGauge("TotalVolumes", 1, volumeHealthMetrics);
+      assertGauge("NumHealthyVolumes", 1, volumeHealthMetrics);
+      assertGauge("NumFailedVolumes", 0, volumeHealthMetrics);
+      assertGauge("TotalVolumes", 1, metaVolumeHealthMetrics);
+      assertGauge("NumHealthyVolumes", 1, metaVolumeHealthMetrics);
+      assertGauge("NumFailedVolumes", 0, metaVolumeHealthMetrics);
 
       // periodic disk checker next round within gap
       timer.advance(gap.toMillis() / 3);
@@ -112,6 +129,12 @@ public class TestPeriodicVolumeChecker {
       assertEquals(1, metrics.getNumMetadataVolumeScans());
       assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
       assertEquals(1, metrics.getNumIterationsSkipped());
+      assertGauge("TotalVolumes", 1, volumeHealthMetrics);
+      assertGauge("NumHealthyVolumes", 1, volumeHealthMetrics);
+      assertGauge("NumFailedVolumes", 0, volumeHealthMetrics);
+      assertGauge("TotalVolumes", 1, metaVolumeHealthMetrics);
+      assertGauge("NumHealthyVolumes", 1, metaVolumeHealthMetrics);
+      assertGauge("NumFailedVolumes", 0, metaVolumeHealthMetrics);
 
       // periodic disk checker next round
       timer.advance(interval.toMillis());
@@ -122,6 +145,12 @@ public class TestPeriodicVolumeChecker {
       assertEquals(2, metrics.getNumMetadataVolumeScans());
       assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
       assertEquals(1, metrics.getNumIterationsSkipped());
+      assertGauge("TotalVolumes", 1, volumeHealthMetrics);
+      assertGauge("NumHealthyVolumes", 1, volumeHealthMetrics);
+      assertGauge("NumFailedVolumes", 0, volumeHealthMetrics);
+      assertGauge("TotalVolumes", 1, metaVolumeHealthMetrics);
+      assertGauge("NumHealthyVolumes", 1, metaVolumeHealthMetrics);
+      assertGauge("NumFailedVolumes", 0, metaVolumeHealthMetrics);
     } finally {
       volumeChecker.shutdownAndWait(1, TimeUnit.SECONDS);
     }

@@ -421,8 +421,6 @@ public class MutableVolumeSet implements VolumeSet {
   public void shutdown() {
     for (StorageVolume volume : volumeMap.values()) {
       try {
-        volumeHealthMetrics.decrementTotalVolumes();
-        volumeHealthMetrics.decrementHealthyVolumes();
         volume.shutdown();
       } catch (Exception ex) {
         LOG.error("Failed to shutdown volume : " + volume.getStorageDir(), ex);
