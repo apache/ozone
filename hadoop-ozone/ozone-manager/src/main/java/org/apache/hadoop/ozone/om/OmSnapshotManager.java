@@ -840,12 +840,11 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   public static String getSnapshotLocalPropertyYamlPath(OMMetadataManager omMetadataManager,
       SnapshotInfo snapshotInfo) {
-    return getSnapshotPath(omMetadataManager, snapshotInfo) + ".yaml";
+    return getSnapshotLocalPropertyYamlPath(getSnapshotPath(omMetadataManager, snapshotInfo));
   }
 
-  public static String getSnapshotLocalPropertyYamlPath(OzoneConfiguration conf,
-      SnapshotInfo snapshotInfo) {
-    return getSnapshotPath(conf, snapshotInfo) + ".yaml";
+  public static String getSnapshotLocalPropertyYamlPath(Path snapshotPath) {
+    return snapshotPath + ".yaml";
   }
 
   public static boolean isSnapshotKey(String[] keyParts) {
