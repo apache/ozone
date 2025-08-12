@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.debug.replicas;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.io.IOException;
+import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
@@ -45,6 +47,22 @@ public class ContainerStateVerifier implements ReplicaVerifier {
   private final XceiverClientManager xceiverClientManager;
   // cache for container info and encodedToken from the SCM
   private final Cache<Long, ContainerInfoToken> encodedTokenCache;
+
+  private static final Set<ContainerDataProto.State> GOOD_REPLICA_STATES =
+      EnumSet.of(
+          ContainerDataProto.State.OPEN,
+          ContainerDataProto.State.CLOSING,
+          ContainerDataProto.State.QUASI_CLOSED,
+          ContainerDataProto.State.CLOSED
+      );
+
+  private static final Set<HddsProtos.LifeCycleState> GOOD_CONTAINER_STATES =
+      EnumSet.of(
+          HddsProtos.LifeCycleState.OPEN,
+          HddsProtos.LifeCycleState.CLOSING,
+          HddsProtos.LifeCycleState.QUASI_CLOSED,
+          HddsProtos.LifeCycleState.CLOSED
+      );
 
   public ContainerStateVerifier(OzoneConfiguration conf, long containerCacheSize) throws IOException {
     containerOperationClient = new ContainerOperationClient(conf);
@@ -99,17 +117,8 @@ public class ContainerStateVerifier implements ReplicaVerifier {
 
   private boolean areContainerAndReplicasInGoodState(ContainerDataProto.State replicaState,
       HddsProtos.LifeCycleState containerState) {
-    boolean replicaInGoodState = (replicaState == ContainerDataProto.State.OPEN ||
-        replicaState == ContainerDataProto.State.CLOSING ||
-        replicaState == ContainerDataProto.State.QUASI_CLOSED ||
-        replicaState == ContainerDataProto.State.CLOSED);
-    
-    boolean containerInGoodState = (containerState == HddsProtos.LifeCycleState.OPEN ||
-        containerState == HddsProtos.LifeCycleState.CLOSING ||
-        containerState == HddsProtos.LifeCycleState.QUASI_CLOSED ||
-        containerState == HddsProtos.LifeCycleState.CLOSED);
-    
-    return replicaInGoodState && containerInGoodState;
+    return GOOD_REPLICA_STATES.contains(replicaState) &&
+        GOOD_CONTAINER_STATES.contains(containerState);
   }
 
   private ContainerDataProto fetchContainerDataFromDatanode(DatanodeDetails dn, long containerId,
