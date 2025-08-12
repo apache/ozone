@@ -591,7 +591,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      */
     protected StorageContainerManager createSCM()
         throws IOException, AuthenticationException {
-      configureSCM();
+      configureSCM(false);
 
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
@@ -650,7 +650,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      */
     protected OzoneManager createOM()
         throws IOException, AuthenticationException {
-      configureOM();
+      configureOM(false);
       OMStorage omStore = new OMStorage(conf);
       initializeOmStorage(omStore);
       return OzoneManager.createOm(conf);
@@ -696,7 +696,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       return hddsDatanodes;
     }
 
-    protected void configureSCM() throws IOException {
+    protected void configureSCM(boolean isHA) throws IOException {
       conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
           localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
@@ -714,25 +714,28 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       Path scmMetaDir = Paths.get(path, SCM_SUBDIR_NAME);
       Files.createDirectories(scmMetaDir.resolve(DATA_SUBDIR_NAME));
 
-      // e.g. when path is /var/lib/hadoop-ozone
-      // ozone.scm.ha.ratis.storage.dir = /var/lib/hadoop-ozone/scm/ratis
-      conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR,
-          scmMetaDir.resolve(RATIS_SUBDIR_NAME).toString());
+      // Extra configs for non-HA SCM
+      if (!isHA) {
+        // e.g. when path is /var/lib/hadoop-ozone
+        // ozone.scm.ha.ratis.storage.dir = /var/lib/hadoop-ozone/scm/ratis
+        conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR,
+            scmMetaDir.resolve(RATIS_SUBDIR_NAME).toString());
 
-      // ozone.scm.ha.ratis.snapshot.dir = /var/lib/hadoop-ozone/scm/ozone-metadata/snapshot
-      conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR,
-          scmMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
+        // ozone.scm.ha.ratis.snapshot.dir = /var/lib/hadoop-ozone/scm/ozone-metadata/snapshot
+        conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR,
+            scmMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
 
-      // ozone.scm.db.dirs = /var/lib/hadoop-ozone/scm/data
-      conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
-          scmMetaDir.resolve(DATA_SUBDIR_NAME).toString());
+        // ozone.scm.db.dirs = /var/lib/hadoop-ozone/scm/data
+        conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
+            scmMetaDir.resolve(DATA_SUBDIR_NAME).toString());
 
-      // ozone.http.basedir = /var/lib/hadoop-ozone/scm/ozone-metadata/webserver
-      conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
-          scmMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME) + SERVER_DIR);
+        // ozone.http.basedir = /var/lib/hadoop-ozone/scm/ozone-metadata/webserver
+        conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+            scmMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME) + SERVER_DIR);
+      }
     }
 
-    private void configureOM() throws IOException {
+    private void configureOM(boolean isHA) throws IOException {
       conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, localhostWithFreePort());
       conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, localhostWithFreePort());
       conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY,
@@ -742,27 +745,30 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       Path omMetaDir = Paths.get(path, OM_SUBDIR_NAME);
       Files.createDirectories(omMetaDir.resolve(DATA_SUBDIR_NAME));
 
-      // e.g. when path is /var/lib/hadoop-ozone
-      // ozone.om.ratis.storage.dir = /var/lib/hadoop-ozone/om/ratis
-      conf.set(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR,
-          omMetaDir.resolve(RATIS_SUBDIR_NAME).toString());
+      // Extra configs for non-HA OM
+      if (!isHA) {
+        // e.g. when path is /var/lib/hadoop-ozone
+        // ozone.om.ratis.storage.dir = /var/lib/hadoop-ozone/om/ratis
+        conf.set(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR,
+            omMetaDir.resolve(RATIS_SUBDIR_NAME).toString());
 
-      // ozone.om.ratis.snapshot.dir = /var/lib/hadoop-ozone/om/ozone-metadata/snapshot
-      conf.set(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR,
-          omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
+        // ozone.om.ratis.snapshot.dir = /var/lib/hadoop-ozone/om/ozone-metadata/snapshot
+        conf.set(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR,
+            omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
 
-      // ozone.om.db.dirs = /var/lib/hadoop-ozone/om/data
-      conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-          omMetaDir.resolve(DATA_SUBDIR_NAME).toString());
+        // ozone.om.db.dirs = /var/lib/hadoop-ozone/om/data
+        conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
+            omMetaDir.resolve(DATA_SUBDIR_NAME).toString());
 
-      // ozone.om.snapshot.diff.db.dir = /var/lib/hadoop-ozone/om/ozone-metadata
-      // actual dir would be /var/lib/hadoop-ozone/om/ozone-metadata/db.snapdiff
-      conf.set(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR,
-          omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).toString());
+        // ozone.om.snapshot.diff.db.dir = /var/lib/hadoop-ozone/om/ozone-metadata
+        // actual dir would be /var/lib/hadoop-ozone/om/ozone-metadata/db.snapdiff
+        conf.set(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR,
+            omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).toString());
 
-      // ozone.http.basedir = /var/lib/hadoop-ozone/om/ozone-metadata/webserver
-      conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
-          omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME) + SERVER_DIR);
+        // ozone.http.basedir = /var/lib/hadoop-ozone/om/ozone-metadata/webserver
+        conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+            omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME) + SERVER_DIR);
+      }
     }
 
   }
