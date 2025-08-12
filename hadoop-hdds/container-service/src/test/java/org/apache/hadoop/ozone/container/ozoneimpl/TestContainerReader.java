@@ -553,12 +553,17 @@ public class TestContainerReader {
     assertTrue(Files.exists(Paths.get(ec2.getContainerData().getContainerPath())));
     assertNotNull(containerSet.getContainer(3));
 
-    // For EC conflict with different replica index, one with matching db replica should exist
+    // For EC conflict with different replica index, all container present but containerSet loaded with same
+    // replica index as the one in DB.
     assertTrue(Files.exists(Paths.get(ec3.getContainerData().getContainerPath())));
-    assertFalse(Files.exists(Paths.get(ec4.getContainerData().getContainerPath())));
+    assertTrue(Files.exists(Paths.get(ec4.getContainerData().getContainerPath())));
+    assertEquals(containerSet.getContainer(ec3.getContainerData().getContainerID()).getContainerData()
+        .getReplicaIndex(), ec3.getContainerData().getReplicaIndex());
 
-    assertFalse(Files.exists(Paths.get(ec5.getContainerData().getContainerPath())));
+    assertTrue(Files.exists(Paths.get(ec5.getContainerData().getContainerPath())));
     assertTrue(Files.exists(Paths.get(ec6.getContainerData().getContainerPath())));
+    assertEquals(containerSet.getContainer(ec6.getContainerData().getContainerID()).getContainerData()
+        .getReplicaIndex(), ec6.getContainerData().getReplicaIndex());
 
     // for EC container whose entry in DB with replica index -1, is allowed to be loaded
     assertTrue(Files.exists(Paths.get(ec7.getContainerData().getContainerPath())));

@@ -274,8 +274,10 @@ public class ContainerReader implements Runnable {
       ContainerCreateInfo containerCreateInfo = containerMetadataStore.getContainerCreateInfoTable()
           .get(ContainerID.valueOf(kvContainer.getContainerData().getContainerID()));
       // check for EC container replica index matching if db entry is present for container as last loaded,
-      // and delete if not matched, ignoring replica index -1 as no previous replica index information
-      if (null != containerCreateInfo && containerCreateInfo.getReplicaIndex() >= 0
+      // and ignore loading container if not matched.
+      // Ignore matching container replica index -1 in db as no previous replica index
+      if (null != containerCreateInfo
+          && containerCreateInfo.getReplicaIndex() != ContainerCreateInfo.INVALID_REPLICA_INDEX
           && containerCreateInfo.getReplicaIndex() != kvContainer.getContainerData().getReplicaIndex()) {
         LOG.info("EC Container {} with replica index {} present at path {} is not matched with DB replica index {}," +
                 " deleting the container data.",
@@ -283,7 +285,6 @@ public class ContainerReader implements Runnable {
             kvContainer.getContainerData().getReplicaIndex(),
             kvContainer.getContainerData().getContainerPath(),
             containerCreateInfo.getReplicaIndex());
-        KeyValueContainerUtil.removeContainer(kvContainer.getContainerData(), hddsVolume.getConf());
         return false;
       }
     }

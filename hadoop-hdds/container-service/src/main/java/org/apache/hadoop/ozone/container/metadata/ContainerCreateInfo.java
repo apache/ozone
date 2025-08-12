@@ -31,6 +31,7 @@ import org.apache.ratis.util.MemoizedSupplier;
  */
 @Immutable
 public final class ContainerCreateInfo {
+  public static final int INVALID_REPLICA_INDEX = -1;
   private static final Codec<ContainerCreateInfo> CODEC = new DelegatedCodec<>(
       Proto3Codec.get(ContainerProtos.ContainerCreateInfo.getDefaultInstance()),
       ContainerCreateInfo::getFromProtobuf, ContainerCreateInfo::getProtobuf,
