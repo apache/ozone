@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
+import org.apache.hadoop.ozone.container.checksum.BlockMerkleTreeWriter.ChunkMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -98,14 +99,22 @@ public class ContainerChecksumTreeManager {
     try {
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
 
-      // Get existing deleted blocks to include in checksum calculation
-      List<ContainerProtos.BlockMerkleTree> deletedBlocks = checksumInfoBuilder.getDeletedBlocksList();
-
       ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
-          () -> tree.toProto(deletedBlocks));
+          tree::toProto);
       checksumInfoBuilder
           .setContainerID(containerID)
           .setContainerMerkleTree(treeProto);
+      if (tree.hasDeletedBlocks()) {
+        Collection<ContainerProtos.BlockMerkleTree> allDeletedBlocks =
+            new ArrayList<>(checksumInfoBuilder.getDeletedBlocksList());
+        allDeletedBlocks.addAll(tree.getDeletedBlocks());
+        Map<Long, ContainerProtos.BlockMerkleTree> sortedDeletedBlocks = allDeletedBlocks.stream()
+            .collect(Collectors.toMap(ContainerProtos.BlockMerkleTree::getBlockID,
+                Function.identity(),
+                (a, b) -> b,
+                TreeMap::new));
+        checksumInfoBuilder.addAllDeletedBlocks(sortedDeletedBlocks.values());
+      }
       checksumInfo = checksumInfoBuilder.build();
       write(data, checksumInfo);
       LOG.debug("Data merkle tree for container {} updated with container checksum {}", containerID,
@@ -120,10 +129,43 @@ public class ContainerChecksumTreeManager {
    * Helper method to create a BlockMerkleTree from BlockData with proper checksum.
    */
   public static ContainerProtos.BlockMerkleTree createBlockMerkleTreeFromBlockData(BlockData blockData) {
-    ContainerMerkleTreeWriter.BlockMerkleTreeWriter blockMerkleTreeWriter = new ContainerMerkleTreeWriter
-        .BlockMerkleTreeWriter(blockData.getLocalID());
+    BlockMerkleTreeWriter blockMerkleTreeWriter = new BlockMerkleTreeWriter(blockData.getLocalID());
     blockMerkleTreeWriter.addChunks(blockData.getChunks());
     return blockMerkleTreeWriter.toProto();
+  }
+
+  /**
+   * Merges child chunk information from two deleted blocks with different checksums.
+   * This handles cases where a peer deletes a block that is completely missing some chunks
+   * so that the checksums can still converge.
+   * 
+   * @param ourDeletedBlock Our version of the deleted block
+   * @param peerDeletedBlock Peer's version of the deleted block
+   * @return A merged BlockMerkleTree with combined chunk information
+   */
+  public static ContainerProtos.BlockMerkleTree mergeDeletedBlockChunks(
+      ContainerProtos.BlockMerkleTree ourDeletedBlock,
+      ContainerProtos.BlockMerkleTree peerDeletedBlock) {
+    
+    if (ourDeletedBlock.getBlockID() != peerDeletedBlock.getBlockID()) {
+      throw new IllegalArgumentException("Cannot merge blocks with different IDs: " +
+          ourDeletedBlock.getBlockID() + " vs " + peerDeletedBlock.getBlockID());
+    }
+
+    // Use BlockMerkleTreeWriter to merge chunks properly
+    BlockMerkleTreeWriter mergedWriter = new BlockMerkleTreeWriter(ourDeletedBlock.getBlockID());
+    
+    // Add chunks from our block
+    for (ContainerProtos.ChunkMerkleTree chunk : ourDeletedBlock.getChunkMerkleTreeList()) {
+      mergedWriter.addChunks(new ChunkMerkleTreeWriter(chunk));
+    }
+    
+    // Add chunks from peer block (this will overwrite any chunks at the same offset)
+    for (ContainerProtos.ChunkMerkleTree chunk : peerDeletedBlock.getChunkMerkleTreeList()) {
+      mergedWriter.addChunks(new ChunkMerkleTreeWriter(chunk));
+    }
+    
+    return mergedWriter.toProto();
   }
 
   /**
@@ -132,12 +174,18 @@ public class ContainerChecksumTreeManager {
    * Concurrent writes to the same file are coordinated internally.
    */
   public void markBlocksAsDeleted(KeyValueContainerData data,
-                                  Collection<ContainerProtos.BlockMerkleTree> deletedBlocks) throws IOException {
+                                  Collection<BlockData> deletedBlockData) throws IOException {
     long containerID = data.getContainerID();
     Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
       ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
+
+      // Convert BlockData objects to BlockMerkleTree objects
+      Collection<ContainerProtos.BlockMerkleTree> deletedBlocks = new ArrayList<>();
+      for (BlockData blockData : deletedBlockData) {
+        deletedBlocks.add(createBlockMerkleTreeFromBlockData(blockData));
+      }
 
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
@@ -150,7 +198,7 @@ public class ContainerChecksumTreeManager {
       Map<Long, ContainerProtos.BlockMerkleTree> sortedDeletedBlocks = allDeletedBlocks.stream()
           .collect(Collectors.toMap(ContainerProtos.BlockMerkleTree::getBlockID,
               Function.identity(),
-              (a, b) -> a,
+              (a, b) -> b,
               TreeMap::new));
 
       checksumInfoBuilder
@@ -160,7 +208,7 @@ public class ContainerChecksumTreeManager {
 
       write(data, checksumInfoBuilder.build());
       LOG.debug("Deleted block list for container {} updated with {} new blocks", data.getContainerID(),
-          sortedDeletedBlocks.size());
+          deletedBlocks.size());
     } finally {
       writeLock.unlock();
     }
@@ -168,13 +216,12 @@ public class ContainerChecksumTreeManager {
 
   /**
    * Compares the checksum info of the container with the peer's checksum info and returns a report of the differences.
+   * This method is read-only and does not modify any container state.
    * @param thisChecksumInfo The checksum info of the container on this datanode.
    * @param peerChecksumInfo The checksum info of the container on the peer datanode.
-   * @param containerData The container data to update with peer deleted blocks if needed.
    */
   public ContainerDiffReport diff(ContainerProtos.ContainerChecksumInfo thisChecksumInfo,
-                                  ContainerProtos.ContainerChecksumInfo peerChecksumInfo,
-                                  KeyValueContainerData containerData) throws
+                                  ContainerProtos.ContainerChecksumInfo peerChecksumInfo) throws
       StorageContainerException {
 
     ContainerDiffReport report = new ContainerDiffReport(thisChecksumInfo.getContainerID());
@@ -188,7 +235,7 @@ public class ContainerChecksumTreeManager {
               ContainerProtos.Result.CONTAINER_ID_MISMATCH);
         }
 
-        compareContainerMerkleTree(thisChecksumInfo, peerChecksumInfo, report, containerData);
+        compareContainerMerkleTree(thisChecksumInfo, peerChecksumInfo, report);
       });
     } catch (IOException ex) {
       metrics.incrementMerkleTreeDiffFailures();
@@ -210,8 +257,7 @@ public class ContainerChecksumTreeManager {
 
   private void compareContainerMerkleTree(ContainerProtos.ContainerChecksumInfo thisChecksumInfo,
                                           ContainerProtos.ContainerChecksumInfo peerChecksumInfo,
-                                          ContainerDiffReport report,
-                                          KeyValueContainerData containerData) {
+                                          ContainerDiffReport report) {
     ContainerProtos.ContainerMerkleTree thisMerkleTree = thisChecksumInfo.getContainerMerkleTree();
     ContainerProtos.ContainerMerkleTree peerMerkleTree = peerChecksumInfo.getContainerMerkleTree();
     Set<Long> thisDeletedBlockSet = getDeletedBlockIDs(thisChecksumInfo);
@@ -247,13 +293,17 @@ public class ContainerChecksumTreeManager {
         boolean peerBlockDeleted = peerDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID());
 
         if (thisBlockDeleted && peerBlockDeleted) {
-          // Both blocks are deleted - check for checksum mismatch and log warning if different
+          // Both blocks are deleted - check for checksum mismatch and add to differences if different
           if (thisBlockMerkleTree.getDataChecksum() != peerBlockMerkleTree.getDataChecksum()) {
-            LOG.warn("Checksum mismatch detected between deleted blocks for block {} in container {}. " +
-                "Our checksum: {}, peer checksum: {}. This indicates the blocks had different checksums " +
-                "when deleted and cannot be resolved.",
+            LOG.info("Checksum mismatch detected between deleted blocks for block {} in container {}. " +
+                "Our checksum: {}, peer checksum: {}. Merging chunk information to converge checksums.",
                 thisBlockMerkleTree.getBlockID(), thisChecksumInfo.getContainerID(),
                 thisBlockMerkleTree.getDataChecksum(), peerBlockMerkleTree.getDataChecksum());
+            
+            // Merge the deleted blocks and add to differences for caller to handle
+            ContainerProtos.BlockMerkleTree mergedBlock = mergeDeletedBlockChunks(
+                thisBlockMerkleTree, peerBlockMerkleTree);
+            report.addDeletedBlockDifference(mergedBlock);
           }
         } else if (!thisBlockDeleted && !peerBlockDeleted &&
             thisBlockMerkleTree.getDataChecksum() != peerBlockMerkleTree.getDataChecksum()) {
@@ -288,26 +338,12 @@ public class ContainerChecksumTreeManager {
     // us when they reconcile.
 
     // Check for peer deleted blocks that we don't have (either in our tree or our deleted list)
-    // These blocks were deleted before upgrading to reconciliation and need to be added to our deleted list
-    List<ContainerProtos.BlockMerkleTree> peerDeletedBlocksToAdd = new ArrayList<>();
+    // These blocks were deleted before upgrading to reconciliation and should be reported as differences
     for (ContainerProtos.BlockMerkleTree peerDeletedBlock : peerChecksumInfo.getDeletedBlocksList()) {
       if (!thisAllBlockIDs.contains(peerDeletedBlock.getBlockID())) {
-        peerDeletedBlocksToAdd.add(peerDeletedBlock);
-        LOG.info("Found peer deleted block {} that we don't have in container {}. Adding to our deleted block list.",
-            peerDeletedBlock.getBlockID(), containerData.getContainerID());
-      }
-    }
-
-    // Directly add peer deleted blocks to our container's deleted block list
-    if (!peerDeletedBlocksToAdd.isEmpty()) {
-      try {
-        // The deleted blocks added will update the checksum when we call updateAndGetContainerChecksum
-        markBlocksAsDeleted(containerData, peerDeletedBlocksToAdd);
-        LOG.info("Added {} peer deleted blocks to container {} deleted block list to converge checksums",
-            peerDeletedBlocksToAdd.size(), containerData.getContainerID());
-      } catch (IOException e) {
-        LOG.error("Failed to add peer deleted blocks to container {} deleted block list",
-            containerData.getContainerID(), e);
+        LOG.info("Found peer deleted block {} that we don't have in container {}. Adding to differences report.",
+            peerDeletedBlock.getBlockID(), thisChecksumInfo.getContainerID());
+        report.addDeletedBlockDifference(peerDeletedBlock);
       }
     }
   }

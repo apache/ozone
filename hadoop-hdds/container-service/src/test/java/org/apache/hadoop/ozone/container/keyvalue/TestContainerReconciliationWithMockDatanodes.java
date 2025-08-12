@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager.createBlockMerkleTreeFromBlockData;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
@@ -322,12 +321,11 @@ public class TestContainerReconciliationWithMockDatanodes {
 
     // Simulate peer having deleted blocks 7-9
     KeyValueContainer peerContainer = peerDatanode.getContainer(newContainerID);
-    List<ContainerProtos.BlockMerkleTree> peerDeletedBlocks = new ArrayList<>();
+    List<BlockData> peerDeletedBlocks = new ArrayList<>();
     for (long blockId = 7; blockId < 10; blockId++) {
       BlockData block = peerDatanode.handler.getBlockManager().getBlock(peerContainer,
           new BlockID(newContainerID, blockId));
-      ContainerProtos.BlockMerkleTree deletedBlockTree = createBlockMerkleTreeFromBlockData(block);
-      peerDeletedBlocks.add(deletedBlockTree);
+      peerDeletedBlocks.add(block);
     }
 
     // Add peer's deleted blocks to its container metadata

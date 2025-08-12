@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.createBlockMerkleTreesFromIds;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.createBlockDataFromIds;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getKeyValueHandler;
@@ -633,7 +633,7 @@ public class TestContainerReader {
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
     ContainerChecksumTreeManager checksumManager = keyValueHandler.getChecksumManager();
     List<Long> deletedBlockIds = Arrays.asList(1L, 2L, 3L);
-    List<ContainerProtos.BlockMerkleTree> deletedBlocks = createBlockMerkleTreesFromIds(deletedBlockIds);
+    List<BlockData> deletedBlocks = createBlockDataFromIds(containerData.getContainerID(), deletedBlockIds);
     checksumManager.markBlocksAsDeleted(containerData, deletedBlocks);
     keyValueHandler.updateContainerChecksum(container, treeWriter);
     long expectedDataChecksum = checksumManager.read(containerData).getContainerMerkleTree().getDataChecksum();

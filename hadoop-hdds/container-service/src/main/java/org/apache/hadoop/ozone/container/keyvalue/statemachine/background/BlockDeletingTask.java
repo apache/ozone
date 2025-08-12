@@ -33,7 +33,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -194,7 +193,7 @@ public class BlockDeletingTask implements BackgroundTask {
         return crr;
       }
 
-      List<ContainerProtos.BlockMerkleTree> succeedDeletedBlocks = new LinkedList<>();
+      List<BlockData> succeedDeletedBlocks = new LinkedList<>();
       List<String> succeedBlockDBKeys = new LinkedList<>();
       LOG.debug("{}, toDeleteBlocks: {}", containerData, toDeleteBlocks.size());
 
@@ -215,10 +214,7 @@ public class BlockDeletingTask implements BackgroundTask {
           handler.deleteBlock(container, entry.getValue());
           releasedBytes += KeyValueContainerUtil.getBlockLength(
               entry.getValue());
-          // Create BlockMerkleTree with proper checksum from BlockData
-          ContainerProtos.BlockMerkleTree deletedBlockTree = 
-              ContainerChecksumTreeManager.createBlockMerkleTreeFromBlockData(entry.getValue());
-          succeedDeletedBlocks.add(deletedBlockTree);
+          succeedDeletedBlocks.add(entry.getValue());
           succeedBlockDBKeys.add(blockName);
         } catch (InvalidProtocolBufferException e) {
           LOG.error("Failed to parse block info for block {}", blockName, e);
@@ -269,7 +265,7 @@ public class BlockDeletingTask implements BackgroundTask {
             succeedBlockDBKeys.size(), releasedBytes,
             Time.monotonicNow() - startTime);
       }
-      crr.addAll(succeedDeletedBlocks.stream().map(ContainerProtos.BlockMerkleTree::getBlockID)
+      crr.addAll(succeedDeletedBlocks.stream().map(BlockData::getLocalID)
           .collect(Collectors.toList()));
       return crr;
     } catch (IOException exception) {
@@ -433,7 +429,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
     // Track deleted blocks to avoid duplicate deletion
     Set<Long> deletedBlockSet = new HashSet<>();
-    List<ContainerProtos.BlockMerkleTree> succeedDeletedBlocks = new LinkedList<>();
+    List<BlockData> succeedDeletedBlocks = new LinkedList<>();
 
     for (DeletedBlocksTransaction entry : delBlocks) {
       for (Long blkLong : entry.getLocalIDList()) {
@@ -467,10 +463,7 @@ public class BlockDeletingTask implements BackgroundTask {
           deleted = true;
           // Track this block as deleted
           deletedBlockSet.add(blkLong);
-          // Create BlockMerkleTree with proper checksum from BlockData
-          ContainerProtos.BlockMerkleTree deletedBlockTree =
-              ContainerChecksumTreeManager.createBlockMerkleTreeFromBlockData(blkInfo);
-          succeedDeletedBlocks.add(deletedBlockTree);
+          succeedDeletedBlocks.add(blkInfo);
         } catch (IOException e) {
           // TODO: if deletion of certain block retries exceed the certain
           //  number of times, service should skip deleting it,

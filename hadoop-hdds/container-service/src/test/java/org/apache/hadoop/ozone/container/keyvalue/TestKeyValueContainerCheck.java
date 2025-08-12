@@ -36,7 +36,6 @@ import java.io.File;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -162,7 +161,7 @@ public class TestKeyValueContainerCheck
     // result here.
     ContainerProtos.ContainerChecksumInfo healthyChecksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
         .setContainerID(containerID)
-        .setContainerMerkleTree(result.getDataTree().toProto(Collections.emptyList()))
+        .setContainerMerkleTree(result.getDataTree().toProto())
         .build();
 
     // Put different types of block failures in the middle of the container.
@@ -201,8 +200,7 @@ public class TestKeyValueContainerCheck
     // This will read the corrupted tree from the disk, which represents the current state of the container, and
     // compare it against the original healthy tree. The diff we get back should match the failures we injected.
     ContainerProtos.ContainerChecksumInfo generatedChecksumInfo = checksumManager.read(container.getContainerData());
-    ContainerDiffReport diffReport = checksumManager.diff(generatedChecksumInfo, healthyChecksumInfo,
-        containerData);
+    ContainerDiffReport diffReport = checksumManager.diff(generatedChecksumInfo, healthyChecksumInfo);
 
     LOG.info("Diff of healthy container with actual container {}", diffReport);
 

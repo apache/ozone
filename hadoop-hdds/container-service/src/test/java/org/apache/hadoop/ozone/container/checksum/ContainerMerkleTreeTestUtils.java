@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,13 +32,13 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -45,6 +46,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -167,7 +172,7 @@ public final class ContainerMerkleTreeTestUtils {
       buildTestTreeWithMismatches(ContainerMerkleTreeWriter originalTree, int numMissingBlocks, int numMissingChunks,
                                   int numCorruptChunks) {
 
-    ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto(Collections.emptyList()).toBuilder();
+    ContainerProtos.ContainerMerkleTree.Builder treeBuilder = originalTree.toProto().toBuilder();
     ContainerDiffReport diff = new ContainerDiffReport(1);
 
     introduceMissingBlocks(treeBuilder, numMissingBlocks, diff);
@@ -354,14 +359,23 @@ public final class ContainerMerkleTreeTestUtils {
     data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
   }
 
-  public static List<ContainerProtos.BlockMerkleTree> createBlockMerkleTreesFromIds(List<Long> blockIDs) {
-    List<ContainerProtos.BlockMerkleTree> blockMerkleTrees = new ArrayList<>();
+  public static List<BlockData> createBlockDataFromIds(long containerId, List<Long> blockIDs)
+      throws OzoneChecksumException {
+    List<BlockData> blockDatas = new ArrayList<>();
     for (Long blockID : blockIDs) {
-      ContainerProtos.BlockMerkleTree blockMerkleTree = ContainerProtos.BlockMerkleTree.newBuilder().setBlockID(blockID)
-          .setDataChecksum(0).build();
-      blockMerkleTrees.add(blockMerkleTree);
+      BlockID block = new BlockID(containerId, blockID);
+      BlockData blockData = new BlockData(block);
+      List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
+      for (int k = 0; k < 5; k++) {
+        long dataLen = 10L;
+        ChunkInfo chunkInfo = ContainerTestHelper.getChunk(blockID, k, k * dataLen, dataLen);
+        ContainerTestHelper.setDataChecksum(chunkInfo, ContainerTestHelper.getData((int) dataLen));
+        chunks.add(chunkInfo.getProtoBufMessage());
+      }
+      blockData.setChunks(chunks);
+      blockDatas.add(blockData);
     }
-    return blockMerkleTrees;
+    return blockDatas;
   }
 
   /**
