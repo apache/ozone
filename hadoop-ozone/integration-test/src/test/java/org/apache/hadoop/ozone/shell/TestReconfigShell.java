@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.net.InetSocketAddress;
 import java.util.Arrays;
@@ -38,7 +39,6 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.service.AbstractKeyDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.NonHATests;
@@ -91,12 +91,11 @@ public abstract class TestReconfigShell implements NonHATests.TestCase {
       InterruptedException, TimeoutException {
     OzoneManager om = cluster().getOzoneManager();
     InetSocketAddress socket = om.getOmRpcServerAddr();
-    LogCapturer dirDeletingServiceLog = LogCapturer.log4j2(AbstractKeyDeletingService.LOG.getName());
     LogCapturer reconfigHandlerLog = LogCapturer.captureLogs(ReconfigurationHandler.class);
 
     String initialInterval = "1m";
     String intervalFromXML = "2m"; //config value set in ozone-site.xml
-    long intervalFromXMLInSeconds = TimeUnit.MINUTES.toSeconds(2); //120 seconds
+    long intervalFromXMLInMillis = TimeUnit.MINUTES.toMillis(2); //120 seconds
 
     reconfigurationHandler.reconfigurePropertyImpl(OZONE_DIR_DELETING_SERVICE_INTERVAL, initialInterval);
     assertThat(reconfigurationHandler.getConf().get(OZONE_DIR_DELETING_SERVICE_INTERVAL)).isEqualTo(initialInterval);
@@ -105,9 +104,8 @@ public abstract class TestReconfigShell implements NonHATests.TestCase {
     executeAndAssertStart("OM", socket);
     GenericTestUtils.waitFor(() -> reconfigHandlerLog.getOutput().contains("Reconfiguration completed"),
         1000, 20000);
-    assertThat(dirDeletingServiceLog.getOutput()).contains(
-        String.format("Updating and restarting DirectoryDeletingService with interval %d %s",
-            intervalFromXMLInSeconds, TimeUnit.SECONDS.name().toLowerCase()));
+
+    assertEquals(intervalFromXMLInMillis, om.getKeyManager().getDirDeletingService().getIntervalMillis());
     assertThat(reconfigurationHandler.getConf().get(OZONE_DIR_DELETING_SERVICE_INTERVAL)).isEqualTo(intervalFromXML);
 
     String address = socket.getHostString() + ":" + socket.getPort();
