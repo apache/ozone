@@ -630,17 +630,28 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 containerData.getLatestDeleteTxnKey(), delTX.getTxID());
       }
 
-      long pendingDeleteBlocks =
-          containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
-      metadataTable
-          .putWithBatch(batchOperation,
-              containerData.getPendingDeleteBlockCountKey(),
-              pendingDeleteBlocks);
+      if (!isDuplicateTransaction(containerData.getContainerID(), containerData, delTX, blockDeleteMetrics)) {
+        long pendingDeleteBlocks =
+            containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
+        metadataTable
+            .putWithBatch(batchOperation,
+                containerData.getPendingDeleteBlockCountKey(),
+                pendingDeleteBlocks);
 
-      // update pending deletion blocks count and delete transaction ID in
-      // in-memory container status
-      containerData.updateDeleteTransactionId(delTX.getTxID());
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
+        // update pending deletion blocks count and delete transaction ID in
+        // in-memory container status
+        long pendingBytes = delTX.getTotalBlockSize();
+        containerData.incrPendingDeletionBlocks(newDeletionBlocks, pendingBytes);
+        metadataTable
+            .putWithBatch(batchOperation,
+                containerData.getPendingDeleteBlockBytesKey(),
+                pendingBytes);
+      }
+
+      //update latest delete transactionid
+      if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
+        containerData.updateDeleteTransactionId(delTX.getTxID());
+      }
     }
   }
 

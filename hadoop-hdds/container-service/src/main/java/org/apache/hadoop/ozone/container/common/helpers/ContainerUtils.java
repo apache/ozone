@@ -329,4 +329,18 @@ public final class ContainerUtils {
           + currentUsage + ", minimum free space spared="  + spared, DISK_OUT_OF_SPACE);
     }
   }
+  
+  public static long getPendingDeletionBytes(ContainerData containerData) {
+    if (containerData.getContainerType()
+        .equals(ContainerProtos.ContainerType.KeyValueContainer)) {
+      return ((KeyValueContainerData) containerData)
+          .getBlockPendingDeletionBytes();
+    } else {
+      // If another ContainerType is available later, implement it
+      throw new IllegalArgumentException(
+          "getPendingDeletionBlocks for ContainerType: " +
+              containerData.getContainerType() +
+              " not support.");
+    }
+  }
 }

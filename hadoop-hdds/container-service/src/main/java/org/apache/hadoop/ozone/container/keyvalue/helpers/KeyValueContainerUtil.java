@@ -26,6 +26,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -313,16 +315,32 @@ public final class KeyValueContainerUtil {
 
     // Set pending deleted block count.
     final long blockPendingDeletion;
+    long blockPendingDeletionBytes = 0L;
+    Long pendingDeletionBlockBytes = metadataTable.get(kvContainerData
+        .getPendingDeleteBlockBytesKey());
     Long pendingDeleteBlockCount =
         metadataTable.get(kvContainerData
             .getPendingDeleteBlockCountKey());
     if (pendingDeleteBlockCount != null) {
       blockPendingDeletion = pendingDeleteBlockCount;
+      if (pendingDeletionBlockBytes != null) {
+        blockPendingDeletionBytes = pendingDeletionBlockBytes;
+      }
     } else {
       // Set pending deleted block count.
       LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
       MetadataKeyFilters.KeyPrefixFilter filter =
           kvContainerData.getDeletingBlockKeyFilter();
+
+      List<? extends Table.KeyValue<String, ChunkInfoList>> data = store.getDeletedBlocksTable()
+          .getRangeKVs(kvContainerData.startKeyEmpty(),
+              Integer.MAX_VALUE, kvContainerData.containerPrefix(),
+              filter);
+
+      for (Table.KeyValue<String, ChunkInfoList> kv : data) {
+        blockPendingDeletionBytes += kv.getValueByteSize();
+      }
+      
       blockPendingDeletion = store.getBlockDataTable().getRangeKVs(
           kvContainerData.startKeyEmpty(), Integer.MAX_VALUE, kvContainerData.containerPrefix(), filter, true)
           // TODO: add a count() method to avoid creating a list
@@ -362,7 +380,8 @@ public final class KeyValueContainerUtil {
       blockCount = b.getCount();
     }
 
-    kvContainerData.getStatistics().updateBlocks(blockBytes, blockCount, blockPendingDeletion);
+    kvContainerData.getStatistics().updateBlocks(blockBytes, blockCount);
+    kvContainerData.getStatistics().addBlockPendingDeletion(blockPendingDeletion, blockPendingDeletionBytes);
 
     // If the container is missing a chunks directory, possibly due to the
     // bug fixed by HDDS-6235, create it here.
@@ -430,7 +449,7 @@ public final class KeyValueContainerUtil {
         usedBytes += getBlockLengthTryCatch(blockIter.nextBlock());
       }
     }
-    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0);
+    return new ContainerData.BlockByteAndCounts(usedBytes, blockCount, 0, 0);
   }
 
   public static long getBlockLengthTryCatch(BlockData block) {

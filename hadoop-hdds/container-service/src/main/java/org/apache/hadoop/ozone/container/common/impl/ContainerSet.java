@@ -70,6 +70,8 @@ public class ContainerSet implements Iterable<Container<?>> {
   private final Table<ContainerID, String> containerIdsTable;
   // Handler that will be invoked when a scan of a container in this set is requested.
   private OnDemandContainerScanner containerScanner;
+  private CachedPendingDeletion cachedPendingDeletion;
+  private Object cacheLock = new Object();
 
   public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
     return new ContainerSet(null, recoveringTimeout);
@@ -470,6 +472,35 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
+   * This method can be used to get total bytes pending for deletion
+   * in cached interval of time. This can be utilized by either storage
+   * report or other services.
+   */
+  public long getPendingDeletionBytes() {
+    CachedPendingDeletion currentCache = cachedPendingDeletion;
+    if (currentCache != null && !currentCache.isExpired()) {
+      return currentCache.getSize();
+    }
+
+    synchronized (cacheLock) {
+      currentCache = cachedPendingDeletion;
+      if (currentCache != null && !currentCache.isExpired()) {
+        return currentCache.getSize();
+      }
+      long total = 0L;
+      List<Container<?>> containers = new ArrayList<>(containerMap.values());
+      for (Container<?> container : containers) {
+        total += container.getContainerData()
+            .getStatistics()
+            .getBlockPendingDeletionBytes();
+      }
+      long cacheDurationMillis = 5 * 60 * 1000;
+      cachedPendingDeletion = new CachedPendingDeletion(total, cacheDurationMillis);
+      return total;
+    }
+  }
+
+  /**
    * Get container report.
    *
    * @return The container report.
@@ -547,5 +578,23 @@ public class ContainerSet implements Iterable<Container<?>> {
         }
       }
     });
+  }
+
+  private static class CachedPendingDeletion {
+    private final long size;
+    private final long expiryTimeMillis;
+
+    CachedPendingDeletion(long size, long cacheDurationMillis) {
+      this.size = size;
+      this.expiryTimeMillis = System.currentTimeMillis() + cacheDurationMillis;
+    }
+
+    public long getSize() {
+      return size;
+    }
+
+    public boolean isExpired() {
+      return System.currentTimeMillis() > expiryTimeMillis;
+    }
   }
 }

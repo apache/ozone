@@ -141,6 +141,7 @@ public final class OzoneConsts {
   public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
   public static final String PENDING_DELETE_BLOCK_COUNT =
       "#PENDINGDELETEBLOCKCOUNT";
+  public static final String PENDING_DELETE_BLOCK_BYTES = "#PENDINGDELETEBLOCKBYTES";
 
   /**
    * OM LevelDB prefixes.
