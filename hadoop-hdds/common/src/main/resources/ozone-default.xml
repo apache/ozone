@@ -321,8 +321,8 @@
     <name>hdds.container.ratis.segment.size</name>
     <value>64MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The size of the raft segment file used
-      by Apache Ratis on datanodes. (64 MB by default)
+    <description>The size of the raft segment file used by Apache Ratis
+      on datanodes. (64 MB by default)
     </description>
   </property>
   <property>
@@ -484,7 +484,7 @@
   </property>
   <property>
     <name>ozone.key.deleting.limit.per.task</name>
-    <value>20000</value>
+    <value>50000</value>
     <tag>OM, PERFORMANCE</tag>
     <description>
       A maximum number of keys to be scanned by key deleting service
@@ -793,6 +793,16 @@
       SCM wraps up many blocks in a deletion transaction and sends that to data
       node for physical deletion periodically. This property determines how many
       times SCM is going to retry sending a deletion operation to the data node.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
+    <value>8</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      Factor with which number of delete blocks sent to each datanode in every interval.
+      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
+      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
     </description>
   </property>
   <property>
@@ -2170,10 +2180,10 @@
 
   <property>
     <name>ozone.om.ratis.segment.size</name>
-    <value>4MB</value>
+    <value>64MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the raft segment used by Apache Ratis on OM.
-      (4 MB by default)
+      (64 MB by default)
     </description>
   </property>
 
@@ -2182,7 +2192,7 @@
     <value>4MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on OM.(4 MB by default)
+      used by Apache Ratis on OM. (4 MB by default)
     </description>
   </property>
 
@@ -2198,6 +2208,20 @@
     <value>32MB</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
     <description>Byte limit for Raft's Log Worker queue.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.server.pending.write.byte-limit</name>
+    <value>64MB</value>
+    <tag>OZONE, DEBUG, OM, RATIS</tag>
+    <description>Maximum byte size of all pending write requests.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.ratis.server.pending.write.element-limit</name>
+    <value>4096</value>
+    <tag>OZONE, DEBUG, OM, RATIS</tag>
+    <description>Maximum number of pending write requests.
     </description>
   </property>
   <property>
@@ -2790,8 +2814,14 @@
     <name>ozone.manager.delegation.token.max-lifetime</name>
     <value>7d</value>
     <description>
-      Default max time interval after which ozone delegation token will
-      not be renewed.
+      Default max time interval after which ozone delegation token will not be renewed.
+      Delegation Token is signed and verified using secret key which has a max hdds.secret.key.expiry.duration lifetime.
+      To guarantee that the delegation token can be properly loaded, verified, and renewed during its lifetime,
+      (ozone.manager.delegation.token.max-lifetime + hdds.secret.key.rotate.duration + ozone.manager.delegation.remover.scan.interval)
+      must not be greater than hdds.secret.key.expiry.duration.
+      If any of ozone.manager.delegation.token.max-lifetime, hdds.secret.key.expiry.duration, hdds.secret.key.rotate.duration
+      or ozone.manager.delegation.remover.scan.interval value is changed, The above constrain must be checked and
+      values be adjusted accordingly if necessary.
     </description>
   </property>
 
@@ -3853,10 +3883,10 @@
   </property>
   <property>
     <name>ozone.scm.ha.ratis.segment.size</name>
-    <value>4MB</value>
+    <value>64MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the raft segment used by Apache Ratis on
-      SCM. (4 MB by default)
+      SCM. (64 MB by default)
     </description>
   </property>
   <property>
@@ -3864,7 +3894,7 @@
     <value>4MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the buffer which is preallocated for
-      raft segment used by Apache Ratis on SCM.(4 MB by default)
+      raft segment used by Apache Ratis on SCM. (4 MB by default)
     </description>
   </property>
   <property>
@@ -3993,7 +4023,7 @@
   </property>
   <property>
     <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
-    <value>600s</value>
+    <value>60s</value>
     <tag>SCM, OZONE</tag>
     <description>Wait duration for flush of buffered transaction.</description>
   </property>
@@ -4575,12 +4605,18 @@
   </property>
   <property>
     <name>hdds.secret.key.expiry.duration</name>
-    <value>7d</value>
+    <value>9d</value>
     <tag>SCM, SECURITY</tag>
     <description>
       The duration for which symmetric secret keys issued by SCM are valid.
-      This default value, in combination with hdds.secret.key.rotate.duration=1d, results in 7 secret keys (for the
-      last 7 days) are kept valid at any point of time.
+      Secret key is used to sign delegation tokens signed by OM, so the secret key must be valid for at least
+      (ozone.manager.delegation.token.max-lifetime + hdds.secret.key.rotate.duration + ozone.manager.delegation.remover.scan.interval)
+      time to guarantee that delegation tokens can be verified by OM. Considering the default value of three properties
+      mentioned and rounding up to days, this property's default value, in combination with hdds.secret.key.rotate.duration=1d,
+      results in 9 secret keys (for the last 9 days) are kept valid at any point of time.
+      If any of ozone.manager.delegation.token.max-lifetime, hdds.secret.key.rotate.duration or
+      ozone.manager.delegation.remover.scan.interval value is changed, this property should be checked, and updated
+      accordingly if necessary.
     </description>
   </property>
   <property>

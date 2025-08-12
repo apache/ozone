@@ -481,6 +481,10 @@ public class MutableVolumeSet implements VolumeSet {
     }
   }
 
+  public StorageVolume.VolumeType getVolumeType() {
+    return volumeType;
+  }
+
   public double getIdealUsage() {
     long totalCapacity = 0L, totalFree = 0L;
     for (StorageVolume volume: volumeMap.values()) {

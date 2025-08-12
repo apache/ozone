@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -81,7 +83,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
@@ -121,6 +123,8 @@ public class TestContainerReconciliationWithMockDatanodes {
   private static final int CHUNKS_PER_BLOCK = 4;
   private static final int NUM_DATANODES = 3;
 
+  private static final String TEST_SCAN = "Test Scan";
+
   /**
    * Number of corrupt blocks and chunks.
    *
@@ -159,12 +163,16 @@ public class TestContainerReconciliationWithMockDatanodes {
       // Use this fake host name to track the node through the test since it's easier to visualize than a UUID.
       dnDetails.setHostName("dn" + (i + 1));
       MockDatanode dn = new MockDatanode(dnDetails, containerDir);
+      // This will close the container and build a data checksum based on the chunk checksums in the metadata.
       dn.addContainerWithBlocks(CONTAINER_ID, 15);
       datanodes.add(dn);
     }
+    long dataChecksumFromMetadata = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
+    assertNotEquals(0, dataChecksumFromMetadata);
 
     datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
     healthyDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
+    assertEquals(dataChecksumFromMetadata, healthyDataChecksum);
     // Do not count the initial synchronous scan to build the merkle tree towards the scan count in the tests.
     // This lets each test run start counting the number of scans from zero.
     datanodes.forEach(MockDatanode::resetOnDemandScanCount);
@@ -299,7 +307,7 @@ public class TestContainerReconciliationWithMockDatanodes {
   private static class MockDatanode {
     private final KeyValueHandler handler;
     private final DatanodeDetails dnDetails;
-    private final OnDemandContainerDataScanner onDemandScanner;
+    private final OnDemandContainerScanner onDemandScanner;
     private final ContainerSet containerSet;
     private final OzoneConfiguration conf;
 
@@ -322,7 +330,7 @@ public class TestContainerReconciliationWithMockDatanodes {
 
       ContainerController controller = new ContainerController(containerSet,
           Collections.singletonMap(ContainerProtos.ContainerType.KeyValueContainer, handler));
-      onDemandScanner = new OnDemandContainerDataScanner(
+      onDemandScanner = new OnDemandContainerScanner(
           conf.getObject(ContainerScannerConfiguration.class), controller);
       // Register the on-demand container scanner with the container set used by the KeyValueHandler.
       containerSet.registerOnDemandScanner(onDemandScanner);
@@ -350,13 +358,13 @@ public class TestContainerReconciliationWithMockDatanodes {
      */
     public long checkAndGetDataChecksum(long containerID) {
       KeyValueContainer container = getContainer(containerID);
+      KeyValueContainerData containerData = container.getContainerData();
       long dataChecksum = 0;
       try {
-        Optional<ContainerProtos.ContainerChecksumInfo> containerChecksumInfo =
-            handler.getChecksumManager().read(container.getContainerData());
-        assertTrue(containerChecksumInfo.isPresent());
-        dataChecksum = containerChecksumInfo.get().getContainerMerkleTree().getDataChecksum();
-        assertEquals(container.getContainerData().getDataChecksum(), dataChecksum);
+        ContainerProtos.ContainerChecksumInfo containerChecksumInfo = handler.getChecksumManager()
+            .read(containerData);
+        dataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+        verifyAllDataChecksumsMatch(containerData, conf);
       } catch (IOException ex) {
         fail("Failed to read container checksum from disk", ex);
       }
@@ -420,7 +428,8 @@ public class TestContainerReconciliationWithMockDatanodes {
      * Triggers a synchronous scan of the container. This method will block until the scan completes.
      */
     public void scanContainer(long containerID) {
-      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID));
+      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID),
+          TEST_SCAN);
       assertTrue(scanFuture.isPresent());
 
       try {

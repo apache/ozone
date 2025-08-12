@@ -34,9 +34,9 @@
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.3</assertj.version>
+    <assertj.version>3.27.4</assertj.version>
     <aws-java-sdk.version>1.12.661</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.31.77</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.32.14</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.81</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -52,9 +52,9 @@
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-configuration2.version>2.12.0</commons-configuration2.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
-    <commons-fileupload.version>1.5</commons-fileupload.version>
+    <commons-fileupload.version>1.6.0</commons-fileupload.version>
     <commons-io.version>2.18.0</commons-io.version>
-    <commons-lang3.version>3.17.0</commons-lang3.version>
+    <commons-lang3.version>3.18.0</commons-lang3.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-text.version>1.13.1</commons-text.version>
@@ -80,13 +80,8 @@
     <docker-maven-plugin.version>0.45.1</docker-maven-plugin.version>
     <download-maven-plugin.version>1.9.0</download-maven-plugin.version>
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
-    <!-- The java version enforced by the maven enforcer -->
-    <!-- more complex patterns can be used here, such as
-       [${javac.version})
-    for an open-ended enforcement
-    -->
     <enforced.java.version>[${javac.version},)</enforced.java.version>
-    <enforced.maven.version>[3.3.0,)</enforced.maven.version>
+    <enforced.maven.version>[3.6.3,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
     <excluded-test-groups>unhealthy</excluded-test-groups>
@@ -127,7 +122,7 @@
     <jetty.version>9.4.57.v20241219</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.4</jline.version>
+    <jline.version>3.30.5</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
@@ -136,7 +131,7 @@
     <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
-    <junit5.version>5.13.3</junit5.version>
+    <junit5.version>5.13.4</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
     <license-maven-plugin.version>2.6.0</license-maven-plugin.version>
@@ -210,12 +205,15 @@
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
     <snakeyaml.version>2.0</snakeyaml.version>
-    <snappy-java.version>1.1.10.7</snappy-java.version>
+    <snappy-java.version>1.1.10.8</snappy-java.version>
+    <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
+    <sonar.organization>apache</sonar.organization>
+    <sonar.projectKey>hadoop-ozone</sonar.projectKey>
     <sortpom-maven-plugin.version>3.0.1</sortpom-maven-plugin.version>
     <spotbugs.version>3.1.12.2</spotbugs.version>
     <spring.version>5.3.39</spring.version>
-    <sqlite.version>3.50.2.0</sqlite.version>
+    <sqlite.version>3.50.3.0</sqlite.version>
     <stax2.version>4.2.2</stax2.version>
     <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
@@ -1316,6 +1314,12 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ratis</groupId>
+        <artifactId>ratis-server</artifactId>
+        <version>${ratis.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ratis</groupId>
         <artifactId>ratis-server-api</artifactId>
         <version>${ratis.version}</version>
       </dependency>
@@ -1393,6 +1397,11 @@
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-io</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-proxy</artifactId>
         <version>${jetty.version}</version>
       </dependency>
       <dependency>
@@ -1889,10 +1898,10 @@
           <configuration>
             <rules>
               <requireMavenVersion>
-                <version>[3.0.2,)</version>
+                <version>${enforced.maven.version}</version>
               </requireMavenVersion>
               <requireJavaVersion>
-                <version>[1.8,)</version>
+                <version>${enforced.java.version}</version>
               </requireJavaVersion>
             </rules>
           </configuration>
@@ -1966,7 +1975,9 @@
                     <bannedImports>
                       <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
                       <bannedImport>org.apache.hadoop.thirdparty.com.google.common.**</bannedImport>
+                      <bannedImport>org.apache.hadoop.util.Lists</bannedImport>
                       <bannedImport>org.apache.hadoop.util.Preconditions</bannedImport>
+                      <bannedImport>org.apache.hadoop.util.Sets</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
@@ -2731,6 +2742,8 @@
               </includes>
               <excludes>
                 <exclude>org.apache.hadoop.ozone.om.snapshot.**</exclude>
+                <!-- default excludes -->
+                <exclude>**/*$*</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2785,6 +2798,8 @@
               </includes>
               <excludes>
                 <exclude>org.apache.hadoop.hdds.scm.container.**</exclude>
+                <!-- default excludes -->
+                <exclude>**/*$*</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2809,6 +2824,8 @@
                 <exclude>org.apache.hadoop.ozone.container.**</exclude>
                 <exclude>org.apache.hadoop.ozone.om.**</exclude>
                 <exclude>org.apache.hadoop.ozone.recon.**</exclude>
+                <!-- default excludes -->
+                <exclude>**/*$*</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
