@@ -39,7 +39,7 @@ public class ContainerBalancerStopSubcommand extends ScmSubcommand {
       System.out.println("Container Balancer stopped.");
     } catch (IOException e) {
       String msg = "Failed to stop Container Balancer";
-      System.out.println(msg);
+      System.err.println(msg);
       throw new IOException(msg, e);
     }
   }
