@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.server.http.BaseHttpServer.SERVER_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
@@ -90,6 +92,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       LoggerFactory.getLogger(MiniOzoneClusterImpl.class);
 
   private static final String[] NO_ARGS = new String[0];
+
+  private static final String SCM_SUBDIR_NAME = "scm";
+  private static final String OM_SUBDIR_NAME = "om";
+  private static final String OZONE_METADATA_SUBDIR_NAME = "ozone-metadata";
+  private static final String RATIS_SUBDIR_NAME = "ratis";
+  private static final String DATA_SUBDIR_NAME = "data";
 
   static {
     CodecBuffer.enableLeakDetection();
@@ -548,7 +556,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * Initializes the configuration required for starting MiniOzoneCluster.
      */
     protected void initializeConfiguration() throws IOException {
-      Path metaDir = Paths.get(path, "ozone-meta");
+      Path metaDir = Paths.get(path, OZONE_METADATA_SUBDIR_NAME);
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
 
@@ -558,7 +566,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // default max retry timeout set to 30s
       scmClientConfig.setMaxRetryTimeout(30 * 1000);
       conf.setFromObject(scmClientConfig);
-      // In this way safemode exit will happen only when atleast we have one
+      // In this way safemode exit will happen only when at least we have one
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
           numOfDatanodes >= 3 ? 3 : 1);
@@ -688,7 +696,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       return hddsDatanodes;
     }
 
-    protected void configureSCM() {
+    protected void configureSCM() throws IOException {
       conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
           localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
@@ -702,14 +710,59 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, getFreePort());
       conf.setInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, getFreePort());
       conf.setIfUnset(ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, "1s");
+
+      Path scmMetaDir = Paths.get(path, SCM_SUBDIR_NAME);
+      Files.createDirectories(scmMetaDir.resolve(DATA_SUBDIR_NAME));
+
+      // e.g. when path is /var/lib/hadoop-ozone
+      // ozone.scm.ha.ratis.storage.dir = /var/lib/hadoop-ozone/scm/ratis
+      conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR,
+          scmMetaDir.resolve(RATIS_SUBDIR_NAME).toString());
+
+      // ozone.scm.ha.ratis.snapshot.dir = /var/lib/hadoop-ozone/scm/ozone-metadata/snapshot
+      conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR,
+          scmMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
+
+      // ozone.scm.db.dirs = /var/lib/hadoop-ozone/scm/data
+      conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
+          scmMetaDir.resolve(DATA_SUBDIR_NAME).toString());
+
+      // ozone.http.basedir = /var/lib/hadoop-ozone/scm/ozone-metadata/webserver
+      conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+          scmMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME) + SERVER_DIR);
     }
 
-    private void configureOM() {
+    private void configureOM() throws IOException {
       conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, localhostWithFreePort());
       conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, localhostWithFreePort());
       conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY,
           localhostWithFreePort());
       conf.setInt(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, getFreePort());
+
+      Path omMetaDir = Paths.get(path, OM_SUBDIR_NAME);
+      Files.createDirectories(omMetaDir.resolve(DATA_SUBDIR_NAME));
+
+      // e.g. when path is /var/lib/hadoop-ozone
+      // ozone.om.ratis.storage.dir = /var/lib/hadoop-ozone/om/ratis
+      conf.set(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR,
+          omMetaDir.resolve(RATIS_SUBDIR_NAME).toString());
+
+      // ozone.om.ratis.snapshot.dir = /var/lib/hadoop-ozone/om/ozone-metadata/snapshot
+      conf.set(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR,
+          omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
+
+      // ozone.om.db.dirs = /var/lib/hadoop-ozone/om/data
+      conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
+          omMetaDir.resolve(DATA_SUBDIR_NAME).toString());
+
+      // ozone.om.snapshot.diff.db.dir = /var/lib/hadoop-ozone/om/ozone-metadata
+      // actual dir would be /var/lib/hadoop-ozone/om/ozone-metadata/db.snapdiff
+      conf.set(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR,
+          omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).toString());
+
+      // ozone.http.basedir = /var/lib/hadoop-ozone/om/ozone-metadata/webserver
+      conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+          omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME) + SERVER_DIR);
     }
 
   }
