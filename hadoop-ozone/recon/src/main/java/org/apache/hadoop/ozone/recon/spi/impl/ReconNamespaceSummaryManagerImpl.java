@@ -91,6 +91,8 @@ public class ReconNamespaceSummaryManagerImpl
 
   @Override
   public void rebuildNSSummaryTree(OMMetadataManager omMetadataManager) {
+    // This method is called by the unified ReconUtils.triggerNSSummaryRebuild
+    // It should only handle the actual rebuild logic without state management
     nsSummaryTask.reprocess(omMetadataManager);
   }
 

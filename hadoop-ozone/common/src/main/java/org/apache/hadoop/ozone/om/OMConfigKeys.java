@@ -183,7 +183,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_SEGMENT_SIZE_KEY
       = "ozone.om.ratis.segment.size";
   public static final String OZONE_OM_RATIS_SEGMENT_SIZE_DEFAULT
-      = "4MB";
+      = "64MB";
   public static final String OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
       = "ozone.om.ratis.segment.preallocated.size";
   public static final String OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT
@@ -639,7 +639,7 @@ public final class OMConfigKeys {
   /**
    * Configuration properties for Compaction Service.
    */
-  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
+  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.om.compaction.service.enabled";
   public static final boolean OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT = false;
   public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
       "ozone.om.compaction.service.run.interval";
