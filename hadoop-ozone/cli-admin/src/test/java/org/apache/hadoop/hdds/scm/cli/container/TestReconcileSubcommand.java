@@ -18,12 +18,12 @@
 package org.apache.hadoop.hdds.scm.cli.container;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -70,6 +70,7 @@ import picocli.CommandLine;
 public class TestReconcileSubcommand {
 
   private static final String EC_CONTAINER_MESSAGE = "Reconciliation is only supported for Ratis replicated containers";
+  private static final String OPEN_CONTAINER_MESSAGE = "Reconciliation is not supported for open containers";
 
   private ScmClient scmClient;
 
@@ -169,8 +170,12 @@ public class TestReconcileSubcommand {
     assertThatOutput(outContent).isEmpty();
   }
 
+  /**
+   * When the `--status` flag is passed, the client will check the replication type and raise an error if the container
+   * returned is EC. The server lets us get information about containers of any type.
+   */
   @Test
-  public void testStatusRejectsAllECContainer() throws Exception {
+  public void testStatusRejectsECContainer() throws Exception {
     mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
 
     RuntimeException exception = assertThrows(RuntimeException.class, () -> executeStatusFromArgs(1));
@@ -187,16 +192,44 @@ public class TestReconcileSubcommand {
     assertTrue(jsonOutput.isEmpty());
   }
 
+  /**
+   * When the `--status` flag is passed, the client will check the container state and raise an error if the container
+   * returned is open. The server lets us get information about containers in any state.
+   */
   @Test
-  public void testReconcileRejectsAllECContainer() throws Exception {
-    mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
+  public void testStatusRejectsOpenContainer() throws Exception {
+    mockOpenContainer(1, 3, RatisReplicationConfig.getInstance(THREE));
+
+    RuntimeException exception = assertThrows(RuntimeException.class, () -> executeStatusFromArgs(1));
+
+    assertThatOutput(errContent).contains("Cannot get status of container 1");
+    assertThatOutput(errContent).contains(OPEN_CONTAINER_MESSAGE);
+
+    assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 1 containers");
+
+    // Should have empty JSON array output since no containers were processed
+    String output = outContent.toString(DEFAULT_ENCODING);
+    JsonNode jsonOutput = JsonUtils.readTree(output);
+    assertTrue(jsonOutput.isArray());
+    assertTrue(jsonOutput.isEmpty());
+  }
+
+  /**
+   * Reconciliation is not supported for open or EC containers. This is checked on the server side by SCM when it gets
+   * a request to reconcile a container. Since the server side is mocked in these tests, this test checks that when any
+   * exception is thrown back from the server, its message is printed by the client.
+   */
+  @Test
+  public void testReconcileHandlesInvalidContainer() throws Exception {
+    mockContainer(1);
 
     // Mock reconcile to fail for EC container
-    doThrow(new IOException(EC_CONTAINER_MESSAGE)).when(scmClient).reconcileContainer(1L);
+    final String mockMessage = "Mock SCM rejection of container";
+    doThrow(new IOException(mockMessage)).when(scmClient).reconcileContainer(1L);
 
     RuntimeException exception = assertThrows(RuntimeException.class, () -> executeReconcileFromArgs(1));
 
-    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + EC_CONTAINER_MESSAGE);
+    assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + mockMessage);
 
     assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 containers");
 
@@ -205,45 +238,53 @@ public class TestReconcileSubcommand {
   }
 
   /**
-   * When a mix of EC and Ratis containers are given to the server, it should return results for the Ratis containers
-   * and errors for the EC containers. All the output should be given to the user.
+   * When`--status` is given and a mix of Open, Ratis, and EC containers are returned from the server,
+   * the client should only print results for the closed Ratis containers. Errors for the other containers should be
+   * printed.
    */
   @Test
-  public void testStatusRejectsECNotRatisContainers() throws Exception {
+  public void testStatusHandlesValidAndInvalidContainers() throws Exception {
     mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
+    // Container ID 2 is the only valid one.
     mockContainer(2, 3, RatisReplicationConfig.getInstance(THREE), true);
     mockContainer(3, 3, new ECReplicationConfig(6, 3), true);
+    mockOpenContainer(4, 3, RatisReplicationConfig.getInstance(THREE));
 
     // Test status output - should process Ratis container but fail due to EC containers
     RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-      executeStatusFromArgs(1, 2, 3);
+      executeStatusFromArgs(1, 2, 3, 4);
     });
 
-    // Should have error messages for EC containers
+    // Should have error messages for EC and open containers
     assertThatOutput(errContent).contains("Cannot get status of container 1");
     assertThatOutput(errContent).contains("Cannot get status of container 3");
+    assertThatOutput(errContent).contains("Cannot get status of container 4");
     assertThatOutput(errContent).contains(EC_CONTAINER_MESSAGE);
+    assertThatOutput(errContent).contains(OPEN_CONTAINER_MESSAGE);
     assertThatOutput(errContent).doesNotContain("2");
 
-    // Exception message should indicate 2 failed containers
-    assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 2 containers");
+    // Exception message should indicate 3 failed containers
+    assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 3 containers");
     
-    // Should have output for only container 2 (Ratis)
+    // Should have output for only container 2: the closed ratis container.
     validateStatusOutput(true, 2);
 
-    // Verify that EC containers 1 and 3 are not present in JSON output
+    // Verify that EC containers 1 and 3 and open container 4 are not present in JSON output
     String output = outContent.toString(DEFAULT_ENCODING);
     JsonNode jsonOutput = JsonUtils.readTree(output);
     assertThat(jsonOutput.isArray()).isTrue();
     for (JsonNode containerNode : jsonOutput) {
       int containerID = containerNode.get("containerID").asInt();
-      assertNotEquals(1, containerID);
-      assertNotEquals(3, containerID);
+      assertThat(containerID).isNotIn(1, 3, 4);
     }
   }
 
+  /**
+   * Give a mix of valid and invalid containers to reconcile, and mock the server to return errors for the invalid ones.
+   * The valid containers should still be processed.
+   */
   @Test
-  public void testReconcileRejectsECNotRatisContainers() throws Exception {
+  public void testReconcileHandlesValidAndInvalidContainers() throws Exception {
     mockContainer(1, 3, new ECReplicationConfig(3, 2), true);
     mockContainer(2, 3, RatisReplicationConfig.getInstance(THREE), true);
     mockContainer(3, 3, new ECReplicationConfig(6, 3), true);
@@ -457,11 +498,20 @@ public class TestReconcileSubcommand {
     mockContainer(containerID, 3, RatisReplicationConfig.getInstance(THREE), true);
   }
 
+  private void mockOpenContainer(long containerID, int numReplicas, ReplicationConfig repConfig) throws Exception {
+    mockContainer(containerID, numReplicas, repConfig, OPEN, true);
+  }
+
   private void mockContainer(long containerID, int numReplicas, ReplicationConfig repConfig, boolean replicasMatch)
       throws Exception {
+    mockContainer(containerID, numReplicas, repConfig, CLOSED, replicasMatch);
+  }
+
+  private void mockContainer(long containerID, int numReplicas, ReplicationConfig repConfig,
+      HddsProtos.LifeCycleState state, boolean replicasMatch) throws Exception {
     ContainerInfo container = new ContainerInfo.Builder()
         .setContainerID(containerID)
-        .setState(CLOSED)
+        .setState(state)
         .setReplicationConfig(repConfig)
         .build();
     when(scmClient.getContainer(containerID)).thenReturn(container);
@@ -477,13 +527,17 @@ public class TestReconcileSubcommand {
 
       ContainerReplicaInfo.Builder replicaBuilder = new ContainerReplicaInfo.Builder()
           .setContainerID(containerID)
-          .setState("CLOSED")
+          .setState(state.name())
           .setDatanodeDetails(dn);
       if (repConfig.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
         replicaBuilder.setReplicaIndex(replicaIndex++);
       }
       if (replicasMatch) {
-        replicaBuilder.setDataChecksum(123);
+        if (state == OPEN) {
+          replicaBuilder.setDataChecksum(0);
+        } else {
+          replicaBuilder.setDataChecksum(123);
+        }
       } else {
         replicaBuilder.setDataChecksum(i);
       }

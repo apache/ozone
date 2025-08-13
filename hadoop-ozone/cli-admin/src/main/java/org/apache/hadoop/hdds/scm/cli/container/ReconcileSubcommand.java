@@ -88,7 +88,11 @@ public class ReconcileSubcommand extends ScmSubcommand {
   private boolean printReconciliationStatus(ScmClient scmClient, long containerID, SequenceWriter arrayWriter) {
     try {
       ContainerInfo containerInfo = scmClient.getContainer(containerID);
-      if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
+      if (containerInfo.isOpen()) {
+        System.err.println("Cannot get status of container " + containerID +
+            ". Reconciliation is not supported for open containers");
+        return false;
+      } else if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
         System.err.println("Cannot get status of container " + containerID +
             ". Reconciliation is only supported for Ratis replicated containers");
         return false;
