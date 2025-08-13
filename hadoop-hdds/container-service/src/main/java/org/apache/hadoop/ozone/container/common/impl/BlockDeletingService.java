@@ -235,8 +235,9 @@ public class BlockDeletingService extends BackgroundService {
   }
 
   private boolean isDeletionAllowed(ContainerData containerData,
-                                    ContainerDeletionChoosingPolicy deletionPolicy) {
-    if (!deletionPolicy.isValidContainerType(containerData.getContainerType())) {
+      ContainerDeletionChoosingPolicy deletionPolicy) {
+    if (!deletionPolicy
+        .isValidContainerType(containerData.getContainerType())) {
       LOG.debug("Container with type {} is not valid for block deletion.",
           containerData.getContainerType());
       return false;
