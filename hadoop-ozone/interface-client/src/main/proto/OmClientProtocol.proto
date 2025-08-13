@@ -1703,6 +1703,26 @@ message PartKeyInfo {
     required KeyInfo partKeyInfo = 3;
 }
 
+// Lightweight version of PartKeyInfo that uses KeyInfoProtoLight.
+message PartKeyInfoLight {
+    required string partName = 1;
+    required uint32 partNumber = 2;
+    required KeyInfoProtoLight partKeyInfo = 3;
+}
+
+// Lightweight version of MultipartKeyInfo.
+message MultipartKeyInfoLight {
+    required string uploadID = 1;
+    required uint64 creationTime = 2;
+    required hadoop.hdds.ReplicationType type = 3;
+    optional hadoop.hdds.ReplicationFactor factor = 4;
+    repeated PartKeyInfoLight partKeyInfoList = 5;
+    optional uint64 objectID = 6;
+    optional uint64 updateID = 7;
+    optional uint64 parentID = 8;
+    optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
+}
+
 message MultipartCommitUploadPartRequest {
     required KeyArgs keyArgs = 1;
     required uint64 clientID = 2;

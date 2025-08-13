@@ -19,17 +19,19 @@ package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfoLight;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfoLight;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Lightweight OmKeyInfo class.
@@ -282,29 +284,25 @@ public final class ReconBasicOmKeyInfo extends WithParentObjectId {
     return builder.build();
   }
 
-  /**
-   * Converts a heavy OmMultipartKeyInfo to a list of lightweight ReconBasicOmKeyInfo objects.
-   * This approach bypasses heavy KeyInfo field access and creates lightweight objects directly,
-   * addressing Devesh's concern about unnecessary deserialization overhead.
-   *
-   * @param omMultipartKeyInfo the heavy OmMultipartKeyInfo object.
-   * @return a list of lightweight ReconBasicOmKeyInfo objects.
-   */
-  public static List<ReconBasicOmKeyInfo> convertMultipartToBasic(OmMultipartKeyInfo omMultipartKeyInfo) {
-    if (omMultipartKeyInfo == null) {
+  public static ReconBasicOmKeyInfo getFromPartKeyInfoLight(PartKeyInfoLight partKeyInfoLight) {
+    if (partKeyInfoLight == null) {
+      return null;
+    }
+    return getFromProtobuf(partKeyInfoLight.getPartKeyInfo());
+  }
+
+  public static List<ReconBasicOmKeyInfo> convertMultipartLightToBasic(OmMultipartKeyInfoLight omMultipartKeyInfoLight) {
+    if (omMultipartKeyInfoLight == null) {
       return new ArrayList<>();
     }
 
     List<ReconBasicOmKeyInfo> basicKeyInfos = new ArrayList<>();
-    
-    // Use the direct conversion method to avoid heavy field access
-    for (OzoneManagerProtocolProtos.PartKeyInfo partKeyInfo : omMultipartKeyInfo.getPartKeyInfoMap()) {
-      ReconBasicOmKeyInfo basicKeyInfo = getFromProtobuf(partKeyInfo.getPartKeyInfo());
+    for (PartKeyInfoLight partKeyInfoLight : omMultipartKeyInfoLight.getPartKeyInfoMap().values()) {
+      ReconBasicOmKeyInfo basicKeyInfo = getFromPartKeyInfoLight(partKeyInfoLight);
       if (basicKeyInfo != null) {
         basicKeyInfos.add(basicKeyInfo);
       }
     }
-    
     return basicKeyInfos;
   }
 
