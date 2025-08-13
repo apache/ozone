@@ -298,7 +298,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir,
             hardLinkFileMap, false);
         Path snapshotLocalPropertyYaml = Paths.get(
-            OmSnapshotManager.getSnapshotLocalPropertyYamlPath(getConf(), snapshotDir.toFile().getName()));
+            OmSnapshotManager.getSnapshotLocalPropertyYamlPath(snapshotDir));
         if (Files.exists(snapshotLocalPropertyYaml)) {
           File yamlFile = snapshotLocalPropertyYaml.toFile();
           hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());
