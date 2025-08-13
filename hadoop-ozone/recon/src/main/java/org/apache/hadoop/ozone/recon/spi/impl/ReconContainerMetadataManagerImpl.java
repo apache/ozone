@@ -83,30 +83,29 @@ public class ReconContainerMetadataManagerImpl
 
   private DBStore containerDbStore;
 
-  @Inject
   private Configuration sqlConfiguration;
 
-  @Inject
   private ReconOMMetadataManager omMetadataManager;
 
   @Inject
-  public ReconContainerMetadataManagerImpl(ReconDBProvider reconDBProvider,
-                                           Configuration sqlConfiguration) {
-    this(reconDBProvider.getDbStore(), sqlConfiguration);
+  public ReconContainerMetadataManagerImpl(
+      ReconDBProvider reconDBProvider, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
+    this(reconDBProvider.getDbStore(), sqlConfiguration, omMetadataManager);
   }
 
-  private ReconContainerMetadataManagerImpl(DBStore reconDBStore,
-                                           Configuration sqlConfiguration) {
+  private ReconContainerMetadataManagerImpl(
+      DBStore reconDBStore, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
     containerDbStore = reconDBStore;
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
+    this.sqlConfiguration = sqlConfiguration;
+    this.omMetadataManager = omMetadataManager;
     initializeTables();
   }
 
   @Override
   public ReconContainerMetadataManager getStagedReconContainerMetadataManager(
       DBStore stagedReconDbStore) {
-    return new ReconContainerMetadataManagerImpl(stagedReconDbStore,
-        sqlConfiguration);
+    return new ReconContainerMetadataManagerImpl(stagedReconDbStore, sqlConfiguration, omMetadataManager);
   }
 
   @Override

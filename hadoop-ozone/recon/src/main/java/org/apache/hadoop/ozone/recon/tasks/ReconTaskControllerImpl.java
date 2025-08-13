@@ -244,8 +244,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           })).toArray(CompletableFuture[]::new)).join();
     } catch (CompletionException ce) {
       LOG.error("Completing all tasks failed with exception ", ce);
+      isRunSuccessful.set(false);
     } catch (CancellationException ce) {
       LOG.error("Some tasks were cancelled with exception", ce);
+      isRunSuccessful.set(false);
     }
 
     if (isRunSuccessful.get()) {
