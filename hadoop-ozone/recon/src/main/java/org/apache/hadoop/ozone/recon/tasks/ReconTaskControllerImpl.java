@@ -186,6 +186,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void reInitializeTasks(ReconOMMetadataManager omMetadataManager,
                                              Map<String, ReconOmTask> reconOmTaskMap) {
+    LOG.info("Starting Re-initialization of tasks.");
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
     Map<String, ReconOmTask> localReconOmTaskMap = reconOmTaskMap;
     if (reconOmTaskMap == null) {
@@ -193,21 +194,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     }
     ReconConstants.resetTableTruncatedFlags();
 
-    ReconTaskStatusUpdater reprocessTaskStatus = taskStatusUpdaterManager.getTaskStatusUpdater(REPROCESS_STAGING);
-    String reconDBName = reconDBProvider.getDbStore().getDbLocation().getPath() + ".staged";
     ReconDBProvider stagedReconDBProvider;
     try {
+      ReconTaskStatusUpdater reprocessTaskStatus = taskStatusUpdaterManager.getTaskStatusUpdater(REPROCESS_STAGING);
       reprocessTaskStatus.recordRunStart();
-      stagedReconDBProvider = reconDBProvider.getStagedReconDBProvider(reconDBName);
+      stagedReconDBProvider = reconDBProvider.getStagedReconDBProvider();
     } catch (IOException e) {
       LOG.error("Failed to get staged Recon DB provider for reinitialization of tasks.", e);
-      localReconOmTaskMap.values().forEach(task -> {
-        ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
-        taskStatusUpdater.setLastTaskRunStatus(-1);
-        taskStatusUpdater.recordRunCompletion();
-      });
-      reprocessTaskStatus.setLastTaskRunStatus(-1);
-      reprocessTaskStatus.recordRunCompletion();
+      recordAllTaskStatus(localReconOmTaskMap, -1, -1);
       return;
     }
 
@@ -233,19 +227,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
               throw new TaskExecutionException(task.getTaskName(), e);
             }
           }, executorService).thenAccept(result -> {
-            String taskName = result.getTaskName();
-            ReconTaskStatusUpdater taskStatusUpdater =
-                taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
             if (!result.isTaskSuccess()) {
+              String taskName = result.getTaskName();
               LOG.error("Init failed for task {}.", taskName);
               isRunSuccessful.set(false);
-              taskStatusUpdater.setLastTaskRunStatus(-1);
-            } else {
-              taskStatusUpdater.setLastTaskRunStatus(0);
-              taskStatusUpdater.setLastUpdatedSeqNumber(
-                  omMetadataManager.getLastSequenceNumberFromDB());
             }
-            taskStatusUpdater.recordRunCompletion();
           }).exceptionally(ex -> {
             LOG.error("Task failed with exception: ", ex);
             isRunSuccessful.set(false);
@@ -253,10 +239,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
               TaskExecutionException taskEx = (TaskExecutionException) ex.getCause();
               String taskName = taskEx.getTaskName();
               LOG.error("The above error occurred while trying to execute task: {}", taskName);
-
-              ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
-              taskStatusUpdater.setLastTaskRunStatus(-1);
-              taskStatusUpdater.recordRunCompletion();
             }
             return null;
           })).toArray(CompletableFuture[]::new)).join();
@@ -271,13 +253,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         reconDBProvider.replaceStagedDb(stagedReconDBProvider);
         reconNamespaceSummaryManager.reinitialize(reconDBProvider);
         reconContainerMetadataManager.reinitialize(reconDBProvider);
-        reprocessTaskStatus.setLastTaskRunStatus(0);
-        reprocessTaskStatus.recordRunCompletion();
+        recordAllTaskStatus(localReconOmTaskMap, 0, omMetadataManager.getLastSequenceNumberFromDB());
         LOG.info("Re-initialization of tasks completed successfully.");
       } catch (Exception e) {
         LOG.error("Re-initialization of tasks failed.", e);
-        reprocessTaskStatus.setLastTaskRunStatus(-1);
-        reprocessTaskStatus.recordRunCompletion();
+        recordAllTaskStatus(localReconOmTaskMap, -1, -1);
         // reinitialize the Recon OM tasks with the original DB provider
         try {
           reconNamespaceSummaryManager.reinitialize(reconDBProvider);
@@ -287,10 +267,36 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         }
       }
     } else {
-      LOG.error("Reprocess of task has failed.");
-      reprocessTaskStatus.setLastTaskRunStatus(-1);
-      reprocessTaskStatus.recordRunCompletion();
+      LOG.error("Re-initialization of tasks failed.");
+      try {
+        stagedReconDBProvider.close();
+      } catch (Exception e) {
+        LOG.error("Close of recon container staged db handler is failed", e);
+      }
+      recordAllTaskStatus(localReconOmTaskMap, -1, -1);
     }
+  }
+
+  private void recordAllTaskStatus(Map<String, ReconOmTask> localReconOmTaskMap, int status, long updateSeqNumber) {
+    localReconOmTaskMap.values().forEach(task -> {
+      ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
+      if (status == 0) {
+        taskStatusUpdater.setLastTaskRunStatus(0);
+        taskStatusUpdater.setLastUpdatedSeqNumber(updateSeqNumber);
+      } else {
+        taskStatusUpdater.setLastTaskRunStatus(-1);
+      }
+      taskStatusUpdater.recordRunCompletion();
+    });
+
+    ReconTaskStatusUpdater reprocessTaskStatus = taskStatusUpdaterManager.getTaskStatusUpdater(REPROCESS_STAGING);
+    if (status == 0) {
+      reprocessTaskStatus.setLastTaskRunStatus(0);
+      reprocessTaskStatus.setLastUpdatedSeqNumber(updateSeqNumber);
+    } else {
+      reprocessTaskStatus.setLastTaskRunStatus(-1);
+    }
+    reprocessTaskStatus.recordRunCompletion();
   }
 
   @Override
