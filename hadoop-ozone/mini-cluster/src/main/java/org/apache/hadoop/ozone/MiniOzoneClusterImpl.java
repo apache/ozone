@@ -757,7 +757,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
             omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
 
         // ozone.om.db.dirs = /var/lib/hadoop-ozone/om/data
-        conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
+        conf.setIfUnset(OMConfigKeys.OZONE_OM_DB_DIRS,
             omMetaDir.resolve(DATA_SUBDIR_NAME).toString());
 
         // ozone.om.snapshot.diff.db.dir = /var/lib/hadoop-ozone/om/ozone-metadata
