@@ -283,21 +283,17 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     localReconOmTaskMap.values().forEach(task -> {
       ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
       if (status == 0) {
-        taskStatusUpdater.setLastTaskRunStatus(0);
         taskStatusUpdater.setLastUpdatedSeqNumber(updateSeqNumber);
-      } else {
-        taskStatusUpdater.setLastTaskRunStatus(-1);
       }
+      taskStatusUpdater.setLastTaskRunStatus(status);
       taskStatusUpdater.recordRunCompletion();
     });
 
     ReconTaskStatusUpdater reprocessTaskStatus = taskStatusUpdaterManager.getTaskStatusUpdater(REPROCESS_STAGING);
     if (status == 0) {
-      reprocessTaskStatus.setLastTaskRunStatus(0);
       reprocessTaskStatus.setLastUpdatedSeqNumber(updateSeqNumber);
-    } else {
-      reprocessTaskStatus.setLastTaskRunStatus(-1);
     }
+    reprocessTaskStatus.setLastTaskRunStatus(status);
     reprocessTaskStatus.recordRunCompletion();
   }
 
