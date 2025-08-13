@@ -718,19 +718,19 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       if (!isHA) {
         // e.g. when path is /var/lib/hadoop-ozone
         // ozone.scm.ha.ratis.storage.dir = /var/lib/hadoop-ozone/scm/ratis
-        conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR,
+        conf.setIfUnset(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR,
             scmMetaDir.resolve(RATIS_SUBDIR_NAME).toString());
 
         // ozone.scm.ha.ratis.snapshot.dir = /var/lib/hadoop-ozone/scm/ozone-metadata/snapshot
-        conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR,
+        conf.setIfUnset(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR,
             scmMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
 
         // ozone.scm.db.dirs = /var/lib/hadoop-ozone/scm/data
-        conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
+        conf.setIfUnset(ScmConfigKeys.OZONE_SCM_DB_DIRS,
             scmMetaDir.resolve(DATA_SUBDIR_NAME).toString());
 
         // ozone.http.basedir = /var/lib/hadoop-ozone/scm/ozone-metadata/webserver
-        conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+        conf.setIfUnset(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
             scmMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME) + SERVER_DIR);
       }
     }
@@ -749,11 +749,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       if (!isHA) {
         // e.g. when path is /var/lib/hadoop-ozone
         // ozone.om.ratis.storage.dir = /var/lib/hadoop-ozone/om/ratis
-        conf.set(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR,
+        conf.setIfUnset(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR,
             omMetaDir.resolve(RATIS_SUBDIR_NAME).toString());
 
         // ozone.om.ratis.snapshot.dir = /var/lib/hadoop-ozone/om/ozone-metadata/snapshot
-        conf.set(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR,
+        conf.setIfUnset(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR,
             omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).resolve(OZONE_RATIS_SNAPSHOT_DIR).toString());
 
         // ozone.om.db.dirs = /var/lib/hadoop-ozone/om/data
@@ -762,11 +762,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
         // ozone.om.snapshot.diff.db.dir = /var/lib/hadoop-ozone/om/ozone-metadata
         // actual dir would be /var/lib/hadoop-ozone/om/ozone-metadata/db.snapdiff
-        conf.set(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR,
+        conf.setIfUnset(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR,
             omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME).toString());
 
         // ozone.http.basedir = /var/lib/hadoop-ozone/om/ozone-metadata/webserver
-        conf.set(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
+        conf.setIfUnset(OzoneConfigKeys.OZONE_HTTP_BASEDIR,
             omMetaDir.resolve(OZONE_METADATA_SUBDIR_NAME) + SERVER_DIR);
       }
     }
