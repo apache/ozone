@@ -61,10 +61,13 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfoLight;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfoProtoLight;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfoLight;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -78,6 +81,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * This test class is designed for the OM Table Insight Task. It conducts tests
@@ -367,13 +373,18 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         when(mockKeyValue.getValue()).thenReturn(keyInfo);
       } else if (tableName.equals(MULTIPART_INFO_TABLE)) {
         String uploadID = UUID.randomUUID().toString();
-        OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+        OmMultipartKeyInfoLight multipartKeyInfo = new OmMultipartKeyInfoLight.Builder()
             .setUploadID(uploadID)
             .build();
-        PartKeyInfo partKeyInfo =
-            createPartKeyInfo(UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+        PartKeyInfoLight partKeyInfo =
+            createPartKeyInfoLight(UUID.randomUUID().toString(), UUID.randomUUID().toString(), UUID.randomUUID().toString(),
                 uploadID, 1, 100L);
-        multipartKeyInfo.addPartKeyInfo(partKeyInfo);
+        Map<Integer, PartKeyInfoLight> partKeyInfoMap = new TreeMap<Integer, PartKeyInfoLight>();
+        partKeyInfoMap.put(1, partKeyInfo);
+        multipartKeyInfo = new OmMultipartKeyInfoLight.Builder()
+            .setUploadID(uploadID)
+            .setPartKeyInfoMap(partKeyInfoMap)
+            .build();
         when(mockKeyValue.getValue()).thenReturn(multipartKeyInfo);
       } else {
         when(mockKeyValue.getValue()).thenReturn(mock(OmKeyInfo.class));
@@ -651,14 +662,15 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // Prepare 5 MPU key PUT events.
     ArrayList<OMDBUpdateEvent> putEvents = new ArrayList<>();
     String[] multipartKeys = new String[5];
-    OmMultipartKeyInfo[] mpuInfos = new OmMultipartKeyInfo[5];
+    OmMultipartKeyInfoLight[] mpuInfos = new OmMultipartKeyInfoLight[5]; // Changed to Light
     String uploadID = UUID.randomUUID().toString();
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
 
     for (int i = 0; i < 5; i++) {
-      OmMultipartKeyInfo mpu = new OmMultipartKeyInfo.Builder()
+      // Create LIGHTWEIGHT objects instead
+      OmMultipartKeyInfoLight mpu = new OmMultipartKeyInfoLight.Builder()
           .setObjectID(i + 1)
           .setUploadID(uploadID)
           .setCreationTime(Time.now())
@@ -667,8 +679,19 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
           .build();
 
       // Each MPU has 2 parts, each part is 100 bytes.
-      mpu.addPartKeyInfo(createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 1, 100L));
-      mpu.addPartKeyInfo(createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 2, 100L));
+      // For lightweight objects, we need to create PartKeyInfoLight objects
+      Map<Integer, PartKeyInfoLight> partKeyInfoMap = new TreeMap<Integer, PartKeyInfoLight>();
+      partKeyInfoMap.put(1, createPartKeyInfoLight(volumeName, bucketName, keyName, uploadID, 1, 100L));
+      partKeyInfoMap.put(2, createPartKeyInfoLight(volumeName, bucketName, keyName, uploadID, 2, 100L));
+      mpu = new OmMultipartKeyInfoLight.Builder()
+          .setObjectID(i + 1)
+          .setUploadID(uploadID)
+          .setCreationTime(Time.now())
+          .setReplicationConfig(RatisReplicationConfig.getInstance(
+              HddsProtos.ReplicationFactor.THREE))
+          .setPartKeyInfoMap(partKeyInfoMap)
+          .build();
+      
       String multipartKey = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
       multipartKeys[i] = multipartKey;
       mpuInfos[i] = mpu;
@@ -696,16 +719,18 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(2400L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
 
     // UPDATE the first MPU key: change part 1 to 200 bytes, part 2 stays 100 bytes.
-    OmMultipartKeyInfo newMpu = new OmMultipartKeyInfo.Builder()
+    Map<Integer, PartKeyInfoLight> newPartKeyInfoMap = new TreeMap<Integer, PartKeyInfoLight>();
+    newPartKeyInfoMap.put(1, createPartKeyInfoLight(volumeName, bucketName, keyName, uploadID, 1, 200L));
+    newPartKeyInfoMap.put(2, createPartKeyInfoLight(volumeName, bucketName, keyName, uploadID, 2, 100L));
+    
+    OmMultipartKeyInfoLight newMpu = new OmMultipartKeyInfoLight.Builder()
         .setObjectID(1L)
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
         .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.THREE))
+        .setPartKeyInfoMap(newPartKeyInfoMap)
         .build();
-
-    newMpu.addPartKeyInfo(createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 1, 200L));
-    newMpu.addPartKeyInfo(createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 2, 100L));
 
     ArrayList<OMDBUpdateEvent> updateEvents = new ArrayList<>();
     updateEvents.add(getOMUpdateEvent(multipartKeys[0], newMpu, MULTIPART_INFO_TABLE, UPDATE, mpuInfos[0]));
@@ -723,7 +748,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @Test
   public void testReprocessForMultipartInfoTable() throws Exception {
     String uploadID = UUID.randomUUID().toString();
-    OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
+    OmMultipartKeyInfoLight omMultipartKeyInfo = new OmMultipartKeyInfoLight.Builder()
         .setObjectID(1L)
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
@@ -735,17 +760,23 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
 
-    PartKeyInfo part1 = createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 1, 100L);
-    omMultipartKeyInfo.addPartKeyInfo(part1);
+    // Create PartKeyInfoLight objects for the lightweight multipart info
+    Map<Integer, PartKeyInfoLight> partKeyInfoMap = new TreeMap<Integer, PartKeyInfoLight>();
+    partKeyInfoMap.put(1, createPartKeyInfoLight(volumeName, bucketName, keyName, uploadID, 1, 100L));
+    partKeyInfoMap.put(2, createPartKeyInfoLight(volumeName, bucketName, keyName, uploadID, 2, 100L));
+    partKeyInfoMap.put(3, createPartKeyInfoLight(volumeName, bucketName, keyName, uploadID, 3, 100L));
 
-    PartKeyInfo part2 = createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 2, 100L);
-    omMultipartKeyInfo.addPartKeyInfo(part2);
-
-    PartKeyInfo part3 = createPartKeyInfo(volumeName, bucketName, keyName, uploadID, 3, 100L);
-    omMultipartKeyInfo.addPartKeyInfo(part3);
+    omMultipartKeyInfo = new OmMultipartKeyInfoLight.Builder()
+        .setObjectID(1L)
+        .setUploadID(uploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setPartKeyInfoMap(partKeyInfoMap)
+        .build();
 
     String multipartKey = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
-    reconOMMetadataManager.getMultipartInfoTable().put(multipartKey, omMultipartKeyInfo);
+    reconOMMetadataManager.getMultipartInfoTableLight().put(multipartKey, omMultipartKeyInfo);
 
     ReconOmTask.TaskResult result = omTableInsightTask.reprocess(reconOMMetadataManager);
     assertTrue(result.isTaskSuccess());
@@ -764,6 +795,26 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         .setPartName(reconOMMetadataManager.getMultipartKey(volumeName,
             bucketName, keyName, uploadID))
         .setPartKeyInfo(KeyInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setDataSize(dataSize)
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setObjectID(UUID.randomUUID().hashCode())
+            .setType(HddsProtos.ReplicationType.RATIS)
+            .setFactor(HddsProtos.ReplicationFactor.THREE)
+            .build())
+        .build();
+  }
+
+  public PartKeyInfoLight createPartKeyInfoLight(String volumeName, String bucketName,
+                                       String keyName, String uploadID, int partNumber, long dataSize) {
+    return PartKeyInfoLight.newBuilder()
+        .setPartNumber(partNumber)
+        .setPartName(reconOMMetadataManager.getMultipartKey(volumeName,
+            bucketName, keyName, uploadID))
+        .setPartKeyInfo(KeyInfoProtoLight.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(keyName)

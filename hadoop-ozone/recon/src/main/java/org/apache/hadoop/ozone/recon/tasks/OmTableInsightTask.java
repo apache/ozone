@@ -112,7 +112,19 @@ public class OmTableInsightTask implements ReconOmTask {
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     init();
     for (String tableName : tables) {
-      Table table = omMetadataManager.getTable(tableName);
+      Table table;
+      
+      // Use lightweight table for multipart info to avoid heavy deserialization
+      if (MULTIPART_INFO_TABLE.equals(tableName)) {
+        try {
+          table = reconOMMetadataManager.getMultipartInfoTableLight();
+        } catch (IOException e) {
+          LOG.error("Unable to get lightweight multipart info table.", e);
+          return buildTaskResult(false);
+        }
+      } else {
+        table = omMetadataManager.getTable(tableName);
+      }
 
       try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
                = table.iterator()) {

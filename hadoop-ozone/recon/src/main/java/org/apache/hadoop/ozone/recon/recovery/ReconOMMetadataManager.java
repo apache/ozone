@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfoLight;
 import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 
 /**
@@ -122,5 +123,14 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
    * @throws IOException
    */
   Table<String, ReconBasicOmKeyInfo> getKeyTableBasic(BucketLayout bucketLayout) throws IOException;
+
+  /**
+   * A lighter weight version of the getMultipartInfoTable method that only returns 
+   * OmMultipartKeyInfoLight objects. This avoids creating full OmMultipartKeyInfo 
+   * objects for each multipart upload if they are not needed.
+   * @return A table of multipart uploads and their lightweight metadata.
+   * @throws IOException
+   */
+  Table<String, OmMultipartKeyInfoLight> getMultipartInfoTableLight() throws IOException;
 
 }

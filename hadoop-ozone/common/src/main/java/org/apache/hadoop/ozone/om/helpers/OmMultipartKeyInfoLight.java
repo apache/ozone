@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfoLight;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfoLight;
@@ -33,6 +36,12 @@ import java.util.stream.Collectors;
  * It is used by Recon to reduce payload and deserialization cost.
  */
 public class OmMultipartKeyInfoLight {
+
+  private static final Codec<OmMultipartKeyInfoLight> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(MultipartKeyInfoLight.getDefaultInstance()),
+      OmMultipartKeyInfoLight::getFromProtobuf,
+      OmMultipartKeyInfoLight::getProtobuf,
+      OmMultipartKeyInfoLight.class);
 
   private final String uploadID;
   private final long creationTime;
@@ -50,6 +59,10 @@ public class OmMultipartKeyInfoLight {
     this.objectID = b.objectID;
     this.updateID = b.updateID;
     this.parentID = b.parentID;
+  }
+
+  public static Codec<OmMultipartKeyInfoLight> getCodec() {
+    return CODEC;
   }
 
   public String getUploadID() {
