@@ -76,6 +76,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -84,18 +85,19 @@ import org.junit.jupiter.params.provider.EnumSource;
  * Tests Exception handling by Ozone Client.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestFailureHandlingByClient {
 
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
-  private static int chunkSize;
-  private static int blockSize;
-  private static String volumeName;
-  private static String bucketName;
-  private static String keyString;
-  private static final List<DatanodeDetails> RESTART_DATA_NODES = new ArrayList<>();
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
+  private OzoneClient client;
+  private ObjectStore objectStore;
+  private int chunkSize;
+  private int blockSize;
+  private String volumeName;
+  private String bucketName;
+  private String keyString;
+  private final List<DatanodeDetails> restartDataNodes = new ArrayList<>();
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -105,7 +107,7 @@ public class TestFailureHandlingByClient {
    * @throws IOException
    */
   @BeforeAll
-  public static void init() throws Exception {
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
@@ -161,13 +163,13 @@ public class TestFailureHandlingByClient {
 
   @BeforeEach
   public void restartDownDataNodes() throws Exception {
-    if (RESTART_DATA_NODES.isEmpty()) {
+    if (restartDataNodes.isEmpty()) {
       return;
     }
-    for (DatanodeDetails dataNode : RESTART_DATA_NODES) {
+    for (DatanodeDetails dataNode : restartDataNodes) {
       cluster.restartHddsDatanode(dataNode, false);
     }
-    RESTART_DATA_NODES.clear();
+    restartDataNodes.clear();
     cluster.waitForClusterToBeReady();
   }
 
@@ -175,7 +177,7 @@ public class TestFailureHandlingByClient {
    * Shutdown MiniDFSCluster.
    */
   @AfterAll
-  public static void shutdown() {
+  public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
@@ -214,8 +216,8 @@ public class TestFailureHandlingByClient {
     List<DatanodeDetails> datanodes = pipeline.getNodes();
     cluster.shutdownHddsDatanode(datanodes.get(0));
     cluster.shutdownHddsDatanode(datanodes.get(1));
-    RESTART_DATA_NODES.add(datanodes.get(0));
-    RESTART_DATA_NODES.add(datanodes.get(1));
+    restartDataNodes.add(datanodes.get(0));
+    restartDataNodes.add(datanodes.get(1));
     // The write will fail but exception will be handled and length will be
     // updated correctly in OzoneManager once the steam is closed
     key.close();
@@ -356,8 +358,8 @@ public class TestFailureHandlingByClient {
 
     cluster.shutdownHddsDatanode(datanodes.get(0));
     cluster.shutdownHddsDatanode(datanodes.get(1));
-    RESTART_DATA_NODES.add(datanodes.get(0));
-    RESTART_DATA_NODES.add(datanodes.get(1));
+    restartDataNodes.add(datanodes.get(0));
+    restartDataNodes.add(datanodes.get(1));
     key.close();
     // this will throw AlreadyClosedException and and current stream
     // will be discarded and write a new block
@@ -471,7 +473,7 @@ public class TestFailureHandlingByClient {
     // shutdown 1 datanode. This will make sure the 2 way commit happens for
     // next write ops.
     cluster.shutdownHddsDatanode(datanodes.get(0));
-    RESTART_DATA_NODES.add(datanodes.get(0));
+    restartDataNodes.add(datanodes.get(0));
 
     key.write(data.getBytes(UTF_8));
     key.write(data.getBytes(UTF_8));
@@ -498,8 +500,7 @@ public class TestFailureHandlingByClient {
         keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0)
             .getBlockID(), blockId);
     assertEquals(3L * data.getBytes(UTF_8).length, keyInfo.getDataSize());
-    TestHelper
-        .validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8),
+    TestHelper.validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8),
             localObjectStore, volumeName, bucketName);
     IOUtils.closeQuietly(localClient);
   }
@@ -536,8 +537,8 @@ public class TestFailureHandlingByClient {
     // will be added in the exclude list
     cluster.shutdownHddsDatanode(datanodes.get(0));
     cluster.shutdownHddsDatanode(datanodes.get(1));
-    RESTART_DATA_NODES.add(datanodes.get(0));
-    RESTART_DATA_NODES.add(datanodes.get(1));
+    restartDataNodes.add(datanodes.get(0));
+    restartDataNodes.add(datanodes.get(1));
 
     key.write(data.getBytes(UTF_8));
     key.write(data.getBytes(UTF_8));
