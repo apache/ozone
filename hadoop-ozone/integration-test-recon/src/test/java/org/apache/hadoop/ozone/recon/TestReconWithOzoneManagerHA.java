@@ -133,6 +133,17 @@ public class TestReconWithOzoneManagerHA {
 
     final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
         (ReconContainerMetadataManagerImpl) recon.getReconServer().getReconContainerMetadataManager();
+    
+    // Wait for async sync to complete
+    GenericTestUtils.waitFor(() -> {
+      try (Table.KeyValueIterator<ContainerKeyPrefix, Integer> iterator
+          = reconContainerMetadataManager.getContainerKeyTableForTesting().iterator()) {
+        return iterator.hasNext();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 20000);
+    
     try (Table.KeyValueIterator<ContainerKeyPrefix, Integer> iterator
         = reconContainerMetadataManager.getContainerKeyTableForTesting().iterator()) {
       String reconKeyPrefix = null;
