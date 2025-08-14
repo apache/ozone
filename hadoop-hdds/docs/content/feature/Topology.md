@@ -38,7 +38,7 @@ Ozone's topology-aware placement strategies vary by container replication type a
 
 ## Configuring Topology Hierarchy
 
-Ozone determines DataNode network locations (e.g., racks) using Hadoop's rack awareness, configured via `net.topology.node.switch.mapping.impl` in `ozone-site.xml`. This key specifies a `org.apache.hadoop.net.CachedDNSToSwitchMapping` implementation. \[1]
+Ozone determines DataNode network locations (e.g., racks) using Hadoop's rack awareness, configured via `net.topology.node.switch.mapping.impl` in `ozone-site.xml`. This key specifies a `org.apache.hadoop.net.CachedDNSToSwitchMapping` implementation. [1]
 
 Two primary methods exist:
 
@@ -46,7 +46,7 @@ Two primary methods exist:
 
 Maps IPs/hostnames to racks using a predefined file.
 
-* **Configuration:** Set `net.topology.node.switch.mapping.impl` to `org.apache.hadoop.net.TableMapping` and `net.topology.table.file.name` to the mapping file's path. \[1]
+* **Configuration:** Set `net.topology.node.switch.mapping.impl` to `org.apache.hadoop.net.TableMapping` and `net.topology.table.file.name` to the mapping file's path. [1]
     ```xml
     <property>
       <name>net.topology.node.switch.mapping.impl</name>
@@ -57,7 +57,7 @@ Maps IPs/hostnames to racks using a predefined file.
       <value>/etc/ozone/topology.map</value>
     </property>
     ```
-* **File Format:** A two-column text file (IP/hostname, rack path per line). Unlisted nodes go to `/default-rack`. \[1]
+* **File Format:** A two-column text file (IP/hostname, rack path per line). Unlisted nodes go to `/default-rack`. [1]
   Example `topology.map`:
     ```
     192.168.1.100 /rack1
@@ -70,7 +70,7 @@ Maps IPs/hostnames to racks using a predefined file.
 
 Uses an external script to resolve rack locations for IPs.
 
-* **Configuration:** Set `net.topology.node.switch.mapping.impl` to `org.apache.hadoop.net.ScriptBasedMapping` and `net.topology.script.file.name` to the script's path. \[1]
+* **Configuration:** Set `net.topology.node.switch.mapping.impl` to `org.apache.hadoop.net.ScriptBasedMapping` and `net.topology.script.file.name` to the script's path. [1]
     ```xml
     <property>
       <name>net.topology.node.switch.mapping.impl</name>
@@ -126,13 +126,13 @@ These policies can be configured to suit different deployment needs and workload
 
 ## Container Placement Policies for Replicated (RATIS) Containers
 
-SCM uses a pluggable policy to place additional replicas of *closed* RATIS-replicated containers. This is configured using the `ozone.scm.container.placement.impl` property in `ozone-site.xml`. Available policies are found in the `org.apache.hadoop.hdds.scm.container.placement.algorithms` package \[1, 3\].
+SCM uses a pluggable policy to place additional replicas of *closed* RATIS-replicated containers. This is configured using the `ozone.scm.container.placement.impl` property in `ozone-site.xml`. Available policies are found in the `org.apache.hadoop.hdds.scm.container.placement.algorithms` package [2].
 
 These policies are applied when SCM needs to re-replicate containers, such as during container balancing.
 
 ### 1. `SCMContainerPlacementRackAware` (Default)
 
-* **Function:** Distributes replicas across racks for fault tolerance (e.g., for 3 replicas, aims for at least two racks). Similar to HDFS placement. \[1]
+* **Function:** Distributes replicas across racks for fault tolerance (e.g., for 3 replicas, aims for at least two racks). Similar to HDFS placement. [1]
 * **Use Cases:** Production clusters needing rack-level fault tolerance.
 * **Configuration:**
     ```xml
@@ -142,11 +142,11 @@ These policies are applied when SCM needs to re-replicate containers, such as du
     </property>
     ```
 * **Best Practices:** Requires accurate topology mapping.
-* **Limitations:** Designed for single-layer rack topologies (e.g., `/rack/node`). Not recommended for multi-layer hierarchies (e.g., `/dc/row/rack/node`) as it may not interpret deeper levels correctly. \[1]
+* **Limitations:** Designed for single-layer rack topologies (e.g., `/rack/node`). Not recommended for multi-layer hierarchies (e.g., `/dc/row/rack/node`) as it may not interpret deeper levels correctly. [1]
 
 ### 2. `SCMContainerPlacementRandom`
 
-* **Function:** Randomly selects healthy, available DataNodes meeting basic criteria (space, no existing replica), ignoring rack topology. \[1, 4\]
+* **Function:** Randomly selects healthy, available DataNodes meeting basic criteria (space, no existing replica), ignoring rack topology. [3]
 * **Use Cases:** Small/dev/test clusters, or if rack fault tolerance for closed replicas isn't critical.
 * **Configuration:**
     ```xml
@@ -159,7 +159,7 @@ These policies are applied when SCM needs to re-replicate containers, such as du
 
 ### 3. `SCMContainerPlacementCapacity`
 
-* **Function:** Selects DataNodes by available capacity (favors lower disk utilization) to balance disk usage. \[5, 6\]
+* **Function:** Selects DataNodes by available capacity (favors lower disk utilization) to balance disk usage. [4]
 * **Use Cases:** Heterogeneous storage clusters or where even disk utilization is key.
 * **Configuration:**
     ```xml
@@ -171,11 +171,27 @@ These policies are applied when SCM needs to re-replicate containers, such as du
 * **Best Practices:** Prevents uneven node filling.
 * **Interaction:** This container placement policy selects datanodes by randomly picking two nodes from a pool of healthy, available nodes and then choosing the one with lower utilization (more free space). This approach aims to distribute containers more evenly across the cluster over time, favoring less utilized nodes without overwhelming newly added nodes.
 
+## Container Placement for Erasure Coded (EC) Containers
 
+For Erasure Coded (EC) containers, SCM employs a specialized placement policy to ensure data resilience and availability by distributing data and parity blocks across multiple racks. This is configured using the `ozone.scm.container.placement.ec.impl.key` property in `ozone-site.xml`.
+
+### 1. `SCMContainerPlacementRackScatter` (Default)
+
+*   **Function:** This is the default policy for EC containers. It attempts to place each block (both data and parity) of an EC container on a different rack. For example, for an RS-6-3-1024k container (6 data blocks + 3 parity blocks), this policy will try to place the 9 blocks on 9 different racks. This "scatter" approach maximizes the fault tolerance, as the loss of a single rack will not impact more than one block of the container. [5]
+*   **Use Cases:** This policy is highly recommended for production clusters using Erasure Coding to protect against rack-level failures.
+*   **Configuration:**
+    ```xml
+    <property>
+      <name>ozone.scm.container.placement.ec.impl.key</name>
+      <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter</value>
+    </property>
+    ```
+*   **Behavior:** If the number of available racks is less than the number of blocks in the EC group, the policy will start placing more than one block on the same rack, while trying to keep the distribution as even as possible.
+*   **Limitations:** Similar to `SCMContainerPlacementRackAware`, this policy is designed for single-layer rack topologies (e.g., `/rack/node`) and is not recommended for multi-layer hierarchies.
 
 ## Optimizing Read Paths
 
-Enable by setting `ozone.network.topology.aware.read` to `true` in `ozone-site.xml`. \[1]
+Enable by setting `ozone.network.topology.aware.read` to `true` in `ozone-site.xml`. [1]
 ```xml
 <property>
   <name>ozone.network.topology.aware.read</name>
@@ -188,6 +204,7 @@ This directs clients (replicated data) to read from topologically closest DataNo
 
 * **Accurate Topology:** Maintain an accurate, up-to-date topology map (static or dynamic script); this is foundational.
 * **Replicated (RATIS) Containers:** For production rack fault tolerance, use `SCMContainerPlacementRackAware` (mindful of its single-layer topology limitation) or `SCMContainerPlacementCapacity` (verify rack interaction) over `SCMContainerPlacementRandom`.
+* **Erasure Coded (EC) Containers:** For production rack fault tolerance, use `SCMContainerPlacementRackScatter`.
 
 * **Read Operations:** Enable `ozone.network.topology.aware.read` with accurate topology.
 * **Monitor & Validate:** Regularly monitor placement and balance; use tools like Recon to verify topology awareness.
@@ -198,3 +215,4 @@ This directs clients (replicated data) to read from topologically closest DataNo
 2.  [Ozone Source Code: container placement policies](https://github.com/apache/ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms). (For implementations of pluggable placement policies).
 3.  [Ozone Source Code: SCMContainerPlacementRandom.java](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms/SCMContainerPlacementRandom.java).
 4.  [Ozone Source Code: SCMContainerPlacementCapacity.java](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms/SCMContainerPlacementCapacity.java).
+5.  [Ozone Source Code: SCMContainerPlacementRackScatter.java](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms/SCMContainerPlacementRackScatter.java).
