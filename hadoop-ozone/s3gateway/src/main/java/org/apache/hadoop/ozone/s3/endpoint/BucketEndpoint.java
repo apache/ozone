@@ -813,7 +813,9 @@ public class BucketEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.ACCESS_DENIED) {
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, bucketName);
+        OS3Exception invalidException = S3ErrorTable.INVALID_REQUEST;
+        invalidException.setErrorMessage(ex.getMessage());
+        throw S3ErrorTable.newError(invalidException, bucketName);
       }
     }
     return Response.ok().build();

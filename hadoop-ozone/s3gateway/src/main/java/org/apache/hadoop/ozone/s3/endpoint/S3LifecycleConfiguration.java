@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -263,7 +265,7 @@ public class S3LifecycleConfiguration {
         builder.addRule(convertToOmRule(rule));
       }
 
-      return builder.build();
+      return builder.buildAndValid();
     } catch (Exception ex) {
       if (ex instanceof IllegalStateException) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
@@ -309,6 +311,7 @@ public class S3LifecycleConfiguration {
     if (expiration.getDate() != null) {
       builder.setDate(expiration.getDate());
     }
+    builder.setCreateDate(ZonedDateTime.now(ZoneOffset.UTC));
 
     return builder.build();
   }

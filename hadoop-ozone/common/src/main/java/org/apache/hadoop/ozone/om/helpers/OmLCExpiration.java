@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 public final class OmLCExpiration implements OmLCAction {
   private final Integer days;
   private final String date;
+  private final ZonedDateTime createDate;
   private ZonedDateTime zonedDateTime;
   private long daysInMilli;
   private static boolean test;
@@ -49,6 +50,7 @@ public final class OmLCExpiration implements OmLCAction {
   private OmLCExpiration(Builder builder) {
     this.days = builder.days;
     this.date = builder.date;
+    this.createDate = builder.createDate;
   }
 
   @Nullable
@@ -121,13 +123,15 @@ public final class OmLCExpiration implements OmLCAction {
   private void validateExpirationDate(String expirationDate) throws OMException {
     try {
       ZonedDateTime parsedDate = ZonedDateTime.parse(expirationDate, DateTimeFormatter.ISO_DATE_TIME);
-      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       // Convert to UTC for validation
       ZonedDateTime dateInUTC = parsedDate.withZoneSameInstant(ZoneOffset.UTC);
       // The date value must conform to the ISO 8601 format, be in the future.
-      if (dateInUTC.isBefore(now)) {
-        throw new OMException("Invalid lifecycle configuration: 'Date' must be in the future " + now + "," + dateInUTC,
-            OMException.ResultCodes.INVALID_REQUEST);
+      if (createDate != null) {
+        // Only check this during create the Lifecycle Configuration
+        if (dateInUTC.isBefore(createDate)) {
+          throw new OMException("Invalid lifecycle configuration: 'Date' must be in the future " + createDate + "," +
+              dateInUTC, OMException.ResultCodes.INVALID_REQUEST);
+        }
       }
       // Verify that the time is midnight UTC (00:00:00Z)
       if (!test && (dateInUTC.getHour() != 0 ||
@@ -179,6 +183,7 @@ public final class OmLCExpiration implements OmLCAction {
     return "OmLCExpiration{" +
         "days=" + days +
         ", date='" + date + '\'' +
+        ", createDate='" + createDate + '\'' +
         '}';
   }
 
@@ -188,6 +193,7 @@ public final class OmLCExpiration implements OmLCAction {
   public static class Builder {
     private Integer days = null;
     private String date = null;
+    private ZonedDateTime createDate = null;
 
     public Builder setDays(int lcDays) {
       this.days = lcDays;
@@ -199,10 +205,13 @@ public final class OmLCExpiration implements OmLCAction {
       return this;
     }
 
+    public Builder setCreateDate(ZonedDateTime lcCreateDate) {
+      this.createDate = lcCreateDate;
+      return this;
+    }
+
     public OmLCExpiration build() throws OMException {
-      OmLCExpiration omLCExpiration = new OmLCExpiration(this);
-      omLCExpiration.valid();
-      return omLCExpiration;
+      return new OmLCExpiration(this);
     }
   }
 

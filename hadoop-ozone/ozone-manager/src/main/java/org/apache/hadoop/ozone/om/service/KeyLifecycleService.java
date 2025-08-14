@@ -126,8 +126,13 @@ public class KeyLifecycleService extends BackgroundService {
       return queue;
     }
 
-    List<OmLifecycleConfiguration> lifecycleConfigurationList =
-        omMetadataManager.listLifecycleConfigurations();
+    List<OmLifecycleConfiguration> lifecycleConfigurationList = null;
+    try {
+      lifecycleConfigurationList = omMetadataManager.listLifecycleConfigurations();
+    } catch (OMException e) {
+      LOG.error("Failed to list lifecycle configurations", e);
+      return queue;
+    }
     for (OmLifecycleConfiguration lifecycleConfiguration : lifecycleConfigurationList) {
       String bucketKey = omMetadataManager.getBucketKey(lifecycleConfiguration.getVolume(),
           lifecycleConfiguration.getBucket());

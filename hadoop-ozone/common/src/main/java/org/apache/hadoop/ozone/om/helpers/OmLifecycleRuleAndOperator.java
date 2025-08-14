@@ -138,7 +138,6 @@ public final class OmLifecycleRuleAndOperator {
   public static class Builder {
     private Map<String, String> tags = new HashMap<>();
     private String prefix;
-    private BucketLayout bucketLayout;
 
     public Builder setPrefix(String lcPrefix) {
       this.prefix = lcPrefix;
@@ -156,15 +155,9 @@ public final class OmLifecycleRuleAndOperator {
       }
       return this;
     }
-    public Builder setBucketLayout(BucketLayout layout) {
-      this.bucketLayout = layout;
-      return this;
-    }
 
     public OmLifecycleRuleAndOperator build() throws OMException {
-      OmLifecycleRuleAndOperator omLifecycleRuleAndOperator = new OmLifecycleRuleAndOperator(this);
-      omLifecycleRuleAndOperator.valid(bucketLayout);
-      return omLifecycleRuleAndOperator;
+      return new OmLifecycleRuleAndOperator(this);
     }
   }
 

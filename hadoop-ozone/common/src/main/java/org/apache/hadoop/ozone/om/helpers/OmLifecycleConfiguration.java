@@ -286,7 +286,11 @@ public final class OmLifecycleConfiguration extends WithObjectID
     }
 
     public OmLifecycleConfiguration build() throws OMException {
-      OmLifecycleConfiguration omLifecycleConfiguration = new OmLifecycleConfiguration(this);
+      return new OmLifecycleConfiguration(this);
+    }
+
+    public OmLifecycleConfiguration buildAndValid() throws OMException {
+      OmLifecycleConfiguration omLifecycleConfiguration = build();
       omLifecycleConfiguration.valid();
       return omLifecycleConfiguration;
     }

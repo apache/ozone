@@ -1411,7 +1411,6 @@ class TestKeyLifecycleService extends OzoneTestBase {
             .setEnabled(enabled)
             .setPrefix(prefix)
             .setFilter(filter)
-            .setBucketLayout(layout)
             .setAction(new OmLCExpiration.Builder()
                 .setDate(date)
                 .build())
@@ -1420,6 +1419,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     String key = "/" + volume + "/" + bucket;
     LifecycleConfiguration lcProto = lcc.getProtobuf();
     OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcProto);
+    canonicalLcc.valid();
     metadataManager.getLifecycleConfigurationTable().put(key, lcc);
     metadataManager.getLifecycleConfigurationTable().addCacheEntry(
         new CacheKey<>(key), CacheValue.get(1L, canonicalLcc));

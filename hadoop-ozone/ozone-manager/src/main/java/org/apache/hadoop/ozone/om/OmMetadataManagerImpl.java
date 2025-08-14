@@ -2092,7 +2092,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @return list all LifecycleConfigurations.
    */
   @Override
-  public List<OmLifecycleConfiguration> listLifecycleConfigurations() {
+  public List<OmLifecycleConfiguration> listLifecycleConfigurations() throws OMException {
     List<OmLifecycleConfiguration> result = Lists.newArrayList();
 
     /* lifecycleConfigurationTable is full-cache, so we use cacheIterator. */
@@ -2108,6 +2108,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         // lifecycleConfiguration null means it's a deleted.
         continue;
       }
+      lifecycleConfiguration.valid();
       result.add(lifecycleConfiguration);
     }
 
@@ -2126,16 +2127,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
       String bucketName) throws IOException {
     Preconditions.checkNotNull(bucketName);
+    OmLifecycleConfiguration value = null;
     try {
       String bucketKey = getBucketKey(volumeName, bucketName);
-      OmLifecycleConfiguration value = getLifecycleConfigurationTable().get(bucketKey);
-
+      value = getLifecycleConfigurationTable().get(bucketKey);
       if (value == null) {
         LOG.debug("lifecycle configuration of bucket /{}/{} not found.",
             volumeName, bucketName);
         throw new OMException("Lifecycle configuration not found",
             LIFECYCLE_CONFIGURATION_NOT_FOUND);
       }
+      value.valid();
       return value;
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {

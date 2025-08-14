@@ -304,7 +304,7 @@ public final class OmLCRule {
       builder.setFilter(OmLCFilter.getFromProtobuf(lifecycleRule.getFilter(), layout));
     }
 
-    return builder.setBucketLayout(layout).build();
+    return builder.build();
   }
 
   @Override
@@ -329,7 +329,6 @@ public final class OmLCRule {
     private boolean enabled;
     private List<OmLCAction> actions = new ArrayList<>();
     private OmLCFilter filter;
-    private BucketLayout bucketLayout;
 
     public Builder setId(String lcId) {
       this.id = lcId;
@@ -378,15 +377,8 @@ public final class OmLCRule {
       return filter;
     }
 
-    public Builder setBucketLayout(BucketLayout layout) {
-      this.bucketLayout = layout;
-      return this;
-    }
-
     public OmLCRule build() throws OMException {
-      OmLCRule omLCRule = new OmLCRule(this);
-      omLCRule.valid(bucketLayout);
-      return omLCRule;
+      return new OmLCRule(this);
     }
   }
 }
