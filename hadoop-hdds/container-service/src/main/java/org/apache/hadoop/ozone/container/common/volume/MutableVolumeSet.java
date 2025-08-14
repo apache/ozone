@@ -125,7 +125,12 @@ public class MutableVolumeSet implements VolumeSet {
       maxVolumeFailuresTolerated = dnConf.getFailedDataVolumesTolerated();
     }
 
-    initializeVolumeSet();
+    try {
+      initializeVolumeSet();
+    } catch (Exception e) {
+      volumeHealthMetrics.unregister();
+      throw e;
+    }
   }
 
   public void setFailedVolumeListener(CheckedRunnable<IOException> runnable) {
