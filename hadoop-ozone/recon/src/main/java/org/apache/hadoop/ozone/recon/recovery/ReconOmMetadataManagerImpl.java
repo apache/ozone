@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfoLight;
 
 /**
  * Recon's implementation of the OM Metadata manager. By extending and
@@ -109,6 +110,12 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   public Table<String, ReconBasicOmKeyInfo> getKeyTableBasic(BucketLayout bucketLayout) throws IOException {
     String tableName = bucketLayout.isFileSystemOptimized() ? OMDBDefinition.FILE_TABLE : OMDBDefinition.KEY_TABLE;
     return getStore().getTable(tableName, StringCodec.get(), ReconBasicOmKeyInfo.getCodec());
+  }
+
+  @Override
+  public Table<String, OmMultipartKeyInfoLight> getMultipartInfoTableLight() throws IOException {
+    return getStore().getTable(OMDBDefinition.MULTIPART_INFO_TABLE, 
+        StringCodec.get(), OmMultipartKeyInfoLight.getCodec());
   }
 
   @Override

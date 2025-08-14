@@ -24,9 +24,14 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfoLight;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfoLight;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Lightweight OmKeyInfo class.
@@ -277,6 +282,28 @@ public final class ReconBasicOmKeyInfo extends WithParentObjectId {
         .setParentId(keyInfoProto.getParentID());
 
     return builder.build();
+  }
+
+  public static ReconBasicOmKeyInfo getFromPartKeyInfoLight(PartKeyInfoLight partKeyInfoLight) {
+    if (partKeyInfoLight == null) {
+      return null;
+    }
+    return getFromProtobuf(partKeyInfoLight.getPartKeyInfo());
+  }
+
+  public static List<ReconBasicOmKeyInfo> convertMultipartLightToBasic(OmMultipartKeyInfoLight omMultipartKeyInfoLight) {
+    if (omMultipartKeyInfoLight == null) {
+      return new ArrayList<>();
+    }
+
+    List<ReconBasicOmKeyInfo> basicKeyInfos = new ArrayList<>();
+    for (PartKeyInfoLight partKeyInfoLight : omMultipartKeyInfoLight.getPartKeyInfoMap().values()) {
+      ReconBasicOmKeyInfo basicKeyInfo = getFromPartKeyInfoLight(partKeyInfoLight);
+      if (basicKeyInfo != null) {
+        basicKeyInfos.add(basicKeyInfo);
+      }
+    }
+    return basicKeyInfos;
   }
 
   public OzoneManagerProtocolProtos.KeyInfoProtoLight toProtobuf() {

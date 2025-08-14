@@ -21,8 +21,7 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfoLight;
 import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,12 +44,11 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
-      OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
+      OmMultipartKeyInfoLight multipartKeyInfo = (OmMultipartKeyInfoLight) event.getValue();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count + 1L);
 
-      for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      for (ReconBasicOmKeyInfo omKeyInfo : ReconBasicOmKeyInfo.convertMultipartLightToBasic(multipartKeyInfo)) {
         unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
             (k, size) -> size + omKeyInfo.getDataSize());
         replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
@@ -70,12 +68,11 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       Map<String, Long> objectCountMap, Map<String, Long> unReplicatedSizeMap, Map<String, Long> replicatedSizeMap) {
 
     if (event.getValue() != null) {
-      OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
+      OmMultipartKeyInfoLight multipartKeyInfo = (OmMultipartKeyInfoLight) event.getValue();
       objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
           (k, count) -> count > 0 ? count - 1L : 0L);
 
-      for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      for (ReconBasicOmKeyInfo omKeyInfo : ReconBasicOmKeyInfo.convertMultipartLightToBasic(multipartKeyInfo)) {
         unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
             (k, size) -> {
               long newSize = size > omKeyInfo.getDataSize() ? size - omKeyInfo.getDataSize() : 0L;
@@ -116,12 +113,11 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
 
       // In Update event the count for the multipart info table will not change. So we
       // don't need to update the count.
-      OmMultipartKeyInfo oldMultipartKeyInfo = (OmMultipartKeyInfo) event.getOldValue();
-      OmMultipartKeyInfo newMultipartKeyInfo = (OmMultipartKeyInfo) event.getValue();
+      OmMultipartKeyInfoLight oldMultipartKeyInfo = (OmMultipartKeyInfoLight) event.getOldValue();
+      OmMultipartKeyInfoLight newMultipartKeyInfo = (OmMultipartKeyInfoLight) event.getValue();
 
       // Calculate old sizes
-      for (PartKeyInfo partKeyInfo : oldMultipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      for (ReconBasicOmKeyInfo omKeyInfo : ReconBasicOmKeyInfo.convertMultipartLightToBasic(oldMultipartKeyInfo)) {
         unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
             (k, size) -> size - omKeyInfo.getDataSize());
         replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
@@ -129,8 +125,7 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       }
 
       // Calculate new sizes
-      for (PartKeyInfo partKeyInfo : newMultipartKeyInfo.getPartKeyInfoMap()) {
-        ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      for (ReconBasicOmKeyInfo omKeyInfo : ReconBasicOmKeyInfo.convertMultipartLightToBasic(newMultipartKeyInfo)) {
         unReplicatedSizeMap.computeIfPresent(getUnReplicatedSizeKeyFromTable(tableName),
             (k, size) -> size + omKeyInfo.getDataSize());
         replicatedSizeMap.computeIfPresent(getReplicatedSizeKeyFromTable(tableName),
@@ -158,9 +153,8 @@ public class MultipartInfoInsightHandler implements OmTableHandler {
       while (iterator.hasNext()) {
         Table.KeyValue<String, ?> kv = iterator.next();
         if (kv != null && kv.getValue() != null) {
-          OmMultipartKeyInfo multipartKeyInfo = (OmMultipartKeyInfo) kv.getValue();
-          for (PartKeyInfo partKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-            ReconBasicOmKeyInfo omKeyInfo = ReconBasicOmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+          OmMultipartKeyInfoLight multipartKeyInfo = (OmMultipartKeyInfoLight) kv.getValue();
+          for (ReconBasicOmKeyInfo omKeyInfo : ReconBasicOmKeyInfo.convertMultipartLightToBasic(multipartKeyInfo)) {
             unReplicatedSize += omKeyInfo.getDataSize();
             replicatedSize += omKeyInfo.getReplicatedSize();
           }
