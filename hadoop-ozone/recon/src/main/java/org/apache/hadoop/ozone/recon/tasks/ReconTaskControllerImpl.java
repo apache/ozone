@@ -126,7 +126,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       ReconConstants.resetTableTruncatedFlags();
       if (!retryFailedTasks.isEmpty()) {
         tasks.clear();
-        for (ReconOmTask.TaskResult taskResult : failedTasks) {
+        for (ReconOmTask.TaskResult taskResult : retryFailedTasks) {
           ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
           tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.reprocess(omMetadataManager)));
         }
