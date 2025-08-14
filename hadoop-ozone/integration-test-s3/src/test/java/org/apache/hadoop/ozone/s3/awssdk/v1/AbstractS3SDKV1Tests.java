@@ -1032,6 +1032,62 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     }
   }
 
+  @Test
+  public void testPresignedUrlHead() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+
+    // Set the presigned URL to expire after one hour.
+    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+
+    // Test HeadObject presigned URL
+    GeneratePresignedUrlRequest generatePresignedUrlRequest =
+        new GeneratePresignedUrlRequest(bucketName, keyName)
+            .withMethod(HttpMethod.HEAD)
+            .withExpiration(expiration);
+    URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+    URL presignedUrl = new URL(url.toExternalForm());
+    HttpURLConnection connection = null;
+    try {
+      connection = (HttpURLConnection) presignedUrl.openConnection();
+      connection.setRequestMethod("HEAD");
+
+      int responseCode = connection.getResponseCode();
+      assertEquals(200, responseCode, "HeadObject presigned URL should return 200 OK");
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
+
+    // Test HeadBucket presigned URL
+    GeneratePresignedUrlRequest generateBucketPresignedUrlRequest =
+        new GeneratePresignedUrlRequest(bucketName, null)
+            .withMethod(HttpMethod.HEAD)
+            .withExpiration(expiration);
+    URL bucketUrl = s3Client.generatePresignedUrl(generateBucketPresignedUrlRequest);
+
+    URL presignedBucketUrl = new URL(bucketUrl.toExternalForm());
+    HttpURLConnection bucketConnection = null;
+    try {
+      bucketConnection = (HttpURLConnection) presignedBucketUrl.openConnection();
+      bucketConnection.setRequestMethod("HEAD");
+
+      int bucketResponseCode = bucketConnection.getResponseCode();
+      assertEquals(200, bucketResponseCode, "HeadBucket presigned URL should return 200 OK");
+    } finally {
+      if (bucketConnection != null) {
+        bucketConnection.disconnect();
+      }
+    }
+  }
+
   /**
    * Tests the functionality to create a snapshot of an Ozone bucket and then read files
    * from the snapshot directory using the S3 SDK.

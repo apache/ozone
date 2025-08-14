@@ -26,8 +26,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.time.Instant;
-import java.util.List;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.FileUtil;
@@ -61,17 +65,16 @@ public class TestOmSnapshotLocalDataYaml {
   private File writeToYaml(String snapshotName) throws IOException {
     String yamlFilePath = snapshotName + ".yaml";
 
-    OmSnapshotLocalDataYaml dataYaml = new OmSnapshotLocalDataYaml();
+    // Create snapshot data with uncompacted SST files
+    Map<String, Set<String>> uncompactedSSTFileList = new HashMap<>();
+    uncompactedSSTFileList.put("table1", Stream.of("sst1", "sst2").collect(Collectors.toSet()));
+    uncompactedSSTFileList.put("table2", Stream.of("sst3").collect(Collectors.toSet()));
+    OmSnapshotLocalDataYaml dataYaml = new OmSnapshotLocalDataYaml(uncompactedSSTFileList);
 
     // Set version
     dataYaml.setVersion(42);
     // Set SST filtered flag
     dataYaml.setSstFiltered(true);
-
-    // Add some uncompacted SST files
-    dataYaml.addUncompactedSSTFile("table1", "sst1");
-    dataYaml.addUncompactedSSTFile("table1", "sst2");
-    dataYaml.addUncompactedSSTFile("table2", "sst3");
 
     // Set last compaction time
     dataYaml.setLastCompactionTime(NOW.toEpochMilli());
@@ -80,9 +83,9 @@ public class TestOmSnapshotLocalDataYaml {
     dataYaml.setNeedsCompaction(true);
 
     // Add some compacted SST files
-    dataYaml.addCompactedSSTFile(1, "table1", "compacted-sst1");
-    dataYaml.addCompactedSSTFile(1, "table2", "compacted-sst2");
-    dataYaml.addCompactedSSTFile(2, "table1", "compacted-sst3");
+    dataYaml.addCompactedSSTFileList(1, "table1", Collections.singleton("compacted-sst1"));
+    dataYaml.addCompactedSSTFileList(1, "table2", Collections.singleton("compacted-sst2"));
+    dataYaml.addCompactedSSTFileList(2, "table1", Collections.singleton("compacted-sst3"));
 
     File yamlFile = new File(testRoot, yamlFilePath);
 
@@ -106,7 +109,7 @@ public class TestOmSnapshotLocalDataYaml {
     assertEquals(42, snapshotData.getVersion());
     assertTrue(snapshotData.getSstFiltered());
 
-    Map<String, List<String>> uncompactedFiles = snapshotData.getUncompactedSSTFileList();
+    Map<String, Set<String>> uncompactedFiles = snapshotData.getUncompactedSSTFileList();
     assertEquals(2, uncompactedFiles.size());
     assertEquals(2, uncompactedFiles.get("table1").size());
     assertEquals(1, uncompactedFiles.get("table2").size());
@@ -117,7 +120,7 @@ public class TestOmSnapshotLocalDataYaml {
     assertEquals(NOW.toEpochMilli(), snapshotData.getLastCompactionTime());
     assertTrue(snapshotData.getNeedsCompaction());
 
-    Map<Integer, Map<String, List<String>>> compactedFiles = snapshotData.getCompactedSSTFileList();
+    Map<Integer, Map<String, Set<String>>> compactedFiles = snapshotData.getCompactedSSTFileList();
     assertEquals(2, compactedFiles.size());
     assertTrue(compactedFiles.containsKey(1));
     assertTrue(compactedFiles.containsKey(2));
@@ -139,8 +142,8 @@ public class TestOmSnapshotLocalDataYaml {
     // Update snapshot data
     dataYaml.setSstFiltered(false);
     dataYaml.setNeedsCompaction(false);
-    dataYaml.addUncompactedSSTFile("table3", "sst4");
-    dataYaml.addCompactedSSTFile(3, "table3", "compacted-sst4");
+    dataYaml.addUncompactedSSTFileList("table3", Collections.singleton("sst4"));
+    dataYaml.addCompactedSSTFileList(3, "table3", Collections.singleton("compacted-sst4"));
 
     // Write updated data back to file
     dataYaml.writeToYaml(yamlFile);
@@ -152,12 +155,12 @@ public class TestOmSnapshotLocalDataYaml {
     assertThat(dataYaml.getSstFiltered()).isFalse();
     assertThat(dataYaml.getNeedsCompaction()).isFalse();
 
-    Map<String, List<String>> uncompactedFiles = dataYaml.getUncompactedSSTFileList();
+    Map<String, Set<String>> uncompactedFiles = dataYaml.getUncompactedSSTFileList();
     assertEquals(3, uncompactedFiles.size());
     assertTrue(uncompactedFiles.containsKey("table3"));
     assertTrue(uncompactedFiles.get("table3").contains("sst4"));
 
-    Map<Integer, Map<String, List<String>>> compactedFiles = dataYaml.getCompactedSSTFileList();
+    Map<Integer, Map<String, Set<String>>> compactedFiles = dataYaml.getCompactedSSTFileList();
     assertEquals(3, compactedFiles.size());
     assertTrue(compactedFiles.containsKey(3));
     assertTrue(compactedFiles.get(3).containsKey("table3"));

@@ -99,6 +99,7 @@ public abstract class ContainerData {
 
   // Checksum of the data within the container.
   private long dataChecksum;
+  private static final long UNSET_DATA_CHECKSUM = -1;
 
   private boolean isEmpty;
 
@@ -153,7 +154,7 @@ public abstract class ContainerData {
     this.originNodeId = originNodeId;
     this.isEmpty = false;
     this.checksum = ZERO_CHECKSUM;
-    this.dataChecksum = 0;
+    this.dataChecksum = UNSET_DATA_CHECKSUM;
   }
 
   protected ContainerData(ContainerData source) {
@@ -538,11 +539,22 @@ public abstract class ContainerData {
   }
 
   public void setDataChecksum(long dataChecksum) {
+    if (dataChecksum < 0) {
+      throw new IllegalArgumentException("Data checksum cannot be set to a negative number.");
+    }
     this.dataChecksum = dataChecksum;
   }
 
   public long getDataChecksum() {
+    // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
+    if (needsDataChecksum()) {
+      return 0;
+    }
     return dataChecksum;
+  }
+
+  public boolean needsDataChecksum() {
+    return dataChecksum == UNSET_DATA_CHECKSUM;
   }
 
   /**

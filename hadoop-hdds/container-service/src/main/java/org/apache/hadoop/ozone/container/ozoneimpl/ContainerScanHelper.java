@@ -26,6 +26,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 
@@ -75,7 +76,7 @@ public final class ContainerScanHelper {
         log.warn("Failed to update container checksum after scan of container {}", containerId, ex);
       }
       if (result.hasErrors()) {
-        handleUnhealthyScanResult(containerId, result);
+        handleUnhealthyScanResult(containerData, result);
       }
       metrics.incNumContainersScanned();
     }
@@ -103,7 +104,7 @@ public final class ContainerScanHelper {
       return;
     }
     if (result.hasErrors()) {
-      handleUnhealthyScanResult(containerId, result);
+      handleUnhealthyScanResult(containerData, result);
     }
 
     Instant now = Instant.now();
@@ -114,8 +115,8 @@ public final class ContainerScanHelper {
     logScanCompleted(containerData, now);
   }
 
-  public void handleUnhealthyScanResult(long containerID, ScanResult result) throws IOException {
-
+  public void handleUnhealthyScanResult(ContainerData containerData, ScanResult result) throws IOException {
+    long containerID = containerData.getContainerID();
     log.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerID, result);
     if (log.isDebugEnabled()) {
       StringBuilder allErrorString = new StringBuilder();
@@ -130,6 +131,23 @@ public final class ContainerScanHelper {
     boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
     if (containerMarkedUnhealthy) {
       metrics.incNumUnHealthyContainers();
+      // triggering a volume scan for the unhealthy container
+      triggerVolumeScan(containerData);
+    }
+  }
+
+  public void triggerVolumeScan(ContainerData containerData) {
+    HddsVolume volume = containerData.getVolume();
+    if (volume != null && !volume.isFailed()) {
+      log.info("Triggering scan of volume [{}] with unhealthy container [{}]",
+          volume, containerData.getContainerID());
+      StorageVolumeUtil.onFailure(volume);
+    } else if (volume == null) {
+      log.warn("Cannot trigger volume scan for container {} since its volume is null",
+          containerData.getContainerID());
+    } else {
+      log.debug("Skipping volume scan for container {} since its volume {} has failed.",
+          containerData.getContainerID(), volume);
     }
   }
 

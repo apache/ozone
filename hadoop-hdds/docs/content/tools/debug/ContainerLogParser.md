@@ -2,7 +2,9 @@
 title: "Container Replica Debugger Tool"
 date: 2025-05-19
 jira: HDDS-12579
-summary: The tool processes container log files from Ozone datanodes to track state transitions. It provides CLI commands for querying containers based on different attributes.
+summary: Processing and querying container log files from Ozone datanodes to track state transitions. 
+menu: debug
+weight: 7
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +17,8 @@ summary: The tool processes container log files from Ozone datanodes to track st
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-# Container Replica Debugger Tool
+
+The tool processes container log files from Ozone datanodes to track state transitions. It provides CLI commands for querying containers based on different attributes.
 
 ## Background
 Containers are the most important part of ozone. Most of the ozone operations happen on them. Containers in ozone go through different states in their lifecycle.

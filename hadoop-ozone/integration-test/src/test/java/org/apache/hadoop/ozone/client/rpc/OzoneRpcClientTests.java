@@ -4990,6 +4990,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
+  @Unhealthy("HDDS-10886")
   public void testParallelDeleteBucketAndCreateKey() throws IOException,
       InterruptedException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();

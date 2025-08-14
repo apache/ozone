@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -62,6 +63,12 @@ public class VolumeInfoMetrics implements MetricsSource {
   private MutableGaugeInt reservedCrossesLimit;
   @Metric("Volume available space is insufficient")
   private MutableGaugeInt availableSpaceInsufficient;
+
+  @Metric("Number of times the volume is scanned")
+  private MutableCounterLong numScans;
+
+  @Metric("Number of scans skipped for the volume")
+  private MutableCounterLong numScansSkipped;
 
   /**
    * @param identifier Typically, path to volume root. E.g. /data/hdds
@@ -154,6 +161,22 @@ public class VolumeInfoMetrics implements MetricsSource {
   @Metric("Returns the Container Count of the Volume")
   public long getContainers() {
     return volume.getContainers();
+  }
+
+  public long getNumScans() {
+    return numScans.value();
+  }
+
+  public void incNumScans() {
+    numScans.incr();
+  }
+
+  public long getNumScansSkipped() {
+    return numScansSkipped.value();
+  }
+
+  public void incNumScansSkipped() {
+    numScansSkipped.incr();
   }
 
   @Override

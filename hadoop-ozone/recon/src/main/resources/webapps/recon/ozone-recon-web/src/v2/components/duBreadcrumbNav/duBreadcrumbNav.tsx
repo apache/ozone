@@ -18,7 +18,7 @@
 
 import React, { useState } from 'react';
 
-import { DUSubpath } from '@/v2/types/diskUsage.types';
+import { DUSubpath } from '@/v2/types/namespaceUsage.types';
 import { Breadcrumb, Menu, Input } from 'antd';
 import { MenuProps } from 'antd/es/menu';
 import { CaretDownOutlined, HomeFilled } from '@ant-design/icons';

@@ -31,11 +31,17 @@ public class ContainerDiffReport {
   private final List<ContainerProtos.BlockMerkleTree> missingBlocks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks;
+  private final long containerID;
 
-  public ContainerDiffReport() {
+  public ContainerDiffReport(long containerID) {
     this.missingBlocks = new ArrayList<>();
     this.missingChunks = new HashMap<>();
     this.corruptChunks = new HashMap<>();
+    this.containerID = containerID;
+  }
+
+  public long getContainerID() {
+    return containerID;
   }
 
   /**
@@ -105,7 +111,7 @@ public class ContainerDiffReport {
 
   @Override
   public String toString() {
-    return "ContainerDiffReport:" +
+    return "Diff report for container " + containerID + ":" +
         " Missing Blocks: " + getNumMissingBlocks() +
         " Missing Chunks: " + getNumMissingChunks() + " chunks from " + missingChunks.size() + " blocks" +
         " Corrupt Chunks: " + getNumCorruptChunks() + " chunks from " + corruptChunks.size() + " blocks";

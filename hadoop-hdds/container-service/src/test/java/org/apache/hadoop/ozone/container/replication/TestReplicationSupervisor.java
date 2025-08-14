@@ -787,6 +787,44 @@ public class TestReplicationSupervisor {
         supervisor.getInFlightReplications(BlockingTask.class));
   }
 
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testReconcileContainerCommandDeduplication() {
+    ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
+        .stateContext(context)
+        .build();
+
+    try {
+      final long containerID = 10L;
+
+      // Create reconcile commands with the same container ID but different peers
+      ReconcileContainerCommand command1 = new ReconcileContainerCommand(containerID, Collections.singleton(
+          MockDatanodeDetails.randomDatanodeDetails()));
+      ReconcileContainerCommand command2 = new ReconcileContainerCommand(containerID, Collections.singleton(
+          MockDatanodeDetails.randomDatanodeDetails()));
+      assertEquals(command1, command2);
+      ReconcileContainerTask task1 = new ReconcileContainerTask(
+          mock(ContainerController.class),
+          mock(DNContainerOperationClient.class),
+          command1);
+      ReconcileContainerTask task2 = new ReconcileContainerTask(
+          mock(ContainerController.class),
+          mock(DNContainerOperationClient.class),
+          command2);
+
+      // Add first task - should be accepted
+      supervisor.addTask(task1);
+      assertEquals(1, supervisor.getTotalInFlightReplications());
+      assertEquals(1, supervisor.getReplicationQueuedCount());
+
+      // Add second task with same container ID but different peers - should be deduplicated
+      supervisor.addTask(task2);
+      assertEquals(1, supervisor.getTotalInFlightReplications());
+      assertEquals(1, supervisor.getReplicationQueuedCount());
+    } finally {
+      supervisor.stop();
+    }
+  }
+
   private static class BlockingTask extends AbstractReplicationTask {
 
     private final CountDownLatch runningLatch;
