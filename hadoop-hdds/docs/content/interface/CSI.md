@@ -26,7 +26,7 @@ summary: Ozone supports Container Storage Interface(CSI) protocol. You can use O
 
 <div class="alert alert-warning" role="alert">
 
-Ozone CSI support is still in alpha phase and buckets can be mounted only via 3rd party S3 compatible Fuse implementation (like Goofys). Fuse over S3 can provide only limited performance compared to a native Fuse file system. Long-term Ozone may support a custom solution to mount buckets which provides better user experience (with fuse or NFS or any other solution). Until that CSI is recommended to use only if you can live with this limitation and your use case is tested carefully.
+Ozone CSI support is still in alpha phase and buckets can be mounted only via 3rd party S3 compatible Fuse implementation (like mountpoint-s3). Fuse over S3 can provide only limited performance compared to a native Fuse file system. Long-term Ozone may support a custom solution to mount buckets which provides better user experience (with fuse or NFS or any other solution). Until that CSI is recommended to use only if you can live with this limitation and your use case is tested carefully.
 </div>
 
 `Container Storage Interface` (CSI) will enable storage vendors (SP) to develop a plugin once and have it work across a number of container orchestration (CO) systems like Kubernetes or Yarn.
@@ -37,7 +37,7 @@ CSI defined a simple GRPC interface with 3 interfaces (Identity, Controller, Nod
 
 ![CSI](CSI.png)
 
-By default Ozone CSI service uses a S3 fuse driver ([goofys](https://github.com/kahing/goofys)) to mount the created Ozone bucket. Implementation of other mounting options such as a dedicated NFS server or native Fuse driver is work in progress.
+By default Ozone CSI service uses a S3 fuse driver ([mountpoint-s3](https://github.com/awslabs/mountpoint-s3)) to mount the created Ozone bucket. Implementation of other mounting options such as a dedicated NFS server or native Fuse driver is work in progress.
 
 
 
@@ -47,7 +47,7 @@ Ozone CSI is an implementation of CSI, it can make possible of using Ozone as a 
 
 First of all, we need an Ozone cluster with s3gateway, and its OM rpc port and s3gateway port must be visible to CSI pod,
 because CSIServer will access OM to create or delete a bucket, also, CSIServer will publish volume by creating a mount point to s3g
-through goofys. 
+through mountpoint-s3. 
 
 If you don't have an Ozone cluster on kubernetes, you can reference [Kubernetes]({{< ref "start/Kubernetes.md" >}}) to create one. Use the resources from `kubernetes/examples/ozone` where you can find all the required Kubernetes resources to run cluster together with the dedicated Ozone CSI daemon (check `kubernetes/examples/ozone/csi`)   
 

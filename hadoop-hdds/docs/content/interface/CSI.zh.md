@@ -34,7 +34,7 @@ CSI 定义了一个简单的，包含3个接口（Identity， Controller， Node
 
 ![CSI](CSI.png)
 
-默认情况下，Ozone CSI 服务使用 S3 FUSE 驱动程序（[goofys](https://github.com/kahing/goofys)）挂载 Ozone 桶。
+默认情况下，Ozone CSI 服务使用 S3 FUSE 驱动程序（[mountpoint-s3](https://github.com/awslabs/mountpoint-s3)）挂载 Ozone 桶。
 其他挂载方式（如专用 NFS 服务或本机FUSE驱动程序）的实现正在进行中。
 
 
@@ -44,7 +44,7 @@ Ozone CSI 是 CSI 的一种实现，它可以将 Ozone 用作容器的存储卷�
 ## 入门
 
 首先，我们需要一个带有 s3gateway 的 Ozone 集群，并且它的 OM 和 s3gateway 的端口都可以对 CSI pod 可见，
-因为 CSIServer 将会访问 OM 来创建或者删除桶，同时 CSIServer 通过 goofys 创建一个可以访问 s3g 的挂载点来发布卷。 
+因为 CSIServer 将会访问 OM 来创建或者删除桶，同时 CSIServer 通过 mountpoint-s3 创建一个可以访问 s3g 的挂载点来发布卷。 
 
 如果你没有一个运行在 Kubernetes 上的 Ozone 集群，你可以参考[Kubernetes]({{< ref "start/Kubernetes.zh.md" >}}) 来创建一个。
 使用来自 `kubernetes/examples/ozone`的资源，你可以找到所有需要的 Kubernetes 资源来和指定的 CSI 运行在一起
