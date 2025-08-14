@@ -160,8 +160,6 @@ public class MutableVolumeSet implements VolumeSet {
 
     for (String locationString : rawLocations) {
       StorageVolume volume = null;
-      volumeHealthMetrics.incrementTotalVolumes();
-      volumeHealthMetrics.incrementHealthyVolumes();
       try {
         StorageLocation location = StorageLocation.parse(locationString);
 
@@ -178,6 +176,7 @@ public class MutableVolumeSet implements VolumeSet {
         }
         volumeMap.put(volume.getStorageDir().getPath(), volume);
         volumeStateMap.get(volume.getStorageType()).add(volume);
+        volumeHealthMetrics.incrementHealthyVolumes();
       } catch (IOException e) {
         volumeHealthMetrics.incrementFailedVolumes();
         if (volume != null) {
@@ -342,7 +341,6 @@ public class MutableVolumeSet implements VolumeSet {
       } else {
         if (failedVolumeMap.containsKey(volumeRoot)) {
           failedVolumeMap.remove(volumeRoot);
-          volumeHealthMetrics.decrementTotalVolumes();
           volumeHealthMetrics.decrementFailedVolumes();
         }
 
@@ -354,7 +352,6 @@ public class MutableVolumeSet implements VolumeSet {
         LOG.info("Added Volume : {} to VolumeSet",
             volume.getStorageDir().getPath());
         success = true;
-        volumeHealthMetrics.incrementTotalVolumes();
         volumeHealthMetrics.incrementHealthyVolumes();
       }
     } catch (IOException ex) {
@@ -377,6 +374,7 @@ public class MutableVolumeSet implements VolumeSet {
         volumeMap.remove(volumeRoot);
         volumeStateMap.get(volume.getStorageType()).remove(volume);
         failedVolumeMap.put(volumeRoot, volume);
+        volumeHealthMetrics.decrementHealthyVolumes();
         volumeHealthMetrics.incrementFailedVolumes();
         LOG.info("Moving Volume : {} to failed Volumes", volumeRoot);
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
@@ -399,12 +397,10 @@ public class MutableVolumeSet implements VolumeSet {
 
         volumeMap.remove(volumeRoot);
         volumeStateMap.get(volume.getStorageType()).remove(volume);
-        volumeHealthMetrics.decrementTotalVolumes();
         volumeHealthMetrics.decrementHealthyVolumes();
         LOG.info("Removed Volume : {} from VolumeSet", volumeRoot);
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
         failedVolumeMap.remove(volumeRoot);
-        volumeHealthMetrics.decrementTotalVolumes();
         volumeHealthMetrics.decrementFailedVolumes();
         LOG.info("Removed Volume : {} from failed VolumeSet", volumeRoot);
       } else {

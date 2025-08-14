@@ -104,6 +104,13 @@ public class TestVolumeSet {
     return false;
   }
 
+  static void assertNumVolumes(MutableVolumeSet volumeSet, int expectedHealthyVolumes, int expectedFailedVolumes) {
+    MetricsRecordBuilder metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
+    assertGauge("TotalVolumes", expectedHealthyVolumes + expectedFailedVolumes, metricsRecords);
+    assertGauge("NumHealthyVolumes", expectedHealthyVolumes, metricsRecords);
+    assertGauge("NumFailedVolumes", expectedFailedVolumes, metricsRecords);
+  }
+
   @Test
   public void testVolumeSetInitialization() throws Exception {
 
@@ -117,10 +124,7 @@ public class TestVolumeSet {
     assertTrue(checkVolumeExistsInVolumeSet(volume2),
         "VolumeSet not initialized correctly");
 
-    MetricsRecordBuilder metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 2, metricsRecords);
-    assertGauge("NumHealthyVolumes", 2, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
+    assertNumVolumes(volumeSet, 2, 0);
   }
 
   @Test
@@ -128,10 +132,7 @@ public class TestVolumeSet {
 
     assertEquals(2, volumeSet.getVolumesList().size());
 
-    MetricsRecordBuilder metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 2, metricsRecords);
-    assertGauge("NumHealthyVolumes", 2, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
+    assertNumVolumes(volumeSet, 2, 0);
 
     // Add a volume to VolumeSet
     String volume3 = baseDir.resolve("disk3").toString();
@@ -142,18 +143,12 @@ public class TestVolumeSet {
     assertTrue(checkVolumeExistsInVolumeSet(volume3),
         "AddVolume did not add requested volume to VolumeSet");
 
-    metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 3, metricsRecords);
-    assertGauge("NumHealthyVolumes", 3, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
+    assertNumVolumes(volumeSet, 3, 0);
   }
 
   @Test
   public void testFailVolume() throws Exception {
-    MetricsRecordBuilder metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 2, metricsRecords);
-    assertGauge("NumHealthyVolumes", 2, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
+    assertNumVolumes(volumeSet, 2, 0);
 
     //Fail a volume
     volumeSet.failVolume(HddsVolumeUtil.getHddsRoot(volume1));
@@ -171,18 +166,12 @@ public class TestVolumeSet {
     // Failed volume should not exist in VolumeMap
     assertThat(volumeSet.getVolumeMap()).doesNotContainKey(volume1);
 
-    metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 2, metricsRecords);
-    assertGauge("NumHealthyVolumes", 1, metricsRecords);
-    assertGauge("NumFailedVolumes", 1, metricsRecords);
+    assertNumVolumes(volumeSet, 1, 1);
   }
 
   @Test
   public void testRemoveVolume() throws Exception {
-    MetricsRecordBuilder metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 2, metricsRecords);
-    assertGauge("NumHealthyVolumes", 2, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
+    assertNumVolumes(volumeSet, 2, 0);
 
     assertEquals(2, volumeSet.getVolumesList().size());
 
@@ -190,10 +179,7 @@ public class TestVolumeSet {
     volumeSet.removeVolume(HddsVolumeUtil.getHddsRoot(volume1));
     assertEquals(1, volumeSet.getVolumesList().size());
 
-    metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 1, metricsRecords);
-    assertGauge("NumHealthyVolumes", 1, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
+    assertNumVolumes(volumeSet, 1, 0);
 
     // Attempting to remove a volume which does not exist in VolumeSet should
     // log a warning.
@@ -203,19 +189,13 @@ public class TestVolumeSet {
     String expectedLogMessage = "Volume : " +
         HddsVolumeUtil.getHddsRoot(volume1) + " does not exist in VolumeSet";
     assertThat(logs.getOutput()).contains(expectedLogMessage);
-    metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 1, metricsRecords);
-    assertGauge("NumHealthyVolumes", 1, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
+
+    assertNumVolumes(volumeSet, 1, 0);
   }
 
   @Test
   public void testVolumeInInconsistentState() throws Exception {
-    MetricsRecordBuilder metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 2, metricsRecords);
-    assertGauge("NumHealthyVolumes", 2, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
-
+    assertNumVolumes(volumeSet, 2, 0);
     assertEquals(2, volumeSet.getVolumesList().size());
 
     // Add a volume to VolumeSet
@@ -239,10 +219,8 @@ public class TestVolumeSet {
     assertEquals(2, volumeSet.getVolumesList().size());
     assertFalse(checkVolumeExistsInVolumeSet(volume3), "AddVolume should fail" +
         " for an inconsistent volume");
-    metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 2, metricsRecords);
-    assertGauge("NumHealthyVolumes", 2, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
+
+    assertNumVolumes(volumeSet, 2, 0);
     // Delete volume3
     File volume = new File(volume3);
     FileUtils.deleteDirectory(volume);
@@ -250,10 +228,7 @@ public class TestVolumeSet {
 
   @Test
   public void testShutdown() throws Exception {
-    MetricsRecordBuilder metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 2, metricsRecords);
-    assertGauge("NumHealthyVolumes", 2, metricsRecords);
-    assertGauge("NumFailedVolumes", 0, metricsRecords);
+    assertNumVolumes(volumeSet, 2, 0);
     List<StorageVolume> volumesList = volumeSet.getVolumesList();
 
     volumeSet.shutdown();
@@ -279,10 +254,7 @@ public class TestVolumeSet {
     assertEquals(1, volSet.getFailedVolumesList().size());
     assertEquals(readOnlyVolumePath, volSet.getFailedVolumesList().get(0)
         .getStorageDir());
-    MetricsRecordBuilder metricsRecords = getMetrics(volSet.getVolumeHealthMetrics());
-    assertGauge("TotalVolumes", 2, metricsRecords);
-    assertGauge("NumHealthyVolumes", 1, metricsRecords);
-    assertGauge("NumFailedVolumes", 1, metricsRecords);
+    assertNumVolumes(volSet, 1, 1);
     volSet.shutdown();
   }
 

@@ -48,7 +48,6 @@ public final class VolumeHealthMetrics implements MetricsSource {
 
   private final MetricsRegistry registry;
   private final String metricsSourceName;
-  private final AtomicInteger totalVolumes;
   private final AtomicInteger healthyVolumes;
   private final AtomicInteger failedVolumes;
 
@@ -58,7 +57,6 @@ public final class VolumeHealthMetrics implements MetricsSource {
    * @param volumeType Type of volumes (DATA_VOLUME, META_VOLUME, DB_VOLUME)
    */
   private VolumeHealthMetrics(StorageVolume.VolumeType volumeType) {
-    this.totalVolumes = new AtomicInteger(0);
     this.healthyVolumes = new AtomicInteger(0);
     this.failedVolumes = new AtomicInteger(0);
     metricsSourceName = SOURCE_BASENAME + '-' + volumeType.name();
@@ -82,21 +80,12 @@ public final class VolumeHealthMetrics implements MetricsSource {
     ms.unregisterSource(metricsSourceName);
   }
 
-  public void incrementTotalVolumes() {
-    totalVolumes.incrementAndGet();
-  }
-
   public void incrementHealthyVolumes() {
     healthyVolumes.incrementAndGet();
   }
 
   public void incrementFailedVolumes() {
-    healthyVolumes.decrementAndGet();
     failedVolumes.incrementAndGet();
-  }
-
-  public void decrementTotalVolumes() {
-    totalVolumes.decrementAndGet();
   }
 
   public void decrementHealthyVolumes() {
@@ -113,7 +102,7 @@ public final class VolumeHealthMetrics implements MetricsSource {
     registry.snapshot(builder, all);
 
     builder
-        .addGauge(TOTAL_VOLUMES, totalVolumes.get())
+        .addGauge(TOTAL_VOLUMES, healthyVolumes.get() + failedVolumes.get())
         .addGauge(HEALTHY_VOLUMES, healthyVolumes.get())
         .addGauge(FAILED_VOLUMES, failedVolumes.get());
   }
