@@ -48,8 +48,6 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
   private final Map<ContainerID, Set<DatanodeID>> ecContainerDNsMap;
   private final AtomicLong ecContainerWithMinReplicas;
 
-  private double ecMaxContainer;
-
   public ECContainerSafeModeRule(EventQueue eventQueue,
       ConfigurationSource conf,
       ContainerManager containerManager,
