@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
+import org.slf4j.Logger;
 
 /**
  * Abstract class for Container Safe mode exit rule.
@@ -43,25 +45,47 @@ import org.apache.hadoop.hdds.server.events.TypedEvent;
 public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationContainerReport> {
 
   private final ContainerManager containerManager;
+  private final Set<ContainerID> containers;
   private final double safeModeCutoff;
+  private final Logger log;
 
-  public AbstractContainerSafeModeRule(ConfigurationSource conf,
-                                       SCMSafeModeManager safeModeManager,
-                                       ContainerManager containerManager,
-                                       String ruleName,
-                                       EventQueue eventQueue) {
+  private int totalContainers;
+
+  public AbstractContainerSafeModeRule(ConfigurationSource conf, SCMSafeModeManager safeModeManager,
+      ContainerManager containerManager, String ruleName, EventQueue eventQueue, Logger log) {
     super(safeModeManager, ruleName, eventQueue);
     this.containerManager = containerManager;
+    this.containers = new HashSet<>();
     this.safeModeCutoff = getSafeModeCutoff(conf);
+    this.log = log;
   }
 
   protected abstract ReplicationType getContainerType();
 
-  protected abstract long getTotalNumberOfContainers();
-
   protected abstract long getNumberOfContainersWithMinReplica();
 
   protected abstract  Set<ContainerID> getSampleMissingContainers();
+
+  protected void initializeRule() {
+    containers.clear();
+    containerManager.getContainers(getContainerType()).stream()
+        .filter(this::isClosed)
+        .filter(c -> c.getNumberOfKeys() > 0)
+        .map(ContainerInfo::containerID)
+        .forEach(containers::add);
+    totalContainers = containers.size();
+    final long cutOff = (long) Math.ceil(getTotalNumberOfContainers() * getSafeModeCutoff());
+    getSafeModeMetrics().setNumContainerReportedThreshold(getContainerType(), cutOff);
+    log.info("Refreshed {} Containers threshold count to {}.", getContainerType(), cutOff);
+  }
+
+  protected Set<ContainerID> getContainers() {
+    return containers;
+  }
+
+  protected int getTotalNumberOfContainers() {
+    return totalContainers;
+  }
 
   protected double getSafeModeCutoff() {
     return safeModeCutoff;
@@ -78,8 +102,8 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
       return getCurrentContainerThreshold() >= getSafeModeCutoff();
     }
 
-    final List<ContainerInfo> containers = containerManager.getContainers(getContainerType());
-    return containers.stream()
+    final List<ContainerInfo> containerInfos = containerManager.getContainers(getContainerType());
+    return containerInfos.stream()
         .filter(this::isClosed)
         .map(ContainerInfo::containerID)
         .noneMatch(this::isMissing);
@@ -87,8 +111,19 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   @VisibleForTesting
   public double getCurrentContainerThreshold() {
-    return getTotalNumberOfContainers() == 0 ? 1 :
-        ((double) getNumberOfContainersWithMinReplica() / getTotalNumberOfContainers());
+    return totalContainers == 0 ? 1 : ((double) getNumberOfContainersWithMinReplica() / totalContainers);
+  }
+
+  @Override
+  public synchronized void refresh(boolean forceRefresh) {
+    if (forceRefresh || !validate()) {
+      initializeRule();
+    }
+  }
+
+  @Override
+  protected void cleanup() {
+    getContainers().clear();
   }
 
   /**

@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import com.google.common.collect.Sets;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,7 +28,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -47,8 +45,6 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
   private static final Logger LOG = LoggerFactory.getLogger(ECContainerSafeModeRule.class);
   private static final String NAME = "ECContainerSafeModeRule";
 
-  private final ContainerManager containerManager;
-  private final Set<ContainerID> ecContainers;
   private final Map<ContainerID, Set<DatanodeID>> ecContainerDNsMap;
   private final AtomicLong ecContainerWithMinReplicas;
 
@@ -58,26 +54,10 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
       ConfigurationSource conf,
       ContainerManager containerManager,
       SCMSafeModeManager manager) {
-    super(conf, manager, containerManager, NAME, eventQueue);
-    this.containerManager = containerManager;
-    this.ecContainers = new HashSet<>();
+    super(conf, manager, containerManager, NAME, eventQueue, LOG);
     this.ecContainerDNsMap = new ConcurrentHashMap<>();
     this.ecContainerWithMinReplicas = new AtomicLong(0);
     initializeRule();
-  }
-
-  private void initializeRule() {
-    ecContainers.clear();
-    containerManager.getContainers(ReplicationType.EC).stream()
-        .filter(this::isClosed)
-        .filter(c -> c.getNumberOfKeys() > 0)
-        .map(ContainerInfo::containerID)
-        .forEach(ecContainers::add);
-    ecMaxContainer = ecContainers.size();
-    long ecCutOff = (long) Math.ceil(ecMaxContainer * getSafeModeCutoff());
-    getSafeModeMetrics().setNumContainerWithECDataReplicaReportedThreshold(ecCutOff);
-
-    LOG.info("Refreshed Containers with ec n replica threshold count {}.", ecCutOff);
   }
 
   @Override
@@ -91,7 +71,7 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
 
     report.getReport().getReportsList().stream()
         .map(c -> ContainerID.valueOf(c.getContainerID()))
-        .filter(ecContainers::contains)
+        .filter(getContainers()::contains)
         .forEach(containerID -> {
           putInContainerDNsMap(containerID, ecContainerDNsMap, datanodeID);
           recordReportedContainer(containerID);
@@ -125,11 +105,6 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
   }
 
   @Override
-  protected long getTotalNumberOfContainers() {
-    return (long) ecMaxContainer;
-  }
-
-  @Override
   protected long getNumberOfContainersWithMinReplica() {
     return ecContainerWithMinReplicas.longValue();
   }
@@ -144,15 +119,8 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
   }
 
   @Override
-  public synchronized void refresh(boolean forceRefresh) {
-    if (forceRefresh || !validate()) {
-      initializeRule();
-    }
-  }
-
-  @Override
   protected void cleanup() {
-    ecContainers.clear();
+    super.cleanup();
     ecContainerDNsMap.clear();
   }
 }

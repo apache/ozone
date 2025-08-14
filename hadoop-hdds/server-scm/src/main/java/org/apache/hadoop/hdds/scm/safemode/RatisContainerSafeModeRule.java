@@ -17,14 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -42,19 +40,13 @@ public class RatisContainerSafeModeRule extends AbstractContainerSafeModeRule {
   private static final Logger LOG = LoggerFactory.getLogger(RatisContainerSafeModeRule.class);
   private static final String NAME = "RatisContainerSafeModeRule";
 
-  private final ContainerManager containerManager;
-  private final Set<ContainerID> ratisContainers;
   private final AtomicLong ratisContainerWithMinReplicas;
-
-  private double ratisMaxContainer;
 
   public RatisContainerSafeModeRule(EventQueue eventQueue,
       ConfigurationSource conf,
       ContainerManager containerManager,
       SCMSafeModeManager manager) {
-    super(conf, manager, containerManager, NAME, eventQueue);
-    this.containerManager = containerManager;
-    this.ratisContainers = new HashSet<>();
+    super(conf, manager, containerManager, NAME, eventQueue, LOG);
     this.ratisContainerWithMinReplicas = new AtomicLong(0);
     initializeRule();
   }
@@ -68,7 +60,7 @@ public class RatisContainerSafeModeRule extends AbstractContainerSafeModeRule {
   protected void process(NodeRegistrationContainerReport report) {
     report.getReport().getReportsList().stream()
         .map(c -> ContainerID.valueOf(c.getContainerID()))
-        .filter(ratisContainers::remove)
+        .filter(getContainers()::remove)
         .forEach(c -> recordReportedContainer());
 
     if (scmInSafeMode()) {
@@ -84,46 +76,16 @@ public class RatisContainerSafeModeRule extends AbstractContainerSafeModeRule {
     getSafeModeMetrics().incCurrentContainersWithOneReplicaReportedCount();
   }
 
-  private void initializeRule() {
-    ratisContainers.clear();
-    containerManager.getContainers(ReplicationType.RATIS).stream()
-        .filter(this::isClosed)
-        .filter(c -> c.getNumberOfKeys() > 0)
-        .map(ContainerInfo::containerID)
-        .forEach(ratisContainers::add);
-    ratisMaxContainer = ratisContainers.size();
-    long ratisCutOff = (long) Math.ceil(ratisMaxContainer * getSafeModeCutoff());
-    getSafeModeMetrics().setNumContainerWithOneReplicaReportedThreshold(ratisCutOff);
-
-    LOG.info("Refreshed Containers with one replica threshold count {}.", ratisCutOff);
-  }
-
   @Override
   protected long getNumberOfContainersWithMinReplica() {
     return ratisContainerWithMinReplicas.longValue();
   }
 
   @Override
-  protected long getTotalNumberOfContainers() {
-    return (long) ratisMaxContainer;
-  }
-
-  @Override
   protected Set<ContainerID> getSampleMissingContainers() {
-    return ratisContainers.stream()
+    return getContainers().stream()
         .limit(SAMPLE_CONTAINER_DISPLAY_LIMIT)
         .collect(Collectors.toSet());
   }
 
-  @Override
-  public synchronized void refresh(boolean forceRefresh) {
-    if (forceRefresh || !validate()) {
-      initializeRule();
-    }
-  }
-
-  @Override
-  protected void cleanup() {
-    ratisContainers.clear();
-  }
 }
