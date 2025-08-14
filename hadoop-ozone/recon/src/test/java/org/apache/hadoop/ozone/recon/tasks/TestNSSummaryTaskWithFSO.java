@@ -84,6 +84,8 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
         threshold);
   }
 
+
+
   /**
    * Nested class for testing NSSummaryTaskWithFSO reprocess.
    */
@@ -111,10 +113,10 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
     @Test
     public void testReprocessGetFiles() {
-      assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(2, nsSummaryForBucket1.getNumOfFiles());
       assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
 
-      assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
+      assertEquals(KEY_ONE_SIZE + KEY_THREE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
       assertEquals(KEY_TWO_OLD_SIZE + KEY_FOUR_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
     }
@@ -511,9 +513,10 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
       Mockito.when(mockIterator.hasNext()).thenReturn(true, true, true, true, false);
       Mockito.when(mockIterator.next()).thenReturn(event1, event2, event3, event4);
 
-      // Mock the flushAndCommitNSToDB method to fail on the last flush
+      // Mock the flushAndCommitUpdatedNSToDB method to fail on the last flush
       NSSummaryTaskWithFSO taskSpy = Mockito.spy(task);
-      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy).flushAndCommitNSToDB(Mockito.anyMap());
+      Mockito.doReturn(true).doReturn(true).doReturn(false).when(taskSpy)
+          .flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
 
       // Call the method under test
       Pair<Integer, Boolean> result1 = taskSpy.processWithFSO(events, 0);
@@ -524,7 +527,7 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
       // Verify interactions
       Mockito.verify(mockIterator, Mockito.times(3)).next();
-      Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitNSToDB(Mockito.anyMap());
+      Mockito.verify(taskSpy, Mockito.times(1)).flushAndCommitUpdatedNSToDB(Mockito.anyMap(), Mockito.anyCollection());
     }
   }
 }

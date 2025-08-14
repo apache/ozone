@@ -51,7 +51,6 @@ import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -83,7 +82,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -99,7 +97,7 @@ public class ReconUtils {
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
 
-  private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
+  // Use NSSummaryTask's unified rebuild control instead of separate tracking
   private static final ExecutorService NSSUMMARY_REBUILD_EXECUTOR =
       Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r);
@@ -109,6 +107,43 @@ public class ReconUtils {
       });
 
   public ReconUtils() {
+  }
+
+  /**
+   * Get the current rebuild state of NSSummary tree.
+   * Delegates to NSSummaryTask's unified control mechanism.
+   * 
+   * @return current RebuildState from NSSummaryTask
+   */
+  public static org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState getNSSummaryRebuildState() {
+    return org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.getRebuildState();
+  }
+
+  /**
+   * Convenience method to trigger asynchronous NSSummary tree rebuild.
+   * Uses the unified control mechanism in NSSummaryTask.
+   * 
+   * @param reconNamespaceSummaryManager The namespace summary manager
+   * @param omMetadataManager The OM metadata manager
+   * @return true if rebuild was triggered successfully, false otherwise
+   */
+  public static boolean triggerAsyncNSSummaryRebuild(
+      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+      ReconOMMetadataManager omMetadataManager) {
+    
+    // Submit rebuild task to single thread executor for async execution
+    NSSUMMARY_REBUILD_EXECUTOR.submit(() -> {
+      try {
+        // This will go through NSSummaryTask's unified control mechanism
+        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
+        log.info("Async NSSummary tree rebuild completed successfully.");
+      } catch (Exception e) {
+        log.error("Async NSSummary tree rebuild failed.", e);
+      }
+    });
+    
+    log.info("Async NSSummary tree rebuild triggered successfully.");
+    return true;
   }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
@@ -265,10 +300,10 @@ public class ReconUtils {
         throw new ServiceNotReadyException("Service is initializing. Please try again later.");
       }
       if (nsSummary.getParentId() == -1) {
-        if (rebuildTriggered.compareAndSet(false, true)) {
-          triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
-        }
-        log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
+        // Trigger async rebuild using unified control mechanism
+        triggerAsyncNSSummaryRebuild(reconNamespaceSummaryManager, omMetadataManager);
+        log.warn(
+            "NSSummary tree corruption detected, rebuild triggered. Returning empty string for path construction.");
         throw new ServiceNotReadyException("Service is initializing. Please try again later.");
       }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
@@ -398,21 +433,6 @@ public class ReconUtils {
       return prevKeyPrefix;
     }
     return prevKeyPrefix;
-  }
-
-  private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                     ReconOMMetadataManager omMetadataManager) {
-    NSSUMMARY_REBUILD_EXECUTOR.submit(() -> {
-      long startTime = Time.monotonicNow();
-      log.info("Rebuilding NSSummary tree...");
-      try {
-        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-        long endTime = Time.monotonicNow();
-        log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
-      } catch (Throwable t) {
-        log.error("NSSummary tree rebuild failed.", t);
-      }
-    });
   }
 
   /**

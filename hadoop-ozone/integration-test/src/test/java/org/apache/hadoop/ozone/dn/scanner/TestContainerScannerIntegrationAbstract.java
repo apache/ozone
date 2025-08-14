@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
@@ -68,6 +69,9 @@ public abstract class TestContainerScannerIntegrationAbstract {
   private static String volumeName;
   private static String bucketName;
   private static OzoneBucket bucket;
+  // Log4j 2 capturer currently doesn't support capturing specific logs.
+  // We must use one capturer for both the container and application logs.
+  private final GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.log4j2("");
 
   public static void buildCluster(OzoneConfiguration ozoneConfig)
       throws Exception {
@@ -166,6 +170,13 @@ public abstract class TestContainerScannerIntegrationAbstract {
         () -> TestHelper.isContainerClosed(cluster, containerID,
             cluster.getHddsDatanodes().get(0).getDatanodeDetails()),
         1000, 5000);
+
+    // After the container is marked as closed in the datanode, we must wait for the checksum generation from metadata
+    // to finish.
+    LambdaTestUtils.await(5000, 1000, () ->
+            getContainerReplica(containerID).getDataChecksum() != 0);
+    long closedChecksum = getContainerReplica(containerID).getDataChecksum();
+    assertNotEquals(0, closedChecksum);
   }
 
   protected long writeDataToOpenContainer() throws Exception {
@@ -201,8 +212,21 @@ public abstract class TestContainerScannerIntegrationAbstract {
     }
   }
 
+  protected GenericTestUtils.LogCapturer getContainerLogCapturer() {
+    return logCapturer;
+  }
+
   private OzoneOutputStream createKey(String keyName) throws Exception {
     return TestHelper.createKey(
         keyName, RATIS, ONE, 0, store, volumeName, bucketName);
+  }
+
+  protected OzoneConfiguration getConf() {
+    return cluster.getConf();
+  }
+
+  protected HddsDatanodeService getDatanode() {
+    assertEquals(1, cluster.getHddsDatanodes().size());
+    return cluster.getHddsDatanodes().get(0);
   }
 }

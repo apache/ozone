@@ -153,7 +153,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       connection.setRequestProperty("Content-Type", contentTypeValue);
       connection.setDoOutput(true);
       writeFormData(connection,
-          HAUtils.getExistingSstFiles(getCandidateDir()));
+          HAUtils.getExistingFiles(getCandidateDir()));
 
       connection.connect();
       int errorCode = connection.getResponseCode();

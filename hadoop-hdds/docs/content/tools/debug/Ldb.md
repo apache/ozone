@@ -1,7 +1,9 @@
 ---
-title: "Ozone Debug"
+title: "LDB Tool"
 date: 2024-10-14
-summary: Ozone Debug command can be used for all the debugging related tasks.
+summary: Parsing rocksDB and debugging related issues.
+menu: debug
+weight: 1
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -20,43 +22,6 @@ summary: Ozone Debug command can be used for all the debugging related tasks.
   limitations under the License.
 -->
 
-Ozone Debug command (`ozone debug`) is a collection of developer tools intended to help in debugging and get more information of various components of ozone.
-
-```bash
-Usage: ozone debug [-hV] [--verbose] [-conf=<configurationPath>]
-                   [-D=<String=String>]... [COMMAND]
-Developer tools for Ozone Debug operations
-      -conf=<configurationPath>
-                  path to the ozone configuration file
-  -D, --set=<String=String>
-                  Map of (configuration_key,configuration_value) for any 
-                    configuration overrides
-  -h, --help      Show this help message and exit.
-  -V, --version   Print version information and exit.
-      --verbose   More verbose output. Show the stack trace of the errors.
-Commands:
-  chunkinfo                  returns chunk location information about an
-                               existing key
-  print-log-dag, pld         Create an image of the current compaction log DAG
-                               in OM.
-  find-missing-padding, fmp  List all keys with any missing padding, optionally
-                               limited to a volume/bucket/key URI.
-  recover                    recover the lease of a specified file. Make sure
-                               to specify file system scheme if ofs:// is not
-                               the default.
-  prefix                     Parse prefix contents
-  ldb                        Parse rocksdb file content
-  read-replicas              Reads every replica for all the blocks associated
-                               with a given key.
-  container                  Container replica specific operations to be
-                               executed on datanodes only
-  ratislogparser             Shell of printing Ratis Log in understandable text
-```
-For more detailed usage see the output of `--help` for each of the subcommands.
-
-
-## ozone debug ldb
-
 Ozone heavily uses RocksDB for storing metadata. This tool helps parse the contents of RocksDB belonging to Ozone Roles.
 Supported DB's : Ozone Manager (om.db) , StorageContainerManager (scm.db),  Datanode/Container (container.db)
 Below is the usage:
@@ -69,6 +34,7 @@ Commands:
   scan                      Parse specified metadataTable
   list_column_families, ls  list all column families in db.
   value-schema              Schema of value in metadataTable
+  checkpoint                Create checkpoint for specified db
 ```
 
 ### list_column_families command
@@ -470,4 +436,12 @@ $ ozone debug ldb --db=/data/metadata/om.db value-schema --cf=keyTable
     "objectID" : "long"
   }
 }
+```
+
+### checkpoint command
+
+`checkpoint` command takes a checkpoint of a rocksdb, at a provided path.
+
+```bash
+$ ozone debug ldb --db=/data/metadata/om.db checkpoint --output=/tmp/om-checkpoint
 ```

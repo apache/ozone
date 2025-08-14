@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Map;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -94,6 +95,23 @@ public class TestEndpointBase {
         "getCustomMetadataFromHeaders should fail." +
             " Expected OS3Exception not thrown");
     assertThat(e.getCode()).contains("MetadataTooLarge");
+  }
+
+  @Test
+  public void testCustomMetadataHeadersWithUpperCaseHeaders() throws OS3Exception {
+    MultivaluedMap<String, String> s3requestHeaders = new MultivaluedHashMap<>();
+    String key = "CUSTOM-KEY";
+    String value = "custom-value1";
+    s3requestHeaders.add(CUSTOM_METADATA_HEADER_PREFIX.toUpperCase(Locale.ROOT) + key, value);
+
+    EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+    };
+
+    Map<String, String> customMetadata = endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);
+
+    assertEquals(value, customMetadata.get(key));
   }
 
 }

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
@@ -206,9 +207,8 @@ public class TestListInfoSubcommand {
     assertEquals(1, root.size(), "Expected 1 node in JSON output");
 
     JsonNode node = root.get(0);
-    assertTrue(node.has("datanodeDetails"), "Missing datanodeDetails");
     String opState = node.get("opState").asText();
-    String uuid = node.get("datanodeDetails").get("uuid").asText();
+    String uuid = node.get("id").asText();
 
     assertEquals("IN_SERVICE", opState, "Expected opState IN_SERVICE but got: " + opState);
     assertEquals(nodes.get(0).getNodeID().getUuid(), uuid,
@@ -278,6 +278,40 @@ public class TestListInfoSubcommand {
     validateOrderingFromTextOutput(textOutput, orderDirection);
   }
 
+  @ParameterizedTest(name = "{0} and {1} should be mutually exclusive")
+  @CsvSource({
+      "--most-used, --node-id",
+      "--most-used, --ip",
+      "--most-used, --hostname",
+      "--least-used, --node-id",
+      "--least-used, --ip",
+      "--least-used, --hostname"
+  })
+  public void testNodeSelectionAndUsageSortingAreMutuallyExclusive(String sortingFlag, String selectionFlag) {
+    CommandLine c = new CommandLine(cmd);
+    
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    String nodeSelectionValue;
+    if ("--node-id".equals(selectionFlag)) {
+      nodeSelectionValue = nodes.get(0).getNodeID().getUuid();
+    } else if ("--ip".equals(selectionFlag)) {
+      nodeSelectionValue = "192.168.1.100";
+    } else {
+      nodeSelectionValue = "host-one";
+    } 
+    
+    CommandLine.MutuallyExclusiveArgsException thrown = assertThrows(
+        CommandLine.MutuallyExclusiveArgsException.class,
+        () -> c.parseArgs(sortingFlag, selectionFlag, nodeSelectionValue),
+        () -> String.format("Expected MutuallyExclusiveArgsException when combining %s and %s",
+            sortingFlag, selectionFlag)
+    );
+    
+    String expectedErrorMessagePart = "mutually exclusive";
+    assertTrue(thrown.getMessage().contains(expectedErrorMessagePart),
+        "Exception message should contain '" + expectedErrorMessagePart + "' but was: " + thrown.getMessage());
+  }
+
   private void validateOrdering(JsonNode root, String orderDirection) {
     for (int i = 0; i < root.size() - 1; i++) {
       long usedCurrent = root.get(i).get("used").asLong();
@@ -330,8 +364,6 @@ public class TestListInfoSubcommand {
       dnd.setIpAddress("1.2.3." + i + 1);
       dnd.setNetworkLocation("/default");
       dnd.setNetworkName("host" + i);
-      dnd.addPorts(HddsProtos.Port.newBuilder()
-          .setName("ratis").setValue(5678).build());
       dnd.setUuid(UUID.randomUUID().toString());
 
       HddsProtos.Node.Builder builder  = HddsProtos.Node.newBuilder();

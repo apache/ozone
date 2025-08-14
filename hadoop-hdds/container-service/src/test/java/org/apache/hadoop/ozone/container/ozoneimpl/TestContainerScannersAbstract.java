@@ -31,6 +31,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -130,6 +131,9 @@ public abstract class TestContainerScannersAbstract {
   @Test
   public abstract void testChecksumUpdateFailure() throws Exception;
 
+  @Test
+  public abstract void testUnhealthyContainersTriggersVolumeScan() throws Exception;
+
   // HELPER METHODS
 
   protected void setScannedTimestampOld(Container<ContainerData> container) {
@@ -197,6 +201,10 @@ public abstract class TestContainerScannersAbstract {
     DataScanResult unhealthyData = getUnhealthyDataScanResult();
     MetadataScanResult healthyMetadata = getHealthyMetadataScanResult();
     MetadataScanResult unhealthyMetadata = getUnhealthyMetadataScanResult();
+
+    File volLocation = mock(File.class);
+    when(volLocation.getPath()).thenReturn("/temp/volume-testcontainerscanner");
+    when(vol.getStorageDir()).thenReturn(volLocation);
 
     // healthy container
     ContainerTestUtils.setupMockContainer(healthy,

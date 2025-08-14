@@ -842,8 +842,9 @@ public class TestNSSummaryEndpointWithFSO {
     String loggedMessage = logCaptor.getValue();
 
     // Here we can assert the exact message we expect to see in the logs.
+    // Since we set parentId = -1, this triggers the corruption detection path
     assertEquals(
-        "NSSummary tree is currently being rebuilt, returning empty string " +
+        "NSSummary tree corruption detected, rebuild triggered. Returning empty string " +
             "for path construction.", loggedMessage);
   }
 

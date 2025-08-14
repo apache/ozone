@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.checksum;
 
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM_EXTENSION;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -29,17 +30,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -47,7 +47,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -94,15 +93,7 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
-      try {
-        // If the file is not present, we will create the data for the first time. This happens under a write lock.
-        checksumInfoBuilder = readBuilder(data).orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
-      } catch (IOException ex) {
-        LOG.error("Failed to read container checksum tree file for container {}. Creating a new instance.",
-            containerID, ex);
-        checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
-      }
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
 
       ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
           tree::toProto);
@@ -129,16 +120,7 @@ public class ContainerChecksumTreeManager {
     Lock writeLock = getLock(containerID);
     writeLock.lock();
     try {
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = null;
-      try {
-        // If the file is not present, we will create the data for the first time. This happens under a write lock.
-        checksumInfoBuilder = readBuilder(data)
-            .orElse(ContainerProtos.ContainerChecksumInfo.newBuilder());
-      } catch (IOException ex) {
-        LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
-            data.getContainerID(), ex);
-        checksumInfoBuilder = ContainerProtos.ContainerChecksumInfo.newBuilder();
-      }
+      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
 
       // Although the persisted block list should already be sorted, we will sort it here to make sure.
       // This will automatically fix any bugs in the persisted order that may show up.
@@ -179,7 +161,7 @@ public class ContainerChecksumTreeManager {
                                   ContainerProtos.ContainerChecksumInfo peerChecksumInfo) throws
       StorageContainerException {
 
-    ContainerDiffReport report = new ContainerDiffReport();
+    ContainerDiffReport report = new ContainerDiffReport(thisChecksumInfo.getContainerID());
     try {
       captureLatencyNs(metrics.getMerkleTreeDiffLatencyNS(), () -> {
         Preconditions.assertNotNull(thisChecksumInfo, "Datanode's checksum info is null.");
@@ -280,6 +262,8 @@ public class ContainerChecksumTreeManager {
     List<ContainerProtos.ChunkMerkleTree> thisChunkMerkleTreeList = thisBlockMerkleTree.getChunkMerkleTreeList();
     List<ContainerProtos.ChunkMerkleTree> peerChunkMerkleTreeList = peerBlockMerkleTree.getChunkMerkleTreeList();
     int thisIdx = 0, peerIdx = 0;
+    long containerID = report.getContainerID();
+    long blockID = thisBlockMerkleTree.getBlockID();
 
     // Step 1: Process both lists while elements are present in both
     while (thisIdx < thisChunkMerkleTreeList.size() && peerIdx < peerChunkMerkleTreeList.size()) {
@@ -293,8 +277,8 @@ public class ContainerChecksumTreeManager {
         // thisTree = Healthy, peerTree = unhealthy -> Do nothing as thisTree is healthy.
         // thisTree = Unhealthy, peerTree = Unhealthy -> Do Nothing as both are corrupt.
         if (thisChunkMerkleTree.getDataChecksum() != peerChunkMerkleTree.getDataChecksum() &&
-            !thisChunkMerkleTree.getChecksumMatches() && peerChunkMerkleTree.getChecksumMatches()) {
-          report.addCorruptChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree);
+            !thisChunkMerkleTree.getChecksumMatches()) {
+          reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTree, report::addCorruptChunk);
         }
         thisIdx++;
         peerIdx++;
@@ -304,14 +288,14 @@ public class ContainerChecksumTreeManager {
         thisIdx++;
       } else {
         // Peer chunk's offset is smaller; record missing chunk and advance peerIdx
-        report.addMissingChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTree);
+        reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTree, report::addMissingChunk);
         peerIdx++;
       }
     }
 
     // Step 2: Process remaining chunks in the peer list
     while (peerIdx < peerChunkMerkleTreeList.size()) {
-      report.addMissingChunk(peerBlockMerkleTree.getBlockID(), peerChunkMerkleTreeList.get(peerIdx));
+      reportChunkIfHealthy(containerID, blockID, peerChunkMerkleTreeList.get(peerIdx), report::addMissingChunk);
       peerIdx++;
     }
 
@@ -319,28 +303,30 @@ public class ContainerChecksumTreeManager {
     // chunks from us when they reconcile.
   }
 
+  private void reportChunkIfHealthy(long containerID, long blockID, ContainerProtos.ChunkMerkleTree peerTree,
+      BiConsumer<Long, ContainerProtos.ChunkMerkleTree> addToReport) {
+    if (peerTree.getChecksumMatches()) {
+      addToReport.accept(blockID, peerTree);
+    } else {
+      LOG.warn("Skipping chunk at offset {} in block {} of container {} since peer reported it as " +
+          "unhealthy.", peerTree.getOffset(), blockID, containerID);
+    }
+  }
+
   public static long getDataChecksum(ContainerProtos.ContainerChecksumInfo checksumInfo) {
     return checksumInfo.getContainerMerkleTree().getDataChecksum();
   }
 
   /**
-   * Returns whether the container checksum tree file for the specified container exists without deserializing it.
-   */
-  public static boolean hasContainerChecksumFile(ContainerData data) {
-    return getContainerChecksumFile(data).exists();
-  }
-
-  /**
    * Returns the container checksum tree file for the specified container without deserializing it.
    */
-  @VisibleForTesting
   public static File getContainerChecksumFile(ContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree");
+    return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION);
   }
 
   @VisibleForTesting
   public static File getTmpContainerChecksumFile(ContainerData data) {
-    return new File(data.getMetadataPath(), data.getContainerID() + ".tree.tmp");
+    return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION + ".tmp");
   }
 
   private Lock getLock(long containerID) {
@@ -348,21 +334,33 @@ public class ContainerChecksumTreeManager {
   }
 
   /**
+   * Reads the checksum info of the specified container. If the tree file with the information does not exist, an empty
+   * instance is returned.
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  public Optional<ContainerProtos.ContainerChecksumInfo> read(ContainerData data) throws IOException {
+  public ContainerProtos.ContainerChecksumInfo read(ContainerData data) throws IOException {
     try {
       return captureLatencyNs(metrics.getReadContainerMerkleTreeLatencyNS(), () -> readChecksumInfo(data));
     } catch (IOException ex) {
       metrics.incrementMerkleTreeReadFailures();
-      throw new IOException(ex);
+      throw ex;
     }
   }
 
-  private Optional<ContainerProtos.ContainerChecksumInfo.Builder> readBuilder(ContainerData data) throws IOException {
-    Optional<ContainerProtos.ContainerChecksumInfo> checksumInfo = read(data);
-    return checksumInfo.map(ContainerProtos.ContainerChecksumInfo::toBuilder);
+  /**
+   * Reads the checksum info of the specified container. If the tree file with the information does not exist, or there
+   * is an exception trying to read the file, an empty instance is returned.
+   */
+  private ContainerProtos.ContainerChecksumInfo readOrCreate(ContainerData data) {
+    try {
+      // If the file is not present, we will create the data for the first time. This happens under a write lock.
+      return read(data);
+    } catch (IOException ex) {
+      LOG.error("Failed to read container checksum tree file for container {}. Overwriting it with a new instance.",
+          data.getContainerID(), ex);
+      return ContainerProtos.ContainerChecksumInfo.newBuilder().build();
+    }
   }
 
   /**
@@ -408,7 +406,7 @@ public class ContainerChecksumTreeManager {
   public ByteString getContainerChecksumInfo(KeyValueContainerData data) throws IOException {
     File checksumFile = getContainerChecksumFile(data);
     if (!checksumFile.exists()) {
-      throw new NoSuchFileException("Checksum file does not exist for container #" + data.getContainerID());
+      throw new FileNotFoundException("Checksum file does not exist for container #" + data.getContainerID());
     }
 
     try (InputStream inStream = Files.newInputStream(checksumFile.toPath())) {
@@ -421,17 +419,18 @@ public class ContainerChecksumTreeManager {
    * Callers are not required to hold a lock while calling this since writes are done to a tmp file and atomically
    * swapped into place.
    */
-  public static Optional<ContainerProtos.ContainerChecksumInfo> readChecksumInfo(ContainerData data)
+  public static ContainerProtos.ContainerChecksumInfo readChecksumInfo(ContainerData data)
       throws IOException {
     long containerID = data.getContainerID();
     File checksumFile = getContainerChecksumFile(data);
     try {
       if (!checksumFile.exists()) {
         LOG.debug("No checksum file currently exists for container {} at the path {}", containerID, checksumFile);
-        return Optional.empty();
+        return ContainerProtos.ContainerChecksumInfo.newBuilder().build();
       }
+
       try (InputStream inStream = Files.newInputStream(checksumFile.toPath())) {
-        return Optional.of(ContainerProtos.ContainerChecksumInfo.parseFrom(inStream));
+        return ContainerProtos.ContainerChecksumInfo.parseFrom(inStream);
       }
     } catch (IOException ex) {
       throw new IOException("Error occurred when reading container merkle tree for containerID "
@@ -443,10 +442,4 @@ public class ContainerChecksumTreeManager {
   public ContainerMerkleTreeMetrics getMetrics() {
     return this.metrics;
   }
-
-  public static boolean checksumFileExist(Container<?> container) {
-    File checksumFile = getContainerChecksumFile(container.getContainerData());
-    return checksumFile.exists();
-  }
-
 }
