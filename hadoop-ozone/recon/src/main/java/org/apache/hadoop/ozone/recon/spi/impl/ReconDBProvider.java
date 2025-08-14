@@ -26,7 +26,6 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -59,10 +58,6 @@ public class ReconDBProvider {
   @VisibleForTesting
   private static final Logger LOG =
           LoggerFactory.getLogger(ReconDBProvider.class);
-
-  // Thread-safe reference to track optimization capability
-  private static final AtomicReference<Boolean> OPTIMIZATION_SUPPORTED = 
-      new AtomicReference<>(null);
 
   @Inject
   ReconDBProvider(OzoneConfiguration configuration, ReconUtils reconUtils) {
