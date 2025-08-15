@@ -193,8 +193,7 @@ public class NSSummaryTask implements ReconOmTask {
     RebuildState previousState = REBUILD_STATE.getAndSet(RebuildState.RUNNING);
     
     if (previousState == RebuildState.RUNNING) {
-      // Another thread is already running - restore the state and exit
-      REBUILD_STATE.set(RebuildState.RUNNING);
+      // Another thread is already running - just exit (state is already RUNNING)
       LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
       return buildTaskResult(false);
     }
@@ -303,7 +302,10 @@ public class NSSummaryTask implements ReconOmTask {
    */
   @VisibleForTesting
   public static void resetRebuildState() {
-    REBUILD_STATE.set(RebuildState.IDLE);
+    // Only reset to IDLE if currently FAILED - never interrupt a RUNNING operation
+    REBUILD_STATE.compareAndSet(RebuildState.FAILED, RebuildState.IDLE);
+    // If state is RUNNING, leave it alone to prevent race conditions
+    // If state is already IDLE, no change needed
   }
 
   /**
