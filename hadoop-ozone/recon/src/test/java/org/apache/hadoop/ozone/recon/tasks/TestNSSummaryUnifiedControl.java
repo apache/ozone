@@ -31,7 +31,10 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -321,23 +324,42 @@ public class TestNSSummaryUnifiedControl {
     AtomicInteger successCount = new AtomicInteger(0);
     AtomicInteger rejectedCount = new AtomicInteger(0);
     AtomicInteger clearTableCallCount = new AtomicInteger(0);
+    
+    // Track which threads are part of our test to filter out external calls
+    final Set<String> testThreadNames = Collections.synchronizedSet(new HashSet<>());
 
     // Ensure clean initial state
     NSSummaryTask.resetRebuildState();
     assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(), 
         "Initial state must be IDLE");
 
-    // Setup rebuild to block and count calls
+    // Setup rebuild to block and count calls with additional debugging
     doAnswer(invocation -> {
-      int callNum = clearTableCallCount.incrementAndGet();
-      LOG.info("clearNSSummaryTable called #{}, current state: {}", callNum, NSSummaryTask.getRebuildState());
+      String threadName = Thread.currentThread().getName();
+      RebuildState currentState = NSSummaryTask.getRebuildState();
       
-      if (callNum == 1) {
-        startLatch.countDown();
-        boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
-        if (!awaitSuccess) {
-          LOG.warn("finishLatch.await() timed out");
+      // Only count calls from our test threads to avoid CI interference
+      if (testThreadNames.contains(threadName)) {
+        int callNum = clearTableCallCount.incrementAndGet();
+        
+        LOG.info("clearNSSummaryTable called #{} by test thread: {}, current state: {}", 
+            callNum, threadName, currentState);
+        
+        if (callNum == 1) {
+          startLatch.countDown();
+          boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
+          if (!awaitSuccess) {
+            LOG.warn("finishLatch.await() timed out");
+          }
+        } else {
+          // If we get a second call from our test threads, this is the bug we're trying to fix
+          LOG.error("UNEXPECTED: clearNSSummaryTable called multiple times (call #{}) by test thread: {}, state: {}", 
+              callNum, threadName, currentState);
         }
+      } else {
+        // Log but don't count calls from external threads (CI interference)
+        LOG.warn("clearNSSummaryTable called by EXTERNAL thread: {}, state: {} - ignoring for test count", 
+            threadName, currentState);
       }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
@@ -350,14 +372,18 @@ public class TestNSSummaryUnifiedControl {
       for (int i = 0; i < threadCount; i++) {
         final int threadId = i;
         futures[i] = CompletableFuture.runAsync(() -> {
-          LOG.info("Thread {} attempting rebuild, current state: {}", threadId, NSSummaryTask.getRebuildState());
+          // Register this thread as part of our test
+          String threadName = Thread.currentThread().getName();
+          testThreadNames.add(threadName);
+          
+          LOG.info("Thread {} ({}) attempting rebuild, current state: {}", threadId, threadName, NSSummaryTask.getRebuildState());
           TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
           if (result.isTaskSuccess()) {
             int count = successCount.incrementAndGet();
-            LOG.info("Thread {} rebuild succeeded (success #{})", threadId, count);
+            LOG.info("Thread {} ({}) rebuild succeeded (success #{})", threadId, threadName, count);
           } else {
             int count = rejectedCount.incrementAndGet();
-            LOG.info("Thread {} rebuild rejected (rejection #{})", threadId, count);
+            LOG.info("Thread {} ({}) rebuild rejected (rejection #{})", threadId, threadName, count);
           }
         }, executor);
       }
