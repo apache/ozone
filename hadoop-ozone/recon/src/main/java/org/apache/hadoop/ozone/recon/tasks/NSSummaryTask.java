@@ -189,21 +189,17 @@ public class NSSummaryTask implements ReconOmTask {
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     // Unified control for all NSS tree rebuild operations
-    // Simple atomic check: only one thread can execute at a time
-    RebuildState currentState = REBUILD_STATE.get();
+    // Use getAndSet to atomically claim the lock - this prevents ALL race conditions
+    RebuildState previousState = REBUILD_STATE.getAndSet(RebuildState.RUNNING);
     
-    if (currentState == RebuildState.RUNNING) {
+    if (previousState == RebuildState.RUNNING) {
+      // Another thread is already running - restore the state and exit
+      REBUILD_STATE.set(RebuildState.RUNNING);
       LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
       return buildTaskResult(false);
     }
-    
-    // Try to atomically transition from current state (IDLE or FAILED) to RUNNING
-    if (!REBUILD_STATE.compareAndSet(currentState, RebuildState.RUNNING)) {
-      LOG.info("Failed to acquire rebuild lock, another thread started rebuild.");
-      return buildTaskResult(false);
-    }
 
-    // Successfully acquired the lock - proceed with rebuild
+    // Successfully acquired the lock (previous state was IDLE or FAILED)
     LOG.info("Starting NSSummary tree reprocess with unified control...");
     long startTime = System.nanoTime();
     

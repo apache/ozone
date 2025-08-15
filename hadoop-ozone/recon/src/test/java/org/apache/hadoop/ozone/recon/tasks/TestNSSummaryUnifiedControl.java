@@ -160,9 +160,9 @@ public class TestNSSummaryUnifiedControl {
           long durationInMillis = TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
           LOG.info("Test NSSummary reprocess execution time: {} milliseconds", durationInMillis);
           
-          // Reset state to IDLE on successful completion
+          // Don't reset state here - let the main reprocess method handle state management
+          // The test should not interfere with state transitions during execution
           if (success) {
-            NSSummaryTask.resetRebuildState();
             LOG.info("Test NSSummary tree reprocess completed successfully with unified control.");
           }
         }
