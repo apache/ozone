@@ -189,54 +189,39 @@ public class NSSummaryTask implements ReconOmTask {
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     // Unified control for all NSS tree rebuild operations
-    // Use bounded retry to handle race conditions safely
-    for (int attempt = 0; attempt < 3; attempt++) {
-      RebuildState currentState = REBUILD_STATE.get();
-      
-      if (currentState == RebuildState.RUNNING) {
-        LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
-        return buildTaskResult(false);
-      }
-      
-      // Try to atomically transition to RUNNING from current state (IDLE or FAILED)
-      if (REBUILD_STATE.compareAndSet(currentState, RebuildState.RUNNING)) {
-        // Successfully acquired the lock
-        LOG.info("Starting NSSummary tree reprocess with unified control...");
-        long startTime = System.nanoTime();
-        
-        try {
-          TaskResult result = executeReprocess(omMetadataManager, startTime);
-          if (result.isTaskSuccess()) {
-            REBUILD_STATE.set(RebuildState.IDLE);
-            LOG.info("NSSummary tree reprocess completed successfully, state reset to IDLE.");
-          } else {
-            REBUILD_STATE.set(RebuildState.FAILED);
-            LOG.warn("NSSummary tree reprocess failed, state set to FAILED.");
-          }
-          return result;
-        } catch (Exception e) {
-          LOG.error("NSSummary reprocess failed with exception.", e);
-          REBUILD_STATE.set(RebuildState.FAILED);
-          return buildTaskResult(false);
-        }
-      }
-      
-      // compareAndSet failed, another thread changed the state
-      // Add a small delay and retry (but only up to 3 times)
-      if (attempt < 2) {
-        try {
-          Thread.sleep(1); // 1ms delay
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          LOG.info("Thread interrupted while waiting to retry rebuild lock acquisition");
-          return buildTaskResult(false);
-        }
-      }
+    // Simple atomic check: only one thread can execute at a time
+    RebuildState currentState = REBUILD_STATE.get();
+    
+    if (currentState == RebuildState.RUNNING) {
+      LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
+      return buildTaskResult(false);
     }
     
-    // All retry attempts failed
-    LOG.info("Failed to acquire rebuild lock after 3 attempts, another thread likely started rebuild.");
-    return buildTaskResult(false);
+    // Try to atomically transition from current state (IDLE or FAILED) to RUNNING
+    if (!REBUILD_STATE.compareAndSet(currentState, RebuildState.RUNNING)) {
+      LOG.info("Failed to acquire rebuild lock, another thread started rebuild.");
+      return buildTaskResult(false);
+    }
+
+    // Successfully acquired the lock - proceed with rebuild
+    LOG.info("Starting NSSummary tree reprocess with unified control...");
+    long startTime = System.nanoTime();
+    
+    try {
+      TaskResult result = executeReprocess(omMetadataManager, startTime);
+      if (result.isTaskSuccess()) {
+        REBUILD_STATE.set(RebuildState.IDLE);
+        LOG.info("NSSummary tree reprocess completed successfully, state reset to IDLE.");
+      } else {
+        REBUILD_STATE.set(RebuildState.FAILED);
+        LOG.warn("NSSummary tree reprocess failed, state set to FAILED.");
+      }
+      return result;
+    } catch (Exception e) {
+      LOG.error("NSSummary reprocess failed with exception.", e);
+      REBUILD_STATE.set(RebuildState.FAILED);
+      return buildTaskResult(false);
+    }
   }
 
   /**
