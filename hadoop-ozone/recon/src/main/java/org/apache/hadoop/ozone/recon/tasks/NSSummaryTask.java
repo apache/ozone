@@ -205,7 +205,15 @@ public class NSSummaryTask implements ReconOmTask {
         long startTime = System.nanoTime();
         
         try {
-          return executeReprocess(omMetadataManager, startTime);
+          TaskResult result = executeReprocess(omMetadataManager, startTime);
+          if (result.isTaskSuccess()) {
+            REBUILD_STATE.set(RebuildState.IDLE);
+            LOG.info("NSSummary tree reprocess completed successfully, state reset to IDLE.");
+          } else {
+            REBUILD_STATE.set(RebuildState.FAILED);
+            LOG.warn("NSSummary tree reprocess failed, state set to FAILED.");
+          }
+          return result;
         } catch (Exception e) {
           LOG.error("NSSummary reprocess failed with exception.", e);
           REBUILD_STATE.set(RebuildState.FAILED);
