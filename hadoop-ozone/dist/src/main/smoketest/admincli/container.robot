@@ -188,10 +188,9 @@ Reset user
 Cannot reconcile open container
     # At this point we should have an open Ratis Three container.
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -n1
+    # Reconciling and querying status of open containers is not supported
     Execute and check rc    ozone admin container reconcile "${container}"    255
-    # The container should not yet have any replica checksums since it is still open.
-    # 0 is the hex value of an empty checksum.
-    Container checksums should match    ${container}    0
+    Execute and check rc    ozone admin container reconcile --status "${container}"    255
 
 Close container
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
