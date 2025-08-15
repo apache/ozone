@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVIC
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -205,8 +206,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     public Stream<Arguments> parameters1() {
       return Stream.of(
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, true),
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, false),
+          arguments(FILE_SYSTEM_OPTIMIZED, true),
+          arguments(FILE_SYSTEM_OPTIMIZED, false),
           arguments(BucketLayout.OBJECT_STORE, true),
           arguments(BucketLayout.OBJECT_STORE, false)
       );
@@ -528,7 +529,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
 
-      if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
         GenericTestUtils.waitFor(() ->
             (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
         assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
@@ -544,7 +545,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @MethodSource("parameters1")
     void testSlashPrefix(BucketLayout bucketLayout, boolean createPrefix)
         throws IOException, TimeoutException, InterruptedException {
-      assumeTrue(bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      assumeTrue(bucketLayout != FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String keyPrefix = "key";
@@ -567,7 +568,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         createLifecyclePolicy(volumeName, bucketName, bucketLayout, null, filter.build(), date.toString(), true);
       }
 
-      if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
         GenericTestUtils.waitFor(() ->
             (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
         assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
@@ -583,7 +584,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @MethodSource("parameters1")
     void testSlashKey(BucketLayout bucketLayout, boolean createPrefix)
         throws IOException, TimeoutException, InterruptedException {
-      assumeTrue(bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      assumeTrue(bucketLayout != FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String keyPrefix = "/key//";
@@ -616,7 +617,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
     void testSlashKeyWithAndOperator(BucketLayout bucketLayout)
         throws IOException, TimeoutException, InterruptedException {
-      assumeTrue(bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      assumeTrue(bucketLayout != FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String keyPrefix = "/key//";
@@ -647,7 +648,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
     void testSlashPrefixWithAndOperator(BucketLayout bucketLayout)
         throws IOException, InterruptedException, TimeoutException {
-      assumeTrue(bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      assumeTrue(bucketLayout != FILE_SYSTEM_OPTIMIZED);
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String keyPrefix = "key";
@@ -751,7 +752,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
           WAIT_CHECK_INTERVAL, 1000);
       // assert directory "dir1/dir2/dir3" exists
-      if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
         KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, "dir1/dir2/dir3");
         assertFalse(keyInfo.getKeyInfo().isFile());
       }
@@ -820,7 +821,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       long initialNumDeletedDir = metrics.getNumDirDeleted().value();
 
       // Create the directory
-      createVolumeAndBucket(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
+      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, false);
       createDirectory(volumeName, bucketName, dirName);
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
@@ -832,11 +833,11 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       if (createPrefix) {
-        createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
             prefix, null, date.toString(), true);
       } else if (createFilterPrefix) {
         OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
-        createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
             null, filter.build(), date.toString(), true);
       }
 
@@ -866,7 +867,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
           WAIT_CHECK_INTERVAL, 1000);
       // assert directory "dir1/dir2/dir3" exists
-      if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
         KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirPath);
         assertFalse(keyInfo.getKeyInfo().isFile());
       }
@@ -878,7 +879,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       Thread.sleep(EXPIRE_SECONDS);
 
-      if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
         assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
         assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
       } else {
@@ -999,7 +1000,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       Thread.sleep(SERVICE_INTERVAL);
       KeyLifecycleService.getInjector(1).resume();
       String expectedString = "Received a request to delete a Key /" + key.getVolumeName() + "/" +
-          key.getBucketName() + "/" + key.getKeyName() +  " whose updateID not match or null";
+          key.getBucketName() + "/" + key.getKeyName() + " whose updateID not match or null";
       GenericTestUtils.waitFor(() -> requestLog.getOutput().contains(expectedString), WAIT_CHECK_INTERVAL, 10000);
 
       // rename will change object's modificationTime. But since expiration action is an absolute timestamp, so
@@ -1082,15 +1083,15 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     public Stream<Arguments> parameters4() {
       return Stream.of(
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/"),
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+          arguments(FILE_SYSTEM_OPTIMIZED, "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/"),
+          arguments(FILE_SYSTEM_OPTIMIZED,
               "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/"),
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+          arguments(FILE_SYSTEM_OPTIMIZED,
               "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/"),
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+          arguments(FILE_SYSTEM_OPTIMIZED,
               "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/" +
                   "dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/"),
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+          arguments(FILE_SYSTEM_OPTIMIZED,
               "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/" +
                   "dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/"),
           arguments(BucketLayout.OBJECT_STORE, "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/"),
@@ -1108,21 +1109,21 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
 
     /**
-    * ozone.om.ratis.log.appender.queue.byte-limit default is 32MB.
-
-    * size 5900049 for 100000 keys like "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/*" (40 bytes path)
-    * size 8400049 for 100000 keys like
-     *        "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/*" (60 bytes path)
-    * size 11000049 for 100000 keys like
-     *       "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/*"
-     *       (80 bytes path)
-    * size 13600049 for 100000 keys like
-     *       "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/" +
-    *        "dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/" (100 bytes path)
-    * size 16200049 for 100000 keys like
-     *       "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/" +
-    *        "dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/" (120 bytes path)
-    */
+     * ozone.om.ratis.log.appender.queue.byte-limit default is 32MB.
+     * <p>
+     * size 5900049 for 100000 keys like "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/*" (40 bytes path)
+     * size 8400049 for 100000 keys like
+     * "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/*" (60 bytes path)
+     * size 11000049 for 100000 keys like
+     * "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/*"
+     * (80 bytes path)
+     * size 13600049 for 100000 keys like
+     * "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/" +
+     * "dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/" (100 bytes path)
+     * size 16200049 for 100000 keys like
+     * "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/" +
+     * "dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/" (120 bytes path)
+     */
     @ParameterizedTest
     @MethodSource("parameters4")
     void testPerformanceWithNestedDir(BucketLayout bucketLayout, String prefix)
@@ -1200,7 +1201,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
           (getDeletedKeyCount() - initialDeletedKeyCount) == keyCount, WAIT_CHECK_INTERVAL, 5000);
       assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
       GenericTestUtils.waitFor(() ->
-          log.getOutput().contains("LimitedSizeList reached maximum size " + 100), WAIT_CHECK_INTERVAL, 5000);
+          log.getOutput().contains("LimitedSizeList has reached maximum size " + 100), WAIT_CHECK_INTERVAL, 5000);
       GenericTestUtils.setLogLevel(KeyLifecycleService.getLog(), Level.INFO);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
@@ -1288,8 +1289,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     public Stream<Arguments> parameters1() {
       return Stream.of(
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, true),
-          arguments(BucketLayout.FILE_SYSTEM_OPTIMIZED, false),
+          arguments(FILE_SYSTEM_OPTIMIZED, true),
+          arguments(FILE_SYSTEM_OPTIMIZED, false),
           arguments(BucketLayout.OBJECT_STORE, true),
           arguments(BucketLayout.OBJECT_STORE, false)
       );
@@ -1387,13 +1388,13 @@ class TestKeyLifecycleService extends OzoneTestBase {
       if (createPrefix) {
         omException = assertThrows(
             OMException.class,
-            () -> createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+            () -> createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
                 prefix, null, date.toString(), true));
       } else {
         OmLCFilter.Builder filter = getOmLCFilterBuilder(prefix, null, null);
         omException = assertThrows(
             OMException.class,
-            () -> createLifecyclePolicy(volumeName, bucketName, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+            () -> createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
                 null, filter.build(), date.toString(), true));
       }
       assertSame(INVALID_REQUEST, omException.getResult());

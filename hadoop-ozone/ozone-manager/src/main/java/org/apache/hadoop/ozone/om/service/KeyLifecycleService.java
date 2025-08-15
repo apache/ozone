@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
@@ -47,7 +48,6 @@ import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -102,8 +102,8 @@ public class KeyLifecycleService extends BackgroundService {
     this.ozoneManager = ozoneManager;
     this.keyDeleteBatchSize = conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT);
-    Preconditions.checkArgument(keyDeleteBatchSize >= 0,
-        OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE + " cannot be negative.");
+    Preconditions.checkArgument(keyDeleteBatchSize > 0,
+        OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE + " should be a positive value.");
     this.listMaxSize = keyDeleteBatchSize >= 10000 ? keyDeleteBatchSize : 10000;
     this.suspended = new AtomicBoolean(false);
     this.metrics = KeyLifecycleServiceMetrics.create();
@@ -240,12 +240,8 @@ public class KeyLifecycleService extends BackgroundService {
         List<OmLCRule> ruleList = originRuleList.stream().filter(r -> r.isEnabled()).collect(Collectors.toList());
 
         // scan file or key table for evaluate rules against files or keys
-        LimitedSizeList<String> expiredKeyNameList = new LimitedSizeList<>(listMaxSize);
-        LimitedSizeList<String> expiredDirNameList = new LimitedSizeList<>(listMaxSize);
-        // the size of expiredKeyUpdateIDList and expiredDirUpdateIDList are equal to size of
-        // expiredKeyNameList and expiredDirNameList
-        List<Long> expiredKeyUpdateIDList = new ArrayList<>();
-        List<Long> expiredDirUpdateIDList = new ArrayList<>();
+        ExpiredObjectList expiredKeyList = new ExpiredObjectList(listMaxSize);
+        ExpiredObjectList expiredDirList = new ExpiredObjectList(listMaxSize);
         Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(bucket.getBucketLayout());
         /**
          * Filter treatment.
@@ -276,37 +272,34 @@ public class KeyLifecycleService extends BackgroundService {
             onFailure(bucketKey);
             return result;
           }
-          evaluateFSOBucket(volume, bucket, bucketKey, keyTable, ruleList,
-              expiredKeyNameList, expiredKeyUpdateIDList, expiredDirNameList, expiredDirUpdateIDList);
+          evaluateFSOBucket(volume, bucket, bucketKey, keyTable, ruleList, expiredKeyList, expiredDirList);
         } else {
           // use bucket name as key iterator prefix
-          evaluateBucket(bucket, keyTable, ruleList, expiredKeyNameList, expiredKeyUpdateIDList);
+          evaluateBucket(bucket, keyTable, ruleList, expiredKeyList);
         }
 
-        if (expiredKeyNameList.isEmpty() && expiredDirNameList.isEmpty()) {
+        if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
           LOG.info("No expired keys/dirs found for bucket {}", bucketKey);
           onSuccess(bucketKey);
           return result;
         }
 
         LOG.info("{} expired keys and {} expired dirs found for bucket {}",
-            expiredKeyNameList.size(), expiredDirNameList.size(), bucketKey);
+            expiredKeyList.size(), expiredDirList.size(), bucketKey);
 
         // If trash is enabled, move files to trash, instead of send delete requests.
         // OBS bucket doesn't support trash.
         if (bucket.getBucketLayout() == BucketLayout.OBJECT_STORE) {
           sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-              expiredKeyNameList, expiredKeyUpdateIDList, false);
+              expiredKeyList, false);
         } else if (ozoneTrash != null) {
           // move keys to trash
           // TODO: add unit test in next patch
-          moveKeysToTrash(expiredKeyNameList);
+          moveKeysToTrash(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList);
         } else {
-          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyNameList,
-              expiredKeyUpdateIDList, false);
-          if (!expiredDirNameList.isEmpty()) {
-            sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredDirNameList,
-                expiredDirUpdateIDList, true);
+          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList, false);
+          if (!expiredDirList.isEmpty()) {
+            sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredDirList, true);
           }
         }
         onSuccess(bucketKey);
@@ -319,8 +312,7 @@ public class KeyLifecycleService extends BackgroundService {
     @SuppressWarnings("checkstyle:parameternumber")
     private void evaluateFSOBucket(OmVolumeArgs volume, OmBucketInfo bucket, String bucketKey,
         Table<String, OmKeyInfo> keyTable, List<OmLCRule> ruleList,
-        LimitedSizeList<String> expiredKeyList, List<Long> expiredKeyUpdateIDList,
-        LimitedSizeList<String> expiredDirList, List<Long> expiredDirUpdateIDList) {
+        ExpiredObjectList expiredKeyList, ExpiredObjectList expiredDirList) {
       List<OmLCRule> directoryStylePrefixRuleList =
           ruleList.stream().filter(r -> r.isDirectoryStylePrefix()).collect(Collectors.toList());
       List<OmLCRule> nonDirectoryStylePrefixRuleList =
@@ -341,59 +333,54 @@ public class KeyLifecycleService extends BackgroundService {
           continue;
         }
         // use last directory's object ID to iterate the keys
-        String prefix = OzoneConsts.OM_KEY_PREFIX + volume.getObjectID() +
-            OzoneConsts.OM_KEY_PREFIX + bucket.getObjectID() + OzoneConsts.OM_KEY_PREFIX;
+        String prefix = OM_KEY_PREFIX + volume.getObjectID() +
+            OM_KEY_PREFIX + bucket.getObjectID() + OM_KEY_PREFIX;
         StringBuffer directoryPath = new StringBuffer();
         if (!dirList.isEmpty()) {
           prefix += dirList.get(dirList.size() - 1).getObjectID();
           for (OmDirectoryInfo dir : dirList) {
-            directoryPath.append(dir.getName()).append(OzoneConsts.OM_KEY_PREFIX);
+            directoryPath.append(dir.getName()).append(OM_KEY_PREFIX);
           }
-          if (directoryPath.toString().equals(rule.getEffectivePrefix() + OzoneConsts.OM_KEY_PREFIX)) {
-            try {
-              expiredDirUpdateIDList.add(dirList.get(dirList.size() - 1).getUpdateID());
-              expiredDirList.add(directoryPath.toString());
-            } catch (IOException e) {
-              // send delete request for pending deletion directories
+          if (directoryPath.toString().equals(rule.getEffectivePrefix() + OM_KEY_PREFIX)) {
+            if (!expiredDirList.add(directoryPath.toString(), dirList.get(dirList.size() - 1).getUpdateID())) {
+              // if expiredDirList is full, send delete request for pending deletion directories
               sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
-                  expiredDirList, expiredDirUpdateIDList, true);
+                  expiredDirList, true);
+              expiredDirList.add(directoryPath.toString(), dirList.get(dirList.size() - 1).getUpdateID());
             }
           }
         }
 
         LOG.info("Prefix {} for {}", prefix, bucketKey);
         evaluateDirTable(directoryInfoTable, prefix, directoryPath.toString(), rule,
-            expiredDirList, expiredDirUpdateIDList, bucket);
-        evaluateKeyTable(keyTable, prefix, directoryPath.toString(), rule, expiredKeyList,
-            expiredKeyUpdateIDList, bucket);
+            expiredDirList, bucket);
+        evaluateKeyTable(keyTable, prefix, directoryPath.toString(), rule, expiredKeyList, bucket);
       }
 
       for (OmLCRule rule : nonDirectoryStylePrefixRuleList) {
         // find the directory for the prefix, it may not exist
         OmDirectoryInfo dirInfo = getDirectory(volume, bucket, rule.getEffectivePrefix(), bucketKey);
-        String prefix = OzoneConsts.OM_KEY_PREFIX + volume.getObjectID() +
-            OzoneConsts.OM_KEY_PREFIX + bucket.getObjectID() + OzoneConsts.OM_KEY_PREFIX;
+        String prefix = OM_KEY_PREFIX + volume.getObjectID() +
+            OM_KEY_PREFIX + bucket.getObjectID() + OM_KEY_PREFIX;
         if (dirInfo != null) {
           prefix += dirInfo.getObjectID();
           if (dirInfo.getName().equals(rule.getEffectivePrefix())) {
-            try {
-              expiredDirUpdateIDList.add(dirInfo.getUpdateID());
-              expiredDirList.add(dirInfo.getName());
-            } catch (IOException e) {
-              // send delete request for pending deletion directories
+            if (!expiredDirList.add(dirInfo.getName(), dirInfo.getUpdateID())) {
+              // if expiredDirList is full, send delete request for pending deletion directories
               sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
-                  expiredDirList, expiredDirUpdateIDList, true);
+                  expiredDirList, true);
+              expiredDirList.add(dirInfo.getName(), dirInfo.getUpdateID());
             }
           }
         }
         LOG.info("Prefix {} for {}", prefix, bucketKey);
-        evaluateKeyTable(keyTable, prefix, "", rule, expiredKeyList, expiredKeyUpdateIDList, bucket);
-        evaluateDirTable(directoryInfoTable, prefix, "", rule, expiredDirList, expiredDirUpdateIDList, bucket);
+        evaluateKeyTable(keyTable, prefix, "", rule, expiredKeyList, bucket);
+        evaluateDirTable(directoryInfoTable, prefix, "", rule, expiredDirList, bucket);
       }
 
       if (!noPrefixRuleList.isEmpty()) {
-        String prefix = OzoneConsts.OM_KEY_PREFIX + volume.getObjectID() +
-            OzoneConsts.OM_KEY_PREFIX + bucket.getObjectID() + OzoneConsts.OM_KEY_PREFIX;
+        String prefix = OM_KEY_PREFIX + volume.getObjectID() +
+            OM_KEY_PREFIX + bucket.getObjectID() + OM_KEY_PREFIX;
         LOG.info("prefix {} for {}", prefix, bucketKey);
         // use bucket name as key iterator prefix
         try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
@@ -405,13 +392,11 @@ public class KeyLifecycleService extends BackgroundService {
             for (OmLCRule rule : noPrefixRuleList) {
               if (rule.match(key)) {
                 // mark key as expired, check next key
-                try {
-                  expiredKeyUpdateIDList.add(key.getUpdateID());
-                  expiredKeyList.add(key.getKeyName());
-                } catch (IOException e) {
-                  // send delete request for pending deletion keys
+                if (!expiredKeyList.add(key.getKeyName(), key.getUpdateID())) {
+                  // if expiredKeyList is full, send delete request for pending deletion keys
                   sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
-                      expiredKeyList, expiredKeyUpdateIDList, true);
+                      expiredKeyList, false);
+                  expiredKeyList.add(key.getKeyName(), key.getUpdateID());
                 }
                 sizeKeyDeleted += key.getReplicatedSize();
                 break;
@@ -431,28 +416,26 @@ public class KeyLifecycleService extends BackgroundService {
             numDirIterated++;
             for (OmLCRule rule : noPrefixRuleList) {
               if (rule.match(dir, dir.getPath())) {
-                try {
-                  // mark key as expired, check next key
-                  expiredDirUpdateIDList.add(dir.getUpdateID());
-                  expiredDirList.add(dir.getPath());
-                } catch (IOException e) {
-                  // send delete request for pending deletion directories
+                // mark directory as expired, check next directory
+                if (!expiredDirList.add(dir.getPath(), dir.getUpdateID())) {
+                  // if expiredDirList is full, send delete request for pending deletion directories
                   sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
-                      expiredDirList, expiredDirUpdateIDList, true);
+                      expiredDirList, true);
+                  expiredDirList.add(dir.getPath(), dir.getUpdateID());
                 }
                 break;
               }
             }
           }
         } catch (IOException e) {
-          // log failure and continue the process to delete/move files already identified in this run
-          LOG.warn("Failed to iterate keyTable for bucket {}", bucketKey, e);
+          // log failure and continue the process to delete/move directories already identified in this run
+          LOG.warn("Failed to iterate directoryTable for bucket {}", bucketKey, e);
         }
       }
     }
 
     private void evaluateKeyTable(Table<String, OmKeyInfo> keyTable, String prefix, String directoryPath,
-        OmLCRule rule, LimitedSizeList<String> keyList, List<Long> keyUpdateIDList, OmBucketInfo bucket) {
+        OmLCRule rule, ExpiredObjectList keyList, OmBucketInfo bucket) {
       String volumeName = bucket.getVolumeName();
       String bucketName = bucket.getBucketName();
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
@@ -463,13 +446,11 @@ public class KeyLifecycleService extends BackgroundService {
           String keyPath = directoryPath + key.getKeyName();
           numKeyIterated++;
           if (rule.match(key, keyPath)) {
-            try {
-              // mark key as expired, check next key
-              keyUpdateIDList.add(key.getUpdateID());
-              keyList.add(keyPath);
-            } catch (IOException e) {
-              // send delete request for pending deletion keys
-              sendDeleteKeysRequestAndClearList(volumeName, bucketName, keyList, keyUpdateIDList, true);
+            // mark key as expired, check next key
+            if (!keyList.add(keyPath, key.getUpdateID())) {
+              // if keyList is full, send delete request for pending deletion keys
+              sendDeleteKeysRequestAndClearList(volumeName, bucketName, keyList, false);
+              keyList.add(keyPath, key.getUpdateID());
             }
             sizeKeyDeleted += key.getReplicatedSize();
           }
@@ -481,8 +462,7 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     private void evaluateDirTable(Table<String, OmDirectoryInfo> directoryInfoTable, String prefix,
-        String directoryPath, OmLCRule rule, LimitedSizeList<String> dirList,
-        List<Long> dirUpdateIDList, OmBucketInfo bucket) {
+        String directoryPath, OmLCRule rule, ExpiredObjectList dirList, OmBucketInfo bucket) {
       String volumeName = bucket.getVolumeName();
       String bucketName = bucket.getBucketName();
       try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> dirTblItr =
@@ -493,25 +473,22 @@ public class KeyLifecycleService extends BackgroundService {
           String dirPath = directoryPath + dir.getName();
           numDirIterated++;
           if (rule.match(dir, dirPath)) {
-            try {
-              // mark dir as expired, check next key
-              dirUpdateIDList.add(dir.getUpdateID());
-              dirList.add(dirPath);
-            } catch (IOException e) {
-              // send delete request for pending deletion directories
-              sendDeleteKeysRequestAndClearList(volumeName, bucketName, dirList, dirUpdateIDList, true);
+            // mark dir as expired, check next key
+            if (!dirList.add(dirPath, dir.getUpdateID())) {
+              // if dirList is full, send delete request for pending deletion directories
+              sendDeleteKeysRequestAndClearList(volumeName, bucketName, dirList, true);
+              dirList.add(dirPath, dir.getUpdateID());
             }
           }
         }
       } catch (IOException e) {
         // log failure and continue the process to delete/move files already identified in this run
-        LOG.warn("Failed to iterate directoryInfoTable for bucket {}/{}", volumeName, bucketName, e);
+        LOG.warn("Failed to iterate directoryTable for bucket {}/{}", volumeName, bucketName, e);
       }
     }
 
     private void evaluateBucket(OmBucketInfo bucketInfo,
-        Table<String, OmKeyInfo> keyTable, List<OmLCRule> ruleList,
-        LimitedSizeList<String> expiredKeyList, List<Long> expiredKeyUpdateIDList) {
+        Table<String, OmKeyInfo> keyTable, List<OmLCRule> ruleList, ExpiredObjectList expiredKeyList) {
       String volumeName = bucketInfo.getVolumeName();
       String bucketName = bucketInfo.getBucketName();
       // use bucket name as key iterator prefix
@@ -523,13 +500,11 @@ public class KeyLifecycleService extends BackgroundService {
           numKeyIterated++;
           for (OmLCRule rule : ruleList) {
             if (rule.match(key)) {
-              try {
-                // mark key as expired, check next key
-                expiredKeyUpdateIDList.add(key.getUpdateID());
-                expiredKeyList.add(key.getKeyName());
-              } catch (IOException e) {
-                // send delete request for pending deletion keys
-                sendDeleteKeysRequestAndClearList(volumeName, bucketName, expiredKeyList, expiredKeyUpdateIDList, true);
+              // mark key as expired, check next key
+              if (!expiredKeyList.add(key.getKeyName(), key.getUpdateID())) {
+                // if expiredKeyList is full, send delete request for pending deletion keys
+                sendDeleteKeysRequestAndClearList(volumeName, bucketName, expiredKeyList, false);
+                expiredKeyList.add(key.getKeyName(), key.getUpdateID());
               }
               sizeKeyDeleted += key.getReplicatedSize();
               break;
@@ -608,8 +583,8 @@ public class KeyLifecycleService extends BackgroundService {
           timeSpent, bucketName, numKeyIterated, numDirIterated, numKeyDeleted, sizeKeyDeleted, numDirDeleted);
     }
 
-    private void sendDeleteKeysRequestAndClearList(String volume, String bucket, LimitedSizeList<String> keysList,
-        List<Long> expiredKeyUpdateIDList, boolean dir) {
+    private void sendDeleteKeysRequestAndClearList(String volume, String bucket,
+        ExpiredObjectList keysList, boolean dir) {
       try {
         if (getInjector(1) != null) {
           try {
@@ -627,8 +602,8 @@ public class KeyLifecycleService extends BackgroundService {
           int endIndex = startIndex + (batchSize < (keysList.size() - startIndex) ?
               batchSize : keysList.size() - startIndex);
           int keyCount = endIndex - startIndex;
-          builder.addAllKeys(keysList.subList(startIndex, endIndex));
-          builder.addAllUpdateIDs(expiredKeyUpdateIDList.subList(startIndex, endIndex));
+          builder.addAllKeys(keysList.nameSubList(startIndex, endIndex));
+          builder.addAllUpdateIDs(keysList.updateIDSubList(startIndex, endIndex));
 
           DeleteKeyArgs deleteKeyArgs = builder.build();
           DeleteKeysRequest deleteKeysRequest = DeleteKeysRequest.newBuilder().setDeleteKeys(deleteKeyArgs).build();
@@ -672,19 +647,19 @@ public class KeyLifecycleService extends BackgroundService {
           }
         }
         keysList.clear();
-        expiredKeyUpdateIDList.clear();
       } catch (ServiceException e) {
         LOG.error("Failed to send DeleteKeysRequest", e);
       }
     }
 
-    private void moveKeysToTrash(LimitedSizeList<String> keysList) {
+    private void moveKeysToTrash(String volume, String bucket, ExpiredObjectList keysList) {
       for (int index = 0; index < keysList.size(); index++) {
         try {
-          ozoneTrash.moveToTrash(new Path(keysList.get(index)));
+          ozoneTrash.moveToTrash(new Path(OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket + OM_KEY_PREFIX +
+              keysList.getName(index)));
         } catch (IOException e) {
           // log failure and continue
-          LOG.warn("Failed to move key {} to trash", keysList.get(index), e);
+          LOG.warn("Failed to move key {} to trash", keysList.getName(index), e);
         }
       }
     }
@@ -711,7 +686,57 @@ public class KeyLifecycleService extends BackgroundService {
   }
 
   /**
-   * An in-memory list with a maximum size.
+   * An in-memory list to hold expired object infos, including object name and current update ID.
+   */
+  public static class ExpiredObjectList {
+    private final LimitedSizeList<String> objectNames;
+    private final List<Long> objectUpdateIDs;
+
+    public ExpiredObjectList(int maxListSize) {
+      this.objectNames = new LimitedSizeList<>(maxListSize);
+      this.objectUpdateIDs = new ArrayList<>();
+    }
+
+    public boolean add(String name, long updateID) {
+      if (!objectNames.add(name)) {
+        return false;
+      }
+      objectUpdateIDs.add(updateID);
+      return true;
+    }
+
+    public int size() {
+      return objectNames.size();
+    }
+
+    public List<String> nameSubList(int fromIndex, int toIndex) {
+      return objectNames.subList(fromIndex, toIndex);
+    }
+
+    public List<Long> updateIDSubList(int fromIndex, int toIndex) {
+      return objectUpdateIDs.subList(fromIndex, toIndex);
+    }
+
+    public void clear() {
+      objectNames.clear();
+      objectUpdateIDs.clear();
+    }
+
+    public boolean isEmpty() {
+      return objectNames.isEmpty();
+    }
+
+    public String getName(int index) {
+      return objectNames.get(index);
+    }
+
+    public long getUpdateID(int index) {
+      return objectUpdateIDs.get(index);
+    }
+  }
+
+  /**
+   * An in-memory list with a maximum size. This class is not thread safe.
    */
   public static class LimitedSizeList<T> {
     private final List<T> internalList;
@@ -722,12 +747,19 @@ public class KeyLifecycleService extends BackgroundService {
       this.internalList = new ArrayList<>();
     }
 
-    public void add(T element) throws IOException {
-      internalList.add(element);
+    /**
+     * Add an element to the list.
+     * @param element
+     * @return true if the element was added successfully, false if the list is full and element is not added.
+     * @throws IOException
+     */
+    public boolean add(T element) {
       if (internalList.size() >= maxSize) {
-        LOG.debug("LimitedSizeList reached maximum size {}", maxSize);
-        throw new IOException("LimitedSizeList reached maximum size " + maxSize);
+        LOG.debug("LimitedSizeList has reached maximum size {}", maxSize);
+        return false;
       }
+      internalList.add(element);
+      return true;
     }
 
     public T get(int index) {
