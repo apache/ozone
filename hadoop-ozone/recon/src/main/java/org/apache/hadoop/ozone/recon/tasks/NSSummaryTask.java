@@ -195,7 +195,8 @@ public class NSSummaryTask implements ReconOmTask {
       RebuildState currentState = REBUILD_STATE.get();
       if (currentState == RebuildState.RUNNING) {
         LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
-      } else {
+        return buildTaskResult(false);
+      } else if (currentState == RebuildState.FAILED) {
         LOG.info("Previous rebuild failed, attempting to recover from FAILED state...");
         // Try to transition from FAILED to RUNNING
         if (!REBUILD_STATE.compareAndSet(RebuildState.FAILED, RebuildState.RUNNING)) {
@@ -203,9 +204,10 @@ public class NSSummaryTask implements ReconOmTask {
           return buildTaskResult(false);
         }
         LOG.info("Successfully acquired rebuild lock after FAILED state recovery.");
-      }
-      
-      if (currentState == RebuildState.RUNNING) {
+        // Fall through to execute the rebuild
+      } else {
+        // Unknown state, should not happen
+        LOG.warn("Unexpected rebuild state: {}, cannot proceed", currentState);
         return buildTaskResult(false);
       }
     }
