@@ -18,13 +18,24 @@
 package org.apache.hadoop.hdds.server.events;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Message;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -60,10 +71,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   private boolean isRunning = true;
 
-  private static final ObjectMapper TRACING_SERIALIZER = new ObjectMapper()
-      .enable(SerializationFeature.INDENT_OUTPUT)
-      .addMixIn(NodeImpl.class, DatanodeDetailsJacksonMixin.class)
-      .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+  private static final ObjectWriter TRACING_SERIALIZER = buildSerializer();
 
   private boolean isSilent = false;
   private final String threadNamePrefix;
@@ -76,10 +84,86 @@ public class EventQueue implements EventPublisher, AutoCloseable {
     this.threadNamePrefix = threadNamePrefix;
   }
 
+  private static String serializeObject(Object payload) {
+    try {
+      return TRACING_SERIALIZER.writeValueAsString(payload);
+    } catch (JsonProcessingException e) {
+      return String.valueOf(payload);
+    }
+  }
+
+  private static ObjectWriter buildSerializer() {
+    ObjectMapper mapper = new ObjectMapper()
+        .enable(SerializationFeature.INDENT_OUTPUT)
+        .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+        .addMixIn(NodeImpl.class, DatanodeDetailsJacksonMixIn.class);
+
+    SimpleModule module = new SimpleModule();
+
+    module.addSerializer(Message.class, new JsonSerializer<Message>() {
+      @Override
+      public void serialize(Message msg, JsonGenerator gen, SerializerProvider sp) throws IOException {
+        gen.writeObject(convertMessageToMap(msg));
+      }
+
+      private Object convertMessageToMap(Message msg) {
+        Map<String, Object> fieldMap = new LinkedHashMap<>();
+        for (Map.Entry<Descriptors.FieldDescriptor, Object> e : msg.getAllFields().entrySet()) {
+          String fieldName = e.getKey().getName();
+          Object value = convertField(e.getKey(), e.getValue());
+          fieldMap.put(fieldName, value);
+        }
+        return fieldMap;
+      }
+
+      /**
+       * Handles protobuf message fields.
+       */
+      private Object convertField(Descriptors.FieldDescriptor fd, Object value) {
+        if (fd.isRepeated()) {
+          List<?> fields = (List<?>) value;
+          List<Object> result = new ArrayList<>();
+          for (Object field : fields) {
+            result.add(convertSingleValue(fd, field));
+          }
+          return result;
+        }
+        return convertSingleValue(fd, value);
+      }
+
+      /**
+       * Converts a single field value to a JSON representation.
+       */
+      private Object convertSingleValue(Descriptors.FieldDescriptor fd, Object field) {
+        switch (fd.getJavaType()) {
+        case STRING:
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case BOOLEAN:
+          return field;
+        case ENUM:
+          return ((Descriptors.EnumValueDescriptor) field).getName();
+        case BYTE_STRING:
+          ByteString bs = (ByteString) field;
+          return Base64.getEncoder().encodeToString(bs.toByteArray());
+        case MESSAGE:
+          return convertMessageToMap((Message) field);
+        default:
+          return String.valueOf(field);
+        }
+      }
+    });
+
+    mapper.registerModule(module);
+    return mapper.writerWithDefaultPrettyPrinter();
+  }
+
   // The field parent in DatanodeDetails class has the circular reference
   // which will result in Gson infinite recursive parsing. We need to exclude
   // this field when generating json string for DatanodeDetails object
-  abstract static class DatanodeDetailsJacksonMixin {
+  abstract static class DatanodeDetailsJacksonMixIn {
     @JsonIgnore
     abstract InnerNode getParent();
   }
@@ -193,26 +277,21 @@ public class EventQueue implements EventPublisher, AutoCloseable {
           eventExecutorListMap.entrySet()) {
         for (EventHandler handler : executorAndHandlers.getValue()) {
           queuedCount.incrementAndGet();
-          try {
-            if (LOG.isTraceEnabled()) {
-              String jsonPayload = TRACING_SERIALIZER.writeValueAsString(payload);
-              LOG.trace(
-                  "Delivering [event={}] to executor/handler {}: <json>{}</json>",
-                  event.getName(),
-                  executorAndHandlers.getKey().getName(),
-                  jsonPayload.replaceAll("\n", "\\\\n"));
-            } else if (LOG.isDebugEnabled()) {
-              LOG.debug("Delivering [event={}] to executor/handler {}: {}",
-                  event.getName(),
-                  executorAndHandlers.getKey().getName(),
-                  payload.getClass().getSimpleName());
-            }
-          } catch (JsonProcessingException e) {
-            LOG.error("Error serializing payload: {}", e.getMessage());
+          if (LOG.isTraceEnabled()) {
+            String jsonPayload = serializeObject(payload);
+            LOG.trace(
+                "Delivering [event={}] to executor/handler {}: <json>{}</json>",
+                event.getName(),
+                executorAndHandlers.getKey().getName(),
+                jsonPayload.replaceAll("\n", "\\\\n"));
+          } else if (LOG.isDebugEnabled()) {
+            LOG.debug("Delivering [event={}] to executor/handler {}: {}",
+                event.getName(),
+                executorAndHandlers.getKey().getName(),
+                payload.getClass().getSimpleName());
           }
           executorAndHandlers.getKey()
               .onMessage(handler, payload, this);
-
         }
       }
     } else {
