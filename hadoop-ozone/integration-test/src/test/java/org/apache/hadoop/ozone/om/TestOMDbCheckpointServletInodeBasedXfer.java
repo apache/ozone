@@ -338,7 +338,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       }).collect(Collectors.toList());
 
       for (String yamlRelativePath : yamlRelativePaths) {
-        String yamlFileName = newDbDir.getPath() + "/" + yamlRelativePath;
+        String yamlFileName = Paths.get(newDbDir.getPath(), yamlRelativePath).toString();
         assertTrue(Files.exists(Paths.get(yamlFileName)));
       }
     }
