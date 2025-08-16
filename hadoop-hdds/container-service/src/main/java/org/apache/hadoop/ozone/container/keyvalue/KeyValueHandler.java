@@ -1641,6 +1641,11 @@ public class KeyValueHandler extends Handler {
         ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
         Pipeline pipeline = createSingleNodePipeline(peer);
 
+        // Add deleted blocks to the container merkle tree writer
+        if (!diffReport.getDeletedBlocksDifferences().isEmpty()) {
+          updatedTreeWriter.addDeletedBlocks(diffReport.getDeletedBlocksDifferences());
+        }
+
         // Handle missing blocks
         for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
           try {
