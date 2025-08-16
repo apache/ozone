@@ -200,22 +200,29 @@ public class NSSummaryTask implements ReconOmTask {
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     // Unified control for all NSS tree rebuild operations
-    RebuildState currentState = REBUILD_STATE.get();
-    if (currentState == RebuildState.RUNNING) {
+    // Use getAndSet to atomically claim the lock - this prevents ALL race conditions
+    RebuildState previousState = REBUILD_STATE.getAndSet(RebuildState.RUNNING);
+    
+    if (previousState == RebuildState.RUNNING) {
+      // Another thread is already running - just exit (state is already RUNNING)
       LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
       return buildTaskResult(false);
     }
-    
-    if (!REBUILD_STATE.compareAndSet(currentState, RebuildState.RUNNING)) {
-      LOG.info("Failed to acquire rebuild lock, another thread may have started rebuild.");
-      return buildTaskResult(false);
-    }
 
+    // Successfully acquired the lock (previous state was IDLE or FAILED)
     LOG.info("Starting NSSummary tree reprocess with unified control...");
-    long startTime = System.nanoTime(); // Record start time
+    long startTime = System.nanoTime();
     
     try {
-      return executeReprocess(omMetadataManager, startTime);
+      TaskResult result = executeReprocess(omMetadataManager, startTime);
+      if (result.isTaskSuccess()) {
+        REBUILD_STATE.set(RebuildState.IDLE);
+        LOG.info("NSSummary tree reprocess completed successfully, state reset to IDLE.");
+      } else {
+        REBUILD_STATE.set(RebuildState.FAILED);
+        LOG.warn("NSSummary tree reprocess failed, state set to FAILED.");
+      }
+      return result;
     } catch (Exception e) {
       LOG.error("NSSummary reprocess failed with exception.", e);
       REBUILD_STATE.set(RebuildState.FAILED);
@@ -306,7 +313,10 @@ public class NSSummaryTask implements ReconOmTask {
    */
   @VisibleForTesting
   public static void resetRebuildState() {
-    REBUILD_STATE.set(RebuildState.IDLE);
+    // Only reset to IDLE if currently FAILED - never interrupt a RUNNING operation
+    REBUILD_STATE.compareAndSet(RebuildState.FAILED, RebuildState.IDLE);
+    // If state is RUNNING, leave it alone to prevent race conditions
+    // If state is already IDLE, no change needed
   }
 
   /**
