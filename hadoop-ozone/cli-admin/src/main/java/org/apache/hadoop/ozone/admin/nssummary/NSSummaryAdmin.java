@@ -48,7 +48,8 @@ import picocli.CommandLine;
         SummarySubCommand.class,
         DiskUsageSubCommand.class,
         QuotaUsageSubCommand.class,
-        FileSizeDistSubCommand.class
+        FileSizeDistSubCommand.class,
+        RebuildSubCommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
 public class NSSummaryAdmin implements AdminSubcommand {
