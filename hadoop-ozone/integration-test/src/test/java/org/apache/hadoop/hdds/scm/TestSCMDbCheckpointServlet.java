@@ -73,14 +73,11 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestSCMDbCheckpointServlet {
   private MiniOzoneCluster cluster = null;
-  private StorageContainerManager scm;
   private SCMMetrics scmMetrics;
-  private OzoneConfiguration conf;
   private HttpServletRequest requestMock;
   private HttpServletResponse responseMock;
   private String method;
   private SCMDBCheckpointServlet scmDbCheckpointServletMock;
-  private ServletContext servletContextMock;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -91,12 +88,12 @@ public class TestSCMDbCheckpointServlet {
    */
   @BeforeEach
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .build();
     cluster.waitForClusterToBeReady();
-    scm = cluster.getStorageContainerManager();
+    StorageContainerManager scm = cluster.getStorageContainerManager();
     scmMetrics = StorageContainerManager.getMetrics();
 
     requestMock = mock(HttpServletRequest.class);
@@ -125,7 +122,7 @@ public class TestSCMDbCheckpointServlet {
     doCallRealMethod().when(scmDbCheckpointServletMock)
         .processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
 
-    servletContextMock = mock(ServletContext.class);
+    ServletContext servletContextMock = mock(ServletContext.class);
     when(scmDbCheckpointServletMock.getServletContext())
         .thenReturn(servletContextMock);
     when(servletContextMock.getAttribute(OzoneConsts.SCM_CONTEXT_ATTRIBUTE))

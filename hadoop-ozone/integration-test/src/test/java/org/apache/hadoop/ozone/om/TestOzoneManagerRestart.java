@@ -56,7 +56,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOzoneManagerRestart {
   private static MiniOzoneCluster cluster = null;
-  private static OzoneConfiguration conf;
   private static OzoneClient client;
 
   /**
@@ -68,7 +67,7 @@ public class TestOzoneManagerRestart {
    */
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);

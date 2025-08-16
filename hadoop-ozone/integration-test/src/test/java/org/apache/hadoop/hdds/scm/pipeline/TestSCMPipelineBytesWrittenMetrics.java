@@ -54,12 +54,11 @@ import org.junit.jupiter.api.Test;
 public class TestSCMPipelineBytesWrittenMetrics {
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private OzoneClient client;
 
   @BeforeEach
   public void setup() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 10, TimeUnit.SECONDS);
