@@ -604,6 +604,45 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
+      int count) throws IOException {
+    return storageContainerLocationClient.getDiskBalancerReport(count,
+        ClientVersion.CURRENT_VERSION);
+  }
+
+  @Override
+  public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
+      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven,
+      Optional<List<String>> hosts) throws IOException {
+    return storageContainerLocationClient.startDiskBalancer(threshold,
+        bandwidthInMB, parallelThread, stopAfterDiskEven, hosts);
+  }
+
+  @Override
+  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+      throws IOException {
+    return storageContainerLocationClient.stopDiskBalancer(hosts);
+  }
+
+  @Override
+  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus)
+      throws IOException {
+    return storageContainerLocationClient.getDiskBalancerStatus(hosts,
+        runningStatus, ClientVersion.CURRENT_VERSION);
+  }
+
+  @Override
+  public List<DatanodeAdminError> updateDiskBalancerConfiguration(
+      Optional<Double> threshold, Optional<Long> bandwidth,
+      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+      throws IOException {
+    return storageContainerLocationClient.updateDiskBalancerConfiguration(
+        threshold, bandwidth, parallelThread, stopAfterDiskEven, hosts);
+  }
+
+  @Override
   public void reconcileContainer(long id) throws IOException {
     storageContainerLocationClient.reconcileContainer(id);
   }

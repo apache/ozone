@@ -90,6 +90,7 @@ public class TestDeadNodeHandler {
   private File storageDir;
   private SCMContext scmContext;
   private DeletedBlockLog deletedBlockLog;
+  private DiskBalancerManager diskBalancerManager;
 
   @BeforeEach
   public void setup() throws IOException, AuthenticationException {
@@ -118,8 +119,10 @@ public class TestDeadNodeHandler {
         mockRatisProvider);
     containerManager = scm.getContainerManager();
     deletedBlockLog = mock(DeletedBlockLog.class);
+    diskBalancerManager = new DiskBalancerManager(conf, new EventQueue(),
+        SCMContext.emptyContext(), null);
     deadNodeHandler = new DeadNodeHandler(nodeManager,
-        mock(PipelineManager.class), containerManager, deletedBlockLog);
+        mock(PipelineManager.class), containerManager, diskBalancerManager, deletedBlockLog);
     healthyReadOnlyNodeHandler =
         new HealthyReadOnlyNodeHandler(nodeManager,
             pipelineManager);
@@ -221,6 +224,11 @@ public class TestDeadNodeHandler {
     HddsTestUtils.quasiCloseContainer(containerManager,
         container3.containerID());
 
+    //starting diskBalancer on all Datanodes
+    diskBalancerManager.addRunningDatanode(datanode1);
+    diskBalancerManager.addRunningDatanode(datanode2);
+    diskBalancerManager.addRunningDatanode(datanode3);
+
     // First set the node to IN_MAINTENANCE and ensure the container replicas
     // are not removed on the dead event
     datanode1 = nodeManager.getNode(datanode1.getID());
@@ -240,6 +248,15 @@ public class TestDeadNodeHandler {
 
     verify(deletedBlockLog, times(0))
         .onDatanodeDead(datanode1.getID());
+
+    // Verify DiskBalancer status is marked UNKNOWN for the dead datanode
+    assertEquals(HddsProtos.DiskBalancerRunningStatus.UNKNOWN,
+        diskBalancerManager.getStatus(datanode1).getRunningStatus());
+    // Verify DiskBalancer status remains unchanged for other datanodes
+    assertEquals(HddsProtos.DiskBalancerRunningStatus.RUNNING,
+        diskBalancerManager.getStatus(datanode2).getRunningStatus());
+    assertEquals(HddsProtos.DiskBalancerRunningStatus.RUNNING,
+        diskBalancerManager.getStatus(datanode3).getRunningStatus());
 
     Set<ContainerReplica> container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));

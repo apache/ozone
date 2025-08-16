@@ -476,4 +476,54 @@ public interface ScmClient extends Closeable {
    * @throws IOException On error
    */
   void reconcileContainer(long containerID) throws IOException;
+
+  /**
+   * Get DiskBalancer report.
+   * REPORT shows the current volume density of datanodes.
+   * @param count top datanodes that need balancing
+   * @return List of DatanodeDiskBalancerInfo.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
+      int count) throws IOException;
+
+  /**
+   * Get DiskBalancer status.
+   * STATUS shows the running status of DiskBalancer on datanodes.
+   * @param hosts If hosts is not null, return status of hosts; If hosts is
+   *              null, return status of all datanodes in balancing.
+   * @return List of DatanodeDiskBalancerInfo.
+   * @throws IOException
+   */
+  List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus)
+      throws IOException;
+
+  /**
+   * Start DiskBalancer.
+   */
+  List<DatanodeAdminError> startDiskBalancer(
+      Optional<Double> threshold,
+      Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread,
+      Optional<Boolean> stopAfterDiskEven,
+      Optional<List<String>> hosts) throws IOException;
+
+  /**
+   * Stop DiskBalancer.
+   */
+  List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+      throws IOException;
+
+
+  /**
+   * Update DiskBalancer Configuration.
+   */
+  List<DatanodeAdminError> updateDiskBalancerConfiguration(
+      Optional<Double> threshold,
+      Optional<Long> bandwidth,
+      Optional<Integer> parallelThread,
+      Optional<Boolean> stopAfterDiskEven,
+      Optional<List<String>> hosts) throws IOException;
 }

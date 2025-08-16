@@ -492,6 +492,43 @@ public interface StorageContainerLocationProtocol extends Closeable {
 
   String getMetrics(String query) throws IOException;
 
+  List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
+      int count, int clientVersion) throws IOException;
+
+  /**
+   * Get DiskBalancer status.
+   */
+  List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus,
+      int clientVersion) throws IOException;
+
+  /**
+   * Start DiskBalancer.
+   */
+  List<DatanodeAdminError> startDiskBalancer(
+      Optional<Double> threshold,
+      Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread,
+      Optional<Boolean> stopAfterDiskEven,
+      Optional<List<String>> hosts) throws IOException;
+
+  /**
+   * Stop DiskBalancer.
+   */
+  List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+      throws IOException;
+
+  /**
+   * Update DiskBalancer Configuration.
+   */
+  List<DatanodeAdminError> updateDiskBalancerConfiguration(
+      Optional<Double> threshold,
+      Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread,
+      Optional<Boolean> stopAfterDiskEven,
+      Optional<List<String>> hosts) throws IOException;
+
   /**
    * Trigger a reconcile command to datanodes for the current container ID.
    *

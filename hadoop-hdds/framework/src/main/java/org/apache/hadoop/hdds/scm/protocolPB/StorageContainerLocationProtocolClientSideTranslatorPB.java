@@ -56,6 +56,11 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainersOnDecomNodeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerInfoType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeDiskBalancerOpResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
@@ -1187,6 +1192,126 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             builder -> builder.setGetContainerCountRequest(request))
             .getGetContainerCountResponse();
     return response.getContainerCount();
+  }
+
+  @Override
+  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerReport(
+      int count, int clientVersion) throws IOException {
+    DatanodeDiskBalancerInfoRequestProto request =
+        DatanodeDiskBalancerInfoRequestProto.newBuilder()
+            .setInfoType(DatanodeDiskBalancerInfoType.report)
+            .setCount(count)
+            .build();
+
+    DatanodeDiskBalancerInfoResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerInfo,
+            builder -> builder.setDatanodeDiskBalancerInfoRequest(request))
+            .getDatanodeDiskBalancerInfoResponse();
+
+    return response.getInfoList();
+  }
+
+  @Override
+  public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
+      Optional<List<String>> hosts,
+      Optional<HddsProtos.DiskBalancerRunningStatus> status,
+      int clientVersion) throws IOException {
+    DatanodeDiskBalancerInfoRequestProto.Builder requestBuilder =
+        DatanodeDiskBalancerInfoRequestProto.newBuilder()
+            .setInfoType(DatanodeDiskBalancerInfoType.status);
+    hosts.ifPresent(requestBuilder::addAllHosts);
+    status.ifPresent(requestBuilder::setStatus);
+    DatanodeDiskBalancerInfoRequestProto request = requestBuilder.build();
+
+    DatanodeDiskBalancerInfoResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerInfo,
+            builder -> builder.setDatanodeDiskBalancerInfoRequest(request))
+            .getDatanodeDiskBalancerInfoResponse();
+
+    return response.getInfoList();
+  }
+
+  @Override
+  public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
+      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
+      Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+      throws IOException {
+    HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
+        HddsProtos.DiskBalancerConfigurationProto.newBuilder();
+    threshold.ifPresent(confBuilder::setThreshold);
+    bandwidthInMB.ifPresent(confBuilder::setDiskBandwidthInMB);
+    parallelThread.ifPresent(confBuilder::setParallelThread);
+    stopAfterDiskEven.ifPresent(confBuilder::setStopAfterDiskEven);
+
+    DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
+        DatanodeDiskBalancerOpRequestProto.newBuilder()
+            .setOpType(HddsProtos.DiskBalancerOpType.START)
+            .setConf(confBuilder);
+    hosts.ifPresent(requestBuilder::addAllHosts);
+
+    DatanodeDiskBalancerOpResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerOp,
+            builder -> builder.setDatanodeDiskBalancerOpRequest(
+                requestBuilder.build()))
+            .getDatanodeDiskBalancerOpResponse();
+
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeAdminErrorResponseProto e : response.getFailedHostsList()) {
+      errors.add(new DatanodeAdminError(e.getHost(), e.getError()));
+    }
+    return errors;
+  }
+
+  @Override
+  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+      throws IOException {
+    DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
+        DatanodeDiskBalancerOpRequestProto.newBuilder()
+            .setOpType(HddsProtos.DiskBalancerOpType.STOP);
+    hosts.ifPresent(requestBuilder::addAllHosts);
+
+    DatanodeDiskBalancerOpResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerOp,
+            builder -> builder.setDatanodeDiskBalancerOpRequest(
+                requestBuilder.build()))
+            .getDatanodeDiskBalancerOpResponse();
+
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeAdminErrorResponseProto e : response.getFailedHostsList()) {
+      errors.add(new DatanodeAdminError(e.getHost(), e.getError()));
+    }
+    return errors;
+  }
+
+  @Override
+  public List<DatanodeAdminError> updateDiskBalancerConfiguration(
+      Optional<Double> threshold, Optional<Long> bandwidthInMB,
+      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+      throws IOException {
+    HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
+        HddsProtos.DiskBalancerConfigurationProto.newBuilder();
+    threshold.ifPresent(confBuilder::setThreshold);
+    bandwidthInMB.ifPresent(confBuilder::setDiskBandwidthInMB);
+    parallelThread.ifPresent(confBuilder::setParallelThread);
+    stopAfterDiskEven.ifPresent(confBuilder::setStopAfterDiskEven);
+
+    DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
+        DatanodeDiskBalancerOpRequestProto.newBuilder()
+            .setOpType(HddsProtos.DiskBalancerOpType.UPDATE)
+            .setConf(confBuilder);
+    hosts.ifPresent(requestBuilder::addAllHosts);
+
+    DatanodeDiskBalancerOpResponseProto response =
+        submitRequest(Type.DatanodeDiskBalancerOp,
+            builder -> builder.setDatanodeDiskBalancerOpRequest(
+                requestBuilder.build()))
+            .getDatanodeDiskBalancerOpResponse();
+
+    List<DatanodeAdminError> errors = new ArrayList<>();
+    for (DatanodeAdminErrorResponseProto e : response.getFailedHostsList()) {
+      errors.add(new DatanodeAdminError(e.getHost(), e.getError()));
+    }
+    return errors;
   }
 
   @Override
