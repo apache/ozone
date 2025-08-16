@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -54,7 +53,6 @@ public class DeletedBlockLogStateManagerImpl
   private ContainerManager containerManager;
   private final DBTransactionBuffer transactionBuffer;
   private final Set<Long> deletingTxIDs;
-  private final Set<Long> skippingRetryTxIDs;
 
   public DeletedBlockLogStateManagerImpl(ConfigurationSource conf,
              Table<Long, DeletedBlocksTransaction> deletedTable,
@@ -63,7 +61,6 @@ public class DeletedBlockLogStateManagerImpl
     this.containerManager = containerManager;
     this.transactionBuffer = txBuffer;
     this.deletingTxIDs = ConcurrentHashMap.newKeySet();
-    this.skippingRetryTxIDs = ConcurrentHashMap.newKeySet();
   }
 
   @Override
@@ -80,17 +77,13 @@ public class DeletedBlockLogStateManagerImpl
 
       private void findNext() {
         while (iter.hasNext()) {
-          TypedTable.KeyValue<Long, DeletedBlocksTransaction> next = iter
-              .next();
+          final TypedTable.KeyValue<Long, DeletedBlocksTransaction> next = iter.next();
           final long txID = next.getKey();
 
-          if ((deletingTxIDs == null || !deletingTxIDs.contains(txID)) && (
-              skippingRetryTxIDs == null || !skippingRetryTxIDs
-                  .contains(txID))) {
+          if ((!deletingTxIDs.contains(txID))) {
             nextTx = next;
             if (LOG.isTraceEnabled()) {
-              LOG.trace("DeletedBlocksTransaction matching txID:{}",
-                  txID);
+              LOG.trace("DeletedBlocksTransaction matching txID:{}", txID);
             }
             return;
           }
@@ -169,71 +162,30 @@ public class DeletedBlockLogStateManagerImpl
     }
   }
 
+  @Deprecated
   @Override
   public void increaseRetryCountOfTransactionInDB(
       ArrayList<Long> txIDs) throws IOException {
-    for (Long txID : txIDs) {
-      DeletedBlocksTransaction block =
-          deletedTable.get(txID);
-      if (block == null) {
-        if (LOG.isDebugEnabled()) {
-          // This can occur due to race condition between retry and old
-          // service task where old task removes the transaction and the new
-          // task is resending
-          LOG.debug("Deleted TXID {} not found.", txID);
-        }
-        continue;
-      }
-      // if the retry time exceeds the maxRetry value
-      // then set the retry value to -1, stop retrying, admins can
-      // analyze those blocks and purge them manually by SCMCli.
-      DeletedBlocksTransaction.Builder builder = block.toBuilder().setCount(-1);
-      transactionBuffer.addToBuffer(deletedTable, txID, builder.build());
-      if (skippingRetryTxIDs != null) {
-        skippingRetryTxIDs.add(txID);
-      }
-    }
+    // We don't store retry count in DB anymore.
+    // This method is being retained to ensure backward compatibility and prevent
+    // issues during minor upgrades. It will be removed in the future, during a major release.
   }
 
+  @Deprecated
   @Override
   public int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
       throws IOException {
-    Objects.requireNonNull(txIDs, "txIds cannot be null.");
-    int resetCount = 0;
-    for (long txId: txIDs) {
-      try {
-        DeletedBlocksTransaction transaction = deletedTable.get(txId);
-        if (transaction == null) {
-          LOG.warn("txId {} is not found in deletedTable.", txId);
-          continue;
-        }
-        if (transaction.getCount() != -1) {
-          LOG.warn("txId {} has already been reset in deletedTable.", txId);
-          continue;
-        }
-        transactionBuffer.addToBuffer(deletedTable, txId,
-            transaction.toBuilder().setCount(0).build());
-        resetCount += 1;
-        if (LOG.isDebugEnabled()) {
-          LOG.info("Reset deleted block Txn retry count to 0 in container {}" +
-              " with txnId {} ", transaction.getContainerID(), txId);
-        }
-      } catch (IOException ex) {
-        LOG.error("Could not reset deleted block transaction {}.", txId, ex);
-        throw ex;
-      }
-    }
-    LOG.info("Reset in total {} deleted block Txn retry count", resetCount);
-    return resetCount;
+    // We don't reset retry count anymore.
+    // This method is being retained to ensure backward compatibility and prevent
+    // issues during minor upgrades. It will be removed in the future, during a major release.
+    return 0;
   }
 
   @Override
   public void onFlush() {
     // onFlush() can be invoked only when ratis is enabled.
     Preconditions.checkNotNull(deletingTxIDs);
-    Preconditions.checkNotNull(skippingRetryTxIDs);
     deletingTxIDs.clear();
-    skippingRetryTxIDs.clear();
   }
 
   @Override

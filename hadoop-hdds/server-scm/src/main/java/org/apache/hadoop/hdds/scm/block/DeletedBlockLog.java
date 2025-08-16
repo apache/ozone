@@ -51,37 +51,12 @@ public interface DeletedBlockLog extends Closeable {
       throws IOException;
 
   /**
-   * Return the failed transactions in batches in the log. A transaction is
-   * considered to be failed if it has been sent more than MAX_RETRY limit
-   * and its count is reset to -1.
-   *
-   * @param count Number of failed transactions to be returned.
-   * @param startTxId The least transaction id to start with.
-   * @return a list of failed deleted block transactions.
-   * @throws IOException
-   */
-  List<DeletedBlocksTransaction> getFailedTransactions(int count,
-      long startTxId) throws IOException;
-
-  /**
-   * Increments count for given list of transactions by 1.
-   * The log maintains a valid range of counts for each transaction
-   * [0, MAX_RETRY]. If exceed this range, resets it to -1 to indicate
-   * the transaction is no longer valid.
-   *
-   * @param txIDs - transaction ID.
+   * Increments count for the given list of transactions by 1.
+   * The retry count is maintained only for in-flight transactions,
+   * this will be useful in debugging.
    */
   void incrementCount(List<Long> txIDs)
       throws IOException;
-
-
-  /**
-   * Reset DeletedBlock transaction retry count.
-   *
-   * @param txIDs transactionId list to be reset
-   * @return num of successful reset
-   */
-  int resetCount(List<Long> txIDs) throws IOException;
 
   /**
    * Records the creation of a transaction for a DataNode.
