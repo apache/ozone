@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.hdds.cli;
 
+import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Interface to access the higher level parameters.
@@ -28,6 +30,9 @@ public interface GenericParentCommand {
 
   /** Returns a cached configuration, i.e. it is created only once, subsequent calls return the same instance. */
   OzoneConfiguration getOzoneConf();
+
+  /** Returns a cached {@link UserGroupInformation} instance. */
+  UserGroupInformation getUser() throws IOException;
 
   void printError(Throwable t);
 }
