@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.replication;
 import java.io.Closeable;
 import java.nio.file.Path;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 /**
@@ -32,8 +33,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
  */
 public interface ContainerDownloader extends Closeable {
 
-  Path getContainerDataFromReplicas(long containerId,
+  Pair<Path, Long> getContainerDataFromReplicas(long containerId,
       List<DatanodeDetails> sources, Path downloadDir,
       CopyContainerCompression compression);
-
 }

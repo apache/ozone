@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
@@ -56,7 +57,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   }
 
   @Override
-  public Path getContainerDataFromReplicas(
+  public Pair<Path, Long> getContainerDataFromReplicas(
       long containerId, List<DatanodeDetails> sourceDatanodes,
       Path downloadDir, CopyContainerCompression compression) {
 
@@ -73,7 +74,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
       GrpcReplicationClient client = null;
       try {
         client = createReplicationClient(datanode, compression);
-        CompletableFuture<Path> result =
+        CompletableFuture<Pair<Path, Long>> result =
             downloadContainer(client, containerId, downloadDir);
         return result.get();
       } catch (InterruptedException e) {
@@ -127,7 +128,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   }
 
   @VisibleForTesting
-  protected CompletableFuture<Path> downloadContainer(
+  protected CompletableFuture<Pair<Path, Long>> downloadContainer(
       GrpcReplicationClient client, long containerId, Path downloadDir) {
     return client.download(containerId, downloadDir);
   }
