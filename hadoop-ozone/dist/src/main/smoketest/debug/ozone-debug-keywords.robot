@@ -36,7 +36,8 @@ Execute replicas verify container state debug tool
 
 Parse replicas verify JSON output
     [Arguments]    ${output}
-    ${json} =      Evaluate    json.loads('''${output}''')    json
+    ${json_split} =  Evaluate  '''${output}'''.split('***')[0].strip()
+    ${json} =      Evaluate  json.loads('''${json_split}''')  json
     [Return]       ${json}
 
 Check to Verify Replicas
