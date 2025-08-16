@@ -84,6 +84,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY,
+        OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY,

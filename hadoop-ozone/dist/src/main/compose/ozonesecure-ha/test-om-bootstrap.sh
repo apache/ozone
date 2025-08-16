@@ -20,14 +20,16 @@
 # This test aims to validate the ozone snapshot data that have been
 # installed on a bootstrapped OM after a Ratis snapshot installation.
 #
+# This test starts 'om3' as FOLLOWER and 'om4' as LISTENER.
+#
 # The test
-#   * starts the docker environment with 'om3' inactive and uninitialised
+#   * starts the docker environment with 'om' inactive and uninitialised
 #   * runs a robot test that creates keys and snapshots
-#   * checks that 'om3' is inactive and has no data
-#   * initialises 'om3'
-#   * starts 'om3'
-#   * verifies that 'om3' is running and is bootstrapping
-#   * runs a robot test that validates the data on 'om3'
+#   * checks that 'om' is inactive and has no data
+#   * initialises 'om'
+#   * starts 'om'
+#   * verifies that 'om' is running and is bootstrapping
+#   * runs a robot test that validates the data on 'om'
 #
 # The data creation robot test
 #   * creates 100 metadata keys
@@ -36,11 +38,11 @@
 #   * creates the second snapshot
 #
 # The data validation robot test
-#   * checks that there have been checkpoints created on 'om3'
-#   * once checkpoints are created, the 'om3' has all the data from the leader
-#   * checks that 'om3' is not leader
-#   * transfers leadership to 'om3', so that we can perform regular leader reads
-#   * checks that the two snapshots exist on 'om3'
+#   * checks that there have been checkpoints created on 'om'
+#   * once checkpoints are created, the 'om' has all the data from the leader
+#   * checks that 'om' is not leader
+#   * transfers leadership to 'om', so that we can perform regular leader reads
+#   * checks that the two snapshots exist on 'om'
 #   * runs a snapshot diff between the two snapshots
 #   * validates that the result of the snapshot diff, contains just the two actual keys
 #   * does a 'key cat' on both snapshot keys and validates the contents
@@ -70,6 +72,7 @@ keyPrefix="sn"
 key1="key1"
 key2="key2"
 bootstrap_om="om3"
+bootstrap_listener="om4"
 
 execute_robot_test om1 kinit.robot
 
@@ -121,3 +124,49 @@ execute_robot_test om3 kinit.robot
 
 # This test checks the disk on the node it's running. It needs to be run on om3.
 execute_robot_test om3 -v BOOTSTRAPPED_OM:${bootstrap_om} -v VOLUME:${volume} -v BUCKET:${bucket} -v SNAP_1:${snap1} -v SNAP_2:${snap2} -v KEY_PREFIX:${keyPrefix} -v KEY_1:${key1} -v KEY_2:${key2} omha/data-validation-after-om-bootstrap.robot
+
+echo "Check that om4 isn't running"
+om4_service=$(execute_command_in_container om4 ps aux | grep 'OzoneManagerStarter' || true)
+
+if [[ $om4_service != "" ]]
+then
+  echo "om4 is running, exiting..."
+  exit 1
+fi
+
+echo "Check that om4 has no data"
+om4_data=$(execute_command_in_container om4 ls -lah /data | grep 'metadata' || true)
+
+if [[ $om4_data != "" ]]
+then
+  echo "om4 has data, exiting..."
+  exit 1
+fi
+
+# Init om4 and start the om daemon in the background
+execute_command_in_container om4 ozone om --init
+execute_command_in_container -d om4 ozone om
+wait_for_port om4 9872 120
+
+echo "Check that om4 is running"
+om4_service=$(execute_command_in_container om4 ps aux | grep 'OzoneManagerStarter' || true)
+
+if [[ $om4_service == "" ]]
+then
+  echo "om4 isn't running, exiting..."
+  exit 1
+fi
+
+echo "Check that om4 has data"
+om4_data=$(execute_command_in_container om4 ls -lah /data | grep 'metadata' || true)
+
+if [[ $om4_data == "" ]]
+then
+  echo "om4 has no data, exiting..."
+  exit 1
+fi
+
+execute_robot_test om4 kinit.robot
+
+# This test checks the disk on the node it's running. It needs to be run on om4.
+execute_robot_test om4 -v BOOTSTRAPPED_OM:${bootstrap_listener} -v IS_FOLLOWER:false -v VOLUME:${volume} -v BUCKET:${bucket} -v SNAP_1:${snap1} -v SNAP_2:${snap2} -v KEY_PREFIX:${keyPrefix} -v KEY_1:${key1} -v KEY_2:${key2} omha/data-validation-after-om-bootstrap.robot
