@@ -29,6 +29,7 @@ import org.apache.ozone.erasurecode.rawcoder.util.RSUtil;
  */
 public class RSRawEncoder extends RawErasureEncoder {
   // relevant to schema and won't change during encode calls.
+  @SuppressWarnings("PMD.SingularField")
   private byte[] encodeMatrix;
   /**
    * Array of input tables generated from coding coefficients previously.
