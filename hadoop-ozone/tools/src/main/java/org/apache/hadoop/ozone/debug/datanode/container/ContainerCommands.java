@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
@@ -174,6 +175,12 @@ public class ContainerCommands extends AbstractSubcommand {
 
   private String getDatanodeUUID(String storageDir, ConfigurationSource config)
       throws IOException {
+
+    File storageDirPath = new File(storageDir);
+    if (!storageDirPath.exists()) {
+      throw new IOException(storageDir + "' configured in '" + ScmConfigKeys.HDDS_DATANODE_DIR_KEY +
+          "' does not exist. Please provide the correct value for config.");
+    }
 
     final File versionFile = new File(storageDir, "hdds/VERSION");
 
