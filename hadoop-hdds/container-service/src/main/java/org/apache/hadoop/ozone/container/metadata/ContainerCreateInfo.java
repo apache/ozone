@@ -31,12 +31,14 @@ import org.apache.ratis.util.MemoizedSupplier;
  */
 @Immutable
 public final class ContainerCreateInfo {
+  public static final int INVALID_REPLICA_INDEX = -1;
   private static final Codec<ContainerCreateInfo> CODEC = new DelegatedCodec<>(
       Proto3Codec.get(ContainerProtos.ContainerCreateInfo.getDefaultInstance()),
       ContainerCreateInfo::getFromProtobuf, ContainerCreateInfo::getProtobuf,
       ContainerCreateInfo.class);
 
   private final ContainerProtos.ContainerDataProto.State state;
+  private final int replicaIndex;
   private final Supplier<ContainerProtos.ContainerCreateInfo> proto;
 
   public static Codec<ContainerCreateInfo> getCodec() {
@@ -47,19 +49,22 @@ public final class ContainerCreateInfo {
     return CODEC;
   }
 
-  private ContainerCreateInfo(ContainerProtos.ContainerDataProto.State state) {
+  private ContainerCreateInfo(ContainerProtos.ContainerDataProto.State state, int replicaIndex) {
     this.state = state;
+    this.replicaIndex = replicaIndex;
     this.proto = MemoizedSupplier.valueOf(
-        () -> ContainerProtos.ContainerCreateInfo.newBuilder().setState(state).build());
+        () -> ContainerProtos.ContainerCreateInfo.newBuilder().setState(state).setReplicaIndex(replicaIndex).build());
   }
 
   /**
    * Factory method for creation of ContainerCreateInfo.
-   * @param state  State
+   *
+   * @param state        State
+   * @param replicaIndex replica index
    * @return ContainerCreateInfo.
    */
-  public static ContainerCreateInfo valueOf(final ContainerProtos.ContainerDataProto.State state) {
-    return new ContainerCreateInfo(state);
+  public static ContainerCreateInfo valueOf(final ContainerProtos.ContainerDataProto.State state, int replicaIndex) {
+    return new ContainerCreateInfo(state, replicaIndex);
   }
 
   public ContainerProtos.ContainerCreateInfo getProtobuf() {
@@ -67,10 +72,14 @@ public final class ContainerCreateInfo {
   }
 
   public static ContainerCreateInfo getFromProtobuf(ContainerProtos.ContainerCreateInfo proto) {
-    return ContainerCreateInfo.valueOf(proto.getState());
+    return ContainerCreateInfo.valueOf(proto.getState(), proto.getReplicaIndex());
   }
 
   public ContainerProtos.ContainerDataProto.State getState() {
     return state;
+  }
+
+  public int getReplicaIndex() {
+    return replicaIndex;
   }
 }

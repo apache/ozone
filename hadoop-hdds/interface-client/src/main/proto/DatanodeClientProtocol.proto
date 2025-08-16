@@ -594,4 +594,5 @@ service IntraDatanodeProtocolService {
 
 message ContainerCreateInfo {
     required ContainerDataProto.State state = 1;
+    optional int32 replicaIndex = 2 [default = -1];
 }
