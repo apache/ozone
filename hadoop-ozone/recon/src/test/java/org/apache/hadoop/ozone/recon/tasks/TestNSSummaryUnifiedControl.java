@@ -326,7 +326,8 @@ public class TestNSSummaryUnifiedControl {
   void testMultipleConcurrentAttempts() throws Exception {
     int threadCount = 5;
     CountDownLatch allThreadsReady = new CountDownLatch(threadCount);
-    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch startSimultaneously = new CountDownLatch(1);
+    CountDownLatch firstThreadStarted = new CountDownLatch(1);
     CountDownLatch finishLatch = new CountDownLatch(1);
     AtomicInteger successCount = new AtomicInteger(0);
     AtomicInteger rejectedCount = new AtomicInteger(0);
@@ -354,7 +355,7 @@ public class TestNSSummaryUnifiedControl {
             callNum, threadName, currentState);
         
         if (callNum == 1) {
-          startLatch.countDown();
+          firstThreadStarted.countDown();
           // Block this thread until all other threads have started and attempted to call reprocess
           // This ensures the first thread holds the lock while others are trying to acquire it
           boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
@@ -389,9 +390,13 @@ public class TestNSSummaryUnifiedControl {
             String threadName = Thread.currentThread().getName();
             testThreadNames.add(threadName);
             
-            // Signal this thread is ready and wait for all threads to be ready
+            // Signal this thread is ready
             allThreadsReady.countDown();
+            // Wait for all threads to be ready before starting simultaneously
             allThreadsReady.await(5, TimeUnit.SECONDS);
+            
+            // All threads now wait for the signal to start simultaneously
+            startSimultaneously.await(5, TimeUnit.SECONDS);
             
             LOG.info("Thread {} ({}) attempting rebuild, current state: {}", threadId, threadName, NSSummaryTask.getRebuildState());
             TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
@@ -409,8 +414,15 @@ public class TestNSSummaryUnifiedControl {
         }, executor);
       }
 
+      // Wait for all threads to be ready, then start them simultaneously
+      assertTrue(allThreadsReady.await(5, TimeUnit.SECONDS), 
+          "All threads should be ready");
+      
+      // Start all threads simultaneously
+      startSimultaneously.countDown();
+      
       // Wait for first rebuild to start
-      assertTrue(startLatch.await(5, TimeUnit.SECONDS), 
+      assertTrue(firstThreadStarted.await(5, TimeUnit.SECONDS), 
           "At least one rebuild should start");
       assertEquals(RebuildState.RUNNING, NSSummaryTask.getRebuildState(),
           "State should be RUNNING");
