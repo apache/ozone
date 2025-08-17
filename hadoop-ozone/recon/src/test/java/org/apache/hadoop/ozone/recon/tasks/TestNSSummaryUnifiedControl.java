@@ -402,10 +402,16 @@ public class TestNSSummaryUnifiedControl {
             // Signal this thread is ready
             allThreadsReady.countDown();
             // Wait for all threads to be ready before starting simultaneously
-            allThreadsReady.await(5, TimeUnit.SECONDS);
+            boolean allReady = allThreadsReady.await(5, TimeUnit.SECONDS);
+            if (!allReady) {
+              LOG.warn("Thread {} timed out waiting for all threads to be ready", threadId);
+            }
             
             // All threads now wait for the signal to start simultaneously
-            startSimultaneously.await(5, TimeUnit.SECONDS);
+            boolean startSignalReceived = startSimultaneously.await(5, TimeUnit.SECONDS);
+            if (!startSignalReceived) {
+              LOG.warn("Thread {} timed out waiting for start signal", threadId);
+            }
 
             LOG.info("Thread {} ({}) attempting rebuild, current state: {}", threadId, threadName,
                 NSSummaryTask.getRebuildState());
