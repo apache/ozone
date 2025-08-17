@@ -325,6 +325,7 @@ public class TestNSSummaryUnifiedControl {
   @Test
   void testMultipleConcurrentAttempts() throws Exception {
     int threadCount = 5;
+    CountDownLatch allThreadsReady = new CountDownLatch(threadCount);
     CountDownLatch startLatch = new CountDownLatch(1);
     CountDownLatch finishLatch = new CountDownLatch(1);
     AtomicInteger successCount = new AtomicInteger(0);
@@ -376,22 +377,31 @@ public class TestNSSummaryUnifiedControl {
     CompletableFuture<Void>[] futures = new CompletableFuture[threadCount];
 
     try {
-      // Launch multiple concurrent rebuilds
+      // Launch multiple concurrent rebuilds with proper synchronization
       for (int i = 0; i < threadCount; i++) {
         final int threadId = i;
         futures[i] = CompletableFuture.runAsync(() -> {
-          // Register this thread as part of our test
-          String threadName = Thread.currentThread().getName();
-          testThreadNames.add(threadName);
-          
-          LOG.info("Thread {} ({}) attempting rebuild, current state: {}", threadId, threadName, NSSummaryTask.getRebuildState());
-          TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
-          if (result.isTaskSuccess()) {
-            int count = successCount.incrementAndGet();
-            LOG.info("Thread {} ({}) rebuild succeeded (success #{})", threadId, threadName, count);
-          } else {
-            int count = rejectedCount.incrementAndGet();
-            LOG.info("Thread {} ({}) rebuild rejected (rejection #{})", threadId, threadName, count);
+          try {
+            // Register this thread as part of our test
+            String threadName = Thread.currentThread().getName();
+            testThreadNames.add(threadName);
+            
+            // Signal this thread is ready and wait for all threads to be ready
+            allThreadsReady.countDown();
+            allThreadsReady.await(5, TimeUnit.SECONDS);
+            
+            LOG.info("Thread {} ({}) attempting rebuild, current state: {}", threadId, threadName, NSSummaryTask.getRebuildState());
+            TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
+            if (result.isTaskSuccess()) {
+              int count = successCount.incrementAndGet();
+              LOG.info("Thread {} ({}) rebuild succeeded (success #{})", threadId, threadName, count);
+            } else {
+              int count = rejectedCount.incrementAndGet();
+              LOG.info("Thread {} ({}) rebuild rejected (rejection #{})", threadId, threadName, count);
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.error("Thread {} interrupted", threadId);
           }
         }, executor);
       }
