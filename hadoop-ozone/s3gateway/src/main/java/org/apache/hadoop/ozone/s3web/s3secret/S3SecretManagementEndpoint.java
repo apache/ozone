@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Endpoint to manage S3 secret.
  */
-@Path("/secret/")
+@Path("/")
 @S3SecretEnabled
 @S3AdminEndpoint
 public class S3SecretManagementEndpoint extends S3SecretEndpointBase {

@@ -25,9 +25,12 @@
   </servlet>
   <servlet-mapping>
     <servlet-name>web</servlet-name>
-    <url-pattern>/*</url-pattern>
+    <url-pattern>/secret/*</url-pattern>
   </servlet-mapping>
-
+  <servlet-mapping>
+    <servlet-name>web</servlet-name>
+    <url-pattern>/sts/*</url-pattern>
+  </servlet-mapping>
   <listener>
     <listener-class>org.jboss.weld.environment.servlet.Listener</listener-class>
   </listener>
