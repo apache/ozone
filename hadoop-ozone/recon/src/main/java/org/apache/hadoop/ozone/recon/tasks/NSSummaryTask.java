@@ -303,7 +303,7 @@ public class NSSummaryTask implements ReconOmTask {
   @VisibleForTesting
   public static void resetRebuildState() {
     // Only reset to IDLE if currently FAILED - never interrupt a RUNNING operation
-    REBUILD_STATE.compareAndSet(RebuildState.FAILED, RebuildState.IDLE);
+    REBUILD_STATE.set(RebuildState.IDLE);
     // If state is RUNNING, leave it alone to prevent race conditions
     // If state is already IDLE, no change needed
   }

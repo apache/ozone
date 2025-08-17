@@ -116,12 +116,18 @@ public class TestNSSummaryUnifiedControl {
         // Simplified test implementation that mimics the real execution flow
         // but bypasses the complex sub-task execution while maintaining proper state management
         
+        String threadName = Thread.currentThread().getName();
+        LOG.info("TEST executeReprocess called by thread: {}, using manager: {}", 
+            threadName, getReconNamespaceSummaryManager().getClass().getSimpleName());
+        
         // Initialize a list of tasks to run in parallel (empty for testing)
         Collection<Callable<Boolean>> tasks = new ArrayList<>();
 
         try {
           // This will call the mocked clearNSSummaryTable (might throw Exception for failure tests)
+          LOG.info("TEST: About to call clearNSSummaryTable on: {}", getReconNamespaceSummaryManager());
           getReconNamespaceSummaryManager().clearNSSummaryTable();
+          LOG.info("TEST: clearNSSummaryTable call completed");
         } catch (IOException ioEx) {
           LOG.error("Unable to clear NSSummary table in Recon DB. ", ioEx);
           NSSummaryTask.setRebuildStateToFailed();
@@ -338,10 +344,11 @@ public class TestNSSummaryUnifiedControl {
       String threadName = Thread.currentThread().getName();
       RebuildState currentState = NSSummaryTask.getRebuildState();
       
-      // Only count calls from our test threads to avoid CI interference
-      if (testThreadNames.contains(threadName)) {
-        int callNum = clearTableCallCount.incrementAndGet();
-        
+      // Count all calls but distinguish between test threads and external threads
+      boolean isTestThread = threadName.contains("ForkJoinPool") || testThreadNames.contains(threadName);
+      int callNum = clearTableCallCount.incrementAndGet();
+      
+      if (isTestThread) {
         LOG.info("clearNSSummaryTable called #{} by test thread: {}, current state: {}", 
             callNum, threadName, currentState);
         
@@ -357,9 +364,9 @@ public class TestNSSummaryUnifiedControl {
               callNum, threadName, currentState);
         }
       } else {
-        // Log but don't count calls from external threads (CI interference)
-        LOG.warn("clearNSSummaryTable called by EXTERNAL thread: {}, state: {} - ignoring for test count", 
-            threadName, currentState);
+        // Log external calls that shouldn't be counted but might indicate CI interference
+        LOG.warn("clearNSSummaryTable called #{} by EXTERNAL thread: {}, state: {} - this may be CI interference", 
+            callNum, threadName, currentState);
       }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
@@ -411,6 +418,9 @@ public class TestNSSummaryUnifiedControl {
           "All other rebuilds should be rejected");
       assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
           "Final state should be IDLE");
+      
+      // Additional verification that our mock was actually used
+      verify(mockNamespaceSummaryManager, times(1)).clearNSSummaryTable();
 
     } finally {
       finishLatch.countDown(); // Ensure cleanup
