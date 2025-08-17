@@ -323,6 +323,7 @@ public class TestNSSummaryUnifiedControl {
    * Test multiple concurrent attempts - only one should succeed, others rejected.
    */
   @Test
+  @SuppressWarnings("methodlength")
   void testMultipleConcurrentAttempts() throws Exception {
     int threadCount = 5;
     CountDownLatch allThreadsReady = new CountDownLatch(threadCount);
