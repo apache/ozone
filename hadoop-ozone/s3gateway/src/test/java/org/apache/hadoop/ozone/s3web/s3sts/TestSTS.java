@@ -51,16 +51,11 @@ public class TestSTS {
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(OZONE_S3_ADMINISTRATORS, "test-user");
     OzoneConfigurationHolder.setConfiguration(config);
-    // Create client stub and object store stub
     clientStub = new OzoneClientStub();
-
-    // Create mock HttpHeaders
     httpHeaders = mock(HttpHeaders.class);
     when(httpHeaders.getHeaderString("Authorization"))
         .thenReturn("AWS4-HMAC-SHA256 Credential=test-user/20240709/us-east-1/s3/aws4_request, "
             + "SignedHeaders=host;x-amz-date, Signature=some-signature");
-
-    // Create STS endpoint and set client to OzoneClientStub
     endpoint = new S3STSEndpoint();
     endpoint.setClient(clientStub);
     endpoint.setContext(context);

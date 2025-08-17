@@ -49,7 +49,6 @@ public final class S3GatewayConfigKeys {
   public static final String OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY =
       "ozone.s3g.webadmin.https-address";
 
-
   public static final String OZONE_S3G_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_S3G_HTTP_BIND_PORT_DEFAULT = 9878;
   public static final int OZONE_S3G_HTTPS_BIND_PORT_DEFAULT = 9879;
