@@ -327,7 +327,7 @@ public class TestNSSummaryUnifiedControl {
     int threadCount = 5;
     CountDownLatch allThreadsReady = new CountDownLatch(threadCount);
     CountDownLatch startSimultaneously = new CountDownLatch(1);
-    CountDownLatch firstThreadStarted = new CountDownLatch(1);
+    CountDownLatch allThreadsStartedReprocess = new CountDownLatch(threadCount);
     CountDownLatch finishLatch = new CountDownLatch(1);
     AtomicInteger successCount = new AtomicInteger(0);
     AtomicInteger rejectedCount = new AtomicInteger(0);
@@ -354,15 +354,24 @@ public class TestNSSummaryUnifiedControl {
         LOG.info("clearNSSummaryTable called #{} by test thread: {}, current state: {}", 
             callNum, threadName, currentState);
         
-        if (callNum == 1) {
-          firstThreadStarted.countDown();
-          // Block this thread until all other threads have started and attempted to call reprocess
-          // This ensures the first thread holds the lock while others are trying to acquire it
-          boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
+        // Wait for ALL threads to have attempted to call reprocess() before allowing any to proceed
+        // This ensures we test true simultaneous access to the compareAndSet operations
+        try {
+          boolean awaitSuccess = allThreadsStartedReprocess.await(10, TimeUnit.SECONDS);
+          if (!awaitSuccess) {
+            LOG.warn("allThreadsStartedReprocess.await() timed out");
+          }
+          // Then wait for test to signal completion
+          awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
           if (!awaitSuccess) {
             LOG.warn("finishLatch.await() timed out");
           }
-        } else {
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          LOG.warn("Thread interrupted while waiting");
+        }
+        
+        if (callNum > 1) {
           // If we get a second call from our test threads during the SAME test execution,
           // this indicates the unified control failed
           LOG.error("UNEXPECTED: clearNSSummaryTable called multiple times (call #{}) by test thread: {}, state: {}", 
@@ -399,6 +408,10 @@ public class TestNSSummaryUnifiedControl {
             startSimultaneously.await(5, TimeUnit.SECONDS);
             
             LOG.info("Thread {} ({}) attempting rebuild, current state: {}", threadId, threadName, NSSummaryTask.getRebuildState());
+            
+            // Signal that this thread has started calling reprocess()
+            allThreadsStartedReprocess.countDown();
+            
             TaskResult result = nsSummaryTask.reprocess(mockOMMetadataManager);
             if (result.isTaskSuccess()) {
               int count = successCount.incrementAndGet();
@@ -421,9 +434,11 @@ public class TestNSSummaryUnifiedControl {
       // Start all threads simultaneously
       startSimultaneously.countDown();
       
-      // Wait for first rebuild to start
-      assertTrue(firstThreadStarted.await(5, TimeUnit.SECONDS), 
-          "At least one rebuild should start");
+      // Wait for all threads to have started their reprocess() calls
+      assertTrue(allThreadsStartedReprocess.await(10, TimeUnit.SECONDS), 
+          "All threads should start reprocess calls");
+      
+      // Verify that state is RUNNING (at least one thread acquired the lock)
       assertEquals(RebuildState.RUNNING, NSSummaryTask.getRebuildState(),
           "State should be RUNNING");
 
