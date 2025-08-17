@@ -355,12 +355,15 @@ public class TestNSSummaryUnifiedControl {
         
         if (callNum == 1) {
           startLatch.countDown();
+          // Block this thread until all other threads have started and attempted to call reprocess
+          // This ensures the first thread holds the lock while others are trying to acquire it
           boolean awaitSuccess = finishLatch.await(10, TimeUnit.SECONDS);
           if (!awaitSuccess) {
             LOG.warn("finishLatch.await() timed out");
           }
         } else {
-          // If we get a second call from our test threads, this is the bug we're trying to fix
+          // If we get a second call from our test threads during the SAME test execution,
+          // this indicates the unified control failed
           LOG.error("UNEXPECTED: clearNSSummaryTable called multiple times (call #{}) by test thread: {}, state: {}", 
               callNum, threadName, currentState);
         }
