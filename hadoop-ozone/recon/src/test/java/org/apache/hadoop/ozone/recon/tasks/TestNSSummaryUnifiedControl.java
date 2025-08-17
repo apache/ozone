@@ -346,9 +346,9 @@ public class TestNSSummaryUnifiedControl {
       
       // Count all calls but distinguish between test threads and external threads
       boolean isTestThread = threadName.contains("ForkJoinPool") || testThreadNames.contains(threadName);
-      int callNum = clearTableCallCount.incrementAndGet();
-      
       if (isTestThread) {
+        LOG.error("Test Thread: {} - Clearing NSSummary table in Recon DB.", Thread.currentThread().getName());
+        int callNum = clearTableCallCount.incrementAndGet();
         LOG.info("clearNSSummaryTable called #{} by test thread: {}, current state: {}", 
             callNum, threadName, currentState);
         
@@ -364,9 +364,10 @@ public class TestNSSummaryUnifiedControl {
               callNum, threadName, currentState);
         }
       } else {
+        LOG.error("External Thread: {} - Clearing NSSummary table in Recon DB.", Thread.currentThread().getName());
         // Log external calls that shouldn't be counted but might indicate CI interference
-        LOG.warn("clearNSSummaryTable called #{} by EXTERNAL thread: {}, state: {} - this may be CI interference", 
-            callNum, threadName, currentState);
+        LOG.warn("clearNSSummaryTable called by EXTERNAL thread: {}, state: {} - this may be CI interference",
+            threadName, currentState);
       }
       return null;
     }).when(mockNamespaceSummaryManager).clearNSSummaryTable();

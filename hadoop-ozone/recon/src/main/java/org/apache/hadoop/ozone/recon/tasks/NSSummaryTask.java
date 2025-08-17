@@ -228,6 +228,7 @@ public class NSSummaryTask implements ReconOmTask {
 
     try {
       // reinit Recon RocksDB's namespace CF.
+      LOG.error("Current Thread: {} - Clearing NSSummary table in Recon DB.", Thread.currentThread().getName());
       reconNamespaceSummaryManager.clearNSSummaryTable();
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ", ioEx);
