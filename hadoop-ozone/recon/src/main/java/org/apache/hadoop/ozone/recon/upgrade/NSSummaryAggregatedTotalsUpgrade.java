@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.hadoop.ozone.recon.upgrade.ReconUpgradeAction.UpgradeActionType.FINALIZE;
 
-import javax.sql.DataSource;
 import com.google.inject.Injector;
+import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.ReconGuiceServletContextListener;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;

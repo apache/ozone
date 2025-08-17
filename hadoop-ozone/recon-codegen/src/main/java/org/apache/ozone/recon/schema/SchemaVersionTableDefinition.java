@@ -90,7 +90,7 @@ public class SchemaVersionTableDefinition implements ReconSchemaDefinition {
     dslContext.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
         .columns(DSL.field(name("version_number")),
             DSL.field(name("applied_on")))
-        .values(2, DSL.currentTimestamp())
+        .values(slv, DSL.currentTimestamp())
         .execute();
     LOG.info("Inserted initial SLV '{}' into SchemaVersion table.", slv);
   }
