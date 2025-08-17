@@ -46,9 +46,8 @@ public class NSSummaryAggregatedTotalsUpgrade implements ReconUpgradeAction {
     // Resolve required services from Guice
     Injector injector = ReconGuiceServletContextListener.getGlobalInjector();
     if (injector == null) {
-      // Should not happen since ReconServer sets the injector before finalize call
-      LOG.warn("Guice injector not initialized yet; skipping NSSummary rebuild at upgrade.");
-      return;
+      throw new IllegalStateException(
+          "Guice injector not initialized. NSSummary rebuild cannot proceed during upgrade.");
     }
 
     ReconNamespaceSummaryManager nsMgr = injector.getInstance(ReconNamespaceSummaryManager.class);

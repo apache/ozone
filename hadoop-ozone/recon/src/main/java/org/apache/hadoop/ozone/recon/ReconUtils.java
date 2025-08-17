@@ -131,37 +131,11 @@ public class ReconUtils {
   public static boolean triggerAsyncNSSummaryRebuild(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager) {
-    
-    // Check if a rebuild is already in progress
-    if (getNSSummaryRebuildState() == NSSummaryTask.RebuildState.RUNNING) {
-      log.info("NSSummary rebuild already in progress; skipping duplicate trigger.");
-      return false;
-    }
-    
+
     // Submit rebuild task to single thread executor for async execution
     NSSUMMARY_REBUILD_EXECUTOR.submit(() -> {
       try {
-        // Wait for OM tables to be initialized before proceeding
-        long maxWaitMillis = 300_000L; // 5 minutes
-        long waited = 0L;
-        long waitInterval = 1000L; // 1 second
-        
-        while (!omMetadataManager.isOmTablesInitialized() && waited < maxWaitMillis) {
-          try {
-            Thread.sleep(waitInterval);
-            waited += waitInterval;
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("Interrupted while waiting for OM tables initialization");
-            return;
-          }
-        }
-        
-        if (waited >= maxWaitMillis) {
-          log.warn("OM tables not initialized after {} ms; skipping NSSummary rebuild trigger.", maxWaitMillis);
-          return;
-        }
-        
+
         // This will go through NSSummaryTask's unified control mechanism
         reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
         log.info("Async NSSummary tree rebuild completed successfully.");
@@ -170,7 +144,6 @@ public class ReconUtils {
       }
     });
     
-    log.info("Async NSSummary tree rebuild scheduled successfully.");
     return true;
   }
 
