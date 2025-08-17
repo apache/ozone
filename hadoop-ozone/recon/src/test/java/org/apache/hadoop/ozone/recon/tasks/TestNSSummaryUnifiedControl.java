@@ -406,8 +406,9 @@ public class TestNSSummaryUnifiedControl {
             
             // All threads now wait for the signal to start simultaneously
             startSimultaneously.await(5, TimeUnit.SECONDS);
-            
-            LOG.info("Thread {} ({}) attempting rebuild, current state: {}", threadId, threadName, NSSummaryTask.getRebuildState());
+
+            LOG.info("Thread {} ({}) attempting rebuild, current state: {}", threadId, threadName,
+                NSSummaryTask.getRebuildState());
             
             // Signal that this thread has started calling reprocess()
             allThreadsStartedReprocess.countDown();
