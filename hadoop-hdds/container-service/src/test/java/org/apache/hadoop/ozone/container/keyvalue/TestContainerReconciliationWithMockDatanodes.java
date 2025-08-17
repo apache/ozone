@@ -35,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.doThrow;
+import  static org.mockito.Mockito.spy;
 
 import java.io.File;
 import java.io.IOException;
@@ -73,6 +75,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -231,31 +234,6 @@ public class TestContainerReconciliationWithMockDatanodes {
     assertEquals(healthyDataChecksum, repairedDataChecksum);
   }
 
-  @Test
-  public void testContainerReconciliationFailureContainerScan()
-      throws Exception {
-    containerProtocolMock.when(() -> ContainerProtocolCalls.getContainerChecksumInfo(any(), anyLong(), any()))
-        .thenThrow(new IOException("Simulated failure to get container checksum info"));
-
-    // Use synchronous on-demand scans to re-build the merkle trees after corruption.
-    datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
-
-    // Each datanode should have had one on-demand scan during test setup, and a second one after corruption was
-    // introduced.
-    waitForExpectedScanCount(1);
-
-    for (MockDatanode current : datanodes) {
-      List<DatanodeDetails> peers = datanodes.stream()
-          .map(MockDatanode::getDnDetails)
-          .filter(other -> !current.getDnDetails().equals(other))
-          .collect(Collectors.toList());
-      // Reconciliation should fail for each datanode, since the checksum info cannot be retrieved.
-      assertThrows(IOException.class, () -> current.reconcileContainer(dnClient, peers, CONTAINER_ID));
-    }
-    // Even failure of Reconciliation should have triggered a second on-demand scan for each replica.
-    waitForExpectedScanCount(2);
-  }
-
   /**
    * Enum to represent different failure modes for container protocol calls.
    */
@@ -330,6 +308,30 @@ public class TestContainerReconciliationWithMockDatanodes {
     
     // Restore the original mock behavior for other tests
     mockContainerProtocolCalls();
+  }
+
+  @Test
+  public void testContainerReconciliationFailureContainerScan()
+      throws Exception {
+    // Use synchronous on-demand scans to re-build the merkle trees after corruption.
+    datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
+
+    // Each datanode should have had one on-demand scan during test setup, and a second one after corruption was
+    // introduced.
+    waitForExpectedScanCount(1);
+
+    for (MockDatanode current : datanodes) {
+      doThrow(IOException.class).when(current.getHandler().getChecksumManager()).read(any());
+      List<DatanodeDetails> peers = datanodes.stream()
+          .map(MockDatanode::getDnDetails)
+          .filter(other -> !current.getDnDetails().equals(other))
+          .collect(Collectors.toList());
+      // Reconciliation should fail for each datanode, since the checksum info cannot be retrieved.
+      assertThrows(IOException.class, () -> current.reconcileContainer(dnClient, peers, CONTAINER_ID));
+      Mockito.reset(current.getHandler().getChecksumManager());
+    }
+    // Even failure of Reconciliation should have triggered a second on-demand scan for each replica.
+    waitForExpectedScanCount(2);
   }
 
   /**
@@ -448,7 +450,8 @@ public class TestContainerReconciliationWithMockDatanodes {
 
       containerSet = newContainerSet();
       MutableVolumeSet volumeSet = createVolumeSet();
-      handler = ContainerTestUtils.getKeyValueHandler(conf, dnDetails.getUuidString(), containerSet, volumeSet);
+      handler = ContainerTestUtils.getKeyValueHandler(conf, dnDetails.getUuidString(), containerSet, volumeSet,
+          spy(new ContainerChecksumTreeManager(conf)));
       handler.setClusterID(CLUSTER_ID);
 
       ContainerController controller = new ContainerController(containerSet,
@@ -461,6 +464,10 @@ public class TestContainerReconciliationWithMockDatanodes {
 
     public DatanodeDetails getDnDetails() {
       return dnDetails;
+    }
+
+    public KeyValueHandler getHandler() {
+      return handler;
     }
 
     /**

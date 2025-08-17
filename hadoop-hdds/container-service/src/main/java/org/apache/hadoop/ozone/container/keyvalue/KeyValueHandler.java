@@ -607,8 +607,13 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
     try {
+      ContainerProtos.ContainerDataProto.State currentState = kvContainer.getContainerState();
       markContainerForClose(kvContainer);
       closeContainer(kvContainer);
+      if (currentState == RECOVERING) {
+        // trigger container scan for recovering containers, i.e., after EC reconstruction
+        containerSet.scanContainer(kvContainer.getContainerData().getContainerID(), "EC Reconstruction");
+      }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -1592,9 +1597,21 @@ public class KeyValueHandler extends Handler {
     deleteInternal(container, force);
   }
 
-  @SuppressWarnings("checkstyle:MethodLength")
   @Override
   public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
+      Collection<DatanodeDetails> peers) throws IOException {
+    long containerID = container.getContainerData().getContainerID();
+    try {
+      reconcileContainerInternal(dnClient, container, peers);
+    } finally {
+      // Trigger on demand scanner after reconciliation
+      containerSet.scanContainerWithoutGap(containerID,
+          "Container reconciliation");
+    }
+  }
+
+  @SuppressWarnings("checkstyle:MethodLength")
+  private void reconcileContainerInternal(DNContainerOperationClient dnClient, Container<?> container,
       Collection<DatanodeDetails> peers) throws IOException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
