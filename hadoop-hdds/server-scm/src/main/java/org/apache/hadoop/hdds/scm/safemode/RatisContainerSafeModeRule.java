@@ -17,17 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Class defining Safe mode exit criteria for Ratis Containers.
@@ -37,18 +33,10 @@ import org.slf4j.LoggerFactory;
  */
 public class RatisContainerSafeModeRule extends AbstractContainerSafeModeRule {
 
-  private static final Logger LOG = LoggerFactory.getLogger(RatisContainerSafeModeRule.class);
-  private static final String NAME = "RatisContainerSafeModeRule";
-
-  private final AtomicLong ratisContainerWithMinReplicas;
-
   public RatisContainerSafeModeRule(EventQueue eventQueue,
-      ConfigurationSource conf,
-      ContainerManager containerManager,
+      ConfigurationSource conf, ContainerManager containerManager,
       SCMSafeModeManager manager) {
-    super(conf, manager, containerManager, NAME, eventQueue, LOG);
-    this.ratisContainerWithMinReplicas = new AtomicLong(0);
-    initializeRule();
+    super(conf, manager, containerManager, eventQueue);
   }
 
   @Override
@@ -57,35 +45,13 @@ public class RatisContainerSafeModeRule extends AbstractContainerSafeModeRule {
   }
 
   @Override
-  protected void process(NodeRegistrationContainerReport report) {
-    report.getReport().getReportsList().stream()
-        .map(c -> ContainerID.valueOf(c.getContainerID()))
-        .filter(getContainers()::remove)
-        .forEach(c -> recordReportedContainer());
-
-    if (scmInSafeMode()) {
-      SCMSafeModeManager.getLogger().info(
-          "SCM in safe mode. {} % containers [Ratis] have at least one reported replica",
-          String.format("%.2f", getCurrentContainerThreshold() * 100));
+  protected void handleReportedContainer(ContainerID containerID, DatanodeID datanodeID) {
+    // assume minReplica == 1
+    Preconditions.assertSame(1, getMinReplica(containerID), "minReplica");
+    if (getContainers().remove(containerID) != null) {
+      incrementContainersWithMinReplicas();
+      getSafeModeMetrics().incCurrentContainersWithOneReplicaReportedCount();
     }
-  }
-
-  /** Record the reported Container. */
-  private void recordReportedContainer() {
-    ratisContainerWithMinReplicas.incrementAndGet();
-    getSafeModeMetrics().incCurrentContainersWithOneReplicaReportedCount();
-  }
-
-  @Override
-  protected long getNumberOfContainersWithMinReplica() {
-    return ratisContainerWithMinReplicas.longValue();
-  }
-
-  @Override
-  protected Set<ContainerID> getSampleMissingContainers() {
-    return getContainers().stream()
-        .limit(SAMPLE_CONTAINER_DISPLAY_LIMIT)
-        .collect(Collectors.toSet());
   }
 
 }

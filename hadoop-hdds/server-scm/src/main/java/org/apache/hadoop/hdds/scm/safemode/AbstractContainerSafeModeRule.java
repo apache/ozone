@@ -22,11 +22,13 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -37,7 +39,6 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
-import org.slf4j.Logger;
 
 /**
  * Abstract class for Container Safe mode exit rule.
@@ -45,46 +46,49 @@ import org.slf4j.Logger;
 public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<NodeRegistrationContainerReport> {
 
   private final ContainerManager containerManager;
-  private final Set<ContainerID> containers;
+  private final Map<ContainerID, Integer> containers = new ConcurrentHashMap<>();
   private final double safeModeCutoff;
-  private final Logger log;
-
-  private int totalContainers;
+  private final AtomicInteger totalContainers = new AtomicInteger();
+  private final AtomicInteger containersWithMinReplicas = new AtomicInteger();
 
   public AbstractContainerSafeModeRule(ConfigurationSource conf, SCMSafeModeManager safeModeManager,
-      ContainerManager containerManager, String ruleName, EventQueue eventQueue, Logger log) {
-    super(safeModeManager, ruleName, eventQueue);
+      ContainerManager containerManager, EventQueue eventQueue) {
+    super(safeModeManager, eventQueue);
     this.containerManager = containerManager;
-    this.containers = new HashSet<>();
     this.safeModeCutoff = getSafeModeCutoff(conf);
-    this.log = log;
+    initializeRule();
   }
 
   protected abstract ReplicationType getContainerType();
 
-  protected abstract long getNumberOfContainersWithMinReplica();
+  protected abstract void handleReportedContainer(ContainerID containerID, DatanodeID datanodeID);
 
-  protected abstract  Set<ContainerID> getSampleMissingContainers();
+  protected long getNumberOfContainersWithMinReplica() {
+    return containersWithMinReplicas.get();
+  }
+
+  protected final void incrementContainersWithMinReplicas() {
+    containersWithMinReplicas.incrementAndGet();
+  }
 
   protected void initializeRule() {
     containers.clear();
     containerManager.getContainers(getContainerType()).stream()
         .filter(this::isClosed)
         .filter(c -> c.getNumberOfKeys() > 0)
-        .map(ContainerInfo::containerID)
-        .forEach(containers::add);
-    totalContainers = containers.size();
+        .forEach(c -> containers.put(c.containerID(), c.getReplicationConfig().getMinimumNodes()));
+    totalContainers.set(containers.size());
     final long cutOff = (long) Math.ceil(getTotalNumberOfContainers() * getSafeModeCutoff());
     getSafeModeMetrics().setNumContainerReportedThreshold(getContainerType(), cutOff);
-    log.info("Refreshed {} Containers threshold count to {}.", getContainerType(), cutOff);
+    SCMSafeModeManager.getLogger().info("Refreshed {} Containers threshold count to {}.", getContainerType(), cutOff);
   }
 
-  protected Set<ContainerID> getContainers() {
+  protected Map<ContainerID, Integer> getContainers() {
     return containers;
   }
 
   protected int getTotalNumberOfContainers() {
-    return totalContainers;
+    return totalContainers.get();
   }
 
   protected double getSafeModeCutoff() {
@@ -94,6 +98,20 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   @Override
   protected TypedEvent<NodeRegistrationContainerReport> getEventType() {
     return SCMEvents.CONTAINER_REGISTRATION_REPORT;
+  }
+
+  @Override
+  protected void process(NodeRegistrationContainerReport report) {
+    final DatanodeID datanodeID = report.getDatanodeDetails().getID();
+    report.getReport().getReportsList().stream()
+        .map(c -> ContainerID.valueOf(c.getContainerID()))
+        .forEach(cid -> handleReportedContainer(cid, datanodeID));
+
+    if (scmInSafeMode()) {
+      SCMSafeModeManager.getLogger().info(
+          "SCM in safe mode. {} % containers [{}] have at least one reported replica",
+          getContainerType(), String.format("%.2f", getCurrentContainerThreshold() * 100));
+    }
   }
 
   @Override
@@ -111,7 +129,8 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   @VisibleForTesting
   public double getCurrentContainerThreshold() {
-    return totalContainers == 0 ? 1 : ((double) getNumberOfContainersWithMinReplica() / totalContainers);
+    final long total = getTotalNumberOfContainers();
+    return total == 0 ? 1 : ((double) getNumberOfContainersWithMinReplica() / total);
   }
 
   @Override
@@ -149,17 +168,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   }
 
   protected int getMinReplica(ContainerID id) {
-    try {
-      final ContainerInfo container = containerManager.getContainer(id);
-      final ReplicationConfig replicationConfig = container.getReplicationConfig();
-      return replicationConfig.getMinimumNodes();
-    } catch (ContainerNotFoundException e) {
-      /*
-       * This should never happen; in case this happens, the container somehow got removed from SCM.
-       * Since the SCM is not tracking this Container anymore, the min replica required is 0.
-       */
-      return 0;
-    }
+    return containers.getOrDefault(id, 0);
   }
 
   @Override
@@ -171,7 +180,9 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
         getNumberOfContainersWithMinReplica(), getTotalNumberOfContainers(),
         getCurrentContainerThreshold(), getSafeModeCutoff());
 
-    final Set<ContainerID> sampleContainers = getSampleMissingContainers();
+    final List<ContainerID> sampleContainers = getContainers().keySet().stream()
+        .limit(SAMPLE_CONTAINER_DISPLAY_LIMIT)
+        .collect(Collectors.toList());
 
     if (!sampleContainers.isEmpty()) {
       String sampleECContainerText = "Sample EC Containers not satisfying the criteria : " + sampleContainers + ";";

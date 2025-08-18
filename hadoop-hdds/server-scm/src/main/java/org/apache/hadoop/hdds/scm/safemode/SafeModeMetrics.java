@@ -73,14 +73,10 @@ public class SafeModeMetrics {
     this.currentPipelinesWithAtleastOneReplicaReportedCount.incr();
   }
 
-  public void setNumContainerWithOneReplicaReportedThreshold(long val) {
-    this.numContainerWithOneReplicaReportedThreshold.set(val);
-  }
-
   public void setNumContainerReportedThreshold(HddsProtos.ReplicationType type, long val) {
     switch (type) {
     case RATIS:
-      this.currentContainersWithOneReplicaReportedCount.incr();
+      this.numContainerWithOneReplicaReportedThreshold.set(val);
       break;
     case EC:
       this.numContainerWithECDataReplicaReportedThreshold.set(val);
@@ -88,11 +84,6 @@ public class SafeModeMetrics {
     default:
       throw new IllegalArgumentException("Unsupported replication type: " + type);
     }
-
-  }
-
-  public void setNumContainerWithECDataReplicaReportedThreshold(long val) {
-    this.numContainerWithECDataReplicaReportedThreshold.set(val);
   }
 
   public void incCurrentContainersWithOneReplicaReportedCount() {

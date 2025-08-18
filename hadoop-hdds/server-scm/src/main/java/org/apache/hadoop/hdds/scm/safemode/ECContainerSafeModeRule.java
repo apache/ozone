@@ -17,22 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import com.google.common.collect.Sets;
-import java.util.Collections;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Safe mode rule for EC containers.
@@ -42,20 +34,12 @@ import org.slf4j.LoggerFactory;
  */
 public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ECContainerSafeModeRule.class);
-  private static final String NAME = "ECContainerSafeModeRule";
-
-  private final Map<ContainerID, Set<DatanodeID>> ecContainerDNsMap;
-  private final AtomicLong ecContainerWithMinReplicas;
+  private final Map<ContainerID, Map<DatanodeID, DatanodeID>> ecContainerDNsMap = new ConcurrentHashMap<>();
 
   public ECContainerSafeModeRule(EventQueue eventQueue,
-      ConfigurationSource conf,
-      ContainerManager containerManager,
+      ConfigurationSource conf, ContainerManager containerManager,
       SCMSafeModeManager manager) {
-    super(conf, manager, containerManager, NAME, eventQueue, LOG);
-    this.ecContainerDNsMap = new ConcurrentHashMap<>();
-    this.ecContainerWithMinReplicas = new AtomicLong(0);
-    initializeRule();
+    super(conf, manager, containerManager, eventQueue);
   }
 
   @Override
@@ -64,56 +48,18 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
   }
 
   @Override
-  protected void process(NodeRegistrationContainerReport report) {
-    final DatanodeID datanodeID = report.getDatanodeDetails().getID();
+  protected void handleReportedContainer(ContainerID containerID, DatanodeID datanodeID) {
+    if (getContainers().containsKey(containerID)) {
+      final Map<DatanodeID, DatanodeID> replicas =
+          ecContainerDNsMap.computeIfAbsent(containerID, key -> new ConcurrentHashMap<>());
+      replicas.put(datanodeID, datanodeID);
 
-    report.getReport().getReportsList().stream()
-        .map(c -> ContainerID.valueOf(c.getContainerID()))
-        .filter(getContainers()::contains)
-        .forEach(containerID -> {
-          putInContainerDNsMap(containerID, ecContainerDNsMap, datanodeID);
-          recordReportedContainer(containerID);
-        });
-
-    if (scmInSafeMode()) {
-      SCMSafeModeManager.getLogger().info(
-          "SCM in safe mode. {} % containers [EC] have at N reported replica",
-          getCurrentContainerThreshold() * 100);
+      if (replicas.size() >= getMinReplica(containerID)) {
+        getContainers().remove(containerID);
+        incrementContainersWithMinReplicas();
+        getSafeModeMetrics().incCurrentContainersWithECDataReplicaReportedCount();
+      }
     }
-  }
-
-  private void putInContainerDNsMap(ContainerID containerID,
-      Map<ContainerID, Set<DatanodeID>> containerDNsMap,
-      DatanodeID datanodeID) {
-    containerDNsMap.computeIfAbsent(containerID, key -> Sets.newHashSet()).add(datanodeID);
-  }
-
-  /**
-   * Record the reported Container.
-   *
-   * @param containerID containerID
-   */
-  private void recordReportedContainer(ContainerID containerID) {
-    final int minReplica = getMinReplica(containerID);
-    final int noOfDNs = ecContainerDNsMap.getOrDefault(containerID, Collections.emptySet()).size();
-    if (noOfDNs >= minReplica) {
-      getSafeModeMetrics().incCurrentContainersWithECDataReplicaReportedCount();
-      ecContainerWithMinReplicas.getAndAdd(1);
-    }
-  }
-
-  @Override
-  protected long getNumberOfContainersWithMinReplica() {
-    return ecContainerWithMinReplicas.longValue();
-  }
-
-  @Override
-  protected Set<ContainerID> getSampleMissingContainers() {
-    return ecContainerDNsMap.entrySet().stream()
-        .filter(entry -> entry.getValue().size() < getMinReplica(entry.getKey()))
-        .map(Map.Entry::getKey)
-        .limit(SAMPLE_CONTAINER_DISPLAY_LIMIT)
-        .collect(Collectors.toSet());
   }
 
   @Override
