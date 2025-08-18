@@ -16,6 +16,7 @@
 *** Settings ***
 Documentation       Test ozone debug CLI
 Library             OperatingSystem
+Library             Collections
 Resource            ../lib/os.robot
 Resource            ozone-debug-keywords.robot
 Test Timeout        5 minute
@@ -60,7 +61,7 @@ Test ozone debug version
 
 Test ozone debug replicas verify with RATIS ONE filter
     ${output} =    Execute replicas verify with replication filter    RATIS    ONE    checksums
-    ${json}   =    Parse replicas verify JSON output      ${output}
+    ${json} =      Parse replicas verify JSON output      ${output}
     
     # Should only contain RATIS ONE key
     ${keys} =      Get From Dictionary    ${json}         keys
@@ -74,7 +75,7 @@ Test ozone debug replicas verify with RATIS ONE filter
 
 Test ozone debug replicas verify with RATIS THREE filter
     ${output} =    Execute replicas verify with replication filter    RATIS    THREE    checksums
-    ${json}   =    Parse replicas verify JSON output      ${output}
+    ${json} =      Parse replicas verify JSON output      ${output}
     
     # Should contain RATIS THREE keys (default testfile and explicit RATIS THREE key)
     ${keys} =      Get From Dictionary    ${json}         keys
@@ -88,7 +89,7 @@ Test ozone debug replicas verify with RATIS THREE filter
 
 Test ozone debug replicas verify with EC rs-3-2-1024k filter
     ${output} =    Execute replicas verify with replication filter    EC    rs-3-2-1024k    checksums
-    ${json}   =    Parse replicas verify JSON output      ${output}
+    ${json} =      Parse replicas verify JSON output      ${output}
     
     # Should only contain EC key
     ${keys} =      Get From Dictionary    ${json}           keys
