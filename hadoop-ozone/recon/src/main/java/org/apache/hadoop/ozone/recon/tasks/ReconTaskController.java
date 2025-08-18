@@ -64,4 +64,11 @@ public interface ReconTaskController {
    * Stop the task scheduler.
    */
   void stop();
+
+  /**
+   * Check if event buffer has overflowed and needs full snapshot fallback.
+   * 
+   * @return true if buffer has dropped events due to overflow
+   */
+  boolean hasEventBufferOverflowed();
 }
