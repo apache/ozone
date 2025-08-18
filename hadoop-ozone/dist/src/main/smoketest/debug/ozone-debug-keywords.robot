@@ -65,3 +65,37 @@ Check Replica Passed
     Should Be True    ${check['completed']}
     Should Be True    ${check['pass']}
     Should Be Empty   ${check['failures']}
+
+Execute replicas verify with replication filter
+    [Arguments]    ${replication_type}    ${replication_factor}    ${verification_type}
+    ${output}      Execute          ozone debug replicas verify --${verification_type} --type ${replication_type} --replication ${replication_factor} o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} --all-results
+    [Return]       ${output}
+
+Execute replicas verify with replication type only
+    [Arguments]    ${replication_type}    ${verification_type}
+    ${output}      Execute          ozone debug replicas verify --${verification_type} --type ${replication_type} o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} --all-results
+    [Return]       ${output}
+
+Create test key with replication config
+    [Arguments]    ${key_name}    ${replication_type}    ${replication_factor}
+    Execute             ozone sh key put --type ${replication_type} --replication ${replication_factor} o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${key_name} ${TEMP_DIR}/${TESTFILE}
+
+Verify key exists in output
+    [Arguments]    ${json}    ${expected_key_name}
+    ${keys} =      Get From Dictionary    ${json}    keys
+    ${key_names} =    Create List
+    FOR    ${key}    IN    @{keys}
+        ${key_name} =    Get From Dictionary    ${key}    name
+        Append To List    ${key_names}    ${key_name}
+    END
+    Should Contain    ${key_names}    ${expected_key_name}    Key ${expected_key_name} not found in output
+
+Verify key not in output
+    [Arguments]    ${json}    ${expected_key_name}
+    ${keys} =      Get From Dictionary    ${json}    keys
+    ${key_names} =    Create List
+    FOR    ${key}    IN    @{keys}
+        ${key_name} =    Get From Dictionary    ${key}    name
+        Append To List    ${key_names}    ${key_name}
+    END
+    Should Not Contain    ${key_names}    ${expected_key_name}    Key ${expected_key_name} should not be in filtered output

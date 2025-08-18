@@ -155,8 +155,8 @@ public class ReplicasVerify extends Handler {
     OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
         volumeName, bucketName, keyName, false);
 
-    // Check if key should be filtered based on replication config
-    if (shouldFilterKey(keyInfo)) {
+    // Check if key should be processed based on replication config
+    if (!shouldProcessKeyByReplicationType(keyInfo)) {
       return;
     }
 
@@ -229,31 +229,23 @@ public class ReplicasVerify extends Handler {
   }
 
   /**
-   * Check if the key should be filtered based on replication config.
+   * Check if the key should be processed based on replication config.
    * @param keyInfo the key to check
-   * @return true if the key should be filtered (skipped), false otherwise
+   * @return true if the key should be processed, false if it should be skipped
    */
-  private boolean shouldFilterKey(OmKeyInfo keyInfo) {
+  private boolean shouldProcessKeyByReplicationType(OmKeyInfo keyInfo) {
     Optional<ReplicationConfig> filterConfig = replication.fromParams(getConf());
     if (!filterConfig.isPresent()) {
       // No filter specified, include all keys
-      return false;
+      return true;
     }
 
     ReplicationConfig keyReplicationConfig = keyInfo.getReplicationConfig();
     ReplicationConfig filter = filterConfig.get();
 
-    // Check replication type match
-    if (!keyReplicationConfig.getReplicationType().equals(filter.getReplicationType())) {
-      return true;
-    }
-
-    // Check replication factor/config match
-    if (!keyReplicationConfig.getReplication().equals(filter.getReplication())) {
-      return true;
-    }
-
-    return false;
+    // Process key only if both replication type and factor/config match
+    return keyReplicationConfig.getReplicationType().equals(filter.getReplicationType())
+        && keyReplicationConfig.getReplication().equals(filter.getReplication());
   }
 
   static class Verification {

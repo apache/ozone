@@ -27,13 +27,23 @@ ${VOLUME}           cli-debug-volume${PREFIX}
 ${BUCKET}           cli-debug-bucket
 ${DEBUGKEY}         debugKey
 ${TESTFILE}         testfile
+${RATIS_ONE_KEY}    ratis-one-key
+${RATIS_THREE_KEY}  ratis-three-key
+${EC_KEY}           ec-key
 
 *** Keywords ***
 Write keys
     Execute             ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME} --space-quota 100TB --namespace-quota 100
     Execute             ozone sh bucket create o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} --space-quota 1TB
     Execute             dd if=/dev/urandom of=${TEMP_DIR}/${TESTFILE} bs=100000 count=15
+    # Create default key (RATIS THREE by default)
     Execute             ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${TESTFILE} ${TEMP_DIR}/${TESTFILE}
+    # Create RATIS ONE key
+    Create test key with replication config    ${RATIS_ONE_KEY}       RATIS    ONE
+    # Create RATIS THREE key
+    Create test key with replication config    ${RATIS_THREE_KEY}     RATIS    THREE
+    # Create EC key (rs-3-2-1024k)
+    Create test key with replication config    ${EC_KEY}              EC        rs-3-2-1024k
 
 *** Test Cases ***
 Test ozone debug replicas verify checksums
@@ -47,3 +57,46 @@ Test ozone debug replicas verify checksums
 Test ozone debug version
     ${output} =    Execute    ozone debug version
                    Execute    echo '${output}' | jq -r '.' # validate JSON
+
+Test ozone debug replicas verify with RATIS ONE filter
+    ${output} =    Execute replicas verify with replication filter    RATIS    ONE    checksums
+    ${json}   =    Parse replicas verify JSON output      ${output}
+    
+    # Should only contain RATIS ONE key
+    ${keys} =      Get From Dictionary    ${json}         keys
+    ${key_count} = Get Length             ${keys}
+    Should Be Equal As Integers           ${key_count}    1
+    Verify key exists in output           ${json}         ${RATIS_ONE_KEY}
+    # Verify EC and RATIS THREE keys are not present
+    Verify key not in output              ${json}         ${EC_KEY}
+    Verify key not in output              ${json}         ${TESTFILE}
+    Verify key not in output              ${json}         ${RATIS_THREE_KEY}
+
+Test ozone debug replicas verify with RATIS THREE filter
+    ${output} =    Execute replicas verify with replication filter    RATIS    THREE    checksums
+    ${json}   =    Parse replicas verify JSON output      ${output}
+    
+    # Should contain RATIS THREE keys (default testfile and explicit RATIS THREE key)
+    ${keys} =      Get From Dictionary    ${json}         keys
+    ${key_count} = Get Length             ${keys}
+    Should Be Equal As Integers           ${key_count}    2
+    Verify key exists in output           ${json}         ${TESTFILE}
+    Verify key exists in output           ${json}         ${RATIS_THREE_KEY}
+    # Verify RATIS ONE and EC keys are not present
+    Verify key not in output              ${json}         ${RATIS_ONE_KEY}
+    Verify key not in output              ${json}         ${EC_KEY}
+
+Test ozone debug replicas verify with EC rs-3-2-1024k filter
+    ${output} =    Execute replicas verify with replication filter    EC    rs-3-2-1024k    checksums
+    ${json}   =    Parse replicas verify JSON output      ${output}
+    
+    # Should only contain EC key
+    ${keys} =      Get From Dictionary    ${json}           keys
+    ${key_count} = Get Length    ${keys}
+    Should Be Equal As Integers           ${key_count}      1
+    Verify key exists in output           ${json}           ${EC_KEY}
+    # Verify RATIS keys are not present
+    Verify key not in output              ${json}           ${TESTFILE}
+    Verify key not in output              ${json}           ${RATIS_ONE_KEY}
+    Verify key not in output              ${json}           ${RATIS_THREE_KEY}
+    
