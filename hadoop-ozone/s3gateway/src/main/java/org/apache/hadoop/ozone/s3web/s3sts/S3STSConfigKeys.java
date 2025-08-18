@@ -24,15 +24,6 @@ package org.apache.hadoop.ozone.s3web.s3sts;
 public final class S3STSConfigKeys {
   public static final String OZONE_S3G_STS_HTTP_ENABLED_KEY =
       "ozone.s3g.sts.http.enabled";
-  public static final boolean OZONE_S3G_STS_HTTP_ENABLED_KEY_DEFAULT =
-      false;
-  public static final String OZONE_S3G_STS_HTTP_AUTH_CONFIG_PREFIX =
-      "ozone.s3g.secret.http.auth.";
-  public static final String OZONE_S3G_STS_HTTP_AUTH_TYPE_KEY =
-      OZONE_S3G_STS_HTTP_AUTH_CONFIG_PREFIX + "type";
-  public static final String OZONE_S3G_STS_HTTP_AUTH_TYPE_DEFAULT =
-      "kerberos";
-
   /**
    * Never constructed.
    */

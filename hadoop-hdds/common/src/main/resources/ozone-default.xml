@@ -1986,14 +1986,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.s3g.sts.http.auth.type</name>
-    <value>kerberos</value>
-    <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
-    <description> simple or kerberos. If kerberos is set, Kerberos SPNEGO
-      will be used for http authentication.
-    </description>
-  </property>
-  <property>
     <name>ozone.s3g.metrics.percentiles.intervals.seconds</name>
     <value>60</value>
     <tag>S3GATEWAY, PERFORMANCE</tag>
