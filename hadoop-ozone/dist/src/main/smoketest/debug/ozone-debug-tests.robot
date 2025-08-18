@@ -64,8 +64,8 @@ Test ozone debug replicas verify with RATIS ONE filter
     ${json} =      Parse replicas verify JSON output      ${output}
     
     # Should only contain RATIS ONE key
-    ${keys} =      Get From Dictionary    ${json}         keys
-    ${key_count} = Get Length             ${keys}
+    ${keys} =             Get From Dictionary     ${json}         keys
+    ${key_count} =        Get Length              ${keys}
     Should Be Equal As Integers           ${key_count}    1
     Verify key exists in output           ${json}         ${RATIS_ONE_KEY}
     # Verify EC and RATIS THREE keys are not present
@@ -78,8 +78,8 @@ Test ozone debug replicas verify with RATIS THREE filter
     ${json} =      Parse replicas verify JSON output      ${output}
     
     # Should contain RATIS THREE keys (default testfile and explicit RATIS THREE key)
-    ${keys} =      Get From Dictionary    ${json}         keys
-    ${key_count} = Get Length             ${keys}
+    ${keys} =             Get From Dictionary     ${json}         keys
+    ${key_count} =        Get Length              ${keys}
     Should Be Equal As Integers           ${key_count}    2
     Verify key exists in output           ${json}         ${TESTFILE}
     Verify key exists in output           ${json}         ${RATIS_THREE_KEY}
@@ -92,8 +92,8 @@ Test ozone debug replicas verify with EC rs-3-2-1024k filter
     ${json} =      Parse replicas verify JSON output      ${output}
     
     # Should only contain EC key
-    ${keys} =      Get From Dictionary    ${json}           keys
-    ${key_count} = Get Length    ${keys}
+    ${keys} =             Get From Dictionary     ${json}           keys
+    ${key_count} =        Get Length              ${keys}
     Should Be Equal As Integers           ${key_count}      1
     Verify key exists in output           ${json}           ${EC_KEY}
     # Verify RATIS keys are not present
