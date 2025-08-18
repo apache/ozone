@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -88,7 +87,6 @@ public class SnapshotDefragService extends BackgroundService
   private static final int DEFRAG_CORE_POOL_SIZE = 1;
 
   private static final String CHECKPOINT_STATE_DEFRAGED_DIR = OM_SNAPSHOT_CHECKPOINT_DEFRAGED_DIR;
-  private static final String TEMP_DIFF_DIR = "tempDiffSstFiles";  // TODO: Put this in OzoneConsts?
 
   private final OzoneManager ozoneManager;
   private final AtomicLong runCount = new AtomicLong(0);
@@ -431,7 +429,8 @@ public class SnapshotDefragService extends BackgroundService
           .setName(previousCheckpointDirName)
           .setPath(Paths.get(previousDefraggedDbPath).getParent())
           .setOpenReadOnly(true)
-          .setCreateCheckpointDirs(false);
+          .setCreateCheckpointDirs(false)
+          .disableDefaultCFAutoCompaction(true);
 
       // Add tracked column families
       for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
@@ -452,7 +451,9 @@ public class SnapshotDefragService extends BackgroundService
       DBStoreBuilder currentDbBuilder = DBStoreBuilder.newBuilder(ozoneManager.getConfiguration())
           .setName(currentCheckpointDirName)
           .setPath(Paths.get(currentDefraggedDbPath).getParent())
-          .setCreateCheckpointDirs(false);
+          .setCreateCheckpointDirs(false)
+          // Disable compaction for defragmented snapshot DB
+          .disableDefaultCFAutoCompaction(true);
 
       // Add tracked column families
       for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
@@ -463,7 +464,7 @@ public class SnapshotDefragService extends BackgroundService
       DBStore currentDefraggedStore = currentDbBuilder.build();
       RocksDatabase currentDefraggedDb = ((RDBStore) currentDefraggedStore).getDb();
 
-      LOG.info("Opened checkpoint as working defragmented DB for incremental update");
+      LOG.info("Opened checkpoint as working defragmented DB for incremental update (compaction disabled)");
 
       // 3. Apply incremental changes from current snapshot
       RDBStore currentSnapshotStore = (RDBStore) currentOmSnapshot.getMetadataManager().getStore();
@@ -475,7 +476,22 @@ public class SnapshotDefragService extends BackgroundService
       LOG.info("Applied {} incremental changes for snapshot: {}",
           incrementalKeysCopied, currentSnapshot.getName());
 
-      // 4. Perform compaction on the updated DB
+      // 4. Flush each table to exactly one SST file
+      LOG.info("Flushing defragged DB for snapshot: {}", currentSnapshot.getName());
+      currentDefraggedStore.flushDB();
+//      for (String cfName : COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT) {
+//        try {
+//          Table<byte[], byte[]> table = currentDefraggedStore.getTable(cfName);
+//          if (table != null) {
+//            ((RDBStore) currentDefraggedStore).flushDB(cfName);
+//            LOG.debug("Flushed table {} to SST file", cfName);
+//          }
+//        } catch (Exception e) {
+//          LOG.warn("Failed to flush table {}: {}", cfName, e.getMessage(), e);
+//        }
+//      }
+
+      // 4. Perform compaction on the updated DB (commented out)
 //      LOG.info("Starting compaction of incrementally defragmented DB for snapshot: {}",
 //          currentSnapshot.getName());
 //      try (ManagedCompactRangeOptions compactOptions = new ManagedCompactRangeOptions()) {
@@ -510,27 +526,18 @@ public class SnapshotDefragService extends BackgroundService
   /**
    * Applies incremental changes by using snapshotDiff to compute the diff list,
    * then iterating that diff list against the current snapshot checkpoint DB.
-   * Uses RDBSstFileWriter to directly write changes to SST files and then ingests them.
+   * Uses direct batch writing to the defragmented DB instead of SST files to avoid sorting requirements.
    */
   @SuppressWarnings("checkstyle:MethodLength")
   private long applyIncrementalChanges(RocksDatabase currentSnapshotDb, DBStore targetStore,
       SnapshotInfo currentSnapshot, SnapshotInfo previousSnapshot) throws RocksDatabaseException {
 
-    LOG.info("Applying incremental changes for snapshot: {} since: {} using snapshotDiff approach",
+    LOG.info("Applying incremental changes for snapshot: {} since: {} using direct batch writing",
         currentSnapshot.getName(), previousSnapshot.getName());
 
     long totalChanges = 0;
 
-    // Create temporary directory for SST files
-    String currentSnapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), currentSnapshot);
-    String parentDir = Paths.get(currentSnapshotPath).getParent().getParent().toString();
-    String tempSstDir = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGED_DIR, TEMP_DIFF_DIR).toString();
-
     try {
-      Files.createDirectories(Paths.get(tempSstDir));
-      LOG.info("Created temporary SST directory: {}", tempSstDir);
-
       // Use snapshotDiff to compute the diff list between previous and current snapshot
       LOG.info("Computing snapshot diff between {} and {}",
           previousSnapshot.getName(), currentSnapshot.getName());
@@ -589,7 +596,6 @@ public class SnapshotDefragService extends BackgroundService
       }
 
       // TODO: Handle pagination when diffList is bigger than server page size
-      // 2025-08-16 09:10:52,500 [IPC Server handler 1 on default port 9862] INFO om.SnapshotDefragService: Found 1000 differences to process
       LOG.info("Found {} differences to process", diffReport.getDiffList().size());
 
       // Get table references for target database
@@ -611,20 +617,12 @@ public class SnapshotDefragService extends BackgroundService
             continue;
           }
 
-          Table<byte[], byte[]> targetTable = targetRdbStore.getTable(cfName);
-          if (targetTable == null) {
-            LOG.warn("Table {} not found in target store, skipping", cfName);
-            continue;
-          }
-
           long cfChanges = 0;
-          String sstFileName = cfName + "_" + currentSnapshot.getSnapshotId() + ".sst";
-          File sstFile = new File(tempSstDir, sstFileName);
 
-          LOG.debug("Creating SST file for column family {} changes: {}", cfName, sstFile.getAbsolutePath());
+          LOG.debug("Processing {} diff entries for column family {}", diffList.size(), cfName);
 
-          // Use RDBSstFileWriter to write changes to SST file
-          try (RDBSstFileWriter sstWriter = new RDBSstFileWriter(sstFile)) {
+          // Use batch writing for efficient operations (no sorting required)
+          try (ManagedWriteBatch writeBatch = new ManagedWriteBatch()) {
 
             // Iterate through the diff list and process each entry
             for (DiffReportEntry diffEntry : diffList) {
@@ -642,34 +640,18 @@ public class SnapshotDefragService extends BackgroundService
               switch (diffType) {
               case CREATE:
               case MODIFY:
-                // Key was created or modified - get current value and write to SST
+                // Key was created or modified - get current value and add to batch
                 byte[] currentValue = currentSnapshotDb.get(currentCf, key);
                 if (currentValue != null) {
-                  sstWriter.put(key, currentValue);
+                  targetCf.batchPut(writeBatch, key, currentValue);
                   cfChanges++;
-
-                  if (cfChanges % 10000 == 0) {
-                    LOG.debug("Written {} changes to SST file for column family {} so far",
-                        cfChanges, cfName);
-                  }
                 }
                 break;
 
               case DELETE:
-                // Key was deleted - write tombstone to SST
-                /* TODO: Sort keys before writing to SST file?
-Caused by: org.rocksdb.RocksDBException: Keys must be added in strict ascending order.
-at org.rocksdb.SstFileWriter.delete(Native Method)
-at org.rocksdb.SstFileWriter.delete(SstFileWriter.java:178)
-at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java:65)
-                * */
-                sstWriter.delete(key);
+                // Key was deleted - add deletion to batch
+                targetCf.batchDelete(writeBatch, key);
                 cfChanges++;
-
-                if (cfChanges % 10000 == 0) {
-                  LOG.debug("Written {} changes (including deletions) to SST file for column family {} so far",
-                      cfChanges, cfName);
-                }
                 break;
 
               case RENAME:
@@ -681,12 +663,12 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
 
                   if (newKey != null) {
                     // Delete old key
-                    sstWriter.delete(key);
+                    targetCf.batchDelete(writeBatch, key);
 
                     // Add new key with current value
                     byte[] newValue = currentSnapshotDb.get(currentCf, newKey);
                     if (newValue != null) {
-                      sstWriter.put(newKey, newValue);
+                      targetCf.batchPut(writeBatch, newKey, newValue);
                     }
                     cfChanges += 2; // Count both delete and put
                   }
@@ -697,45 +679,32 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
                 LOG.warn("Unknown diff type: {}, skipping entry", diffType);
                 break;
               }
+
+              // Commit batch every 1000 operations to avoid memory issues
+              if (cfChanges % 1000 == 0 && writeBatch.count() > 0) {
+                targetDb.batchWrite(writeBatch);
+                writeBatch.clear();
+                LOG.debug("Committed batch for column family {} after {} changes", cfName, cfChanges);
+              }
             }
 
-            LOG.debug("Finished writing {} changes for column family: {} to SST file",
-                cfChanges, cfName);
+            // Commit any remaining operations in the batch
+            if (writeBatch.count() > 0) {
+              targetDb.batchWrite(writeBatch);
+              LOG.debug("Final batch commit for column family {} with {} total changes", cfName, cfChanges);
+            }
 
           } catch (Exception e) {
             LOG.error("Error processing column family {} for snapshot {}: {}",
                 cfName, currentSnapshot.getName(), e.getMessage(), e);
-          }
-
-          // Ingest SST file into target database if there were changes
-          if (cfChanges > 0 && sstFile.exists() && sstFile.length() > 0) {
-            try {
-              targetTable.loadFromFile(sstFile);
-              LOG.info("Successfully ingested SST file for column family {}: {} changes",
-                  cfName, cfChanges);
-            } catch (Exception e) {
-              LOG.error("Failed to ingest SST file for column family {}: {}", cfName, e.getMessage(), e);
-            }
-          } else {
-            LOG.debug("No changes to ingest for column family {}", cfName);
-          }
-
-          // Clean up SST file after ingestion
-          try {
-            if (sstFile.exists()) {
-              Files.delete(sstFile.toPath());
-              LOG.debug("Cleaned up SST file: {}", sstFile.getAbsolutePath());
-            }
-          } catch (IOException e) {
-            LOG.warn("Failed to clean up SST file: {}", sstFile.getAbsolutePath(), e);
+            throw new RocksDatabaseException("Failed to apply incremental changes for column family: " + cfName, e);
           }
 
           totalChanges += cfChanges;
-          LOG.debug("Applied {} incremental changes for column family: {}", cfChanges, cfName);
+          LOG.info("Applied {} incremental changes for column family: {}", cfChanges, cfName);
         }
 
-
-//        String lastToken = new String(diffList.get(diffList.size() - 1).getSourcePath(), StandardCharsets.UTF_8);
+        // Get next page of differences if available
         nextToken += diffList.size();
         LOG.debug("Retrieving next page of snapshot diff with token: {}", nextToken);
         diffResponse = ozoneManager.snapshotDiff(
@@ -759,19 +728,11 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
         diffReport = diffResponse.getSnapshotDiffReport();
       }
 
-      // Clean up temporary directory
-      try {
-        Files.deleteIfExists(Paths.get(tempSstDir));
-        LOG.debug("Cleaned up temporary SST directory: {}", tempSstDir);
-      } catch (IOException e) {
-        LOG.warn("Failed to clean up temporary SST directory: {}", tempSstDir, e);
-      }
-
-    } catch (IOException e) {
-      throw new RocksDatabaseException("Failed to create temporary SST directory: " + tempSstDir, e);
+    } catch (Exception e) {
+      throw new RocksDatabaseException("Failed to apply incremental changes", e);
     }
 
-    LOG.info("Applied {} total incremental changes using snapshotDiff approach", totalChanges);
+    LOG.info("Applied {} total incremental changes using direct batch writing", totalChanges);
     return totalChanges;
   }
 
