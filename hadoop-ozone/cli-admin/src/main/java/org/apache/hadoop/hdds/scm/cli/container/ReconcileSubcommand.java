@@ -68,40 +68,50 @@ public class ReconcileSubcommand extends ScmSubcommand {
     // Do validation outside the json array writer, otherwise failed validation will print an empty json array.
     List<Long> containerIDs = containerList.getValidatedIDs();
     int failureCount = 0;
-    try (SequenceWriter arrayWriter = JsonUtils.getSequenceWriter(System.out)) {
+    StringBuilder errorBuilder = new StringBuilder();
+    try (SequenceWriter arrayWriter = JsonUtils.getStdoutSequenceWriter()) {
       // Since status is retrieved using container info, do client side validation that it is only used for Ratis
       // containers. If EC containers are given, print a  message to stderr and eventually exit non-zero, but continue
       // processing the remaining containers.
       for (Long containerID : containerIDs) {
-        if (!printReconciliationStatus(scmClient, containerID, arrayWriter)) {
+        if (!printReconciliationStatus(scmClient, containerID, arrayWriter, errorBuilder)) {
           failureCount++;
         }
       }
+      arrayWriter.flush();
     }
-    // Array writer will not add a newline to the end.
+    // Sequence writer will not add a newline to the end.
     System.out.println();
+    System.out.flush();
+    // Flush all json output before printing errors.
+    if (errorBuilder.length() > 0) {
+      System.err.print(errorBuilder);
+    }
     if (failureCount > 0) {
-      throw new RuntimeException("Failed to process reconciliation status for " + failureCount + " containers");
+      throw new RuntimeException("Failed to process reconciliation status for " + failureCount + " container" +
+          (failureCount > 1 ? "s" : ""));
     }
   }
 
-  private boolean printReconciliationStatus(ScmClient scmClient, long containerID, SequenceWriter arrayWriter) {
+  private boolean printReconciliationStatus(ScmClient scmClient, long containerID, SequenceWriter arrayWriter,
+      StringBuilder errorBuilder) {
     try {
       ContainerInfo containerInfo = scmClient.getContainer(containerID);
       if (containerInfo.isOpen()) {
-        System.err.println("Cannot get status of container " + containerID +
-            ". Reconciliation is not supported for open containers");
+        errorBuilder.append("Cannot get status of container ").append(containerID)
+            .append(". Reconciliation is not supported for open containers\n");
         return false;
       } else if (containerInfo.getReplicationType() != HddsProtos.ReplicationType.RATIS) {
-        System.err.println("Cannot get status of container " + containerID +
-            ". Reconciliation is only supported for Ratis replicated containers");
+        errorBuilder.append("Cannot get status of container ").append(containerID)
+            .append(". Reconciliation is only supported for Ratis replicated containers\n");
         return false;
       }
       List<ContainerReplicaInfo> replicas = scmClient.getContainerReplicas(containerID);
       arrayWriter.write(new ContainerWrapper(containerInfo, replicas));
       arrayWriter.flush();
     } catch (Exception ex) {
-      System.err.println("Failed to get reconciliation status of container " + containerID + ": " + ex.getMessage());
+      errorBuilder.append("Failed to get reconciliation status of container ")
+          .append(containerID).append(": ").append(getExceptionMessage(ex)).append("\n");
       return false;
     }
     return true;
@@ -109,20 +119,35 @@ public class ReconcileSubcommand extends ScmSubcommand {
 
   private void executeReconcile(ScmClient scmClient) {
     int failureCount = 0;
+    int successCount = 0;
     for (Long containerID : containerList.getValidatedIDs()) {
       try {
         scmClient.reconcileContainer(containerID);
-        System.out.println("Reconciliation has been triggered for container " + (long) containerID);
-        System.out.println("Use \"ozone admin container reconcile --status " + containerID + 
-            "\" to see the checksums of each container replica");
+        System.out.println("Reconciliation has been triggered for container " + containerID);
+        successCount++;
       } catch (Exception ex) {
-        System.err.println("Failed to trigger reconciliation for container " + containerID + ": " + ex.getMessage());
+        System.err.println("Failed to trigger reconciliation for container " + containerID + ": " +
+            getExceptionMessage(ex));
         failureCount++;
       }
     }
-    if (failureCount > 0) {
-      throw new RuntimeException("Failed to trigger reconciliation for " + failureCount + " containers");
+
+    if (successCount > 0) {
+      System.out.println("\nUse \"ozone admin container reconcile --status\" to see the checksums of each container " +
+          "replica");
     }
+    if (failureCount > 0) {
+      throw new RuntimeException("Failed to trigger reconciliation for " + failureCount + " container" +
+          (failureCount > 1 ? "s" : ""));
+    }
+  }
+
+  /**
+   * Hadoop RPC puts the server side stack trace within the exception message. This method is a workaround to not
+   * display that to the user.
+   */
+  private String getExceptionMessage(Exception ex) {
+    return ex.getMessage().split("\n", 2)[0];
   }
 
   /**

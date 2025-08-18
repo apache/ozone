@@ -43,9 +43,9 @@ Container checksums should match
                          Should be equal as strings    ${data_checksum2}    ${expected_checksum}
                          Should be equal as strings    ${data_checksum3}    ${expected_checksum}
     # Verify that container info shows the same checksums as reconcile status
-    ${info_checksum1} =  Execute     ozone admin container info "${container}" --json | jq -r '.[].replicas[0].dataChecksum'
-    ${info_checksum2} =  Execute     ozone admin container info "${container}" --json | jq -r '.[].replicas[1].dataChecksum'
-    ${info_checksum3} =  Execute     ozone admin container info "${container}" --json | jq -r '.[].replicas[2].dataChecksum'
+    ${info_checksum1} =  Execute     ozone admin container info "${container}" --json | jq -r '.replicas[0].dataChecksum'
+    ${info_checksum2} =  Execute     ozone admin container info "${container}" --json | jq -r '.replicas[1].dataChecksum'
+    ${info_checksum3} =  Execute     ozone admin container info "${container}" --json | jq -r '.replicas[2].dataChecksum'
                          Should be equal as strings    ${data_checksum1}    ${info_checksum1}
                          Should be equal as strings    ${data_checksum2}    ${info_checksum2}
                          Should be equal as strings    ${data_checksum3}    ${info_checksum3}

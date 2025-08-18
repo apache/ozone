@@ -81,8 +81,21 @@ public final class JsonUtils {
     return MAPPER.writeValueAsString(obj);
   }
 
+  /**
+   * Returns a {@link SequenceWriter} that will write to and close the provided output stream when it is closed.
+   * If the sequence is being written to stdout and more stdout output is needed later, use
+   * {@link this#getStdoutSequenceWriter()} instead.
+   */
   public static SequenceWriter getSequenceWriter(OutputStream stream) throws IOException {
     return WRITER.writeValuesAsArray(stream);
+  }
+
+  /**
+   * Returns a {@link SequenceWriter} that will write to stdout but not close stdout for more output once the sequence
+   * writer is closed.
+   */
+  public static SequenceWriter getStdoutSequenceWriter() throws IOException {
+    return getSequenceWriter(new NonClosingOutputStream(System.out));
   }
 
   public static String toJsonStringWIthIndent(Object obj)  {
@@ -152,6 +165,40 @@ public final class JsonUtils {
     @Override
     public void serialize(Long value, JsonGenerator gen, SerializerProvider provider) throws IOException {
       gen.writeString(HddsUtils.checksumToString(value));
+    }
+  }
+
+  private static class NonClosingOutputStream extends OutputStream {
+
+    private final OutputStream delegate;
+
+    NonClosingOutputStream(OutputStream delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public void write(int b) throws IOException {
+      delegate.write(b);
+    }
+
+    @Override
+    public void write(byte[] b) throws IOException {
+      delegate.write(b);
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) throws IOException {
+      delegate.write(b, off, len);
+    }
+
+    @Override
+    public void flush() throws IOException {
+      delegate.flush();
+    }
+
+    @Override
+    public void close() {
+      // Ignore close to keep the underlying stream open
     }
   }
 }

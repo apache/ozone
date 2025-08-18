@@ -161,12 +161,15 @@ public class TestReconcileSubcommand {
   public void testRejectsStdinAndArgs() throws Exception {
     mockContainer(1);
     // Test sending reconcile command.
-    assertThrows(RuntimeException.class, () -> parseArgsAndExecute("1", "-"));
-    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -");
+    Exception reconcileEx = assertThrows(RuntimeException.class, () -> parseArgsAndExecute("1", "-"));
+    assertThat(reconcileEx.getMessage())
+        .contains("Container IDs must be positive integers. Invalid container IDs: -");
     assertThatOutput(outContent).isEmpty();
+
     // Test checking status.
-    assertThrows(RuntimeException.class, () -> parseArgsAndExecute("--status", "1", "-"));
-    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -");
+    Exception statusEx = assertThrows(RuntimeException.class, () -> parseArgsAndExecute("--status", "1", "-"));
+    assertThat(statusEx.getMessage())
+        .contains("Container IDs must be positive integers. Invalid container IDs: -");
     assertThatOutput(outContent).isEmpty();
   }
 
@@ -183,7 +186,7 @@ public class TestReconcileSubcommand {
     assertThatOutput(errContent).contains("Cannot get status of container 1");
     assertThatOutput(errContent).contains(EC_CONTAINER_MESSAGE);
     
-    assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 1 containers");
+    assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 1 container");
     
     // Should have empty JSON array output since no containers were processed
     String output = outContent.toString(DEFAULT_ENCODING);
@@ -205,7 +208,7 @@ public class TestReconcileSubcommand {
     assertThatOutput(errContent).contains("Cannot get status of container 1");
     assertThatOutput(errContent).contains(OPEN_CONTAINER_MESSAGE);
 
-    assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 1 containers");
+    assertThat(exception.getMessage()).contains("Failed to process reconciliation status for 1 container");
 
     // Should have empty JSON array output since no containers were processed
     String output = outContent.toString(DEFAULT_ENCODING);
@@ -231,7 +234,7 @@ public class TestReconcileSubcommand {
 
     assertThatOutput(errContent).contains("Failed to trigger reconciliation for container 1: " + mockMessage);
 
-    assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 containers");
+    assertThat(exception.getMessage()).contains("Failed to trigger reconciliation for 1 container");
 
     // Should have no successful reconcile output
     assertThatOutput(outContent).doesNotContain("Reconciliation has been triggered for container 1");
@@ -320,23 +323,25 @@ public class TestReconcileSubcommand {
   @Test
   public void testSomeInvalidContainerIDs() throws Exception {
     // Test status command
-    assertThrows(RuntimeException.class, () -> {
-      parseArgsAndExecute("--status", "123", "invalid", "-1", "456");
-    });
+    Exception statusEx =
+        assertThrows(RuntimeException.class, () -> parseArgsAndExecute("--status", "123", "invalid", "-1", "456"));
     
     // Should have error messages for invalid container IDs only.
-    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: invalid");
-    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -1");
+    assertThat(statusEx.getMessage())
+        .contains("Container IDs must be positive integers. Invalid container IDs: invalid -1")
+        .doesNotContain("123", "456");
     assertThatOutput(errContent).doesNotContain("123");
     assertThatOutput(errContent).doesNotContain("456");
     assertThatOutput(outContent).isEmpty();
     
     // Test reconcile command
-    assertThrows(RuntimeException.class, () -> parseArgsAndExecute("123", "invalid", "-1", "456"));
+    Exception reconcileEx =
+        assertThrows(RuntimeException.class, () -> parseArgsAndExecute("123", "invalid", "-1", "456"));
     
     // Should have error messages for invalid IDs
-    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: invalid");
-    assertThatOutput(errContent).contains("Container ID must be a positive integer, got: -1");
+    assertThat(reconcileEx.getMessage())
+        .contains("Container IDs must be positive integers. Invalid container IDs: invalid -1")
+        .doesNotContain("123", "456");
     assertThatOutput(errContent).doesNotContain("123");
     assertThatOutput(errContent).doesNotContain("456");
     assertThatOutput(outContent).isEmpty();
@@ -432,8 +437,8 @@ public class TestReconcileSubcommand {
 
   private void validateStatusOutput(boolean replicasMatch, long... containerIDs) throws Exception {
     String output = outContent.toString(DEFAULT_ENCODING);
-    // Output should be pretty-printed with newlines.
-    assertThat(output).contains("\n");
+    // Output should be pretty-printed and end in a newline.
+    assertThat(output).endsWith("\n");
 
     List<Object> containerOutputList = JsonUtils.getDefaultMapper()
         .readValue(new StringReader(output), new TypeReference<List<Object>>() { });
