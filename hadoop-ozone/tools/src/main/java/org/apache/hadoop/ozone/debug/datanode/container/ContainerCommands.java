@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -87,6 +88,8 @@ public class ContainerCommands extends AbstractSubcommand {
 
   public void loadContainersFromVolumes() throws IOException {
     OzoneConfiguration conf = getOzoneConf();
+
+    validateAllStorageDirectories(conf);
 
     ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
 
@@ -176,12 +179,6 @@ public class ContainerCommands extends AbstractSubcommand {
   private String getDatanodeUUID(String storageDir, ConfigurationSource config)
       throws IOException {
 
-    File storageDirPath = new File(storageDir);
-    if (!storageDirPath.exists()) {
-      throw new IOException(storageDir + "' configured in '" + ScmConfigKeys.HDDS_DATANODE_DIR_KEY +
-          "' does not exist. Please provide the correct value for config.");
-    }
-
     final File versionFile = new File(storageDir, "hdds/VERSION");
 
     Properties props = DatanodeVersionFile.readFrom(versionFile);
@@ -206,5 +203,26 @@ public class ContainerCommands extends AbstractSubcommand {
 
   public static void outputContainer(ContainerData data) throws IOException {
     System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(data));
+  }
+
+  private void validateAllStorageDirectories(ConfigurationSource config) throws IOException {
+    final Collection<String> storageDirs = HddsServerUtil.getDatanodeStorageDirs(config);
+    LOG.info("Configured storage directories for '{}': {}", ScmConfigKeys.HDDS_DATANODE_DIR_KEY, storageDirs);
+
+    List<String> missingDirs = new ArrayList<>();
+    for (String storageDir : storageDirs) {
+      String storageDirPath = StorageLocation.parse(storageDir).getUri().getPath();
+
+      if (!new File(storageDirPath).exists()) {
+        missingDirs.add(storageDirPath);
+      }
+    }
+    if (!missingDirs.isEmpty()) {
+      String errorMsg = String.join(", ", missingDirs) +
+          "' configured in '" + ScmConfigKeys.HDDS_DATANODE_DIR_KEY +
+          "' does not exist. Please provide the correct value for config.";
+      LOG.error(errorMsg);
+      throw new IOException(errorMsg);
+    }
   }
 }
