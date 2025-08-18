@@ -71,7 +71,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private ExecutorService executorService;
   private final int threadCount;
   private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
-  private static final int TASK_FAILURE_THRESHOLD = 2;
   private final ReconTaskStatusUpdaterManager taskStatusUpdaterManager;
   private final OMUpdateEventBuffer eventBuffer;
   private ExecutorService eventProcessingExecutor;
@@ -131,23 +130,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       } else {
         LOG.debug("Buffered event batch with {} events. Buffer queue size: {}", 
             events.getEvents().size(), eventBuffer.getQueueSize());
-      }
-    }
-  }
-
-  /**
-   * Ignore tasks that failed reprocess step more than threshold times.
-   * @param failedTasks list of failed tasks.
-   */
-  private void ignoreFailedTasks(List<ReconOmTask.TaskResult> failedTasks) {
-    for (ReconOmTask.TaskResult taskResult : failedTasks) {
-      String taskName = taskResult.getTaskName();
-      LOG.info("Reprocess step failed for task {}.", taskName);
-      if (taskFailureCounter.get(taskName).incrementAndGet() >
-          TASK_FAILURE_THRESHOLD) {
-        LOG.info("Ignoring task since it failed retry and " +
-            "reprocess more than {} times.", TASK_FAILURE_THRESHOLD);
-        reconOmTasks.remove(taskName);
       }
     }
   }
