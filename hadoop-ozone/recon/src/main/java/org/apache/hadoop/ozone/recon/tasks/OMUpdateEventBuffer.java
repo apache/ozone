@@ -88,12 +88,12 @@ public class OMUpdateEventBuffer {
     boolean added = eventQueue.offer(eventBatch);
     if (added) {
       totalBufferedEvents.addAndGet(eventBatch.getEvents().size());
-      LOG.debug("Buffered event batch with {} events. Queue size: {}, Total buffered events: {}", 
+      LOG.debug("Buffered event batch with {} events. Queue size: {}, Total buffered events: {}",
           eventBatch.getEvents().size(), eventQueue.size(), totalBufferedEvents.get());
     } else {
       droppedBatches.incrementAndGet();
       LOG.warn("Event buffer queue is full (capacity: {}). Dropping event batch with {} events. " +
-              "Total dropped batches: {}", 
+              "Total dropped batches: {}",
           maxCapacity, eventBatch.getEvents().size(), droppedBatches.get());
     }
     return added;
@@ -161,6 +161,7 @@ public class OMUpdateEventBuffer {
    * 
    * @return true if queue is nearly full
    */
+  @VisibleForTesting
   public boolean isNearCapacity() {
     return eventQueue.size() >= (maxCapacity * 0.95);
   }
@@ -173,14 +174,5 @@ public class OMUpdateEventBuffer {
     eventQueue.clear();
     totalBufferedEvents.set(0);
     droppedBatches.set(0);
-  }
-  
-  /**
-   * Force stop buffering without draining events.
-   */
-  @VisibleForTesting
-  public void forceStopBuffering() {
-    isBuffering.set(false);
-    clear();
   }
 }
