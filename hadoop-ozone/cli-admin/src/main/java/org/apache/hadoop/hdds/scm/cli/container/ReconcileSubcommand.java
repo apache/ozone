@@ -111,7 +111,7 @@ public class ReconcileSubcommand extends ScmSubcommand {
       arrayWriter.flush();
     } catch (Exception ex) {
       errorBuilder.append("Failed to get reconciliation status of container ")
-          .append(containerID).append(": ").append(getExceptionMessage(ex)).append("\n");
+          .append(containerID).append(": ").append(getExceptionMessage(ex)).append('\n');
       return false;
     }
     return true;

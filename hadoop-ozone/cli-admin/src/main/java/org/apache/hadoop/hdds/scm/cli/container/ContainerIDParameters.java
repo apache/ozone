@@ -26,15 +26,15 @@ import picocli.CommandLine;
 @CommandLine.Command
 public class ContainerIDParameters extends ItemsFromStdin {
 
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   @CommandLine.Parameters(description = "Container IDs" + FORMAT_DESCRIPTION,
       arity = "1..*",
       paramLabel = "<container ID>")
   public void setContainerIDs(List<String> arguments) {
     setItems(arguments);
   }
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
 
   public List<Long> getValidatedIDs() {
     List<Long> containerIDs = new ArrayList<>(size());
