@@ -130,10 +130,11 @@ public class ReconUtils {
   public static boolean triggerAsyncNSSummaryRebuild(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager omMetadataManager) {
-    
+
     // Submit rebuild task to single thread executor for async execution
     NSSUMMARY_REBUILD_EXECUTOR.submit(() -> {
       try {
+
         // This will go through NSSummaryTask's unified control mechanism
         reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
         log.info("Async NSSummary tree rebuild completed successfully.");
@@ -142,7 +143,6 @@ public class ReconUtils {
       }
     });
     
-    log.info("Async NSSummary tree rebuild triggered successfully.");
     return true;
   }
 
