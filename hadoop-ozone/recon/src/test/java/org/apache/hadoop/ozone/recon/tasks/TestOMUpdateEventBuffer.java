@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -40,12 +41,8 @@ public class TestOMUpdateEventBuffer {
   }
 
   @Test
-  void testBasicBuffering() {
-    assertFalse(eventBuffer.isBuffering());
+  void testOfferAndPoll() {
     assertEquals(0, eventBuffer.getQueueSize());
-
-    eventBuffer.startBuffering();
-    assertTrue(eventBuffer.isBuffering());
 
     // Create test event batch
     List<OMDBUpdateEvent> events = new ArrayList<>();
@@ -56,20 +53,15 @@ public class TestOMUpdateEventBuffer {
     // Offer event batch
     assertTrue(eventBuffer.offer(batch));
     assertEquals(1, eventBuffer.getQueueSize());
-    assertEquals(2, eventBuffer.getTotalBufferedEvents());
 
-    // Stop buffering and drain
-    List<OMUpdateEventBatch> drained = eventBuffer.stopBufferingAndDrain();
-    assertEquals(1, drained.size());
-    assertEquals(2, drained.get(0).getEvents().size());
-    assertFalse(eventBuffer.isBuffering());
+    // Poll event batch
+    OMUpdateEventBatch polled = eventBuffer.poll(100);
+    assertEquals(batch, polled);
     assertEquals(0, eventBuffer.getQueueSize());
   }
 
   @Test
   void testCapacityLimits() {
-    eventBuffer.startBuffering();
-    
     // Fill buffer to capacity
     for (int i = 0; i < TEST_CAPACITY; i++) {
       List<OMDBUpdateEvent> events = new ArrayList<>();
@@ -90,41 +82,62 @@ public class TestOMUpdateEventBuffer {
   }
 
   @Test
-  void testNearCapacity() {
-    eventBuffer.startBuffering();
-    
-    // Fill to 94% - should not be near capacity
-    int nearCapacityCount = (int)(TEST_CAPACITY * 0.94);
-    for (int i = 0; i < nearCapacityCount; i++) {
-      List<OMDBUpdateEvent> events = new ArrayList<>();
-      events.add(createTestEvent("test" + i));
-      OMUpdateEventBatch batch = new OMUpdateEventBatch(events, i);
-      eventBuffer.offer(batch);
-    }
-    assertFalse(eventBuffer.isNearCapacity());
-    
-    // Fill to 95% - should be near capacity
-    int capacityThreshold = (int)(TEST_CAPACITY * 0.95);
-    for (int i = nearCapacityCount; i < capacityThreshold; i++) {
-      List<OMDBUpdateEvent> events = new ArrayList<>();
-      events.add(createTestEvent("test" + i));
-      OMUpdateEventBatch batch = new OMUpdateEventBatch(events, i);
-      eventBuffer.offer(batch);
-    }
-    assertTrue(eventBuffer.isNearCapacity());
+  void testPollTimeout() {
+    // Poll from empty buffer should return null after timeout
+    assertNull(eventBuffer.poll(10)); // 10ms timeout
   }
 
   @Test
-  void testOfferWithoutBuffering() {
-    // Not in buffering mode
-    assertFalse(eventBuffer.isBuffering());
-    
+  void testClear() {
+    // Add some events
     List<OMDBUpdateEvent> events = new ArrayList<>();
     events.add(createTestEvent("test"));
     OMUpdateEventBatch batch = new OMUpdateEventBatch(events, 1);
+    eventBuffer.offer(batch);
     
-    // Should return false when not buffering
-    assertFalse(eventBuffer.offer(batch));
+    assertEquals(1, eventBuffer.getQueueSize());
+    
+    // Clear buffer
+    eventBuffer.clear();
+    assertEquals(0, eventBuffer.getQueueSize());
+    // Note: droppedBatches is not reset by clear() to maintain overflow detection
+  }
+
+  @Test
+  void testResetDroppedBatches() {
+    // Fill buffer to capacity and trigger overflow
+    for (int i = 0; i <= TEST_CAPACITY; i++) {
+      List<OMDBUpdateEvent> events = new ArrayList<>();
+      events.add(createTestEvent("test" + i));
+      OMUpdateEventBatch batch = new OMUpdateEventBatch(events, i);
+      eventBuffer.offer(batch);
+    }
+    
+    // Should have dropped batches
+    assertTrue(eventBuffer.getDroppedBatches() > 0);
+    
+    // Reset dropped batches
+    eventBuffer.resetDroppedBatches();
+    assertEquals(0, eventBuffer.getDroppedBatches());
+  }
+
+  @Test 
+  void testClearPreservesDroppedBatches() {
+    // Fill buffer to capacity and trigger overflow
+    for (int i = 0; i <= TEST_CAPACITY; i++) {
+      List<OMDBUpdateEvent> events = new ArrayList<>();
+      events.add(createTestEvent("test" + i));
+      OMUpdateEventBatch batch = new OMUpdateEventBatch(events, i);
+      eventBuffer.offer(batch);
+    }
+    
+    long droppedBefore = eventBuffer.getDroppedBatches();
+    assertTrue(droppedBefore > 0);
+    
+    // Clear should not reset dropped batches counter
+    eventBuffer.clear();
+    assertEquals(0, eventBuffer.getQueueSize());
+    assertEquals(droppedBefore, eventBuffer.getDroppedBatches());
   }
 
   private OMDBUpdateEvent createTestEvent(String key) {

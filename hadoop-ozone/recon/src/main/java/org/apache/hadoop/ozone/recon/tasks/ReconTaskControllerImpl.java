@@ -32,14 +32,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -70,10 +68,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private Map<String, ReconOmTask> reconOmTasks;
   private ExecutorService executorService;
   private final int threadCount;
-  private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
   private final ReconTaskStatusUpdaterManager taskStatusUpdaterManager;
   private final OMUpdateEventBuffer eventBuffer;
   private ExecutorService eventProcessingExecutor;
+  private final AtomicBoolean deltaTasksFailed = new AtomicBoolean(false);
 
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
@@ -104,8 +102,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
     // Store task in Task Map.
     reconOmTasks.put(taskName, task);
-    // Store Task in Task failure tracker.
-    taskFailureCounter.put(taskName, new AtomicInteger(0));
   }
 
   /**
@@ -291,7 +287,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   /**
-   * For a given list of {@link Callable} tasks process them and add any failed task to the provided list.
+   * For a given list of {@code Callable} tasks process them and add any failed task to the provided list.
    * The tasks are executed in parallel, but will wait for the tasks to complete i.e. the longest
    * time taken by this method will be the time taken by the longest task in the list.
    * @param tasks       A list of tasks to execute.
@@ -324,7 +320,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
                 .build());
             taskStatusUpdater.setLastTaskRunStatus(-1);
           } else {
-            taskFailureCounter.get(taskName).set(0);
             taskStatusUpdater.setLastTaskRunStatus(0);
             taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
           }
@@ -365,11 +360,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         if (eventBatch != null && !eventBatch.isEmpty()) {
           LOG.debug("Processing buffered event batch with {} events", eventBatch.getEvents().size());
           processEventBatchDirectly(eventBatch);
-        }
-        // Check if thread was interrupted during poll (poll returns null when interrupted)
-        if (Thread.currentThread().isInterrupted()) {
-          LOG.info("Async event processing thread interrupted");
-          break;
         }
       } catch (Exception e) {
         LOG.error("Error in async event processing thread", e);
@@ -414,8 +404,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       processTasks(tasks, events, retryFailedTasks);
       
       if (!retryFailedTasks.isEmpty()) {
-        LOG.warn("Some tasks still failed after retry while processing buffered events");
-        // For buffered events, we don't trigger reprocess - just log and continue
+        LOG.warn("Some tasks still failed after retry while processing buffered events, signaling for " +
+            "task reinitialization");
+        // Set flag to indicate delta tasks failed even after retry
+        deltaTasksFailed.set(true);
       }
     }
   }
@@ -423,5 +415,20 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public boolean hasEventBufferOverflowed() {
     return eventBuffer.getDroppedBatches() > 0;
+  }
+  
+  @Override
+  public void resetEventBufferOverflowFlag() {
+    eventBuffer.resetDroppedBatches();
+  }
+  
+  @Override
+  public boolean hasDeltaTasksFailed() {
+    return deltaTasksFailed.get();
+  }
+  
+  @Override
+  public void resetDeltaTasksFailureFlag() {
+    deltaTasksFailed.set(false);
   }
 }

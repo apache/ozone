@@ -18,11 +18,8 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +34,6 @@ public class OMUpdateEventBuffer {
   
   private final BlockingQueue<OMUpdateEventBatch> eventQueue;
   private final int maxCapacity;
-  private final AtomicBoolean isBuffering = new AtomicBoolean(false);
   private final AtomicLong totalBufferedEvents = new AtomicLong(0);
   private final AtomicLong droppedBatches = new AtomicLong(0);
   
@@ -45,39 +41,7 @@ public class OMUpdateEventBuffer {
     this.maxCapacity = maxCapacity;
     this.eventQueue = new LinkedBlockingQueue<>(maxCapacity);
   }
-  
-  /**
-   * Start buffering mode - events will be queued instead of processed immediately.
-   */
-  public void startBuffering() {
-    if (isBuffering.compareAndSet(false, true)) {
-      LOG.info("Started buffering OM update events. Queue capacity: {}", maxCapacity);
-      clear(); // Clear any leftover events
-    }
-  }
-  
-  /**
-   * Stop buffering mode and return all buffered events.
-   * 
-   * @return List of buffered event batches in FIFO order
-   */
-  public List<OMUpdateEventBatch> stopBufferingAndDrain() {
-    if (isBuffering.compareAndSet(true, false)) {
-      List<OMUpdateEventBatch> bufferedEvents = new ArrayList<>();
-      eventQueue.drainTo(bufferedEvents);
-      LOG.info("Stopped buffering. Drained {} event batches with total {} events. " +
-              "Dropped batches due to overflow: {}", 
-          bufferedEvents.size(), totalBufferedEvents.get(), droppedBatches.get());
-      
-      // Reset counters
-      totalBufferedEvents.set(0);
-      droppedBatches.set(0);
-      
-      return bufferedEvents;
-    }
-    return new ArrayList<>();
-  }
-  
+
   /**
    * Add an event batch to the buffer.
    * 
@@ -119,16 +83,7 @@ public class OMUpdateEventBuffer {
       return null;
     }
   }
-  
-  /**
-   * Check if currently in buffering mode.
-   * 
-   * @return true if buffering is active
-   */
-  public boolean isBuffering() {
-    return isBuffering.get();
-  }
-  
+
   /**
    * Get the current queue size.
    * 
@@ -139,15 +94,6 @@ public class OMUpdateEventBuffer {
   }
   
   /**
-   * Get the total number of events currently buffered.
-   * 
-   * @return total buffered events count
-   */
-  public long getTotalBufferedEvents() {
-    return totalBufferedEvents.get();
-  }
-  
-  /**
    * Get the number of batches dropped due to queue overflow.
    * 
    * @return dropped batches count
@@ -155,17 +101,7 @@ public class OMUpdateEventBuffer {
   public long getDroppedBatches() {
     return droppedBatches.get();
   }
-  
-  /**
-   * Check if the queue is near capacity (>=95% full).
-   * 
-   * @return true if queue is nearly full
-   */
-  @VisibleForTesting
-  public boolean isNearCapacity() {
-    return eventQueue.size() >= (maxCapacity * 0.95);
-  }
-  
+
   /**
    * Clear all buffered events.
    */
@@ -173,6 +109,13 @@ public class OMUpdateEventBuffer {
   public void clear() {
     eventQueue.clear();
     totalBufferedEvents.set(0);
+    // Note: We don't reset droppedBatches here to maintain overflow detection
+  }
+
+  /**
+   * Reset the dropped batches counter. Used after full snapshot is triggered.
+   */
+  public void resetDroppedBatches() {
     droppedBatches.set(0);
   }
 }

@@ -665,13 +665,29 @@ public class OzoneManagerServiceProviderImpl
               reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
                   omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
               
-              // Check if event buffer has overflowed and trigger full snapshot if needed
-              if (reconTaskController.hasEventBufferOverflowed()) {
-                LOG.warn("Event buffer has overflowed during task reinitialization, falling back to full snapshot");
-                metrics.incrNumDeltaRequestsFailed();
-                deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
-                deltaReconTaskStatusUpdater.recordRunCompletion();
-                fullSnapshot = true;
+              // Check if task reinitialization is needed due to buffer overflow or task failures
+              boolean bufferOverflowed = reconTaskController.hasEventBufferOverflowed();
+              boolean tasksFailed = reconTaskController.hasDeltaTasksFailed();
+              
+              if (bufferOverflowed || tasksFailed) {
+                String reason = bufferOverflowed ? "Event buffer overflow" : "Delta tasks failed after retry";
+                LOG.warn("{}, triggering task reinitialization", reason);
+                
+                if (bufferOverflowed) {
+                  metrics.incrNumDeltaRequestsFailed();
+                  deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
+                  deltaReconTaskStatusUpdater.recordRunCompletion();
+                }
+                
+                reconTaskController.reInitializeTasks(omMetadataManager, null);
+                
+                // Reset appropriate flags after reinitialization
+                if (bufferOverflowed) {
+                  reconTaskController.resetEventBufferOverflowFlag();
+                }
+                if (tasksFailed) {
+                  reconTaskController.resetDeltaTasksFailureFlag();
+                }
               }
               
               currentSequenceNumber = getCurrentOMDBSequenceNumber();
@@ -763,6 +779,9 @@ public class OzoneManagerServiceProviderImpl
       // Reinitialize tasks that are listening.
       LOG.info("Calling reprocess on Recon tasks.");
       reconTaskController.reInitializeTasks(omMetadataManager, null);
+      
+      // Reset event buffer overflow flag after successful full snapshot
+      reconTaskController.resetEventBufferOverflowFlag();
 
       // Update health status in ReconContext
       reconContext.updateHealthStatus(new AtomicBoolean(true));
