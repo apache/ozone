@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -247,7 +248,7 @@ public class TestContainerStateMachineFailures {
               .getScmContext()
               .getTermOfLeader());
       cluster.getStorageContainerManager().getScmNodeManager()
-          .addDatanodeCommand(dn.getDatanodeDetails().getUuid(), command);
+          .addDatanodeCommand(dn.getDatanodeDetails().getID(), command);
     }
 
 
@@ -452,7 +453,6 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
-  @Flaky("HDDS-6935")
   public void testApplyTransactionFailure() throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -627,6 +627,7 @@ public class TestContainerStateMachineFailures {
   // not be marked unhealthy and pipeline should not fail if container gets
   // closed here.
   @Test
+  @Flaky("HDDS-13482")
   void testWriteStateMachineDataIdempotencyWithClosedContainer()
       throws Exception {
     OzoneOutputStream key =
@@ -815,14 +816,14 @@ public class TestContainerStateMachineFailures {
 
   private void induceFollowerFailure(OmKeyLocationInfo omKeyLocationInfo,
                                      int failureCount) {
-    UUID leader = omKeyLocationInfo.getPipeline().getLeaderId();
+    DatanodeID leader = omKeyLocationInfo.getPipeline().getLeaderId();
     Set<HddsDatanodeService> datanodeSet =
         TestHelper.getDatanodeServices(cluster,
             omKeyLocationInfo.getPipeline());
     int count = 0;
     for (HddsDatanodeService dn : datanodeSet) {
-      UUID dnUuid = dn.getDatanodeDetails().getUuid();
-      if (!dnUuid.equals(leader)) {
+      DatanodeID dnId = dn.getDatanodeDetails().getID();
+      if (!dnId.equals(leader)) {
         count++;
         long containerID = omKeyLocationInfo.getContainerID();
         Container container = dn

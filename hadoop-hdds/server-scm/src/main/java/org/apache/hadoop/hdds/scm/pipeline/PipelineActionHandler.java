@@ -119,7 +119,7 @@ public class PipelineActionHandler
       SCMCommand<?> command = new ClosePipelineCommand(pid);
       command.setTerm(scmContext.getTermOfLeader());
       publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-          new CommandForDatanode<>(datanode.getUuid(), command));
+          new CommandForDatanode<>(datanode, command));
     } catch (NotLeaderException nle) {
       LOG.info("Cannot process Pipeline Action for pipeline {} as " +
           "current SCM is not leader anymore.", pid);

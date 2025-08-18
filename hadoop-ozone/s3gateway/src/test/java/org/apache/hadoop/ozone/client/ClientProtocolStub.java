@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -252,6 +253,13 @@ public class ClientProtocolStub implements ClientProtocol {
   public OzoneInputStream getKey(String volumeName, String bucketName,
                                  String keyName) throws IOException {
     return getBucket(volumeName, bucketName).readKey(keyName);
+  }
+
+  @Override
+  public OmKeyInfo getKeyInfo(String volumeName, String bucketName, String keyName,
+      boolean forceUpdateContainerCache) throws IOException {
+    return objectStoreStub.getClientProxy().getKeyInfo(
+        volumeName, bucketName, keyName, forceUpdateContainerCache);
   }
 
   private OzoneBucket getBucket(String volumeName, String bucketName)
@@ -724,6 +732,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @Deprecated
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType) throws IOException {
     return null;

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,7 +116,7 @@ public class TestBlockManager {
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
-
+    conf.setBoolean(HDDS_SCM_SAFEMODE_ENABLED, false);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 5,
         TimeUnit.SECONDS);
@@ -160,12 +161,7 @@ public class TestBlockManager {
             new ContainerReplicaPendingOps(
                 Clock.system(ZoneId.systemDefault())));
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
-        containerManager, pipelineManager, nodeManager, eventQueue, serviceManager, scmContext) {
-      @Override
-      public void emitSafeModeStatus() {
-        // skip
-      }
-    };
+        nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setPipelineManager(pipelineManager);
@@ -190,7 +186,7 @@ public class TestBlockManager {
     replicationConfig = RatisReplicationConfig
         .getInstance(ReplicationFactor.THREE);
 
-    scm.getScmContext().updateSafeModeStatus(new SafeModeStatus(false, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
   }
 
   @AfterEach
@@ -454,8 +450,7 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockFailureInSafeMode() {
-    scm.getScmContext().updateSafeModeStatus(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     // Test1: In safe mode expect an SCMException.
     Throwable t = assertThrows(IOException.class, () ->
         blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,

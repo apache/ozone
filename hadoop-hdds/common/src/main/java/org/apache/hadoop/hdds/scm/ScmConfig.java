@@ -104,7 +104,7 @@ public class ScmConfig extends ReconfigurableConfig {
 
   @Config(key = "hdds.scm.block.deletion.per-interval.max",
       type = ConfigType.INT,
-      defaultValue = "100000",
+      defaultValue = "500000",
       reconfigurable = true,
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
       description =
@@ -127,6 +127,20 @@ public class ScmConfig extends ReconfigurableConfig {
               + "postfix (ns,ms,s,m,h,d). "
   )
   private Duration blockDeletionInterval = Duration.ofSeconds(60);
+
+  @Config(key = "hdds.scm.block.deletion.txn.dn.commit.map.limit",
+      defaultValue = "5000000",
+      type = ConfigType.INT,
+      tags = { ConfigTag.SCM },
+      description =
+          " This value indicates the size of the transactionToDNsCommitMap after which" +
+              " we will skip one round of scm block deleting interval."
+  )
+  private int transactionToDNsCommitMapLimit = 5000000;
+
+  public int getTransactionToDNsCommitMapLimit() {
+    return transactionToDNsCommitMapLimit;
+  }
 
   public Duration getBlockDeletionInterval() {
     return blockDeletionInterval;

@@ -109,14 +109,14 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
 
       // remove commands in command queue for the DN
       final List<SCMCommand<?>> cmdList = nodeManager.getCommandQueue(
-          datanodeDetails.getUuid());
+          datanodeDetails.getID());
       LOG.info("Clearing command queue of size {} for DN {}",
           cmdList.size(), datanodeDetails);
 
       // remove DeleteBlocksCommand associated with the dead node unless it
       // is IN_MAINTENANCE
       if (deletedBlockLog != null && !isNodeInMaintenance) {
-        deletedBlockLog.onDatanodeDead(datanodeDetails.getUuid());
+        deletedBlockLog.onDatanodeDead(datanodeDetails.getID());
       }
 
       //move dead datanode out of ClusterNetworkTopology

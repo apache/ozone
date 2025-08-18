@@ -35,7 +35,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -354,7 +353,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return number of pipelines associated with it
    */
   public int getPipelinesCount(DatanodeDetails datanodeDetails) {
-    return node2PipelineMap.getPipelinesCount(datanodeDetails.getUuid());
+    return node2PipelineMap.getPipelinesCount(datanodeDetails.getID());
   }
 
   /**
@@ -545,6 +544,10 @@ public class NodeStateManager implements Runnable, Closeable {
     return nodeStateMap.getAllDatanodeInfos();
   }
 
+  int getAllNodeCount() {
+    return nodeStateMap.getNodeCount();
+  }
+
   /**
    * Sets the operational state of the given node. Intended to be called when
    * a node is being decommissioned etc.
@@ -595,7 +598,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @param dnId - Datanode ID
    * @return Set of PipelineID
    */
-  public Set<PipelineID> getPipelineByDnID(UUID dnId) {
+  public Set<PipelineID> getPipelineByDnID(DatanodeID dnId) {
     return node2PipelineMap.getPipelines(dnId);
   }
 

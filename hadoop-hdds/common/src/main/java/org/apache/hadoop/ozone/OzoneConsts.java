@@ -88,6 +88,7 @@ public final class OzoneConsts {
   public static final Path ROOT_PATH = Paths.get(OZONE_ROOT);
 
   public static final String CONTAINER_EXTENSION = ".container";
+  public static final String CONTAINER_DATA_CHECKSUM_EXTENSION = ".tree";
   public static final String CONTAINER_META_PATH = "metadata";
   public static final String CONTAINER_TEMPORARY_CHUNK_PREFIX = "tmp";
   public static final String CONTAINER_CHUNK_NAME_DELIMITER = ".";
@@ -141,6 +142,7 @@ public final class OzoneConsts {
   public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
   public static final String PENDING_DELETE_BLOCK_COUNT =
       "#PENDINGDELETEBLOCKCOUNT";
+  public static final String CONTAINER_DATA_CHECKSUM = "#DATACHECKSUM";
 
   /**
    * OM LevelDB prefixes.
@@ -201,6 +203,15 @@ public final class OzoneConsts {
   public static final String OM_CONTEXT_ATTRIBUTE = "ozone.om";
 
   public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
+
+  // YAML field constants for OmSnapshotLocalData (thus the OM_SLD_ prefix) YAML files
+  public static final String OM_SLD_VERSION = "version";
+  public static final String OM_SLD_CHECKSUM = "checksum";
+  public static final String OM_SLD_IS_SST_FILTERED = "isSSTFiltered";
+  public static final String OM_SLD_UNCOMPACTED_SST_FILE_LIST = "uncompactedSSTFileList";
+  public static final String OM_SLD_LAST_COMPACTION_TIME = "lastCompactionTime";
+  public static final String OM_SLD_NEEDS_COMPACTION = "needsCompaction";
+  public static final String OM_SLD_COMPACTED_SST_FILE_LIST = "compactedSSTFileList";
 
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
@@ -290,6 +301,13 @@ public final class OzoneConsts {
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
   public static final String REWRITE_GENERATION = "rewriteGeneration";
+  public static final String FROM_SNAPSHOT = "fromSnapshot";
+  public static final String TO_SNAPSHOT = "toSnapshot";
+  public static final String TOKEN = "token";
+  public static final String PAGE_SIZE = "pageSize";
+  public static final String FORCE_FULL_DIFF = "forceFullDiff";
+  public static final String DISABLE_NATIVE_DIFF = "disableNativeDiff";
+  public static final String JOB_STATUS = "jobStatus";
 
   // For multi-tenancy
   public static final String TENANT_ID_USERNAME_DELIMITER = "$";
@@ -525,6 +543,12 @@ public final class OzoneConsts {
    * S3G multipart upload request's ETag header key.
    */
   public static final String ETAG = "ETag";
+
+  /**
+   * A constant string used as a separator in various contexts within
+   * the OMDBCheckpoint functions.
+   */
+  public static final String OM_SNAPSHOT_SEPARATOR = "-";
 
   private OzoneConsts() {
     // Never Constructed

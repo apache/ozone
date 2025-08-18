@@ -80,6 +80,8 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
+import org.apache.hadoop.ozone.container.ozoneimpl.MetadataScanResult;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -157,8 +159,15 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           = StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
       while (true) {
         HddsVolume containerVolume;
+        String hddsVolumeDir;
         try {
           containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize);
+          hddsVolumeDir = containerVolume.getHddsRootDir().toString();
+          // Set volume before getContainerDBFile(), because we may need the
+          // volume to deduce the db file.
+          containerData.setVolume(containerVolume);
+          // commit bytes have been reserved in volumeChoosingPolicy#chooseVolume
+          containerData.setCommittedSpace(true);
         } catch (DiskOutOfSpaceException ex) {
           throw new StorageContainerException("Container creation failed, " +
               "due to disk out of space", ex, DISK_OUT_OF_SPACE);
@@ -169,11 +178,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         }
 
         try {
-          String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-          // Set volume before getContainerDBFile(), because we may need the
-          // volume to deduce the db file.
-          containerData.setVolume(containerVolume);
-
           long containerID = containerData.getContainerID();
           String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
@@ -206,7 +210,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           // Create .container file
           File containerFile = getContainerFile();
           createContainerFile(containerFile);
-
           return;
         } catch (StorageContainerException ex) {
           if (containerMetaDataPath != null
@@ -658,7 +661,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
 
     //fill in memory stat counter (keycount, byte usage)
-    KeyValueContainerUtil.parseKVContainerData(containerData, config);
+    KeyValueContainerUtil.parseKVContainerData(containerData, config, true);
 
     // rewriting the yaml file with new checksum calculation
     // restore imported container's state to the original state and flush the yaml file
@@ -848,57 +851,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * Returns KeyValueContainerReport for the KeyValueContainer.
    */
   @Override
-  public ContainerReplicaProto getContainerReport()
-      throws StorageContainerException {
-    ContainerReplicaProto.Builder ciBuilder =
-        ContainerReplicaProto.newBuilder();
-    ciBuilder.setContainerID(containerData.getContainerID())
-        .setReadCount(containerData.getReadCount())
-        .setWriteCount(containerData.getWriteCount())
-        .setReadBytes(containerData.getReadBytes())
-        .setWriteBytes(containerData.getWriteBytes())
-        .setKeyCount(containerData.getBlockCount())
-        .setUsed(containerData.getBytesUsed())
-        .setState(getHddsState())
-        .setReplicaIndex(containerData.getReplicaIndex())
-        .setDeleteTransactionId(containerData.getDeleteTransactionId())
-        .setBlockCommitSequenceId(containerData.getBlockCommitSequenceId())
-        .setOriginNodeId(containerData.getOriginNodeId())
-        .setIsEmpty(containerData.isEmpty());
-    return ciBuilder.build();
-  }
-
-  /**
-   * Returns LifeCycle State of the container.
-   * @return LifeCycle State of the container in HddsProtos format
-   * @throws StorageContainerException
-   */
-  private ContainerReplicaProto.State getHddsState()
-      throws StorageContainerException {
-    ContainerReplicaProto.State state;
-    switch (containerData.getState()) {
-    case OPEN:
-      state = ContainerReplicaProto.State.OPEN;
-      break;
-    case CLOSING:
-      state = ContainerReplicaProto.State.CLOSING;
-      break;
-    case QUASI_CLOSED:
-      state = ContainerReplicaProto.State.QUASI_CLOSED;
-      break;
-    case CLOSED:
-      state = ContainerReplicaProto.State.CLOSED;
-      break;
-    case UNHEALTHY:
-      state = ContainerReplicaProto.State.UNHEALTHY;
-      break;
-    case DELETED:
-      state = ContainerReplicaProto.State.DELETED;
-      break;
-    default:
-      throw new StorageContainerException("Invalid Container state: " + containerData, INVALID_CONTAINER_STATE);
-    }
-    return state;
+  public ContainerReplicaProto getContainerReport() throws StorageContainerException {
+    return containerData.buildContainerReplicaProto();
   }
 
   /**
@@ -910,40 +864,37 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean shouldScanMetadata() {
-    final boolean shouldScan = getContainerState() != UNHEALTHY;
-    if (!shouldScan) {
-      LOG.debug("Healthy container metadata is not scanned: {}", containerData);
-    }
-    return shouldScan;
-  }
-
-  @Override
-  public ScanResult scanMetaData() throws InterruptedException {
-    return new KeyValueContainerCheck(containerData, this, config)
-        .fastCheck();
+  public MetadataScanResult scanMetaData() throws InterruptedException {
+    KeyValueContainerCheck checker =
+        new KeyValueContainerCheck(config, this);
+    return checker.fastCheck();
   }
 
   @Override
   public boolean shouldScanData() {
-    final boolean shouldScan = getContainerState() == CLOSED || getContainerState() == QUASI_CLOSED;
-    if (!shouldScan) {
-      LOG.debug("Healthy container is not scanned: {}", containerData);
+    boolean shouldScan =
+        getContainerState() == CLOSED
+        || getContainerState() == QUASI_CLOSED
+        || getContainerState() == UNHEALTHY;
+    if (!shouldScan && LOG.isDebugEnabled()) {
+      LOG.debug("Container {} in state {} should not have its data scanned.",
+          containerData.getContainerID(), containerData.getState());
     }
 
     return shouldScan;
   }
 
   @Override
-  public ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
+  public DataScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
       throws InterruptedException {
     if (!shouldScanData()) {
       throw new IllegalStateException("The checksum verification can not be" +
           " done for container in state "
           + containerData.getState());
     }
-    return new KeyValueContainerCheck(containerData, this, config)
-        .fullCheck(throttler, canceler);
+
+    KeyValueContainerCheck checker = new KeyValueContainerCheck(config, this);
+    return checker.fullCheck(throttler, canceler);
   }
 
   /**

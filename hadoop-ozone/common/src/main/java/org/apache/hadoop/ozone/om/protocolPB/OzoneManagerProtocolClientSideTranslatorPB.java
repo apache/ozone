@@ -187,7 +187,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PutObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RangerBGSyncResponse;
@@ -1325,30 +1324,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     handleError(omResponse);
     return SnapshotInfo.getFromProtobuf(omResponse.getSnapshotInfoResponse()
         .getSnapshotInfo());
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public String printCompactionLogDag(String fileNamePrefix, String graphType)
-      throws IOException {
-    final PrintCompactionLogDagRequest.Builder request =
-        PrintCompactionLogDagRequest.newBuilder();
-
-    if (fileNamePrefix != null) {
-      request.setFileNamePrefix(fileNamePrefix);
-    }
-    if (graphType != null) {
-      request.setGraphType(graphType);
-    }
-
-    final OMRequest omRequest = createOMRequest(Type.PrintCompactionLogDag)
-        .setPrintCompactionLogDagRequest(request.build())
-        .build();
-    final OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
-    return omResponse.getPrintCompactionLogDagResponse().getMessage();
   }
 
   /**

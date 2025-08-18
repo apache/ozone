@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +42,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
@@ -500,6 +503,26 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     expectedKeys =
         getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
     checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+  }
+
+  @Test
+  void testIsFileFalseForDir() throws Exception {
+    byte[] data = "key-data".getBytes(StandardCharsets.UTF_8);
+    try (OzoneOutputStream out = emptyFsoOzoneBucket.createKey("dir1/key1", data.length)) {
+      out.write(data);
+    }
+
+    Iterator<? extends OzoneKey> keyIterator = emptyFsoOzoneBucket.listKeys("");
+
+    assertTrue(keyIterator.hasNext(), "Expected dir1, key1 in the bucket");
+
+    OzoneKey ozoneKey = keyIterator.next();
+    assertEquals("dir1/", ozoneKey.getName());
+    assertFalse(ozoneKey.isFile(), "Expected isFile to be false for directory key");
+
+    ozoneKey = keyIterator.next();
+    assertEquals("dir1/key1", ozoneKey.getName());
+    assertTrue(ozoneKey.isFile(), "Expected isFile to be true for key");
   }
 
   /**

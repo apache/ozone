@@ -22,7 +22,7 @@ import java.util.Iterator;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshotDiff;
 import org.apache.hadoop.ozone.shell.Handler;
-import org.apache.hadoop.ozone.shell.ListOptions;
+import org.apache.hadoop.ozone.shell.ListPaginationOptions;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketUri;
 import picocli.CommandLine;
@@ -50,7 +50,7 @@ public class ListSnapshotDiffHandler extends Handler {
   private boolean listAllStatus;
 
   @CommandLine.Mixin
-  private ListOptions listOptions;
+  private ListPaginationOptions listOptions;
 
   @Override
   protected OzoneAddress getAddress() {

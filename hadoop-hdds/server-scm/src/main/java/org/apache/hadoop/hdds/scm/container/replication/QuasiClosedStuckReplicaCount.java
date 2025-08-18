@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -34,18 +34,20 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class QuasiClosedStuckReplicaCount {
 
-  private final Map<UUID, Set<ContainerReplica>> replicasByOrigin = new HashMap<>();
-  private final Map<UUID, Set<ContainerReplica>> inServiceReplicasByOrigin = new HashMap<>();
-  private final Map<UUID, Set<ContainerReplica>> maintenanceReplicasByOrigin = new HashMap<>();
-  private boolean hasOutOfServiceReplicas = false;
-  private int minHealthyForMaintenance;
-  private boolean hasHealthyReplicas = false;
+  private final Map<DatanodeID, Set<ContainerReplica>> replicasByOrigin = new HashMap<>();
+  private final Map<DatanodeID, Set<ContainerReplica>> inServiceReplicasByOrigin = new HashMap<>();
+  private final Map<DatanodeID, Set<ContainerReplica>> maintenanceReplicasByOrigin = new HashMap<>();
+  private final int minHealthyForMaintenance;
+  private final boolean hasHealthyReplicas;
+  private final boolean hasOutOfServiceReplicas;
 
   public QuasiClosedStuckReplicaCount(Set<ContainerReplica> replicas, int minHealthyForMaintenance) {
     this.minHealthyForMaintenance = minHealthyForMaintenance;
+    boolean hasHealthy = false;
+    boolean hasOutOfService = false;
     for (ContainerReplica r : replicas) {
       if (r.getState() != StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY) {
-        hasHealthyReplicas = true;
+        hasHealthy = true;
       }
       replicasByOrigin.computeIfAbsent(r.getOriginDatanodeId(), k -> new HashSet<>()).add(r);
       HddsProtos.NodeOperationalState opState = r.getDatanodeDetails().getPersistedOpState();
@@ -54,11 +56,14 @@ public class QuasiClosedStuckReplicaCount {
       } else if (opState == HddsProtos.NodeOperationalState.IN_MAINTENANCE
           || opState == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE) {
         maintenanceReplicasByOrigin.computeIfAbsent(r.getOriginDatanodeId(), k -> new HashSet<>()).add(r);
-        hasOutOfServiceReplicas = true;
+        hasOutOfService = true;
       } else {
-        hasOutOfServiceReplicas = true;
+        hasOutOfService = true;
       }
     }
+
+    this.hasHealthyReplicas = hasHealthy;
+    this.hasOutOfServiceReplicas = hasOutOfService;
   }
 
   public int availableOrigins() {
@@ -77,17 +82,23 @@ public class QuasiClosedStuckReplicaCount {
     return !getUnderReplicatedReplicas().isEmpty();
   }
 
+  private Set<ContainerReplica> getInService(DatanodeID origin) {
+    final Set<ContainerReplica> set = inServiceReplicasByOrigin.get(origin);
+    return set == null ? Collections.emptySet() : set;
+  }
+
+  private int getMaintenanceCount(DatanodeID origin) {
+    final Set<ContainerReplica> maintenance = maintenanceReplicasByOrigin.get(origin);
+    return maintenance == null ? 0 : maintenance.size();
+  }
+
   public List<MisReplicatedOrigin> getUnderReplicatedReplicas() {
     List<MisReplicatedOrigin> misReplicatedOrigins = new ArrayList<>();
 
     if (replicasByOrigin.size() == 1) {
-      Map.Entry<UUID, Set<ContainerReplica>> entry = replicasByOrigin.entrySet().iterator().next();
-      Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(entry.getKey());
-      if (inService == null) {
-        inService = Collections.emptySet();
-      }
-      Set<ContainerReplica> maintenance = maintenanceReplicasByOrigin.get(entry.getKey());
-      int maintenanceCount = maintenance == null ? 0 : maintenance.size();
+      final Map.Entry<DatanodeID, Set<ContainerReplica>> entry = replicasByOrigin.entrySet().iterator().next();
+      final Set<ContainerReplica> inService = getInService(entry.getKey());
+      final int maintenanceCount = getMaintenanceCount(entry.getKey());
 
       if (maintenanceCount > 0) {
         if (inService.size() < minHealthyForMaintenance) {
@@ -105,13 +116,9 @@ public class QuasiClosedStuckReplicaCount {
 
     // If there are multiple origins, we expect 2 copies of each origin
     // For maintenance, we expect 1 copy of each origin and ignore the minHealthyForMaintenance parameter
-    for (Map.Entry<UUID, Set<ContainerReplica>> entry : replicasByOrigin.entrySet()) {
-      Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(entry.getKey());
-      if (inService == null) {
-        inService = Collections.emptySet();
-      }
-      Set<ContainerReplica> maintenance = maintenanceReplicasByOrigin.get(entry.getKey());
-      int maintenanceCount = maintenance == null ? 0 : maintenance.size();
+    for (Map.Entry<DatanodeID, Set<ContainerReplica>> entry : replicasByOrigin.entrySet()) {
+      final Set<ContainerReplica> inService = getInService(entry.getKey());
+      final int maintenanceCount = getMaintenanceCount(entry.getKey());
 
       if (inService.size() < 2) {
         if (maintenanceCount > 0) {
@@ -142,9 +149,9 @@ public class QuasiClosedStuckReplicaCount {
   public List<MisReplicatedOrigin> getOverReplicatedOrigins() {
     // If there is only a single origin, we expect 3 copies, otherwise we expect 2 copies of each origin
     if (replicasByOrigin.size() == 1) {
-      UUID origin = replicasByOrigin.keySet().iterator().next();
-      Set<ContainerReplica> inService = inServiceReplicasByOrigin.get(origin);
-      if (inService != null && inService.size() > 3) {
+      final DatanodeID origin = replicasByOrigin.keySet().iterator().next();
+      final Set<ContainerReplica> inService = getInService(origin);
+      if (inService.size() > 3) {
         return Collections.singletonList(new MisReplicatedOrigin(inService, inService.size() - 3));
       }
       return Collections.emptyList();
@@ -152,9 +159,9 @@ public class QuasiClosedStuckReplicaCount {
 
     // If there are multiple origins, we expect 2 copies of each origin
     List<MisReplicatedOrigin> overReplicatedOrigins = new ArrayList<>();
-    for (UUID origin : replicasByOrigin.keySet()) {
-      Set<ContainerReplica> replicas = inServiceReplicasByOrigin.get(origin);
-      if (replicas != null && replicas.size() > 2) {
+    for (DatanodeID origin : replicasByOrigin.keySet()) {
+      final Set<ContainerReplica> replicas = getInService(origin);
+      if (replicas.size() > 2) {
         overReplicatedOrigins.add(new MisReplicatedOrigin(replicas, replicas.size() - 2));
       }
     }

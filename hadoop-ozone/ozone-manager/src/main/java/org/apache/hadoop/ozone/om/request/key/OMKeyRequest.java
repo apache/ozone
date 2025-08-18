@@ -28,7 +28,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 import com.google.common.base.Preconditions;
@@ -40,6 +40,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -53,7 +54,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -65,9 +65,9 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -176,80 +176,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         resolvedArgs.getBucketName(), keyArgs.getKeyName(),
         aclType, clientId);
     return resolvedArgs;
-  }
-
-  /**
-   * Define the parameters carried when verifying the Key.
-   */
-  public static class ValidateKeyArgs {
-    private String snapshotReservedWord;
-    private String keyName;
-    private boolean validateSnapshotReserved;
-    private boolean validateKeyName;
-
-    ValidateKeyArgs(String snapshotReservedWord, String keyName,
-        boolean validateSnapshotReserved, boolean validateKeyName) {
-      this.snapshotReservedWord = snapshotReservedWord;
-      this.keyName = keyName;
-      this.validateSnapshotReserved = validateSnapshotReserved;
-      this.validateKeyName = validateKeyName;
-    }
-
-    public String getSnapshotReservedWord() {
-      return snapshotReservedWord;
-    }
-
-    public String getKeyName() {
-      return keyName;
-    }
-
-    public boolean isValidateSnapshotReserved() {
-      return validateSnapshotReserved;
-    }
-
-    public boolean isValidateKeyName() {
-      return validateKeyName;
-    }
-
-    /**
-     * Tools for building {@link ValidateKeyArgs}.
-     */
-    public static class Builder {
-      private String snapshotReservedWord;
-      private String keyName;
-      private boolean validateSnapshotReserved;
-      private boolean validateKeyName;
-
-      public Builder setSnapshotReservedWord(String snapshotReservedWord) {
-        this.snapshotReservedWord = snapshotReservedWord;
-        this.validateSnapshotReserved = true;
-        return this;
-      }
-
-      public Builder setKeyName(String keyName) {
-        this.keyName = keyName;
-        this.validateKeyName = true;
-        return this;
-      }
-
-      public ValidateKeyArgs build() {
-        return new ValidateKeyArgs(snapshotReservedWord, keyName,
-            validateSnapshotReserved, validateKeyName);
-      }
-    }
-  }
-
-  protected void validateKey(OzoneManager ozoneManager, ValidateKeyArgs validateKeyArgs)
-      throws OMException {
-    if (validateKeyArgs.isValidateSnapshotReserved()) {
-      OmUtils.verifyKeyNameWithSnapshotReservedWord(validateKeyArgs.getSnapshotReservedWord());
-    }
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-        .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-            OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (validateKeyArgs.isValidateKeyName() && checkKeyNameEnabled) {
-      OmUtils.validateKeyName(validateKeyArgs.getKeyName());
-    }
   }
 
   /**
@@ -403,7 +329,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   protected List<OzoneAcl> getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
-      PrefixManager prefixManager, OzoneConfiguration config) throws OMException {
+      PrefixManager prefixManager, OmConfig config) throws OMException {
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.addAll(getDefaultAclList(createUGIForApi(), config));
@@ -463,7 +389,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @return Acls which inherited parent DEFAULT and keyArgs ACCESS acls.
    */
   protected List<OzoneAcl> getAclsForDir(KeyArgs keyArgs, OmBucketInfo bucketInfo,
-      OMFileRequest.OMPathInfo omPathInfo, OzoneConfiguration config) throws OMException {
+      OMFileRequest.OMPathInfo omPathInfo, OmConfig config) throws OMException {
     // Acls inherited from parent or bucket will convert to DEFAULT scope
     List<OzoneAcl> acls = new ArrayList<>();
     // add default ACLs
@@ -528,7 +454,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           missingKey);
       OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(missingKey,
           keyArgs, nextObjId, lastKnownParentId, trxnLogIndex,
-          bucketInfo, pathInfo, ozoneManager.getConfiguration());
+          bucketInfo, pathInfo, ozoneManager.getConfig());
       objectCount++;
 
       missingParentInfos.add(dirInfo);
@@ -584,7 +510,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OmKeyInfo parentKeyInfo =
           createDirectoryKeyInfoWithACL(missingKey, keyArgs, nextObjId,
               bucketInfo, omPathInfo, trxnLogIndex,
-              ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfiguration());
+              ozoneManager.getDefaultReplicationConfig(), ozoneManager.getConfig());
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
@@ -609,7 +535,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       String dirName, KeyArgs keyArgs, long objectId,
       long parentObjectId, long transactionIndex,
       OmBucketInfo bucketInfo, OMFileRequest.OMPathInfo omPathInfo,
-      OzoneConfiguration config) throws OMException {
+      OmConfig config) throws OMException {
     return OmDirectoryInfo.newBuilder()
         .setName(dirName)
         .setOwner(keyArgs.getOwnerName())
@@ -640,7 +566,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected OmKeyInfo createDirectoryKeyInfoWithACL(String keyName,
       KeyArgs keyArgs, long objectId, OmBucketInfo bucketInfo,
       OMFileRequest.OMPathInfo omPathInfo, long transactionIndex,
-      ReplicationConfig serverDefaultReplConfig, OzoneConfiguration config) throws OMException {
+      ReplicationConfig serverDefaultReplConfig, OmConfig config) throws OMException {
     return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId,
         serverDefaultReplConfig)
         .setAcls(getAclsForDir(keyArgs, bucketInfo, omPathInfo, config))
@@ -1006,7 +932,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
-          ReplicationConfig replicationConfig, OzoneConfiguration config)
+          ReplicationConfig replicationConfig, OmConfig config)
           throws IOException {
 
     return prepareFileInfo(omMetadataManager, keyArgs, dbKeyInfo, size,
@@ -1030,7 +956,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           OMFileRequest.OMPathInfo omPathInfo,
           long transactionLogIndex, long objectID,
           ReplicationConfig replicationConfig,
-          OzoneConfiguration config) throws IOException {
+          OmConfig config) throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartFileInfo(omMetadataManager, keyArgs,
               size, locations, encInfo, prefixManager, omBucketInfo,
@@ -1095,7 +1021,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       OMFileRequest.OMPathInfo omPathInfo,
       long transactionLogIndex, long objectID,
-      OzoneConfiguration config) throws OMException {
+      OmConfig config) throws OMException {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
     builder.setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
@@ -1143,7 +1069,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nullable OmBucketInfo omBucketInfo,
           OMFileRequest.OMPathInfo omPathInfo,
           @Nonnull long transactionLogIndex, long objectID,
-          OzoneConfiguration configuration) throws IOException {
+          OmConfig configuration) throws IOException {
 
     Preconditions.checkArgument(args.getMultipartNumber() > 0,
             "PartNumber Should be greater than zero");
@@ -1247,6 +1173,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
     uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
     pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
     return pseudoKeyInfo;
+  }
+
+  protected static Map<String, RepeatedOmKeyInfo> addKeyInfoToDeleteMap(OzoneManager om,
+      long trxnLogIndex, String ozoneKey, OmKeyInfo keyInfo, Map<String, RepeatedOmKeyInfo> deleteMap) {
+    if (keyInfo == null) {
+      return deleteMap;
+    }
+    final long pseudoObjId = om.getObjectIdFromTxId(trxnLogIndex);
+    final String delKeyName = om.getMetadataManager().getOzoneDeletePathKey(pseudoObjId, ozoneKey);
+    if (deleteMap == null) {
+      deleteMap = new HashMap<>();
+    }
+    deleteMap.computeIfAbsent(delKeyName, key -> new RepeatedOmKeyInfo())
+        .addOmKeyInfo(keyInfo);
+    return deleteMap;
   }
 
   /**

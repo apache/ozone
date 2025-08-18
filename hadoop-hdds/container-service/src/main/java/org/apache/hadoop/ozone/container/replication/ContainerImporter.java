@@ -88,7 +88,7 @@ public class ContainerImporter {
   }
 
   public void importContainer(long containerID, Path tarFilePath,
-      HddsVolume hddsVolume, CopyContainerCompression compression)
+      HddsVolume targetVolume, CopyContainerCompression compression)
       throws IOException {
     if (!importContainerProgress.add(containerID)) {
       deleteFileQuietely(tarFilePath);
@@ -106,11 +106,6 @@ public class ContainerImporter {
             ContainerProtos.Result.CONTAINER_EXISTS);
       }
 
-      HddsVolume targetVolume = hddsVolume;
-      if (targetVolume == null) {
-        targetVolume = chooseNextVolume();
-      }
-
       KeyValueContainerData containerData;
       TarContainerPacker packer = getPacker(compression);
 
@@ -119,15 +114,18 @@ public class ContainerImporter {
             packer.unpackContainerDescriptor(input);
         containerData = getKeyValueContainerData(containerDescriptorYaml);
       }
-      ContainerUtils.verifyChecksum(containerData, conf);
+      ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
+      // lastDataScanTime should be cleared for an imported container
+      containerData.setDataScanTimestamp(null);
 
       try (InputStream input = Files.newInputStream(tarFilePath)) {
         Container container = controller.importContainer(
             containerData, input, packer);
-        // After container import is successful, increase used space for the volume
+        // After container import is successful, increase used space for the volume and schedule an OnDemand scan for it
         targetVolume.incrementUsedSpace(container.getContainerData().getBytesUsed());
         containerSet.addContainerByOverwriteMissingContainer(container);
+        containerSet.scanContainer(containerID, "Imported container");
       }
     } finally {
       importContainerProgress.remove(containerID);
@@ -148,7 +146,7 @@ public class ContainerImporter {
     // Choose volume that can hold both container in tmp and dest directory
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        HddsServerUtil.requiredReplicationSpace(containerSize));
+        getDefaultReplicationSpace());
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)
@@ -171,7 +169,7 @@ public class ContainerImporter {
     return new TarContainerPacker(compression);
   }
 
-  public long getDefaultContainerSize() {
-    return containerSize;
+  public long getDefaultReplicationSpace() {
+    return HddsServerUtil.requiredReplicationSpace(containerSize);
   }
 }

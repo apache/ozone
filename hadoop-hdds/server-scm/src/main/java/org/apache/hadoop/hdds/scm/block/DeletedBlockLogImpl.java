@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.block;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 
@@ -30,7 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
@@ -57,7 +59,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,6 +95,7 @@ public class DeletedBlockLogImpl
   private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
   private long lastProcessedTransactionId = -1;
   private final int logAppenderQueueByteLimit;
+  private int deletionFactorPerDatanode;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
@@ -124,11 +126,20 @@ public class DeletedBlockLogImpl
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     this.logAppenderQueueByteLimit = (int) (limit * 0.9);
+    int deletionFactor = conf.getInt(OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR,
+        OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT);
+    this.deletionFactorPerDatanode = deletionFactor <= 0 ? 1 : deletionFactor;
+
   }
 
   @VisibleForTesting
   void setDeletedBlockLogStateManager(DeletedBlockLogStateManager manager) {
     this.deletedBlockLogStateManager = manager;
+  }
+
+  @VisibleForTesting
+  void setDeleteBlocksFactorPerDatanode(int deleteBlocksFactorPerDatanode) {
+    this.deletionFactorPerDatanode = deleteBlocksFactorPerDatanode;
   }
 
   @Override
@@ -137,8 +148,7 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
-      try (TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+      try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
         if (count == LIST_ALL_FAILED_TRANSACTIONS) {
           while (iter.hasNext()) {
@@ -245,8 +255,7 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       final AtomicInteger num = new AtomicInteger(0);
-      try (TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+      try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
         while (iter.hasNext()) {
           DeletedBlocksTransaction delTX = iter.next().getValue();
@@ -325,26 +334,37 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
   }
 
   private void getTransaction(DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions,
-      Set<DatanodeDetails> dnList, Set<ContainerReplica> replicas,
-      Map<UUID, Map<Long, CmdStatus>> commandStatus) {
+      Set<ContainerReplica> replicas,
+      Map<DatanodeID, Map<Long, CmdStatus>> commandStatus,
+      int maxDeleteBlocksPerDatanode) {
+    // Ensure all DNs for this transaction are below their max block limit.
+    if (!replicas.stream().allMatch(replica -> {
+      final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
+      return transactions.getNumberOfBlocksForDatanode(datanodeID) < maxDeleteBlocksPerDatanode;
+    })) {
+      return;
+    }
+
     DeletedBlocksTransaction updatedTxn =
         DeletedBlocksTransaction.newBuilder(tx)
-            .setCount(transactionStatusManager.getOrDefaultRetryCount(
-              tx.getTxID(), 0))
+            .setCount(transactionStatusManager.getRetryCount(tx.getTxID()))
             .build();
-
+    boolean flag = false;
     for (ContainerReplica replica : replicas) {
-      DatanodeDetails details = replica.getDatanodeDetails();
+      final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
       if (!transactionStatusManager.isDuplication(
-          details, updatedTxn.getTxID(), commandStatus)) {
-        transactions.addTransactionToDN(details.getUuid(), updatedTxn);
-        metrics.incrProcessedTransaction();
+          datanodeID, tx.getTxID(), commandStatus)) {
+        transactions.addTransactionToDN(datanodeID, updatedTxn);
+        flag = true;
       }
+    }
+    if (flag) {
+      metrics.incrProcessedTransaction();
     }
   }
 
@@ -372,7 +392,7 @@ public class DeletedBlockLogImpl
       if (!dnList.contains(datanodeDetails)) {
         DatanodeDetails dnDetail = replica.getDatanodeDetails();
         LOG.debug("Skip Container = {}, because DN = {} is not in dnList.",
-            containerId, dnDetail.getUuid());
+            containerId, dnDetail);
         return true;
       }
     }
@@ -392,8 +412,7 @@ public class DeletedBlockLogImpl
           scmCommandTimeoutMs);
       DatanodeDeletedBlockTransactions transactions =
           new DatanodeDeletedBlockTransactions();
-      try (TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+      try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
         if (lastProcessedTransactionId != -1) {
           iter.seek(lastProcessedTransactionId);
@@ -425,13 +444,19 @@ public class DeletedBlockLogImpl
 
         // Get the CmdStatus status of the aggregation, so that the current
         // status of the specified transaction can be found faster
-        Map<UUID, Map<Long, CmdStatus>> commandStatus =
+        final Map<DatanodeID, Map<Long, CmdStatus>> commandStatus =
             getSCMDeletedBlockTransactionStatusManager()
                 .getCommandStatusByTxId(dnList.stream().
-                map(DatanodeDetails::getUuid).collect(Collectors.toSet()));
+                map(DatanodeDetails::getID).collect(Collectors.toSet()));
         ArrayList<Long> txIDs = new ArrayList<>();
         metrics.setNumBlockDeletionTransactionDataNodes(dnList.size());
         Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = null;
+
+        int factor = dnList.size() / deletionFactorPerDatanode;
+        int maxDeleteBlocksPerDatanode = (factor > 0)
+            ? Math.min(blockDeletionLimit, blockDeletionLimit / factor)
+            : blockDeletionLimit;
+
         // Here takes block replica count as the threshold to avoid the case
         // that part of replicas committed the TXN and recorded in the
         // SCMDeletedBlockTransactionStatusManager, while they are counted
@@ -453,12 +478,11 @@ public class DeletedBlockLogImpl
               Set<ContainerReplica> replicas = containerManager
                   .getContainerReplicas(
                       ContainerID.valueOf(txn.getContainerID()));
-              if (checkInadequateReplica(replicas, txn, dnList)) {
+              if (!checkInadequateReplica(replicas, txn, dnList)) {
+                getTransaction(txn, transactions, replicas, commandStatus, maxDeleteBlocksPerDatanode);
+              } else {
                 metrics.incrSkippedTransaction();
-                continue;
               }
-              getTransaction(
-                  txn, transactions, dnList, replicas, commandStatus);
             } else if (txn.getCount() >= maxRetry || containerManager.getContainer(id).isOpen()) {
               metrics.incrSkippedTransaction();
             }
@@ -506,14 +530,19 @@ public class DeletedBlockLogImpl
   }
 
   @Override
-  public void recordTransactionCreated(UUID dnId, long scmCmdId,
+  public void recordTransactionCreated(DatanodeID dnId, long scmCmdId,
       Set<Long> dnTxSet) {
     getSCMDeletedBlockTransactionStatusManager()
         .recordTransactionCreated(dnId, scmCmdId, dnTxSet);
   }
 
   @Override
-  public void onDatanodeDead(UUID dnId) {
+  public int getTransactionToDNsCommitMapSize() {
+    return getSCMDeletedBlockTransactionStatusManager().getTransactionToDNsCommitMapSize();
+  }
+
+  @Override
+  public void onDatanodeDead(DatanodeID dnId) {
     getSCMDeletedBlockTransactionStatusManager().onDatanodeDead(dnId);
   }
 
@@ -531,7 +560,7 @@ public class DeletedBlockLogImpl
     }
 
     DatanodeDetails details = deleteBlockStatus.getDatanodeDetails();
-    UUID dnId = details.getUuid();
+    DatanodeID dnId = details.getID();
     for (CommandStatus commandStatus : deleteBlockStatus.getCmdStatus()) {
       CommandStatus.Status status = commandStatus.getStatus();
       lock.lock();

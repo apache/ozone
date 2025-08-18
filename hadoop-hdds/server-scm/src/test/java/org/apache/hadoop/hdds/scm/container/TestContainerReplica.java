@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.container;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +38,7 @@ class TestContainerReplica {
             ThreadLocalRandom.current().nextLong(Long.MAX_VALUE - 1) + 1))
         .setContainerState(CLOSED)
         .setKeyCount(ThreadLocalRandom.current().nextLong())
-        .setOriginNodeId(UUID.randomUUID())
+        .setOriginNodeId(DatanodeID.randomID())
         .setSequenceId(ThreadLocalRandom.current().nextLong())
         .setReplicaIndex(ThreadLocalRandom.current().nextInt())
         .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())

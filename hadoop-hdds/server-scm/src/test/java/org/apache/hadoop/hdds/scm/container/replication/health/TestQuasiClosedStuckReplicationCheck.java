@@ -30,9 +30,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -51,9 +51,10 @@ import org.junit.jupiter.api.Test;
 public class TestQuasiClosedStuckReplicationCheck {
 
   private QuasiClosedStuckReplicationCheck handler;
-  private final UUID origin1 = UUID.randomUUID();
-  private final UUID origin2 = UUID.randomUUID();
-  private final UUID origin3 = UUID.randomUUID();
+  private final DatanodeID origin1 = DatanodeID.randomID();
+  private final DatanodeID origin2 = DatanodeID.randomID();
+  private final DatanodeID origin3 = DatanodeID.randomID();
+
   private ReplicationManagerReport report;
   private ReplicationQueue queue;
 

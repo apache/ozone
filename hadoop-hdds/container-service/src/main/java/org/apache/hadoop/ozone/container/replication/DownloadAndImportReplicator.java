@@ -22,11 +22,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.slf4j.Logger;
@@ -47,7 +44,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   private final ContainerDownloader downloader;
   private final ContainerImporter containerImporter;
   private final ContainerSet containerSet;
-  private final long containerSize;
 
   public DownloadAndImportReplicator(
       ConfigurationSource conf, ContainerSet containerSet,
@@ -57,9 +53,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     this.containerSet = containerSet;
     this.downloader = downloader;
     this.containerImporter = containerImporter;
-    containerSize = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
   @Override
@@ -81,15 +74,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
     try {
       targetVolume = containerImporter.chooseNextVolume();
-      // Increment committed bytes and verify if it doesn't cross the space left.
-      targetVolume.incCommittedBytes(containerSize * 2);
-      StorageLocationReport volumeReport = targetVolume.getReport();
-      // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
-      if (volumeReport.getUsableSpace() <= 0) {
-        LOG.warn("Container {} replication was unsuccessful, no space left on volume {}", containerID, volumeReport);
-        task.setStatus(Status.FAILED);
-        return;
-      }
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.
       Path tarFilePath =
@@ -114,7 +98,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       task.setStatus(Status.FAILED);
     } finally {
       if (targetVolume != null) {
-        targetVolume.incCommittedBytes(-containerSize * 2);
+        targetVolume.incCommittedBytes(-containerImporter.getDefaultReplicationSpace());
       }
     }
   }

@@ -228,11 +228,11 @@ public class TestQuasiClosedContainerHandler {
 
     // 1001 is the highest sequence id
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, dnOne.getUuid(), dnOne);
+        id, State.QUASI_CLOSED, 1000L, dnOne.getID(), dnOne);
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, dnTwo.getUuid(), dnTwo);
+        id, State.QUASI_CLOSED, 1000L, dnTwo.getID(), dnTwo);
     final ContainerReplica replicaThree = getReplicas(
-        id, State.UNHEALTHY, 1001L, dnThree.getUuid(), dnThree);
+        id, State.UNHEALTHY, 1001L, dnThree.getID(), dnThree);
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     containerReplicas.add(replicaOne);
     containerReplicas.add(replicaTwo);
@@ -332,11 +332,11 @@ public class TestQuasiClosedContainerHandler {
 
     // 1001 is the highest sequence id
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, dnOne.getUuid(), dnOne);
+        id, State.QUASI_CLOSED, 1000L, dnOne.getID(), dnOne);
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.QUASI_CLOSED, 1001L, dnTwo.getUuid(), dnTwo);
+        id, State.QUASI_CLOSED, 1001L, dnTwo.getID(), dnTwo);
     final ContainerReplica replicaThree = getReplicas(
-        id, State.QUASI_CLOSED, 1001L, dnThree.getUuid(), dnThree);
+        id, State.QUASI_CLOSED, 1001L, dnThree.getID(), dnThree);
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     containerReplicas.add(replicaOne);
     containerReplicas.add(replicaTwo);

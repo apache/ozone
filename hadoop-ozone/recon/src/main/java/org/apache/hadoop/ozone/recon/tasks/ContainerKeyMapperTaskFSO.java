@@ -18,11 +18,14 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.inject.Inject;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 
 /**
@@ -38,6 +41,13 @@ public class ContainerKeyMapperTaskFSO implements ReconOmTask {
                                    OzoneConfiguration configuration) {
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.ozoneConfiguration = configuration;
+  }
+
+  @Override
+  public ReconOmTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    return new ContainerKeyMapperTaskFSO(
+        reconContainerMetadataManager.getStagedReconContainerMetadataManager(stagedReconDbStore), ozoneConfiguration);
   }
 
   @Override

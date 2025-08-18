@@ -35,6 +35,9 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 OZONE_VERSION=$(mvn help:evaluate -Dexpression=ozone.version -q -DforceStdout -Dscan=false)
 DIST_DIR="${OZONE_ROOT}/hadoop-ozone/dist/target/ozone-$OZONE_VERSION"
 
+# workaround attempt for https://github.com/docker/compose/issues/12747
+export COMPOSE_PARALLEL_LIMIT=1
+
 if [ ! -d "$DIST_DIR" ]; then
     echo "Distribution dir is missing. Doing a full build"
     "$DIR/build.sh" -Pcoverage

@@ -99,7 +99,7 @@ public abstract class SafeModeExitRule<T> implements EventHandler<T> {
 
     if (scmInSafeMode()) {
       if (validate()) {
-        safeModeManager.validateSafeModeExitRules(ruleName, publisher);
+        safeModeManager.validateSafeModeExitRules(ruleName);
         cleanup();
         return;
       }
@@ -107,7 +107,7 @@ public abstract class SafeModeExitRule<T> implements EventHandler<T> {
       process(report);
 
       if (validate()) {
-        safeModeManager.validateSafeModeExitRules(ruleName, publisher);
+        safeModeManager.validateSafeModeExitRules(ruleName);
         cleanup();
       }
     }

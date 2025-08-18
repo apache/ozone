@@ -17,6 +17,11 @@
 
 package org.apache.hadoop.ozone.debug.logs.container;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
+import org.apache.hadoop.ozone.debug.logs.container.utils.SQLDBConstants;
 import picocli.CommandLine;
 
 /**
@@ -26,14 +31,16 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "container",
     subcommands = {
+        ContainerInfoCommand.class,    
         ContainerLogParser.class,
+        DuplicateOpenContainersCommand.class,
         ListContainers.class
     },
     description = "Tool to parse and store container logs from datanodes into a temporary SQLite database." +
             " Supports querying state transitions of container replicas using various subcommands."
 )
 
-public class ContainerLogController {
+public class ContainerLogController extends AbstractSubcommand {
   @CommandLine.Option(names = {"--db"},
       scope = CommandLine.ScopeType.INHERIT,
       description = "Path to the SQLite database file where the parsed information from logs is stored.")
@@ -45,5 +52,31 @@ public class ContainerLogController {
   
   public void setDbPath(String dbPath) {
     this.dbPath = dbPath;
+  }
+
+  public Path resolveDbPath() {
+    Path resolvedPath;
+
+    if (dbPath == null) {
+      resolvedPath = Paths.get(System.getProperty("user.dir"), SQLDBConstants.DEFAULT_DB_FILENAME);
+
+      if (Files.exists(resolvedPath) && Files.isRegularFile(resolvedPath)) {
+        out().println("Using default database file found in current directory: " + resolvedPath);
+      } else {
+        throw new IllegalArgumentException("No database path provided and default file '" + 
+            SQLDBConstants.DEFAULT_DB_FILENAME + "' not " +
+            "found in current directory. Please provide a valid database path");
+      }
+    } else {
+      resolvedPath = Paths.get(dbPath);
+      Path parentDir = resolvedPath.getParent();
+
+      if (parentDir != null && !Files.exists(parentDir)) {
+        throw new IllegalArgumentException("The parent directory of the provided database " +
+            "path does not exist: " + parentDir);
+      }
+    }
+
+    return resolvedPath;
   }
 }

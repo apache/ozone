@@ -35,7 +35,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -43,6 +42,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -419,7 +419,7 @@ public class TestRatisPipelineProvider {
           .setContainerState(StorageContainerDatanodeProtocolProtos
               .ContainerReplicaProto.State.CLOSED)
           .setKeyCount(1)
-          .setOriginNodeId(UUID.randomUUID())
+          .setOriginNodeId(DatanodeID.randomID())
           .setSequenceId(1)
           .setReplicaIndex(0)
           .setDatanodeDetails(dn)

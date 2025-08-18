@@ -89,6 +89,30 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
+  public void testReplicasVerifyCmd(boolean isEcKey) throws Exception {
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String keyName = UUID.randomUUID().toString();
+
+    writeKey(volumeName, bucketName, keyName, isEcKey, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    String bucketPath = Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
+    String fullKeyPath = bucketPath + Path.SEPARATOR + keyName;
+
+    //TODO HDDS-12715: Create common integration test cluster for debug and repair tools
+    String[] args = new String[] {
+        getSetConfStringFromConf(OMConfigKeys.OZONE_OM_ADDRESS_KEY),
+        getSetConfStringFromConf(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY),
+        "replicas", "verify", "--checksums", "--block-existence", "--container-state", fullKeyPath,
+        //, "--all-results"
+    };
+
+    int exitCode = ozoneDebugShell.execute(args);
+    assertEquals(0, exitCode);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
   public void testChunkInfoCmdBeforeAfterCloseContainer(boolean isEcKey) throws Exception {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
@@ -193,10 +217,10 @@ public abstract class TestOzoneDebugShell implements NonHATests.TestCase {
       ObjectMapper objectMapper = new ObjectMapper();
       // Parse the JSON array string into a JsonNode
       JsonNode jsonNode = objectMapper.readTree(output);
-      JsonNode keyLocations = jsonNode.get("KeyLocations").get(0);
+      JsonNode keyLocations = jsonNode.get("keyLocations").get(0);
       for (JsonNode element : keyLocations) {
         String fileName =
-            element.get("Locations").get("files").get(0).toString();
+            element.get("file").toString();
         blockFilePaths.add(fileName);
       }
       // DN storage directories are set differently for each DN

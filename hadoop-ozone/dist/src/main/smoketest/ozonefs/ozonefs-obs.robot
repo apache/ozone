@@ -23,7 +23,7 @@ Test Timeout        5 minutes
 
 *** Variables ***
 ${SCHEME}           ofs
-${volume}           volume1
+${volume}           obs-volume1
 ${bucket}           obs-bucket1
 ${PREFIX}           ozone
 
@@ -50,6 +50,11 @@ Verify ls fails on OBS bucket
 
 Create key in OBS bucket
     Execute             ozone sh key put /${volume}/${bucket}/testfile NOTICE.txt
+
+Verify ls fails on OBS bucket key
+    ${url} =            Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile
+    ${result} =         Execute and checkrc   ozone fs -ls ${url}     255
+    Should contain      ${result}             Bucket: ${bucket} has layout: OBJECT_STORE, which does not support file system semantics. Bucket Layout must be FILE_SYSTEM_OPTIMIZED or LEGACY.
 
 Verify rm fails on OBS bucket
     ${url} =            Format FS URL         ${SCHEME}    ${volume}    ${bucket}    testfile

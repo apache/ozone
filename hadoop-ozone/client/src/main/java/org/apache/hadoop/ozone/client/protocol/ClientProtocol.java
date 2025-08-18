@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -436,6 +437,17 @@ public interface ClientProtocol {
   OzoneInputStream getKey(String volumeName, String bucketName, String keyName)
       throws IOException;
 
+  /**
+   * Reads key info from an existing bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param forceUpdateContainerCache if true force OM to update container cache location from SCM
+   * @return {@link OmKeyInfo}
+   * @throws IOException
+   */
+  OmKeyInfo getKeyInfo(String volumeName, String bucketName, String keyName,
+      boolean forceUpdateContainerCache) throws IOException;
 
   /**
    * Deletes an existing key.
@@ -1207,6 +1219,7 @@ public interface ClientProtocol {
    * @return message which tells the image name, parent dir and OM leader
    * node information.
    */
+  @Deprecated
   String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException;
 

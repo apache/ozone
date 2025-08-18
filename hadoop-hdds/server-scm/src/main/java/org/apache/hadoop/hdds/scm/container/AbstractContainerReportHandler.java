@@ -23,10 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -356,12 +356,13 @@ abstract class AbstractContainerReportHandler {
         .setContainerID(containerId)
         .setContainerState(replicaProto.getState())
         .setDatanodeDetails(datanodeDetails)
-        .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
+        .setOriginNodeId(DatanodeID.fromUuidString(replicaProto.getOriginNodeId()))
         .setSequenceId(replicaProto.getBlockCommitSequenceId())
         .setKeyCount(replicaProto.getKeyCount())
         .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
         .setEmpty(replicaProto.getIsEmpty())
+        .setDataChecksum(replicaProto.getDataChecksum())
         .build();
 
     if (replica.getState().equals(State.DELETED)) {

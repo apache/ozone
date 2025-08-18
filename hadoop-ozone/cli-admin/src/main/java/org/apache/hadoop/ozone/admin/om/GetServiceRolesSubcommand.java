@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -130,15 +129,5 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
     }
     System.out.print(
         JsonUtils.toJsonStringWithDefaultPrettyPrinter(omServiceList));
-  }
-
-  @VisibleForTesting
-  public void setOzoneManagerClient(OzoneManagerProtocol ozoneManagerClient) {
-    this.ozoneManagerClient = ozoneManagerClient;
-  }
-
-  @VisibleForTesting
-  public void setParent(OMAdmin parent) {
-    this.parent = parent;
   }
 }

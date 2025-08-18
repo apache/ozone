@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.common;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.ByteBuffer;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -45,7 +44,7 @@ public class TestChecksum {
   }
 
   /**
-   * Tests {@link Checksum#verifyChecksum(byte[], ChecksumData)}.
+   * Tests {@link Checksum#verifyChecksum(ByteBuffer, ChecksumData, int)}.
    */
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
@@ -63,7 +62,7 @@ public class TestChecksum {
     assertEquals(6, checksumData.getChecksums().size());
 
     // Checksum verification should pass
-    assertTrue(Checksum.verifyChecksum(data, checksumData), "Checksum mismatch");
+    Checksum.verifyChecksum(ByteBuffer.wrap(data), checksumData, 0);
   }
 
   /**

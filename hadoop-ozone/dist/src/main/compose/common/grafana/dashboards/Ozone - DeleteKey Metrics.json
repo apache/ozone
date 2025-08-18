@@ -43,7 +43,7 @@
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
-                "axisLabel": "No. of keys",
+                "axisLabel": "Requests",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
                 "barWidthFactor": 0.6,
@@ -121,7 +121,7 @@
               "useBackend": false
             }
           ],
-          "title": "No. of Failed Key Deletes",
+          "title": "No. of delete request failed",
           "type": "timeseries"
         },
         {
@@ -231,7 +231,7 @@
                 "axisBorderShow": false,
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
-                "axisLabel": "No. of keys",
+                "axisLabel": "Requests",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
                 "barWidthFactor": 0.6,
@@ -309,7 +309,7 @@
               "useBackend": false
             }
           ],
-          "title": "No. of Successful Key Deletes",
+          "title": "No. of delete request received",
           "type": "timeseries"
         },
         {
@@ -1077,7 +1077,7 @@
               "useBackend": false
             }
           ],
-          "title": "KeyDeletingService: Keys processed",
+          "title": "KeyDeletingService: No. of keys sent to SCM for deletion",
           "type": "timeseries"
         },
         {
@@ -1171,7 +1171,7 @@
               "useBackend": false
             }
           ],
-          "title": "KeyDeletingService: Keys sent for purge",
+          "title": "KeyDeletingService: No. of keys to be purged",
           "type": "timeseries"
         },
         {
@@ -1265,7 +1265,7 @@
               "useBackend": false
             }
           ],
-          "title": "DirectoryDeletingService: Dirs",
+          "title": "DirectoryDeletingService: No. of Dirs deleted",
           "type": "timeseries"
         },
         {
@@ -1361,7 +1361,7 @@
               "useBackend": false
             }
           ],
-          "title": "DirectoryDeletingService: Files",
+          "title": "DirectoryDeletingService: No. of Files moved to deletedTable",
           "type": "timeseries"
         },
         {
@@ -1549,7 +1549,7 @@
               "useBackend": false
             }
           ],
-          "title": "PurgeRequests: Keys",
+          "title": "PurgeRequests: No. of keys purged",
           "type": "timeseries"
         },
         {
@@ -1927,7 +1927,7 @@
               "useBackend": false
             }
           ],
-          "title": "OpenKeyDeletion: Keys deleted",
+          "title": "Number of OpenKeys Deleted",
           "type": "timeseries"
         },
         {
@@ -2413,7 +2413,7 @@
               "useBackend": false
             }
           ],
-          "title": "No. of Successful Key Deletes",
+          "title": "Number of keys received for deletion from OM",
           "type": "timeseries"
         },
         {
@@ -2498,7 +2498,7 @@
             {
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "om_performance_metrics_delete_key_success_latency_ns_avg_time",
+              "expr": "scm_performance_metrics_delete_key_success_latency_ns_avg_time",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "legendFormat": "{{hostname}}",
@@ -2779,13 +2779,107 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "(scm_block_deleting_service_num_block_deletion_transaction_success / clamp_min(scm_block_deleting_service_num_block_deletion_transaction_sent, 1)) * 100",
+              "expr": "(scm_block_deleting_service_num_block_deletion_transaction_success_on_datanodes / clamp_min(scm_block_deleting_service_num_block_deletion_transactions_on_datanodes, 1)) * 100",
               "legendFormat": "{{hostname}}",
               "range": true,
               "refId": "A"
             }
           ],
           "title": "Percentage of successful delete transactions",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "No. of blocks",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 73
+          },
+          "id": 49,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "disableTextWrap": false,
+              "editorMode": "builder",
+              "expr": "scm_performance_metrics_delete_key_blocks_success",
+              "fullMetaSearch": false,
+              "includeNullMetadata": true,
+              "legendFormat": "{{hostname}}",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "Number of blocks received for deletion from OM",
           "type": "timeseries"
         }
       ],
@@ -3177,7 +3271,7 @@
               "useBackend": false
             }
           ],
-          "title": "No. of deletion transactions created",
+          "title": "Number of transactions(group of blocks) created",
           "type": "timeseries"
         },
         {
@@ -3262,7 +3356,7 @@
             {
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "scm_block_deleting_service_num_block_deletion_transaction_sent",
+              "expr": "scm_block_deleting_service_num_block_deletion_transactions_on_datanodes",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "legendFormat": "{{hostname}}",
@@ -3271,7 +3365,7 @@
               "useBackend": false
             }
           ],
-          "title": "No. of deletion transactions sent",
+          "title": "Number of transactions(group of blocks) sent for deletion to DN",
           "type": "timeseries"
         },
         {
@@ -3365,7 +3459,7 @@
               "useBackend": false
             }
           ],
-          "title": "No. of deletion transactions completed",
+          "title": "Number of transactions(group of blocks) completed",
           "type": "timeseries"
         },
         {
@@ -3450,7 +3544,7 @@
             {
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "scm_block_deleting_service_num_block_deletion_transaction_success",
+              "expr": "scm_block_deleting_service_num_block_deletion_transaction_success_on_datanodes",
               "fullMetaSearch": false,
               "includeNullMetadata": true,
               "legendFormat": "{{hostname}}",
@@ -3544,7 +3638,7 @@
             {
               "disableTextWrap": false,
               "editorMode": "builder",
-              "expr": "scm_block_deleting_service_num_block_deletion_transaction_failure",
+              "expr": "scm_block_deleting_service_num_block_deletion_transaction_failure_on_datanodes",
               "fullMetaSearch": false,
               "hide": false,
               "includeNullMetadata": true,
@@ -3650,6 +3744,292 @@
             }
           ],
           "title": "No. of deletion transactions skipped",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "No. of blocks",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 0,
+            "y": 1313
+          },
+          "id": 45,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "disableTextWrap": false,
+              "editorMode": "builder",
+              "expr": "scm_block_deleting_service_blocks_sent",
+              "fullMetaSearch": false,
+              "hide": false,
+              "includeNullMetadata": true,
+              "instant": false,
+              "legendFormat": "{{datanode}}",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "No. of blocks sent to each DN for deletion",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "No. of blocks",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 8,
+            "y": 1313
+          },
+          "id": 40,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "disableTextWrap": false,
+              "editorMode": "builder",
+              "expr": "scm_block_deleting_service_num_block_added_for_deletion_to_dn",
+              "fullMetaSearch": false,
+              "includeNullMetadata": true,
+              "legendFormat": "{{hostname}}",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "Number of blocks sent for deletion to DN",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "No. of commands",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "barWidthFactor": 0.6,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 8,
+            "x": 16,
+            "y": 1313
+          },
+          "id": 45,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "disableTextWrap": false,
+              "editorMode": "builder",
+              "expr": "scm_block_deleting_service_commands_timeout",
+              "fullMetaSearch": false,
+              "hide": false,
+              "includeNullMetadata": true,
+              "instant": false,
+              "legendFormat": "{{datanode}}",
+              "range": true,
+              "refId": "A",
+              "useBackend": false
+            }
+          ],
+          "title": "Number of commands timeout from SCM to DN",
           "type": "timeseries"
         }
       ],
@@ -4407,7 +4787,7 @@
           "targets": [
             {
               "editorMode": "code",
-              "expr": "(block_deleting_service_metrics_processed_transaction_success_count / clamp_min(block_deleting_service_metrics_received_block_count, 1)) * 100",
+              "expr": "(block_deleting_service_metrics_success_count / clamp_min(block_deleting_service_metrics_received_block_count, 1)) * 100",
               "legendFormat": "{{hostname}}",
               "range": true,
               "refId": "A"

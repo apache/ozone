@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ratis.util.function.CheckedFunction;
 
 /**
@@ -64,24 +65,37 @@ public final class Proto2Codec<M extends MessageLite> implements Codec<M> {
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull M message,
-      CodecBuffer.Allocator allocator) throws IOException {
+      CodecBuffer.Allocator allocator) throws CodecException {
     final int size = message.getSerializedSize();
     return allocator.apply(size).put(writeTo(message, size));
   }
 
   private CheckedFunction<OutputStream, Integer, IOException> writeTo(
       M message, int size) {
-    return out -> {
-      message.writeTo(out);
-      return size;
+    return new CheckedFunction<OutputStream, Integer, IOException>() {
+      @Override
+      public Integer apply(OutputStream out) throws IOException {
+        message.writeTo(out);
+        return size;
+      }
+
+      @Override
+      public String toString() {
+        return "source: size=" + size + ", message=" + message;
+      }
     };
   }
 
   @Override
   public M fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws IOException {
-    try (InputStream in = buffer.getInputStream()) {
+      throws CodecException {
+    final InputStream in = buffer.getInputStream();
+    try {
       return parser.parseFrom(in);
+    } catch (InvalidProtocolBufferException e) {
+      throw new CodecException("Failed to parse " + buffer + " for " + getTypeClass(), e);
+    } finally {
+      IOUtils.closeQuietly(in);
     }
   }
 
@@ -91,7 +105,7 @@ public final class Proto2Codec<M extends MessageLite> implements Codec<M> {
   }
 
   @Override
-  public M fromPersistedFormat(byte[] bytes)
+  public M fromPersistedFormatImpl(byte[] bytes)
       throws InvalidProtocolBufferException {
     return parser.parseFrom(bytes);
   }

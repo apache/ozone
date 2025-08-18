@@ -67,6 +67,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -489,7 +490,7 @@ public class TestSstFilteringService {
                                           String snapshot) throws IOException {
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volume, bucket, snapshot));
-    try (ReferenceCounted<OmSnapshot> snapshotMetadataReader =
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshotMetadataReader =
              om.getOmSnapshotManager().getActiveSnapshot(
                  snapshotInfo.getVolumeName(),
                  snapshotInfo.getBucketName(),

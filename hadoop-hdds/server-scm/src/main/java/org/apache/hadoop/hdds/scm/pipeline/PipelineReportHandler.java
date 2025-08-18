@@ -101,7 +101,7 @@ public class PipelineReportHandler implements
         final SCMCommand<?> command = new ClosePipelineCommand(pipelineID);
         command.setTerm(scmContext.getTermOfLeader());
         publisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-            new CommandForDatanode<>(dn.getUuid(), command));
+            new CommandForDatanode<>(dn, command));
       } catch (NotLeaderException ex) {
         // Do nothing if the leader has changed.
       }
@@ -153,7 +153,7 @@ public class PipelineReportHandler implements
     if (report.getIsLeader() ||
         RatisReplicationConfig.hasFactor(pipeline.getReplicationConfig(),
             ReplicationFactor.ONE)) {
-      pipeline.setLeaderId(dn.getUuid());
+      pipeline.setLeaderId(dn.getID());
       metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }
   }

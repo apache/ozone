@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -102,7 +103,7 @@ public final class HddsTestUtils {
   public static DatanodeDetails getDatanodeDetails(
       RegisteredCommand registeredCommand) {
     return MockDatanodeDetails.createDatanodeDetails(
-        registeredCommand.getDatanode().getUuidString(),
+        registeredCommand.getDatanode().getID(),
         registeredCommand.getDatanode().getHostName(),
         registeredCommand.getDatanode().getIpAddress(),
         null);
@@ -251,6 +252,19 @@ public final class HddsTestUtils {
         0,
         capacity,
         StorageTypeProto.DISK);
+  }
+
+  public static List<StorageReportProto> createStorageReports(DatanodeID nodeID, long capacity, long remaining,
+                                                              long committed) {
+    return Collections.singletonList(
+        StorageReportProto.newBuilder()
+            .setStorageUuid(nodeID.toString())
+            .setStorageLocation("test")
+            .setCapacity(capacity)
+            .setRemaining(remaining)
+            .setCommitted(committed)
+            .setScmUsed(200L - remaining)
+            .build());
   }
 
   public static StorageReportProto createStorageReport(DatanodeID nodeId, String path,
@@ -679,7 +693,7 @@ public final class HddsTestUtils {
     List<ContainerReplica> replicas = new ArrayList<>();
     for (DatanodeDetails datanode : datanodeDetails) {
       replicas.add(getReplicas(containerId, state,
-          sequenceId, datanode.getUuid(), datanode));
+          sequenceId, datanode.getID(), datanode));
     }
     return replicas;
   }
@@ -688,11 +702,11 @@ public final class HddsTestUtils {
       final ContainerID containerId,
       final ContainerReplicaProto.State state,
       final long sequenceId,
-      final UUID originNodeId,
+      final DatanodeID originNodeId,
       final DatanodeDetails datanodeDetails) {
-    return getReplicas(containerId, state, CONTAINER_USED_BYTES_DEFAULT,
+    return getReplicaBuilder(containerId, state, CONTAINER_USED_BYTES_DEFAULT,
             CONTAINER_NUM_KEYS_DEFAULT, sequenceId, originNodeId,
-            datanodeDetails);
+            datanodeDetails).build();
   }
 
   public static ContainerReplica.ContainerReplicaBuilder getReplicaBuilder(
@@ -701,7 +715,7 @@ public final class HddsTestUtils {
           final long usedBytes,
           final long keyCount,
           final long sequenceId,
-          final UUID originNodeId,
+          final DatanodeID originNodeId,
           final DatanodeDetails datanodeDetails) {
     return ContainerReplica.newBuilder()
             .setContainerID(containerId).setContainerState(state)
@@ -710,20 +724,6 @@ public final class HddsTestUtils {
             .setBytesUsed(usedBytes)
             .setKeyCount(keyCount)
             .setEmpty(keyCount == 0);
-  }
-
-  public static ContainerReplica getReplicas(
-      final ContainerID containerId,
-      final ContainerReplicaProto.State state,
-      final long usedBytes,
-      final long keyCount,
-      final long sequenceId,
-      final UUID originNodeId,
-      final DatanodeDetails datanodeDetails) {
-    ContainerReplica.ContainerReplicaBuilder builder =
-            getReplicaBuilder(containerId, state, usedBytes, keyCount,
-                    sequenceId, originNodeId, datanodeDetails);
-    return builder.build();
   }
 
   public static List<ContainerReplica> getReplicasWithReplicaIndex(
@@ -737,7 +737,7 @@ public final class HddsTestUtils {
     int replicaIndex = 1;
     for (DatanodeDetails datanode : datanodeDetails) {
       replicas.add(getReplicaBuilder(containerId, state,
-              usedBytes, keyCount, sequenceId, datanode.getUuid(), datanode)
+              usedBytes, keyCount, sequenceId, datanode.getID(), datanode)
               .setReplicaIndex(replicaIndex).build());
       replicaIndex += 1;
     }

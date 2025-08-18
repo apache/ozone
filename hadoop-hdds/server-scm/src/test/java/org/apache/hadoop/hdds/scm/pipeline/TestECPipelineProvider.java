@@ -41,11 +41,11 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -213,7 +213,7 @@ public class TestECPipelineProvider {
           .setContainerState(StorageContainerDatanodeProtocolProtos
               .ContainerReplicaProto.State.CLOSED)
           .setKeyCount(1)
-          .setOriginNodeId(UUID.randomUUID())
+          .setOriginNodeId(DatanodeID.randomID())
           .setSequenceId(1)
           .setReplicaIndex(i + 1)
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())

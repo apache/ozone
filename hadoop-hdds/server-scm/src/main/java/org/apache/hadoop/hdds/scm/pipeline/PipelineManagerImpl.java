@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -53,6 +54,7 @@ import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -551,16 +553,15 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @VisibleForTesting
   List<Pipeline> getStalePipelines(DatanodeDetails datanodeDetails) {
-    List<Pipeline> pipelines = getPipelines();
-    return pipelines.stream()
-            .filter(p -> p.getNodes().stream()
-                    .anyMatch(n -> n.getUuid()
-                            .equals(datanodeDetails.getUuid())
-                            && (!n.getIpAddress()
-                            .equals(datanodeDetails.getIpAddress())
-                            || !n.getHostName()
-                            .equals(datanodeDetails.getHostName()))))
-            .collect(Collectors.toList());
+    return getPipelines().stream()
+        .filter(p -> p.getNodes().stream().anyMatch(n -> sameIdDifferentHostOrAddress(n, datanodeDetails)))
+        .collect(Collectors.toList());
+  }
+
+  static boolean sameIdDifferentHostOrAddress(DatanodeDetails left, DatanodeDetails right) {
+    return left.getID().equals(right.getID())
+        && (!left.getIpAddress().equals(right.getIpAddress())
+        ||  !left.getHostName().equals(right.getHostName()));
   }
 
   /**
@@ -632,6 +633,20 @@ public class PipelineManagerImpl implements PipelineManager {
       }
     }
     return false;
+  }
+
+  @Override
+  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
+    for (DatanodeDetails node : pipeline.getNodes()) {
+      if (!(node instanceof DatanodeInfo)) {
+        node = nodeManager.getDatanodeInfo(node);
+      }
+      if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize, null)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -904,12 +919,8 @@ public class PipelineManagerImpl implements PipelineManager {
         metrics.incNumPipelineContainSameDatanodes();
         //TODO remove until pipeline allocation is proved equally distributed.
         for (Pipeline overlapPipeline : overlapPipelines) {
-          LOG.info("Pipeline: " + pipeline.getId().toString() +
-              " contains same datanodes as previous pipelines: " +
-              overlapPipeline.getId().toString() + " nodeIds: " +
-              pipeline.getNodes().get(0).getUuid().toString() +
-              ", " + pipeline.getNodes().get(1).getUuid().toString() +
-              ", " + pipeline.getNodes().get(2).getUuid().toString());
+          LOG.info("{} and {} have exactly the same set of datanodes: {}",
+              pipeline.getId(), overlapPipeline.getId(), pipeline.getNodeSet());
         }
       }
       return;

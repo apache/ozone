@@ -24,12 +24,15 @@ import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
 import static org.apache.hadoop.util.Time.now;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.PRUNED_SST_FILE_TEMP;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -59,12 +63,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -77,17 +82,25 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
@@ -102,6 +115,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -138,7 +152,6 @@ public class TestRocksDBCheckpointDiffer {
                   .map(
                       sstFile -> new CompactionNode(sstFile,
                           1000L,
-                          Long.parseLong(sstFile.substring(0, 6)),
                           null, null, null
                       ))
                   .collect(Collectors.toList()))
@@ -310,6 +323,18 @@ public class TestRocksDBCheckpointDiffer {
   private ColumnFamilyHandle fileTableCFHandle;
   private ColumnFamilyHandle compactionLogTableCFHandle;
 
+  public static final Integer DEBUG_DAG_BUILD_UP = 2;
+  public static final Integer DEBUG_DAG_TRAVERSAL = 3;
+  public static final Integer DEBUG_DAG_LIVE_NODES = 4;
+  public static final Integer DEBUG_READ_ALL_DB_KEYS = 5;
+  private static final HashSet<Integer> DEBUG_LEVEL = new HashSet<>();
+
+  static {
+    DEBUG_LEVEL.add(DEBUG_DAG_BUILD_UP);
+    DEBUG_LEVEL.add(DEBUG_DAG_TRAVERSAL);
+    DEBUG_LEVEL.add(DEBUG_DAG_LIVE_NODES);
+  }
+
   @BeforeEach
   public void init() throws RocksDBException {
     // Checkpoint differ log level. Set to DEBUG for verbose output
@@ -341,11 +366,22 @@ public class TestRocksDBCheckpointDiffer {
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(0L);
 
-    rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
-        SST_BACK_UP_DIR_NAME,
-        COMPACTION_LOG_DIR_NAME,
-        ACTIVE_DB_DIR_NAME,
-        config);
+    when(config.getInt(
+        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE,
+        OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT)).thenReturn(2000);
+
+    when(config.getBoolean(
+        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
+        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)).thenReturn(true);
+
+    try (MockedStatic<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockStatic(ManagedRawSSTFileReader.class)) {
+      mockedRawSSTReader.when(ManagedRawSSTFileReader::loadLibrary).thenReturn(true);
+      rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
+          SST_BACK_UP_DIR_NAME,
+          COMPACTION_LOG_DIR_NAME,
+          ACTIVE_DB_DIR_NAME,
+          config);
+    }
 
     ManagedColumnFamilyOptions cfOpts = new ManagedColumnFamilyOptions();
     cfOpts.optimizeUniversalStyleCompaction();
@@ -1035,7 +1071,7 @@ public class TestRocksDBCheckpointDiffer {
         LOG.debug("\tLevel: {}", m.level());
         LOG.debug("\tTable: {}", bytes2String(m.columnFamilyName()));
         LOG.debug("\tKey Range: {}", bytes2String(m.smallestKey()) + " <-> " + bytes2String(m.largestKey()));
-        if (differ.debugEnabled(DEBUG_DAG_LIVE_NODES)) {
+        if (debugEnabled(DEBUG_DAG_LIVE_NODES)) {
           printMutableGraphFromAGivenNode(
               differ.getCompactionNodeMap(),
               m.fileName(), m.level(),
@@ -1043,7 +1079,7 @@ public class TestRocksDBCheckpointDiffer {
         }
       }
 
-      if (differ.debugEnabled(DEBUG_READ_ALL_DB_KEYS)) {
+      if (debugEnabled(DEBUG_READ_ALL_DB_KEYS)) {
         try (ManagedRocksIterator iter = new ManagedRocksIterator(rocksDB.get().newIterator())) {
           for (iter.get().seekToFirst(); iter.get().isValid(); iter.get().next()) {
             LOG.debug(
@@ -1065,6 +1101,10 @@ public class TestRocksDBCheckpointDiffer {
     }
   }
 
+  public boolean debugEnabled(Integer level) {
+    return DEBUG_LEVEL.contains(level);
+  }
+
   /**
    * Helper that traverses the graphs for testing.
    * @param compactionNodeMap
@@ -1072,7 +1112,7 @@ public class TestRocksDBCheckpointDiffer {
    * @param fwdMutableGraph
    */
   private void traverseGraph(
-      ConcurrentHashMap<String, CompactionNode> compactionNodeMap,
+      ConcurrentMap<String, CompactionNode> compactionNodeMap,
       MutableGraph<CompactionNode> reverseMutableGraph,
       MutableGraph<CompactionNode> fwdMutableGraph) {
 
@@ -1132,7 +1172,7 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   private void printMutableGraphFromAGivenNode(
-      ConcurrentHashMap<String, CompactionNode> compactionNodeMap,
+      ConcurrentMap<String, CompactionNode> compactionNodeMap,
       String fileName,
       int sstLevel,
       MutableGraph<CompactionNode> mutableGraph) {
@@ -1889,6 +1929,122 @@ public class TestRocksDBCheckpointDiffer {
     );
   }
 
+
+  /**
+   * Test that backup SST files are pruned on loading previous compaction logs.
+   */
+  @Test
+  public void testPruneSSTFileValues() throws Exception {
+    SSTFilePruningMetrics sstFilePruningMetrics = rocksDBCheckpointDiffer.getPruningMetrics();
+    assertEquals(0L, sstFilePruningMetrics.getPruneQueueSize());
+    assertEquals(0L, sstFilePruningMetrics.getFilesPrunedTotal());
+    assertEquals(0L, sstFilePruningMetrics.getFilesPrunedLast());
+    assertEquals(0L, sstFilePruningMetrics.getCompactionsProcessed());
+    assertEquals(0L, sstFilePruningMetrics.getFilesRemovedTotal());
+
+    List<Pair<byte[], Integer>> keys = new ArrayList<Pair<byte[], Integer>>();
+    keys.add(Pair.of("key1".getBytes(UTF_8), Integer.valueOf(1)));
+    keys.add(Pair.of("key2".getBytes(UTF_8), Integer.valueOf(0)));
+    keys.add(Pair.of("key3".getBytes(UTF_8), Integer.valueOf(1)));
+
+    String inputFile78 = "000078";
+    String inputFile73 = "000073";
+    String outputFile81 = "000081";
+    // Create src & destination files in backup & activedirectory.
+    // Pruning job should succeed when pruned temp file is already present.
+    createSSTFileWithKeys(sstBackUpDir + "/" + inputFile78 + SST_FILE_EXTENSION, keys);
+    createSSTFileWithKeys(sstBackUpDir + "/" + inputFile73 + SST_FILE_EXTENSION, keys);
+    createSSTFileWithKeys(sstBackUpDir + PRUNED_SST_FILE_TEMP, keys);
+    createSSTFileWithKeys(activeDbDir + "/" + outputFile81 + SST_FILE_EXTENSION, keys);
+
+    // Load compaction log
+    CompactionLogEntry compactionLogEntry = new CompactionLogEntry(178, System.currentTimeMillis(),
+        Arrays.asList(
+            new CompactionFileInfo(inputFile78, "/volume/bucket1/key-5", "/volume/bucket2/key-10", "keyTable"),
+            new CompactionFileInfo(inputFile73, "/volume/bucket1/key-1", "/volume/bucket2/key-5", "keyTable")),
+        Collections.singletonList(
+            new CompactionFileInfo(outputFile81, "/volume/bucket1/key-1", "/volume/bucket2/key-10", "keyTable")),
+        null
+    );
+    byte[] compactionLogEntryKey = rocksDBCheckpointDiffer.addToCompactionLogTable(compactionLogEntry);
+    rocksDBCheckpointDiffer.loadAllCompactionLogs();
+    assertEquals(1L, sstFilePruningMetrics.getPruneQueueSize());
+
+    // Pruning should not fail a source SST file has been removed by another pruner.
+    Files.delete(sstBackUpDir.toPath().resolve(inputFile73 + SST_FILE_EXTENSION));
+    // Run the SST file pruner.
+    ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
+    Iterator keyItr = keys.iterator();
+    when(mockedRawSSTFileItr.hasNext()).thenReturn(true, true, true, false);
+    when(mockedRawSSTFileItr.next()).thenReturn(keyItr.next(), keyItr.next(), keyItr.next());
+    try (MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
+        ManagedRawSSTFileReader.class, (mock, context) -> {
+          when(mock.newIterator(any(), any(), any())).thenReturn(mockedRawSSTFileItr);
+          doNothing().when(mock).close();
+        })) {
+      rocksDBCheckpointDiffer.pruneSstFileValues();
+    }
+    // pruned.sst.tmp should be deleted when pruning job exits successfully.
+    assertFalse(Files.exists(sstBackUpDir.toPath().resolve(PRUNED_SST_FILE_TEMP)));
+
+    CompactionLogEntry updatedLogEntry;
+    try {
+      updatedLogEntry = CompactionLogEntry.getCodec().fromPersistedFormat(
+          activeRocksDB.get().get(compactionLogTableCFHandle, compactionLogEntryKey));
+    } catch (RocksDBException ex) {
+      throw new RocksDatabaseException("Failed to get compaction log entry.", ex);
+    }
+    CompactionFileInfo fileInfo78 = updatedLogEntry.getInputFileInfoList().get(0);
+    CompactionFileInfo fileInfo73 = updatedLogEntry.getInputFileInfoList().get(1);
+
+    // Verify 000078.sst has been pruned
+    assertEquals(inputFile78, fileInfo78.getFileName());
+    assertTrue(fileInfo78.isPruned());
+    ManagedSstFileReader sstFileReader = new ManagedSstFileReader(new ManagedOptions());
+    sstFileReader.open(sstBackUpDir.toPath().resolve(inputFile78 + SST_FILE_EXTENSION).toFile().getAbsolutePath());
+    ManagedSstFileReaderIterator itr = ManagedSstFileReaderIterator
+        .managed(sstFileReader.newIterator(new ManagedReadOptions()));
+    itr.get().seekToFirst();
+    int prunedKeys = 0;
+    while (itr.get().isValid()) {
+      // Verify that value is removed for non-tombstone keys.
+      assertEquals(0, itr.get().value().length);
+      prunedKeys++;
+      itr.get().next();
+    }
+    assertEquals(2, prunedKeys);
+    itr.close();
+    sstFileReader.close();
+
+    // Verify 000073.sst pruning has been skipped
+    assertFalse(fileInfo73.isPruned());
+
+    assertEquals(0L, sstFilePruningMetrics.getPruneQueueSize());
+    assertEquals(1L, sstFilePruningMetrics.getFilesPrunedTotal());
+    assertEquals(1L, sstFilePruningMetrics.getFilesPrunedLast());
+    assertEquals(1L, sstFilePruningMetrics.getCompactionsProcessed());
+    assertEquals(1L, sstFilePruningMetrics.getFilesRemovedTotal());
+  }
+
+  private void createSSTFileWithKeys(String filePath, List<Pair<byte[], Integer>> keys)
+      throws Exception {
+    try (ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(new ManagedEnvOptions(), new ManagedOptions())) {
+      sstFileWriter.open(filePath);
+      Iterator<Pair<byte[], Integer>> itr = keys.iterator();
+      while (itr.hasNext()) {
+        Pair<byte[], Integer> entry = itr.next();
+        if (entry.getValue() == 0) {
+          sstFileWriter.delete(entry.getKey());
+        } else {
+          sstFileWriter.put(entry.getKey(), "dummyValue".getBytes(UTF_8));
+        }
+      }
+      sstFileWriter.finish();
+    } catch (RocksDBException ex) {
+      throw new RocksDatabaseException("Failed to get write " + filePath, ex);
+    }
+  }
+
   /**
    * Tests core SST diff list logic. Does not involve DB.
    * Focuses on testing edge cases in internalGetSSTDiffList().
@@ -1968,14 +2124,10 @@ public class TestRocksDBCheckpointDiffer {
   }
 
   private static Stream<Arguments> shouldSkipNodeEdgeCases() {
-    CompactionNode node = new CompactionNode("fileName",
-        100, 100, "startKey", "endKey", "columnFamily");
-    CompactionNode nullColumnFamilyNode = new CompactionNode("fileName",
-        100, 100, "startKey", "endKey", null);
-    CompactionNode nullStartKeyNode = new CompactionNode("fileName",
-        100, 100, null, "endKey", "columnFamily");
-    CompactionNode nullEndKeyNode = new CompactionNode("fileName",
-        100, 100, "startKey", null, "columnFamily");
+    CompactionNode node = new CompactionNode("fileName", 100, "startKey", "endKey", "columnFamily");
+    CompactionNode nullColumnFamilyNode = new CompactionNode("fileName", 100, "startKey", "endKey", null);
+    CompactionNode nullStartKeyNode = new CompactionNode("fileName", 100, null, "endKey", "columnFamily");
+    CompactionNode nullEndKeyNode = new CompactionNode("fileName", 100, "startKey", null, "columnFamily");
 
     return Stream.of(
         Arguments.of(node, Collections.emptyMap(), false),

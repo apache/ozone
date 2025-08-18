@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -81,7 +80,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * keyName is "a/b/key1" then the fileName stores "key1".
    */
   private String fileName;
-  private String ownerName;
+  private final String ownerName;
 
   /**
    * ACL Information.
@@ -335,13 +334,11 @@ public final class OmKeyInfo extends WithParentObjectId
    *
    * @param newLocationList the list of new blocks to be added.
    * @param updateTime if true, will update modification time.
-   * @throws IOException
    */
   public synchronized void appendNewBlocks(
-      List<OmKeyLocationInfo> newLocationList, boolean updateTime)
-      throws IOException {
+      List<OmKeyLocationInfo> newLocationList, boolean updateTime) {
     if (keyLocationVersions.isEmpty()) {
-      throw new IOException("Appending new block, but no version exist");
+      throw new IllegalStateException("Appending new blocks but keyLocationVersions is empty");
     }
     OmKeyLocationInfoGroup currentLatestVersion =
         keyLocationVersions.get(keyLocationVersions.size() - 1);
@@ -733,7 +730,7 @@ public final class OmKeyInfo extends WithParentObjectId
     return kb.build();
   }
 
-  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) throws IOException {
+  public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
     if (keyInfo == null) {
       return null;
     }

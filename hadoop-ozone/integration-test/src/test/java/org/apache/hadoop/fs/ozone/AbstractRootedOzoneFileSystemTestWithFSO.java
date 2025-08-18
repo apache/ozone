@@ -226,5 +226,4 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
       TestLeaseRecovery.closeIgnoringKeyNotFound(stream);
     }
   }
-
 }
