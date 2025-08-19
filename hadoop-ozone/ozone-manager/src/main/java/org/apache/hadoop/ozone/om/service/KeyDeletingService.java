@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -251,26 +252,18 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
       // 3.1 Add purgeKeys
       List<String> batchPurgeKeys = new ArrayList<>();
-      int estimatedPurgeKeysSize = 0;
 
       while (purgeKeyIndex < purgeKeys.size()) {
         String nextKey = purgeKeys.get(purgeKeyIndex);
 
-        List<String> temp = new ArrayList<>(batchPurgeKeys);
-        temp.add(nextKey);
+        int estimatedKeySize = estimateStringEntrySize(nextKey);
 
-        OzoneManagerProtocolProtos.DeletedKeys deletedKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
-            .setVolumeName("").setBucketName("").addAllKeys(temp).build();
-
-        PurgeKeysRequest.Builder tempBuilder = requestBuilder.clone();
-        tempBuilder.clearDeletedKeys().addDeletedKeys(deletedKeys);
-
-        estimatedPurgeKeysSize = tempBuilder.build().getSerializedSize();
-        if (currSize + estimatedPurgeKeysSize > ratisLimit) {
+        if (currSize + estimatedKeySize > ratisLimit) {
           batchCapacityReached = true;
           break;
         }
 
+        currSize += estimatedKeySize;
         batchPurgeKeys.add(nextKey);
         purgeKeyIndex++;
       }
@@ -341,6 +334,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
 
     return Pair.of(deletedCount, purgeSuccess);
+  }
+
+  // Helper: estimate protobuf serialized size of a string field
+  private static int estimateStringEntrySize(String key) {
+    int len = key.getBytes(StandardCharsets.UTF_8).length;
+    return 1 /* tag size */ + 1 /* length variant */ + len; /* actual string bytes */
   }
 
   @Override
