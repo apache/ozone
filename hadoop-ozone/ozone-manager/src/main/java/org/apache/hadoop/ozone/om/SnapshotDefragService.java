@@ -57,6 +57,8 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -751,7 +753,19 @@ public class SnapshotDefragService extends BackgroundService
       } else if (FILE_TABLE.equals(columnFamily)) {  // TODO: FSO code path not tested
         // For fileTable, use OmMetadataManagerImpl#getOzoneKeyFSO
         // Path in diff report contains just the key part (after volume/bucket)
-        String dbKey = ozoneManager.getMetadataManager().getOzoneKeyFSO(volume, bucket, path);
+        OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volume)
+            .setBucketName(bucket)
+            .setKeyName(path)
+            .build();
+        OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
+        if (keyInfo == null) {
+          // TODO: Handle FSO case properly. key might not exist in current DB
+          //  Should use source/target DB depending on diff type
+          return null;
+        }
+        String dbKey = ozoneManager.getMetadataManager().getOzoneKeyFSO(volume, bucket,
+            keyInfo.getParentObjectID() + "/" + path);
         return dbKey.getBytes(StandardCharsets.UTF_8);
       }
 
