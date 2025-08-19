@@ -157,6 +157,8 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
           snapshotLocalData.setDefraggedSSTFileList(compactedSSTFileList);
         }
 
+        // TODO: Add OM_SLD_DB_CHECKPOINT_DIR field
+
         String checksum = (String) nodes.get(OzoneConsts.OM_SLD_CHECKSUM);
         if (checksum != null) {
           snapshotLocalData.setChecksum(checksum);
