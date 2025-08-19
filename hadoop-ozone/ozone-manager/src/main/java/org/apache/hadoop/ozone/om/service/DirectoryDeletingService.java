@@ -296,9 +296,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         break;
       }
     }
-    if (purgePathRequestList.isEmpty() ||
-        submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId) == null) {
-      return;
+    if (!purgePathRequestList.isEmpty()) {
+      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {

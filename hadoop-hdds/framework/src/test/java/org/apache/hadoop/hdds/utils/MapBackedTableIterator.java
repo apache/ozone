@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
@@ -42,12 +41,7 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
   public void seekToFirst() {
     this.itr = this.values.entrySet().stream()
         .filter(e -> prefix == null || e.getKey().startsWith(prefix))
-        .map(e -> {
-          V value = e.getValue();
-          int size = value != null ? value.toString().getBytes(StandardCharsets.UTF_8).length : 0;
-          return Table.newKeyValue(e.getKey(), value, size);
-        })
-        .iterator();
+        .map(e -> Table.newKeyValue(e.getKey(), e.getValue())).iterator();
   }
 
   @Override
@@ -59,8 +53,8 @@ public class MapBackedTableIterator<V> implements Table.KeyValueIterator<String,
   public Table.KeyValue<String, V> seek(String s) {
     this.itr = this.values.entrySet().stream()
         .filter(e -> prefix == null || e.getKey().startsWith(prefix))
-        .filter(e -> e.getKey().compareTo(s) >= 0).map(e -> Table.newKeyValue(e.getKey(), e.getValue(),
-            e.getValue().toString().getBytes(StandardCharsets.UTF_8).length)).iterator();
+        .filter(e -> e.getKey().compareTo(s) >= 0)
+        .map(e -> Table.newKeyValue(e.getKey(), e.getValue())).iterator();
     Map.Entry<String, V> firstEntry = values.ceilingEntry(s);
     return firstEntry == null ? null : Table.newKeyValue(firstEntry.getKey(), firstEntry.getValue());
   }
