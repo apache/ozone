@@ -229,9 +229,10 @@ public class ReplicasVerify extends Handler {
     private boolean doExecuteBlockExistence;
 
     @CommandLine.Option(names = "--container-state",
-        description = "Check the container and replica states. " +
-            "Containers in [DELETING, DELETED] states, or " +
-            "it's replicas in [DELETED, UNHEALTHY, INVALID] states fail the check.",
+        description = "Check the container and replica states." +
+            " Containers must be in [OPEN, CLOSING, QUASI_CLOSED, CLOSED] states," +
+            " and it's replicas must be in [OPEN, CLOSING, QUASI_CLOSED, CLOSED] states" +
+            " to pass the check. Any other states will fail the verification.",
         defaultValue = "false")
     private boolean doExecuteReplicaState;
 

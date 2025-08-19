@@ -565,7 +565,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             scmConfig.set(OZONE_METADATA_DIRS, metaDirPath);
             scmConfig.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
 
-            configureSCM();
+            configureSCM(true);
             if (i == 1) {
               StorageContainerManager.scmInit(scmConfig, clusterId);
             } else {

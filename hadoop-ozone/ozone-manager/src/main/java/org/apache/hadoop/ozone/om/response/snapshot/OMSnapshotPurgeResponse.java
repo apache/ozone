@@ -23,7 +23,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAP
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -125,11 +127,14 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
     if (acquiredSnapshotLock) {
       Path snapshotDirPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotInfo);
+      Path snapshotLocalDataPath = Paths.get(
+          OmSnapshotManager.getSnapshotLocalPropertyYamlPath(omMetadataManager, snapshotInfo));
       try {
         FileUtils.deleteDirectory(snapshotDirPath.toFile());
+        Files.deleteIfExists(snapshotLocalDataPath);
       } catch (IOException ex) {
-        LOG.error("Failed to delete snapshot directory {} for snapshot {}",
-            snapshotDirPath, snapshotInfo.getTableKey(), ex);
+        LOG.error("Failed to delete snapshot directory {} and/or local data file {} for snapshot {}",
+            snapshotDirPath, snapshotLocalDataPath, snapshotInfo.getTableKey(), ex);
       } finally {
         omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
       }

@@ -56,6 +56,7 @@ public class CheckNative extends AbstractSubcommand implements Callable<Void>, D
     ));
 
     // Ozone
+    ManagedRocksObjectUtils.loadRocksDBLibrary();
     NativeLibraryLoader.getInstance().loadLibrary(
         ROCKS_TOOLS_NATIVE_LIBRARY_NAME,
         Collections.singletonList(ManagedRocksObjectUtils.getRocksDBLibFileName()));

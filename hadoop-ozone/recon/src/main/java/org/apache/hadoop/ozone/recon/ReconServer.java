@@ -146,19 +146,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
 
-      LOG.info("Finalizing Layout Features.");
-      // Handle Recon Schema Versioning
-      ReconSchemaVersionTableManager versionTableManager =
-          injector.getInstance(ReconSchemaVersionTableManager.class);
-      DataSource dataSource = injector.getInstance(DataSource.class);
-
-      ReconLayoutVersionManager layoutVersionManager =
-          new ReconLayoutVersionManager(versionTableManager, reconContext, dataSource);
-      // Run the upgrade framework to finalize layout features if needed
-      layoutVersionManager.finalizeLayoutFeatures();
-
-      LOG.info("Recon schema versioning completed.");
-
       this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
       this.reconSafeModeMgr.setInSafeMode(true);
       httpServer = injector.getInstance(ReconHttpServer.class);
@@ -177,6 +164,20 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       // Start all services
       start();
       isStarted = true;
+
+      LOG.info("Finalizing Layout Features.");
+      // Handle Recon Schema Versioning
+      ReconSchemaVersionTableManager versionTableManager =
+          injector.getInstance(ReconSchemaVersionTableManager.class);
+      DataSource dataSource = injector.getInstance(DataSource.class);
+
+      ReconLayoutVersionManager layoutVersionManager =
+          new ReconLayoutVersionManager(versionTableManager, reconContext, dataSource);
+      // Run the upgrade framework to finalize layout features if needed
+      layoutVersionManager.finalizeLayoutFeatures();
+
+      LOG.info("Recon schema versioning completed.");
+
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);

@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 
 /**
  * Interface used to denote a Recon task that needs to act on OM DB events.
@@ -61,6 +64,18 @@ public interface ReconOmTask {
    *         - A boolean indicating whether the task was successful.
    */
   TaskResult reprocess(OMMetadataManager omMetadataManager);
+
+  /**
+   * Returns a staged task that can be used to reprocess events.
+   * @param stagedOmMetadataManager  om metadata manager for staged OM DB
+   * @param stagedReconDbStore recon DB store for staged
+   * @return task that can be used to reprocess events
+   * @throws IOException exception
+   */
+  default ReconOmTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    return this;
+  }
 
   /**
    * Represents the result of a task execution, including the task name,

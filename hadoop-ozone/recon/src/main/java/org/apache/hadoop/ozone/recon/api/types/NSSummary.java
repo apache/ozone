@@ -26,9 +26,15 @@ import org.apache.hadoop.ozone.recon.ReconConstants;
 
 /**
  * Class to encapsulate namespace metadata summaries from OM.
+ * 
+ * IMPORTANT: As of the materialized optimization, sizeOfFiles and numOfFiles 
+ * now represent TOTAL values (including this directory and ALL subdirectories)
+ * rather than just direct files in this directory, for O(1) disk usage queries.
  */
 
 public class NSSummary {
+  // IMPORTANT: These fields now contain TOTAL values (this directory + all subdirectories)
+  // for performance optimization, not just direct files in this directory
   private int numOfFiles;
   private long sizeOfFiles;
   private int[] fileSizeBucket;
@@ -55,10 +61,16 @@ public class NSSummary {
     this.parentId = parentId;
   }
 
+  /**
+   * @return Total number of files in this directory and ALL subdirectories
+   */
   public int getNumOfFiles() {
     return numOfFiles;
   }
 
+  /**
+   * @return Total size of files in this directory and ALL subdirectories
+   */
   public long getSizeOfFiles() {
     return sizeOfFiles;
   }
@@ -75,10 +87,16 @@ public class NSSummary {
     return dirName;
   }
 
+  /**
+   * @param numOfFiles Total number of files in this directory and ALL subdirectories
+   */
   public void setNumOfFiles(int numOfFiles) {
     this.numOfFiles = numOfFiles;
   }
 
+  /**
+   * @param sizeOfFiles Total size of files in this directory and ALL subdirectories
+   */
   public void setSizeOfFiles(long sizeOfFiles) {
     this.sizeOfFiles = sizeOfFiles;
   }

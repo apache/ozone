@@ -291,10 +291,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     Path checkpointLocation = realCheckpoint.get().getCheckpointLocation();
     populateInodesOfFilesInDirectory(dbStore, checkpointLocation,
         inodesFromOmDataDir, hardLinkMapFromOmData);
+    int numSnapshots = 0;
     if (includeSnapshot) {
       for (String snapshotPath : snapshotPaths) {
         populateInodesOfFilesInDirectory(dbStore, Paths.get(snapshotPath),
             inodesFromOmDataDir, hardLinkMapFromOmData);
+        numSnapshots++;
       }
     }
     populateInodesOfFilesInDirectory(dbStore, Paths.get(dbStore.getRocksDBCheckpointDiffer().getSSTBackupDir()),
@@ -317,8 +319,30 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertFalse(inodesFromTarball.isEmpty());
     assertTrue(inodesFromTarball.containsAll(inodesFromOmDataDir));
 
+    long actualYamlFiles = Files.list(newDbDir.toPath())
+        .filter(f -> f.getFileName().toString()
+            .endsWith(".yaml")).count();
+    assertEquals(numSnapshots, actualYamlFiles,
+        "Number of generated YAML files should match the number of snapshots.");
+
     // create hardlinks now
     OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
+
+    if (includeSnapshot) {
+      List<String> yamlRelativePaths = snapshotPaths.stream().map(path -> {
+        int startIndex = path.indexOf("db.snapshots");
+        if (startIndex != -1) {
+          return path.substring(startIndex) + ".yaml";
+        }
+        return path + ".yaml";
+      }).collect(Collectors.toList());
+
+      for (String yamlRelativePath : yamlRelativePaths) {
+        String yamlFileName = Paths.get(newDbDir.getPath(), yamlRelativePath).toString();
+        assertTrue(Files.exists(Paths.get(yamlFileName)));
+      }
+    }
+
     assertFalse(hardlinkFilePath.toFile().exists());
   }
 
