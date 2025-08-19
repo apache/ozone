@@ -67,10 +67,10 @@ public abstract class OmSnapshotLocalData {
   public OmSnapshotLocalData(Map<String, Set<String>> notDefraggedSSTFileList) {
     this.isSSTFiltered = false;
     this.notDefraggedSSTFileList = notDefraggedSSTFileList != null ? notDefraggedSSTFileList : new HashMap<>();
-    this.lastDefragTime = 0L;
-    this.needsDefragmentation = false;
+    this.lastDefragTime = -1L;
+    this.needsDefragmentation = true;
     this.defraggedSSTFileList = new HashMap<>();
-    this.version = 0;
+    this.version = 1;
     setChecksumTo0ByteArray();
   }
 
