@@ -84,7 +84,7 @@ public final class JsonUtils {
   /**
    * Returns a {@link SequenceWriter} that will write to and close the provided output stream when it is closed.
    * If the sequence is being written to stdout and more stdout output is needed later, use
-   * {@link this#getStdoutSequenceWriter()} instead.
+   * {@link #getStdoutSequenceWriter} instead.
    */
   public static SequenceWriter getSequenceWriter(OutputStream stream) throws IOException {
     return WRITER.writeValuesAsArray(stream);
