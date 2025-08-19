@@ -216,6 +216,9 @@ public final class DBStoreBuilder {
       ManagedWriteOptions writeOptions = new ManagedWriteOptions();
       writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
+      // Disable WAL to reduce disk write, for testing only
+      writeOptions.setDisableWAL(true);
+
       File dbFile = getDBFile();
       if (!dbFile.getParentFile().exists()) {
         throw new RocksDatabaseException("The DB destination directory should exist.");
