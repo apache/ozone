@@ -105,7 +105,6 @@ public class MutableVolumeSet implements VolumeSet {
       this.volumeChecker.registerVolumeSet(this);
     }
     this.volumeType = volumeType;
-    this.volumeHealthMetrics = VolumeHealthMetrics.create(volumeType);
 
     SpaceUsageCheckFactory usageCheckFactory =
         SpaceUsageCheckFactory.create(conf);
@@ -125,6 +124,8 @@ public class MutableVolumeSet implements VolumeSet {
       maxVolumeFailuresTolerated = dnConf.getFailedDataVolumesTolerated();
     }
 
+    // Ensure metrics are unregistered if the volume set initialization fails.
+    this.volumeHealthMetrics = VolumeHealthMetrics.create(volumeType);
     try {
       initializeVolumeSet();
     } catch (Exception e) {
