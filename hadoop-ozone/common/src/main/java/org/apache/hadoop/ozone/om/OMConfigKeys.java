@@ -568,13 +568,12 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE
       = "ozone.om.snapshot.diff.max.page.size";
+  public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT = 1000;
 
   public static final String OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES
       = "ozone.om.snapshot.db.max.open.files";
   public static final int OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
       = 100;
-  public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
-      = 1000;
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE
       = "ozone.om.snapshot.diff.thread.pool.size";
