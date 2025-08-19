@@ -18,8 +18,6 @@
 x-common-config:
   &common-config
   image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
-  volumes:
-    - ../..:/opt/hadoop
   env_file:
     - docker-config
 
@@ -36,6 +34,9 @@ services:
     environment:
       <<: *replication
       OZONE_OPTS:
+    volumes:
+      - ../..:/opt/hadoop
+      - ../../../data-dn:/data
     command: ["ozone","datanode"]
   om:
     <<: *common-config
@@ -43,6 +44,11 @@ services:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       OZONE_OPTS:
       <<: *replication
+    volumes:
+      - ../..:/opt/hadoop       # inherited from common-config
+      - ../../../data-om:/data     # om-specific data volume
+      # Add your extra volumes here, for example:
+      # - /host/path:/container/path
     ports:
       - 9874:9874
       - 9862:9862
@@ -57,6 +63,9 @@ services:
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       OZONE_OPTS:
       <<: *replication
+    volumes:
+      - ../..:/opt/hadoop
+      - ../../../data-scm:/data
     command: ["ozone","scm"]
   httpfs:
     <<: *common-config
@@ -65,7 +74,11 @@ services:
       <<: *replication
     ports:
       - 14000:14000
+    volumes:
+      - ../..:/opt/hadoop
     command: [ "ozone","httpfs" ]
+    profiles:
+      - with-httpfs
   s3g:
     <<: *common-config
     environment:
@@ -74,7 +87,11 @@ services:
     ports:
       - 9878:9878
       - 19878:19878
+    volumes:
+      - ../..:/opt/hadoop
     command: ["ozone","s3g"]
+    profiles:
+      - with-s3g
   recon:
     <<: *common-config
     hostname: recon
@@ -83,4 +100,10 @@ services:
     environment:
       OZONE_OPTS:
       <<: *replication
+    volumes:
+      - ../..:/opt/hadoop
     command: ["ozone","recon"]
+    profiles:
+      # Do not start Recon by default to avoid OM DB being checkpointed every minute
+      # This service is only started when the profile is enabled
+      - with-recon
