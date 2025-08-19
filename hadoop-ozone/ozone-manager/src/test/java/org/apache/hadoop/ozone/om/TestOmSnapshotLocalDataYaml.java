@@ -131,6 +131,44 @@ public class TestOmSnapshotLocalDataYaml {
     assertTrue(compactedFiles.get(2).get("table1").contains("compacted-sst3"));
   }
 
+  private void setValuesToYaml(File yamlFile) throws IOException {
+    // Read from YAML file
+    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
+
+    // Update version
+    snapshotData.setVersion(1);
+    // Update SST filtered flag
+//    snapshotData.setSstFiltered(false);
+    // Update last defrag time
+    snapshotData.setLastDefragTime(-1L);
+    // Update needs defragmentation flag
+    snapshotData.setNeedsDefragmentation(true);
+
+    // Write updated data back to file
+    snapshotData.writeToYaml(yamlFile);
+
+    // Read back the updated data
+    snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
+
+    // Verify updated data
+    assertEquals(1, snapshotData.getVersion());
+    assertEquals(-1, snapshotData.getLastDefragTime());
+    assertTrue(snapshotData.getNeedsDefragmentation());
+  }
+
+  @Test
+  public void testUpdateYaml() throws IOException {
+    setValuesToYaml(new File("../../hadoop-ozone/dist/target/" +
+        "data-om/metadata/db.snapshots/checkpointState/" +
+        "om.db-d39279ce-cab6-44e0-839a-2baecb8c283a.yaml"));
+    setValuesToYaml(new File("../../hadoop-ozone/dist/target/" +
+        "data-om/metadata/db.snapshots/checkpointState/" +
+        "om.db-77b75627-5534-4db4-88e5-1661aceae92f.yaml"));
+    setValuesToYaml(new File("../../hadoop-ozone/dist/target/" +
+        "data-om/metadata/db.snapshots/checkpointState/" +
+        "om.db-6639d124-6615-4ced-9af6-3dabd680727b.yaml"));
+  }
+
   @Test
   public void testUpdateSnapshotDataFile() throws IOException {
     File yamlFile = writeToYaml("snapshot2");
