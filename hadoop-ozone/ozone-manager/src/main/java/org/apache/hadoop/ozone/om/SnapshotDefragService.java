@@ -518,8 +518,8 @@ public class SnapshotDefragService extends BackgroundService
     } catch (Exception e) {
       LOG.error("Unexpected error during incremental defragmentation of snapshot: {}",
           currentSnapshot.getName(), e);
-      LOG.warn("Falling back to full defragmentation due to error");
-      performFullDefragmentation(currentSnapshot, currentOmSnapshot);
+//      LOG.warn("Falling back to full defragmentation due to error");
+//      performFullDefragmentation(currentSnapshot, currentOmSnapshot);
     }
   }
 
