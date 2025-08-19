@@ -399,6 +399,9 @@ public final class DBStoreBuilder {
     // RocksDB log settings.
     dbOptions.setMaxLogFileSize(rocksDBConfiguration.getMaxLogFileSize());
     dbOptions.setKeepLogFileNum(rocksDBConfiguration.getKeepLogFileNum());
+    // Disable WAL archival (for more accurate RocksDB size measurements when there aren't too many keys)
+    rocksDBConfiguration.setWalTTL(0);
+    rocksDBConfiguration.setWalSizeLimit(0);
 
     // Apply WAL settings.
     dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
