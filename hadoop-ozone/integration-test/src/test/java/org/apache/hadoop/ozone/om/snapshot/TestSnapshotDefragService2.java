@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
 import static org.apache.ozone.test.LambdaTestUtils.await;
@@ -38,11 +39,13 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -70,7 +73,7 @@ import org.slf4j.event.Level;
  * Test SnapshotDefragService functionality using MiniOzoneCluster.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestSnapshotDefragService2 {
+public class TestSnapshotDefragService2 {  // TODO: Rename this to TestSnapshotDefragService
 
   private static final Logger LOG = LoggerFactory.getLogger(TestSnapshotDefragService2.class);
 
@@ -92,8 +95,9 @@ public class TestSnapshotDefragService2 {
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, BucketLayout.OBJECT_STORE.name());
     conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY,
         OMLayoutFeature.SNAPSHOT_DEFRAGMENTATION.layoutVersion());
+    conf.setInt(OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE, 1000);
 
-    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, -1);
+    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, 1000000);
 //    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT, 300);
     conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 5);
 
@@ -109,9 +113,9 @@ public class TestSnapshotDefragService2 {
 
     // Create SnapshotDefragService for manual triggering
     defragService = new SnapshotDefragService(
-        10000, // interval
+        1000000, // interval
         TimeUnit.MILLISECONDS,
-        30000, // service timeout
+        3000000, // service timeout
         ozoneManager,
         conf
     );
@@ -139,12 +143,17 @@ public class TestSnapshotDefragService2 {
 
     for (int i = 0; i < keyCount; i++) {
       String keyName = "key-" + i;
-      String data = RandomStringUtils.randomAlphabetic(100);
+      // Prepend zeros to work around SstFileWriter limitation:
+      // Caused by: org.rocksdb.RocksDBException: Keys must be added in strict ascending order.
+      //     at org.rocksdb.SstFileWriter.put(Native Method)
+//      String keyName = "key-" + String.format("%09d", i);
 
-      try (OzoneOutputStream outputStream = bucket.createKey(keyName, data.length(),
-          StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+      String data = RandomStringUtils.randomAlphabetic(10);
+
+      try (OzoneOutputStream outputStream = bucket.createKey(keyName, 0,
+          StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),  // TODO: Use RATIS ONE instead
           java.util.Collections.emptyMap(), java.util.Collections.emptyMap())) {
-        outputStream.write(data.getBytes());
+//        outputStream.write(data.getBytes());
       }
     }
     LOG.info("Created {} keys in bucket {}/{}", keyCount, volumeName, bucketName);
@@ -320,7 +329,7 @@ public class TestSnapshotDefragService2 {
    * Trigger the SnapshotDefragService by starting it and waiting for it to process snapshots.
    */
   private void triggerSnapshotDefragService() throws Exception {
-    LOG.info("Triggering SnapshotDefragService...");
+    LOG.info("Triggering SnapshotDefragService ...");
 
     // Mark all snapshots as needing defragmentation first
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
@@ -338,7 +347,8 @@ public class TestSnapshotDefragService2 {
     LOG.info("Initial defragmented count: {}", initialDefragCount);
 
     // Start the service
-    defragService.start();
+    defragService.resume();  // HACK
+    defragService.triggerSnapshotDefragOnce();
 
     // Wait for the service to process snapshots
     try {
@@ -364,7 +374,11 @@ public class TestSnapshotDefragService2 {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     // TODO: Test FSO bucket as well, default is LEGACY / OBJECT_STORE
-    volume.createBucket(bucketName);
+    BucketArgs.Builder bb = new BucketArgs.Builder()
+        .setStorageType(StorageType.SSD)
+        .setVersioning(false)
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    volume.createBucket(bucketName, bb.build());
 
     LOG.info("Starting snapshot defragmentation test...");
 
@@ -372,19 +386,19 @@ public class TestSnapshotDefragService2 {
     printSnapshotDirectoryListing("Initial state - no snapshots");
 
     // Step 1: Create 2 keys, then create snap-1
-    createKeys(volumeName, bucketName, 2);
+    createKeys(volumeName, bucketName, 11);
     createSnapshot(volumeName, bucketName, "snap-1");
-    printSnapshotDirectoryListing("After creating snap-1 (2 keys)");
+    printSnapshotDirectoryListing("After creating snap-1");
 
     // Step 2: Create 2 more keys, then create snap-2
-    createKeys(volumeName, bucketName, 2);  // TODO: This actually overwrites the previous keys
+    createKeys(volumeName, bucketName, 11);  // TODO: This actually overwrites the previous keys
     createSnapshot(volumeName, bucketName, "snap-2");
-    printSnapshotDirectoryListing("After creating snap-2 (4 keys total)");
+    printSnapshotDirectoryListing("After creating snap-2");
 
     // Step 3: Create 2 more keys, then create snap-3
-    createKeys(volumeName, bucketName, 2);  // TODO: This actually overwrites the previous keys
+    createKeys(volumeName, bucketName, 11);  // TODO: This actually overwrites the previous keys
     createSnapshot(volumeName, bucketName, "snap-3");
-    printSnapshotDirectoryListing("After creating snap-3 (6 keys total)");
+    printSnapshotDirectoryListing("After creating snap-3");
 
     // Step 4: Trigger SnapshotDefragService
     triggerSnapshotDefragService();
