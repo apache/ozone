@@ -71,11 +71,6 @@ Execute replicas verify with replication filter
     ${output}      Execute          ozone debug replicas verify --${verification_type} --type ${replication_type} --replication ${replication_factor} o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} --all-results
     [Return]       ${output}
 
-Execute replicas verify with replication type only
-    [Arguments]    ${replication_type}    ${verification_type}
-    ${output}      Execute          ozone debug replicas verify --${verification_type} --type ${replication_type} o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} --all-results
-    [Return]       ${output}
-
 Create test key with replication config
     [Arguments]    ${key_name}    ${replication_type}    ${replication_factor}
     Execute             ozone sh key put --type ${replication_type} --replication ${replication_factor} o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${key_name} ${TEMP_DIR}/${TESTFILE}

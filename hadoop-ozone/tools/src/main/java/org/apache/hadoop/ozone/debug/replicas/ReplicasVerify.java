@@ -243,7 +243,7 @@ public class ReplicasVerify extends Handler {
     ReplicationConfig keyReplicationConfig = keyInfo.getReplicationConfig();
     ReplicationConfig filter = filterConfig.get();
 
-    // Process key only if both replication type and factor/config match
+    // Process key only if both replication type and factor match
     return keyReplicationConfig.getReplicationType().equals(filter.getReplicationType())
         && keyReplicationConfig.getReplication().equals(filter.getReplication());
   }
