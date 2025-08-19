@@ -660,11 +660,11 @@ public abstract class ContainerData {
       writeBytes += length;
     }
 
-    public synchronized void updateDeletion(long deletedBytes, long deletedBlockCount, long processedBlockCount) {
+    public synchronized void updateDeletion(long deletedBytes, long processedBytes, long deletedBlockCount, long processedBlockCount) {
       blockBytes -= deletedBytes;
       blockCount -= deletedBlockCount;
       blockPendingDeletion -= processedBlockCount;
-      blockPendingDeletionBytes -= deletedBytes;
+      blockPendingDeletionBytes -= processedBytes;
     }
 
     public synchronized void updateBlocks(long bytes, long count) {

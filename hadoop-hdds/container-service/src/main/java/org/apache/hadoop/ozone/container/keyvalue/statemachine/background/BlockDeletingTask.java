@@ -252,7 +252,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
         // update count of pending deletion blocks, block count and used
         // bytes in in-memory container status.
-        containerData.getStatistics().updateDeletion(releasedBytes, deletedBlocksCount, deletedBlocksCount);
+        containerData.getStatistics().updateDeletion(releasedBytes, releasedBytes, deletedBlocksCount, deletedBlocksCount);
         containerData.getVolume().decrementUsedSpace(releasedBytes);
         metrics.incrSuccessCount(deletedBlocksCount);
         metrics.incrSuccessBytes(releasedBytes);
@@ -355,6 +355,7 @@ public class BlockDeletingTask implements BackgroundTask {
       int deletedBlocksProcessed = deleteBlocksResult.getBlocksProcessed();
       int deletedBlocksCount = deleteBlocksResult.getBlocksDeleted();
       long releasedBytes = deleteBlocksResult.getBytesReleased();
+      long processedBytes = deleteBlocksResult.getBytesProcessed();
       List<DeletedBlocksTransaction> deletedBlocksTxs =
           deleteBlocksResult.deletedBlocksTxs();
       deleteBlocksResult.deletedBlocksTxs().forEach(
@@ -396,7 +397,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
         // update count of pending deletion blocks, block count and used
         // bytes in in-memory container status and used space in volume.
-        containerData.getStatistics().updateDeletion(releasedBytes, deletedBlocksCount, deletedBlocksProcessed);
+        containerData.getStatistics().updateDeletion(releasedBytes, processedBytes, deletedBlocksCount, deletedBlocksProcessed);
         containerData.getVolume().decrementUsedSpace(releasedBytes);
         metrics.incrSuccessCount(deletedBlocksCount);
         metrics.incrSuccessBytes(releasedBytes);
@@ -427,6 +428,7 @@ public class BlockDeletingTask implements BackgroundTask {
     int blocksProcessed = 0;
     int blocksDeleted = 0;
     long bytesReleased = 0;
+    long bytesProcessed = 0;
     List<DeletedBlocksTransaction> deletedBlocksTxs = new ArrayList<>();
     Instant startTime = Instant.now();
 
@@ -446,6 +448,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
         String blk = containerData.getBlockKey(blkLong);
         BlockData blkInfo = blockDataTable.get(blk);
+        bytesProcessed += KeyValueContainerUtil.getBlockLengthTryCatch(blkInfo);
         LOG.debug("Deleting block {}", blkLong);
         if (blkInfo == null) {
           try {
@@ -493,7 +496,7 @@ public class BlockDeletingTask implements BackgroundTask {
       }
     }
     return new DeleteTransactionStats(blocksProcessed,
-        blocksDeleted, bytesReleased, deletedBlocksTxs);
+        blocksDeleted, bytesReleased, bytesProcessed, deletedBlocksTxs);
   }
 
   @Override
@@ -518,13 +521,15 @@ public class BlockDeletingTask implements BackgroundTask {
     private final int blocksProcessed;
     private final int blocksDeleted;
     private final long bytesReleased;
+    private final long bytesProcessed;
     private final List<DeletedBlocksTransaction> delBlockTxs;
 
-    DeleteTransactionStats(int proceeded, int deleted, long released,
+    DeleteTransactionStats(int proceeded, int deleted, long releasedBytes, long processedBytes,
         List<DeletedBlocksTransaction> delBlocks) {
       blocksProcessed = proceeded;
       blocksDeleted = deleted;
-      bytesReleased = released;
+      bytesReleased = releasedBytes;
+      bytesProcessed = processedBytes;
       delBlockTxs = delBlocks;
     }
 
@@ -538,6 +543,10 @@ public class BlockDeletingTask implements BackgroundTask {
 
     public long getBytesReleased() {
       return bytesReleased;
+    }
+
+    public long getBytesProcessed() {
+      return bytesProcessed;
     }
 
     public List<DeletedBlocksTransaction> deletedBlocksTxs() {
