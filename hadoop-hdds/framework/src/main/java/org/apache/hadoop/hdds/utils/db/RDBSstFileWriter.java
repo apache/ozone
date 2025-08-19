@@ -60,6 +60,17 @@ public class RDBSstFileWriter implements Closeable {
     }
   }
 
+  public void delete(byte[] key) throws RocksDatabaseException {
+    try {
+      sstFileWriter.delete(key);
+      keyCounter.incrementAndGet();
+    } catch (RocksDBException e) {
+      closeOnFailure();
+      throw new RocksDatabaseException("Failed to delete key (length=" + key.length
+          + "), sstFile=" + sstFile.getAbsolutePath(), e);
+    }
+  }
+
   @Override
   public void close() throws RocksDatabaseException {
     if (sstFileWriter != null) {
