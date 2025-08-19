@@ -1,4 +1,28 @@
-# HDDS-13515: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
+---
+title: "HDDS-13515: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery"
+date: "2025-07-30"
+weight: 8
+menu: 
+  main:
+     parent: Architecture
+summary: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
+---
+<!---
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
 
 ## Document Information
 - **JIRA**: HDDS-13515
@@ -7,8 +31,6 @@
 - **Author**: [Devesh Singh]
 - **Date**: [Current Date]
 - **Status**: Draft
-
----
 
 ## 1. Executive Summary
 
@@ -71,32 +93,17 @@ public TaskResult reprocess(OMMetadataManager omMetadataManager) {
 }
 ```
 
-### 2.3 Current Storage Layer Interfaces
+### 2.3 Current Recon OM Task Interface
 
-#### ReconNamespaceSummaryManager (RocksDB)
+#### ReconOmTask
 ```java
-public interface ReconNamespaceSummaryManager {
+public interface ReconOmTask {
     // Current operations
-    void clearNSSummaryTable() throws IOException;
-    void storeNSSummary(NSSummary nsSummary) throws IOException;
-    NSSummary getNSSummary(long objectId) throws IOException;
-    
-    // Batch operations
-    void batchStoreNSSummaries(List<NSSummary> nsSummaries);
-    void commitBatchOperation(RDBBatchOperation batchOperation);
-}
-```
-
-#### ReconContainerMetadataManager (RocksDB)
-```java
-public interface ReconContainerMetadataManager {
-    // Current operations
-    void reinitWithNewContainerDataFromOm(Map<Long, Long> containerKeyCountMap);
-    void batchStoreContainerKeyMapping(Map<ContainerKeyPrefix, Integer> containerKeyMap);
-    
-    // Query operations
-    Set<ContainerKeyPrefix> getKeyPrefixesForContainer(long containerId, String prevKey, int limit);
-    long getKeyCountForContainer(long containerId);
+    String getTaskName();
+    default void init() { }
+    TaskResult process(OMUpdateEventBatch events,
+                       Map<String, Integer> subTaskSeekPosMap);
+    TaskResult reprocess(OMMetadataManager omMetadataManager);
 }
 ```
 
@@ -143,72 +150,20 @@ flowchart LR
 
 ### 3.2 Core Components
 
-#### 3.2.1 StagingManager Interface
+#### 3.2.1 Updated Recon OM Task Interface
 ```java
-public interface StagingManager {
-    /**
-     * Create staging area for reprocessing operation
-     * @return stagingId unique identifier for this staging operation
-     */
-    String createStagingArea() throws IOException;
-    
-    /**
-     * Get staging-aware storage interfaces for reprocessing
-     * @param stagingId the staging operation identifier
-     * @return map of storage interfaces configured for staging
-     */
-    Map<String, Object> getStagingStorageInterfaces(String stagingId) throws IOException;
-    
-    /**
-     * Atomically switch from production to staging data
-     * @param stagingId the staging operation to promote
-     * @return true if switch was successful
-     */
-    boolean commitStagingArea(String stagingId) throws IOException;
-    
-    /**
-     * Rollback staging operation and clean up staging data
-     * @param stagingId the staging operation to rollback
-     */
-    void rollbackStagingArea(String stagingId) throws IOException;
-    
-    /**
-     * Get current staging state for monitoring
-     */
-    StagingState getStagingState();
-}
-```
-
-#### 3.2.2 Enhanced Storage Interface Contracts
-
-**Enhanced ReconNamespaceSummaryManager**
-```java
-public interface ReconNamespaceSummaryManager {
-    // Existing operations...
-    
-    // Staging-aware operations
-    void clearNSSummaryTable(String stagingId) throws IOException;
-    void storeNSSummary(NSSummary nsSummary, String stagingId) throws IOException;
-    NSSummary getNSSummary(long objectId, String stagingId) throws IOException;
-    
-    // Atomic operations
-    void switchToStaging(String stagingId) throws IOException;
-    void cleanupStaging(String stagingId) throws IOException;
-}
-```
-
-**Enhanced ReconContainerMetadataManager**
-```java
-public interface ReconContainerMetadataManager {
-    // Existing operations...
-    
-    // Staging-aware operations  
-    void reinitWithNewContainerDataFromOm(Map<Long, Long> containerKeyCountMap, String stagingId);
-    void batchStoreContainerKeyMapping(Map<ContainerKeyPrefix, Integer> containerKeyMap, String stagingId);
-    
-    // Atomic operations
-    void switchToStaging(String stagingId) throws IOException;
-    void cleanupStaging(String stagingId) throws IOException;
+public interface ReconOmTask {
+  // Current operations
+  String getTaskName();
+  default void init() { }
+  TaskResult process(OMUpdateEventBatch events,
+                     Map<String, Integer> subTaskSeekPosMap);
+  TaskResult reprocess(OMMetadataManager omMetadataManager);
+  // Returns a staged task that can be used to reprocess events.
+  default ReconOmTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    return this;
+  }
 }
 ```
 
@@ -247,29 +202,9 @@ flowchart TB
     ROLLING_BACK --> FAILED
 ```
 
-### 4.2 Enhanced ReconOmTask Interface
+### 4.2 Orchestrated Staging Reprocess Flow
 
-#### 4.2.1 Staging-Aware Task Interface
-```java
-public interface ReconOmTask {
-    // Existing methods...
-    TaskResult process(OMUpdateEventBatch events, Map<String, Integer> subTaskSeekPosMap);
-    TaskResult reprocess(OMMetadataManager omMetadataManager);
-    
-    // New staging-aware methods
-    TaskResult reprocessToStaging(OMMetadataManager omMetadataManager, String stagingId);
-    boolean validateStagingData(String stagingId);
-    void cleanupStagingData(String stagingId);
-    
-    // Lifecycle hooks
-    void onStagingStart(String stagingId);
-    void onStagingComplete(String stagingId, boolean success);
-}
-```
-
-### 4.3 Orchestrated Staging Reprocess Flow
-
-#### 4.3.1 Enhanced ReconTaskController
+#### 4.2.1 Enhanced ReconTaskController
 ```java
 public class ReconTaskControllerImpl implements ReconTaskController {
     
@@ -282,7 +217,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     public synchronized void reInitializeTasksWithStaging(ReconOMMetadataManager omMetadataManager,
                                                          Map<String, ReconOmTask> reconOmTaskMap) {
         try {
-            // Phase 1: Initialize staging area
+            // Phase 1: Initialize staging DB area
             
             // Phase 2: Execute staging reprocess
             
@@ -427,95 +362,17 @@ T4: Successful completion and switch
 
 ---
 
-## 6. Configuration and Monitoring
+## 6. Monitoring
 
-### 6.1 Configuration Parameters
-
-```properties
-# Staging Configuration
-ozone.recon.staging.enabled=true
-ozone.recon.staging.base.path=/opt/ozone/recon/staging
-ozone.recon.staging.cleanup.retention.hours=24
-ozone.recon.staging.timeout.minutes=120
-
-# Resource Allocation
-ozone.recon.staging.memory.factor=0.5
-ozone.recon.staging.thread.pool.size=4
-ozone.recon.staging.batch.size.multiplier=2.0
-
-# Rollback and Retry
-ozone.recon.staging.auto.retry.enabled=true  
-ozone.recon.staging.max.retry.attempts=3
-ozone.recon.staging.retry.delay.minutes=10
-
-# Monitoring
-ozone.recon.staging.progress.report.interval.seconds=30
-ozone.recon.staging.health.check.interval.seconds=10
-```
-
-### 6.2 Metrics and Monitoring
+### 6.1 Metrics and Monitoring
 
 #### Staging Metrics
+REPROCESS_STAGING will be a new task to track staging operations:
 ```java
-public class StagingMetrics {
-    // Performance metrics
-    private final Timer stagingDuration;
-    private final Timer atomicSwitchDuration;
-    private final Gauge currentStagingState;
-    
-    // Progress metrics
-    private final Gauge stagingProgressPercent;
-    private final Counter stagingOperationsTotal;
-    private final Counter stagingOperationsSuccessful;
-    private final Counter stagingOperationsFailures;
-    
-    // Resource metrics
-    private final Gauge stagingDiskUsage;
-    private final Gauge stagingMemoryUsage;
-    private final Gauge stagingThreadCount;
-    
-    // Task-specific metrics
-    private final Map<String, Gauge> taskStagingProgress;
-    private final Map<String, Timer> taskStagingDuration;
-}
+ReconTaskStatusUpdater reprocessTaskStatus = taskStatusUpdaterManager.getTaskStatusUpdater(REPROCESS_STAGING);
 ```
 
-#### Health Checks
-```java
-public class StagingHealthIndicator implements HealthIndicator {
-    @Override
-    public Health health() {
-        StagingState state = stagingManager.getStagingState();
-        
-        switch (state) {
-            case NONE:
-            case COMMITTED:
-                return Health.up()
-                    .withDetail("staging", "idle")
-                    .build();
-                    
-            case PROCESSING:
-                return Health.up()
-                    .withDetail("staging", "in-progress")
-                    .withDetail("progress", getProgressPercent())
-                    .build();
-                    
-            case FAILED:
-                return Health.down()
-                    .withDetail("staging", "failed")
-                    .withDetail("error", getLastError())
-                    .build();
-                    
-            default:
-                return Health.unknown()
-                    .withDetail("staging", state.toString())
-                    .build();
-        }
-    }
-}
-```
-
-### 6.3 Administrative APIs
+### 6.2 Administrative APIs
 
 #### Staging Control APIs
 ```java
@@ -560,82 +417,9 @@ public class StagingAdminController {
 
 ---
 
-## 7. Risk Analysis and Mitigation
+## 7. Testing Strategy
 
-### 7.1 Technical Risks
-
-#### Risk 1: Resource Exhaustion During Staging
-**Description**: Large datasets may cause memory/disk exhaustion
-**Probability**: Medium
-**Impact**: High
-**Mitigation**:
-- Implement resource monitoring and circuit breakers
-- Configurable batch sizes and memory limits
-- Graceful degradation with partial processing
-
-#### Risk 2: Atomic Switch Failure
-**Description**: Filesystem/database issues during switch operation
-**Probability**: Low  
-**Impact**: High
-**Mitigation**:
-- Comprehensive pre-switch validation
-- Atomic operation with rollback capability
-- Multiple backup strategies (filesystem + database backups)
-
-#### Risk 3: Staging Data Corruption
-**Description**: Staged data becomes corrupted during processing
-**Probability**: Low
-**Impact**: Medium
-**Mitigation**:
-- Staging data validation before commit
-- Checksums and integrity verification
-- Ability to restart staging from clean state
-
-#### Risk 4: Performance Impact on Production APIs
-**Description**: Staging operations affect production API performance
-**Probability**: Medium
-**Impact**: Medium
-**Mitigation**:
-- Separate resource pools for staging and production
-- Configurable resource allocation limits
-- Performance monitoring and alerting
-
-### 7.2 Operational Risks
-
-#### Risk 5: Configuration Complexity
-**Description**: Complex configuration leads to operational errors
-**Probability**: Medium
-**Impact**: Medium
-**Mitigation**:
-- Comprehensive documentation and examples
-- Validation of configuration parameters
-- Default values for safe operation
-
-#### Risk 6: Debugging Complexity
-**Description**: Staging operations make troubleshooting more complex
-**Probability**: Medium
-**Impact**: Medium
-**Mitigation**:
-- Detailed logging at each stage
-- Clear state transitions and error messages
-- Administrative APIs for visibility
-
-### 7.3 Compatibility Risks
-
-#### Risk 7: Storage Format Evolution
-**Description**: Changes to storage formats break staging compatibility
-**Probability**: Low
-**Impact**: High
-**Mitigation**:
-- Version compatibility checks in staging manager
-- Migration strategies for format changes
-- Backward compatibility requirements
-
----
-
-## 8. Testing Strategy
-
-### 8.1 Unit Testing
+### 7.1 Unit Testing
 
 #### Component Tests
 - **StagingManager**: Mock storage interfaces, test state transitions
@@ -650,7 +434,7 @@ public void testStagingReprocessSuccess() {
 }
 ```
 
-### 8.2 Integration Testing
+### 7.2 Integration Testing
 
 #### End-to-End Staging Tests
 ```java
@@ -667,7 +451,7 @@ public class StagingIntegrationTest {
 }
 ```
 
-### 8.3 Performance Testing
+### 7.3 Performance Testing
 
 #### Load Testing Scenarios
 1. **Large Dataset Processing**: 100M+ keys with staging
@@ -687,89 +471,7 @@ public class StagingPerformanceTest {
 ```
 
 ---
-
-## 9. Migration and Rollout Strategy
-
-### 9.1 Feature Flag Implementation
-
-#### Gradual Rollout Configuration
-```properties
-# Phase 1: Development and Testing
-ozone.recon.staging.enabled=false
-ozone.recon.staging.development.mode=true
-
-# Phase 2: Beta Testing
-ozone.recon.staging.enabled=true
-ozone.recon.staging.beta.mode=true
-ozone.recon.staging.fallback.enabled=true
-
-# Phase 3: Production Rollout
-ozone.recon.staging.enabled=true
-ozone.recon.staging.production.mode=true
-ozone.recon.staging.monitoring.enhanced=true
-```
-
-### 9.2 Rollout Phases
-
-#### Phase 1: Development and Unit Testing (Week 1-4)
-- Implement core staging interfaces and manager
-- Develop enhanced storage layer interfaces  
-- Create unit tests for all components
-- Internal testing with synthetic data
-
-#### Phase 2: Integration Testing (Week 5-8)
-- Integration with existing Recon components
-- End-to-end testing with real OM snapshots
-- Performance benchmarking and optimization
-- Chaos engineering tests
-
-#### Phase 3: Beta Testing (Week 9-12)
-- Deploy to staging environments
-- A/B testing with feature flags
-- Monitor performance and stability
-- Documentation and operational runbooks
-
-#### Phase 4: Production Rollout (Week 13-16)
-- Gradual rollout to production clusters
-- Monitor key metrics and user experience
-- Feedback collection and issue resolution
-- Full production deployment
-
-### 9.3 Success Criteria
-
-#### Technical Metrics
-- **API Availability**: >99.5% during staging operations
-- **Performance Overhead**: <25% increase in reprocess time
-- **Resource Utilization**: <50% increase in peak memory usage
-- **Failure Recovery**: <1 minute average rollback time
-
-#### User Experience Metrics
-- **Zero Blank UI Periods**: No more empty dashboard scenarios
-- **Data Freshness**: <5 minutes delay from snapshot to fresh data
-- **Error Rate**: <0.1% staging operation failure rate
-
----
-
-## 10. Future Enhancements
-
-### 10.1 Advanced Staging Features
-
-#### Incremental Staging
-```java
-public interface IncrementalStagingManager extends StagingManager {
-    /**
-     * Create staging area with incremental updates from last known state
-     */
-    String createIncrementalStagingArea(long fromSequenceNumber) throws IOException;
-    
-    /**
-     * Apply delta updates to existing staging area
-     */
-    void applyDeltaToStaging(String stagingId, OMUpdateEventBatch events) throws IOException;
-}
-```
-
-## 11. Conclusion
+## 8. Conclusion
 
 The Staged Reprocessing Architecture for HDDS-13515 provides a robust solution to eliminate the data availability gap during Recon's full snapshot recovery operations. By leveraging the proven staging pattern from TarExtractor and extending it to all ReconOmTask data tables, we can maintain continuous API availability while ensuring data consistency and system reliability.
 
