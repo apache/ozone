@@ -88,7 +88,7 @@ public class SnapshotDefragService extends BackgroundService
   // Use only a single thread for snapshot defragmentation to avoid conflicts
   private static final int DEFRAG_CORE_POOL_SIZE = 1;
 
-  private static final String CHECKPOINT_STATE_DEFRAGED_DIR = OM_SNAPSHOT_CHECKPOINT_DEFRAGED_DIR;
+  private static final String CHECKPOINT_STATE_DEFRAGGED_DIR = OM_SNAPSHOT_CHECKPOINT_DEFRAGED_DIR;
 
   private final OzoneManager ozoneManager;
   private final AtomicLong runCount = new AtomicLong(0);
@@ -259,7 +259,7 @@ public class SnapshotDefragService extends BackgroundService
     // For defraggedDbPath, we need to go up to the parent directory and use checkpointStateDefragged
     String parentDir = Paths.get(snapshotPath).getParent().getParent().toString();
     String checkpointDirName = Paths.get(snapshotPath).getFileName().toString();
-    String defraggedDbPath = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGED_DIR, checkpointDirName).toString();
+    String defraggedDbPath = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, checkpointDirName).toString();
 
     LOG.info("Starting full defragmentation for snapshot: {} at path: {}",
         snapshotInfo.getName(), snapshotPath);
@@ -398,12 +398,12 @@ public class SnapshotDefragService extends BackgroundService
     // Fix path construction similar to performFullDefragmentation
     String previousParentDir = Paths.get(previousSnapshotPath).getParent().getParent().toString();
     String previousCheckpointDirName = Paths.get(previousSnapshotPath).getFileName().toString();
-    String previousDefraggedDbPath = Paths.get(previousParentDir, CHECKPOINT_STATE_DEFRAGED_DIR,
+    String previousDefraggedDbPath = Paths.get(previousParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
         previousCheckpointDirName).toString();
 
     String currentParentDir = Paths.get(currentSnapshotPath).getParent().getParent().toString();
     String currentCheckpointDirName = Paths.get(currentSnapshotPath).getFileName().toString();
-    String currentDefraggedDbPath = Paths.get(currentParentDir, CHECKPOINT_STATE_DEFRAGED_DIR,
+    String currentDefraggedDbPath = Paths.get(currentParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
         currentCheckpointDirName).toString();
 
     LOG.info("Starting incremental defragmentation for snapshot: {} using previous: {}",

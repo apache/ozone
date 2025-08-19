@@ -180,7 +180,7 @@ public class TestOmSnapshotLocalDataYaml {
     // Update snapshot data
     dataYaml.setSstFiltered(false);
     dataYaml.setNeedsDefragmentation(false);
-    dataYaml.addUncompactedSSTFileList("table3", Collections.singleton("sst4"));
+    dataYaml.addNotDefraggedSSTFileList("table3", Collections.singleton("sst4"));
     dataYaml.addDefraggedSSTFileList(3, "table3", Collections.singleton("compacted-sst4"));
 
     // Write updated data back to file
@@ -192,12 +192,12 @@ public class TestOmSnapshotLocalDataYaml {
     // Verify updated data
     assertThat(dataYaml.getSstFiltered()).isFalse();
     assertThat(dataYaml.getNeedsDefragmentation()).isFalse();
-
+    // TODO: Fix variable names
     Map<String, Set<String>> uncompactedFiles = dataYaml.getNotDefraggedSSTFileList();
     assertEquals(3, uncompactedFiles.size());
     assertTrue(uncompactedFiles.containsKey("table3"));
     assertTrue(uncompactedFiles.get("table3").contains("sst4"));
-
+    // TODO: Fix variable names
     Map<Integer, Map<String, Set<String>>> compactedFiles = dataYaml.getDefraggedSSTFileList();
     assertEquals(3, compactedFiles.size());
     assertTrue(compactedFiles.containsKey(3));
