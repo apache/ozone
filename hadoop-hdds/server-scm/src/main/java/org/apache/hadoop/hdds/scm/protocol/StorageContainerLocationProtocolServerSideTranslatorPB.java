@@ -1384,10 +1384,10 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       break;
     case status:
       infoProtoList = impl.getDiskBalancerStatus(
-          Optional.of(request.getHostsList()),
+          request.getHostsList().isEmpty() ? null : request.getHostsList(),
           // If an optional proto enum field is not set, it will return the first
           // enum value. So, we need to check if the field is set.
-          request.hasStatus() ? Optional.of(request.getStatus()) : Optional.empty(),
+          request.hasStatus() ? request.getStatus() : null,
           clientVersion);
       break;
     default:
@@ -1416,24 +1416,24 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     switch (request.getOpType()) {
     case START:
       errors = impl.startDiskBalancer(
-          conf.hasThreshold() ? Optional.of(conf.getThreshold()) : Optional.empty(),
-          conf.hasDiskBandwidthInMB() ? Optional.of(conf.getDiskBandwidthInMB()) : Optional.empty(),
-          conf.hasParallelThread() ? Optional.of(conf.getParallelThread()) : Optional.empty(),
-          conf.hasStopAfterDiskEven() ? Optional.of(conf.getStopAfterDiskEven()) : Optional.empty(),
-          request.getHostsList().isEmpty() ? Optional.empty() : Optional.of(request.getHostsList()));
+          conf.hasThreshold() ? conf.getThreshold() : null,
+          conf.hasDiskBandwidthInMB() ? conf.getDiskBandwidthInMB() : null,
+          conf.hasParallelThread() ? conf.getParallelThread() : null,
+          conf.hasStopAfterDiskEven() ? conf.getStopAfterDiskEven() : null,
+          request.getHostsList().isEmpty() ? null : request.getHostsList());
       break;
     case UPDATE:
 
       errors = impl.updateDiskBalancerConfiguration(
-          conf.hasThreshold() ? Optional.of(conf.getThreshold()) : Optional.empty(),
-          conf.hasDiskBandwidthInMB() ? Optional.of(conf.getDiskBandwidthInMB()) : Optional.empty(),
-          conf.hasParallelThread() ? Optional.of(conf.getParallelThread()) : Optional.empty(),
-          conf.hasStopAfterDiskEven() ? Optional.of(conf.getStopAfterDiskEven()) : Optional.empty(),
-          request.getHostsList().isEmpty() ? Optional.empty() : Optional.of(request.getHostsList()));
+          conf.hasThreshold() ? conf.getThreshold() : null,
+          conf.hasDiskBandwidthInMB() ? conf.getDiskBandwidthInMB() : null,
+          conf.hasParallelThread() ? conf.getParallelThread() : null,
+          conf.hasStopAfterDiskEven() ? conf.getStopAfterDiskEven() : null,
+          request.getHostsList().isEmpty() ? null : request.getHostsList());
       break;
     case STOP:
       errors = impl.stopDiskBalancer(
-          request.getHostsList().isEmpty() ? Optional.empty() : Optional.of(request.getHostsList()));
+          request.getHostsList().isEmpty() ? null : request.getHostsList());
       break;
     default:
       errors = new ArrayList<>();

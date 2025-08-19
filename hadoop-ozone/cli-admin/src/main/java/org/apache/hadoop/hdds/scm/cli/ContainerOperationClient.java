@@ -611,23 +611,23 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
-      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven,
-      Optional<List<String>> hosts) throws IOException {
+  public List<DatanodeAdminError> startDiskBalancer(Double threshold,
+      Long bandwidthInMB, Integer parallelThread, Boolean stopAfterDiskEven,
+      List<String> hosts) throws IOException {
     return storageContainerLocationClient.startDiskBalancer(threshold,
         bandwidthInMB, parallelThread, stopAfterDiskEven, hosts);
   }
 
   @Override
-  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+  public List<DatanodeAdminError> stopDiskBalancer(List<String> hosts)
       throws IOException {
     return storageContainerLocationClient.stopDiskBalancer(hosts);
   }
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts,
-      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus)
+      List<String> hosts,
+      HddsProtos.DiskBalancerRunningStatus runningStatus)
       throws IOException {
     return storageContainerLocationClient.getDiskBalancerStatus(hosts,
         runningStatus, ClientVersion.CURRENT_VERSION);
@@ -635,8 +635,8 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      Optional<Double> threshold, Optional<Long> bandwidth,
-      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+      Double threshold, Long bandwidth,
+      Integer parallelThread, Boolean stopAfterDiskEven, List<String> hosts)
       throws IOException {
     return storageContainerLocationClient.updateDiskBalancerConfiguration(
         threshold, bandwidth, parallelThread, stopAfterDiskEven, hosts);

@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import picocli.CommandLine;
 
 /**
@@ -60,9 +59,8 @@ public class DiskBalancerCommonOptions {
     return isAllHosts() ? "All datanodes" : String.join("\n", getDatanodes());
   }
 
-  public Optional<List<String>> getSpecifiedDatanodes() {
-    return getDatanodes().isEmpty() ?
-        Optional.empty() : Optional.of(getDatanodes());
+  public List<String> getSpecifiedDatanodes() {
+    return getDatanodes().isEmpty() ? null : getDatanodes();
   }
 
   public boolean isAllHosts() {

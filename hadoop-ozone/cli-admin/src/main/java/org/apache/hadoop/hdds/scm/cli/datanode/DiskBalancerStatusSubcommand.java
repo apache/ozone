@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -51,8 +50,8 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     List<HddsProtos.DatanodeDiskBalancerInfoProto> resultProto =
         scmClient.getDiskBalancerStatus(
-            hosts.isEmpty() ? Optional.empty() : Optional.of(hosts),
-            state == null ? Optional.empty() : Optional.of(state));
+            hosts.isEmpty() ? null : hosts,
+            state);
 
     System.out.println(generateStatus(resultProto));
   }

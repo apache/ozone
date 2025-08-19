@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.diskbalancer;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -159,7 +159,7 @@ public class DiskBalancerService extends BackgroundService {
     this.conf = conf;
 
     String diskBalancerInfoPath = getDiskBalancerInfoPath();
-    Preconditions.checkNotNull(diskBalancerInfoPath);
+    Objects.requireNonNull(diskBalancerInfoPath);
     diskBalancerInfoFile = new File(diskBalancerInfoPath);
 
     inProgressContainers = ConcurrentHashMap.newKeySet();
@@ -176,7 +176,7 @@ public class DiskBalancerService extends BackgroundService {
               .getContainerChoosingPolicyClass().newInstance();
     } catch (Exception e) {
       LOG.error("Got exception when initializing DiskBalancerService", e);
-      throw new RuntimeException(e);
+      throw new IOException(e);
     }
 
     metrics = DiskBalancerServiceMetrics.create();

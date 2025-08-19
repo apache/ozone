@@ -1213,14 +1213,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts,
-      Optional<HddsProtos.DiskBalancerRunningStatus> status,
+      List<String> hosts,
+      HddsProtos.DiskBalancerRunningStatus status,
       int clientVersion) throws IOException {
     DatanodeDiskBalancerInfoRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerInfoRequestProto.newBuilder()
             .setInfoType(DatanodeDiskBalancerInfoType.status);
-    hosts.ifPresent(requestBuilder::addAllHosts);
-    status.ifPresent(requestBuilder::setStatus);
+    if (hosts != null && !hosts.isEmpty()) {
+      requestBuilder.addAllHosts(hosts);
+    }
+    if (status != null) {
+      requestBuilder.setStatus(status);
+    }
     DatanodeDiskBalancerInfoRequestProto request = requestBuilder.build();
 
     DatanodeDiskBalancerInfoResponseProto response =
@@ -1232,22 +1236,32 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
-      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
-      Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+  public List<DatanodeAdminError> startDiskBalancer(Double threshold,
+      Long bandwidthInMB, Integer parallelThread,
+      Boolean stopAfterDiskEven, List<String> hosts)
       throws IOException {
     HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
         HddsProtos.DiskBalancerConfigurationProto.newBuilder();
-    threshold.ifPresent(confBuilder::setThreshold);
-    bandwidthInMB.ifPresent(confBuilder::setDiskBandwidthInMB);
-    parallelThread.ifPresent(confBuilder::setParallelThread);
-    stopAfterDiskEven.ifPresent(confBuilder::setStopAfterDiskEven);
+    if (threshold != null) {
+      confBuilder.setThreshold(threshold);
+    }
+    if (bandwidthInMB != null) {
+      confBuilder.setDiskBandwidthInMB(bandwidthInMB);
+    }
+    if (parallelThread != null) {
+      confBuilder.setParallelThread(parallelThread);
+    }
+    if (stopAfterDiskEven != null) {
+      confBuilder.setStopAfterDiskEven(stopAfterDiskEven);
+    }
 
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
             .setOpType(HddsProtos.DiskBalancerOpType.START)
             .setConf(confBuilder);
-    hosts.ifPresent(requestBuilder::addAllHosts);
+    if (hosts != null && !hosts.isEmpty()) {
+      requestBuilder.addAllHosts(hosts);
+    }
 
     DatanodeDiskBalancerOpResponseProto response =
         submitRequest(Type.DatanodeDiskBalancerOp,
@@ -1263,12 +1277,14 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+  public List<DatanodeAdminError> stopDiskBalancer(List<String> hosts)
       throws IOException {
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
             .setOpType(HddsProtos.DiskBalancerOpType.STOP);
-    hosts.ifPresent(requestBuilder::addAllHosts);
+    if (hosts != null && !hosts.isEmpty()) {
+      requestBuilder.addAllHosts(hosts);
+    }
 
     DatanodeDiskBalancerOpResponseProto response =
         submitRequest(Type.DatanodeDiskBalancerOp,
@@ -1285,21 +1301,31 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      Optional<Double> threshold, Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+      Double threshold, Long bandwidthInMB,
+      Integer parallelThread, Boolean stopAfterDiskEven, List<String> hosts)
       throws IOException {
     HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
         HddsProtos.DiskBalancerConfigurationProto.newBuilder();
-    threshold.ifPresent(confBuilder::setThreshold);
-    bandwidthInMB.ifPresent(confBuilder::setDiskBandwidthInMB);
-    parallelThread.ifPresent(confBuilder::setParallelThread);
-    stopAfterDiskEven.ifPresent(confBuilder::setStopAfterDiskEven);
+    if (threshold != null) {
+      confBuilder.setThreshold(threshold);
+    }
+    if (bandwidthInMB != null) {
+      confBuilder.setDiskBandwidthInMB(bandwidthInMB);
+    }
+    if (parallelThread != null) {
+      confBuilder.setParallelThread(parallelThread);
+    }
+    if (stopAfterDiskEven != null) {
+      confBuilder.setStopAfterDiskEven(stopAfterDiskEven);
+    }
 
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
             .setOpType(HddsProtos.DiskBalancerOpType.UPDATE)
             .setConf(confBuilder);
-    hosts.ifPresent(requestBuilder::addAllHosts);
+    if (hosts != null && !hosts.isEmpty()) {
+      requestBuilder.addAllHosts(hosts);
+    }
 
     DatanodeDiskBalancerOpResponseProto response =
         submitRequest(Type.DatanodeDiskBalancerOp,

@@ -1530,8 +1530,8 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts,
-      Optional<HddsProtos.DiskBalancerRunningStatus> status,
+      List<String> hosts,
+      HddsProtos.DiskBalancerRunningStatus status,
       int clientVersion) throws IOException {
     checkDiskBalancerEnabled();
     return scm.getDiskBalancerManager().getDiskBalancerStatus(hosts, status,
@@ -1539,9 +1539,9 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<DatanodeAdminError> startDiskBalancer(Optional<Double> threshold,
-      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread,
-      Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+  public List<DatanodeAdminError> startDiskBalancer(Double threshold,
+      Long bandwidthInMB, Integer parallelThread,
+      Boolean stopAfterDiskEven, List<String> hosts)
       throws IOException {
     checkDiskBalancerEnabled();
 
@@ -1557,7 +1557,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+  public List<DatanodeAdminError> stopDiskBalancer(List<String> hosts)
       throws IOException {
     checkDiskBalancerEnabled();
 
@@ -1572,8 +1572,8 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      Optional<Double> threshold, Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+      Double threshold, Long bandwidthInMB,
+      Integer parallelThread, Boolean stopAfterDiskEven, List<String> hosts)
       throws IOException {
     checkDiskBalancerEnabled();
 

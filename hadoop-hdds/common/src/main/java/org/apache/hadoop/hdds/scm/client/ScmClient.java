@@ -496,24 +496,24 @@ public interface ScmClient extends Closeable {
    * @throws IOException
    */
   List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts,
-      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus)
+      List<String> hosts,
+      HddsProtos.DiskBalancerRunningStatus runningStatus)
       throws IOException;
 
   /**
    * Start DiskBalancer.
    */
   List<DatanodeAdminError> startDiskBalancer(
-      Optional<Double> threshold,
-      Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread,
-      Optional<Boolean> stopAfterDiskEven,
-      Optional<List<String>> hosts) throws IOException;
+      Double threshold,
+      Long bandwidthInMB,
+      Integer parallelThread,
+      Boolean stopAfterDiskEven,
+      List<String> hosts) throws IOException;
 
   /**
    * Stop DiskBalancer.
    */
-  List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+  List<DatanodeAdminError> stopDiskBalancer(List<String> hosts)
       throws IOException;
 
 
@@ -521,9 +521,9 @@ public interface ScmClient extends Closeable {
    * Update DiskBalancer Configuration.
    */
   List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      Optional<Double> threshold,
-      Optional<Long> bandwidth,
-      Optional<Integer> parallelThread,
-      Optional<Boolean> stopAfterDiskEven,
-      Optional<List<String>> hosts) throws IOException;
+      Double threshold,
+      Long bandwidth,
+      Integer parallelThread,
+      Boolean stopAfterDiskEven,
+      List<String> hosts) throws IOException;
 }

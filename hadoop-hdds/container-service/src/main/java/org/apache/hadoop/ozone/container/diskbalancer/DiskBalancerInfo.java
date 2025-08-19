@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import java.util.Objects;
-import java.util.Optional;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
@@ -101,8 +100,8 @@ public class DiskBalancerInfo {
   }
 
   public StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto toDiskBalancerReportProto() {
-    DiskBalancerConfiguration conf = new DiskBalancerConfiguration(Optional.of(threshold),
-        Optional.of(bandwidthInMB), Optional.of(parallelThread), Optional.of(stopAfterDiskEven));
+    DiskBalancerConfiguration conf = new DiskBalancerConfiguration(threshold,
+        bandwidthInMB, parallelThread, stopAfterDiskEven);
     HddsProtos.DiskBalancerConfigurationProto confProto = conf.toProtobufBuilder().build();
 
     StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.Builder builder =
