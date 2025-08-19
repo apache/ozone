@@ -288,6 +288,8 @@ public class SnapshotDefragService extends BackgroundService
         LOG.debug("Added column family {} to defragmented DB", cfName);
       }
 
+      // TODO: Add DELETED_TABLE, DELETED_FILE_TABLE and DELETED_DIR_TABLE
+
       // Build the new defragmented database
       DBStore defraggedStore = defraggedDbBuilder.build();
       RocksDatabase defraggedDb = ((RDBStore) defraggedStore).getDb();
@@ -384,8 +386,7 @@ public class SnapshotDefragService extends BackgroundService
    * Performs incremental defragmentation using diff from previous defragmented snapshot.
    */
   private void performIncrementalDefragmentation(SnapshotInfo currentSnapshot,
-      SnapshotInfo previousDefraggedSnapshot, OmSnapshot currentOmSnapshot)
-      throws IOException {
+      SnapshotInfo previousDefraggedSnapshot, OmSnapshot currentOmSnapshot) {
 
     String currentSnapshotPath = OmSnapshotManager.getSnapshotPath(
         ozoneManager.getConfiguration(), currentSnapshot);
@@ -416,6 +417,7 @@ public class SnapshotDefragService extends BackgroundService
       if (!Files.exists(Paths.get(previousDefraggedDbPath))) {
         LOG.warn("Previous defragmented DB not found at {}, falling back to full defragmentation",
             previousDefraggedDbPath);
+        // TODO: Throw exception instead of falling back
         performFullDefragmentation(currentSnapshot, currentOmSnapshot);
         return;
       }
@@ -595,8 +597,7 @@ public class SnapshotDefragService extends BackgroundService
         return 0;
       }
 
-      // TODO: Handle pagination when diffList is bigger than server page size
-      LOG.info("Found {} differences to process", diffReport.getDiffList().size());
+      LOG.info("Found {} differences to process from first page of snapshotDiff list", diffReport.getDiffList().size());
 
       // Get table references for target database
       RDBStore targetRdbStore = (RDBStore) targetStore;
