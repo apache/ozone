@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +60,8 @@ import org.slf4j.LoggerFactory;
 public final class KeyValueContainerUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(KeyValueContainerUtil.class);
+  public static final String PENDING_DELETION_BLOCKS = "pendingDeleteBlocks";
+  public static final String PENDING_DELETION_BYTES = "pendingDeleteBytes";
 
   /* Never constructed. */
   private KeyValueContainerUtil() {
@@ -325,12 +329,18 @@ public final class KeyValueContainerUtil {
       if (pendingDeletionBlockBytes != null) {
         blockPendingDeletionBytes = pendingDeletionBlockBytes;
       }
+      if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
+        LOG.warn("Missing pendingDeletionSize from {}: recalculate them from  delete txn tables",
+            metadataTable.getName());
+        ObjectNode pendingDeletions = getAggregateValues(store, kvContainerData, kvContainerData.getSchemaVersion());
+        blockPendingDeletionBytes = pendingDeletions.get(PENDING_DELETION_BYTES).asLong();
+      }
     } else {
-      // Set pending deleted block count.
-      LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
+      LOG.warn("Missing pendingDeleteBlockCount/size from {}: recalculate them from delete txn tables",
+          metadataTable.getName());
       ObjectNode pendingDeletions = getAggregateValues(store, kvContainerData, kvContainerData.getSchemaVersion());
-      blockPendingDeletionBytes = pendingDeletions.get("pendingDeleteBytes").asLong();
-      blockPendingDeletion = pendingDeletions.get("pendingDeleteBlocks").asLong();
+      blockPendingDeletionBytes = pendingDeletions.get(PENDING_DELETION_BYTES).asLong();
+      blockPendingDeletion = pendingDeletions.get(PENDING_DELETION_BLOCKS).asLong();
     }
     // Set delete transaction id.
     Long delTxnId =
