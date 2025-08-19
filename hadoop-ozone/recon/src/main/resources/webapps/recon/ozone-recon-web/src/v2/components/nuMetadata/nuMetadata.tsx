@@ -121,7 +121,7 @@ type MetadataState = {
 
 
 // ------------- Component -------------- //
-const DUMetadata: React.FC<MetadataProps> = ({
+const NUMetadata: React.FC<MetadataProps> = ({
   path = '/'
 }) => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -380,4 +380,4 @@ const DUMetadata: React.FC<MetadataProps> = ({
   );
 }
 
-export default DUMetadata;
+export default NUMetadata;
