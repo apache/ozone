@@ -30,7 +30,7 @@ It includes the following tools:
    * **om** - Debug commands related to OM.
    * **datanode** - Debug commands related to Datanode.
    * **replicas** - Debug commands for key replica related issues.
-   * **ratislogparser** - Shell of printing Ratis Log in understandable text
+   * **ratis** - Debug commands related to Ratis.
    * **auditparser** - A tool to parse and query Ozone audit logs.
    * **log** - A tool to parse and provide insights on logs, currently supports only the datanode's container logs.
    * **checknative** - Checks if native libraries are loaded
