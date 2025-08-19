@@ -3290,7 +3290,7 @@
     <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
     </description>
-  </property>f
+  </property>
   <property>
     <name>ozone.recon.db.dir</name>
     <value/>

@@ -24,6 +24,7 @@ package org.apache.hadoop.ozone.s3web.s3sts;
 public final class S3STSConfigKeys {
   public static final String OZONE_S3G_STS_HTTP_ENABLED_KEY =
       "ozone.s3g.sts.http.enabled";
+
   /**
    * Never constructed.
    */
