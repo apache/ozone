@@ -309,8 +309,10 @@ public class OzoneManagerServiceProviderImpl
                 taskStatusUpdaterManager.getTaskStatusUpdater(taskName).getLastUpdatedSeqNumber());
 
           });
+      LOG.info("Re-initializing all tasks again (not just above failed delta tasks) based on updated OM DB snapshot " +
+          "and last updated sequence number because fresh staging DB needs to be created for all tasks.");
+      reconTaskController.reInitializeTasks(omMetadataManager, null);
     }
-    reconTaskController.reInitializeTasks(omMetadataManager, reconOmTaskMap);
     startSyncDataFromOM(initialDelay);
     LOG.info("Ozone Manager Service Provider is started.");
   }
@@ -673,12 +675,10 @@ public class OzoneManagerServiceProviderImpl
                 String reason = bufferOverflowed ? "Event buffer overflow" : "Delta tasks failed after retry";
                 LOG.warn("{}, triggering task reinitialization", reason);
                 
-                if (bufferOverflowed) {
-                  metrics.incrNumDeltaRequestsFailed();
-                  deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
-                  deltaReconTaskStatusUpdater.recordRunCompletion();
-                }
-                
+                metrics.incrNumDeltaRequestsFailed();
+                deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
+                deltaReconTaskStatusUpdater.recordRunCompletion();
+
                 reconTaskController.reInitializeTasks(omMetadataManager, null);
                 
                 // Reset appropriate flags after reinitialization
