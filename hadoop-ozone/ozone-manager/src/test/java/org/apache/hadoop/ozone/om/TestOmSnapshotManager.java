@@ -311,11 +311,11 @@ class TestOmSnapshotManager {
     OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(snapshotYaml.toFile());
     assertNotNull(localData);
     assertEquals(0, localData.getVersion());
-    assertEquals(expUncompactedSSTFileList, localData.getUncompactedSSTFileList());
+    assertEquals(expUncompactedSSTFileList, localData.getNotDefraggedSSTFileList());
     assertFalse(localData.getSstFiltered());
-    assertEquals(0L, localData.getLastCompactionTime());
-    assertFalse(localData.getNeedsCompaction());
-    assertTrue(localData.getCompactedSSTFileList().isEmpty());
+    assertEquals(0L, localData.getLastDefragTime());
+    assertFalse(localData.getNeedsDefragmentation());
+    assertTrue(localData.getDefraggedSSTFileList().isEmpty());
 
     // Cleanup
     Files.delete(snapshotYaml);

@@ -35,8 +35,8 @@ import org.yaml.snakeyaml.Yaml;
  */
 public abstract class OmSnapshotLocalData {
 
-  // Version of the snapshot local data. 0 indicates uncompacted snapshot.
-  // compacted snapshots will have version > 0.
+  // Version of the snapshot local data. 0 indicates not defragged snapshot.
+  // defragged snapshots will have version > 0.
   private int version;
 
   // Checksum of the YAML representation
@@ -45,18 +45,18 @@ public abstract class OmSnapshotLocalData {
   // Whether SST is filtered
   private boolean isSSTFiltered;
 
-  // Map of Table to uncompacted SST file list on snapshot create
-  private Map<String, Set<String>> uncompactedSSTFileList;
+  // Map of Table to not defragged SST file list on snapshot create
+  private Map<String, Set<String>> notDefraggedSSTFileList;
 
-  // Time of last compaction, in epoch milliseconds
-  private long lastCompactionTime;
+  // Time of last defragmentation, in epoch milliseconds
+  private long lastDefragTime;
 
-  // Whether the snapshot needs compaction
-  private boolean needsCompaction;
+  // Whether the snapshot needs defragmentation
+  private boolean needsDefragmentation;
 
-  // Map of version to compacted SST file list
+  // Map of version to defragged SST file list
   // Map<version, Map<Table, sstFileList>>
-  private Map<Integer, Map<String, Set<String>>> compactedSSTFileList;
+  private Map<Integer, Map<String, Set<String>>> defraggedSSTFileList;
 
   public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
   private static final String DUMMY_CHECKSUM = new String(new byte[64], CHARSET_ENCODING);
@@ -64,12 +64,12 @@ public abstract class OmSnapshotLocalData {
   /**
    * Creates a OmSnapshotLocalData object with default values.
    */
-  public OmSnapshotLocalData(Map<String, Set<String>> uncompactedSSTFileList) {
+  public OmSnapshotLocalData(Map<String, Set<String>> notDefraggedSSTFileList) {
     this.isSSTFiltered = false;
-    this.uncompactedSSTFileList = uncompactedSSTFileList != null ? uncompactedSSTFileList : new HashMap<>();
-    this.lastCompactionTime = 0L;
-    this.needsCompaction = false;
-    this.compactedSSTFileList = new HashMap<>();
+    this.notDefraggedSSTFileList = notDefraggedSSTFileList != null ? notDefraggedSSTFileList : new HashMap<>();
+    this.lastDefragTime = 0L;
+    this.needsDefragmentation = false;
+    this.defraggedSSTFileList = new HashMap<>();
     this.version = 0;
     setChecksumTo0ByteArray();
   }
@@ -81,24 +81,24 @@ public abstract class OmSnapshotLocalData {
   public OmSnapshotLocalData(OmSnapshotLocalData source) {
     // Copy primitive fields directly
     this.isSSTFiltered = source.isSSTFiltered;
-    this.lastCompactionTime = source.lastCompactionTime;
-    this.needsCompaction = source.needsCompaction;
+    this.lastDefragTime = source.lastDefragTime;
+    this.needsDefragmentation = source.needsDefragmentation;
     this.checksum = source.checksum;
     this.version = source.version;
 
-    // Deep copy for uncompactedSSTFileList
-    this.uncompactedSSTFileList = new HashMap<>();
+    // Deep copy for notDefraggedSSTFileList
+    this.notDefraggedSSTFileList = new HashMap<>();
     for (Map.Entry<String, Set<String>> entry :
-        source.uncompactedSSTFileList.entrySet()) {
-      this.uncompactedSSTFileList.put(
+        source.notDefraggedSSTFileList.entrySet()) {
+      this.notDefraggedSSTFileList.put(
           entry.getKey(),
           new HashSet<>(entry.getValue()));
     }
 
-    // Deep copy for compactedSSTFileList
-    this.compactedSSTFileList = new HashMap<>();
+    // Deep copy for defraggedSSTFileList
+    this.defraggedSSTFileList = new HashMap<>();
     for (Map.Entry<Integer, Map<String, Set<String>>> versionEntry :
-        source.compactedSSTFileList.entrySet()) {
+        source.defraggedSSTFileList.entrySet()) {
       Map<String, Set<String>> tableMap = new HashMap<>();
 
       for (Map.Entry<String, Set<String>> tableEntry :
@@ -108,7 +108,7 @@ public abstract class OmSnapshotLocalData {
             new HashSet<>(tableEntry.getValue()));
       }
 
-      this.compactedSSTFileList.put(versionEntry.getKey(), tableMap);
+      this.defraggedSSTFileList.put(versionEntry.getKey(), tableMap);
     }
   }
 
@@ -129,91 +129,91 @@ public abstract class OmSnapshotLocalData {
   }
 
   /**
-   * Returns the uncompacted SST file list.
-   * @return Map of Table to uncompacted SST file list
+   * Returns the not defragged SST file list.
+   * @return Map of Table to not defragged SST file list
    */
-  public Map<String, Set<String>> getUncompactedSSTFileList() {
-    return Collections.unmodifiableMap(this.uncompactedSSTFileList);
+  public Map<String, Set<String>> getNotDefraggedSSTFileList() {
+    return Collections.unmodifiableMap(this.notDefraggedSSTFileList);
   }
 
   /**
-   * Sets the uncompacted SST file list.
-   * @param uncompactedSSTFileList Map of Table to uncompacted SST file list
+   * Sets the not defragged SST file list.
+   * @param notDefraggedSSTFileList Map of Table to not defragged SST file list
    */
-  public void setUncompactedSSTFileList(
-      Map<String, Set<String>> uncompactedSSTFileList) {
-    this.uncompactedSSTFileList.clear();
-    this.uncompactedSSTFileList.putAll(uncompactedSSTFileList);
+  public void setNotDefraggedSSTFileList(
+      Map<String, Set<String>> notDefraggedSSTFileList) {
+    this.notDefraggedSSTFileList.clear();
+    this.notDefraggedSSTFileList.putAll(notDefraggedSSTFileList);
   }
 
   /**
-   * Adds an entry to the uncompacted SST file list.
+   * Adds an entry to the not defragged SST file list.
    * @param table Table name
    * @param sstFiles SST file name
    */
-  public void addUncompactedSSTFileList(String table, Set<String> sstFiles) {
-    this.uncompactedSSTFileList.computeIfAbsent(table, k -> new HashSet<>())
+  public void addNotDefraggedSSTFileList(String table, Set<String> sstFiles) {
+    this.notDefraggedSSTFileList.computeIfAbsent(table, k -> new HashSet<>())
         .addAll(sstFiles);
   }
 
   /**
-   * Returns the last compaction time, in epoch milliseconds.
-   * @return Timestamp of the last compaction
+   * Returns the last defragmentation time, in epoch milliseconds.
+   * @return Timestamp of the last defragmentation
    */
-  public long getLastCompactionTime() {
-    return lastCompactionTime;
+  public long getLastDefragTime() {
+    return lastDefragTime;
   }
 
   /**
-   * Sets the last compaction time, in epoch milliseconds.
-   * @param lastCompactionTime Timestamp of the last compaction
+   * Sets the last defragmentation time, in epoch milliseconds.
+   * @param lastDefragTime Timestamp of the last defragmentation
    */
-  public void setLastCompactionTime(Long lastCompactionTime) {
-    this.lastCompactionTime = lastCompactionTime;
+  public void setLastDefragTime(Long lastDefragTime) {
+    this.lastDefragTime = lastDefragTime;
   }
 
   /**
-   * Returns whether the snapshot needs compaction.
-   * @return true if the snapshot needs compaction, false otherwise
+   * Returns whether the snapshot needs defragmentation.
+   * @return true if the snapshot needs defragmentation, false otherwise
    */
-  public boolean getNeedsCompaction() {
-    return needsCompaction;
+  public boolean getNeedsDefragmentation() {
+    return needsDefragmentation;
   }
 
   /**
-   * Sets whether the snapshot needs compaction.
-   * @param needsCompaction true if the snapshot needs compaction, false otherwise
+   * Sets whether the snapshot needs defragmentation.
+   * @param needsDefragmentation true if the snapshot needs defragmentation, false otherwise
    */
-  public void setNeedsCompaction(boolean needsCompaction) {
-    this.needsCompaction = needsCompaction;
+  public void setNeedsDefragmentation(boolean needsDefragmentation) {
+    this.needsDefragmentation = needsDefragmentation;
   }
 
   /**
-   * Returns the compacted SST file list.
-   * @return Map of version to compacted SST file list
+   * Returns the defragged SST file list.
+   * @return Map of version to defragged SST file list
    */
-  public Map<Integer, Map<String, Set<String>>> getCompactedSSTFileList() {
-    return Collections.unmodifiableMap(this.compactedSSTFileList);
+  public Map<Integer, Map<String, Set<String>>> getDefraggedSSTFileList() {
+    return Collections.unmodifiableMap(this.defraggedSSTFileList);
   }
 
   /**
-   * Sets the compacted SST file list.
-   * @param compactedSSTFileList Map of version to compacted SST file list
+   * Sets the defragged SST file list.
+   * @param defraggedSSTFileList Map of version to defragged SST file list
    */
-  public void setCompactedSSTFileList(
-      Map<Integer, Map<String, Set<String>>> compactedSSTFileList) {
-    this.compactedSSTFileList.clear();
-    this.compactedSSTFileList.putAll(compactedSSTFileList);
+  public void setDefraggedSSTFileList(
+      Map<Integer, Map<String, Set<String>>> defraggedSSTFileList) {
+    this.defraggedSSTFileList.clear();
+    this.defraggedSSTFileList.putAll(defraggedSSTFileList);
   }
 
   /**
-   * Adds an entry to the compacted SST file list.
+   * Adds an entry to the defragged SST file list.
    * @param ver Version number (TODO: to be clarified)
    * @param table Table name
    * @param sstFiles SST file name
    */
-  public void addCompactedSSTFileList(Integer ver, String table, Set<String> sstFiles) {
-    this.compactedSSTFileList.computeIfAbsent(ver, k -> Maps.newHashMap())
+  public void addDefraggedSSTFileList(Integer ver, String table, Set<String> sstFiles) {
+    this.defraggedSSTFileList.computeIfAbsent(ver, k -> Maps.newHashMap())
         .computeIfAbsent(table, k -> new HashSet<>())
         .addAll(sstFiles);
   }
