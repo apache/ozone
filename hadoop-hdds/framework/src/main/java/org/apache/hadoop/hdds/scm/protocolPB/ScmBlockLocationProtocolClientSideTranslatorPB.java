@@ -256,7 +256,9 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       int currSize = bg.getProto().getSerializedSize();
       if (currSize + serializedSize > ratisByteLimit) {
         allResults.addAll(submitDeleteKeyBlocks(batch));
-        LOG.info("Sending batch of {} KeyBlocks (~{} bytes)", batch.size(), serializedSize);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Sending batch of {} KeyBlocks (~{} bytes)", batch.size(), serializedSize);
+        }
         serializedSize = 0;
         batch.clear();
       }
