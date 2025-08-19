@@ -1193,6 +1193,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       recordActivity(jobKey, SST_FILE_DELTA_DAG_WALK);
       LOG.debug("Calling RocksDBCheckpointDiffer");
       try {
+        // TODO: Use this
         deltaFiles = differ.getSSTDiffListWithFullPath(toDSI, fromDSI, diffDir).map(HashSet::new);
       } catch (Exception exception) {
         recordActivity(jobKey, SST_FILE_DELTA_FULL_DIFF);
@@ -1496,7 +1497,7 @@ public class SnapshotDiffManager implements AutoCloseable {
    */
   private boolean isKeyModified(OmKeyInfo fromKey, OmKeyInfo toKey) {
     return !fromKey.isKeyInfoSame(toKey,
-        false, false, false, false, true)
+        false, false, true, false, true)
         || !SnapshotUtils.isBlockLocationInfoSame(fromKey, toKey);
   }
 
