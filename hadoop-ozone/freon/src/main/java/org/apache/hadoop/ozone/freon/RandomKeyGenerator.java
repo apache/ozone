@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.util.Time;
@@ -736,13 +737,20 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   }
 
   private boolean createVolume(int volumeNumber) {
-    String volumeName = "vol-" + volumeNumber + "-"
-        + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "vol-" + volumeNumber;
     LOG.trace("Creating volume: {}", volumeName);
     try (AutoCloseable scope = TracingUtil
         .createActivatedSpan("createVolume")) {
       long start = System.nanoTime();
-      objectStore.createVolume(volumeName);
+      try {
+        objectStore.createVolume(volumeName);
+      } catch (OMException e) {
+        if (e.getResult() == OMException.ResultCodes.VOLUME_ALREADY_EXISTS) {
+          LOG.warn("Volume {} already exists, continuing...", volumeName);
+        } else {
+          throw e;
+        }
+      }
       long volumeCreationDuration = System.nanoTime() - start;
       volumeCreationTime.getAndAdd(volumeCreationDuration);
       histograms.get(FreonOps.VOLUME_CREATE.ordinal())
@@ -767,22 +775,31 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       LOG.error("Could not find volume {}", volumeNumber);
       return false;
     }
-    String bucketName = "bucket-" + bucketNumber + "-" +
-        RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket-" + bucketNumber;
     LOG.trace("Creating bucket: {} in volume: {}",
         bucketName, volume.getName());
     try (AutoCloseable scope = TracingUtil
         .createActivatedSpan("createBucket")) {
 
       long start = System.nanoTime();
-      if (bucketLayout != null) {
-        BucketArgs bucketArgs = BucketArgs.newBuilder()
-            .setBucketLayout(bucketLayout)
-            .build();
-        volume.createBucket(bucketName, bucketArgs);
-      } else {
-        volume.createBucket(bucketName);
+
+      try {
+        if (bucketLayout != null) {
+          BucketArgs bucketArgs = BucketArgs.newBuilder()
+              .setBucketLayout(bucketLayout)
+              .build();
+          volume.createBucket(bucketName, bucketArgs);
+        } else {
+          volume.createBucket(bucketName);
+        }
+      } catch (OMException e) {
+        if (e.getResult() == OMException.ResultCodes.BUCKET_ALREADY_EXISTS) {
+          LOG.warn("Bucket {} already exists, continuing...", bucketName);
+        } else {
+          throw e;
+        }
       }
+
       long bucketCreationDuration = System.nanoTime() - start;
       histograms.get(FreonOps.BUCKET_CREATE.ordinal())
           .update(bucketCreationDuration);
@@ -809,8 +826,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     }
     String bucketName = bucket.getName();
     String volumeName = bucket.getVolumeName();
-    String keyName = "key-" + keyNumber + "-"
-        + RandomStringUtils.secure().nextNumeric(5);
+    String keyName = "key-" + String.format("%09d", keyNumber);
     LOG.trace("Adding key: {} in bucket: {} of volume: {}",
         keyName, bucketName, volumeName);
     try {
