@@ -3575,7 +3575,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (noWait) {
       final Thread t = new Thread(() -> {
         try {
-          defragService.start();
+          defragService.triggerSnapshotDefragOnce();
         } catch (Exception e) {
           LOG.error("Error during snapshot defragmentation", e);
         }
@@ -3587,7 +3587,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       LOG.info("User '{}' manually triggered Snapshot Defragmentation and is waiting", ugi);
       try {
-        defragService.start();
+        defragService.triggerSnapshotDefragOnce();
         return true;
       } catch (Exception e) {
         LOG.error("Error during snapshot defragmentation", e);
