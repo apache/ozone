@@ -219,6 +219,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDefragRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDefragResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
@@ -1922,6 +1924,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     RangerBGSyncResponse resp = handleError(submitRequest(omRequest))
         .getRangerBGSyncResponse();
+
+    return resp.getRunSuccess();
+  }
+
+  @Override
+  public boolean triggerSnapshotDefrag(boolean noWait) throws IOException {
+    SnapshotDefragRequest req = SnapshotDefragRequest.newBuilder()
+        .setNoWait(noWait)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.SnapshotDefrag)
+        .setSnapshotDefragRequest(req)
+        .build();
+
+    SnapshotDefragResponse resp = handleError(submitRequest(omRequest))
+        .getSnapshotDefragResponse();
 
     return resp.getRunSuccess();
   }

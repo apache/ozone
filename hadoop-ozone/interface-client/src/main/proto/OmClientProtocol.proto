@@ -156,6 +156,8 @@ enum Type {
   PutObjectTagging = 140;
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
+
+  SnapshotDefrag = 144;
 }
 
 enum SafeMode {
@@ -304,6 +306,8 @@ message OMRequest {
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
+
+  optional SnapshotDefragRequest            SnapshotDefragRequest          = 144;
 }
 
 message OMResponse {
@@ -437,6 +441,8 @@ message OMResponse {
   optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
+
+  optional SnapshotDefragResponse            SnapshotDefragResponse        = 144;
 }
 
 enum Status {
@@ -1595,6 +1601,14 @@ message RangerBGSyncRequest {
 
 message RangerBGSyncResponse {
     optional bool runSuccess = 1;
+}
+
+message SnapshotDefragRequest {
+  optional bool noWait = 1;
+}
+
+message SnapshotDefragResponse {
+  optional bool runSuccess = 1;
 }
 
 message FinalizeUpgradeRequest {
