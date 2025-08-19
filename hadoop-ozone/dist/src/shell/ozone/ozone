@@ -139,6 +139,7 @@ function ozonecmd_case
       OZONE_OM_OPTS="${RATIS_OPTS} ${OZONE_OM_OPTS}"
       OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/om-audit-log4j2.properties"
       OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      JAVA_LIBRARY_PATH="${JAVA_LIBRARY_PATH}:${OZONE_HOME}/share/ozone/lib"
       OZONE_RUN_ARTIFACT_NAME="ozone-manager"
     ;;
     sh | shell)
@@ -220,6 +221,7 @@ function ozonecmd_case
     debug)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
       OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      JAVA_LIBRARY_PATH="${JAVA_LIBRARY_PATH}:${OZONE_HOME}/share/ozone/lib"
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     repair)
