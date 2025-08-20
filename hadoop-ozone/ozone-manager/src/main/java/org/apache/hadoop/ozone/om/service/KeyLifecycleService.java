@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -342,7 +343,9 @@ public class KeyLifecycleService extends BackgroundService {
           for (OmDirectoryInfo dir : dirList) {
             directoryPath.append(dir.getName()).append(OM_KEY_PREFIX);
           }
-          if (directoryPath.toString().equals(rule.getEffectivePrefix() + OM_KEY_PREFIX)) {
+          if ((directoryPath.toString().equals(rule.getEffectivePrefix()) ||
+              directoryPath.toString().equals(rule.getEffectivePrefix() + OM_KEY_PREFIX))
+              && rule.match(lastDir, directoryPath.toString())) {
             if (expiredDirList.isFull()) {
               // if expiredDirList is full, send delete request for pending deletion directories
               sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
@@ -353,9 +356,9 @@ public class KeyLifecycleService extends BackgroundService {
         }
 
         LOG.info("Prefix {} for {}", prefix, bucketKey);
+        evaluateKeyTable(keyTable, prefix, directoryPath.toString(), rule, expiredKeyList, bucket);
         evaluateDirTable(directoryInfoTable, prefix, directoryPath.toString(), rule,
             expiredDirList, bucket);
-        evaluateKeyTable(keyTable, prefix, directoryPath.toString(), rule, expiredKeyList, bucket);
       }
 
       for (OmLCRule rule : nonDirectoryStylePrefixRuleList) {
@@ -365,7 +368,7 @@ public class KeyLifecycleService extends BackgroundService {
             OM_KEY_PREFIX + bucket.getObjectID() + OM_KEY_PREFIX;
         if (dirInfo != null) {
           prefix += dirInfo.getObjectID();
-          if (dirInfo.getName().equals(rule.getEffectivePrefix())) {
+          if (dirInfo.getName().equals(rule.getEffectivePrefix()) && rule.match(dirInfo, dirInfo.getName())) {
             if (expiredDirList.isFull()) {
               // if expiredDirList is full, send delete request for pending deletion directories
               sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
@@ -375,8 +378,10 @@ public class KeyLifecycleService extends BackgroundService {
           }
         }
         LOG.info("Prefix {} for {}", prefix, bucketKey);
-        evaluateKeyTable(keyTable, prefix, "", rule, expiredKeyList, bucket);
-        evaluateDirTable(directoryInfoTable, prefix, "", rule, expiredDirList, bucket);
+        evaluateKeyTable(keyTable, prefix, dirInfo == null ? "" : dirInfo.getName() + OzoneConsts.OM_KEY_PREFIX,
+            rule, expiredKeyList, bucket);
+        evaluateDirTable(directoryInfoTable, prefix,
+            dirInfo == null ? "" : dirInfo.getName() + OzoneConsts.OM_KEY_PREFIX, rule, expiredDirList, bucket);
       }
 
       if (!noPrefixRuleList.isEmpty()) {

@@ -62,10 +62,12 @@ public final class OmLCExpiration implements OmLCAction {
   }
 
   public boolean isExpired(long timestamp) {
-    ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
     if (zonedDateTime != null) {
-      return now.isAfter(zonedDateTime);
+      Instant instant = Instant.ofEpochMilli(timestamp);
+      ZonedDateTime objectTime = instant.atZone(ZoneOffset.UTC);
+      return objectTime.isBefore(zonedDateTime);
     } else {
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime dateTime =
           ZonedDateTime.ofInstant(Instant.ofEpochMilli(timestamp + daysInMilli), ZoneOffset.UTC);
       return now.isAfter(dateTime);

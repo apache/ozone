@@ -770,6 +770,64 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     public Stream<Arguments> parameters3() {
       return Stream.of(
+          arguments("dir1/dir2/dir3/key", "dir1/dir2/dir3/", "dir1/dir2/dir3"),
+          arguments("dir1/dir2/dir3/key", "dir1/dir2/dir3", "dir1/dir2/dir3"),
+          arguments("dir1/key", "dir1", "dir1"),
+          arguments("dir1/key", "dir1/", "dir1"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters3")
+    void testMatchedDirectoryNotDeleted(String keyPrefix, String rulePrefix, String dirName) throws IOException,
+        TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialDeletedDirCount = getDeletedDirectoryCount();
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+      // create keys
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, KEY_COUNT, 1, keyPrefix, null);
+      // check there are keys in keyTable
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      // assert directory exists
+      KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
+      assertFalse(keyInfo.getKeyInfo().isFile());
+
+      KeyLifecycleService.setInjectors(
+          Arrays.asList(new FaultInjectorImpl(), new FaultInjectorImpl()));
+
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, rulePrefix, null, date.toString(), true);
+      LOG.info("expiry date {}", date.toInstant().toEpochMilli());
+
+      GenericTestUtils.waitFor(() -> date.isBefore(ZonedDateTime.now(ZoneOffset.UTC)), WAIT_CHECK_INTERVAL, 10000);
+
+      // rename a key under directory to change directory's Modification time
+      writeClient.renameKey(keyList.get(0), keyList.get(0).getKeyName() + "-new");
+      LOG.info("Dir {} refreshes its modification time", dirName);
+
+      // resume KeyLifecycleService bucket scan
+      KeyLifecycleService.getInjector(0).resume();
+      KeyLifecycleService.getInjector(1).resume();
+
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(0, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+      assertEquals(0, getDeletedDirectoryCount() - initialDeletedDirCount);
+      KeyInfoWithVolumeContext directory = getDirectory(volumeName, bucketName, dirName);
+      assertNotNull(directory);
+
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    public Stream<Arguments> parameters4() {
+      return Stream.of(
           arguments("dir1/dir2/dir3", "dir1/dir2/dir3", 3, 0, true, false),
           arguments("dir1/dir2/dir3", "dir1/dir2/dir3", 3, 0, false, true),
           arguments("/dir1/dir2/dir3", "dir1/dir2/dir3", 3, 1, true, false),
@@ -810,7 +868,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
 
     @ParameterizedTest
-    @MethodSource("parameters3")
+    @MethodSource("parameters4")
     void testExpireOnlyDirectory(String dirName, String prefix, int dirDepth, int deletedDirCount,
         boolean createPrefix, boolean createFilterPrefix) throws IOException,
         TimeoutException, InterruptedException {
@@ -1081,7 +1139,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
-    public Stream<Arguments> parameters4() {
+    public Stream<Arguments> parameters5() {
       return Stream.of(
           arguments(FILE_SYSTEM_OPTIMIZED, "dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/"),
           arguments(FILE_SYSTEM_OPTIMIZED,
@@ -1125,7 +1183,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
      * "dir6/dir7/dir8/dir9/dir10/dir1/dir2/dir3/dir4/dir5/dir6/dir7/dir8/dir9/dir10/" (120 bytes path)
      */
     @ParameterizedTest
-    @MethodSource("parameters4")
+    @MethodSource("parameters5")
     void testPerformanceWithNestedDir(BucketLayout bucketLayout, String prefix)
         throws IOException, InterruptedException, TimeoutException {
       final String volumeName = getTestName();
@@ -1164,7 +1222,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.waitFor(() -> metrics.getNumKeyDeleted().value() - initialKeyDeleted == keyCount,
           WAIT_CHECK_INTERVAL, 5000);
       assertEquals(0, metrics.getNumDirIterated().value() - initialDirIterated);
-      assertEquals(0, metrics.getNumDirDeleted().value() - initialDirDeleted);
+      assertEquals(bucketLayout == FILE_SYSTEM_OPTIMIZED ? 1 : 0,
+          metrics.getNumDirDeleted().value() - initialDirDeleted);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
