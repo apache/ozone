@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -113,11 +112,11 @@ public class TestDiskBalancer {
 
     // Start DiskBalancer on all datanodes
     diskBalancerManager.startDiskBalancer(
-        Optional.of(10.0), // threshold
-        Optional.of(10L),  // bandwidth in MB
-        Optional.of(5),    // parallel threads
-        Optional.of(true), // stopAfterDiskEven
-        Optional.empty()); // apply to all datanodes
+        10.0, // threshold
+        10L,  // bandwidth in MB
+        5,    // parallel threads
+        true, // stopAfterDiskEven
+        null); // apply to all datanodes
 
     // verify logs for all DNs has started
     String logs = logCapturer.getOutput();
@@ -144,16 +143,16 @@ public class TestDiskBalancer {
     DatanodeDetails toDecommission = dns.get(0).getDatanodeDetails();
 
     diskBalancerManager.startDiskBalancer(
-        Optional.of(10.0), // threshold
-        Optional.of(10L),  // bandwidth in MB
-        Optional.of(5),    // parallel threads
-        Optional.of(true), // stopAfterDiskEven
-        Optional.empty());
+        10.0, // threshold
+        10L,  // bandwidth in MB
+        5,    // parallel threads
+        true, // stopAfterDiskEven
+        null);
 
     //all DNs IN_SERVICE, so disk balancer status for all should be present
     List<HddsProtos.DatanodeDiskBalancerInfoProto> statusProtoList =
-        diskBalancerManager.getDiskBalancerStatus(Optional.empty(),
-            Optional.empty(),
+        diskBalancerManager.getDiskBalancerStatus(null,
+            null,
             ClientVersion.CURRENT_VERSION);
     assertEquals(3, statusProtoList.size());
 
@@ -165,15 +164,15 @@ public class TestDiskBalancer {
     waitForDnToReachOpState(nm, toDecommission, DECOMMISSIONING);
 
     //one DN is in DECOMMISSIONING state, so disk balancer status for it should not be present
-    statusProtoList = diskBalancerManager.getDiskBalancerStatus(Optional.empty(),
-        Optional.empty(),
+    statusProtoList = diskBalancerManager.getDiskBalancerStatus(null,
+        null,
         ClientVersion.CURRENT_VERSION);
     assertEquals(2, statusProtoList.size());
 
     // Check status for the decommissioned DN should not be present
     statusProtoList = diskBalancerManager.getDiskBalancerStatus(
-        Optional.of(Collections.singletonList(getDNHostAndPort(toDecommission))),
-        Optional.empty(),
+        Collections.singletonList(getDNHostAndPort(toDecommission)),
+        null,
         ClientVersion.CURRENT_VERSION);
     assertEquals(0, statusProtoList.size());
 
@@ -183,8 +182,8 @@ public class TestDiskBalancer {
 
     // Check status for the recommissioned DN should now be present
     statusProtoList = diskBalancerManager.getDiskBalancerStatus(
-        Optional.of(Collections.singletonList(getDNHostAndPort(toDecommission))),
-        Optional.empty(),
+        Collections.singletonList(getDNHostAndPort(toDecommission)),
+        null,
         ClientVersion.CURRENT_VERSION);
     assertEquals(1, statusProtoList.size());
   }

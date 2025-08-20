@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_DESCRIPTOR_MISSING;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_OPEN;
@@ -660,38 +659,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     update(originalContainerData.getMetadata(), true);
   }
 
-  @Override
-  public void importContainerData(Path containerPath) throws IOException {
-    writeLock();
-    try {
-      if (!getContainerFile().exists()) {
-        String errorMessage = String.format(
-            "Can't load container (cid=%d) data from a specific location"
-                + " as the container descriptor (%s) is missing",
-            getContainerData().getContainerID(),
-            getContainerFile().getAbsolutePath());
-        throw new StorageContainerException(errorMessage,
-            CONTAINER_DESCRIPTOR_MISSING);
-      }
-      KeyValueContainerData originalContainerData =
-          (KeyValueContainerData) ContainerDataYaml
-              .readContainerFile(getContainerFile());
-
-      importContainerData(originalContainerData);
-    } catch (Exception ex) {
-      if (ex instanceof StorageContainerException &&
-          ((StorageContainerException) ex).getResult() ==
-              CONTAINER_DESCRIPTOR_MISSING) {
-        throw ex;
-      }
-      //delete all the temporary data in case of any exception.
-      cleanupFailedImport();
-      throw ex;
-    } finally {
-      writeUnlock();
-    }
-  }
-
   private void cleanupFailedImport() {
     try {
       if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
@@ -935,7 +902,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public void copyContainerData(Path destination) throws IOException {
+  public void copyContainerDirectory(Path destination) throws IOException {
     readLock();
     try {
       // Closed/ Quasi closed containers are considered for replication by

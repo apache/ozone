@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -103,12 +102,12 @@ public class DiskBalancerManager {
    * If hosts is null, return status of all datanodes in balancing.
    */
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts,
-      Optional<HddsProtos.DiskBalancerRunningStatus> status,
+      List<String> hosts,
+      HddsProtos.DiskBalancerRunningStatus status,
       int clientVersion) throws IOException {
     List<DatanodeDetails> filterDns = null;
-    if (hosts.isPresent() && !hosts.get().isEmpty()) {
-      filterDns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
+    if (hosts != null && !hosts.isEmpty()) {
+      filterDns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts,
           useHostnames).stream()
           .filter(dn -> {
             try {
@@ -127,7 +126,7 @@ public class DiskBalancerManager {
     }
 
     // Filter Running Status by default
-    HddsProtos.DiskBalancerRunningStatus filterStatus = status.orElse(null);
+    HddsProtos.DiskBalancerRunningStatus filterStatus = status;
 
     if (filterDns != null) {
       return filterDns.stream()
@@ -154,12 +153,12 @@ public class DiskBalancerManager {
    * @throws IOException
    */
   public List<DatanodeAdminError> startDiskBalancer(
-      Optional<Double> threshold, Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven,
-      Optional<List<String>> hosts) throws IOException {
+      Double threshold, Long bandwidthInMB,
+      Integer parallelThread, Boolean stopAfterDiskEven,
+      List<String> hosts) throws IOException {
     List<DatanodeDetails> dns;
-    if (hosts.isPresent()) {
-      dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
+    if (hosts != null && !hosts.isEmpty()) {
+      dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts,
           useHostnames);
     } else {
       dns = nodeManager.getNodes(NodeStatus.inServiceHealthy());
@@ -193,11 +192,11 @@ public class DiskBalancerManager {
    * If hosts is not specified, send commands to all datanodes.
    * @param hosts Datanodes that command will apply on
    * */
-  public List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+  public List<DatanodeAdminError> stopDiskBalancer(List<String> hosts)
       throws IOException {
     List<DatanodeDetails> dns;
-    if (hosts.isPresent()) {
-      dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
+    if (hosts != null && !hosts.isEmpty()) {
+      dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts,
           useHostnames);
     } else {
       dns = nodeManager.getNodes(NodeStatus.inServiceHealthy());
@@ -227,12 +226,12 @@ public class DiskBalancerManager {
    * @throws IOException
    */
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      Optional<Double> threshold, Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven, Optional<List<String>> hosts)
+      Double threshold, Long bandwidthInMB,
+      Integer parallelThread, Boolean stopAfterDiskEven, List<String> hosts)
       throws IOException {
     List<DatanodeDetails> dns;
-    if (hosts.isPresent()) {
-      dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts.get(),
+    if (hosts != null && !hosts.isEmpty()) {
+      dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts,
           useHostnames);
     } else {
       dns = nodeManager.getNodes(NodeStatus.inServiceHealthy());
@@ -360,15 +359,23 @@ public class DiskBalancerManager {
   }
 
   private DiskBalancerConfiguration attachDiskBalancerConf(
-      DatanodeDetails dn, Optional<Double> threshold,
-      Optional<Long> bandwidthInMB, Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven) {
+      DatanodeDetails dn, Double threshold,
+      Long bandwidthInMB, Integer parallelThread, Boolean stopAfterDiskEven) {
     DiskBalancerConfiguration baseConf = statusMap.containsKey(dn) ?
         statusMap.get(dn).getDiskBalancerConfiguration() :
         new DiskBalancerConfiguration();
-    threshold.ifPresent(baseConf::setThreshold);
-    bandwidthInMB.ifPresent(baseConf::setDiskBandwidthInMB);
-    parallelThread.ifPresent(baseConf::setParallelThread);
-    stopAfterDiskEven.ifPresent(baseConf::setStopAfterDiskEven);
+    if (threshold != null) {
+      baseConf.setThreshold(threshold);
+    }
+    if (bandwidthInMB != null) {
+      baseConf.setDiskBandwidthInMB(bandwidthInMB);
+    }
+    if (parallelThread != null) {
+      baseConf.setParallelThread(parallelThread);
+    }
+    if (stopAfterDiskEven != null) {
+      baseConf.setStopAfterDiskEven(stopAfterDiskEven);
+    }
     return baseConf;
   }
 

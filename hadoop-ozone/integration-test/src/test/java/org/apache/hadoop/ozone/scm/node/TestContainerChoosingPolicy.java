@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataScanOrder;
@@ -90,7 +91,7 @@ public class TestContainerChoosingPolicy {
   private ContainerController containerController;
 
   // Simulate containers currently being balanced (in progress)
-  private Set<Long> inProgressContainerIDs = ConcurrentHashMap.newKeySet();
+  private Set<ContainerID> inProgressContainerIDs = ConcurrentHashMap.newKeySet();
 
   @BeforeEach
   public void setup() throws Exception {
@@ -139,7 +140,7 @@ public class TestContainerChoosingPolicy {
     ContainerData container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume, inProgressContainerIDs);
     assertEquals(containerList.get(0).getContainerData().getContainerID(), container.getContainerID());
     ozoneContainer.getContainerSet().removeContainer(containerList.get(1).getContainerData().getContainerID());
-    inProgressContainerIDs.add(container.getContainerID());
+    inProgressContainerIDs.add(ContainerID.valueOf(container.getContainerID()));
     container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume, inProgressContainerIDs);
     assertEquals(containerList.get(1).getContainerData().getContainerID(), container.getContainerID());
   }
@@ -175,7 +176,7 @@ public class TestContainerChoosingPolicy {
               } else {
                 containerChosen++;
                 if (inProgressContainerIDs.size() < MAX_IN_PROGRESS) {
-                  inProgressContainerIDs.add(c.getContainerID());
+                  inProgressContainerIDs.add(ContainerID.valueOf(c.getContainerID()));
                 }
               }
             } catch (Exception e) {
@@ -231,7 +232,7 @@ public class TestContainerChoosingPolicy {
   }
 
   public void createContainers() {
-    List<Long> closedContainerIDs = new ArrayList<>();
+    List<ContainerID> closedContainerIDs = new ArrayList<>();
     Random random = new Random();
     long startTime = System.currentTimeMillis();
 
@@ -256,7 +257,7 @@ public class TestContainerChoosingPolicy {
 
       // Collect IDs of closed containers
       if (!isOpen) {
-        closedContainerIDs.add((long) i);
+        closedContainerIDs.add(ContainerID.valueOf((long) i));
       }
     }
 

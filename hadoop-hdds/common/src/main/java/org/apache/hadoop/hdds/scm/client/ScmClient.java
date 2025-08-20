@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
+import jakarta.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
@@ -496,24 +497,24 @@ public interface ScmClient extends Closeable {
    * @throws IOException
    */
   List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts,
-      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus)
+      @Nullable List<String> hosts,
+      @Nullable HddsProtos.DiskBalancerRunningStatus runningStatus)
       throws IOException;
 
   /**
    * Start DiskBalancer.
    */
   List<DatanodeAdminError> startDiskBalancer(
-      Optional<Double> threshold,
-      Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread,
-      Optional<Boolean> stopAfterDiskEven,
-      Optional<List<String>> hosts) throws IOException;
+      @Nullable Double threshold,
+      @Nullable Long bandwidthInMB,
+      @Nullable Integer parallelThread,
+      @Nullable Boolean stopAfterDiskEven,
+      @Nullable List<String> hosts) throws IOException;
 
   /**
    * Stop DiskBalancer.
    */
-  List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+  List<DatanodeAdminError> stopDiskBalancer(@Nullable List<String> hosts)
       throws IOException;
 
 
@@ -521,9 +522,9 @@ public interface ScmClient extends Closeable {
    * Update DiskBalancer Configuration.
    */
   List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      Optional<Double> threshold,
-      Optional<Long> bandwidth,
-      Optional<Integer> parallelThread,
-      Optional<Boolean> stopAfterDiskEven,
-      Optional<List<String>> hosts) throws IOException;
+      @Nullable Double threshold,
+      @Nullable Long bandwidth,
+      @Nullable Integer parallelThread,
+      @Nullable Boolean stopAfterDiskEven,
+      @Nullable List<String> hosts) throws IOException;
 }

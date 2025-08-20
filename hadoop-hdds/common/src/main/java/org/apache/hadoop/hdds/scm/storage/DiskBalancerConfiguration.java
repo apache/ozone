@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 
 import jakarta.annotation.Nonnull;
 import java.time.Duration;
-import java.util.Optional;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -117,13 +116,22 @@ public final class DiskBalancerConfiguration {
       description = "If true, the DiskBalancer will automatically stop once disks are balanced.")
   private boolean stopAfterDiskEven = true;
 
-  public DiskBalancerConfiguration(Optional<Double> threshold,
-      Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread, Optional<Boolean> stopAfterDiskEven) {
-    threshold.ifPresent(aDouble -> this.threshold = aDouble);
-    bandwidthInMB.ifPresent(aLong -> this.diskBandwidthInMB = aLong);
-    parallelThread.ifPresent(integer -> this.parallelThread = integer);
-    stopAfterDiskEven.ifPresent(bool -> this.stopAfterDiskEven = bool);
+  public DiskBalancerConfiguration(Double threshold,
+      Long bandwidthInMB,
+      Integer parallelThread,
+      Boolean stopAfterDiskEven) {
+    if (threshold != null) {
+      this.threshold = threshold;
+    }
+    if (bandwidthInMB != null) {
+      this.diskBandwidthInMB = bandwidthInMB;
+    }
+    if (parallelThread != null) {
+      this.parallelThread = parallelThread;
+    }
+    if (stopAfterDiskEven != null) {
+      this.stopAfterDiskEven = stopAfterDiskEven;
+    }
   }
 
   public DiskBalancerConfiguration() {

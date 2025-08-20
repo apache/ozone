@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -103,7 +102,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
   @AfterEach
   public void stopDiskBalancer() throws IOException, InterruptedException, TimeoutException {
     // Stop disk balancer after each test
-    diskBalancerManager.stopDiskBalancer(Optional.empty());
+    diskBalancerManager.stopDiskBalancer(null);
     // Verify that all DNs have stopped DiskBalancerService
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       GenericTestUtils.waitFor(() -> {
@@ -124,11 +123,11 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Start disk balancer on all DNs
     diskBalancerManager.startDiskBalancer(
-        Optional.of(10.0),
-        Optional.of(10L),
-        Optional.of(5),
-        Optional.of(false),
-        Optional.empty());
+        10.0,
+        10L,
+        5,
+        false,
+        null);
 
     NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
 
@@ -149,8 +148,8 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     //get diskBalancer status
     List<HddsProtos.DatanodeDiskBalancerInfoProto> statusProtoList =
-        diskBalancerManager.getDiskBalancerStatus(Optional.empty(),
-            Optional.empty(),
+        diskBalancerManager.getDiskBalancerStatus(null,
+            null,
             ClientVersion.CURRENT_VERSION);
 
     // Verify that decommissioning and maintenance DN is not
@@ -193,8 +192,8 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // Verify that recommissioned DN is included in DiskBalancer report and status
     reportProtoList = diskBalancerManager.getDiskBalancerReport(5,
         ClientVersion.CURRENT_VERSION);
-    statusProtoList = diskBalancerManager.getDiskBalancerStatus(Optional.empty(),
-        Optional.empty(),
+    statusProtoList = diskBalancerManager.getDiskBalancerStatus(null,
+        null,
         ClientVersion.CURRENT_VERSION);
 
     boolean isRecommissionedDnInReport = reportProtoList.stream()
@@ -228,18 +227,17 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Start disk balancer on this specific DN
     diskBalancerManager.startDiskBalancer(
-        Optional.of(10.0),
-        Optional.of(10L),
-        Optional.of(1),
-        Optional.of(false),
-        Optional.of(dnAddressList));
+        10.0,
+        10L,
+        1,
+        false,
+        dnAddressList);
 
     // Verify diskBalancer is running
     GenericTestUtils.waitFor(() -> {
       try {
         HddsProtos.DatanodeDiskBalancerInfoProto status =
-            diskBalancerManager.getDiskBalancerStatus(Optional.of(dnAddressList),
-                Optional.empty(),
+            diskBalancerManager.getDiskBalancerStatus(dnAddressList, null,
                 ClientVersion.CURRENT_VERSION).stream().findFirst().orElse(null);
         return status != null && status.getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.RUNNING;
       } catch (IOException e) {
@@ -258,7 +256,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
         100, 5000);
 
     // Attempt to stop disk balancer on the decommissioning DN
-    diskBalancerManager.stopDiskBalancer(Optional.of(dnAddressList));
+    diskBalancerManager.stopDiskBalancer(dnAddressList);
 
     // Verify disk balancer is now explicitly stopped (operationalState becomes STOPPED)
     final String expectedLogForStop =
@@ -272,8 +270,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Verify it does not automatically restart (since it was explicitly stopped)
     HddsProtos.DatanodeDiskBalancerInfoProto statusAfterRecommission =
-        diskBalancerManager.getDiskBalancerStatus(Optional.of(dnAddressList),
-            Optional.empty(),
+        diskBalancerManager.getDiskBalancerStatus(dnAddressList, null,
             ClientVersion.CURRENT_VERSION).stream().findFirst().orElse(null);
     assertEquals(HddsProtos.DiskBalancerRunningStatus.STOPPED, statusAfterRecommission.getRunningStatus());
   }
@@ -292,8 +289,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     GenericTestUtils.waitFor(() -> {
       try {
         HddsProtos.DatanodeDiskBalancerInfoProto status =
-            diskBalancerManager.getDiskBalancerStatus(Optional.of(dnAddressList),
-                Optional.empty(),
+            diskBalancerManager.getDiskBalancerStatus(dnAddressList, null,
                 ClientVersion.CURRENT_VERSION).stream().findFirst().orElse(null);
         return status != null && status.getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.STOPPED;
       } catch (IOException e) {
@@ -312,11 +308,11 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Attempt to start disk balancer on the decommissioning DN
     diskBalancerManager.startDiskBalancer(
-        Optional.of(10.0),
-        Optional.of(10L),
-        Optional.of(1),
-        Optional.of(false),
-        Optional.of(dnAddressList));
+        10.0,
+        10L,
+        1,
+        false,
+        dnAddressList);
 
     // Verify disk balancer goes to PAUSED_BY_NODE_STATE
     final String expectedLogForPause =
@@ -332,8 +328,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     GenericTestUtils.waitFor(() -> {
       try {
         HddsProtos.DatanodeDiskBalancerInfoProto status =
-            diskBalancerManager.getDiskBalancerStatus(Optional.of(dnAddressList),
-                Optional.empty(),
+            diskBalancerManager.getDiskBalancerStatus(dnAddressList, null,
                 ClientVersion.CURRENT_VERSION).stream().findFirst().orElse(null);
         return status != null && status.getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.RUNNING;
       } catch (IOException e) {

@@ -145,11 +145,6 @@ public interface Container<CONTAINERDATA extends ContainerData> {
       ContainerPacker<CONTAINERDATA> packer) throws IOException;
 
   /**
-   * Import the container from a container path.
-   */
-  void importContainerData(Path containerPath) throws IOException;
-
-  /**
    * Export all the data of the container to one output archive with the help
    * of the packer.
    *
@@ -204,7 +199,7 @@ public interface Container<CONTAINERDATA extends ContainerData> {
   /**
    * Copy all the data of the container to the destination path.
    */
-  void copyContainerData(Path destPath) throws IOException;
+  void copyContainerDirectory(Path destPath) throws IOException;
 
   /** Acquire read lock. */
   void readLock();

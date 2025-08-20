@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
+import jakarta.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
@@ -499,35 +500,35 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * Get DiskBalancer status.
    */
   List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      Optional<List<String>> hosts,
-      Optional<HddsProtos.DiskBalancerRunningStatus> runningStatus,
+      @Nullable List<String> hosts,
+      @Nullable HddsProtos.DiskBalancerRunningStatus runningStatus,
       int clientVersion) throws IOException;
 
   /**
    * Start DiskBalancer.
    */
   List<DatanodeAdminError> startDiskBalancer(
-      Optional<Double> threshold,
-      Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread,
-      Optional<Boolean> stopAfterDiskEven,
-      Optional<List<String>> hosts) throws IOException;
+      @Nullable Double threshold,
+      @Nullable Long bandwidthInMB,
+      @Nullable Integer parallelThread,
+      @Nullable Boolean stopAfterDiskEven,
+      @Nullable List<String> hosts) throws IOException;
 
   /**
    * Stop DiskBalancer.
    */
-  List<DatanodeAdminError> stopDiskBalancer(Optional<List<String>> hosts)
+  List<DatanodeAdminError> stopDiskBalancer(@Nullable List<String> hosts)
       throws IOException;
 
   /**
    * Update DiskBalancer Configuration.
    */
   List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      Optional<Double> threshold,
-      Optional<Long> bandwidthInMB,
-      Optional<Integer> parallelThread,
-      Optional<Boolean> stopAfterDiskEven,
-      Optional<List<String>> hosts) throws IOException;
+      @Nullable Double threshold,
+      @Nullable Long bandwidthInMB,
+      @Nullable Integer parallelThread,
+      @Nullable Boolean stopAfterDiskEven,
+      @Nullable List<String> hosts) throws IOException;
 
   /**
    * Trigger a reconcile command to datanodes for the current container ID.

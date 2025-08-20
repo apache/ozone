@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -58,20 +59,26 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
       List<HddsVolume> volumes = StorageVolumeUtil
           .getHddsVolumesList(volumeSet.getVolumesList())
           .stream()
-          .filter(volume ->
-              Math.abs(
-                  ((double)((volume.getCurrentUsage().getCapacity() - volume.getCurrentUsage().getAvailable())
+          .filter(volume -> {
+            SpaceUsageSource usage = volume.getCurrentUsage();
+
+            return Math.abs(
+                  ((double)((usage.getCapacity() - usage.getAvailable())
                       + deltaMap.getOrDefault(volume, 0L) + volume.getCommittedBytes()))
-                      / volume.getCurrentUsage().getCapacity() - idealUsage) >= normalizedThreshold)
-          .sorted((v1, v2) ->
-              Double.compare(
-                  (double) ((v2.getCurrentUsage().getCapacity() - v2.getCurrentUsage().getAvailable())
+                      / usage.getCapacity() - idealUsage) >= normalizedThreshold;
+
+          }).sorted((v1, v2) -> {
+            SpaceUsageSource usage1 = v1.getCurrentUsage();
+            SpaceUsageSource usage2 = v2.getCurrentUsage();
+
+            return Double.compare(
+                  (double) ((usage2.getCapacity() - usage2.getAvailable())
                       + deltaMap.getOrDefault(v2, 0L) + v2.getCommittedBytes()) /
-                      v2.getCurrentUsage().getCapacity(),
-                  (double) ((v1.getCurrentUsage().getCapacity() - v1.getCurrentUsage().getAvailable())
+                      usage2.getCapacity(),
+                  (double) ((usage1.getCapacity() - usage1.getAvailable())
                       + deltaMap.getOrDefault(v1, 0L) + v1.getCommittedBytes()) /
-                      v1.getCurrentUsage().getCapacity()))
-          .collect(Collectors.toList());
+                      usage1.getCapacity());
+          }).collect(Collectors.toList());
 
       // Can not generate DiskBalancerTask if we have less than 2 results
       if (volumes.size() <= 1) {

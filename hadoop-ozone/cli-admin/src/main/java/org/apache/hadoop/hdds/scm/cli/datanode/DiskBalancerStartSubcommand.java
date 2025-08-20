@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -43,19 +42,19 @@ public class DiskBalancerStartSubcommand extends ScmSubcommand {
       description = "Percentage deviation from average utilization of " +
           "the disks after which a datanode will be rebalanced (for " +
           "example, '10' for 10%%).")
-  private Optional<Double> threshold;
+  private Double threshold;
 
   @Option(names = {"-b", "--bandwidthInMB"},
       description = "Maximum bandwidth for DiskBalancer per second.")
-  private Optional<Long> bandwidthInMB;
+  private Long bandwidthInMB;
 
   @Option(names = {"-p", "--parallelThread"},
       description = "Max parallelThread for DiskBalancer.")
-  private Optional<Integer> parallelThread;
+  private Integer parallelThread;
 
   @Option(names = {"-s", "--stop-after-disk-even"},
       description = "Stop DiskBalancer automatically after disk utilization is even.")
-  private Optional<Boolean> stopAfterDiskEven;
+  private Boolean stopAfterDiskEven;
 
   @CommandLine.Mixin
   private DiskBalancerCommonOptions commonOptions =

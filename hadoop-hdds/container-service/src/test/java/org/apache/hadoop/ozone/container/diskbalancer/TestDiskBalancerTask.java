@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.hdds.utils.FaultInjector;
@@ -71,6 +72,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -84,7 +86,6 @@ import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -117,6 +118,7 @@ public class TestDiskBalancerTask {
   private static final long CONTAINER_SIZE = 1024L * 1024L; // 1 MB
 
   private final TestFaultInjector kvFaultInjector = new TestFaultInjector();
+  private String schemaVersion;
 
   /**
    * A FaultInjector that can be configured to throw an exception on a
@@ -306,8 +308,11 @@ public class TestDiskBalancerTask {
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
-  @Test
-  public void moveFailsAfterCopy() throws IOException, InterruptedException, TimeoutException, ExecutionException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void moveFailsAfterCopy(ContainerTestVersionInfo versionInfo)
+      throws IOException, InterruptedException, TimeoutException, ExecutionException {
+    setLayoutAndSchemaForTest(versionInfo);
+
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
@@ -335,7 +340,7 @@ public class TestDiskBalancerTask {
       }
       return false;
     }, 100, 30000);
-    assertTrue(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertTrue(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
 
     serviceFaultInjector.resume();
     // wait for task to be completed
@@ -351,12 +356,15 @@ public class TestDiskBalancerTask {
     assertFalse(Files.exists(tempContainerDir), "Temp container directory should be cleaned up");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
-    assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
-  @Test
-  public void moveFailsOnAtomicMove() throws IOException, InterruptedException, TimeoutException, ExecutionException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void moveFailsOnAtomicMove(ContainerTestVersionInfo versionInfo)
+      throws IOException, InterruptedException, TimeoutException, ExecutionException {
+    setLayoutAndSchemaForTest(versionInfo);
+
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
@@ -394,7 +402,7 @@ public class TestDiskBalancerTask {
       }
       return false;
     }, 100, 30000);
-    assertTrue(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertTrue(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     serviceFaultInjector.resume();
     completableFuture.get();
 
@@ -412,13 +420,15 @@ public class TestDiskBalancerTask {
     assertTrue(testfile.toFile().exists(), "testfile should not be cleaned up");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
-    assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
-  @Test
-  public void moveFailsDuringInMemoryUpdate()
+  @ContainerTestVersionInfo.ContainerTest
+  public void moveFailsDuringInMemoryUpdate(ContainerTestVersionInfo versionInfo)
       throws IOException, InterruptedException, TimeoutException, ExecutionException {
+    setLayoutAndSchemaForTest(versionInfo);
+
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.QUASI_CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
@@ -453,7 +463,7 @@ public class TestDiskBalancerTask {
       }
       return false;
     }, 100, 30000);
-    assertTrue(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertTrue(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     serviceFaultInjector.resume();
     // wait for task to be completed
     completableFuture.get();
@@ -476,12 +486,14 @@ public class TestDiskBalancerTask {
         "Moved container at destination should be cleaned up on failure");
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
-    assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
-  @Test
-  public void moveFailsDuringOldContainerRemove() throws IOException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void moveFailsDuringOldContainerRemove(ContainerTestVersionInfo versionInfo) throws IOException {
+    setLayoutAndSchemaForTest(versionInfo);
+
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
@@ -523,13 +535,15 @@ public class TestDiskBalancerTask {
       assertEquals(initialDestUsed + CONTAINER_SIZE,
           destVolume.getCurrentUsage().getUsedSpace());
       assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
-      assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+      assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
       assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
     }
   }
 
-  @Test
-  public void testDestVolumeCommittedSpaceReleased() throws IOException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDestVolumeCommittedSpaceReleased(ContainerTestVersionInfo versionInfo) throws IOException {
+    setLayoutAndSchemaForTest(versionInfo);
+
     createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
@@ -558,7 +572,7 @@ public class TestDiskBalancerTask {
     assertEquals(0, destVolume.getCommittedBytes() - initialDestCommitted);
     assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
-    assertFalse(diskBalancerService.getInProgressContainers().contains(CONTAINER_ID));
+    assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
@@ -584,5 +598,10 @@ public class TestDiskBalancerTask {
 
   private DiskBalancerService.DiskBalancerTask getTask() {
     return (DiskBalancerService.DiskBalancerTask) diskBalancerService.getTasks().poll();
+  }
+
+  private void setLayoutAndSchemaForTest(ContainerTestVersionInfo versionInfo) {
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 }

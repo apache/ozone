@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.node;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -88,8 +87,7 @@ public class TestDiskBalancerManager {
         Collectors.toList());
 
     List<HddsProtos.DatanodeDiskBalancerInfoProto> statusProtoList =
-        diskBalancerManager.getDiskBalancerStatus(Optional.of(dns),
-            Optional.empty(),
+        diskBalancerManager.getDiskBalancerStatus(dns, null,
             ClientVersion.CURRENT_VERSION);
 
     Assertions.assertEquals(3, statusProtoList.size());
@@ -100,8 +98,7 @@ public class TestDiskBalancerManager {
         Collectors.toList());
 
     statusProtoList =
-        diskBalancerManager.getDiskBalancerStatus(Optional.of(dns),
-            Optional.empty(),
+        diskBalancerManager.getDiskBalancerStatus(dns, null,
             ClientVersion.CURRENT_VERSION);
 
     Assertions.assertEquals(1, statusProtoList.size());
