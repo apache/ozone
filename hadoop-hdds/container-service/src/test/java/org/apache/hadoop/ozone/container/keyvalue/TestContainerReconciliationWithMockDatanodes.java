@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
@@ -60,7 +61,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.text.RandomStringGenerator;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -197,7 +197,7 @@ public class TestContainerReconciliationWithMockDatanodes {
   @MethodSource("corruptionValues")
   public void testContainerReconciliation(int numBlocksToDelete, int numChunksToCorrupt) throws Exception {
     LOG.info("Healthy data checksum for container {} in this test is {}", CONTAINER_ID,
-        HddsUtils.checksumToString(healthyDataChecksum));
+        checksumToString(healthyDataChecksum));
     // Introduce corruption in each container on different replicas.
     List<MockDatanode> dnsToCorrupt = datanodes.stream().limit(2).collect(Collectors.toList());
 
@@ -227,6 +227,82 @@ public class TestContainerReconciliationWithMockDatanodes {
     // After reconciliation, checksums should be the same for all containers.
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
+  }
+
+  /**
+   * Enum to represent different failure modes for container protocol calls.
+   */
+  public enum FailureLocation {
+    GET_CONTAINER_CHECKSUM_INFO("getContainerChecksumInfo"),
+    GET_BLOCK("getBlock"), 
+    READ_CHUNK("readChunk");
+    
+    private final String methodName;
+    
+    FailureLocation(String methodName) {
+      this.methodName = methodName;
+    }
+    
+    public String getMethodName() {
+      return methodName;
+    }
+  }
+
+  /**
+   * Provides test parameters for different failure modes.
+   */
+  public static Stream<Arguments> failureLocations() {
+    return Stream.of(
+        Arguments.of(FailureLocation.GET_CONTAINER_CHECKSUM_INFO),
+        Arguments.of(FailureLocation.GET_BLOCK),
+        Arguments.of(FailureLocation.READ_CHUNK)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("failureLocations")
+  public void testContainerReconciliationWithPeerFailure(FailureLocation failureLocation) throws Exception {
+    LOG.info("Testing container reconciliation with peer failure in {} for container {}", 
+        failureLocation.getMethodName(), CONTAINER_ID);
+    
+    // Introduce corruption in the first datanode
+    MockDatanode corruptedNode = datanodes.get(0);
+    MockDatanode healthyNode1 = datanodes.get(1);
+    MockDatanode healthyNode2 = datanodes.get(2);
+    corruptedNode.introduceCorruption(CONTAINER_ID, 1, 1, false);
+    
+    // Use synchronous on-demand scans to re-build the merkle trees after corruption.
+    datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
+    
+    // Without reconciliation, checksums should be different.
+    assertUniqueChecksumCount(CONTAINER_ID, datanodes, 2);
+    waitForExpectedScanCount(1);
+    
+    // Create a failing peer - we'll make the second datanode fail during the specified operation
+    DatanodeDetails failingPeerDetails = healthyNode1.getDnDetails();
+    // Mock the failure for the specific method based on the failure mode
+    mockContainerProtocolCalls(failureLocation, failingPeerDetails);
+    
+    // Now reconcile the corrupted node with its peers (including the failing one)
+    List<DatanodeDetails> peers = Arrays.asList(failingPeerDetails, healthyNode2.getDnDetails());
+    corruptedNode.reconcileContainer(dnClient, peers, CONTAINER_ID);
+    
+    // Wait for scan to complete - but this time we only expect the corrupted node to have a scan
+    // triggered by reconciliation, so we wait specifically for that one
+    try {
+      GenericTestUtils.waitFor(() -> corruptedNode.getOnDemandScanCount() == 2, 100, 5_000);
+    } catch (TimeoutException ex) {
+      LOG.warn("Timed out waiting for on-demand scan after reconciliation. Current count: {}", 
+          corruptedNode.getOnDemandScanCount());
+    }
+    
+    // The corrupted node should still be repaired because it was able to reconcile with the healthy peer
+    // even though one peer failed
+    long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
+    assertEquals(healthyDataChecksum, repairedDataChecksum);
+    
+    // Restore the original mock behavior for other tests
+    mockContainerProtocolCalls();
   }
 
   /**
@@ -260,6 +336,11 @@ public class TestContainerReconciliationWithMockDatanodes {
   }
 
   private static void mockContainerProtocolCalls() {
+    // Mock network calls without injecting failures.
+    mockContainerProtocolCalls(null, null);
+  }
+
+  private static void mockContainerProtocolCalls(FailureLocation failureLocation, DatanodeDetails failingPeerDetails) {
     Map<DatanodeDetails, MockDatanode> dnMap = datanodes.stream()
         .collect(Collectors.toMap(MockDatanode::getDnDetails, Function.identity()));
 
@@ -271,6 +352,11 @@ public class TestContainerReconciliationWithMockDatanodes {
           Pipeline pipeline = xceiverClientSpi.getPipeline();
           assertEquals(1, pipeline.size());
           DatanodeDetails dn = pipeline.getFirstNode();
+
+          if (failureLocation == FailureLocation.GET_CONTAINER_CHECKSUM_INFO && dn.equals(failingPeerDetails)) {
+            throw new IOException("Simulated peer failure for testing in getContainerChecksumInfo");
+          }
+
           return dnMap.get(dn).getChecksumInfo(containerID);
         });
 
@@ -282,6 +368,11 @@ public class TestContainerReconciliationWithMockDatanodes {
           Pipeline pipeline = xceiverClientSpi.getPipeline();
           assertEquals(1, pipeline.size());
           DatanodeDetails dn = pipeline.getFirstNode();
+
+          if (failureLocation == FailureLocation.GET_BLOCK && dn.equals(failingPeerDetails)) {
+            throw new IOException("Simulated peer failure for testing in getBlock");
+          }
+
           return dnMap.get(dn).getBlock(blockID);
         });
 
@@ -295,6 +386,11 @@ public class TestContainerReconciliationWithMockDatanodes {
           Pipeline pipeline = xceiverClientSpi.getPipeline();
           assertEquals(1, pipeline.size());
           DatanodeDetails dn = pipeline.getFirstNode();
+
+          if (failureLocation == FailureLocation.READ_CHUNK && dn.equals(failingPeerDetails)) {
+            throw new IOException("Simulated peer failure for testing in readChunk");
+          }
+
           return dnMap.get(dn).readChunk(blockId, chunkInfo, checksumValidators);
         });
 
@@ -368,8 +464,7 @@ public class TestContainerReconciliationWithMockDatanodes {
       } catch (IOException ex) {
         fail("Failed to read container checksum from disk", ex);
       }
-      log.info("Retrieved data checksum {} from container {}", HddsUtils.checksumToString(dataChecksum),
-          containerID);
+      log.info("Retrieved data checksum {} from container {}", checksumToString(dataChecksum), containerID);
       return dataChecksum;
     }
 

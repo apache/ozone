@@ -1552,7 +1552,7 @@
   </property>
 
   <property>
-    <name>ozone.compaction.service.enabled</name>
+    <name>ozone.om.compaction.service.enabled</name>
     <value>false</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
@@ -3512,6 +3512,17 @@
     <tag>OZONE, RECON</tag>
     <description>
       The number of Recon Tasks that are waiting on updates from OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.om.event.buffer.capacity</name>
+    <value>20000</value>
+    <tag>OZONE, RECON, OM, PERFORMANCE</tag>
+    <description>
+      Maximum capacity of the event buffer used by Recon to queue OM delta updates
+      during task reinitialization. When tasks are being reprocessed on staging DB,
+      this buffer holds incoming delta updates to prevent blocking the OM sync process.
+      If the buffer overflows, task reinitialization will be triggered.
     </description>
   </property>
   <property>

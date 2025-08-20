@@ -494,6 +494,11 @@ public class OzoneContainer {
     backgroundScanners.forEach(AbstractBackgroundContainerScanner::unpause);
   }
 
+  @VisibleForTesting
+  public OnDemandContainerScanner getOnDemandScanner() {
+    return onDemandScanner;
+  }
+
   /**
    * Starts serving requests to ozone container.
    *
