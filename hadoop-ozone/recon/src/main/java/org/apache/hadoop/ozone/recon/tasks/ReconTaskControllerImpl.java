@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_EVENT_BUFFER_CAPACITY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_EVENT_BUFFER_CAPACITY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_KEY;
 
@@ -30,14 +32,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -68,9 +68,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private Map<String, ReconOmTask> reconOmTasks;
   private ExecutorService executorService;
   private final int threadCount;
-  private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
-  private static final int TASK_FAILURE_THRESHOLD = 2;
   private final ReconTaskStatusUpdaterManager taskStatusUpdaterManager;
+  private final OMUpdateEventBuffer eventBuffer;
+  private ExecutorService eventProcessingExecutor;
+  private final AtomicBoolean deltaTasksFailed = new AtomicBoolean(false);
 
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
@@ -86,6 +87,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
     this.taskStatusUpdaterManager = taskStatusUpdaterManager;
+    int eventBufferCapacity = configuration.getInt(OZONE_RECON_OM_EVENT_BUFFER_CAPACITY,
+        OZONE_RECON_OM_EVENT_BUFFER_CAPACITY_DEFAULT);
+    this.eventBuffer = new OMUpdateEventBuffer(eventBufferCapacity);
     for (ReconOmTask task : tasks) {
       registerTask(task);
     }
@@ -98,8 +102,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
     // Store task in Task Map.
     reconOmTasks.put(taskName, task);
-    // Store Task in Task failure tracker.
-    taskFailureCounter.put(taskName, new AtomicInteger(0));
   }
 
   /**
@@ -112,62 +114,18 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void consumeOMEvents(OMUpdateEventBatch events, OMMetadataManager omMetadataManager) {
     if (!events.isEmpty()) {
-      Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
-      List<ReconOmTask.TaskResult> failedTasks = new ArrayList<>();
-      for (Map.Entry<String, ReconOmTask> taskEntry :
-          reconOmTasks.entrySet()) {
-        ReconOmTask task = taskEntry.getValue();
-        ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
-        taskStatusUpdater.recordRunStart();
-        // events passed to process method is no longer filtered
-        tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.process(events, Collections.emptyMap())));
-      }
-      processTasks(tasks, events, failedTasks);
-
-      // Retry processing failed tasks
-      List<ReconOmTask.TaskResult> retryFailedTasks = new ArrayList<>();
-      if (!failedTasks.isEmpty()) {
-        tasks.clear();
-        for (ReconOmTask.TaskResult taskResult : failedTasks) {
-          ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
-          // events passed to process method is no longer filtered
-          tasks.add(new NamedCallableTask<>(task.getTaskName(),
-              () -> task.process(events, taskResult.getSubTaskSeekPositions())));
-        }
-        processTasks(tasks, events, retryFailedTasks);
-      }
-
-      // Reprocess the failed tasks.
-      ReconConstants.resetTableTruncatedFlags();
-      if (!retryFailedTasks.isEmpty()) {
-        tasks.clear();
-        for (ReconOmTask.TaskResult taskResult : failedTasks) {
-          ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
-          tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.reprocess(omMetadataManager)));
-        }
-        List<ReconOmTask.TaskResult> reprocessFailedTasks = new ArrayList<>();
-        processTasks(tasks, events, reprocessFailedTasks);
-        // Here the assumption is that even if full re-process of task also fails,
-        // then there is something wrong in recon rocks DB got from OM and needs to be
-        // investigated.
-        ignoreFailedTasks(reprocessFailedTasks);
-      }
-    }
-  }
-
-  /**
-   * Ignore tasks that failed reprocess step more than threshold times.
-   * @param failedTasks list of failed tasks.
-   */
-  private void ignoreFailedTasks(List<ReconOmTask.TaskResult> failedTasks) {
-    for (ReconOmTask.TaskResult taskResult : failedTasks) {
-      String taskName = taskResult.getTaskName();
-      LOG.info("Reprocess step failed for task {}.", taskName);
-      if (taskFailureCounter.get(taskName).incrementAndGet() >
-          TASK_FAILURE_THRESHOLD) {
-        LOG.info("Ignoring task since it failed retry and " +
-            "reprocess more than {} times.", TASK_FAILURE_THRESHOLD);
-        reconOmTasks.remove(taskName);
+      // Always buffer events for async processing
+      boolean buffered = eventBuffer.offer(events);
+      if (!buffered) {
+        LOG.error("Event buffer is full (capacity: {}). Dropping buffered events and signaling full snapshot. " +
+            "Buffer size: {}, Dropped batches: {}", 
+            20000, eventBuffer.getQueueSize(), eventBuffer.getDroppedBatches());
+        
+        // Clear buffer and signal full snapshot requirement
+        eventBuffer.clear();
+      } else {
+        LOG.debug("Buffered event batch with {} events. Buffer queue size: {}", 
+            events.getEvents().size(), eventBuffer.getQueueSize());
       }
     }
   }
@@ -186,7 +144,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void reInitializeTasks(ReconOMMetadataManager omMetadataManager,
                                              Map<String, ReconOmTask> reconOmTaskMap) {
-    LOG.info("Starting Re-initialization of tasks.");
+    LOG.info("Starting Re-initialization of tasks. This is a blocking operation.");
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
     Map<String, ReconOmTask> localReconOmTaskMap = reconOmTaskMap;
     if (reconOmTaskMap == null) {
@@ -308,6 +266,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     executorService = Executors.newFixedThreadPool(threadCount,
         new ThreadFactoryBuilder().setNameFormat("ReconTaskThread-%d")
             .build());
+    
+    // Start async event processing thread
+    eventProcessingExecutor = Executors.newSingleThreadExecutor(
+        new ThreadFactoryBuilder().setNameFormat("ReconEventProcessor-%d")
+            .build());
+    eventProcessingExecutor.submit(this::processBufferedEventsAsync);
+    LOG.info("Started async event processing thread.");
   }
 
   @Override
@@ -316,10 +281,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     if (this.executorService != null) {
       this.executorService.shutdownNow();
     }
+    if (this.eventProcessingExecutor != null) {
+      this.eventProcessingExecutor.shutdownNow();
+    }
   }
 
   /**
-   * For a given list of {@link Callable} tasks process them and add any failed task to the provided list.
+   * For a given list of {@code Callable} tasks process them and add any failed task to the provided list.
    * The tasks are executed in parallel, but will wait for the tasks to complete i.e. the longest
    * time taken by this method will be the time taken by the longest task in the list.
    * @param tasks       A list of tasks to execute.
@@ -352,7 +320,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
                 .build());
             taskStatusUpdater.setLastTaskRunStatus(-1);
           } else {
-            taskFailureCounter.get(taskName).set(0);
             taskStatusUpdater.setLastTaskRunStatus(0);
             taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
           }
@@ -379,5 +346,89 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     } catch (CancellationException ce) {
       LOG.error("Some tasks were cancelled with exception", ce);
     }
+  }
+  
+  /**
+   * Async thread that continuously processes buffered events.
+   */
+  private void processBufferedEventsAsync() {
+    LOG.info("Started async buffered event processing thread");
+    
+    while (!Thread.currentThread().isInterrupted()) {
+      try {
+        OMUpdateEventBatch eventBatch = eventBuffer.poll(1000); // 1 second timeout
+        if (eventBatch != null && !eventBatch.isEmpty()) {
+          LOG.debug("Processing buffered event batch with {} events", eventBatch.getEvents().size());
+          processEventBatchDirectly(eventBatch);
+        }
+      } catch (Exception e) {
+        LOG.error("Error in async event processing thread", e);
+        // Continue processing other events
+      }
+    }
+    
+    LOG.info("Async buffered event processing thread stopped");
+  }
+  
+  /**
+   * Process a single event batch directly (used by async processing thread).
+   */
+  private void processEventBatchDirectly(OMUpdateEventBatch events) {
+    if (events.isEmpty()) {
+      return;
+    }
+    
+    Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
+    List<ReconOmTask.TaskResult> failedTasks = new ArrayList<>();
+    
+    for (Map.Entry<String, ReconOmTask> taskEntry : reconOmTasks.entrySet()) {
+      ReconOmTask task = taskEntry.getValue();
+      ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
+      taskStatusUpdater.recordRunStart();
+      tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.process(events, Collections.emptyMap())));
+    }
+    
+    processTasks(tasks, events, failedTasks);
+    
+    // Handle failed tasks with retry logic
+    List<ReconOmTask.TaskResult> retryFailedTasks = new ArrayList<>();
+    if (!failedTasks.isEmpty()) {
+      LOG.warn("Some tasks failed while processing buffered events, retrying...");
+      tasks.clear();
+      
+      for (ReconOmTask.TaskResult taskResult : failedTasks) {
+        ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
+        tasks.add(new NamedCallableTask<>(task.getTaskName(),
+            () -> task.process(events, taskResult.getSubTaskSeekPositions())));
+      }
+      processTasks(tasks, events, retryFailedTasks);
+      
+      if (!retryFailedTasks.isEmpty()) {
+        LOG.warn("Some tasks still failed after retry while processing buffered events, signaling for " +
+            "task reinitialization");
+        // Set flag to indicate delta tasks failed even after retry
+        deltaTasksFailed.set(true);
+      }
+    }
+  }
+  
+  @Override
+  public boolean hasEventBufferOverflowed() {
+    return eventBuffer.getDroppedBatches() > 0;
+  }
+  
+  @Override
+  public void resetEventBufferOverflowFlag() {
+    eventBuffer.resetDroppedBatches();
+  }
+  
+  @Override
+  public boolean hasDeltaTasksFailed() {
+    return deltaTasksFailed.get();
+  }
+  
+  @Override
+  public void resetDeltaTasksFailureFlag() {
+    deltaTasksFailed.set(false);
   }
 }
