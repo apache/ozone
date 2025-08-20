@@ -26,6 +26,7 @@ import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
@@ -40,6 +41,8 @@ import org.apache.hadoop.ozone.recon.api.types.GlobalStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.UsedSpaceBreakDown;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This endpoint handles requests related to storage distribution across
@@ -54,13 +57,14 @@ import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
  * An instance of {@link ReconNodeManager} is used to fetch detailed
  * node-specific statistics required for generating the report.
  */
-@Path("/storagedistribution")
+@Path("/storageDistribution")
 @Produces("application/json")
 public class StorageDistributionEndpoint {
   private final ReconNodeManager nodeManager;
   private final OMDBInsightEndpoint omdbInsightEndpoint;
   private final NSSummaryEndpoint nsSummaryEndpoint;
   private final StorageContainerLocationProtocol scmClient;
+  private static Logger log = LoggerFactory.getLogger(StorageDistributionEndpoint.class);
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
@@ -94,11 +98,14 @@ public class StorageDistributionEndpoint {
 
   private Map<String, Long> calculateNamespaceMetrics() {
     Map<String, Long> metrics = new HashMap<>();
-    long totalPendingAtOmSide = calculatePendingSizes();
+    Map<String, Long> totalPendingAtOmSide = calculatePendingSizes();
     long totalOpenKeySize = calculateOpenKeySizes();
     long totalCommittedSize = calculateCommittedSize();
-    long totalUsedNamespace = totalPendingAtOmSide + totalOpenKeySize + totalCommittedSize;
-    metrics.put("totalPendingAtOmSide", totalPendingAtOmSide);
+    long pendingDirectorySize = totalPendingAtOmSide.getOrDefault("pendingDirectorySize", 0L);
+    long pendingKeySize = totalPendingAtOmSide.getOrDefault("pendingKeySize", 0L);
+    long totalUsedNamespace = pendingDirectorySize + pendingKeySize + totalOpenKeySize + totalCommittedSize;
+    metrics.put("pendingDirectorySize", pendingDirectorySize);
+    metrics.put("pendingKeySize", pendingKeySize);
     metrics.put("totalOpenKeySize", totalOpenKeySize);
     metrics.put("totalCommittedSize", totalCommittedSize);
     metrics.put("totalUsedNamespace", totalUsedNamespace);
@@ -113,12 +120,15 @@ public class StorageDistributionEndpoint {
     try {
       scmSummary = scmClient.getDeletedBlockSummary();
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      log.error("Failed to get deleted block summary from SCM", e);
+      throw new WebApplicationException("Unable to retrieve storage metrics",
+          Response.Status.INTERNAL_SERVER_ERROR);
     }
     long totalPendingAtDnSide = nodeStorageReports.stream().mapToLong(DatanodeStorageReport::getPendingDeletions).sum();
 
     DeletionPendingBytesByStage deletionPendingBytesByStage =
-        createDeletionPendingBytesByStage(namespaceMetrics.get("totalPendingAtOmSide"),
+        createDeletionPendingBytesByStage(namespaceMetrics.getOrDefault("pendingDirectorySize", 0L),
+            namespaceMetrics.getOrDefault("pendingKeySize", 0L),
             scmSummary.getTotalBlockReplicatedSize(),
             totalPendingAtDnSide);
     return StorageCapacityDistributionResponse.newBuilder()
@@ -138,44 +148,52 @@ public class StorageDistributionEndpoint {
         .collect(Collectors.toList());
   }
 
-  private long calculatePendingSizes() {
+  private Map<String, Long> calculatePendingSizes() {
+    Map<String, Long> result = new HashMap<>();
     Map<String, Long> pendingDeletedDirSizes = new HashMap<>();
     omdbInsightEndpoint.calculateTotalPendingDeletedDirSizes(pendingDeletedDirSizes);
     Map<String, Long> pendingKeySize = new HashMap<>();
     omdbInsightEndpoint.createKeysSummaryForDeletedKey(pendingKeySize);
-    long totalPendingDeletedDirSize = pendingDeletedDirSizes.getOrDefault("totalReplicatedDataSize", 0L);
-    long totalPendingKeySize = pendingKeySize.getOrDefault("totalReplicatedDataSize", 0L);
-    return totalPendingDeletedDirSize + totalPendingKeySize;
+    result.put("pendingDirectorySize", pendingDeletedDirSizes.getOrDefault("totalReplicatedDataSize", 0L));
+    result.put("pendingKeySize", pendingKeySize.getOrDefault("totalReplicatedDataSize", 0L));
+    return result;
   }
 
   private long calculateOpenKeySizes() {
     Map<String, Long> openKeySummary = new HashMap<>();
     omdbInsightEndpoint.createKeysSummaryForOpenKey(openKeySummary);
-    omdbInsightEndpoint.createKeysSummaryForOpenMPUKey(openKeySummary);
-    Map<String, Long> pendingKeySize = new HashMap<>();
-    omdbInsightEndpoint.createKeysSummaryForDeletedKey(pendingKeySize);
+    Map<String, Long> openKeyMPUSummary = new HashMap<>();
+    omdbInsightEndpoint.createKeysSummaryForOpenMPUKey(openKeyMPUSummary);
     long openKeyDataSize = openKeySummary.getOrDefault("totalReplicatedDataSize", 0L);
-    long totalMPUKeySize = pendingKeySize.getOrDefault("totalDataSize", 0L);
+    long totalMPUKeySize = openKeyMPUSummary.getOrDefault("totalReplicatedDataSize", 0L);
     return openKeyDataSize + totalMPUKeySize;
   }
 
   private long calculateCommittedSize() {
     try {
       Response rootResponse = nsSummaryEndpoint.getDiskUsage("/", false, true, false);
+      if (rootResponse.getStatus() != Response.Status.OK.getStatusCode()) {
+        log.warn("Failed to get disk usage, status: {}", rootResponse.getStatus());
+        return 0L;
+      }
       DUResponse duRootRes = (DUResponse) rootResponse.getEntity();
-      return duRootRes.getSizeWithReplica();
+      return duRootRes != null ? duRootRes.getSizeWithReplica() : 0L;
     } catch (IOException e) {
-      return -1;
+      log.error("IOException while calculating committed size", e);
+      return 0L;
     }
   }
 
-  private DeletionPendingBytesByStage createDeletionPendingBytesByStage(long totalPendingAtOmSide,
+  private DeletionPendingBytesByStage createDeletionPendingBytesByStage(long pendingDirectorySize,
+                                                                        long pendingKeySize,
                                                                         long totalPendingAtScmSide,
                                                                         long totalPendingAtDnSide) {
-    long totalPending = totalPendingAtOmSide + totalPendingAtScmSide + totalPendingAtDnSide;
+    long totalPending = pendingDirectorySize + pendingKeySize + totalPendingAtScmSide + totalPendingAtDnSide;
     Map<String, Map<String, Long>> stageItems = new HashMap<>();
     Map<String, Long> omMap = new HashMap<>();
-    omMap.put("pendingBytes", totalPendingAtOmSide);
+    omMap.put("pendingBytes", pendingDirectorySize + pendingKeySize);
+    omMap.put("pendingDirectoryBytes", pendingDirectorySize);
+    omMap.put("pendingKeyBytes", pendingKeySize);
     Map<String, Long> scmMap = new HashMap<>();
     scmMap.put("pendingBytes", totalPendingAtScmSide);
     Map<String, Long> dnMap = new HashMap<>();
