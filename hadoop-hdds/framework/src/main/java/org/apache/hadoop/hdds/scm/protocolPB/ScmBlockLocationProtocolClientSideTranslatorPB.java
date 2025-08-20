@@ -253,7 +253,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
     int serializedSize = 0;
     for (BlockGroup bg : keyBlocksInfoList) {
-      int currSize = bg.getProto().getSerializedSize();
+      KeyBlocks bgProto = bg.getProto();
+      int currSize = bgProto.getSerializedSize();
       if (currSize + serializedSize > ratisByteLimit) {
         allResults.addAll(submitDeleteKeyBlocks(batch));
         if (LOG.isDebugEnabled()) {
@@ -262,7 +263,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
         serializedSize = 0;
         batch.clear();
       }
-      batch.add(bg.getProto());
+      batch.add(bgProto);
       serializedSize += currSize;
     }
 

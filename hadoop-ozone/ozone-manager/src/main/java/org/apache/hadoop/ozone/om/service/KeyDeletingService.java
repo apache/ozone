@@ -154,8 +154,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
       long purgeStartTime = Time.monotonicNow();
-      purgeResult = submitPurgeKeysRequest(blockDeletionResults,
-          keysToModify, renameEntries, snapTableKey, expectedPreviousSnapshotId, ratisByteLimit, keyBlockReplicatedSize);
+      purgeResult = submitPurgeKeysRequest(blockDeletionResults, keysToModify, renameEntries, snapTableKey,
+          expectedPreviousSnapshotId, ratisByteLimit, keyBlockReplicatedSize);
       int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
@@ -292,9 +292,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       while (!batchCapacityReached && updateIndex < keysToUpdateList.size()) {
         OzoneManagerProtocolProtos.SnapshotMoveKeyInfos nextUpdate = keysToUpdateList.get(updateIndex);
 
-        PurgeKeysRequest.Builder tempBuilder = requestBuilder.clone();
-        tempBuilder.addKeysToUpdate(nextUpdate);
-        int estimatedSize = tempBuilder.build().getSerializedSize();
+        int estimatedSize = nextUpdate.getSerializedSize();
 
         if (currSize + estimatedSize > ratisLimit) {
           batchCapacityReached = true;
@@ -311,9 +309,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           renameIndex < renameEntriesToBeDeleted.size()) {
         String nextRename = renameEntriesToBeDeleted.get(renameIndex);
 
-        PurgeKeysRequest.Builder tempBuilder = requestBuilder.clone();
-        tempBuilder.addRenamedKeys(nextRename);
-        int estimatedSize = tempBuilder.build().getSerializedSize();
+        int estimatedSize = estimateStringEntrySize(nextRename);
 
         if (currSize + estimatedSize > ratisLimit) {
           break;
