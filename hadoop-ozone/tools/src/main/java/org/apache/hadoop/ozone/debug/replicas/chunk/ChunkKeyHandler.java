@@ -238,6 +238,7 @@ public class ChunkKeyHandler extends KeyHandler {
         jsonGen.writeEndArray(); // End keyLocations array
         jsonGen.writeEndObject(); // End root object
         jsonGen.flush();
+        System.out.println();
       }
     }
   }
