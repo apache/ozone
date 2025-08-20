@@ -328,8 +328,7 @@ public final class KeyValueContainerUtil {
       blockPendingDeletion = pendingDeleteBlockCount;
       if (pendingDeletionBlockBytes != null) {
         blockPendingDeletionBytes = pendingDeletionBlockBytes;
-      }
-      else if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
+      } else if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
         LOG.warn("Missing pendingDeletionSize from {}: recalculate them from  delete txn tables",
             metadataTable.getName());
         ObjectNode pendingDeletions = getAggregateValues(store, kvContainerData, kvContainerData.getSchemaVersion());
