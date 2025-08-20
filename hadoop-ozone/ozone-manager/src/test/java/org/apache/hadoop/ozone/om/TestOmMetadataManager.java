@@ -603,6 +603,58 @@ public class TestOmMetadataManager {
 
   }
 
+  @Test
+  public void testListKeysWithEntriesInCacheAndDB() throws Exception {
+    String volumeNameA = "volumeA";
+    String ozoneBucket = "ozoneBucket";
+
+    // Create volumes and bucket.
+    OMRequestTestUtils.addVolumeToDB(volumeNameA, omMetadataManager);
+
+    addBucketsToCache(volumeNameA, ozoneBucket);
+
+    String prefixKeyA = "key-a";
+    TreeMap<String, OmKeyInfo> keyAMap = new TreeMap<>();
+
+    for (int i = 1; i <= 100; i++) {
+      if (i % 2 == 0) {
+        // Add to DB
+        addKeysToOM(volumeNameA, ozoneBucket, prefixKeyA + i, i);
+
+        String key = omMetadataManager.getOzoneKey(volumeNameA,
+            ozoneBucket, prefixKeyA + i);
+        // Key is overwritten in cache (with higher updateID),
+        // but the cache has not been flushed to the DB
+        OmKeyInfo overwriteKey = OMRequestTestUtils.createOmKeyInfo(volumeNameA, ozoneBucket, prefixKeyA + i,
+            RatisReplicationConfig.getInstance(ONE)).setUpdateID(100L).build();
+        omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
+            new CacheKey<>(key),
+            CacheValue.get(100L, overwriteKey));
+        keyAMap.put(prefixKeyA + i, overwriteKey);
+      } else {
+        // Add to cache
+        OmKeyInfo omKeyInfo = addKeysToOM(volumeNameA, ozoneBucket, prefixKeyA + i, i);
+        keyAMap.put(prefixKeyA + i, omKeyInfo);
+      }
+    }
+
+    // Now list keys which match with prefixKeyA.
+    List<OmKeyInfo> omKeyInfoList =
+        omMetadataManager.listKeys(volumeNameA, ozoneBucket,
+            null, prefixKeyA, 1000).getKeys();
+
+    assertEquals(100, omKeyInfoList.size());
+
+    TreeMap<String, OmKeyInfo> currentKeys = new TreeMap<>();
+
+    for (OmKeyInfo omKeyInfo : omKeyInfoList) {
+      currentKeys.put(omKeyInfo.getKeyName(), omKeyInfo);
+      assertTrue(omKeyInfo.getKeyName().startsWith(prefixKeyA));
+    }
+
+    assertEquals(keyAMap, currentKeys);
+  }
+
   /**
    * Tests inner impl of listOpenFiles with different bucket types with and
    * without pagination. NOTE: This UT does NOT test hsync here since the hsync
@@ -989,14 +1041,14 @@ public class TestOmMetadataManager {
         .collect(Collectors.toList());
   }
 
-  private void addKeysToOM(String volumeName, String bucketName,
+  private OmKeyInfo addKeysToOM(String volumeName, String bucketName,
       String keyName, int i) throws Exception {
 
     if (i % 2 == 0) {
-      OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+      return OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
           1000L, RatisReplicationConfig.getInstance(ONE), omMetadataManager);
     } else {
-      OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName, keyName,
+      return OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName, keyName,
           RatisReplicationConfig.getInstance(ONE),
           omMetadataManager);
     }
