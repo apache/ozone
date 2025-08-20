@@ -16,20 +16,20 @@
  * limitations under the License.
  */
 
-export type DUSubpath = {
+export type NUSubpath = {
   path: string;
   size: number;
   sizeWithReplica: number;
   isKey: boolean;
 }
 
-export type DUResponse = {
+export type NUResponse = {
   status: string;
   path: string;
   subPathCount: number;
   size: number;
   sizeWithReplica: number;
-  subPaths: DUSubpath[];
+  subPaths: NUSubpath[];
   sizeDirectKey: number;
 }
 
