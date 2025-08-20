@@ -800,8 +800,10 @@ public class TestReplicationSupervisor {
       // Create reconcile commands with the same container ID but different peers
       ReconcileContainerCommand command1 = new ReconcileContainerCommand(containerID, Collections.singleton(
           MockDatanodeDetails.randomDatanodeDetails()));
+      command1.setTerm(1);
       ReconcileContainerCommand command2 = new ReconcileContainerCommand(containerID, Collections.singleton(
           MockDatanodeDetails.randomDatanodeDetails()));
+      command2.setTerm(1);
       assertEquals(command1, command2);
 
       // Create a controller that blocks the execution of reconciliation until the latch is counted down from the test.
