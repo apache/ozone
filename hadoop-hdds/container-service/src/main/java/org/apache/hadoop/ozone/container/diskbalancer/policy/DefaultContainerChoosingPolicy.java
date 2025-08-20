@@ -25,6 +25,7 @@ import com.google.common.cache.CacheBuilder;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -48,7 +49,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
 
   @Override
   public ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume hddsVolume, Set<Long> inProgressContainerIDs) {
+      HddsVolume hddsVolume, Set<ContainerID> inProgressContainerIDs) {
     Iterator<Container<?>> itr;
     try {
       itr = CACHE.get().get(hddsVolume,
@@ -61,7 +62,8 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
       if (!inProgressContainerIDs.contains(
-          containerData.getContainerID()) && (containerData.isClosed() || (test && containerData.isQuasiClosed()))) {
+          ContainerID.valueOf(containerData.getContainerID())) &&
+          (containerData.isClosed() || (test && containerData.isQuasiClosed()))) {
         return containerData;
       }
     }

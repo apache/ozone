@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import jakarta.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -1213,8 +1214,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      List<String> hosts,
-      HddsProtos.DiskBalancerRunningStatus status,
+      @Nullable List<String> hosts,
+      @Nullable HddsProtos.DiskBalancerRunningStatus status,
       int clientVersion) throws IOException {
     DatanodeDiskBalancerInfoRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerInfoRequestProto.newBuilder()
@@ -1237,8 +1238,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public List<DatanodeAdminError> startDiskBalancer(Double threshold,
-      Long bandwidthInMB, Integer parallelThread,
-      Boolean stopAfterDiskEven, List<String> hosts)
+      @Nullable Long bandwidthInMB, @Nullable Integer parallelThread,
+      @Nullable Boolean stopAfterDiskEven, @Nullable List<String> hosts)
       throws IOException {
     HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
         HddsProtos.DiskBalancerConfigurationProto.newBuilder();
@@ -1277,7 +1278,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<DatanodeAdminError> stopDiskBalancer(List<String> hosts)
+  public List<DatanodeAdminError> stopDiskBalancer(@Nullable List<String> hosts)
       throws IOException {
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
         DatanodeDiskBalancerOpRequestProto.newBuilder()
@@ -1301,8 +1302,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   @Override
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      Double threshold, Long bandwidthInMB,
-      Integer parallelThread, Boolean stopAfterDiskEven, List<String> hosts)
+      @Nullable Double threshold, @Nullable Long bandwidthInMB,
+      @Nullable Integer parallelThread, @Nullable Boolean stopAfterDiskEven, @Nullable List<String> hosts)
       throws IOException {
     HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
         HddsProtos.DiskBalancerConfigurationProto.newBuilder();

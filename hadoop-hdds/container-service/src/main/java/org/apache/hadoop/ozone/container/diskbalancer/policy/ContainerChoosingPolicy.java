@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
 import java.util.Set;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -35,5 +36,5 @@ public interface ContainerChoosingPolicy {
    * @return a Container
    */
   ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume volume, Set<Long> inProgressContainerIDs);
+      HddsVolume volume, Set<ContainerID> inProgressContainerIDs);
 }

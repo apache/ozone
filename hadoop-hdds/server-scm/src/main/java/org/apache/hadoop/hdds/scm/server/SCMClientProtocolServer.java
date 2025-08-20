@@ -35,6 +35,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -1530,8 +1531,8 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<HddsProtos.DatanodeDiskBalancerInfoProto> getDiskBalancerStatus(
-      List<String> hosts,
-      HddsProtos.DiskBalancerRunningStatus status,
+      @Nullable List<String> hosts,
+      @Nullable HddsProtos.DiskBalancerRunningStatus status,
       int clientVersion) throws IOException {
     checkDiskBalancerEnabled();
     return scm.getDiskBalancerManager().getDiskBalancerStatus(hosts, status,
@@ -1539,9 +1540,9 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<DatanodeAdminError> startDiskBalancer(Double threshold,
-      Long bandwidthInMB, Integer parallelThread,
-      Boolean stopAfterDiskEven, List<String> hosts)
+  public List<DatanodeAdminError> startDiskBalancer(@Nullable Double threshold,
+      @Nullable Long bandwidthInMB, Integer parallelThread,
+      @Nullable Boolean stopAfterDiskEven, List<String> hosts)
       throws IOException {
     checkDiskBalancerEnabled();
 
@@ -1557,7 +1558,7 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<DatanodeAdminError> stopDiskBalancer(List<String> hosts)
+  public List<DatanodeAdminError> stopDiskBalancer(@Nullable List<String> hosts)
       throws IOException {
     checkDiskBalancerEnabled();
 
@@ -1572,8 +1573,8 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      Double threshold, Long bandwidthInMB,
-      Integer parallelThread, Boolean stopAfterDiskEven, List<String> hosts)
+      @Nullable Double threshold, @Nullable Long bandwidthInMB,
+      @Nullable Integer parallelThread, @Nullable Boolean stopAfterDiskEven, @Nullable List<String> hosts)
       throws IOException {
     checkDiskBalancerEnabled();
 

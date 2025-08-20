@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeChoosingPolicy;
@@ -83,8 +85,6 @@ public class DiskBalancerService extends BackgroundService {
 
   public static final String DISK_BALANCER_DIR = "diskBalancer";
 
-  private static final String DISK_BALANCER_TMP_DIR = "tmp";
-
   private OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
 
@@ -102,7 +102,7 @@ public class DiskBalancerService extends BackgroundService {
   private AtomicLong balancedBytesInLastWindow = new AtomicLong(0L);
   private AtomicLong nextAvailableTime = new AtomicLong(Time.monotonicNow());
 
-  private Set<Long> inProgressContainers;
+  private Set<ContainerID> inProgressContainers;
   private static FaultInjector injector;
 
   /**
@@ -408,7 +408,7 @@ public class DiskBalancerService extends BackgroundService {
         DiskBalancerTask task = new DiskBalancerTask(toBalanceContainer, sourceVolume,
             destVolume);
         queue.add(task);
-        inProgressContainers.add(toBalanceContainer.getContainerID());
+        inProgressContainers.add(ContainerID.valueOf(toBalanceContainer.getContainerID()));
         deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
             - toBalanceContainer.getBytesUsed());
       } else {
@@ -620,7 +620,7 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     private void postCall(boolean success, long startTime) {
-      inProgressContainers.remove(containerData.getContainerID());
+      inProgressContainers.remove(ContainerID.valueOf(containerData.getContainerID()));
       deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
           containerData.getBytesUsed());
       destVolume.incCommittedBytes(0 - containerDefaultSize);
@@ -677,7 +677,7 @@ public class DiskBalancerService extends BackgroundService {
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
     return Paths.get(hddsVolume.getVolumeRootDir())
-        .resolve(DISK_BALANCER_TMP_DIR).resolve(DISK_BALANCER_DIR);
+        .resolve(StorageVolume.TMP_DIR_NAME).resolve(DISK_BALANCER_DIR);
   }
 
   public DiskBalancerServiceMetrics getMetrics() {
@@ -708,7 +708,7 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   @VisibleForTesting
-  public Set<Long> getInProgressContainers() {
+  public Set<ContainerID> getInProgressContainers() {
     return inProgressContainers;
   }
 
