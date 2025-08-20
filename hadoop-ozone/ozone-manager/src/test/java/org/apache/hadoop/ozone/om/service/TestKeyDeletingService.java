@@ -65,7 +65,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -75,7 +74,6 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -146,7 +144,6 @@ class TestKeyDeletingService extends OzoneTestBase {
   private KeyDeletingService keyDeletingService;
   private DirectoryDeletingService directoryDeletingService;
   private ScmBlockLocationTestingClient scmBlockTestingClient;
-  private int ratisLimit;
   private DeletingServiceMetrics metrics;
 
   @BeforeAll
@@ -185,11 +182,6 @@ class TestKeyDeletingService extends OzoneTestBase {
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
-    int limit = (int) conf.getStorageSize(
-        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
-        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
-        StorageUnit.BYTES);
-    ratisLimit = (int) (limit * 0.9);
     metrics = keyDeletingService.getMetrics();
   }
 
@@ -242,7 +234,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertThat(getRunCount()).isGreaterThan(initialRunCount);
       assertThat(keyManager.getPendingDeletionKeys(new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
               ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
-              keyManager, om.getMetadataManager().getLock()), Integer.MAX_VALUE, ratisLimit).getKeyBlocksList())
+              keyManager, om.getMetadataManager().getLock()), Integer.MAX_VALUE).getKeyBlocksList())
           .isEmpty();
     }
 
@@ -271,7 +263,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 10000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
-      assertThat(keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit).getKeyBlocksList())
+      assertThat(keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE).getKeyBlocksList())
           .isEmpty();
 
       // The 1st version of the key has 1 block and the 2nd version has 2
@@ -316,7 +308,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertThat(keyManager.getPendingDeletionKeys(new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
               ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
               keyManager, om.getMetadataManager().getLock()),
-          Integer.MAX_VALUE, ratisLimit).getKeyBlocksList())
+          Integer.MAX_VALUE).getKeyBlocksList())
           .isEmpty();
 
       // deletedTable should have deleted key of the snapshot bucket
@@ -424,7 +416,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           Assertions.assertNotEquals(deletePathKey[0], group.getGroupID());
         }
         return pendingKeysDeletion;
-      }).when(km).getPendingDeletionKeys(any(), anyInt(), anyInt());
+      }).when(km).getPendingDeletionKeys(any(), anyInt());
       service.runPeriodicalTaskNow();
       service.runPeriodicalTaskNow();
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
@@ -1217,7 +1209,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private int countKeysPendingDeletion() {
     try {
-      final int count = keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit)
+      final int count = keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
           .getKeyBlocksList().size();
       LOG.debug("KeyManager keys pending deletion: {}", count);
       return count;
@@ -1228,7 +1220,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private long countBlocksPendingDeletion() {
     try {
-      return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE, ratisLimit)
+      return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
           .getKeyBlocksList()
           .stream()
           .map(BlockGroup::getBlockIDList)
