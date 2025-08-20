@@ -337,7 +337,8 @@ public class KeyLifecycleService extends BackgroundService {
             OM_KEY_PREFIX + bucket.getObjectID() + OM_KEY_PREFIX;
         StringBuffer directoryPath = new StringBuffer();
         if (!dirList.isEmpty()) {
-          prefix += dirList.get(dirList.size() - 1).getObjectID();
+          OmDirectoryInfo lastDir = dirList.get(dirList.size() - 1);
+          prefix += lastDir.getObjectID();
           for (OmDirectoryInfo dir : dirList) {
             directoryPath.append(dir.getName()).append(OM_KEY_PREFIX);
           }
@@ -347,7 +348,7 @@ public class KeyLifecycleService extends BackgroundService {
               sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
                   expiredDirList, true);
             }
-            expiredDirList.add(directoryPath.toString(), dirList.get(dirList.size() - 1).getUpdateID());
+            expiredDirList.add(directoryPath.toString(), lastDir.getUpdateID());
           }
         }
 
