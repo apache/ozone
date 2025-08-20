@@ -46,9 +46,10 @@ public class RatisContainerSafeModeRule extends AbstractContainerSafeModeRule {
 
   @Override
   protected void handleReportedContainer(ContainerID containerID, DatanodeID datanodeID) {
-    // assume minReplica == 1
-    Preconditions.assertSame(1, getMinReplica(containerID), "minReplica");
+    final int minReplica = getMinReplica(containerID);
     if (getContainers().remove(containerID) != null) {
+      // Assume minReplica == 1 for Ratis Containers.
+      Preconditions.assertSame(1, minReplica, "minReplica");
       incrementContainersWithMinReplicas();
       getSafeModeMetrics().incCurrentContainersWithOneReplicaReportedCount();
     }

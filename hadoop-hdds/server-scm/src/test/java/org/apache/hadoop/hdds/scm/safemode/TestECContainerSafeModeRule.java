@@ -27,7 +27,6 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -88,7 +87,7 @@ public class TestECContainerSafeModeRule {
     containers.add(mockECContainer(LifeCycleState.CLOSED, 1L));
     containers.add(mockECContainer(LifeCycleState.OPEN, 2L));
 
-    rule.refresh(false);
+    rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold());
   }
@@ -98,6 +97,7 @@ public class TestECContainerSafeModeRule {
       names = {"OPEN", "CLOSING", "QUASI_CLOSED", "CLOSED", "DELETING", "DELETED", "RECOVERING"})
   public void testValidateReturnsTrueAndFalse(LifeCycleState state) {
     containers.add(mockECContainer(state, 1L));
+    rule.refresh(true);
     boolean expected = state != LifeCycleState.QUASI_CLOSED && state != LifeCycleState.CLOSED;
     assertEquals(expected, rule.validate());
   }
@@ -137,7 +137,7 @@ public class TestECContainerSafeModeRule {
     containers.add(mockECContainer(LifeCycleState.CLOSED, 11L));
     containers.add(mockECContainer(LifeCycleState.CLOSED, 32L));
 
-    rule.refresh(false);
+    rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold(), "Threshold should be 0.0 when all containers are closed");
     assertFalse(rule.validate(), "Validate should return false when all containers are closed");
@@ -148,7 +148,7 @@ public class TestECContainerSafeModeRule {
     containers.add(mockECContainer(LifeCycleState.OPEN, 11L));
     containers.add(mockECContainer(LifeCycleState.OPEN, 32L));
 
-    rule.refresh(false);
+    rule.refresh(true);
 
     assertEquals(1.0, rule.getCurrentContainerThreshold(), "Threshold should be 1.0 when all containers are open");
     assertTrue(rule.validate(), "Validate should return true when all containers are open");
@@ -159,7 +159,7 @@ public class TestECContainerSafeModeRule {
     long containerId = 42L;
     containers.add(mockECContainer(LifeCycleState.OPEN, containerId));
 
-    rule.refresh(false);
+    rule.refresh(true);
 
     ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
     ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
@@ -170,7 +170,7 @@ public class TestECContainerSafeModeRule {
     when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
     when(report.getReport()).thenReturn(containerReport);
     when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
-    when(datanodeDetails.getUuid()).thenReturn(UUID.randomUUID());
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 
     rule.process(report);
     rule.process(report);
@@ -184,7 +184,7 @@ public class TestECContainerSafeModeRule {
     long containerId = 1L;
     containers.add(mockECContainer(LifeCycleState.OPEN, containerId));
 
-    rule.refresh(false);
+    rule.refresh(true);
 
     ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
     ContainerReportsProto reportsProto = mock(ContainerReportsProto.class);
@@ -195,7 +195,7 @@ public class TestECContainerSafeModeRule {
     when(reportsProto.getReportsList()).thenReturn(Collections.singletonList(replica));
     when(report.getReport()).thenReturn(reportsProto);
     when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
-    when(datanodeDetails.getUuid()).thenReturn(UUID.randomUUID());
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 
 
     rule.process(report);

@@ -185,7 +185,8 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
         .collect(Collectors.toList());
 
     if (!sampleContainers.isEmpty()) {
-      String sampleECContainerText = "Sample EC Containers not satisfying the criteria : " + sampleContainers + ";";
+      String sampleECContainerText = "Sample  " + getContainerType() + " Containers not satisfying the criteria : "
+          + sampleContainers + ";";
       status = status.concat("\n").concat(sampleECContainerText);
     }
 

@@ -29,6 +29,8 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -86,7 +88,7 @@ public class TestRatisContainerSafeModeRule {
     containers.add(mockRatisContainer(LifeCycleState.CLOSED, 1L));
     containers.add(mockRatisContainer(LifeCycleState.OPEN, 2L));
 
-    rule.refresh(false);
+    rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold());
   }
@@ -96,6 +98,7 @@ public class TestRatisContainerSafeModeRule {
       names = {"OPEN", "CLOSING", "QUASI_CLOSED", "CLOSED", "DELETING", "DELETED", "RECOVERING"})
   public void testValidateReturnsTrueAndFalse(LifeCycleState state) {
     containers.add(mockRatisContainer(state, 1L));
+    rule.refresh(true);
 
     boolean expected = state != LifeCycleState.QUASI_CLOSED && state != LifeCycleState.CLOSED;
     assertEquals(expected, rule.validate());
@@ -115,10 +118,13 @@ public class TestRatisContainerSafeModeRule {
     replicas.add(replica);
     ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
     NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
 
     when(replica.getContainerID()).thenReturn(containerId);
     when(containerReport.getReportsList()).thenReturn(replicas);
     when(report.getReport()).thenReturn(containerReport);
+    when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 
     rule.process(report);
 
@@ -130,7 +136,7 @@ public class TestRatisContainerSafeModeRule {
     containers.add(mockRatisContainer(LifeCycleState.CLOSED, 11L));
     containers.add(mockRatisContainer(LifeCycleState.CLOSED, 32L));
 
-    rule.refresh(false);
+    rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold(), "Threshold should be 0.0 when all containers are closed");
     assertFalse(rule.validate(), "Validate should return false when all containers are closed");
@@ -152,15 +158,18 @@ public class TestRatisContainerSafeModeRule {
     long containerId = 42L;
     containers.add(mockRatisContainer(LifeCycleState.OPEN, containerId));
 
-    rule.refresh(false);
+    rule.refresh(true);
 
     ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
     ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
     NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
 
     when(replica.getContainerID()).thenReturn(containerId);
     when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
     when(report.getReport()).thenReturn(containerReport);
+    when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 
     rule.process(report);
     rule.process(report);
@@ -179,10 +188,13 @@ public class TestRatisContainerSafeModeRule {
     ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
     ContainerReportsProto reportsProto = mock(ContainerReportsProto.class);
     NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
 
     when(replica.getContainerID()).thenReturn(containerId);
     when(reportsProto.getReportsList()).thenReturn(Collections.singletonList(replica));
     when(report.getReport()).thenReturn(reportsProto);
+    when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 
     rule.process(report);
 
