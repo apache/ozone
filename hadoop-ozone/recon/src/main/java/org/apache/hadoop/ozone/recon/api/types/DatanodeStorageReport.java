@@ -25,9 +25,10 @@ public class DatanodeStorageReport {
   private long used;
   private long remaining;
   private long committed;
+  private long pendingDeletion;
 
   public DatanodeStorageReport(long capacity, long used, long remaining,
-                               long committed) {
+                               long committed, long pendingDeletion) {
     this.capacity = capacity;
     this.used = used;
     this.remaining = remaining;
@@ -48,5 +49,9 @@ public class DatanodeStorageReport {
 
   public long getCommitted() {
     return committed;
+  }
+
+  public long getPendingDeletion() {
+    return pendingDeletion;
   }
 }
