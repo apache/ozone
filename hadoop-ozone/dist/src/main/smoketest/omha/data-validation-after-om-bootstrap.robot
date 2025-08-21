@@ -17,6 +17,7 @@
 Documentation       Smoke test for validating snapshot data after om bootstrap.
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Variables ***
@@ -31,7 +32,7 @@ ${KEY_2}
 
 *** Keywords ***
 Number of checkpoints equals 2
-    ${checkpoints} =    Execute                 ls -lah /data/metadata/db.snapshots/checkpointState | grep 'om.db-' | wc -l
+    ${checkpoints} =    Execute                 ls -lah /data/metadata/db.snapshots/checkpointState | grep -v '.yaml' | grep 'om.db-' | wc -l
                         Should be true          ${checkpoints} == 2
 
 Check current leader is different than OM

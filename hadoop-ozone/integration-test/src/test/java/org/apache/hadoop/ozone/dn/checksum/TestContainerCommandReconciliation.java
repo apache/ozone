@@ -49,6 +49,8 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeMa
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_REMOVER_SCAN_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
@@ -56,6 +58,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPA
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -99,6 +102,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -114,6 +118,7 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -134,6 +139,7 @@ public class TestContainerCommandReconciliation {
   private static DNContainerOperationClient dnClient;
   private static final String KEY_NAME = "testkey";
   private static final Logger LOG = LoggerFactory.getLogger(TestContainerCommandReconciliation.class);
+  private static final String TEST_SCAN = "Test Scan";
 
   @TempDir
   private static File testDir;
@@ -227,11 +233,10 @@ public class TestContainerCommandReconciliation {
   }
 
   /**
-   * Tests reading the container checksum info file from a datanode where the container exists, but the file has not
-   * yet been created.
+   * Tests container checksum file creation if it doesn't exist during getContainerChecksumInfo call.
    */
   @Test
-  public void testGetChecksumInfoNonexistentFile() throws Exception {
+  public void testMerkleTreeCreationDuringGetChecksumInfo() throws Exception {
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
     long containerID = writeDataAndGetContainer(true, volume, bucket);
@@ -241,14 +246,39 @@ public class TestContainerCommandReconciliation {
         .getContainerSet().getContainer(containerID);
     File treeFile = getContainerChecksumFile(container.getContainerData());
     // Closing the container should have generated the tree file.
+    ContainerProtos.ContainerChecksumInfo srcChecksumInfo = ContainerChecksumTreeManager.readChecksumInfo(
+        container.getContainerData());
     assertTrue(treeFile.exists());
     assertTrue(treeFile.delete());
+
+    ContainerProtos.ContainerChecksumInfo destChecksumInfo = dnClient.getContainerChecksumInfo(
+        containerID, targetDN.getDatanodeDetails());
+    assertNotNull(destChecksumInfo);
+    assertTreesSortedAndMatch(srcChecksumInfo.getContainerMerkleTree(), destChecksumInfo.getContainerMerkleTree());
+  }
+
+  /**
+   * Tests reading the container checksum info file from a datanode where there's an IO error 
+   * that's not related to file not found (e.g., permission error). Such errors should not 
+   * trigger fallback to building from metadata.
+   */
+  @Test
+  public void testGetChecksumInfoIOError() throws Exception {
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    long containerID = writeDataAndGetContainer(true, volume, bucket);
+    // Pick a datanode and make its checksum file unreadable to simulate permission error.
+    HddsDatanodeService targetDN = cluster.getHddsDatanodes().get(0);
+    Container<?> container = targetDN.getDatanodeStateMachine().getContainer()
+        .getContainerSet().getContainer(containerID);
+    File treeFile = getContainerChecksumFile(container.getContainerData());
+    assertTrue(treeFile.exists());
+    // Make the server unable to read the file (permission error, not file not found).
+    assertTrue(treeFile.setReadable(false));
 
     StorageContainerException ex = assertThrows(StorageContainerException.class, () ->
         dnClient.getContainerChecksumInfo(containerID, targetDN.getDatanodeDetails()));
     assertEquals(ContainerProtos.Result.IO_EXCEPTION, ex.getResult());
-    assertTrue(ex.getMessage().contains("Checksum file does not exist"), ex.getMessage() +
-        " did not contain the expected string");
   }
 
   /**
@@ -344,6 +374,7 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
+  @Flaky("HDDS-13401")
   public void testContainerChecksumWithBlockMissing() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.
@@ -385,7 +416,7 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID, TEST_SCAN);
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
@@ -434,7 +465,7 @@ public class TestContainerCommandReconciliation {
       TestContainerCorruptions.CORRUPT_BLOCK.applyTo(container, blockID);
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID, TEST_SCAN);
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterChunkCorruption =
         readChecksumFile(container.getContainerData());
@@ -455,6 +486,7 @@ public class TestContainerCommandReconciliation {
   }
 
   @Test
+  @Flaky("HDDS-13401")
   public void testDataChecksumReportedAtSCM() throws Exception {
     // 1. Write data to a container.
     // Read the key back and check its hash.
@@ -504,7 +536,7 @@ public class TestContainerCommandReconciliation {
       db.getStore().flushDB();
     }
 
-    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID);
+    datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID, TEST_SCAN);
     waitForDataChecksumsAtSCM(containerID, 2);
     ContainerProtos.ContainerChecksumInfo containerChecksumAfterBlockDelete =
         readChecksumFile(container.getContainerData());
@@ -597,9 +629,11 @@ public class TestContainerCommandReconciliation {
 
   private static void setSecretKeysConfig() {
     // Secret key lifecycle configs.
-    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "500s");
-    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "500s");
+    conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "1s");
+    conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "100s");
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "500s");
+    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, "300s");
+    conf.set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, "1s");
 
     // enable tokens
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);

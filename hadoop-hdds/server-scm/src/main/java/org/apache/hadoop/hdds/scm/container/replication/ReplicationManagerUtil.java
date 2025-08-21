@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -34,7 +35,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -195,7 +199,54 @@ public final class ReplicationManagerUtil {
         excludedNodes.add(pending.getTarget());
       }
     }
+    excludeFullNodes(replicationManager, container, excludedNodes);
     return new ExcludedAndUsedNodes(excludedNodes, usedNodes);
+  }
+
+  private static void excludeFullNodes(ReplicationManager replicationManager,
+      ContainerInfo container, List<DatanodeDetails> excludedNodes) {
+    ContainerReplicaPendingOps pendingOps = replicationManager.getContainerReplicaPendingOps();
+    Map<DatanodeID, ContainerReplicaPendingOps.SizeAndTime>
+        containerSizeScheduled = pendingOps.getContainerSizeScheduled();
+    if (containerSizeScheduled == null || containerSizeScheduled.isEmpty()) {
+      return;
+    }
+
+    final long requiredSize = HddsServerUtil.requiredReplicationSpace(container.getUsedBytes());
+    NodeManager nodeManager = replicationManager.getNodeManager();
+
+    for (Map.Entry<DatanodeID, ContainerReplicaPendingOps.SizeAndTime> entry : containerSizeScheduled.entrySet()) {
+      DatanodeDetails dn = nodeManager.getNode(entry.getKey());
+      if (dn == null || excludedNodes.contains(dn)) {
+        continue;
+      }
+
+      SCMNodeMetric nodeMetric = nodeManager.getNodeStat(dn);
+      if (nodeMetric == null) {
+        continue;
+      }
+
+      long scheduledSize = 0;
+      ContainerReplicaPendingOps.SizeAndTime sizeAndTime = entry.getValue();
+      if (sizeAndTime != null) {
+        // Only consider sizes added in the last event timeout window
+        if (pendingOps.getClock().millis() - sizeAndTime.getLastUpdatedTime()
+            < replicationManager.getConfig().getEventTimeout()) {
+          scheduledSize = sizeAndTime.getSize();
+        } else {
+          LOG.debug("Expired op {} found while computing exclude nodes", entry);
+        }
+      }
+
+      SCMNodeStat scmNodeStat = nodeMetric.get();
+      if (scmNodeStat.getRemaining().get() - scmNodeStat.getFreeSpaceToSpare().get() - scheduledSize
+          < requiredSize) {
+        LOG.debug("Adding datanode {} to exclude list. Remaining: {}, freeSpaceToSpare: {}, scheduledSize: {}, " +
+            "requiredSize: {}. ContainerInfo: {}.", dn, scmNodeStat.getRemaining().get(),
+            scmNodeStat.getFreeSpaceToSpare().get(), scheduledSize, requiredSize, container);
+        excludedNodes.add(dn);
+      }
+    }
   }
 
   /**
