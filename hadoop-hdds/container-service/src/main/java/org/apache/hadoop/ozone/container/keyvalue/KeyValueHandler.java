@@ -607,11 +607,11 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
     try {
-      ContainerProtos.ContainerDataProto.State currentState = kvContainer.getContainerState();
+      ContainerProtos.ContainerDataProto.State previousState = kvContainer.getContainerState();
       markContainerForClose(kvContainer);
       closeContainer(kvContainer);
-      if (currentState == RECOVERING) {
-        // trigger container scan for recovering containers, i.e., after EC reconstruction
+      if (previousState == RECOVERING) {
+        // trigger container scan for recovered containers, i.e., after EC reconstruction
         containerSet.scanContainer(kvContainer.getContainerData().getContainerID(), "EC Reconstruction");
       }
     } catch (StorageContainerException ex) {

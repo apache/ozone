@@ -103,11 +103,6 @@ public abstract class Handler {
     return datanodeId;
   }
 
-  @VisibleForTesting
-  public ContainerSet getContainerSet() {
-    return containerSet;
-  }
-
   /**
    * This should be called whenever there is state change. It will trigger
    * an ICR to SCM.

@@ -395,9 +395,8 @@ public class TestKeyValueHandler {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void testCloseRecoveringContainerTriggersScan(ContainerLayoutVersion layoutVersion) {
-    final ContainerSet containerSet = spy(newContainerSet());
     final KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
-        DATANODE_UUID, containerSet, mock(MutableVolumeSet.class),  mock(ContainerMetrics.class),
+        DATANODE_UUID, mockContainerSet, mock(MutableVolumeSet.class),  mock(ContainerMetrics.class),
         c -> { }, new ContainerChecksumTreeManager(conf));
 
     conf = new OzoneConfiguration();
@@ -428,8 +427,7 @@ public class TestKeyValueHandler {
 
     keyValueHandler.handleCloseContainer(closeContainerRequest, container);
 
-    verify(keyValueHandler.getContainerSet(), atLeastOnce())
-        .scanContainer(DUMMY_CONTAINER_ID, "EC Reconstruction");
+    verify(mockContainerSet, atLeastOnce()).scanContainer(DUMMY_CONTAINER_ID, "EC Reconstruction");
   }
 
   @Test

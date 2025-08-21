@@ -369,7 +369,7 @@ public class TestContainerCommandsEC {
 
     try (ECReconstructionCoordinator coordinator =
              new ECReconstructionCoordinator(config, certClient,
-                 secretKeyClient, cluster.getHddsDatanodes().get(0).getDatanodeStateMachine().getContext(),
+                 secretKeyClient, null,
                  ECReconstructionMetrics.create(), "")) {
 
       // Attempt to reconstruct the container.
@@ -682,8 +682,7 @@ public class TestContainerCommandsEC {
             new XceiverClientManager(config);
         ECReconstructionCoordinator coordinator =
             new ECReconstructionCoordinator(config, certClient, secretKeyClient,
-                cluster.getHddsDatanodes().get(0).getDatanodeStateMachine().getContext(),
-                ECReconstructionMetrics.create(), "2")) {
+                null, ECReconstructionMetrics.create(), "2")) {
 
       ECReconstructionMetrics metrics =
           coordinator.getECReconstructionMetrics();
@@ -916,8 +915,8 @@ public class TestContainerCommandsEC {
     assertThrows(IOException.class, () -> {
       try (ECReconstructionCoordinator coordinator =
                new ECReconstructionCoordinator(config, certClient,
-                   secretKeyClient, cluster.getHddsDatanodes().get(0).getDatanodeStateMachine().getContext(),
-                   ECReconstructionMetrics.create(), "")) {
+                   secretKeyClient,
+                   null, ECReconstructionMetrics.create(), "")) {
         coordinator.reconstructECContainerGroup(conID,
             (ECReplicationConfig) containerPipeline.getReplicationConfig(),
             sourceNodeMap, targetNodeMap);
