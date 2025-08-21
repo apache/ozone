@@ -68,12 +68,16 @@ import picocli.CommandLine;
  * This can be done using `ozone admin prepare` before running the tool, and `ozone admin
  * cancelprepare` when done.
 
- * The tool will run a DFS from each bucket, and save all reachable directories as keys in a new temporary RocksDB
- * instance called "reachable.db" in the same directory as om.db.
- * It will then scan the entire file and directory tables for each bucket to see if each object's parent is in the
- * reachable table of reachable.db. The reachable table will be dropped and recreated for each bucket.
- * The tool is idempotent. reachable.db will not be deleted automatically when the tool finishes,
- * in case users want to manually inspect it. It can be safely deleted once the tool finishes.
+ * The tool will run a DFS from each bucket, and save all reachable directories as objectID-based keys in a
+ * temporary RocksDB instance called "temp.db" in the same directory as om.db. It will also scan the
+ * deletedDirectoryTable to identify objects pending deletion and store them as original keys in an unreachable
+ * table within the same temp.db instance.
+
+ * It will then scan the entire file and directory tables for each bucket to classify each object:
+ * - REACHABLE: Object's parent is in the reachable table (accessible from bucket root)
+ * - UNREACHABLE: Object is in the unreachable table (pending deletion)
+ * - UNREFERENCED: Object is neither reachable nor unreachable (orphaned, needs repair)
+ * The tool is idempotent. temp.db will be automatically deleted when the tool finishes to ensure clean state.
  */
 @CommandLine.Command(
     name = "fso-tree",
@@ -130,8 +134,7 @@ public class FSORepairTool extends RepairTool {
     private final Table<String, OmKeyInfo> deletedDirectoryTable;
     private final Table<String, RepeatedOmKeyInfo> deletedTable;
     private final Table<String, SnapshotInfo> snapshotInfoTable;
-    private DBStore reachableDB;
-    private DBStore unreachableDB;
+    private DBStore tempDB;
     private TypedTable<String, byte[]> reachableTable;
     private TypedTable<String, byte[]> unreachableTable;
     private final ReportStatistics reachableStats;
@@ -172,8 +175,7 @@ public class FSORepairTool extends RepairTool {
         try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
                  volumeIterator = volumeTable.iterator()) {
           try {
-            openReachableDB();
-            openUnreachableDB();
+            openTempDB();
           } catch (IOException e) {
             error("Failed to open reachable database: " + e.getMessage());
             throw e;
@@ -234,8 +236,7 @@ public class FSORepairTool extends RepairTool {
         error("An error occurred while processing" + e.getMessage());
         throw e;
       } finally {
-        closeReachableDB();
-        closeUnreachableDB();
+        closeTempDB();
         store.close();
       }
 
@@ -301,7 +302,9 @@ public class FSORepairTool extends RepairTool {
         String currentDirKey = dirKeyStack.pop();
         OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
         if (currentDir == null) {
-          info("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
+          if (isVerbose()) {
+            info("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
+          }
           continue;
         }
 
@@ -351,7 +354,9 @@ public class FSORepairTool extends RepairTool {
         String currentDirKey = dirKeyStack.pop();
         OmDirectoryInfo currentDir = directoryTable.get(currentDirKey);
         if (currentDir == null) {
-          info("Directory key " + currentDirKey + " to be processed was not found in the directory table.");
+          if (isVerbose()) {
+            info("Directory key" + currentDirKey + "to be processed was not found in the directory table.");
+          }
           continue;
         }
 
@@ -580,57 +585,32 @@ public class FSORepairTool extends RepairTool {
       return unreachableTable.get(fileOrDirKey) != null;
     }
 
-    private void openReachableDB() throws IOException {
-      File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
-      info("Creating database of reachable directories at " + reachableDBFile);
+    private void openTempDB() throws IOException {
+      File tempDBFile = new File(new File(omDBPath).getParentFile(), "temp.db");
+      info("Creating database with reachable and unreachable tables at " + tempDBFile);
       // Delete the DB from the last run if it exists.
-      if (reachableDBFile.exists()) {
-        FileUtils.deleteDirectory(reachableDBFile);
+      if (tempDBFile.exists()) {
+        FileUtils.deleteDirectory(tempDBFile);
       }
 
       ConfigurationSource conf = new OzoneConfiguration();
-      reachableDB = DBStoreBuilder.newBuilder(conf)
-          .setName("reachable.db")
-          .setPath(reachableDBFile.getParentFile().toPath())
+      tempDB = DBStoreBuilder.newBuilder(conf)
+          .setName("temp.db")
+          .setPath(tempDBFile.getParentFile().toPath())
           .addTable(REACHABLE_TABLE)
-          .build();
-      reachableTable = reachableDB.getTable(REACHABLE_TABLE, StringCodec.get(), ByteArrayCodec.get());
-    }
-
-    private void openUnreachableDB() throws IOException {
-      File unreachableDBFile = new File(new File(omDBPath).getParentFile(), "unreachable.db");
-      info("Creating database of unreachable directories at " + unreachableDBFile);
-      // Delete the DB from the last run if it exists.
-      if (unreachableDBFile.exists()) {
-        FileUtils.deleteDirectory(unreachableDBFile);
-      }
-
-      ConfigurationSource conf = new OzoneConfiguration();
-      unreachableDB = DBStoreBuilder.newBuilder(conf)
-          .setName("unreachable.db")
-          .setPath(unreachableDBFile.getParentFile().toPath())
           .addTable(UNREACHABLE_TABLE)
           .build();
-      unreachableTable = unreachableDB.getTable(UNREACHABLE_TABLE, StringCodec.get(), ByteArrayCodec.get());
+      reachableTable = tempDB.getTable(REACHABLE_TABLE, StringCodec.get(), ByteArrayCodec.get());
+      unreachableTable = tempDB.getTable(UNREACHABLE_TABLE, StringCodec.get(), ByteArrayCodec.get());
     }
 
-    private void closeReachableDB() throws IOException {
-      if (reachableDB != null) {
-        reachableDB.close();
+    private void closeTempDB() throws IOException {
+      if (tempDB != null) {
+        tempDB.close();
       }
-      File reachableDBFile = new File(new File(omDBPath).getParentFile(), "reachable.db");
-      if (reachableDBFile.exists()) {
-        FileUtils.deleteDirectory(reachableDBFile);
-      }
-    }
-
-    private void closeUnreachableDB() throws IOException {
-      if (unreachableDB != null) {
-        unreachableDB.close();
-      }
-      File unreachableDBFile = new File(new File(omDBPath).getParentFile(), "unreachable.db");
-      if (unreachableDBFile.exists()) {
-        FileUtils.deleteDirectory(unreachableDBFile);
+      File tempDBFile = new File(new File(omDBPath).getParentFile(), "temp.db");
+      if (tempDBFile.exists()) {
+        FileUtils.deleteDirectory(tempDBFile);
       }
     }
   }
