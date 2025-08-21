@@ -249,7 +249,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return dBMetadata;
   }
 
-  public static ObjectNode getAggregateValues(DatanodeStore store,
+  private static ObjectNode getAggregateValues(DatanodeStore store,
       KeyValueContainerData containerData, String schemaVersion)
       throws IOException {
 
@@ -269,6 +269,23 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
 
     // Count pending delete blocks.
+    final PendingDelete pendingDelete = getAggregatePendingDelete(store, containerData, schemaVersion);
+
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
+      blockCountTotal += pendingDelete.getCount();
+      usedBytesTotal += pendingDelete.getBytes();
+    }
+
+    aggregates.put("blockCount", blockCountTotal);
+    aggregates.put("usedBytes", usedBytesTotal);
+    pendingDelete.addToJson(aggregates);
+
+    return aggregates;
+  }
+
+  public static PendingDelete getAggregatePendingDelete(DatanodeStore store,
+                KeyValueContainerData containerData, String schemaVersion)
+      throws IOException {
     final PendingDelete pendingDelete;
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
       long pendingDeleteBlockCountTotal = 0;
@@ -278,10 +295,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
                    containerData.getDeletingBlockKeyFilter())) {
 
         while (blockIter.hasNext()) {
-          blockCountTotal++;
           pendingDeleteBlockCountTotal++;
           final long bytes = getBlockLength(blockIter.nextBlock());
-          usedBytesTotal += bytes;
           pendingDeleteBytes += bytes;
         }
       }
@@ -299,14 +314,9 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           countPendingDeletesSchemaV3(schemaThreeStore, containerData);
     } else {
       throw new IOException("Failed to process deleted blocks for unknown " +
-              "container schema " + schemaVersion);
+          "container schema " + schemaVersion);
     }
-
-    aggregates.put("blockCount", blockCountTotal);
-    aggregates.put("usedBytes", usedBytesTotal);
-    pendingDelete.addToJson(aggregates);
-
-    return aggregates;
+    return pendingDelete;
   }
 
   static ObjectNode getChunksDirectoryJson(File chunksDir) throws IOException {
@@ -493,24 +503,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     error.put("repaired", repaired);
 
     return error;
-  }
-
-  static class PendingDelete {
-    static final String COUNT = "pendingDeleteBlocks";
-    static final String BYTES = "pendingDeleteBytes";
-
-    private final long count;
-    private final long bytes;
-
-    PendingDelete(long count, long bytes) {
-      this.count = count;
-      this.bytes = bytes;
-    }
-
-    void addToJson(ObjectNode json) {
-      json.put(COUNT, count);
-      json.put(BYTES, bytes);
-    }
   }
 
   static PendingDelete countPendingDeletesSchemaV2(

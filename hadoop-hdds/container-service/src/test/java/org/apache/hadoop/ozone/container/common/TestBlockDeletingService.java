@@ -281,7 +281,9 @@ public class TestBlockDeletingService {
       StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx =
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
               .newBuilder().setTxID(txnID).setContainerID(containerID)
-              .addAllLocalID(containerBlocks).setCount(0).build();
+              .addAllLocalID(containerBlocks)
+              .setTotalBlockSize(containerBlocks.size() * BLOCK_CHUNK_SIZE)
+              .setCount(0).build();
       try (BatchOperation batch = metadata.getStore().getBatchHandler()
           .initBatchOperation()) {
         DatanodeStore ds = metadata.getStore();

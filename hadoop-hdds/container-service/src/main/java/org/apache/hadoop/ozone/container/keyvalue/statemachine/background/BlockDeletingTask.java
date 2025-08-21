@@ -252,7 +252,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
         // update count of pending deletion blocks, block count and used
         // bytes in in-memory container status.
-        containerData.getStatistics().updateDeletion(releasedBytes, releasedBytes,
+        containerData.getStatistics().decDeletion(releasedBytes, releasedBytes,
             deletedBlocksCount, deletedBlocksCount);
         containerData.getVolume().decrementUsedSpace(releasedBytes);
         metrics.incrSuccessCount(deletedBlocksCount);
@@ -398,7 +398,7 @@ public class BlockDeletingTask implements BackgroundTask {
 
         // update count of pending deletion blocks, block count and used
         // bytes in in-memory container status and used space in volume.
-        containerData.getStatistics().updateDeletion(releasedBytes, processedBytes,
+        containerData.getStatistics().decDeletion(releasedBytes, processedBytes,
             deletedBlocksCount, deletedBlocksProcessed);
         containerData.getVolume().decrementUsedSpace(releasedBytes);
         metrics.incrSuccessCount(deletedBlocksCount);
@@ -460,8 +460,6 @@ public class BlockDeletingTask implements BackgroundTask {
                 container.getContainerData().getContainerID(), e);
           }
           continue;
-        } else {
-          bytesProcessed += KeyValueContainerUtil.getBlockLengthTryCatch(blkInfo);
         }
 
         boolean deleted = false;
@@ -484,6 +482,7 @@ public class BlockDeletingTask implements BackgroundTask {
           // TODO: handle the bytesReleased correctly for the unexpected exception.
         }
       }
+      bytesProcessed += entry.getTotalBlockSize();
       deletedBlocksTxs.add(entry);
       Duration execTime = Duration.between(startTime, Instant.now());
       if (deletedBlocksTxs.size() < delBlocks.size() &&

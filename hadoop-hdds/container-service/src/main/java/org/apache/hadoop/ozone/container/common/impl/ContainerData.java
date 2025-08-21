@@ -660,7 +660,7 @@ public abstract class ContainerData {
       writeBytes += length;
     }
 
-    public synchronized void updateDeletion(long deletedBytes, long processedBytes,
+    public synchronized void decDeletion(long deletedBytes, long processedBytes,
                                             long deletedBlockCount, long processedBlockCount) {
       blockBytes -= deletedBytes;
       blockCount -= deletedBlockCount;
@@ -687,6 +687,11 @@ public abstract class ContainerData {
           .setWriteCount(writeCount)
           .setUsed(blockBytes)
           .setKeyCount(blockCount);
+    }
+
+    public synchronized void setBlockPendingDeletion(long count, long bytes) {
+      blockPendingDeletion = count;
+      blockPendingDeletionBytes = bytes;
     }
 
     public synchronized void addBlockPendingDeletion(long count, long bytes) {

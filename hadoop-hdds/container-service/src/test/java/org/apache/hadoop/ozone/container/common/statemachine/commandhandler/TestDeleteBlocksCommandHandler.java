@@ -419,78 +419,26 @@ public class TestDeleteBlocksCommandHandler {
     // Verify pending block count and size remained the same (no double counting)
     assertEquals(afterFirstPendingBlocks, containerData.getNumPendingDeletionBlocks());
     assertEquals(afterFirstPendingBytes, containerData.getBlockPendingDeletionBytes());
-  }
 
-  @ContainerTestVersionInfo.ContainerTest
-  public void testDuplicateTxExecutedByContainerBlockInfoInBlockDeletingService(
-      ContainerTestVersionInfo versionInfo) throws Exception {
-    prepareTest(versionInfo);
-    assertThat(containerSet.containerCount()).isGreaterThan(0);
-    Container<?> container = containerSet.getContainerIterator(volume1).next();
-    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
-
-    // Create a delete transaction that will be processed
-    DeletedBlocksTransaction transaction = DeletedBlocksTransaction.newBuilder()
+    long afterSecondPendingBlocks = containerData.getNumPendingDeletionBlocks();
+    long afterSecondPendingBytes = containerData.getBlockPendingDeletionBytes();
+    DeletedBlocksTransaction transaction2 = DeletedBlocksTransaction.newBuilder()
         .setContainerID(container.getContainerData().getContainerID())
         .setCount(0)
-        .addLocalID(10L)
-        .addLocalID(11L) // 2 blocks
-        .setTxID(200)
-        .setTotalBlockSize(512L) // 2 blocks * 256 bytes each
-        .build();
-
-    // Record initial state
-    long initialPendingBlocks = containerData.getNumPendingDeletionBlocks();
-    long initialPendingBytes = containerData.getBlockPendingDeletionBytes();
-
-    // First execution - simulate normal processing by ContainerBlockInfo
-    List<DeleteBlockTransactionResult> results1 =
-        handler.executeCmdWithRetry(Arrays.asList(transaction));
-
-    assertEquals(1, results1.size());
-    assertTrue(results1.get(0).getSuccess());
-
-    // Verify counters increased after first execution
-    long afterFirstPendingBlocks = containerData.getNumPendingDeletionBlocks();
-    long afterFirstPendingBytes = containerData.getBlockPendingDeletionBytes();
-    assertEquals(initialPendingBlocks + 2, afterFirstPendingBlocks);
-    assertEquals(initialPendingBytes + 512L, afterFirstPendingBytes);
-
-    // Execute the same transaction again through ContainerBlockInfo context
-    // This should detect it as duplicate and not modify counters
-    List<DeleteBlockTransactionResult> results2 =
-        handler.executeCmdWithRetry(Arrays.asList(transaction));
-
-    assertEquals(1, results2.size());
-    assertTrue(results2.get(0).getSuccess());
-
-    // Verify pending block count and size accuracy - should remain unchanged
-    // because duplicate transaction was detected
-    assertEquals(afterFirstPendingBlocks, containerData.getNumPendingDeletionBlocks());
-    assertEquals(afterFirstPendingBytes, containerData.getBlockPendingDeletionBytes());
-
-    // Verify that the transaction ID tracking prevented double processing
-    assertEquals(200L, containerData.getDeleteTransactionId());
-
-    // Test with a newer transaction to ensure normal processing still works
-    DeletedBlocksTransaction newerTransaction = DeletedBlocksTransaction.newBuilder()
-        .setContainerID(container.getContainerData().getContainerID())
-        .setCount(0)
-        .addLocalID(12L) // 1 block
-        .setTxID(201) // Higher transaction ID
-        .setTotalBlockSize(256L) // 1 block * 256 bytes
+        .addLocalID(1L)
+        .addLocalID(2L)
+        .addLocalID(3L) // 3 blocks
+        .setTxID(90)
+        .setTotalBlockSize(768L) // 3 blocks * 256 bytes each
         .build();
 
     List<DeleteBlockTransactionResult> results3 =
-        handler.executeCmdWithRetry(Arrays.asList(newerTransaction));
-
+        handler.executeCmdWithRetry(Arrays.asList(transaction2));
     assertEquals(1, results3.size());
     assertTrue(results3.get(0).getSuccess());
-
-    // Verify newer transaction was processed and counters updated
-    assertEquals(afterFirstPendingBlocks + 1, containerData.getNumPendingDeletionBlocks());
-    assertEquals(afterFirstPendingBytes + 256L, containerData.getBlockPendingDeletionBytes());
-    assertEquals(201L, containerData.getDeleteTransactionId());
+    // Verify pending block count and size increased since its processed.
+    assertEquals(afterSecondPendingBlocks + 3, containerData.getNumPendingDeletionBlocks());
+    assertEquals(afterSecondPendingBytes + 768L, containerData.getBlockPendingDeletionBytes());
   }
 
   private DeletedBlocksTransaction createDeletedBlocksTransaction(long txID,

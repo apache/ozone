@@ -18,9 +18,8 @@
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
-import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerMetadataInspector.getAggregateValues;
+import static org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerMetadataInspector.getAggregatePendingDelete;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -45,6 +44,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.PendingDelete;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
@@ -58,8 +58,6 @@ import org.slf4j.LoggerFactory;
 public final class KeyValueContainerUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(KeyValueContainerUtil.class);
-  public static final String PENDING_DELETION_BLOCKS = "pendingDeleteBlocks";
-  public static final String PENDING_DELETION_BYTES = "pendingDeleteBytes";
 
   /* Never constructed. */
   private KeyValueContainerUtil() {
@@ -326,13 +324,20 @@ public final class KeyValueContainerUtil {
       blockPendingDeletion = pendingDeleteBlockCount;
       if (pendingDeletionBlockBytes != null) {
         blockPendingDeletionBytes = pendingDeletionBlockBytes;
+      } else {
+        LOG.warn("Missing pendingDeleteBlocksize from {}: recalculate them from delete txn tables",
+            metadataTable.getName());
+        PendingDelete pendingDeletions = getAggregatePendingDelete(
+            store, kvContainerData, kvContainerData.getSchemaVersion());
+        blockPendingDeletionBytes = pendingDeletions.getCount();
       }
     } else {
       LOG.warn("Missing pendingDeleteBlockCount/size from {}: recalculate them from delete txn tables",
           metadataTable.getName());
-      ObjectNode pendingDeletions = getAggregateValues(store, kvContainerData, kvContainerData.getSchemaVersion());
-      blockPendingDeletionBytes = pendingDeletions.get(PENDING_DELETION_BYTES).asLong();
-      blockPendingDeletion = pendingDeletions.get(PENDING_DELETION_BLOCKS).asLong();
+      PendingDelete pendingDeletions = getAggregatePendingDelete(
+          store, kvContainerData, kvContainerData.getSchemaVersion());
+      blockPendingDeletionBytes = pendingDeletions.getCount();
+      blockPendingDeletion = pendingDeletions.getBytes();
     }
     // Set delete transaction id.
     Long delTxnId =
@@ -369,7 +374,7 @@ public final class KeyValueContainerUtil {
     }
 
     kvContainerData.getStatistics().updateBlocks(blockBytes, blockCount);
-    kvContainerData.getStatistics().addBlockPendingDeletion(blockPendingDeletion, blockPendingDeletionBytes);
+    kvContainerData.getStatistics().setBlockPendingDeletion(blockPendingDeletion, blockPendingDeletionBytes);
 
     // If the container is missing a chunks directory, possibly due to the
     // bug fixed by HDDS-6235, create it here.
