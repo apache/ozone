@@ -26,7 +26,7 @@ public class ReconTaskReInitializationEvent implements ReconEvent {
 
   private final ReInitializationReason reason;
   private final long timestamp;
-  
+
   /**
    * Enum representing the reasons for task reinitialization.
    */
