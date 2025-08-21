@@ -88,4 +88,20 @@ public interface ReconTaskController {
    * Reset the delta tasks failure flag after reinitialization is completed.
    */
   void resetDeltaTasksFailureFlag();
+  
+  /**
+   * Queue a task reinitialization event to be processed asynchronously.
+   * This clears the event buffer and queues a reinitialization event.
+   * 
+   * @param reason the reason for reinitialization
+   * @return true if the event was successfully queued
+   */
+  boolean queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason reason);
+  
+  /**
+   * Update the current OM metadata manager reference for reinitialization.
+   * 
+   * @param omMetadataManager the current OM metadata manager
+   */
+  void updateOMMetadataManager(ReconOMMetadataManager omMetadataManager);
 }

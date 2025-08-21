@@ -72,6 +72,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private final OMUpdateEventBuffer eventBuffer;
   private ExecutorService eventProcessingExecutor;
   private final AtomicBoolean deltaTasksFailed = new AtomicBoolean(false);
+  private volatile ReconOMMetadataManager currentOMMetadataManager;
 
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
@@ -356,10 +357,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     
     while (!Thread.currentThread().isInterrupted()) {
       try {
-        OMUpdateEventBatch eventBatch = eventBuffer.poll(1000); // 1 second timeout
-        if (eventBatch != null && !eventBatch.isEmpty()) {
-          LOG.debug("Processing buffered event batch with {} events", eventBatch.getEvents().size());
-          processEventBatchDirectly(eventBatch);
+        ReconEvent event = eventBuffer.poll(1000); // 1 second timeout
+        if (event != null) {
+          LOG.debug("Processing buffered event of type {} with {} events", 
+              event.getEventType(), event.getEventCount());
+          processReconEvent(event);
         }
       } catch (Exception e) {
         LOG.error("Error in async event processing thread", e);
@@ -371,38 +373,55 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
   
   /**
-   * Process a single event batch directly (used by async processing thread).
+   * Process a single Recon event (used by async processing thread).
    */
-  private void processEventBatchDirectly(OMUpdateEventBatch events) {
+  private void processReconEvent(ReconEvent event) {
+    switch (event.getEventType()) {
+    case OM_UPDATE_BATCH:
+      processOMUpdateBatch((OMUpdateEventBatch) event);
+      break;
+    case TASK_REINITIALIZATION:
+      processReInitializationEvent((ReconTaskReInitializationEvent) event);
+      break;
+    default:
+      LOG.warn("Unknown event type: {}", event.getEventType());
+      break;
+    }
+  }
+  
+  /**
+   * Process an OM update batch event (used by async processing thread).
+   */
+  private void processOMUpdateBatch(OMUpdateEventBatch events) {
     if (events.isEmpty()) {
       return;
     }
-    
+
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
     List<ReconOmTask.TaskResult> failedTasks = new ArrayList<>();
-    
+
     for (Map.Entry<String, ReconOmTask> taskEntry : reconOmTasks.entrySet()) {
       ReconOmTask task = taskEntry.getValue();
       ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
       taskStatusUpdater.recordRunStart();
       tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.process(events, Collections.emptyMap())));
     }
-    
+
     processTasks(tasks, events, failedTasks);
-    
+
     // Handle failed tasks with retry logic
     List<ReconOmTask.TaskResult> retryFailedTasks = new ArrayList<>();
     if (!failedTasks.isEmpty()) {
       LOG.warn("Some tasks failed while processing buffered events, retrying...");
       tasks.clear();
-      
+
       for (ReconOmTask.TaskResult taskResult : failedTasks) {
         ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
         tasks.add(new NamedCallableTask<>(task.getTaskName(),
             () -> task.process(events, taskResult.getSubTaskSeekPositions())));
       }
       processTasks(tasks, events, retryFailedTasks);
-      
+
       if (!retryFailedTasks.isEmpty()) {
         LOG.warn("Some tasks still failed after retry while processing buffered events, signaling for " +
             "task reinitialization");
@@ -430,5 +449,65 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public void resetDeltaTasksFailureFlag() {
     deltaTasksFailed.set(false);
+  }
+  
+  @Override
+  public boolean queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason reason) {
+    LOG.info("Queueing task reinitialization event due to: {}", reason);
+    
+    // Clear the buffer to discard all pending events
+    eventBuffer.clear();
+    
+    // Create and queue the reinitialization event
+    ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(reason);
+    boolean queued = eventBuffer.offer(reinitEvent);
+    
+    if (queued) {
+      LOG.info("Successfully queued reinitialization event");
+    } else {
+      LOG.error("Failed to queue reinitialization event - buffer is full");
+    }
+    
+    return queued;
+  }
+  
+  @Override
+  public void updateOMMetadataManager(ReconOMMetadataManager omMetadataManager) {
+    this.currentOMMetadataManager = omMetadataManager;
+  }
+  
+  /**
+   * Process a task reinitialization event asynchronously.
+   */
+  private void processReInitializationEvent(ReconTaskReInitializationEvent event) {
+    LOG.info("Processing reinitialization event: reason={}, timestamp={}", 
+        event.getReason(), event.getTimestamp());
+    
+    try {
+      // Use the current OM metadata manager for reinitialization
+      if (currentOMMetadataManager != null) {
+        LOG.info("Starting async task reinitialization due to: {}", event.getReason());
+        reInitializeTasks(currentOMMetadataManager, null);
+        LOG.info("Completed async task reinitialization");
+      } else {
+        LOG.warn("Current OM metadata manager is null, cannot perform reinitialization");
+        deltaTasksFailed.set(true);
+        return;
+      }
+      
+      // Reset appropriate flags based on the reason
+      if (event.getReason() == ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW) {
+        resetEventBufferOverflowFlag();
+      } else if (event.getReason() == ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES) {
+        resetDeltaTasksFailureFlag();
+      }
+      
+      LOG.info("Completed processing reinitialization event: {}", event.getReason());
+      
+    } catch (Exception e) {
+      LOG.error("Error processing reinitialization event", e);
+      // Set failure flags so the sync thread can try again
+      deltaTasksFailed.set(true);
+    }
   }
 }

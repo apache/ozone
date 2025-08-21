@@ -97,6 +97,7 @@ import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -663,6 +664,9 @@ public class OzoneManagerServiceProviderImpl
               fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
               deltaReconTaskStatusUpdater.recordRunCompletion();
               fullSnapshotReconTaskUpdater.updateDetails();
+              // Update the current OM metadata manager in task controller
+              reconTaskController.updateOMMetadataManager(omMetadataManager);
+              
               // Pass on DB update events to tasks that are listening.
               reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
                   omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
@@ -672,21 +676,30 @@ public class OzoneManagerServiceProviderImpl
               boolean tasksFailed = reconTaskController.hasDeltaTasksFailed();
               
               if (bufferOverflowed || tasksFailed) {
-                String reason = bufferOverflowed ? "Event buffer overflow" : "Delta tasks failed after retry";
-                LOG.warn("{}, triggering task reinitialization", reason);
+                ReconTaskReInitializationEvent.ReInitializationReason reason = bufferOverflowed ? 
+                    ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW : 
+                    ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES;
+
+                LOG.warn("Detected condition for task reinitialization: {}, queueing async reinitialization event",
+                    reason);
                 
                 metrics.incrNumDeltaRequestsFailed();
                 deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
                 deltaReconTaskStatusUpdater.recordRunCompletion();
 
-                reconTaskController.reInitializeTasks(omMetadataManager, null);
-                
-                // Reset appropriate flags after reinitialization
-                if (bufferOverflowed) {
-                  reconTaskController.resetEventBufferOverflowFlag();
-                }
-                if (tasksFailed) {
-                  reconTaskController.resetDeltaTasksFailureFlag();
+                // Queue async reinitialization event instead of blocking call
+                boolean queued = reconTaskController.queueReInitializationEvent(reason);
+                if (!queued) {
+                  LOG.error("Failed to queue reinitialization event, attempting immediate reinitialization");
+                  // Fallback to sync reinitialization if queueing fails
+                  reconTaskController.reInitializeTasks(omMetadataManager, null);
+                  // Reset flags immediately since this was synchronous
+                  if (bufferOverflowed) {
+                    reconTaskController.resetEventBufferOverflowFlag();
+                  }
+                  if (tasksFailed) {
+                    reconTaskController.resetDeltaTasksFailureFlag();
+                  }
                 }
               }
               
