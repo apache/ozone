@@ -24,6 +24,9 @@ package org.apache.hadoop.ozone.recon.tasks;
  */
 public class ReconTaskReInitializationEvent implements ReconEvent {
 
+  private final ReInitializationReason reason;
+  private final long timestamp;
+  
   /**
    * Enum representing the reasons for task reinitialization.
    */
@@ -31,9 +34,6 @@ public class ReconTaskReInitializationEvent implements ReconEvent {
     BUFFER_OVERFLOW,
     TASK_FAILURES
   }
-
-  private final ReInitializationReason reason;
-  private final long timestamp;
 
   public ReconTaskReInitializationEvent(ReInitializationReason reason) {
     this.reason = reason;
