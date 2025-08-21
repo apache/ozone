@@ -445,323 +445,142 @@
       <build>
         <plugins>
           <plugin>
-            <groupId>org.vafer</groupId>
-            <artifactId>jdeb</artifactId>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
             <executions>
               <execution>
-                <id>build-lib-deb</id>
+                <id>detect-distro</id>
                 <goals>
-                  <goal>jdeb</goal>
+                  <goal>exec</goal>
                 </goals>
-                <phase>package</phase>
+                <phase>initialize</phase>
                 <configuration>
-                  <controlDir>${project.basedir}/src/main/package/deb/control/lib</controlDir>
-                  <deb>${project.build.directory}/ozone-lib_${project.version}.deb</deb>
-                  <dataSet>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/lib</src>
-                      <type>directory</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/share/ozone/lib/</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                      </mapper>
-                    </data>
-                  </dataSet>
-                </configuration>
-              </execution>
-
-              <execution>
-                <id>build-common-deb</id>
-                <goals>
-                  <goal>jdeb</goal>
-                </goals>
-                <phase>package</phase>
-                <configuration>
-                  <controlDir>${project.basedir}/src/main/package/deb/control/common</controlDir>
-                  <deb>${project.build.directory}/ozone-common_${project.version}.deb</deb>
-                  <dataSet>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/bin/ozone</src>
-                      <type>file</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/bin/</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/sbin</src>
-                      <type>directory</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/sbin</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                      </mapper>
-                    </data>
-
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/etc</src>
-                      <type>directory</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/etc</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                      </mapper>
-                    </data>
-
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/libexec</src>
-                      <type>directory</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/libexec</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                      </mapper>
-                    </data>
-
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/byteman</src>
-                      <type>directory</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/share/ozone/byteman</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                      </mapper>
-                    </data>
-
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/web</src>
-                      <type>directory</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/share/ozone/web</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                      </mapper>
-                    </data>
-
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-cli-admin.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-cli-shell.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-csi.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-freon.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-insight.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-tools.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <type>perm</type>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-
-                  </dataSet>
-                </configuration>
-              </execution>
-
-              <execution>
-                <id>build-datanode-deb</id>
-                <goals>
-                  <goal>jdeb</goal>
-                </goals>
-                <phase>package</phase>
-                <configuration>
-                  <controlDir>${project.basedir}/src/main/package/deb/control/datanode</controlDir>
-                  <deb>${project.build.directory}/ozone-datanode_${project.version}.deb</deb>
-                  <dataSet>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-datanode.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <type>perm</type>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                  </dataSet>
+                  <executable>bash</executable>
+                  <arguments>
+                    <argument>-c</argument>
+                    <argument><![CDATA[echo "linux.distro=$(if [ -f /etc/lsb-release ] && grep -q Ubuntu /etc/lsb-release; then echo ubuntu; elif [ -f /etc/debian_version ]; then echo debian; else echo linux; fi)" > ${project.build.directory}/system.properties]]></argument>
+                  </arguments>
                 </configuration>
               </execution>
               <execution>
-                <id>build-scm-deb</id>
+                <id>detect-system</id>
                 <goals>
-                  <goal>jdeb</goal>
+                  <goal>exec</goal>
                 </goals>
-                <phase>package</phase>
+                <phase>initialize</phase>
                 <configuration>
-                  <controlDir>${project.basedir}/src/main/package/deb/control/scm</controlDir>
-                  <deb>${project.build.directory}/ozone-scm_${project.version}.deb</deb>
-                  <dataSet>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/hdds-server-scm.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <type>perm</type>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                  </dataSet>
+                  <executable>bash</executable>
+                  <arguments>
+                    <argument>-c</argument>
+                    <argument><![CDATA[ARCH=$(uname -m)
+                      case $ARCH in
+                          x86_64) DEB_ARCH=amd64 ;;
+                          aarch64) DEB_ARCH=arm64 ;;
+                          armv7l) DEB_ARCH=armhf ;;
+                          i386|i686) DEB_ARCH=i386 ;;
+                          *) DEB_ARCH=all ;;
+                      esac
+                      
+                      echo "deb.arch=$DEB_ARCH" >> ${project.build.directory}/system.properties]]></argument>
+                  </arguments>
                 </configuration>
               </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>properties-maven-plugin</artifactId>
+            <version>1.1.0</version>
+            <executions>
               <execution>
-                <id>build-httpfs-deb</id>
+                <id>read-distro</id>
                 <goals>
-                  <goal>jdeb</goal>
+                  <goal>read-project-properties</goal>
                 </goals>
-                <phase>package</phase>
+                <phase>initialize</phase>
                 <configuration>
-                  <controlDir>${project.basedir}/src/main/package/deb/control/httpfs</controlDir>
-                  <deb>${project.build.directory}/ozone-httpfs_${project.version}.deb</deb>
-                  <dataSet>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-httpfsgateway.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <type>perm</type>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                  </dataSet>
+                  <files>
+                    <file>${project.build.directory}/system.properties</file>
+                  </files>
                 </configuration>
               </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.vafer</groupId>
+            <artifactId>jdeb</artifactId>
+            <version>1.14</version>
+            <configuration>
+              <controlDir>${basedir}/src/main/package/deb/control</controlDir>
+              <deb>${project.build.directory}/ozone_${project.version}-${linux.distro}_${deb.arch}.deb</deb>
+              <skip>false</skip>
+              <skipPOMs>false</skipPOMs>
+              <dataSet>
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/bin/ozone</src>
+                  <type>file</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/bin</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                    <filemode>755</filemode>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/sbin</src>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/sbin</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/etc</src>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/etc</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/libexec</src>
+                  <dst>/opt/ozone/libexec</dst>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/libexec</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/share</src>
+                  <dst>/opt/ozone/share</dst>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/share</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+              </dataSet>
+            </configuration>
+            <executions>
               <execution>
-                <id>build-om-deb</id>
                 <goals>
                   <goal>jdeb</goal>
                 </goals>
                 <phase>package</phase>
-                <configuration>
-                  <controlDir>${project.basedir}/src/main/package/deb/control/om</controlDir>
-                  <deb>${project.build.directory}/ozone-om_${project.version}.deb</deb>
-                  <dataSet>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-manager.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <type>perm</type>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                  </dataSet>
-                </configuration>
-              </execution>
-              <execution>
-                <id>build-recon-deb</id>
-                <goals>
-                  <goal>jdeb</goal>
-                </goals>
-                <phase>package</phase>
-                <configuration>
-                  <controlDir>${project.basedir}/src/main/package/deb/control/recon</controlDir>
-                  <deb>${project.build.directory}/ozone-recon_${project.version}.deb</deb>
-                  <dataSet>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-recon.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <type>perm</type>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                  </dataSet>
-                </configuration>
-              </execution>
-              <execution>
-                <id>build-s3g-deb</id>
-                <goals>
-                  <goal>jdeb</goal>
-                </goals>
-                <phase>package</phase>
-                <configuration>
-                  <controlDir>${project.basedir}/src/main/package/deb/control/s3g</controlDir>
-                  <deb>${project.build.directory}/ozone-s3g_${project.version}.deb</deb>
-                  <dataSet>
-                    <data>
-                      <src>${project.build.directory}/ozone-${project.version}/share/ozone/classpath/ozone-s3gateway.classpath</src>
-                      <type>file</type>
-                      <mapper>
-                        <prefix>/opt/ozone/share/ozone/classpath/</prefix>
-                        <type>perm</type>
-                        <user>root</user>
-                        <group>root</group>
-                        <filemode>755</filemode>
-                      </mapper>
-                    </data>
-                  </dataSet>
-                </configuration>
               </execution>
             </executions>
           </plugin>
