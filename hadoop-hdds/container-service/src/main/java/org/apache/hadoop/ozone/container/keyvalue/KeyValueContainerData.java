@@ -385,7 +385,7 @@ public class KeyValueContainerData extends ContainerData {
     metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockCountKey(),
         b.getPendingDeletion() - deletedBlockCount);
     metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockBytesKey(),
-        getStatistics().getBlockPendingDeletionBytes() - releasedBytes);
+        b.getPendingDeletionBytes() - releasedBytes);
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
