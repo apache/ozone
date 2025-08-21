@@ -31,7 +31,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator.Type.VALUE_ONLY;
 
 import com.google.common.util.concurrent.Striped;
 import java.io.IOException;
@@ -65,6 +64,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.apache.ratis.util.AutoCloseableLock;
@@ -233,10 +233,10 @@ public final class ContainerStateManagerImpl
    * @throws IOException in case of error while loading the containers
    */
   private void initialize() throws IOException {
-    try (Table.KeyValueIterator<ContainerID, ContainerInfo> iterator = containerStore.iterator(VALUE_ONLY)) {
+    try (TableIterator<ContainerID, ContainerInfo> iterator = containerStore.valueIterator()) {
 
       while (iterator.hasNext()) {
-        final ContainerInfo container = iterator.next().getValue();
+        final ContainerInfo container = iterator.next();
         Objects.requireNonNull(container, "container == null");
         containers.addContainer(container);
         if (container.getState() == LifeCycleState.OPEN) {
@@ -532,20 +532,10 @@ public final class ContainerStateManagerImpl
   public void reinitialize(
       Table<ContainerID, ContainerInfo> store) throws IOException {
     try (AutoCloseableLock ignored = writeLock()) {
-      close();
       this.containerStore = store;
       this.containers = new ContainerStateMap();
       this.lastUsedMap = new ConcurrentHashMap<>();
       initialize();
-    }
-  }
-
-  @Override
-  public void close() throws IOException {
-    try {
-      containerStore.close();
-    } catch (Exception e) {
-      throw new IOException(e);
     }
   }
 

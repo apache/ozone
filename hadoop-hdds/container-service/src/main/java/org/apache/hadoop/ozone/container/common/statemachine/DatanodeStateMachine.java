@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Crea
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconcileContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
@@ -230,6 +232,10 @@ public class DatanodeStateMachine implements Closeable {
         new ReconstructECContainersCommandHandler(conf, supervisor,
             ecReconstructionCoordinator);
 
+    // TODO HDDS-11218 combine the clients used for reconstruction and reconciliation so they share the same cache of
+    //  datanode clients.
+    DNContainerOperationClient dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
+
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat(threadNamePrefix + "PipelineCommandHandlerThread-%d")
         .build();
@@ -258,6 +264,7 @@ public class DatanodeStateMachine implements Closeable {
             supervisor::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
+        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
