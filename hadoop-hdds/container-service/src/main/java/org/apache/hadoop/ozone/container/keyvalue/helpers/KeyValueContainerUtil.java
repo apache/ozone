@@ -29,9 +29,11 @@ import java.nio.file.Paths;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerChecksumInfo;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -221,7 +223,7 @@ public final class KeyValueContainerUtil {
     // Verify Checksum
     // skip verify checksum if the state has changed to RECOVERING during container import
     if (!skipVerifyChecksum) {
-      ContainerUtils.verifyChecksum(kvContainerData, config);
+      ContainerUtils.verifyContainerFileChecksum(kvContainerData, config);
     }
 
     if (kvContainerData.getSchemaVersion() == null) {
@@ -233,8 +235,8 @@ public final class KeyValueContainerUtil {
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
         kvContainerData);
     if (!dbFile.exists()) {
-      LOG.error("Container DB file is missing for ContainerID {}. " +
-          "Skipping loading of this container.", containerID);
+      LOG.error("Container DB file is missing at {} for ContainerID {}. " +
+          "Skipping loading of this container.", dbFile, containerID);
       // Don't further process this container, as it is missing db file.
       throw new IOException("Container DB file is missing for containerID "
           + containerID);
@@ -257,10 +259,10 @@ public final class KeyValueContainerUtil {
     DatanodeStore store = null;
     try {
       try {
-        boolean readOnly = ContainerInspectorUtil.isReadOnly(
-            ContainerProtos.ContainerType.KeyValueContainer);
-        store = BlockUtils.getUncachedDatanodeStore(
-            kvContainerData, config, readOnly);
+        // Open RocksDB in write mode, as it is required for container checksum updates and inspector repair operations.
+        // The method KeyValueContainerMetadataInspector.buildErrorAndRepair will determine if write access to the DB
+        // is permitted based on the mode.
+        store = BlockUtils.getUncachedDatanodeStore(kvContainerData, config, false);
       } catch (IOException e) {
         // If an exception is thrown, then it may indicate the RocksDB is
         // already open in the container cache. As this code is only executed at
@@ -280,15 +282,33 @@ public final class KeyValueContainerUtil {
       } else if (store != null) {
         // We only stop the store if cacheDB is null, as otherwise we would
         // close the rocksDB handle in the cache and the next reader would fail
-        try {
-          store.stop();
-        } catch (IOException e) {
-          throw e;
-        } catch (Exception e) {
-          throw new RuntimeException("Unexpected exception closing the " +
-              "RocksDB when loading containers", e);
-        }
+        store.stop();
       }
+    }
+  }
+
+  private static void loadAndSetContainerDataChecksum(KeyValueContainerData kvContainerData,
+                                                      Table<String, Long> metadataTable) {
+    if (kvContainerData.isOpen()) {
+      return;
+    }
+
+    try {
+      Long containerDataChecksum = metadataTable.get(kvContainerData.getContainerDataChecksumKey());
+      if (containerDataChecksum != null && kvContainerData.needsDataChecksum()) {
+        kvContainerData.setDataChecksum(containerDataChecksum);
+        return;
+      }
+
+      ContainerChecksumInfo containerChecksumInfo = ContainerChecksumTreeManager.readChecksumInfo(kvContainerData);
+      if (containerChecksumInfo != null && containerChecksumInfo.hasContainerMerkleTree()
+          && kvContainerData.needsDataChecksum()) {
+        containerDataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+        kvContainerData.setDataChecksum(containerDataChecksum);
+        metadataTable.put(kvContainerData.getContainerDataChecksumKey(), containerDataChecksum);
+      }
+    } catch (IOException ex) {
+      LOG.warn("Failed to read checksum info for container {}", kvContainerData.getContainerID(), ex);
     }
   }
 
@@ -310,10 +330,10 @@ public final class KeyValueContainerUtil {
       LOG.warn("Missing pendingDeleteBlockCount from {}: recalculate them from block table", metadataTable.getName());
       MetadataKeyFilters.KeyPrefixFilter filter =
           kvContainerData.getDeletingBlockKeyFilter();
-      blockPendingDeletion = store.getBlockDataTable()
-              .getSequentialRangeKVs(kvContainerData.startKeyEmpty(),
-                  Integer.MAX_VALUE, kvContainerData.containerPrefix(),
-                  filter).size();
+      blockPendingDeletion = store.getBlockDataTable().getRangeKVs(
+          kvContainerData.startKeyEmpty(), Integer.MAX_VALUE, kvContainerData.containerPrefix(), filter, true)
+          // TODO: add a count() method to avoid creating a list
+          .size();
     }
     // Set delete transaction id.
     Long delTxnId =
@@ -361,6 +381,8 @@ public final class KeyValueContainerUtil {
     if (noBlocksInContainer(store, kvContainerData, bCheckChunksFilePath)) {
       kvContainerData.markAsEmpty();
     }
+
+    loadAndSetContainerDataChecksum(kvContainerData, metadataTable);
 
     // Run advanced container inspection/repair operations if specified on
     // startup. If this method is called but not as a part of startup,

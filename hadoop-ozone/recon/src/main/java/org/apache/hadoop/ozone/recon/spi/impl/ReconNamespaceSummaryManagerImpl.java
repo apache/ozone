@@ -44,9 +44,25 @@ public class ReconNamespaceSummaryManagerImpl
   @Inject
   public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider, NSSummaryTask nsSummaryTask)
           throws IOException {
-    namespaceDbStore = reconDBProvider.getDbStore();
+    this(reconDBProvider.getDbStore(), nsSummaryTask);
+  }
+
+  private ReconNamespaceSummaryManagerImpl(DBStore dbStore, NSSummaryTask nsSummaryTask)
+      throws IOException {
+    namespaceDbStore = dbStore;
     this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
     this.nsSummaryTask = nsSummaryTask;
+  }
+
+  @Override
+  public ReconNamespaceSummaryManager getStagedNsSummaryManager(DBStore dbStore) throws IOException {
+    return new ReconNamespaceSummaryManagerImpl(dbStore, nsSummaryTask);
+  }
+
+  @Override
+  public void reinitialize(ReconDBProvider reconDBProvider) throws IOException {
+    namespaceDbStore = reconDBProvider.getDbStore();
+    this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
   }
 
   @Override
@@ -68,6 +84,12 @@ public class ReconNamespaceSummaryManagerImpl
   }
 
   @Override
+  public void batchDeleteNSSummaries(BatchOperation batch, long objectId)
+      throws IOException {
+    nsSummaryTable.deleteWithBatch(batch, objectId);
+  }
+
+  @Override
   public void deleteNSSummary(long objectId) throws IOException {
     nsSummaryTable.delete(objectId);
   }
@@ -85,6 +107,8 @@ public class ReconNamespaceSummaryManagerImpl
 
   @Override
   public void rebuildNSSummaryTree(OMMetadataManager omMetadataManager) {
+    // This method is called by the unified ReconUtils.triggerNSSummaryRebuild
+    // It should only handle the actual rebuild logic without state management
     nsSummaryTask.reprocess(omMetadataManager);
   }
 

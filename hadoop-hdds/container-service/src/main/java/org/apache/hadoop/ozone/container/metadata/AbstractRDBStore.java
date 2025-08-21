@@ -22,15 +22,16 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMI
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -45,10 +46,10 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
   private final DEF dbDef;
   private final ManagedColumnFamilyOptions cfOptions;
   private static DatanodeDBProfile dbProfile;
-  private final boolean openReadOnly;
   private volatile DBStore store;
 
-  protected AbstractRDBStore(DEF dbDef, ConfigurationSource config, boolean openReadOnly) throws IOException {
+  protected AbstractRDBStore(DEF dbDef, ConfigurationSource config, boolean openReadOnly)
+      throws RocksDatabaseException, CodecException {
     dbProfile = DatanodeDBProfile.getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
     // The same config instance is used on each datanode, so we can share the
@@ -58,15 +59,9 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
         config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
     cfOptions = dbProfile.getColumnFamilyOptions(config, optionsPath, DEFAULT_COLUMN_FAMILY_NAME);
     this.dbDef = dbDef;
-    this.openReadOnly = openReadOnly;
-    start(config);
-  }
 
-  @Override
-  public void start(ConfigurationSource config)
-      throws IOException {
     if (this.store == null) {
-      Path optionsPath = Paths.get(
+      optionsPath = Paths.get(
           config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
       ManagedDBOptions options = dbProfile.getDBOptions(optionsPath);
       options.setCreateIfMissing(true);
@@ -88,10 +83,11 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
   }
 
   protected abstract DBStore initDBStore(DBStoreBuilder dbStoreBuilder, ManagedDBOptions options,
-                                         ConfigurationSource config) throws IOException;
+                                         ConfigurationSource config)
+      throws RocksDatabaseException, CodecException;
 
   @Override
-  public synchronized void stop() throws Exception {
+  public synchronized void stop() {
     if (store != null) {
       store.close();
       store = null;
@@ -117,23 +113,23 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     this.store.close();
     this.cfOptions.close();
   }
 
   @Override
-  public void flushDB() throws IOException {
+  public void flushDB() throws RocksDatabaseException {
     store.flushDB();
   }
 
   @Override
-  public void flushLog(boolean sync) throws IOException {
+  public void flushLog(boolean sync) throws RocksDatabaseException {
     store.flushLog(sync);
   }
 
   @Override
-  public void compactDB() throws IOException {
+  public void compactDB() throws RocksDatabaseException {
     store.compactDB();
   }
 

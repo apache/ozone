@@ -26,6 +26,7 @@ import org.rocksdb.ConfigOptions;
  * Managed ConfigOptions.
  */
 public class ManagedConfigOptions extends ConfigOptions {
+
   private final UncheckedAutoCloseable leakTracker = track(this);
 
   @Override

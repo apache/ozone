@@ -94,6 +94,7 @@ import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -195,7 +196,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.setSilent(true);
     this.reconContext = reconContext;
     this.scmContext = new SCMContext.Builder()
-        .setIsPreCheckComplete(true)
+        .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.OUT_OF_SAFE_MODE)
         .setSCM(this)
         .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
@@ -244,7 +245,8 @@ public class ReconStorageContainerManagerFacade
         scmhaManager,
         scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
-        Clock.system(ZoneId.systemDefault()));
+        Clock.system(ZoneId.systemDefault()),
+        conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class));
     this.containerManager = new ReconContainerManager(conf,
         dbStore,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
@@ -435,6 +437,7 @@ public class ReconStorageContainerManagerFacade
     if (!this.safeModeManager.getInSafeMode()) {
       this.reconScmTasks.forEach(ReconScmTask::start);
     }
+    LOG.info("Successfully started Recon Storage Container Manager.");
   }
 
   /**
@@ -464,7 +467,6 @@ public class ReconStorageContainerManagerFacade
       LOG.error("SCM Event Queue stop failed", ex);
     }
     IOUtils.cleanupWithLogger(LOG, nodeManager);
-    IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
@@ -510,6 +512,8 @@ public class ReconStorageContainerManagerFacade
       }
     } catch (IOException e) {
       LOG.error("Exception encountered while getting SCM DB.");
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.INTERNAL_ERROR);
     } finally {
       isSyncDataFromSCMRunning.compareAndSet(true, false);
     }

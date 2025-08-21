@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import java.io.File;
 import java.util.List;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -111,18 +111,9 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public List<KeyValue<KEY, VALUE>> getRangeKVs(
-          KEY startKey, int count, KEY prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws RocksDatabaseException, CodecException {
-    return table.getRangeKVs(startKey, count, prefix, filters);
-  }
-
-  @Override
-  public List<KeyValue<KEY, VALUE>> getSequentialRangeKVs(
-          KEY startKey, int count, KEY prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws RocksDatabaseException, CodecException {
-    return table.getSequentialRangeKVs(startKey, count, prefix, filters);
+      KEY startKey, int count, KEY prefix, KeyPrefixFilter filter, boolean isSequential)
+      throws RocksDatabaseException, CodecException {
+    return table.getRangeKVs(startKey, count, prefix, filter, isSequential);
   }
 
   @Override
@@ -138,10 +129,5 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public void loadFromFile(File externalFile) throws RocksDatabaseException {
     table.loadFromFile(externalFile);
-  }
-
-  @Override
-  public void close() throws Exception {
-    table.close();
   }
 }

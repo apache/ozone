@@ -20,6 +20,7 @@ Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${OM_JMX_ENDPOINT}                          http://om:9874/jmx

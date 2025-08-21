@@ -18,6 +18,7 @@ Documentation       Keywords and other resources used by EC tests
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${SCM}       scm

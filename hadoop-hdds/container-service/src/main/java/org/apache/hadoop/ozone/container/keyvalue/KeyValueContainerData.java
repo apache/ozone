@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETE_TRANSACTION_KEY;
@@ -176,6 +177,7 @@ public class KeyValueContainerData extends ContainerData {
    * Returns container metadata path.
    * @return - Physical path where container file and checksum is stored.
    */
+  @Override
   public String getMetadataPath() {
     return metadataPath;
   }
@@ -270,6 +272,7 @@ public class KeyValueContainerData extends ContainerData {
         .setReplicaIndex(getReplicaIndex())
         .setBlockCommitSequenceId(getBlockCommitSequenceId())
         .setDeleteTransactionId(getDeleteTransactionId())
+        .setDataChecksum(getDataChecksum())
         .build();
   }
 
@@ -422,17 +425,21 @@ public class KeyValueContainerData extends ContainerData {
     return formatKey(PENDING_DELETE_BLOCK_COUNT);
   }
 
+  public String getContainerDataChecksumKey() {
+    return formatKey(CONTAINER_DATA_CHECKSUM);
+  }
+
   public String getDeletingBlockKeyPrefix() {
     return formatKey(DELETING_KEY_PREFIX);
   }
 
   public KeyPrefixFilter getUnprefixedKeyFilter() {
     String schemaPrefix = containerPrefix();
-    return new KeyPrefixFilter().addFilter(schemaPrefix + "#", true);
+    return KeyPrefixFilter.newFilter(schemaPrefix + "#", true);
   }
 
   public KeyPrefixFilter getDeletingBlockKeyFilter() {
-    return new KeyPrefixFilter().addFilter(getDeletingBlockKeyPrefix());
+    return KeyPrefixFilter.newFilter(getDeletingBlockKeyPrefix());
   }
 
   /**

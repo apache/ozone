@@ -116,9 +116,11 @@ public class TestRDBSnapshotProvider {
                 concat(String.valueOf(a.length())))
             .collect(Collectors.toList()));
         try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
-          writeDBCheckpointToStream(dbCheckpoint, outputStream,
-              new HashSet<>(HAUtils.getExistingSstFiles(
-                  rdbSnapshotProvider.getCandidateDir())));
+          Set<String> existingSstFiles = HAUtils.getExistingFiles(rdbSnapshotProvider.getCandidateDir())
+              .stream()
+              .filter(fName -> fName.endsWith(".sst") && !fName.equals(".sst"))
+              .collect(Collectors.toSet());
+          writeDBCheckpointToStream(dbCheckpoint, outputStream, existingSstFiles);
         }
       }
     };
@@ -141,7 +143,7 @@ public class TestRDBSnapshotProvider {
     assertTrue(candidateDir.exists());
 
     DBCheckpoint checkpoint;
-    int before = HAUtils.getExistingSstFiles(
+    int before = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertEquals(0, before);
 
@@ -149,12 +151,12 @@ public class TestRDBSnapshotProvider {
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
     File checkpointDir = checkpoint.getCheckpointLocation().toFile();
     assertEquals(candidateDir, checkpointDir);
-    int first = HAUtils.getExistingSstFiles(
+    int first = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
 
     // Get second snapshot
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
-    int second = HAUtils.getExistingSstFiles(
+    int second = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertThat(second).withFailMessage("The second snapshot should have more SST files")
         .isGreaterThan(first);
@@ -164,7 +166,7 @@ public class TestRDBSnapshotProvider {
 
     // Get third snapshot
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
-    int third = HAUtils.getExistingSstFiles(
+    int third = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertThat(third).withFailMessage("The third snapshot should have more SST files")
         .isGreaterThan(second);
@@ -173,7 +175,7 @@ public class TestRDBSnapshotProvider {
 
     // Test cleanup candidateDB
     rdbSnapshotProvider.init();
-    assertEquals(0, HAUtils.getExistingSstFiles(
+    assertEquals(0, HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size());
   }
 
@@ -221,18 +223,12 @@ public class TestRDBSnapshotProvider {
 
   public void insertRandomData(RDBStore dbStore, int familyIndex)
       throws IOException {
-    try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
-        get(familyIndex))) {
-      assertNotNull(firstTable, "Table cannot be null");
-      for (int x = 0; x < 100; x++) {
-        byte[] key =
-            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-      }
-    } catch (Exception e) {
-      throw new IOException(e);
+    Table<byte[], byte[]> firstTable = dbStore.getTable(families.get(familyIndex));
+    assertNotNull(firstTable, "Table cannot be null");
+    for (int x = 0; x < 100; x++) {
+      byte[] key = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      byte[] value = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+      firstTable.put(key, value);
     }
   }
 

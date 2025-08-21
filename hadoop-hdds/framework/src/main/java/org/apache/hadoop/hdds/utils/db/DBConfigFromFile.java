@@ -21,15 +21,15 @@ import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.hadoop.hdds.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.OptionsUtil;
 import org.rocksdb.RocksDBException;
@@ -60,11 +60,11 @@ public final class DBConfigFromFile {
 
     // Make testing easy.
     // If there is No Env. defined, let us try to read the JVM property
-    if (StringUtil.isBlank(path)) {
+    if (StringUtils.isBlank(path)) {
       path = System.getProperty(CONFIG_DIR);
     }
 
-    if (StringUtil.isBlank(path)) {
+    if (StringUtils.isBlank(path)) {
       LOG.debug("Unable to find the configuration directory. "
           + "Please make sure that " + CONFIG_DIR + " is setup correctly.");
       return null;
@@ -120,14 +120,15 @@ public final class DBConfigFromFile {
       closeDescriptors(descriptors);
     }
   }
-  
+
   public static ManagedColumnFamilyOptions readCFOptionsFromFile(Path dbPath, String cfName) throws RocksDBException {
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
-    String validatedCfName = StringUtil.isEmpty(cfName) ? StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY) : cfName;
+    String defaultColumnFamilyString = StringUtils.toEncodedString(DEFAULT_COLUMN_FAMILY, StandardCharsets.UTF_8);
+    String validatedCfName = StringUtils.isEmpty(cfName) ? defaultColumnFamilyString : cfName;
     ManagedColumnFamilyOptions resultCfOptions = null;
     try (ManagedDBOptions ignored = readFromFile(dbPath, descriptors)) {
       ColumnFamilyDescriptor descriptor = descriptors.stream()
-          .filter(desc -> StringUtils.bytes2String(desc.getName()).equals(validatedCfName))
+          .filter(desc -> StringUtils.toEncodedString(desc.getName(), StandardCharsets.UTF_8).equals(validatedCfName))
           .findAny().orElse(null);
       if (descriptor != null) {
         resultCfOptions = new ManagedColumnFamilyOptions(descriptor.getOptions());
@@ -179,7 +180,7 @@ public final class DBConfigFromFile {
       LOG.debug("RocksDB path: {} not found, attempting to use fallback", path);
       File configLocation = getConfigLocation();
       if (configLocation != null &&
-          StringUtil.isNotBlank(configLocation.toString())) {
+          StringUtils.isNotBlank(configLocation.toString())) {
         Path fallbackPath = Paths.get(configLocation.toString(),
             getOptionsFileNameFromDB(path.toString()));
         LOG.debug("Fallback path found: {}", path);
