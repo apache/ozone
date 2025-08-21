@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -390,6 +391,43 @@ public class TestKeyValueHandler {
     assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
         response.getResult(),
         "Close container should return Invalid container error");
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testCloseRecoveringContainerTriggersScan(ContainerLayoutVersion layoutVersion) {
+    final KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
+        DATANODE_UUID, mockContainerSet, mock(MutableVolumeSet.class),  mock(ContainerMetrics.class),
+        c -> { }, new ContainerChecksumTreeManager(conf));
+
+    conf = new OzoneConfiguration();
+    KeyValueContainerData kvData = new KeyValueContainerData(DUMMY_CONTAINER_ID,
+        layoutVersion,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+    kvData.setMetadataPath(tempDir.toString());
+    kvData.setDbFile(dbFile.toFile());
+    KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    ContainerCommandRequestProto createContainerRequest =
+        createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID);
+    keyValueHandler.handleCreateContainer(createContainerRequest, container);
+
+    // Make the container state as invalid.
+    kvData.setState(State.RECOVERING);
+
+    // Create Close container request
+    ContainerCommandRequestProto closeContainerRequest =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.CloseContainer)
+            .setContainerID(DUMMY_CONTAINER_ID)
+            .setDatanodeUuid(DATANODE_UUID)
+            .setCloseContainer(ContainerProtos.CloseContainerRequestProto
+                .getDefaultInstance())
+            .build();
+    dispatcher.dispatch(closeContainerRequest, null);
+
+    keyValueHandler.handleCloseContainer(closeContainerRequest, container);
+
+    verify(mockContainerSet, atLeastOnce()).scanContainer(DUMMY_CONTAINER_ID, "EC Reconstruction");
   }
 
   @Test
