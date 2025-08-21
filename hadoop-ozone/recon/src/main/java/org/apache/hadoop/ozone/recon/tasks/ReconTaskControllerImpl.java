@@ -510,4 +510,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       deltaTasksFailed.set(true);
     }
   }
+  
+  @Override
+  public int getEventBufferSize() {
+    return eventBuffer.getQueueSize();
+  }
+  
+  @Override
+  public long getDroppedBatches() {
+    return eventBuffer.getDroppedBatches();
+  }
 }

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -104,4 +105,20 @@ public interface ReconTaskController {
    * @param omMetadataManager the current OM metadata manager
    */
   void updateOMMetadataManager(ReconOMMetadataManager omMetadataManager);
+  
+  /**
+   * Get the current size of the event buffer.
+   * 
+   * @return the number of events currently in the buffer
+   */
+  @VisibleForTesting
+  int getEventBufferSize();
+  
+  /**
+   * Get the number of batches that have been dropped due to buffer overflow.
+   * This is used by the overflow detection logic.
+   * 
+   * @return the number of dropped batches
+   */
+  long getDroppedBatches();
 }
