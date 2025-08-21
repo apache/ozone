@@ -70,8 +70,6 @@ public class ContainerSet implements Iterable<Container<?>> {
   private final Table<ContainerID, String> containerIdsTable;
   // Handler that will be invoked when a scan of a container in this set is requested.
   private OnDemandContainerScanner containerScanner;
-  private CachedPendingDeletion cachedPendingDeletion;
-  private Object cacheLock = new Object();
 
   public static ContainerSet newReadOnlyContainerSet(long recoveringTimeout) {
     return new ContainerSet(null, recoveringTimeout);
@@ -549,23 +547,5 @@ public class ContainerSet implements Iterable<Container<?>> {
         }
       }
     });
-  }
-
-  private static class CachedPendingDeletion {
-    private final long size;
-    private final long expiryTimeMillis;
-
-    CachedPendingDeletion(long size, long cacheDurationMillis) {
-      this.size = size;
-      this.expiryTimeMillis = System.currentTimeMillis() + cacheDurationMillis;
-    }
-
-    public long getSize() {
-      return size;
-    }
-
-    public boolean isExpired() {
-      return System.currentTimeMillis() > expiryTimeMillis;
-    }
   }
 }
