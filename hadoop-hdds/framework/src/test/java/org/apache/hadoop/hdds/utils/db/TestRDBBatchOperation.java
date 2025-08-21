@@ -32,7 +32,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
