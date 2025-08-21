@@ -331,9 +331,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       KeyValueContainerData containerData, DatanodeStore store) {
     ArrayNode errors = JsonUtils.createArrayNode();
     boolean passed = true;
-
     Table<String, Long> metadataTable = store.getMetadataTable();
-
     ObjectNode dBMetadata = (ObjectNode) parent.get("dBMetadata");
     ObjectNode aggregates = (ObjectNode) parent.get("aggregates");
 
@@ -344,7 +342,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     // If block count is absent from the DB, it is only an error if there are
     // a non-zero amount of block keys in the DB.
     long blockCountDBLong = blockCountDB.isNull() ? 0 : blockCountDB.asLong();
-
     if (blockCountDBLong != blockCountAggregate.asLong()) {
       passed = false;
 
@@ -427,6 +424,30 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       errors.add(deleteCountError);
     }
 
+    // check and repair if db delete bytes mismatches delete transaction
+    JsonNode pendingDeletionBlockSize = dBMetadata.path(
+        OzoneConsts.PENDING_DELETE_BLOCK_BYTES);
+    final long dbDeleteBytes = jsonToLong(pendingDeletionBlockSize);
+    final JsonNode pendingDeleteBytesAggregate = aggregates.path(PendingDelete.BYTES);
+    final long deleteTransactionBytes = jsonToLong(pendingDeleteBytesAggregate);
+    if (dbDeleteBytes != deleteTransactionBytes) {
+      passed = false;
+      final BooleanSupplier deleteBytesRepairAction = () -> {
+        final String key = containerData.getPendingDeleteBlockBytesKey();
+        try {
+          metadataTable.put(key, deleteTransactionBytes);
+        } catch (IOException ex) {
+          LOG.error("Failed to reset {} for container {}.",
+              key, containerData.getContainerID(), ex);
+        }
+        return false;
+      };
+      final ObjectNode deleteBytesError = buildErrorAndRepair(
+          "dBMetadata." + OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
+          pendingDeleteBytesAggregate, pendingDeletionBlockSize, deleteBytesRepairAction);
+      errors.add(deleteBytesError);
+    }
+
     // check and repair chunks dir.
     JsonNode chunksDirPresent = parent.path("chunksDirectory").path("present");
     if (!chunksDirPresent.asBoolean()) {
@@ -449,7 +470,6 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           JsonNodeFactory.instance.booleanNode(true), chunksDirPresent, dirRepairAction);
       errors.add(chunksDirError);
     }
-
     parent.put("correct", passed);
     parent.set("errors", errors);
     return passed;

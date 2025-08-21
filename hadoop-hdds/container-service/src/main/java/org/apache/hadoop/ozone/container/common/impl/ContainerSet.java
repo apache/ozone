@@ -31,12 +31,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.ToLongFunction;
@@ -45,7 +43,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -472,46 +469,6 @@ public class ContainerSet implements Iterable<Container<?>> {
         return;
       }
     }
-  }
-
-  /**
-   * This method can be used to get total bytes pending for deletion
-   * in cached interval of time. This can be utilized by either storage
-   * report or other services.
-   */
-  public long getPendingDeletionBytes() {
-
-    CachedPendingDeletion currentCache = cachedPendingDeletion;
-    if (currentCache != null && !currentCache.isExpired()) {
-      return currentCache.getSize();
-    }
-
-    synchronized (cacheLock) {
-      currentCache = cachedPendingDeletion;
-      if (currentCache != null && !currentCache.isExpired()) {
-        return currentCache.getSize();
-      }
-      long total = 0L;
-      for (Container<?> container : containerMap.values()) {
-        total += container.getContainerData()
-            .getStatistics()
-            .getBlockPendingDeletionBytes();
-      }
-      long cacheDurationMillis = getSafeHeartbeatInterval(containerMap);
-      cachedPendingDeletion = new CachedPendingDeletion(total, cacheDurationMillis);
-      return total;
-    }
-  }
-
-  private long getSafeHeartbeatInterval(Map<Long, Container<?>> containers) {
-    return Optional.ofNullable(containers)
-        .filter(m -> !m.isEmpty())
-        .map(m -> m.values().iterator().next())
-        .map(Container::getContainerData)
-        .map(ContainerData::getVolume)
-        .map(HddsVolume::getConf)
-        .map(conf -> HddsServerUtil.getScmHeartbeatInterval(conf) * 5)
-        .orElse(TimeUnit.MINUTES.toMillis(5));
   }
 
   /**
