@@ -714,8 +714,6 @@ public class TestBlockDeletingService {
     containerSet.listContainer(0L, 1, containerData);
     assertEquals(1, containerData.size());
     KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
-    KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
-        data.getDeletingBlockKeyFilter() : data.getUnprefixedKeyFilter();
 
     try (DBHandle meta = BlockUtils.getDB(data, conf)) {
       //Execute fist delete to update metrics
