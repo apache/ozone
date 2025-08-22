@@ -162,6 +162,22 @@ public final class BlockUtils {
   }
 
   /**
+   * Attempts to remove the database associated with the specified container from the ContainerCache.
+   * This method ignores exceptions related to any existing handles to the Db
+   * that prevent its eviction from the cache
+   */
+  public static void tryRemoveDB(KeyValueContainerData container, ConfigurationSource conf) {
+    try {
+      removeDB(container, conf);
+    } catch (IllegalArgumentException e) {
+      // Ignore error message of type "refCount: [1]"
+      if (!e.getMessage().contains("refCount")) {
+        throw e;
+      }
+    }
+  }
+
+  /**
    * Shutdown all DB Handles.
    *
    * @param config
