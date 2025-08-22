@@ -107,7 +107,128 @@ test_cross_compatibility() {
     done
   done
 
+    # NEW: Add checkpoint compatibility tests
+    echo ""
+    echo "=========================================="
+    echo "Running checkpoint compatibility tests"
+    echo "=========================================="
+    for client_version in "$@"; do
+      client _test_checkpoint_compatibility
+    done
+
   KEEP_RUNNING=false stop_docker_env
+}
+
+_get_om_hostname() {
+  # Get OM hostname from the cluster configuration
+  echo "om"  # Default OM service name in docker-compose
+}
+
+_download_checkpoint_v1() {
+  _kinit
+  local om_host=$(_get_om_hostname)
+  local expected_result="$1"
+
+  echo "Testing /dbCheckpoint endpoint: client ${client_version} → cluster ${cluster_version}"
+
+  # Download using original checkpoint endpoint
+  local download_cmd="curl -f -s -o /tmp/checkpoint_v1_${client_version}.tar.gz http://${om_host}:9874/dbCheckpoint"
+
+  if execute_command_in_container ${container} bash -c "${download_cmd}"; then
+    local actual_result="pass"
+    echo "✓ Successfully downloaded checkpoint via v1 endpoint"
+  else
+    local actual_result="fail"
+    echo "✗ Failed to download checkpoint via v1 endpoint"
+  fi
+
+  if [[ "${expected_result}" == "${actual_result}" ]]; then
+    echo "✓ EXPECTED: ${expected_result}, GOT: ${actual_result}"
+    return 0
+  else
+    echo "✗ EXPECTED: ${expected_result}, GOT: ${actual_result}"
+    return 1
+  fi
+}
+
+_download_checkpoint_v2() {
+  _kinit
+  local om_host=$(_get_om_hostname)
+  local expected_result="$1"
+
+  echo "Testing /dbCheckpointv2 endpoint: client ${client_version} → cluster ${cluster_version}"
+
+  # Download using new checkpointv2 endpoint
+  local download_cmd="curl -f -s -o /tmp/checkpoint_v2_${client_version}.tar.gz http://${om_host}:9874/dbCheckpointv2"
+
+  if execute_command_in_container ${container} bash -c "${download_cmd}"; then
+    local actual_result="pass"
+    echo "✓ Successfully downloaded checkpoint via v2 endpoint"
+  else
+    local actual_result="fail"
+    echo "✗ Failed to download checkpoint via v2 endpoint"
+  fi
+
+  if [[ "${expected_result}" == "${actual_result}" ]]; then
+    echo "✓ EXPECTED: ${expected_result}, GOT: ${actual_result}"
+    return 0
+  else
+    echo "✗ EXPECTED: ${expected_result}, GOT: ${actual_result}"
+    return 1
+  fi
+}
+
+_test_checkpoint_compatibility() {
+  local test_result=0
+
+  # Determine client and cluster types
+  local is_old_client=false
+  local is_old_cluster=false
+
+  if [[ "${client_version}" != "${current_version}" ]]; then
+    is_old_client=true
+  fi
+
+  if [[ "${cluster_version}" != "${current_version}" ]]; then
+    is_old_cluster=true
+  fi
+
+  echo ""
+  echo "=== CHECKPOINT COMPATIBILITY TEST ==="
+  echo "Client: ${client_version} ($([ "$is_old_client" = true ] && echo "OLD" || echo "NEW"))"
+  echo "Cluster: ${cluster_version} ($([ "$is_old_cluster" = true ] && echo "OLD" || echo "NEW"))"
+  echo "====================================="
+
+  # Test v1 endpoint (/dbCheckpoint)
+  echo "→ Testing v1 endpoint compatibility..."
+  # Both old and new clusters should serve v1 endpoint (backward compatibility)
+  client _download_checkpoint_v1 "pass" || test_result=1
+
+  # Test v2 endpoint (/dbCheckpointv2)
+  echo "→ Testing v2 endpoint compatibility..."
+  if [ "$is_old_cluster" = true ]; then
+    # Old cluster doesn't have v2 endpoint
+    if [ "$is_old_client" = false ]; then
+      # New client hitting v2 on old cluster should fail
+      client _download_checkpoint_v2 "fail" || test_result=1
+    fi
+    # Old client won't try v2 endpoint
+  else
+    # New cluster has v2 endpoint
+    if [ "$is_old_client" = false ]; then
+      # New client should successfully use v2 endpoint
+      client _download_checkpoint_v2 "pass" || test_result=1
+    fi
+    # Old client doesn't know about v2 endpoint
+  fi
+
+  if [ $test_result -eq 0 ]; then
+    echo "✓ All checkpoint compatibility tests PASSED"
+  else
+    echo "✗ Some checkpoint compatibility tests FAILED"
+  fi
+
+  return $test_result
 }
 
 create_results_dir
