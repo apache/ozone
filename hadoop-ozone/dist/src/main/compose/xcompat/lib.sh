@@ -107,14 +107,30 @@ test_cross_compatibility() {
     done
   done
 
-    # NEW: Add checkpoint compatibility tests
-    echo ""
-    echo "=========================================="
-    echo "Running checkpoint compatibility tests"
-    echo "=========================================="
-    for client_version in "$@"; do
-      client _test_checkpoint_compatibility
-    done
+
+
+  KEEP_RUNNING=false stop_docker_env
+}
+
+test_checkpoint_compatibility_only() {
+  local checkpoint_client_versions="$@"
+  
+  echo "Starting ${cluster_version} cluster with COMPOSE_FILE=${COMPOSE_FILE}"
+
+  OZONE_KEEP_RESULTS=true start_docker_env 5
+
+  execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
+
+  _init
+
+  # Run checkpoint compatibility tests only
+  echo ""
+  echo "=========================================="
+  echo "Running checkpoint compatibility tests"
+  echo "=========================================="
+  for client_version in ${checkpoint_client_versions}; do
+    client _test_checkpoint_compatibility
+  done
 
   KEEP_RUNNING=false stop_docker_env
 }

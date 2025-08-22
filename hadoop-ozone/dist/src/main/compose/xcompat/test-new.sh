@@ -27,3 +27,10 @@ source "${COMPOSE_DIR}/lib.sh"
 
 # current cluster with various clients
 COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}
+
+# Run checkpoint compatibility tests specifically for 2.0 client
+echo ""
+echo "=========================================="
+echo "Running checkpoint compatibility tests with 2.0 client"
+echo "=========================================="
+COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_checkpoint_compatibility_only "2.0.0"
