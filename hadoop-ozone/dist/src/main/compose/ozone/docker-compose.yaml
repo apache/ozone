@@ -47,8 +47,6 @@ services:
     volumes:
       - ../..:/opt/hadoop       # inherited from common-config
       - ../../../data-om:/data     # om-specific data volume
-      # Add your extra volumes here, for example:
-      # - /host/path:/container/path
     ports:
       - 9874:9874
       - 9862:9862
