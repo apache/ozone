@@ -329,15 +329,15 @@ public final class KeyValueContainerUtil {
             metadataTable.getName());
         PendingDelete pendingDeletions = getAggregatePendingDelete(
             store, kvContainerData, kvContainerData.getSchemaVersion());
-        blockPendingDeletionBytes = pendingDeletions.getCount();
+        blockPendingDeletionBytes = pendingDeletions.getBytes();
       }
     } else {
       LOG.warn("Missing pendingDeleteBlockCount/size from {}: recalculate them from delete txn tables",
           metadataTable.getName());
       PendingDelete pendingDeletions = getAggregatePendingDelete(
           store, kvContainerData, kvContainerData.getSchemaVersion());
-      blockPendingDeletionBytes = pendingDeletions.getCount();
-      blockPendingDeletion = pendingDeletions.getBytes();
+      blockPendingDeletion = pendingDeletions.getCount();
+      blockPendingDeletionBytes = pendingDeletions.getBytes();
     }
     // Set delete transaction id.
     Long delTxnId =
