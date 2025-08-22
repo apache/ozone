@@ -284,7 +284,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   }
 
   public static PendingDelete getAggregatePendingDelete(DatanodeStore store,
-                KeyValueContainerData containerData, String schemaVersion)
+      KeyValueContainerData containerData, String schemaVersion)
       throws IOException {
     final PendingDelete pendingDelete;
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1)) {
