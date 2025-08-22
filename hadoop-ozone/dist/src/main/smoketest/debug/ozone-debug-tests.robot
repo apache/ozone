@@ -55,7 +55,8 @@ Execute and validate replicas verify with filter
     ${keys} =             Get From Dictionary     ${json}         keys
     ${key_count} =        Get Length              ${keys}
     Should Be Equal As Integers           ${key_count}    ${expected_key_count}
-    [Return]              ${json}
+    ${key_names} =        Get key names from output    ${json}
+    [Return]              ${key_names}
 
 *** Test Cases ***
 Test ozone debug replicas verify checksums, block-existence and container-state
@@ -67,8 +68,7 @@ Test ozone debug replicas verify checksums, block-existence and container-state
     Should Be True       ${json}[pass]     ${True}
 
 Test ozone debug replicas verify with RATIS ONE filter
-    ${json} =             Execute and validate replicas verify with filter    RATIS    ONE    checksums    1
-    ${key_names} =        Get key names from output    ${json}
+    ${key_names} =        Execute and validate replicas verify with filter    RATIS    ONE    checksums    1
 
     # Should only contain RATIS ONE key
     Should Contain        ${key_names}    ${RATIS_ONE_KEY}      Key ${RATIS_ONE_KEY} not found in output
@@ -78,8 +78,7 @@ Test ozone debug replicas verify with RATIS ONE filter
     Should Not Contain    ${key_names}    ${RATIS_THREE_KEY}    Key ${RATIS_THREE_KEY} should not be in filtered output
 
 Test ozone debug replicas verify with RATIS THREE filter
-    ${json} =             Execute and validate replicas verify with filter    RATIS    THREE    checksums    2
-    ${key_names} =        Get key names from output    ${json}
+    ${key_names} =        Execute and validate replicas verify with filter    RATIS    THREE    checksums    2
 
     # Should contain RATIS THREE keys (default testfile and explicit RATIS THREE key)
     Should Contain        ${key_names}    ${TESTFILE}           Key ${TESTFILE} not found in output
@@ -89,8 +88,7 @@ Test ozone debug replicas verify with RATIS THREE filter
     Should Not Contain    ${key_names}    ${EC_KEY}             Key ${EC_KEY} should not be in filtered output
 
 Test ozone debug replicas verify with EC rs-3-2-1024k filter
-    ${json} =             Execute and validate replicas verify with filter    EC    rs-3-2-1024k    checksums    1
-    ${key_names} =        Get key names from output    ${json}
+    ${key_names} =        Execute and validate replicas verify with filter    EC    rs-3-2-1024k    checksums    1
 
     # Should only contain EC key
     Should Contain        ${key_names}    ${EC_KEY}             Key ${EC_KEY} not found in output
