@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DISK_BALANCER_DIR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -246,7 +247,7 @@ public class TestDiskBalancerTask {
     conf.setFromObject(diskBalancerConfiguration);
     diskBalancerService = new DiskBalancerServiceTestImpl(ozoneContainer,
         100, conf, 1);
-
+    DiskBalancerService.setReplicaDeletionDelayMills(0);
     KeyValueContainer.setInjector(kvFaultInjector);
   }
 
@@ -323,7 +324,7 @@ public class TestDiskBalancerTask {
 
     // verify temp container directory doesn't exist before task execution
     Path tempContainerDir = destVolume.getTmpDir().toPath()
-        .resolve(DiskBalancerService.DISK_BALANCER_DIR).resolve(String.valueOf(CONTAINER_ID));
+        .resolve(DISK_BALANCER_DIR).resolve(String.valueOf(CONTAINER_ID));
     File dir = new File(String.valueOf(tempContainerDir));
     assertFalse(dir.exists(), "Temp container directory should not exist before task starts");
 
@@ -373,7 +374,7 @@ public class TestDiskBalancerTask {
         0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
     String oldContainerPath = container.getContainerData().getContainerPath();
     Path tempDir = destVolume.getTmpDir().toPath()
-        .resolve(DiskBalancerService.DISK_BALANCER_DIR)
+        .resolve(DISK_BALANCER_DIR)
         .resolve(String.valueOf(CONTAINER_ID));
     assertFalse(Files.exists(tempDir), "Temp container directory should not exist");
     Path destDirPath = Paths.get(
@@ -574,6 +575,34 @@ public class TestDiskBalancerTask {
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testOldReplicaDelayedDeletion(ContainerTestVersionInfo versionInfo)
+      throws IOException, InterruptedException {
+    setLayoutAndSchemaForTest(versionInfo);
+    long delay = 2000L; // 2 second delay
+    DiskBalancerService.setReplicaDeletionDelayMills(delay);
+
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    KeyValueContainerData keyValueContainerData = (KeyValueContainerData) container.getContainerData();
+    File oldContainerDir = new File(keyValueContainerData.getContainerPath());
+    assertTrue(oldContainerDir.exists());
+
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    task.call();
+    assertEquals(State.DELETED, container.getContainerState());
+    // Verify that the old container is not deleted immediately
+    assertTrue(oldContainerDir.exists());
+
+    // create another container to trigger the deletion of old replicas
+    createContainer(CONTAINER_ID + 1, sourceVolume, State.CLOSED);
+    task = getTask();
+    // Wait for the delay to pass
+    Thread.sleep(delay);
+    task.call();
+    // Verify that the old container is deleted
+    assertFalse(oldContainerDir.exists());
   }
 
   private KeyValueContainer createContainer(long containerId, HddsVolume vol, State state)
