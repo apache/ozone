@@ -151,7 +151,7 @@ public class TestContainerReader {
   }
 
   private void markBlocksForDelete(KeyValueContainer keyValueContainer,
-                                   boolean setMetaData, List<Long> blockNames, int count) throws Exception {
+      boolean setMetaData, List<Long> blockNames, int count) throws Exception {
     KeyValueContainerData cData = keyValueContainer.getContainerData();
     try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
 
