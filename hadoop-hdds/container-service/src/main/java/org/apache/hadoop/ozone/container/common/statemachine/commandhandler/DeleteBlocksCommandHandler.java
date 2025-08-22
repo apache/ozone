@@ -644,7 +644,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           .putWithBatch(batchOperation,
               containerData.getPendingDeleteBlockBytesKey(),
               pendingBytes);
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks, pendingBytes);
+      containerData.incrPendingDeletionBlocks(newDeletionBlocks, delTX.getTotalBlockSize());
       containerData.updateDeleteTransactionId(delTX.getTxID());
     }
   }
