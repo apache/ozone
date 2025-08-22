@@ -688,6 +688,61 @@ public class TestBlockDeletingService {
   }
 
   @ContainerTestVersionInfo.ContainerTest
+  public void testBlockDeletionMetricsUpdatedProperlyAfterEachExecution(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(1);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
+    ContainerSet containerSet = newContainerSet();
+
+    // Create transactions including duplicates
+    createToDeleteBlocks(containerSet, 1, 3, 1);
+
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    BlockDeletingServiceMetrics blockDeletingServiceMetrics = BlockDeletingServiceMetrics.create();
+    KeyValueHandler keyValueHandler =
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
+    BlockDeletingServiceTestImpl svc =
+        getBlockDeletingService(containerSet, conf, keyValueHandler);
+    svc.start();
+    GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+
+    // Ensure 1 container was created
+    List<ContainerData> containerData = Lists.newArrayList();
+    containerSet.listContainer(0L, 1, containerData);
+    assertEquals(1, containerData.size());
+    KeyValueContainerData data = (KeyValueContainerData) containerData.get(0);
+    KeyPrefixFilter filter = isSameSchemaVersion(schemaVersion, SCHEMA_V1) ?
+        data.getDeletingBlockKeyFilter() : data.getUnprefixedKeyFilter();
+
+    try (DBHandle meta = BlockUtils.getDB(data, conf)) {
+      //Execute fist delete to update metrics
+      deleteAndWait(svc, 1);
+
+      assertEquals(3, blockDeletingServiceMetrics.getTotalPendingBlockCount());
+      assertEquals(3 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
+
+      //Execute the second delete to check whether metrics values decreased
+      deleteAndWait(svc, 2);
+
+      assertEquals(2, blockDeletingServiceMetrics.getTotalPendingBlockCount());
+      assertEquals(2 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
+
+      //Execute the third delete to check whether metrics values decreased
+      deleteAndWait(svc, 3);
+
+      assertEquals(1, blockDeletingServiceMetrics.getTotalPendingBlockCount());
+      assertEquals(1 * BLOCK_CHUNK_SIZE, blockDeletingServiceMetrics.getTotalPendingBlockBytes());
+
+    } catch (Exception ex) {
+      ex.printStackTrace();
+      fail("Test failed with exception: " + ex.getMessage());
+    }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
   public void testWithUnrecordedBlocks(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
