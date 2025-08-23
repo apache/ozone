@@ -653,6 +653,21 @@ public class TestOmMetadataManager {
     }
 
     assertEquals(keyAMap, currentKeys);
+
+    omKeyInfoList =
+        omMetadataManager.listKeys(volumeNameA, ozoneBucket,
+            null, prefixKeyA, 100).getKeys();
+    assertEquals(100, omKeyInfoList.size());
+
+    omKeyInfoList =
+        omMetadataManager.listKeys(volumeNameA, ozoneBucket,
+            null, prefixKeyA, 98).getKeys();
+    assertEquals(98, omKeyInfoList.size());
+
+    omKeyInfoList =
+        omMetadataManager.listKeys(volumeNameA, ozoneBucket,
+            null, prefixKeyA, 1).getKeys();
+    assertEquals(1, omKeyInfoList.size());
   }
 
   /**

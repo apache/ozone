@@ -1027,8 +1027,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     } else {
       seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
     }
-    int currentCount = 0;
-
 
     TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
@@ -1056,6 +1054,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         cacheKeyMap.put(key, omKeyInfo);
       }
     }
+
+    int currentCount = 0;
     long readFromRDbStartNs, readFromRDbStopNs = 0;
     // Get maxKeys from DB if it has.
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
