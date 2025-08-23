@@ -107,23 +107,11 @@ test_cross_compatibility() {
     done
   done
 
+    # NEW: Add checkpoint compatibility tests
+  # Give OM a moment to be fully ready for HTTP requests
+  echo "Waiting for OM to be ready for HTTP requests..."
+  sleep 10
 
-
-  KEEP_RUNNING=false stop_docker_env
-}
-
-test_checkpoint_compatibility_only() {
-  local checkpoint_client_versions="$@"
-  
-  echo "Starting ${cluster_version} cluster with COMPOSE_FILE=${COMPOSE_FILE}"
-
-  OZONE_KEEP_RESULTS=true start_docker_env 5
-
-  execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
-
-  _init
-
-  # Run checkpoint compatibility tests only
   echo ""
   echo "=========================================="
   echo "Running checkpoint compatibility tests"
@@ -147,12 +135,31 @@ _download_checkpoint_v1() {
 
   echo "Testing /dbCheckpoint endpoint: client ${client_version} → cluster ${cluster_version}"
 
+  # Add debugging information
+  echo "DEBUG: Using container: ${container}"
+  echo "DEBUG: Using OM host: ${om_host}"
+  
+  # Check if OM is reachable
+  echo "DEBUG: Testing OM connectivity..."
+  execute_command_in_container ${container} curl -v -s --connect-timeout 5 "http://${om_host}:9874/" || echo "DEBUG: Basic OM connectivity failed"
+  
+  # List running OM processes for debugging
+  echo "DEBUG: Checking OM processes..."
+  execute_command_in_container om ps aux | grep -i ozone || echo "DEBUG: No OM processes found"
+  
+  # Check if the specific endpoint exists
+  echo "DEBUG: Testing if dbCheckpoint endpoint exists..."
+  execute_command_in_container ${container} curl -v -s --connect-timeout 5 "http://${om_host}:9874/dbCheckpoint" || echo "DEBUG: dbCheckpoint endpoint test failed"
+
   # Download using original checkpoint endpoint
   local download_cmd="curl -f -s -o /tmp/checkpoint_v1_${client_version}.tar.gz http://${om_host}:9874/dbCheckpoint"
+  echo "DEBUG: Executing: ${download_cmd}"
 
   if execute_command_in_container ${container} bash -c "${download_cmd}"; then
     local actual_result="pass"
     echo "✓ Successfully downloaded checkpoint via v1 endpoint"
+    # Show file info for verification
+    execute_command_in_container ${container} ls -la /tmp/checkpoint_v1_${client_version}.tar.gz || true
   else
     local actual_result="fail"
     echo "✗ Failed to download checkpoint via v1 endpoint"
@@ -174,12 +181,23 @@ _download_checkpoint_v2() {
 
   echo "Testing /dbCheckpointv2 endpoint: client ${client_version} → cluster ${cluster_version}"
 
+  # Add debugging information (similar to v1 but for v2 endpoint)
+  echo "DEBUG: Using container: ${container}"
+  echo "DEBUG: Using OM host: ${om_host}"
+  
+  # Check if the specific v2 endpoint exists
+  echo "DEBUG: Testing if dbCheckpointv2 endpoint exists..."
+  execute_command_in_container ${container} curl -v -s --connect-timeout 5 "http://${om_host}:9874/dbCheckpointv2" || echo "DEBUG: dbCheckpointv2 endpoint test failed"
+
   # Download using new checkpointv2 endpoint
   local download_cmd="curl -f -s -o /tmp/checkpoint_v2_${client_version}.tar.gz http://${om_host}:9874/dbCheckpointv2"
+  echo "DEBUG: Executing: ${download_cmd}"
 
   if execute_command_in_container ${container} bash -c "${download_cmd}"; then
     local actual_result="pass"
     echo "✓ Successfully downloaded checkpoint via v2 endpoint"
+    # Show file info for verification
+    execute_command_in_container ${container} ls -la /tmp/checkpoint_v2_${client_version}.tar.gz || true
   else
     local actual_result="fail"
     echo "✗ Failed to download checkpoint via v2 endpoint"
