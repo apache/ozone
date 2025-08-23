@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
  * @see <a href="https://docs.aws.amazon.com/STS/latest/APIReference/">AWS STS API Reference</a>
  */
 @Path("/")
+@S3STSEnabled
 public class S3STSEndpoint extends S3STSEndpointBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(S3STSEndpoint.class);
