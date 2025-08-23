@@ -36,20 +36,21 @@ The primary inefficiency in the current snapshotting mechanism stems from consta
 
 ## Snapshot Defragmentation
 
-Currently, automatic RocksDB compactions are disabled for snapshot RocksDB to preserve snapshot diff performance, preventing any form of compaction. However, snapshots can be defragmented in the way that the next snapshot in the chain is a checkpoint of the previous snapshot plus a diff stored in separate SST files (one for each table). The proposed approach involves rewriting snapshots iteratively from the beginning of the snapshot chain and restructuring them in a separate directory.
+Currently, automatic RocksDB compactions are disabled for snapshot RocksDB to preserve snapshot diff performance, preventing any form of compaction. However, snapshots can be defragmented in the way that the next active snapshot in the chain is a checkpoint of its previous active snapshot plus a diff stored in separate SST files (one SST for each column family changed). The proposed approach involves rewriting snapshots iteratively from the beginning of the snapshot chain and restructuring them in a separate directory.
 
 Note: Snapshot Defragmentation was previously called Snapshot Compaction earlier during the design phase. It is not RocksDB compaction. Thus the rename to avoid such confusion. We are also not going to enable RocksDB auto compaction on snapshot RocksDB.
 
 1. ### Introducing last defragmentation time
 
-   A new boolean flag (`needsDefrag`), timestamp (`lastDefragTime`), int `version` will be added to snapshot metadata. If absent, `needsDefrag` will default to `true`.   
+   A new boolean flag (`needsDefrag`), timestamp (`lastDefragTime`), int `version` will be added to snapshot metadata. If absent, `needsDefrag` will default to `true`.
+   `needsDefrag` tells the system whether a snapshot is pending defrag (`true`) or if it is already defragged and up to date (`false`). This helps manage and automate the defrag workflow, ensuring snapshots are efficiently stored and maintained.
    A new list of Map\<String, List\<Longs\>\> (`notDefraggedSstFileList`) also needs to be added to snapshot meta as part of snapshot create operation; this would be storing the original list of sst files in the not defragged copy of the snapshot corresponding to keyTable/fileTable/DirectoryTable. This should be done as part of the snapshot create operation.
    Since this is not going to be consistent across all OMs this would have to be written to a local yaml file inside the snapshot directory and this can be maintained in the SnapshotChainManager in memory on startup. So all updates should not go through Ratis.  
    An additional Map\<Integer, Map\<String, List\<Long\>\>\> (`defraggedSstFileList`) also needs to be added to snapshotMeta. This will be maintaining a list of sstFiles of different versions of defragged snapshots. The key here would be the version number of snapshots.
 
 2. ### Snapshot Cache Lock for Read Prevention
 
-   A snapshot lock will be introduced in the snapshot cache to prevent reads on a specific snapshot during defragmentation. This ensures no active reads occur while replacing the underlying RocksDB instance.
+   A snapshot lock will be introduced in the snapshot cache to prevent reads on a specific snapshot during the last step of defragmentation. This ensures no active reads occur while we are replacing the underlying RocksDB instance. The swap should be instantaneous.
 
 3. ### Directory Structure Changes
 
@@ -93,6 +94,32 @@ To compute a snapshot diff:
 9. **Release the snapshot cache lock** on the snapshot id. Now the snapshot is ready to be used to read.
 
 
+#### Visualization
+
+```mermaid
+flowchart TD
+    A[Start: Not defragged Snapshot Exists] --> B[Has SST Filtering Occurred?]
+    B -- No --> Z[Wait for SST Filtering]
+    B -- Yes --> C[Create RocksDB Checkpoint of Previous Snapshot]
+    C --> D{Defragged Copy Exists?}
+    D -- Yes --> E[Update defragTime, set needsDefrag=false]
+    D -- No --> F[Create Checkpoint in Temp Directory]
+    E --> G[Acquire SNAPSHOT_GC_LOCK]
+    F --> G
+    G --> H[Compute Diff between Checkpoint & Current Snapshot]
+    H --> I[Flush Changed Objects into SST Files by table]
+    I --> J[Ingest SST Files into Checkpointed RocksDB]
+    J --> K[Truncate/Replace deletedTable, etc.]
+    K --> L[Acquire Snapshot Cache Lock]
+    L --> M[Move Checkpoint Dir to checkpointStateDefragged]
+    M --> N[Update Snapshot Metadata: lastDefragTime, needsDefrag=false, set next snapshot needsDefrag=true, set sstFiles]
+    N --> O[Delete old snapshot DB dir]
+    O --> P[Release Snapshot Cache Lock]
+    P --> Q[Defragged Snapshot Ready]
+```
+
+
+
 ### Computing Changed Objects Between Snapshots
 
    The following steps outline how to compute changed objects:  
@@ -106,9 +133,37 @@ To compute a snapshot diff:
      * If the object is present in source snapshot but not present in target snapshot then we just have to write a tombstone entry by calling sstFileWriter.delete().  
 5. **Ingest these SST files** into the checkpointed RocksDB.
 
-7. ### Handling Snapshot Purge
+#### Visualization
+
+```mermaid
+flowchart TD
+    A[Start: Need Diff Between Snapshots] --> B[Determine delta SST files]
+    B -- DAG Info available --> C[Retrieve from DAG]
+    B -- Otherwise --> D[Compute delta by comparing SST files in both RocksDBs]
+    C --> E[Initialize SST file writers: keyTable, directoryTable, fileTable]
+    D --> E
+    E --> F[Iterate SST files in parallel, merge keys: MinHeapIterator-like]
+    F --> G[Compare keys between snapshots]
+    G --> H{Object in Target?}
+    H -- Yes --> I[sstFileWriter.put]
+    H -- No --> J[sstFileWriter.delete tombstone]
+    I --> K[Ingest SST Files into Checkpointed RocksDB]
+    J --> K
+```
+
+
+### Handling Snapshot Purge
 
    Upon snapshot deletion, the `needsDefrag` flag for the next snapshot in the chain is set to `true`, ensuring defragmentation propagates incrementally across the snapshot chain.
+
+#### Visualization
+
+```mermaid
+flowchart TD
+    A[Snapshot Deletion Requested] --> B[Set needsDefrag=true for next snapshot in chain]
+    B --> C[Next snapshots will be defragged incrementally]
+```
+
 
 # Conclusion
 
