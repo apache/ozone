@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
@@ -318,7 +317,7 @@ public class TestOMSnapshotDAG {
     assertEquals(1000L, randomKeyGenerator.getSuccessfulValidationCount());
 
     String omMetadataDir =
-        cluster.getOzoneManager().getConfiguration().get(OZONE_METADATA_DIRS);
+        cluster.getOzoneManager().getConfiguration().get(OMConfigKeys.OZONE_OM_DB_DIRS);
     // Verify that no compaction log entry has been written
     Path logPath = Paths.get(omMetadataDir, OM_SNAPSHOT_DIFF_DIR,
         DB_COMPACTION_LOG_DIR);

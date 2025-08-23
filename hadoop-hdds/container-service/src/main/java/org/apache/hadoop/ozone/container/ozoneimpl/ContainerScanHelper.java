@@ -26,6 +26,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 
@@ -63,7 +64,7 @@ public final class ContainerScanHelper {
     }
     ContainerData containerData = container.getContainerData();
     long containerId = containerData.getContainerID();
-    logScanStart(containerData);
+    logScanStart(containerData, "data");
     DataScanResult result = container.scanData(throttler, canceler);
 
     if (result.isDeleted()) {
@@ -75,7 +76,7 @@ public final class ContainerScanHelper {
         log.warn("Failed to update container checksum after scan of container {}", containerId, ex);
       }
       if (result.hasErrors()) {
-        handleUnhealthyScanResult(containerId, result);
+        handleUnhealthyScanResult(containerData, result);
       }
       metrics.incNumContainersScanned();
     }
@@ -88,8 +89,34 @@ public final class ContainerScanHelper {
     logScanCompleted(containerData, now);
   }
 
-  public void handleUnhealthyScanResult(long containerID, ScanResult result) throws IOException {
+  public void scanMetadata(Container<?> container)
+      throws IOException, InterruptedException {
+    if (!shouldScanMetadata(container)) {
+      return;
+    }
+    ContainerData containerData = container.getContainerData();
+    long containerId = containerData.getContainerID();
+    logScanStart(containerData, "only metadata");
 
+    MetadataScanResult result = container.scanMetaData();
+    if (result.isDeleted()) {
+      log.debug("Container [{}] has been deleted during metadata scan.", containerId);
+      return;
+    }
+    if (result.hasErrors()) {
+      handleUnhealthyScanResult(containerData, result);
+    }
+
+    Instant now = Instant.now();
+    // Do not update the scan timestamp after the scan since this was just a
+    // metadata scan, not a full data scan.
+    metrics.incNumContainersScanned();
+    // Even if the container was deleted, mark the scan as completed since we already logged it as starting.
+    logScanCompleted(containerData, now);
+  }
+
+  public void handleUnhealthyScanResult(ContainerData containerData, ScanResult result) throws IOException {
+    long containerID = containerData.getContainerID();
     log.error("Corruption detected in container [{}]. Marking it UNHEALTHY. {}", containerID, result);
     if (log.isDebugEnabled()) {
       StringBuilder allErrorString = new StringBuilder();
@@ -104,6 +131,23 @@ public final class ContainerScanHelper {
     boolean containerMarkedUnhealthy = controller.markContainerUnhealthy(containerID, result);
     if (containerMarkedUnhealthy) {
       metrics.incNumUnHealthyContainers();
+      // triggering a volume scan for the unhealthy container
+      triggerVolumeScan(containerData);
+    }
+  }
+
+  public void triggerVolumeScan(ContainerData containerData) {
+    HddsVolume volume = containerData.getVolume();
+    if (volume != null && !volume.isFailed()) {
+      log.info("Triggering scan of volume [{}] with unhealthy container [{}]",
+          volume, containerData.getContainerID());
+      StorageVolumeUtil.onFailure(volume);
+    } else if (volume == null) {
+      log.warn("Cannot trigger volume scan for container {} since its volume is null",
+          containerData.getContainerID());
+    } else {
+      log.debug("Skipping volume scan for container {} since its volume {} has failed.",
+          containerData.getContainerID(), volume);
     }
   }
 
@@ -147,12 +191,12 @@ public final class ContainerScanHelper {
     return recentlyScanned;
   }
 
-  private void logScanStart(ContainerData containerData) {
+  private void logScanStart(ContainerData containerData, String scanType) {
     if (log.isDebugEnabled()) {
       Optional<Instant> scanTimestamp = containerData.lastDataScanTime();
       Object lastScanTime = scanTimestamp.map(ts -> "at " + ts).orElse("never");
-      log.debug("Scanning container {}, last scanned {}",
-          containerData.getContainerID(), lastScanTime);
+      log.debug("Scanning {} of container {}, last scanned {}",
+          scanType, containerData.getContainerID(), lastScanTime);
     }
   }
 

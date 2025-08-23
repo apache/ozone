@@ -88,6 +88,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final AtomicLong deletedKeyCount;
   private final boolean deepCleanSnapshots;
   private final SnapshotChainManager snapshotChainManager;
+  // Track metrics for current task execution
+  private long latestRunTimestamp = 0L;
+  private final DeletionStats aosDeletionStats = new DeletionStats();
+  private final DeletionStats snapshotDeletionStats = new DeletionStats();
 
   public KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient, long serviceInterval,
@@ -116,11 +120,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return deletedKeyCount;
   }
 
-  Pair<Integer, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
+  Pair<Pair<Integer, Long>, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
-      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
+      String snapTableKey, UUID expectedPreviousSnapshotId, Map<String, Long> keyBlockReplicatedSize)
+      throws IOException, InterruptedException {
     long startTime = Time.monotonicNow();
-    Pair<Integer, Boolean> purgeResult = Pair.of(0, false);
+    Pair<Pair<Integer, Long>, Boolean> purgeResult = Pair.of(Pair.of(0, 0L), false);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send {} key(s) to SCM: {}",
           keyBlocksList.size(), keyBlocksList);
@@ -139,11 +144,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     if (blockDeletionResults != null) {
       long purgeStartTime = Time.monotonicNow();
       purgeResult = submitPurgeKeysRequest(blockDeletionResults,
-          keysToModify, renameEntries, snapTableKey, expectedPreviousSnapshotId);
+          keysToModify, renameEntries, snapTableKey, expectedPreviousSnapshotId, keyBlockReplicatedSize);
       int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
-          purgeResult, blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
+          purgeResult.getKey().getKey(), blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
     }
     getPerfMetrics().setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
     return purgeResult;
@@ -155,13 +160,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * @param results DeleteBlockGroups returned by SCM.
    * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
-  private Pair<Integer, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
+  private Pair<Pair<Integer, Long>, Boolean> submitPurgeKeysRequest(List<DeleteBlockGroupResult> results,
       Map<String, RepeatedOmKeyInfo> keysToModify,  List<String> renameEntriesToBeDeleted,
-      String snapTableKey, UUID expectedPreviousSnapshotId) {
+      String snapTableKey, UUID expectedPreviousSnapshotId, Map<String, Long> keyBlockReplicatedSize)
+      throws InterruptedException {
     List<String> purgeKeys = new ArrayList<>();
 
     // Put all keys to be purged in a list
     int deletedCount = 0;
+    long deletedReplSize = 0;
     Set<String> failedDeletedKeys = new HashSet<>();
     boolean purgeSuccess = true;
     for (DeleteBlockGroupResult result : results) {
@@ -180,6 +187,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Key {} set to be purged from OM DB", deletedKey);
           }
+        }
+        if (keyBlockReplicatedSize != null) {
+          deletedReplSize += keyBlockReplicatedSize.getOrDefault(deletedKey, 0L);
         }
         deletedCount++;
       } else {
@@ -243,16 +253,44 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (omResponse != null) {
         purgeSuccess = purgeSuccess && omResponse.getSuccess();
       }
-    } catch (ServiceException | InterruptedException e) {
+    } catch (ServiceException e) {
       LOG.error("PurgeKey request failed. Will retry at next run.", e);
-      return Pair.of(0, false);
+      return Pair.of(Pair.of(0, 0L), false);
     }
 
-    return Pair.of(deletedCount, purgeSuccess);
+    return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
+  }
+
+  /**
+   * Updates ServiceMetrics for the last run of the service.
+   */
+  @Override
+  protected void execTaskCompletion() {
+    getMetrics().updateIntervalCumulativeMetrics(
+        aosDeletionStats.reclaimedKeyCount.get() + snapshotDeletionStats.reclaimedKeyCount.get(),
+        aosDeletionStats.reclaimedKeySize.get() + snapshotDeletionStats.reclaimedKeySize.get());
+    getMetrics().updateAosLastRunMetrics(aosDeletionStats.reclaimedKeyCount.get(),
+        aosDeletionStats.reclaimedKeySize.get(), aosDeletionStats.iteratedKeyCount.get(),
+        aosDeletionStats.notReclaimableKeyCount.get());
+    getMetrics().updateSnapLastRunMetrics(snapshotDeletionStats.reclaimedKeyCount.get(),
+        snapshotDeletionStats.reclaimedKeySize.get(), snapshotDeletionStats.iteratedKeyCount.get(),
+        snapshotDeletionStats.notReclaimableKeyCount.get());
+    getMetrics().setKdsLastRunTimestamp(latestRunTimestamp);
+  }
+
+  /**
+   * Resets ServiceMetrics for the current run of the service.
+   */
+  private void resetMetrics() {
+    aosDeletionStats.reset();
+    snapshotDeletionStats.reset();
+    latestRunTimestamp = System.currentTimeMillis();
+    getMetrics().setKdsCurRunTimestamp(latestRunTimestamp);
   }
 
   @Override
   public BackgroundTaskQueue getTasks() {
+    resetMetrics();
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
     queue.add(new KeyDeletingTask(null));
     if (deepCleanSnapshots) {
@@ -311,12 +349,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
 
     /**
-     *
      * @param currentSnapshotInfo if null, deleted directories in AOS should be processed.
      * @param keyManager KeyManager of the underlying store.
      */
     private void processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
-        int remainNum) throws IOException {
+        int remainNum) throws IOException, InterruptedException {
       String volume = null, bucket = null, snapshotTableKey = null;
       if (currentSnapshotInfo != null) {
         volume = currentSnapshotInfo.getVolumeName();
@@ -364,14 +401,21 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             // Validating if the previous snapshot is still the same before purging the blocks.
             SnapshotUtils.validatePreviousSnapshotId(currentSnapshotInfo, snapshotChainManager,
                 expectedPreviousSnapshotId);
-            Pair<Integer, Boolean> purgeResult = processKeyDeletes(keyBlocksList, pendingKeysDeletion.getKeysToModify(),
-                renamedTableEntries, snapshotTableKey, expectedPreviousSnapshotId);
-            remainNum -= purgeResult.getKey();
+            Pair<Pair<Integer, Long>, Boolean> purgeResult = processKeyDeletes(keyBlocksList,
+                pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey,
+                expectedPreviousSnapshotId, pendingKeysDeletion.getKeyBlockReplicatedSize());
+            remainNum -= purgeResult.getKey().getKey();
             successStatus = purgeResult.getValue();
             getMetrics().incrNumKeysProcessed(keyBlocksList.size());
-            getMetrics().incrNumKeysSentForPurge(purgeResult.getKey());
+            getMetrics().incrNumKeysSentForPurge(purgeResult.getKey().getKey());
+
+            DeletionStats statsToUpdate = currentSnapshotInfo == null ? aosDeletionStats : snapshotDeletionStats;
+            statsToUpdate.updateDeletionStats(purgeResult.getKey().getKey(), purgeResult.getKey().getValue(),
+                keyBlocksList.size() + pendingKeysDeletion.getNotReclaimableKeyCount(),
+                pendingKeysDeletion.getNotReclaimableKeyCount()
+            );
             if (successStatus) {
-              deletedKeyCount.addAndGet(purgeResult.getKey());
+              deletedKeyCount.addAndGet(purgeResult.getKey().getKey());
             }
           }
 
@@ -454,10 +498,35 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         } catch (IOException e) {
           LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
               snapInfo, e);
+        } catch (InterruptedException e) {
+          LOG.error("Interruption while running delete files background task for store {}.", snapInfo, e);
+          Thread.currentThread().interrupt();
         }
       }
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();
+    }
+  }
+
+  private static class DeletionStats {
+    private final AtomicLong reclaimedKeyCount = new AtomicLong(0L);
+    private final AtomicLong reclaimedKeySize = new AtomicLong(0L);
+    private final AtomicLong iteratedKeyCount = new AtomicLong(0L);
+    private final AtomicLong notReclaimableKeyCount = new AtomicLong(0L);
+
+    private void updateDeletionStats(long reclaimedKeys, long reclaimedSize,
+                                       long iteratedKeys, long notReclaimableKeys) {
+      this.reclaimedKeyCount.addAndGet(reclaimedKeys);
+      this.reclaimedKeySize.addAndGet(reclaimedSize);
+      this.iteratedKeyCount.addAndGet(iteratedKeys);
+      this.notReclaimableKeyCount.addAndGet(notReclaimableKeys);
+    }
+
+    private void reset() {
+      reclaimedKeyCount.set(0L);
+      reclaimedKeySize.set(0L);
+      iteratedKeyCount.set(0L);
+      notReclaimableKeyCount.set(0L);
     }
   }
 }

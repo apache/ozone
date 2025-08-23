@@ -61,7 +61,10 @@ public class SnapshotDiffHandler extends Handler {
   private String token;
 
   @CommandLine.Option(names = {"-p", "--page-size"},
-      description = "number of diff entries to be returned in the response",
+      description = "number of diff entries to be returned in the response. " +
+          "Note the effective page size will also be bound by " +
+          "the server-side page size limit, see config:\n" +
+          "  ozone.om.snapshot.diff.max.page.size",
       defaultValue = "1000",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS
   )

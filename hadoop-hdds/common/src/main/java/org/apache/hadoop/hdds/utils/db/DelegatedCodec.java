@@ -114,6 +114,17 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
     }
   }
 
+  public static <T, DELEGATE> DelegatedCodec<T, DELEGATE> decodeOnly(
+      Codec<DELEGATE> delegate, CheckedFunction<DELEGATE, T, CodecException> forward, Class<T> clazz) {
+    return new DelegatedCodec<>(delegate, forward, unsupportedBackward(), clazz, CopyType.DEEP);
+  }
+
+  private static <A, B> CheckedFunction<A, B, CodecException> unsupportedBackward() {
+    return a -> {
+      throw new UnsupportedOperationException("Unsupported backward conversion");
+    };
+  }
+
   @Override
   public String toString() {
     return name;

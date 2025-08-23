@@ -34,7 +34,7 @@ const showErrorNotification = (title: string, description: string) => {
   notification.error(args);
 };
 
-const showInfoNotification = (title: string, description: string) => {
+export const showInfoNotification = (title: string, description: string) => {
   const args = {
     message: title,
     description,
