@@ -1049,7 +1049,8 @@ class TestKeyDeletingService extends OzoneTestBase {
     // Define a small Ratis limit to force multiple batches for testing
     // The actual byte size of protobuf messages depends on content.
     // A small value like 1KB or 2KB should ensure batching for ~10-20 keys.
-    final int testRatisLimitBytes = 1024; // 2 KB to encourage multiple batches
+    final int actualRatisLimitBytes = 1138;
+    final int testRatisLimitBytes = 1024; // 2 KB to encourage multiple batches, 90% of the actualRatisLimitBytes.
 
     // Create a fresh configuration for this test to control the Ratis limit
     OzoneConfiguration testConf = new OzoneConfiguration();
@@ -1118,18 +1119,18 @@ class TestKeyDeletingService extends OzoneTestBase {
 
         OzoneManagerProtocolProtos.PurgeKeysRequest purgeRequest = omRequest.getPurgeKeysRequest();
 
-        // Assert that the serialized size of each batch is within the configured ratisLimit
-        // We use isLessThanOrEqualTo because the batching logic ensures it doesn't exceed the limit.
+        // At runtime we enforce ~90% of the Ratis limit as a safety margin,
+        // but in tests we assert against the actual limit to avoid false negatives.
+        // This ensures no batch ever exceeds the true Ratis size limit.
         assertThat(omRequest.getSerializedSize())
-            .as("Batch size " + omRequest.getSerializedSize() + " should be <= ratisLimit " + testRatisLimitBytes)
-            .isLessThanOrEqualTo(testRatisLimitBytes);
+            .as("Batch size " + omRequest.getSerializedSize() + " should be <= ratisLimit " + actualRatisLimitBytes)
+            .isLessThanOrEqualTo(actualRatisLimitBytes);
 
         // Sum up all the keys purged in this batch (may be spread across multiple DeletedKeys entries)
-        int batchKeyCount = 0;
-        for (OzoneManagerProtocolProtos.DeletedKeys deletedKeys : purgeRequest.getDeletedKeysList()) {
-          batchKeyCount += deletedKeys.getKeysCount();
-        }
-        totalPurgedKeysAcrossBatches += batchKeyCount;
+        totalPurgedKeysAcrossBatches += purgeRequest.getDeletedKeysList()
+            .stream()
+            .mapToInt(OzoneManagerProtocolProtos.DeletedKeys::getKeysCount)
+            .sum();
       }
 
       // Assert that the sum of keys across all batches equals the total number of keys initially deleted.

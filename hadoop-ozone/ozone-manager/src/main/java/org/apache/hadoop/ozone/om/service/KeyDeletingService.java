@@ -116,7 +116,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
-    // always go to 90% of max limit for request as other header will be added
+    // Use 90% of the actual Ratis limit to account for protobuf overhead and
+    // prevent accidentally exceeding the hard limit during request serialization.
     this.ratisByteLimit = (int) Math.max(limit * RATIS_LIMIT_FACTOR, 1);
   }
 
@@ -243,12 +244,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
 
     int purgeKeyIndex = 0, updateIndex = 0, renameIndex = 0;
-    PurgeKeysRequest.Builder requestBuilder = setSnapTableKeyAndPrevSnapId(snapTableKey, expectedPreviousSnapshotId);
+    PurgeKeysRequest.Builder requestBuilder = getPurgeKeysRequest(snapTableKey, expectedPreviousSnapshotId);
     int currSize = requestBuilder.build().getSerializedSize();
     int baseSize = currSize;
 
-    while (purgeKeyIndex < purgeKeys.size() ||
-        updateIndex < keysToUpdateList.size() ||
+    while (purgeKeyIndex < purgeKeys.size() || updateIndex < keysToUpdateList.size() ||
         (renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size())) {
 
       // 3.1 Purge keys (one at a time)
@@ -256,71 +256,54 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         String nextKey = purgeKeys.get(purgeKeyIndex);
         int estimatedKeySize = ProtobufUtils.computeRepeatedStringSize(nextKey);
 
-        if (currSize + estimatedKeySize <= ratisLimit) {
-          requestBuilder.addDeletedKeys(
-              OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
-                  .setVolumeName("").setBucketName("")
-                  .addKeys(nextKey)
-                  .build());
-          currSize += estimatedKeySize;
-          purgeKeyIndex++;
-        } else {
-          purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
-          requestBuilder = setSnapTableKeyAndPrevSnapId(snapTableKey, expectedPreviousSnapshotId);
-          currSize = baseSize;
-          continue;
-        }
-      }
+        requestBuilder.addDeletedKeys(
+            OzoneManagerProtocolProtos.DeletedKeys.newBuilder().setVolumeName("").setBucketName("").addKeys(nextKey)
+                .build());
+        currSize += estimatedKeySize;
+        purgeKeyIndex++;
 
-      // 3.2 Add keysToUpdate
-      if (updateIndex < keysToUpdateList.size()) {
-        OzoneManagerProtocolProtos.SnapshotMoveKeyInfos nextUpdate =
-            keysToUpdateList.get(updateIndex);
+      } else if (updateIndex < keysToUpdateList.size()) {
+        // 3.2 Add keysToUpdate
+        OzoneManagerProtocolProtos.SnapshotMoveKeyInfos nextUpdate = keysToUpdateList.get(updateIndex);
 
         int estimatedSize = nextUpdate.getSerializedSize();
 
-        if (currSize + estimatedSize <= ratisLimit) {
-          requestBuilder.addKeysToUpdate(nextUpdate);
-          currSize += estimatedSize;
-          updateIndex++;
-        } else {
-          purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
-          requestBuilder = setSnapTableKeyAndPrevSnapId(snapTableKey, expectedPreviousSnapshotId);
-          currSize = baseSize;
-          continue;
-        }
-      }
+        requestBuilder.addKeysToUpdate(nextUpdate);
+        currSize += estimatedSize;
+        updateIndex++;
 
-      // 3.3 Add renamed keys
-      if (renameEntriesToBeDeleted != null &&
-          renameIndex < renameEntriesToBeDeleted.size()) {
+      } else if (renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size()) {
+        // 3.3 Add renamed keys
         String nextRename = renameEntriesToBeDeleted.get(renameIndex);
 
         int estimatedSize = ProtobufUtils.computeRepeatedStringSize(nextRename);
 
-        if (currSize + estimatedSize <= ratisLimit) {
-          requestBuilder.addRenamedKeys(nextRename);
-          currSize += estimatedSize;
-          renameIndex++;
-        } else {
-          purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
-          requestBuilder = setSnapTableKeyAndPrevSnapId(snapTableKey, expectedPreviousSnapshotId);
-          currSize = baseSize;
-        }
+        requestBuilder.addRenamedKeys(nextRename);
+        currSize += estimatedSize;
+        renameIndex++;
       }
 
-    }
-    // Finalize and send this batch
-    if (requestBuilder.getDeletedKeysCount() > 0
-        || requestBuilder.getKeysToUpdateCount() > 0
-        || requestBuilder.getRenamedKeysCount() > 0) {
-      purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
+      // Flush either when limit is hit, or at the very end if items remain
+      boolean allDone = purgeKeyIndex == purgeKeys.size() && updateIndex == keysToUpdateList.size() &&
+          (renameEntriesToBeDeleted == null || renameIndex == renameEntriesToBeDeleted.size());
+
+      if (currSize >= ratisLimit || (allDone && hasPendingItems(requestBuilder))) {
+        purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
+        requestBuilder = getPurgeKeysRequest(snapTableKey, expectedPreviousSnapshotId);
+        currSize = baseSize;
+      }
     }
 
     return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
   }
 
-  private static PurgeKeysRequest.Builder setSnapTableKeyAndPrevSnapId(String snapTableKey,
+  private boolean hasPendingItems(PurgeKeysRequest.Builder builder) {
+    return builder.getDeletedKeysCount() > 0
+        || builder.getKeysToUpdateCount() > 0
+        || builder.getRenamedKeysCount() > 0;
+  }
+
+  private static PurgeKeysRequest.Builder getPurgeKeysRequest(String snapTableKey,
       UUID expectedPreviousSnapshotId) {
     PurgeKeysRequest.Builder requestBuilder = PurgeKeysRequest.newBuilder();
 
