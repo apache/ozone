@@ -1124,10 +1124,12 @@ class TestKeyDeletingService extends OzoneTestBase {
             .as("Batch size " + omRequest.getSerializedSize() + " should be <= ratisLimit " + testRatisLimitBytes)
             .isLessThanOrEqualTo(testRatisLimitBytes);
 
-        // Sum up the keys purged in this particular batch request
-        if (purgeRequest.getDeletedKeysCount() > 0) {
-          totalPurgedKeysAcrossBatches += purgeRequest.getDeletedKeys(0).getKeysCount();
+        // Sum up all the keys purged in this batch (may be spread across multiple DeletedKeys entries)
+        int batchKeyCount = 0;
+        for (OzoneManagerProtocolProtos.DeletedKeys deletedKeys : purgeRequest.getDeletedKeysList()) {
+          batchKeyCount += deletedKeys.getKeysCount();
         }
+        totalPurgedKeysAcrossBatches += batchKeyCount;
       }
 
       // Assert that the sum of keys across all batches equals the total number of keys initially deleted.

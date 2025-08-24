@@ -25,7 +25,6 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -51,7 +50,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -70,6 +68,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NullableUUID;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
+import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
@@ -118,7 +117,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     // always go to 90% of max limit for request as other header will be added
-    this.ratisByteLimit = (int) (limit * RATIS_LIMIT_FACTOR);
+    this.ratisByteLimit = (int) Math.max(limit * RATIS_LIMIT_FACTOR, 1);
   }
 
   /**
@@ -238,109 +237,121 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       }
     }
 
+    if (purgeKeys.isEmpty() && keysToUpdateList.isEmpty() &&
+        (renameEntriesToBeDeleted == null || renameEntriesToBeDeleted.isEmpty())) {
+      return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
+    }
+
     int purgeKeyIndex = 0, updateIndex = 0, renameIndex = 0;
-    int currSize = 0;
-    boolean batchCapacityReached;
+    PurgeKeysRequest.Builder requestBuilder = setSnapTableKeyAndPrevSnapId(snapTableKey, expectedPreviousSnapshotId);
+    int currSize = requestBuilder.build().getSerializedSize();
+    int baseSize = currSize;
 
     while (purgeKeyIndex < purgeKeys.size() ||
         updateIndex < keysToUpdateList.size() ||
         (renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size())) {
 
-      batchCapacityReached = false;
-      PurgeKeysRequest.Builder requestBuilder = PurgeKeysRequest.newBuilder();
-
-      if (snapTableKey != null) {
-        requestBuilder.setSnapshotTableKey(snapTableKey);
-      }
-      if (expectedPreviousSnapshotId != null) {
-        requestBuilder.setExpectedPreviousSnapshotID(
-            NullableUUID.newBuilder()
-                .setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId))
-                .build());
-      }
-
-      currSize = requestBuilder.build().getSerializedSize();
-
-      // 3.1 Add purgeKeys
-      List<String> batchPurgeKeys = new ArrayList<>();
-
-      while (purgeKeyIndex < purgeKeys.size()) {
+      // 3.1 Purge keys (one at a time)
+      if (purgeKeyIndex < purgeKeys.size()) {
         String nextKey = purgeKeys.get(purgeKeyIndex);
+        int estimatedKeySize = ProtobufUtils.computeRepeatedStringSize(nextKey);
 
-        int estimatedKeySize = estimateStringEntrySize(nextKey);
-
-        if (currSize + estimatedKeySize > ratisLimit) {
-          batchCapacityReached = true;
-          break;
+        if (currSize + estimatedKeySize <= ratisLimit) {
+          requestBuilder.addDeletedKeys(
+              OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
+                  .setVolumeName("").setBucketName("")
+                  .addKeys(nextKey)
+                  .build());
+          currSize += estimatedKeySize;
+          purgeKeyIndex++;
+        } else {
+          purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
+          requestBuilder = setSnapTableKeyAndPrevSnapId(snapTableKey, expectedPreviousSnapshotId);
+          currSize = baseSize;
+          continue;
         }
-
-        currSize += estimatedKeySize;
-        batchPurgeKeys.add(nextKey);
-        purgeKeyIndex++;
-      }
-
-      // Now actually add batchPurgeKeys
-      if (!batchPurgeKeys.isEmpty()) {
-        OzoneManagerProtocolProtos.DeletedKeys deletedKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
-            .setVolumeName("").setBucketName("")
-            .addAllKeys(batchPurgeKeys).build();
-        requestBuilder.addDeletedKeys(deletedKeys);
-        currSize = requestBuilder.build().getSerializedSize();
       }
 
       // 3.2 Add keysToUpdate
-      while (!batchCapacityReached && updateIndex < keysToUpdateList.size()) {
-        OzoneManagerProtocolProtos.SnapshotMoveKeyInfos nextUpdate = keysToUpdateList.get(updateIndex);
+      if (updateIndex < keysToUpdateList.size()) {
+        OzoneManagerProtocolProtos.SnapshotMoveKeyInfos nextUpdate =
+            keysToUpdateList.get(updateIndex);
 
         int estimatedSize = nextUpdate.getSerializedSize();
 
-        if (currSize + estimatedSize > ratisLimit) {
-          batchCapacityReached = true;
-          break;
+        if (currSize + estimatedSize <= ratisLimit) {
+          requestBuilder.addKeysToUpdate(nextUpdate);
+          currSize += estimatedSize;
+          updateIndex++;
+        } else {
+          purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
+          requestBuilder = setSnapTableKeyAndPrevSnapId(snapTableKey, expectedPreviousSnapshotId);
+          currSize = baseSize;
+          continue;
         }
-
-        requestBuilder.addKeysToUpdate(nextUpdate);
-        currSize += estimatedSize;
-        updateIndex++;
       }
 
       // 3.3 Add renamed keys
-      while (!batchCapacityReached && renameEntriesToBeDeleted != null &&
+      if (renameEntriesToBeDeleted != null &&
           renameIndex < renameEntriesToBeDeleted.size()) {
         String nextRename = renameEntriesToBeDeleted.get(renameIndex);
 
-        int estimatedSize = estimateStringEntrySize(nextRename);
+        int estimatedSize = ProtobufUtils.computeRepeatedStringSize(nextRename);
 
-        if (currSize + estimatedSize > ratisLimit) {
-          break;
+        if (currSize + estimatedSize <= ratisLimit) {
+          currSize += estimatedSize;
+          requestBuilder.addRenamedKeys(nextRename);
+          renameIndex++;
+        } else {
+          purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
+          requestBuilder = setSnapTableKeyAndPrevSnapId(snapTableKey, expectedPreviousSnapshotId);
+          currSize = baseSize;
         }
-
-        requestBuilder.addRenamedKeys(nextRename);
-        currSize += estimatedSize;
-        renameIndex++;
       }
 
-      // Finalize and send this batch
-      OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-          .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
-          .setPurgeKeysRequest(requestBuilder.build())
-          .setClientId(getClientId().toString())
-          .build();
-
-      try (BootstrapStateHandler.Lock lock =
-          snapTableKey != null ? getBootstrapStateLock().lock() : null) {
-        OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
-        if (omResponse != null) {
-          purgeSuccess = purgeSuccess && omResponse.getSuccess();
-        }
-      } catch (ServiceException | InterruptedException e) {
-        LOG.error("PurgeKey request failed in batch. Will retry at next run.", e);
-        purgeSuccess = false;
-        // Continue to next batch instead of returning immediately
-      }
+    }
+    // Finalize and send this batch
+    if (currSize > baseSize) {
+      purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
     }
 
     return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
+  }
+
+  private static PurgeKeysRequest.Builder setSnapTableKeyAndPrevSnapId(String snapTableKey,
+      UUID expectedPreviousSnapshotId) {
+    PurgeKeysRequest.Builder requestBuilder = PurgeKeysRequest.newBuilder();
+
+    if (snapTableKey != null) {
+      requestBuilder.setSnapshotTableKey(snapTableKey);
+    }
+
+    NullableUUID.Builder expectedPreviousSnapshotNullableUUID = NullableUUID.newBuilder();
+    if (expectedPreviousSnapshotId != null) {
+      expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+    }
+    requestBuilder.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
+    return requestBuilder;
+  }
+
+  private boolean submitPurgeRequest(String snapTableKey, boolean purgeSuccess,
+      PurgeKeysRequest.Builder requestBuilder) {
+
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
+            .setPurgeKeysRequest(requestBuilder.build()).setClientId(getClientId().toString()).build();
+
+    try (Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
+      OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
+      if (omResponse != null) {
+        purgeSuccess = purgeSuccess && omResponse.getSuccess();
+      }
+    } catch (ServiceException | InterruptedException e) {
+      LOG.error("PurgeKey request failed in batch. Will retry at next run.", e);
+      purgeSuccess = false;
+      // Continue to next batch instead of returning immediately
+    }
+    return purgeSuccess;
   }
 
   /**
@@ -368,12 +379,6 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     snapshotDeletionStats.reset();
     latestRunTimestamp = System.currentTimeMillis();
     getMetrics().setKdsCurRunTimestamp(latestRunTimestamp);
-  }
-
-  // Helper: estimate protobuf serialized size of a string field
-  private static int estimateStringEntrySize(String key) {
-    int len = key.getBytes(StandardCharsets.UTF_8).length;
-    return 1 /* tag size */ + 1 /* length variant */ + len; /* actual string bytes */
   }
 
   @Override
