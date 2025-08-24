@@ -299,8 +299,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         int estimatedSize = ProtobufUtils.computeRepeatedStringSize(nextRename);
 
         if (currSize + estimatedSize <= ratisLimit) {
-          currSize += estimatedSize;
           requestBuilder.addRenamedKeys(nextRename);
+          currSize += estimatedSize;
           renameIndex++;
         } else {
           purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
@@ -311,7 +311,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     }
     // Finalize and send this batch
-    if (currSize > baseSize) {
+    if (requestBuilder.getDeletedKeysCount() > 0
+        || requestBuilder.getKeysToUpdateCount() > 0
+        || requestBuilder.getRenamedKeysCount() > 0) {
       purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
     }
 
