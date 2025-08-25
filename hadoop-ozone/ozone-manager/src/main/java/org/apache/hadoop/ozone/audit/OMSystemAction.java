@@ -22,7 +22,12 @@ package org.apache.hadoop.ozone.audit;
  * as present for request.
  */
 public enum OMSystemAction implements AuditAction {
-  STARTUP;
+  STARTUP,
+
+  //Background Deletion Actions
+  DIRECTORY_DELETION,
+  KEY_DELETION,
+  SNAPSHOT_DELETION;
 
   @Override
   public String getAction() {
