@@ -42,11 +42,11 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.om.service.AbstractKeyDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.logging.log4j.Logger;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Response for {@link OMDirectoriesPurgeRequestWithFSO} request.
@@ -54,8 +54,7 @@ import org.slf4j.LoggerFactory;
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE, DELETED_DIR_TABLE,
     DIRECTORY_TABLE, FILE_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMDirectoriesPurgeResponseWithFSO.class);
+  private static final Logger LOG = AbstractKeyDeletingService.LOG;
 
   private List<OzoneManagerProtocolProtos.PurgePathRequest> paths;
   private Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap;

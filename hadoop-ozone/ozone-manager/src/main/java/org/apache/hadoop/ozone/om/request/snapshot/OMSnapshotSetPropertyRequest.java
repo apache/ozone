@@ -40,18 +40,17 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
+import org.apache.hadoop.ozone.om.service.AbstractKeyDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Updates the exclusive size of the snapshot.
  */
 public class OMSnapshotSetPropertyRequest extends OMClientRequest {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMSnapshotSetPropertyRequest.class);
+  private static final Logger LOG = AbstractKeyDeletingService.LOG;
 
   public OMSnapshotSetPropertyRequest(OMRequest omRequest) {
     super(omRequest);

@@ -71,8 +71,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnap
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This is the background service to delete keys. Scan the metadata of om
@@ -81,8 +79,6 @@ import org.slf4j.LoggerFactory;
  * keys.
  */
 public class KeyDeletingService extends AbstractKeyDeletingService {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(KeyDeletingService.class);
   private final ScmBlockLocationProtocol scmClient;
 
   private int keyLimitPerTask;
