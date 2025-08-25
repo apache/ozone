@@ -36,10 +36,12 @@ public interface DeletedBlockLogStateManager {
   void removeTransactionsFromDB(ArrayList<Long> txIDs)
       throws IOException;
 
+  @Deprecated
   @Replicate
   void increaseRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
       throws IOException;
 
+  @Deprecated
   @Replicate
   int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
       throws IOException;
