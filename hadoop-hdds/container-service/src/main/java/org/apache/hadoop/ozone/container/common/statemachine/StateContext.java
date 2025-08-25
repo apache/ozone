@@ -764,6 +764,8 @@ public class StateContext {
           return command;
         }
 
+        updateCommandStatus(command.getId(),
+            status -> status.setStatus(Status.FAILED));
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
             command, command.getTerm(), currentTerm);
@@ -781,9 +783,12 @@ public class StateContext {
   public void addCommand(SCMCommand<?> command) {
     lock.lock();
     try {
+      this.addCmdStatus(command);
       if (commandQueue.size() >= maxCommandQueueLimit) {
-        LOG.warn("Ignore command as command queue crosses max limit {}.",
-            maxCommandQueueLimit);
+        updateCommandStatus(command.getId(), 
+            status -> status.setStatus(Status.FAILED));
+        LOG.warn("Command {} dropped as queue exceeds limit {}.",
+            command.getId(), maxCommandQueueLimit);
         return;
       }
       updateTermOfLeaderSCM(command);
@@ -791,7 +796,6 @@ public class StateContext {
     } finally {
       lock.unlock();
     }
-    this.addCmdStatus(command);
   }
 
   public Map<SCMCommandProto.Type, Integer> getCommandQueueSummary() {
