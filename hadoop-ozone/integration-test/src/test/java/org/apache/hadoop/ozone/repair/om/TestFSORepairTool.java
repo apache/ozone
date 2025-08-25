@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.repair.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
@@ -48,6 +49,8 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -85,6 +88,7 @@ public class TestFSORepairTool {
   private static FSORepairTool.Report vol2Report;
   private static FSORepairTool.Report fullReport;
   private static FSORepairTool.Report emptyReport;
+  private static FSORepairTool.Report unreachableReport;
 
   private static GenericTestUtils.PrintStreamCapturer out;
   private static GenericTestUtils.PrintStreamCapturer err;
@@ -110,11 +114,13 @@ public class TestFSORepairTool {
     FSORepairTool.Report report2 = buildDisconnectedTree("vol2", "bucket1", 10);
     FSORepairTool.Report report3 = buildConnectedTree("vol2", "bucket2", 10);
     FSORepairTool.Report report4 = buildEmptyTree();
+    FSORepairTool.Report report5 = buildTreeWithUnreachableObjects("vol-unreachable", "bucket-unreachable", 5);
 
     vol1Report = new FSORepairTool.Report(report1);
     vol2Report = new FSORepairTool.Report(report2, report3);
-    fullReport = new FSORepairTool.Report(report1, report2, report3, report4);
+    fullReport = new FSORepairTool.Report(report1, report2, report3, report4, report5);
     emptyReport = new FSORepairTool.Report(report4);
+    unreachableReport = new FSORepairTool.Report(report5);
 
     client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore store = client.getObjectStore();
@@ -153,6 +159,24 @@ public class TestFSORepairTool {
   @AfterAll
   public static void reset() throws IOException {
     IOUtils.closeQuietly(fs, client, cluster, out, err);
+  }
+
+  /**
+   * Test to verify that if parent is in deletedDirectoryTable then its
+   * children should be marked unreachable, not unreferenced.
+   */
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testUnreachableObjectsWithParentInDeletedTable() {
+    String expectedOutput = serializeReport(unreachableReport);
+
+    int exitCode = dryRun("-v", "/vol-unreachable", "-b", "bucket-unreachable");
+    assertEquals(0, exitCode);
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+
+    assertEquals(expectedOutput, reportOutput);
   }
 
   /**
@@ -303,7 +327,7 @@ public class TestFSORepairTool {
     String cliOutput = out.getOutput();
     String reportOutput = extractRelevantSection(cliOutput);
     assertEquals(expectedOutput, reportOutput);
-    assertThat(cliOutput).contains("Unreferenced:\n\tDirectories: 1\n\tFiles: 3\n\tBytes: 30");
+    assertThat(cliOutput).contains("Unreferenced (Orphaned):\n\tDirectories: 1\n\tFiles: 3\n\tBytes: 30");
   }
 
   @Order(ORDER_REPAIR_ALL_AGAIN)
@@ -312,7 +336,7 @@ public class TestFSORepairTool {
     int exitCode = repair();
     assertEquals(0, exitCode);
     String cliOutput = out.getOutput();
-    assertThat(cliOutput).contains("Unreferenced:\n\tDirectories: 0\n\tFiles: 0\n\tBytes: 0");
+    assertThat(cliOutput).contains("Unreferenced (Orphaned):\n\tDirectories: 0\n\tFiles: 0\n\tBytes: 0");
   }
 
   /**
@@ -323,12 +347,14 @@ public class TestFSORepairTool {
   public void validateClusterAfterRestart() throws Exception {
     cluster.getOzoneManager().restart();
 
-    // 4 volumes (/s3v, /vol1, /vol2, /vol-empty)
-    assertEquals(4, countTableEntries(cluster.getOzoneManager().getMetadataManager().getVolumeTable()));
-    // 6 buckets (vol1/bucket1, vol2/bucket1, vol2/bucket2, vol-empty/bucket-empty, vol/legacy-bucket, vol1/obs-bucket)
-    assertEquals(6, countTableEntries(cluster.getOzoneManager().getMetadataManager().getBucketTable()));
-    // 1 directory is unreferenced and moved to the deletedDirTable during repair mode.
-    assertEquals(1, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedDirTable()));
+    // 5 volumes (/s3v, /vol1, /vol2, /vol-empty, /vol-unreachable)
+    assertEquals(5, countTableEntries(cluster.getOzoneManager().getMetadataManager().getVolumeTable()));
+    // 7 buckets (vol1/bucket1, vol2/bucket1, vol2/bucket2, vol-empty/bucket-empty, vol/legacy-bucket, vol1/obs-bucket,
+    // /vol-unreachable/bucket-unreachable)
+    assertEquals(7, countTableEntries(cluster.getOzoneManager().getMetadataManager().getBucketTable()));
+    // 1 directory is unreferenced and moved to the deletedDirTable during repair mode
+    // 1 is moved to deletedDirTable for testing
+    assertEquals(2, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedDirTable()));
     // 3 files are unreferenced and moved to the deletedTable during repair mode.
     assertEquals(3, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedTable()));
   }
@@ -374,8 +400,8 @@ public class TestFSORepairTool {
   private String serializeReport(FSORepairTool.Report report) {
     return String.format(
         "Reachable:%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d%n" +
-        "Unreachable:%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d%n" +
-        "Unreferenced:%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d",
+        "Unreachable (Pending to delete):%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d%n" +
+        "Unreferenced (Orphaned):%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d",
         report.getReachable().getDirs(),
         report.getReachable().getFiles(),
         report.getReachable().getBytes(),
@@ -447,6 +473,79 @@ public class TestFSORepairTool {
         .build();
   }
 
+  private static FSORepairTool.Report buildTreeWithUnreachableObjects(String volume, String bucket, int fileSize)
+      throws Exception {
+    Path bucketPath = new Path("/" + volume + "/" + bucket);
+    // Create a parent directory that will be moved to deleted directory table
+    Path parentToDelete = new Path(bucketPath, "parentToDelete");
+    Path childDir = new Path(parentToDelete, "childDir");
+    Path file1 = new Path(parentToDelete, "file1.txt");
+    Path file2 = new Path(childDir, "file2.txt");
+    
+    Path reachableDir = new Path(bucketPath, "reachableDir");
+    Path reachableFile = new Path(reachableDir, "reachableFile.txt");
+    
+    fs.mkdirs(childDir);
+    fs.mkdirs(reachableDir);
+
+    // Content to put in every file.
+    String data = new String(new char[fileSize]);
+
+    FSDataOutputStream stream = fs.create(file1);
+    stream.write(data.getBytes(StandardCharsets.UTF_8));
+    stream.close();
+    stream = fs.create(file2);
+    stream.write(data.getBytes(StandardCharsets.UTF_8));
+    stream.close();
+    stream = fs.create(reachableFile);
+    stream.write(data.getBytes(StandardCharsets.UTF_8));
+    stream.close();
+    
+    // Simulate parent deletion by moving parentToDelete to deleted directory table
+    // This makes childDir, file1 and file2 unreachable
+    moveDirectoryToDeletedTable(volume, bucket, "parentToDelete");
+
+    FSORepairTool.ReportStatistics reachableCount = 
+        new FSORepairTool.ReportStatistics(1, 1, fileSize);
+    FSORepairTool.ReportStatistics unreachableCount =
+        new FSORepairTool.ReportStatistics(1, 2, fileSize * 2L);
+    FSORepairTool.ReportStatistics unreferencedCount =
+        new FSORepairTool.ReportStatistics(0, 0, 0);
+    return new FSORepairTool.Report.Builder()
+        .setReachable(reachableCount)
+        .setUnreachable(unreachableCount)
+        .setUnreferenced(unreferencedCount)
+        .build();
+  }
+
+  /**
+   * Move a directory from directory table to deleted directory table.
+   * This is used to verify unreachable objects.
+   */
+  private static void moveDirectoryToDeletedTable(String volumeName, String bucketName, String dirName) 
+      throws Exception {
+    Table<String, OmDirectoryInfo> dirTable = cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+    Table<String, OmKeyInfo> deletedDirTable = cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    
+    try (Table.KeyValueIterator<String, OmDirectoryInfo> iterator = dirTable.iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+        String key = entry.getKey();
+        OmDirectoryInfo dirInfo = entry.getValue();
+        
+        // Find the directory by name, remove from directory table and add to deleted directory table
+        if (key.contains(dirName) && dirInfo.getName().equals(dirName)) {
+          dirTable.delete(key);
+          String deleteDirKeyName = key + OM_KEY_PREFIX + dirInfo.getObjectID();
+          // Convert directory to OmKeyInfo for the deleted table
+          OmKeyInfo dirAsKeyInfo = OMFileRequest.getOmKeyInfo(volumeName, bucketName, dirInfo, dirInfo.getName());
+          deletedDirTable.put(deleteDirKeyName, dirAsKeyInfo);
+          break;
+        }
+      }
+    }
+  }
+
   private static void assertConnectedTreeReadable(String volume, String bucket) throws IOException {
     Path bucketPath = new Path("/" + volume + "/" + bucket);
     Path dir1 = new Path(bucketPath, "dir1");
@@ -470,7 +569,7 @@ public class TestFSORepairTool {
 
   /**
    * Creates a tree with 1 reachable directory, 1 reachable file, 1
-   * unreachable directory, and 3 unreachable files.
+   * unreferenced directory, and 3 unreferenced files.
    */
   private static FSORepairTool.Report buildDisconnectedTree(String volume, String bucket, int fileSize)
         throws Exception {
@@ -482,7 +581,7 @@ public class TestFSORepairTool {
 
     assertDisconnectedTreePartiallyReadable(volume, bucket);
 
-    // dir1 does not count towards the unreachable directories the tool
+    // dir1 does not count towards the unreferenced directories the tool
     // will see. It was deleted completely so the tool will never see it.
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(1, 1, fileSize);
