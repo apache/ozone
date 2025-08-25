@@ -484,7 +484,7 @@ public class OzoneDelegationTokenSecretManager
       awsSecret = s3SecretManager.getSecretString(identifier
           .getAwsAccessId());
     } catch (IOException e) {
-      LOG.error("Error while validating S3 identifier:{}",
+      LOG.warn("S3 identifier validation failed:{}",
           identifier, e);
       throw new InvalidToken("No S3 secret found for S3 identifier:"
           + identifier);
