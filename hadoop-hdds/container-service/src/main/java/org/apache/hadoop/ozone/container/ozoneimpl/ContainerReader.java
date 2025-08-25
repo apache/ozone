@@ -280,7 +280,7 @@ public class ContainerReader implements Runnable {
           && containerCreateInfo.getReplicaIndex() != ContainerCreateInfo.INVALID_REPLICA_INDEX
           && containerCreateInfo.getReplicaIndex() != kvContainer.getContainerData().getReplicaIndex()) {
         LOG.info("EC Container {} with replica index {} present at path {} is not matched with DB replica index {}," +
-                " deleting the container data.",
+                " ignoring the load of the container.",
             kvContainer.getContainerData().getContainerID(),
             kvContainer.getContainerData().getReplicaIndex(),
             kvContainer.getContainerData().getContainerPath(),
