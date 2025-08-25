@@ -24,8 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
 import org.junit.jupiter.api.Test;
@@ -39,51 +37,52 @@ class TestOmLCExpiration {
   public void testCreateValidOmLCExpiration() {
     OmLCExpiration.Builder exp1 = new OmLCExpiration.Builder()
         .setDays(30);
-    assertDoesNotThrow(() -> exp1.build().valid());
+    long currentTime = System.currentTimeMillis();
+    assertDoesNotThrow(() -> exp1.build().valid(currentTime));
 
     OmLCExpiration.Builder exp2 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:00Z");
-    assertDoesNotThrow(() -> exp2.build().valid());
+    assertDoesNotThrow(() -> exp2.build().valid(currentTime));
 
     OmLCExpiration.Builder exp3 = new OmLCExpiration.Builder()
         .setDays(1);
-    assertDoesNotThrow(() -> exp3.build().valid());
+    assertDoesNotThrow(() -> exp3.build().valid(currentTime));
 
     OmLCExpiration.Builder exp4 = new OmLCExpiration.Builder()
         .setDate("2099-12-31T00:00:00Z");
-    assertDoesNotThrow(() -> exp4.build().valid());
+    assertDoesNotThrow(() -> exp4.build().valid(currentTime));
 
     OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder()
         .setDate("2099-02-15T00:00:00.000Z");
-    assertDoesNotThrow(() -> exp5.build().valid());
+    assertDoesNotThrow(() -> exp5.build().valid(currentTime));
 
     OmLCExpiration.Builder exp6 = new OmLCExpiration.Builder()
         .setDate("2042-04-02T00:00:00Z");
-    assertDoesNotThrow(() -> exp6.build().valid());
+    assertDoesNotThrow(() -> exp6.build().valid(currentTime));
 
     OmLCExpiration.Builder exp7 = new OmLCExpiration.Builder()
         .setDate("2042-04-02T00:00:00+00:00");
-    assertDoesNotThrow(() -> exp7.build().valid());
+    assertDoesNotThrow(() -> exp7.build().valid(currentTime));
 
     OmLCExpiration.Builder exp8 = new OmLCExpiration.Builder()
         .setDate("2099-12-31T00:00:00+00:00");
-    assertDoesNotThrow(() -> exp8.build().valid());
+    assertDoesNotThrow(() -> exp8.build().valid(currentTime));
 
     OmLCExpiration.Builder exp9 = new OmLCExpiration.Builder()
         .setDate("2099-12-31T23:00:00-01:00");
-    assertDoesNotThrow(() -> exp9.build().valid());
+    assertDoesNotThrow(() -> exp9.build().valid(currentTime));
 
     OmLCExpiration.Builder exp10 = new OmLCExpiration.Builder()
         .setDate("2100-01-01T01:00:00+01:00");
-    assertDoesNotThrow(() -> exp10.build().valid());
+    assertDoesNotThrow(() -> exp10.build().valid(currentTime));
 
     OmLCExpiration.Builder exp11 = new OmLCExpiration.Builder()
         .setDate("2099-12-31T12:00:00-12:00");
-    assertDoesNotThrow(() -> exp11.build().valid());
+    assertDoesNotThrow(() -> exp11.build().valid(currentTime));
 
     OmLCExpiration.Builder exp12 = new OmLCExpiration.Builder()
         .setDate("2100-01-01T12:00:00+12:00");
-    assertDoesNotThrow(() -> exp12.build().valid());
+    assertDoesNotThrow(() -> exp12.build().valid(currentTime));
   }
 
   @Test
@@ -91,86 +90,86 @@ class TestOmLCExpiration {
     OmLCExpiration.Builder exp1 = new OmLCExpiration.Builder()
         .setDays(30)
         .setDate(getFutureDateString(100));
-    assertOMException(() -> exp1.build().valid(), INVALID_REQUEST,
+    long currentTime = System.currentTimeMillis();
+    assertOMException(() -> exp1.build().valid(currentTime), INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
     OmLCExpiration.Builder exp2 = new OmLCExpiration.Builder()
         .setDays(-1);
-    assertOMException(() -> exp2.build().valid(), INVALID_REQUEST,
+    assertOMException(() -> exp2.build().valid(currentTime), INVALID_REQUEST,
         "'Days' for Expiration action must be a positive integer");
 
     OmLCExpiration.Builder exp3 = new OmLCExpiration.Builder()
         .setDate(null);
-    assertOMException(() -> exp3.build().valid(), INVALID_REQUEST,
+    assertOMException(() -> exp3.build().valid(currentTime), INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
     OmLCExpiration.Builder exp4 = new OmLCExpiration.Builder()
         .setDate("");
-    assertOMException(() -> exp4.build().valid(), INVALID_REQUEST,
+    assertOMException(() -> exp4.build().valid(currentTime), INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
     OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder();
-    assertOMException(() -> exp5.build().valid(), INVALID_REQUEST,
+    assertOMException(() -> exp5.build().valid(currentTime), INVALID_REQUEST,
         "Either 'days' or 'date' should be specified, but not both or neither.");
 
     OmLCExpiration.Builder exp6 = new OmLCExpiration.Builder()
         .setDate("10-10-2099");
-    assertOMException(() -> exp6.build().valid(), INVALID_REQUEST,
+    assertOMException(() -> exp6.build().valid(currentTime), INVALID_REQUEST,
         "'Date' must be in ISO 8601 format");
 
     OmLCExpiration.Builder exp7 = new OmLCExpiration.Builder()
         .setDate("2099-12-31T00:00:00");
-    assertOMException(() -> exp7.build().valid(), INVALID_REQUEST,
+    assertOMException(() -> exp7.build().valid(currentTime), INVALID_REQUEST,
         "'Date' must be in ISO 8601 format");
 
-    // Testing for date in the past
+    // Testing for date in the past with creation time
     OmLCExpiration.Builder exp8 = new OmLCExpiration.Builder()
-        .setDate(getFutureDateString(-1))
-        .setCreateDate(ZonedDateTime.now(ZoneOffset.UTC));
-    assertOMException(() -> exp8.build().valid(), INVALID_REQUEST,
+        .setDate(getFutureDateString(-1));
+    assertOMException(() -> exp8.build().valid(currentTime), INVALID_REQUEST,
         "'Date' must be in the future");
 
     OmLCExpiration.Builder exp9 = new OmLCExpiration.Builder()
         .setDays(0);
-    assertOMException(() -> exp9.build().valid(), INVALID_REQUEST,
+    assertOMException(() -> exp9.build().valid(currentTime), INVALID_REQUEST,
         "'Days' for Expiration action must be a positive integer");
 
-    // 1 minute ago
+    // 1 minute ago with creation time
     OmLCExpiration.Builder exp10 = new OmLCExpiration.Builder()
-        .setDate(getFutureDateString(0, 0, -1))
-        .setCreateDate(ZonedDateTime.now(ZoneOffset.UTC));
-    assertOMException(() -> exp10.build().valid(), INVALID_REQUEST,
+        .setDate(getFutureDateString(0, 0, -1));
+    assertOMException(() -> exp10.build().valid(currentTime), INVALID_REQUEST,
         "'Date' must be in the future");
   }
 
   @Test
   public void testDateMustBeAtMidnightUTC() {
     // Acceptable date - midnight UTC
+    long currentTime = System.currentTimeMillis();
     OmLCExpiration.Builder validExp = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:00Z");
-    assertDoesNotThrow(() -> validExp.build().valid());
+    assertDoesNotThrow(() -> validExp.build().valid(currentTime));
 
     // Non-midnight UTC dates should be rejected
     OmLCExpiration.Builder exp1 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T10:00:00Z");
-    assertOMException(() -> exp1.build().valid(), INVALID_REQUEST, "'Date' must represent midnight UTC");
+    assertOMException(() -> exp1.build().valid(currentTime), INVALID_REQUEST, "'Date' must represent midnight UTC");
 
     OmLCExpiration.Builder exp2 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:30:00Z");
-    assertOMException(() -> exp2.build().valid(), INVALID_REQUEST, "'Date' must represent midnight UTC");
+    assertOMException(() -> exp2.build().valid(currentTime), INVALID_REQUEST, "'Date' must represent midnight UTC");
 
     OmLCExpiration.Builder exp3 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:30Z");
-    assertOMException(() -> exp3.build().valid(), INVALID_REQUEST, "'Date' must represent midnight UTC");
+    assertOMException(() -> exp3.build().valid(currentTime), INVALID_REQUEST, "'Date' must represent midnight UTC");
 
     OmLCExpiration.Builder exp4 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:00.123Z");
-    assertOMException(() -> exp4.build().valid(), INVALID_REQUEST, "'Date' must represent midnight UTC");
+    assertOMException(() -> exp4.build().valid(currentTime), INVALID_REQUEST, "'Date' must represent midnight UTC");
 
     // Non-UTC timezone should be rejected
     OmLCExpiration.Builder exp5 = new OmLCExpiration.Builder()
         .setDate("2099-10-10T00:00:00+01:00");
-    assertOMException(() -> exp5.build().valid(), INVALID_REQUEST, "'Date' must represent midnight UTC");
+    assertOMException(() -> exp5.build().valid(currentTime), INVALID_REQUEST, "'Date' must represent midnight UTC");
   }
 
   @Test

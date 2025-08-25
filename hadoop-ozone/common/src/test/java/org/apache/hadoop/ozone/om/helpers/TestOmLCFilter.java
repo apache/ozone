@@ -42,12 +42,13 @@ class TestOmLCFilter {
 
   @Test
   public void testInValidOmLCRulePrefixFilterCoExist() throws OMException {
+    long currentTime = System.currentTimeMillis();
     OmLCRule.Builder rule1 = getOmLCRuleBuilder("id", "prefix", true, 1, VALID_OM_LC_FILTER);
-    assertOMException(() -> rule1.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+    assertOMException(() -> rule1.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
         "Filter and Prefix cannot be used together");
 
     OmLCRule.Builder rule2 = getOmLCRuleBuilder("id", "", true, 1, VALID_OM_LC_FILTER);
-    assertOMException(() -> rule2.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+    assertOMException(() -> rule2.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
         "Filter and Prefix cannot be used together");
   }
 

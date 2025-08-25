@@ -30,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.google.common.collect.ImmutableMap;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -193,7 +195,7 @@ public class TestOmLifeCycleConfiguration {
         .build();
 
     assertFalse(rule.isEnabled());
-    assertDoesNotThrow(() -> rule.valid(BucketLayout.DEFAULT));
+    assertDoesNotThrow(() -> rule.valid(BucketLayout.DEFAULT, System.currentTimeMillis()));
   }
 
   @Test
@@ -232,7 +234,7 @@ public class TestOmLifeCycleConfiguration {
     // since the lifecycle configuration was created.
     
     // Create a rule with expiration date that is in the past (simulating old config)
-    String pastDate = getFutureDateString(-1); // A date clearly in the past
+    String pastDate = getFutureDateString(-1); // A date clearly in the past (1 day ago)
     OmLCExpiration pastExpiration = new OmLCExpiration.Builder()
         .setDate(pastDate)
         .build();
@@ -248,7 +250,8 @@ public class TestOmLifeCycleConfiguration {
         .setVolume("test-volume")
         .setBucket("test-bucket")
         .setBucketLayout(BucketLayout.DEFAULT)
-        .setCreationTime(System.currentTimeMillis())
+        // An Expiration was created two days ago and expired 1 day ago, should be valid
+        .setCreationTime(ZonedDateTime.now(ZoneOffset.UTC).minusDays(2).toInstant().toEpochMilli())
         .addRule(ruleWithPastDate)
         .setObjectID(123456L)
         .setUpdateID(78910L)
