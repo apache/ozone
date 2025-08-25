@@ -69,6 +69,7 @@ public class InfoSubcommand extends ScmSubcommand {
     multiContainer = containerList.size() > 1;
 
     printHeader();
+    // TODO HDDS-13592: Use ContainerIDParameters#getValidatedIDs to automatically handle type conversion and fail fast.
     for (String id : containerList) {
       printOutput(scmClient, id, first);
       first = false;
