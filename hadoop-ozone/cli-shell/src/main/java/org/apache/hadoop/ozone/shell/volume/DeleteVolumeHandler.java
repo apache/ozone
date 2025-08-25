@@ -60,7 +60,6 @@ public class DeleteVolumeHandler extends VolumeHandler {
   @CommandLine.Option(names = {"-y", "--yes"},
       description = "Continue without interactive user confirmation")
   private boolean yes;
-  private ExecutorService executor;
   private List<String> bucketIdList = new ArrayList<>();
   private AtomicInteger cleanedBucketCounter =
       new AtomicInteger();
@@ -216,7 +215,7 @@ public class DeleteVolumeHandler extends VolumeHandler {
   }
 
   private void doCleanBuckets() throws InterruptedException {
-    executor = Executors.newFixedThreadPool(threadNo);
+    ExecutorService executor = Executors.newFixedThreadPool(threadNo);
     for (int i = 0; i < threadNo; i++) {
       executor.execute(new BucketCleaner());
     }

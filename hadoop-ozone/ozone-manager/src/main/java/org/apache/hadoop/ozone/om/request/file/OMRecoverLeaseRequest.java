@@ -75,8 +75,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   private String volumeName;
   private String bucketName;
   private String keyName;
-  private OmKeyInfo keyInfo;
-  private String dbFileKey;
   private OmKeyInfo openKeyInfo;
   private String dbOpenFileKey;
   private boolean force;
@@ -198,9 +196,9 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
         .setErrMsg(errMsg)
         .build();
 
-    dbFileKey = fsoFile.getOzonePathKey();
+    String dbFileKey = fsoFile.getOzonePathKey();
 
-    keyInfo = getKey(dbFileKey);
+    OmKeyInfo keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
       throw new OMException("Key:" + keyName + " not found in keyTable.", KEY_NOT_FOUND);
     }

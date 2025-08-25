@@ -77,7 +77,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private DatanodeDetails datanodeDetails;
   private ThreadPoolExecutor readExecutors;
   private EventLoopGroup eventLoopGroup;
-  private Class<? extends ServerChannel> channelType;
 
   /**
    * Constructs a Grpc server class.
@@ -119,6 +118,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
             "ChunkReader-ELG-%d")
         .build();
 
+    Class<? extends ServerChannel> channelType;
     if (Epoll.isAvailable()) {
       eventLoopGroup = new EpollEventLoopGroup(poolSize / 10, factory);
       channelType = EpollServerSocketChannel.class;

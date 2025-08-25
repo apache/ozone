@@ -132,6 +132,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int serverPort;
   private int adminPort;
   private int clientPort;
+
+  // TODO: https://issues.apache.org/jira/browse/HDDS-13558
+  @SuppressWarnings("PMD.SingularField")
   private int dataStreamPort;
   private final RaftServer server;
   private final String name;
