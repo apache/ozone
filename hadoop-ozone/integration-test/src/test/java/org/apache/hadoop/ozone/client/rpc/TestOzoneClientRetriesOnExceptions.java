@@ -69,14 +69,15 @@ public class TestOzoneClientRetriesOnExceptions {
 
   private static final int MAX_RETRIES = 3;
 
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
   private ObjectStore objectStore;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private String volumeName;
   private String bucketName;
   private String keyString;
@@ -91,11 +92,6 @@ public class TestOzoneClientRetriesOnExceptions {
    */
   @BeforeEach
   public void init() throws Exception {
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
-
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setMaxRetryCount(MAX_RETRIES);
     clientConfig.setChecksumType(ChecksumType.NONE);
@@ -110,10 +106,10 @@ public class TestOzoneClientRetriesOnExceptions {
     conf.setQuietMode(false);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -149,7 +145,7 @@ public class TestOzoneClientRetriesOnExceptions {
   @Test
   public void testGroupMismatchExceptionHandling() throws Exception {
     String keyName = getKeyName();
-    int dataLength = maxFlushSize + 50;
+    int dataLength = MAX_FLUSH_SIZE + 50;
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS,
         dataLength);
     // write data more than 1 chunk
@@ -193,13 +189,13 @@ public class TestOzoneClientRetriesOnExceptions {
   void testMaxRetriesByOzoneClient() throws Exception {
     String keyName = getKeyName();
     try (OzoneOutputStream key = createKey(
-        keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * blockSize)) {
+        keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * BLOCK_SIZE)) {
       KeyOutputStream keyOutputStream =
           assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
       List<BlockOutputStreamEntry> entries = keyOutputStream.getStreamEntries();
       assertEquals((MAX_RETRIES + 1),
           keyOutputStream.getStreamEntries().size());
-      int dataLength = maxFlushSize + 50;
+      int dataLength = MAX_FLUSH_SIZE + 50;
       // write data more than 1 chunk
       byte[] data1 =
           ContainerTestHelper.getFixedLengthString(keyString, dataLength)

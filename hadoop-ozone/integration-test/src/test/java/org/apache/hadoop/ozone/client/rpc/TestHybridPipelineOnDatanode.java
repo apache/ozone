@@ -56,7 +56,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestHybridPipelineOnDatanode {
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
   private static OzoneClient client;
   private static ObjectStore objectStore;
 
@@ -69,7 +68,7 @@ public class TestHybridPipelineOnDatanode {
    */
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 5);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .build();

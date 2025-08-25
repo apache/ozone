@@ -45,12 +45,11 @@ public class TestStorageContainerManagerHA {
   private static final Logger LOG = LoggerFactory.getLogger(TestStorageContainerManagerHA.class);
 
   private MiniOzoneHAClusterImpl cluster;
-  private OzoneConfiguration conf;
   private static final int OM_COUNT = 3;
   private static final int SCM_COUNT = 3;
 
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     conf.set(ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
         "5s");
@@ -114,7 +113,7 @@ public class TestStorageContainerManagerHA {
   public void testSCMLeadershipMetric() throws IOException, InterruptedException {
     // GIVEN
     int scmInstancesCount = 3;
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     MiniOzoneHAClusterImpl.Builder haMiniClusterBuilder = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId("scm-service-id")
         .setOMServiceId("om-service-id")

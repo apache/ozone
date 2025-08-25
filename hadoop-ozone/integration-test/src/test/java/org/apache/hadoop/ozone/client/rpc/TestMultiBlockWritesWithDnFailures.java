@@ -62,7 +62,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestMultiBlockWritesWithDnFailures {
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private OzoneClient client;
   private ObjectStore objectStore;
   private int chunkSize;
@@ -79,7 +78,7 @@ public class TestMultiBlockWritesWithDnFailures {
    * @throws IOException
    */
   private void startCluster(int datanodes) throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);

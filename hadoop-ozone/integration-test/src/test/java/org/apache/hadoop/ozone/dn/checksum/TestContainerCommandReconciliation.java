@@ -150,7 +150,6 @@ public class TestContainerCommandReconciliation {
   private static File spnegoKeytab;
   private static File testUserKeytab;
   private static String testUserPrincipal;
-  private static String host;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -662,8 +661,8 @@ public class TestContainerCommandReconciliation {
 
   private static void setSecureConfig() throws IOException {
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
+    String host = InetAddress.getLocalHost().getCanonicalHostName()
+                      .toLowerCase();
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
     String curUser = UserGroupInformation.getCurrentUser().getUserName();
     conf.set(OZONE_ADMINISTRATORS, curUser);
