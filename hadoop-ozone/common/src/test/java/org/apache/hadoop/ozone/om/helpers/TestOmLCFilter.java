@@ -42,11 +42,14 @@ class TestOmLCFilter {
 
   @Test
   public void testInValidOmLCRulePrefixFilterCoExist() throws OMException {
+    long currentTime = System.currentTimeMillis();
     OmLCRule.Builder rule1 = getOmLCRuleBuilder("id", "prefix", true, 1, VALID_OM_LC_FILTER);
-    assertOMException(rule1::build, INVALID_REQUEST, "Filter and Prefix cannot be used together");
+    assertOMException(() -> rule1.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "Filter and Prefix cannot be used together");
 
     OmLCRule.Builder rule2 = getOmLCRuleBuilder("id", "", true, 1, VALID_OM_LC_FILTER);
-    assertOMException(rule2::build, INVALID_REQUEST, "Filter and Prefix cannot be used together");
+    assertOMException(() -> rule2.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "Filter and Prefix cannot be used together");
   }
 
   @Test
@@ -70,19 +73,19 @@ class TestOmLCFilter {
   @Test
   public void testInValidFilter() {
     OmLCFilter.Builder lcFilter1 = getOmLCFilterBuilder("prefix", Pair.of("key", "value"), VALID_OM_LC_AND_OPERATOR);
-    assertOMException(lcFilter1::build, INVALID_REQUEST,
+    assertOMException(() -> lcFilter1.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
     OmLCFilter.Builder lcFilter2 = getOmLCFilterBuilder("prefix", Pair.of("key", "value"), null);
-    assertOMException(lcFilter2::build, INVALID_REQUEST,
+    assertOMException(() -> lcFilter2.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
     OmLCFilter.Builder lcFilter3 = getOmLCFilterBuilder("prefix", null, VALID_OM_LC_AND_OPERATOR);
-    assertOMException(lcFilter3::build, INVALID_REQUEST,
+    assertOMException(() -> lcFilter3.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
     OmLCFilter.Builder lcFilter4 = getOmLCFilterBuilder(null, Pair.of("key", "value"), VALID_OM_LC_AND_OPERATOR);
-    assertOMException(lcFilter4::build, INVALID_REQUEST,
+    assertOMException(() -> lcFilter4.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
   }

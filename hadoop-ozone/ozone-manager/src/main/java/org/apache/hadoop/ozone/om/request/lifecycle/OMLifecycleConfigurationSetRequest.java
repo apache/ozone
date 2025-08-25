@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLife
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,7 +99,7 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
             .setVolume(resolvedBucket.realVolume())
             .setBucket(resolvedBucket.realBucket());
 
-    newLifecycleConfiguration.setCreationTime(Time.now());
+    newLifecycleConfiguration.setCreationTime(System.currentTimeMillis());
     newCreateRequest.setLifecycleConfiguration(newLifecycleConfiguration);
 
     return omRequest.toBuilder().setUserInfo(getUserInfo())

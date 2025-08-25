@@ -257,13 +257,14 @@ public class S3LifecycleConfiguration {
       OmLifecycleConfiguration.Builder builder = new OmLifecycleConfiguration.Builder()
           .setVolume(ozoneBucket.getVolumeName())
           .setBucketLayout(ozoneBucket.getBucketLayout())
+          .setCreationTime(System.currentTimeMillis())
           .setBucket(ozoneBucket.getName());
 
       for (Rule rule : getRules()) {
         builder.addRule(convertToOmRule(rule));
       }
 
-      return builder.build();
+      return builder.buildAndValid();
     } catch (Exception ex) {
       if (ex instanceof IllegalStateException) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
