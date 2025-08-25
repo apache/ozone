@@ -54,6 +54,9 @@ class SendContainerRequestHandler
   private Path path;
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
+  private Long actualContainerSize = null;
+  private long spaceReserved = 0;
+  private boolean firstRequest = true;
 
   SendContainerRequestHandler(
       ContainerImporter importer,
@@ -84,6 +87,8 @@ class SendContainerRequestHandler
 
       if (containerId == -1) {
         containerId = req.getContainerID();
+        spaceReserved = importer.getDefaultReplicationSpace();
+
         volume = importer.chooseNextVolume();
 
         Path dir = ContainerImporter.getUntarDirectory(volume);
@@ -93,6 +98,22 @@ class SendContainerRequestHandler
         compression = CopyContainerCompression.fromProto(req.getCompression());
 
         LOG.info("Accepting container {}", req.getContainerID());
+      }
+
+      if (firstRequest) {
+        firstRequest = false;
+        if (req.hasActualContainerSize()) {
+          actualContainerSize = req.getActualContainerSize();
+          long actualSpaceNeeded = importer.getRequiredReplicationSpace(actualContainerSize);
+          long spaceAdjustment = actualSpaceNeeded - spaceReserved;
+
+          if (spaceAdjustment > 0) {
+            volume.incCommittedBytes(spaceAdjustment);
+            spaceReserved = actualSpaceNeeded;
+            LOG.info("Container {} space adjusted by {} bytes (actual size: {} bytes)",
+                containerId, spaceAdjustment, actualContainerSize);
+          }
+        }
       }
 
       assertSame(containerId, req.getContainerID(), "containerID");
@@ -117,8 +138,8 @@ class SendContainerRequestHandler
       deleteTarball();
       responseObserver.onError(t);
     } finally {
-      if (volume != null) {
-        volume.incCommittedBytes(-importer.getDefaultReplicationSpace());
+      if (volume != null && spaceReserved > 0) {
+        volume.incCommittedBytes(-spaceReserved);
       }
     }
   }
@@ -146,8 +167,8 @@ class SendContainerRequestHandler
         responseObserver.onError(t);
       }
     } finally {
-      if (volume != null) {
-        volume.incCommittedBytes(-importer.getDefaultReplicationSpace());
+      if (volume != null && spaceReserved > 0) {
+        volume.incCommittedBytes(-spaceReserved);
       }
     }
   }
