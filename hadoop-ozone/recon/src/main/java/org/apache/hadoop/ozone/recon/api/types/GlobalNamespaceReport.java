@@ -17,42 +17,36 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
- * Metadata object that contains storage report of a Datanode.
+ * The GlobalNamespaceReport class serves as a representation of
+ * the global namespace metadata summary for a storage system.
+ * This class encapsulates statistical information related
+ * to the state of the global namespace.
+ *
+ * The metadata includes:
+ * - Total space utilized.
+ * - Total number of keys present in the namespace.
  */
-public class DatanodeStorageReport {
-  private long capacity;
-  private long used;
-  private long remaining;
-  private long committed;
-  private long pendingDeletions;
+public class GlobalNamespaceReport {
 
-  public DatanodeStorageReport(long capacity, long used, long remaining,
-                               long committed, long pendingDeletions) {
-    this.capacity = capacity;
-    this.used = used;
-    this.remaining = remaining;
-    this.committed = committed;
-    this.pendingDeletions = pendingDeletions;
+  @JsonProperty("totalUsedSpace")
+  private long totalUsedSpace;
+
+  @JsonProperty("totalKeys")
+  private long totalKeys;
+
+  public GlobalNamespaceReport(long totalUsedSpace, long totalKeys) {
+    this.totalUsedSpace = totalUsedSpace;
+    this.totalKeys = totalKeys;
   }
 
-  public long getCapacity() {
-    return capacity;
+  public long getTotalUsedSpace() {
+    return totalUsedSpace;
   }
 
-  public long getUsed() {
-    return used;
-  }
-
-  public long getRemaining() {
-    return remaining;
-  }
-
-  public long getCommitted() {
-    return committed;
-  }
-
-  public long getPendingDeletions() {
-    return pendingDeletions;
+  public long getTotalKeys() {
+    return totalKeys;
   }
 }
