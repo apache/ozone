@@ -219,6 +219,16 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.container.startup.cache.enabled</name>
+    <value>false</value>
+    <tag>OZONE, CONTAINER, DATANODE</tag>
+    <description>
+      Enable container metadata startup cache to improve DataNode boot performance.
+      When enabled, container YAML file content is cached during
+      shutdown and loaded during startup, reducing random I/O operations.
+    </description>
+  </property>
+  <property>
     <name>hdds.container.ratis.enabled</name>
     <value>false</value>
     <tag>OZONE, MANAGEMENT, PIPELINE, RATIS</tag>
