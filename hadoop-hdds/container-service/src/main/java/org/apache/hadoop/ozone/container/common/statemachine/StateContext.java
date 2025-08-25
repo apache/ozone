@@ -60,10 +60,12 @@ import java.util.stream.Collectors;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
@@ -101,6 +103,12 @@ public class StateContext {
   @VisibleForTesting
   static final String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
       IncrementalContainerReportProto.getDescriptor().getFullName();
+  @VisibleForTesting
+  static final String CRL_STATUS_REPORT_PROTO_NAME =
+      StorageContainerDatanodeProtocolProtos.CRLStatusReport.getDescriptor().getFullName();
+  @VisibleForTesting
+  static final String DISK_BALANCER_REPORT_PROTO_NAME =
+      DiskBalancerReportProto.getDescriptor().getFullName();
 
   static final Logger LOG =
       LoggerFactory.getLogger(StateContext.class);
@@ -115,6 +123,8 @@ public class StateContext {
   private final AtomicReference<Message> containerReports;
   private final AtomicReference<Message> nodeReport;
   private final AtomicReference<Message> pipelineReports;
+  private final AtomicReference<Message> crlStatusReport;
+  private final AtomicReference<Message> diskBalancerReport;
   // Incremental reports are queued in the map below
   private final Map<InetSocketAddress, List<Message>>
       incrementalReportsQueue;
@@ -183,6 +193,8 @@ public class StateContext {
     containerReports = new AtomicReference<>();
     nodeReport = new AtomicReference<>();
     pipelineReports = new AtomicReference<>();
+    crlStatusReport = new AtomicReference<>(); // Certificate Revocation List
+    diskBalancerReport = new AtomicReference<>();
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
     pipelineActions = new ConcurrentHashMap<>();
@@ -209,6 +221,10 @@ public class StateContext {
     type2Reports.put(NODE_REPORT_PROTO_NAME, nodeReport);
     fullReportTypeList.add(PIPELINE_REPORTS_PROTO_NAME);
     type2Reports.put(PIPELINE_REPORTS_PROTO_NAME, pipelineReports);
+    fullReportTypeList.add(CRL_STATUS_REPORT_PROTO_NAME);
+    type2Reports.put(CRL_STATUS_REPORT_PROTO_NAME, crlStatusReport);
+    fullReportTypeList.add(DISK_BALANCER_REPORT_PROTO_NAME);
+    type2Reports.put(DISK_BALANCER_REPORT_PROTO_NAME, diskBalancerReport);
   }
 
   /**
@@ -916,6 +932,16 @@ public class StateContext {
   @VisibleForTesting
   public Message getPipelineReports() {
     return pipelineReports.get();
+  }
+
+  @VisibleForTesting
+  public Message getCRLStatusReport() {
+    return crlStatusReport.get();
+  }
+
+  @VisibleForTesting
+  public Message getDiskBalancerReport() {
+    return diskBalancerReport.get();
   }
 
   public void configureReconHeartbeatFrequency() {

@@ -1343,30 +1343,30 @@ public class KeyValueHandler extends Handler {
   @Override
   public Container importContainer(ContainerData originalContainerData,
       final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
-    Preconditions.checkState(originalContainerData instanceof
-        KeyValueContainerData, "Should be KeyValueContainerData instance");
-
-    KeyValueContainerData containerData = new KeyValueContainerData(
-        (KeyValueContainerData) originalContainerData);
-
-    KeyValueContainer container = new KeyValueContainer(containerData,
-        conf);
+      final TarContainerPacker packer) throws IOException {
+    KeyValueContainer container = createNewContainer(originalContainerData);
 
     HddsVolume targetVolume = originalContainerData.getVolume();
     populateContainerPathFields(container, targetVolume);
     container.importContainerData(rawContainerStream, packer);
-    ContainerLogger.logImported(containerData);
+    ContainerLogger.logImported(container.getContainerData());
     sendICR(container);
     return container;
+  }
 
+  @Override
+  public Container importContainer(ContainerData targetTempContainerData) throws IOException {
+    KeyValueContainer container = createNewContainer(targetTempContainerData);
+    HddsVolume targetVolume = targetTempContainerData.getVolume();
+    populateContainerPathFields(container, targetVolume);
+    container.importContainerData((KeyValueContainerData) targetTempContainerData);
+    return container;
   }
 
   @Override
   public void exportContainer(final Container container,
-                              final OutputStream outputStream,
-                              final TarContainerPacker packer)
+      final OutputStream outputStream,
+      final TarContainerPacker packer)
       throws IOException {
     final KeyValueContainer kvc = (KeyValueContainer) container;
     kvc.exportContainerData(outputStream, packer);
@@ -1589,6 +1589,24 @@ public class KeyValueHandler extends Handler {
     updateContainerChecksumFromMetadataIfNeeded(container);
     ContainerLogger.logClosed(container.getContainerData());
     sendICR(container);
+  }
+
+  @Override
+  public void copyContainer(final Container container, Path destinationPath)
+      throws IOException {
+    final KeyValueContainer kvc = (KeyValueContainer) container;
+    kvc.copyContainerDirectory(destinationPath);
+  }
+
+  private KeyValueContainer createNewContainer(
+      ContainerData originalContainerData) {
+    Preconditions.checkState(originalContainerData instanceof
+        KeyValueContainerData, "Should be KeyValueContainerData instance");
+
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        (KeyValueContainerData) originalContainerData);
+
+    return new KeyValueContainer(containerData, conf);
   }
 
   @Override
