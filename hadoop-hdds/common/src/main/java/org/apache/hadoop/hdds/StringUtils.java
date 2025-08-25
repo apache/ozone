@@ -97,4 +97,16 @@ public final class StringUtils {
   public static byte[] string2Bytes(String str) {
     return str.getBytes(UTF8);
   }
+
+  public static String getLexicographicallyLowerString(String val) {
+    char[] charVal = val.toCharArray();
+    charVal[charVal.length - 1] -= 1;
+    return String.valueOf(charVal);
+  }
+
+  public static String getLexicographicallyHigherString(String val) {
+    char[] charVal = val.toCharArray();
+    charVal[charVal.length - 1] += 1;
+    return String.valueOf(charVal);
+  }
 }

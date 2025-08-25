@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -89,7 +90,6 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -107,7 +107,6 @@ import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
-import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -505,7 +504,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager, snapshotInfo, store);
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
-    // Snapshot create is processed as a single transactions and
+    // Snapshot create is processed as a single transaction and
     // transactions are flushed sequentially so, no need to take any lock as of now.
     deleteKeysFromDelKeyTableInSnapshotScope(omMetadataManager,
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
@@ -529,6 +528,20 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
+   * Helper method to perform batch delete range operation on a given key prefix.
+   * @param prefix prefix of keys to be deleted
+   * @param table table from which keys are to be deleted
+   * @param batchOperation batch operation
+   */
+  private static void deleteKeysFromTableWithPrefix(
+      String prefix, Table<String, ?> table, BatchOperation batchOperation) throws IOException {
+    String endKey = getLexicographicallyHigherString(prefix);
+    LOG.debug("Deleting key range from {} - startKey: {}, endKey: {}",
+        table.getName(), prefix, endKey);
+    table.deleteRangeWithBatch(batchOperation, prefix, endKey);
+  }
+
+  /**
    * Helper method to delete DB keys in the snapshot scope (bucket)
    * from active DB's deletedDirectoryTable.
    * @param omMetadataManager OMMetadataManager instance
@@ -540,18 +553,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       OMMetadataManager omMetadataManager, String volumeName,
       String bucketName, BatchOperation batchOperation) throws IOException {
 
-    final String startKey = omMetadataManager.getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
-    // endKey is the smallest key that is lexicographically larger than the startKey. (exclusive)
-    final String endKey = startKey.substring(0, startKey.length() - 1) +
-        (char)(startKey.charAt(startKey.length() - 1) + 1);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Deleting key range from SnapshotRenamedTable - startKey: {}, endKey: {}",
-          startKey, endKey);
-    }
-
-    // Remove all entries from snapshotRenamedTable using deleteRange API
-    omMetadataManager.getSnapshotRenamedTable().deleteRangeWithBatch(batchOperation, startKey, endKey);
+    final String keyPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
+    deleteKeysFromTableWithPrefix(keyPrefix, omMetadataManager.getSnapshotRenamedTable(), batchOperation);
   }
 
   /**
@@ -567,19 +570,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String startKey = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
-
-    // endKey is the smallest key that is lexicographically larger than the startKey. (exclusive)
-    final String endKey = startKey.substring(0, startKey.length() - 1) +
-        (char)(startKey.charAt(startKey.length() - 1) + 1);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Deleting key range from DeletedDirTable - startKey: {}, endKey: {}",
-          startKey, endKey);
-    }
-
-    // Use deleteRange instead of iterating through each key
-    omMetadataManager.getDeletedDirTable().deleteRangeWithBatch(batchOperation, startKey, endKey);
+    final String keyPreix = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
+    deleteKeysFromTableWithPrefix(keyPreix, omMetadataManager.getDeletedDirTable(), batchOperation);
   }
 
   @VisibleForTesting
@@ -603,26 +595,9 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static void deleteKeysFromDelKeyTableInSnapshotScope(
       OMMetadataManager omMetadataManager, String volumeName,
       String bucketName, BatchOperation batchOperation) throws IOException {
-
-    // Range delete start key (inclusive)
-    final String startKey = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
-    // endKey is the smallest key that is lexicographically larger than the startKey. (exclusive)
-    final String endKey = startKey.substring(0, startKey.length() - 1) +
-        (char)(startKey.charAt(startKey.length() - 1) + 1);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Deleting key range from DeletedTable - startKey: {}, endKey: {}",
-          startKey, endKey);
-    }
-
-    // Use deleteRange instead of iterating through each key
-    omMetadataManager.getDeletedDirTable().deleteRangeWithBatch(batchOperation, startKey, endKey);
-    // No need to invalidate deletedTable cache since entries are not added to its table cache
-    // in the first place. See OMKeyDeleteRequest and OMKeyPurgeRequest#validateAndUpdateCache.
-    //
-    // This makes the table clean up efficient as we only need one
-    // deleteRange() operation. No need to invalidate cache entries
-    // one by one.
+    // Range delete prefix (inclusive)
+    final String keyPrefix = omMetadataManager.getBucketKeyPrefix(volumeName, bucketName);
+    deleteKeysFromTableWithPrefix(keyPrefix, omMetadataManager.getDeletedTable(), batchOperation);
   }
 
   /**
