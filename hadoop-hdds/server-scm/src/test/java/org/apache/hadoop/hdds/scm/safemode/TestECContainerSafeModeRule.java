@@ -20,16 +20,17 @@ package org.apache.hadoop.hdds.scm.safemode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,16 +55,26 @@ public class TestECContainerSafeModeRule {
   private EventQueue eventQueue;
   private SCMSafeModeManager safeModeManager;
   private SafeModeMetrics metrics;
+  private List<ContainerInfo> containers;
 
   private ECContainerSafeModeRule rule;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws ContainerNotFoundException {
     containerManager = mock(ContainerManager.class);
     conf = mock(ConfigurationSource.class);
     eventQueue = mock(EventQueue.class);
     safeModeManager = mock(SCMSafeModeManager.class);
     metrics = mock(SafeModeMetrics.class);
+    containers = new ArrayList<>();
+    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(containers);
+    when(containerManager.getContainer(any(ContainerID.class))).thenAnswer(invocation -> {
+      ContainerID id = invocation.getArgument(0);
+      return containers.stream()
+          .filter(c -> c.containerID().equals(id))
+          .findFirst()
+          .orElseThrow(ContainerNotFoundException::new);
+    });
 
     when(safeModeManager.getSafeModeMetrics()).thenReturn(metrics);
 
@@ -72,14 +84,10 @@ public class TestECContainerSafeModeRule {
 
   @Test
   public void testRefreshInitializeECContainers() {
-    List<ContainerInfo> containers = Arrays.asList(
-        mockECContainer(LifeCycleState.CLOSED, 1L),
-        mockECContainer(LifeCycleState.OPEN, 2L)
-    );
+    containers.add(mockECContainer(LifeCycleState.CLOSED, 1L));
+    containers.add(mockECContainer(LifeCycleState.OPEN, 2L));
 
-    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(containers);
-
-    rule.refresh(false);
+    rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold());
   }
@@ -88,10 +96,8 @@ public class TestECContainerSafeModeRule {
   @EnumSource(value = LifeCycleState.class,
       names = {"OPEN", "CLOSING", "QUASI_CLOSED", "CLOSED", "DELETING", "DELETED", "RECOVERING"})
   public void testValidateReturnsTrueAndFalse(LifeCycleState state) {
-    ContainerInfo container = mockECContainer(state, 1L);
-
-    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(Collections.singletonList(container));
-
+    containers.add(mockECContainer(state, 1L));
+    rule.refresh(true);
     boolean expected = state != LifeCycleState.QUASI_CLOSED && state != LifeCycleState.CLOSED;
     assertEquals(expected, rule.validate());
   }
@@ -99,41 +105,39 @@ public class TestECContainerSafeModeRule {
   @Test
   public void testProcessECContainer() {
     long containerId = 123L;
-    ContainerInfo container = mockECContainer(LifeCycleState.CLOSED, containerId);
-
-    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(Collections.singletonList(container));
+    containers.add(mockECContainer(LifeCycleState.CLOSED, containerId));
     rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold());
 
-    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
-    List<ContainerReplicaProto> replicas = new ArrayList<>();
-    replicas.add(replica);
-    ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
-    NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
-    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
-
-    when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
-    when(datanodeDetails.getUuid()).thenReturn(UUID.randomUUID());
-    when(replica.getContainerID()).thenReturn(containerId);
-    when(containerReport.getReportsList()).thenReturn(replicas);
-    when(report.getReport()).thenReturn(containerReport);
-
-    rule.process(report);
+    // We need at least 3 replicas to be reported to validate the rule
+    rule.process(getNewContainerReport(containerId));
+    rule.process(getNewContainerReport(containerId));
+    rule.process(getNewContainerReport(containerId));
 
     assertEquals(1.0, rule.getCurrentContainerThreshold());
   }
 
+  private NodeRegistrationContainerReport getNewContainerReport(long containerID) {
+    DatanodeDetails datanode = mock(DatanodeDetails.class);
+    ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
+    NodeRegistrationContainerReport report = mock(NodeRegistrationContainerReport.class);
+    ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
+
+    when(report.getDatanodeDetails()).thenReturn(datanode);
+    when(datanode.getID()).thenReturn(DatanodeID.randomID());
+    when(replica.getContainerID()).thenReturn(containerID);
+    when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
+    when(report.getReport()).thenReturn(containerReport);
+    return report;
+  }
+
   @Test
   public void testAllContainersClosed() {
-    List<ContainerInfo> closedContainers = Arrays.asList(
-        mockECContainer(LifeCycleState.CLOSED, 11L),
-        mockECContainer(LifeCycleState.CLOSED, 32L)
-    );
+    containers.add(mockECContainer(LifeCycleState.CLOSED, 11L));
+    containers.add(mockECContainer(LifeCycleState.CLOSED, 32L));
 
-    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(closedContainers);
-
-    rule.refresh(false);
+    rule.refresh(true);
 
     assertEquals(0.0, rule.getCurrentContainerThreshold(), "Threshold should be 0.0 when all containers are closed");
     assertFalse(rule.validate(), "Validate should return false when all containers are closed");
@@ -141,14 +145,10 @@ public class TestECContainerSafeModeRule {
 
   @Test
   public void testAllContainersOpen() {
-    List<ContainerInfo> openContainers = Arrays.asList(
-        mockECContainer(LifeCycleState.OPEN, 11L),
-        mockECContainer(LifeCycleState.OPEN, 32L)
-    );
+    containers.add(mockECContainer(LifeCycleState.OPEN, 11L));
+    containers.add(mockECContainer(LifeCycleState.OPEN, 32L));
 
-    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(openContainers);
-
-    rule.refresh(false);
+    rule.refresh(true);
 
     assertEquals(1.0, rule.getCurrentContainerThreshold(), "Threshold should be 1.0 when all containers are open");
     assertTrue(rule.validate(), "Validate should return true when all containers are open");
@@ -157,11 +157,9 @@ public class TestECContainerSafeModeRule {
   @Test
   public void testDuplicateContainerIdsInReports() {
     long containerId = 42L;
-    ContainerInfo container = mockECContainer(LifeCycleState.OPEN, containerId);
+    containers.add(mockECContainer(LifeCycleState.OPEN, containerId));
 
-    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(Collections.singletonList(container));
-
-    rule.refresh(false);
+    rule.refresh(true);
 
     ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
     ContainerReportsProto containerReport = mock(ContainerReportsProto.class);
@@ -172,7 +170,7 @@ public class TestECContainerSafeModeRule {
     when(containerReport.getReportsList()).thenReturn(Collections.singletonList(replica));
     when(report.getReport()).thenReturn(containerReport);
     when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
-    when(datanodeDetails.getUuid()).thenReturn(UUID.randomUUID());
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 
     rule.process(report);
     rule.process(report);
@@ -184,11 +182,9 @@ public class TestECContainerSafeModeRule {
   public void testValidateBasedOnReportProcessingTrue() throws Exception {
     rule.setValidateBasedOnReportProcessing(true);
     long containerId = 1L;
-    ContainerInfo container = mockECContainer(LifeCycleState.OPEN, containerId);
+    containers.add(mockECContainer(LifeCycleState.OPEN, containerId));
 
-    when(containerManager.getContainers(ReplicationType.EC)).thenReturn(Collections.singletonList(container));
-
-    rule.refresh(false);
+    rule.refresh(true);
 
     ContainerReplicaProto replica = mock(ContainerReplicaProto.class);
     ContainerReportsProto reportsProto = mock(ContainerReportsProto.class);
@@ -199,7 +195,7 @@ public class TestECContainerSafeModeRule {
     when(reportsProto.getReportsList()).thenReturn(Collections.singletonList(replica));
     when(report.getReport()).thenReturn(reportsProto);
     when(report.getDatanodeDetails()).thenReturn(datanodeDetails);
-    when(datanodeDetails.getUuid()).thenReturn(UUID.randomUUID());
+    when(datanodeDetails.getID()).thenReturn(DatanodeID.randomID());
 
 
     rule.process(report);
@@ -214,6 +210,7 @@ public class TestECContainerSafeModeRule {
     when(container.getContainerID()).thenReturn(containerID);
     when(container.containerID()).thenReturn(ContainerID.valueOf(containerID));
     when(container.getNumberOfKeys()).thenReturn(1L);
+    when(container.getReplicationConfig()).thenReturn(new ECReplicationConfig(3, 2));
     return container;
   }
 }
