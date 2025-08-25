@@ -36,7 +36,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.4</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.32.24</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.32.29</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.81</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -44,7 +44,7 @@
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
-    <com.nimbusds.nimbus-jose-jwt.version>9.40</com.nimbusds.nimbus-jose-jwt.version>
+    <com.nimbusds.nimbus-jose-jwt.version>10.4</com.nimbusds.nimbus-jose-jwt.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
     <commons-cli.version>1.8.0</commons-cli.version>
     <commons-codec.version>1.18.0</commons-codec.version>
@@ -89,7 +89,7 @@
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
     <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
-    <gson.version>2.10.1</gson.version>
+    <gson.version>2.13.1</gson.version>
     <guava.version>33.4.8-jre</guava.version>
     <guice.version>6.0.0</guice.version>
     <hadoop-thirdparty.version>1.4.0</hadoop-thirdparty.version>
