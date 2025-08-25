@@ -210,6 +210,7 @@ public class BlockDeletingService extends BackgroundService {
       throws StorageContainerException {
 
     AtomicLong totalPendingBlockCount = new AtomicLong(0L);
+    AtomicLong totalPendingBlockBytes = new AtomicLong(0L);
     Map<Long, ContainerData> containerDataMap =
         ozoneContainer.getContainerSet().getContainerMap().entrySet().stream()
             .filter(e -> (checkPendingDeletionBlocks(
@@ -222,10 +223,12 @@ public class BlockDeletingService extends BackgroundService {
               totalPendingBlockCount
                   .addAndGet(
                       ContainerUtils.getPendingDeletionBlocks(containerData));
+              totalPendingBlockBytes.addAndGet(ContainerUtils.getPendingDeletionBytes(containerData));
               return containerData;
             }));
 
     metrics.setTotalPendingBlockCount(totalPendingBlockCount.get());
+    metrics.setTotalPendingBlockBytes(totalPendingBlockBytes.get());
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }
