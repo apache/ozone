@@ -203,6 +203,7 @@ public class HddsVolume extends StorageVolume {
     StorageLocationReport.Builder builder = super.reportBuilder();
     if (!builder.isFailed()) {
       builder.setCommitted(getCommittedBytes())
+          .setPendingDeletions(0) // TODO Integrate with HDDS-13467
           .setFreeSpaceToSpare(getFreeSpaceToSpare(builder.getCapacity()));
     }
     return builder;
