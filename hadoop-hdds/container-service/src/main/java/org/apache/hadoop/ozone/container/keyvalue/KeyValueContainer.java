@@ -661,7 +661,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     }
 
     //fill in memory stat counter (keycount, byte usage)
-    KeyValueContainerUtil.parseKVContainerData(containerData, config, true);
+    KeyValueContainerUtil.parseKVContainerData(containerData, config, true, null);
 
     // rewriting the yaml file with new checksum calculation
     // restore imported container's state to the original state and flush the yaml file
