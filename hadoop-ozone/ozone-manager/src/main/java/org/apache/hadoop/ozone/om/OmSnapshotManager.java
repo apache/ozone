@@ -123,9 +123,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotManager.class);
 
-  // Threshold for the table iterator loop in nanoseconds.
-  private static final long DB_TABLE_ITER_LOOP_THRESHOLD_NS = 100000;
-
   private final OzoneManager ozoneManager;
   private final SnapshotDiffManager snapshotDiffManager;
   // Per-OM instance of snapshot cache map
