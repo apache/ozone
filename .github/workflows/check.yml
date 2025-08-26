@@ -45,12 +45,6 @@ on:
         default: ''
         required: false
 
-      pnpm-version:
-        type: string
-        description: "pnpm version to use for builds (default: none)"
-        default: ''
-        required: false
-
       needs-maven-cache:
         type: boolean
         description: "Whether to restore Maven cache before run (default: yes)"
@@ -173,7 +167,6 @@ jobs:
         with:
           path: |
             ~/.pnpm-store
-            **/node_modules
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
@@ -225,12 +218,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: ${{ inputs.java-version }}
-
-      - name: Setup pnpm version ${{ inputs.pnpm-version }}
-        if: ${{ inputs.pnpm-version }}
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ inputs.pnpm-version }}
 
       - name: Execute pre-test steps
         if: ${{ inputs.pre-script }}

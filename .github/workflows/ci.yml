@@ -30,7 +30,6 @@ env:
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
   TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
-  PNPM_VERSION: 8.15.7 # This is defined in the pom.xml file with pnpm.version, should be updated accordingly
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
@@ -55,7 +54,6 @@ jobs:
       # `env` context cannot be used when calling reusable workflow, so we need to convert these to `outputs`
       build-args: ${{ env.BUILD_ARGS }}
       java-version: ${{ env.TEST_JAVA_VERSION }}
-      pnpm-version: ${{ env.PNPM_VERSION }}
       with-coverage: ${{ env.OZONE_WITH_COVERAGE }}
     steps:
       - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
@@ -116,7 +114,6 @@ jobs:
     if: needs.build-info.outputs.needs-build == 'true' || needs.build-info.outputs.needs-integration-tests == 'true'
     uses: ./.github/workflows/check.yml
     with:
-      pnpm-version: ${{ needs.build-info.outputs.pnpm-version }}
       java-version: ${{ needs.build-info.outputs.java-version }}
       needs-npm-cache: true
       ratis-args: ${{ inputs.ratis_args }}
