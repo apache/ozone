@@ -60,7 +60,14 @@ public class DiskBalancerReportSubcommand extends ScmSubcommand {
     for (HddsProtos.DatanodeDiskBalancerInfoProto proto: protos) {
       formatBuilder.append("%-50s %s%n");
       contentList.add(proto.getNode().getHostName());
-      contentList.add(String.valueOf(proto.getCurrentVolumeDensitySum()));
+      
+      // Display "N/A" for dead/down datanodes, otherwise show the actual value
+      double volumeDensity = proto.getCurrentVolumeDensitySum();
+      if (Double.isNaN(volumeDensity)) {
+        contentList.add("N/A");
+      } else {
+        contentList.add(String.valueOf(volumeDensity));
+      }
     }
 
     return String.format(formatBuilder.toString(),
