@@ -38,6 +38,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -626,37 +627,38 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
-    long bytesPendingToMove = 0;
-    long totalFreeSpace = 0;
-    long totalCapacity = 0;
-
-    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
-      totalFreeSpace += volume.getCurrentUsage().getAvailable();
-      totalCapacity += volume.getCurrentUsage().getCapacity();
-    }
-
-    if (totalCapacity == 0) {
+    // If there are no available volumes, return 0 bytes to move
+    if (inputVolumeSet.getVolumesList().isEmpty()) {
       return 0;
     }
 
-    double datanodeUtilization = ((double) (totalCapacity - totalFreeSpace)) / totalCapacity;
+    double idealUsage = inputVolumeSet.getIdealUsage();
+    double normalizedThreshold = threshold / 100.0;
 
-    double thresholdFraction = threshold / 100.0;
-    double upperLimit = datanodeUtilization + thresholdFraction;
+    long totalBytesToMove = 0;
 
     // Calculate excess data in overused volumes
     for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
-      long freeSpace = volume.getCurrentUsage().getAvailable();
-      long capacity = volume.getCurrentUsage().getCapacity();
-      double volumeUtilization = ((double) (capacity - freeSpace)) / capacity;
+      SpaceUsageSource usage = volume.getCurrentUsage();
 
-      // Consider only volumes exceeding the upper threshold
-      if (volumeUtilization > upperLimit) {
-        long excessData = (capacity - freeSpace) - (long) (upperLimit * capacity);
-        bytesPendingToMove += excessData;
+      if (usage.getCapacity() == 0) {
+        continue;
+      }
+
+      long deltaSize = deltaSizes.getOrDefault(volume, 0L);
+      double currentUsage = (double)((usage.getCapacity() - usage.getAvailable())
+          + deltaSize + volume.getCommittedBytes()) / usage.getCapacity();
+
+      double volumeUtilisation = currentUsage - idealUsage;
+
+      // Only consider volumes that exceed the threshold (source volumes)
+      if (volumeUtilisation >= normalizedThreshold) {
+        // Calculate excess bytes that need to be moved from this volume
+        long excessBytes = (long) ((volumeUtilisation - normalizedThreshold) * usage.getCapacity());
+        totalBytesToMove += Math.max(0, excessBytes);
       }
     }
-    return bytesPendingToMove;
+    return totalBytesToMove;
   }
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {

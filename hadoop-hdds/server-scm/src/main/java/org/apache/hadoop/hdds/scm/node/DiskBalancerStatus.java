@@ -35,15 +35,18 @@ public class DiskBalancerStatus {
   private long failureMoveCount;
   private long bytesToMove;
   private long balancedBytes;
+  private double volumeDataDensity;
 
   public DiskBalancerStatus(DiskBalancerRunningStatus isRunning, DiskBalancerConfiguration conf,
-      long successMoveCount, long failureMoveCount, long bytesToMove, long balancedBytes) {
+      long successMoveCount, long failureMoveCount, long bytesToMove, long balancedBytes, 
+      double volumeDataDensity) {
     this.isRunning = isRunning;
     this.diskBalancerConfiguration = conf;
     this.successMoveCount = successMoveCount;
     this.failureMoveCount = failureMoveCount;
     this.bytesToMove = bytesToMove;
     this.balancedBytes = balancedBytes;
+    this.volumeDataDensity = volumeDataDensity;
   }
 
   public DiskBalancerRunningStatus getRunningStatus() {
@@ -68,5 +71,9 @@ public class DiskBalancerStatus {
 
   public long getBalancedBytes() {
     return balancedBytes;
+  }
+
+  public double getVolumeDataDensity() {
+    return volumeDataDensity;
   }
 }

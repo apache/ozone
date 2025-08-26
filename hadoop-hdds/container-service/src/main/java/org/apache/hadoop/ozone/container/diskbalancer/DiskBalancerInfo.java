@@ -17,10 +17,13 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
 
 /**
@@ -100,6 +103,15 @@ public class DiskBalancerInfo {
   }
 
   public StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto toDiskBalancerReportProto() {
+    return toDiskBalancerReportProto(null, null);
+  }
+
+  /**
+   * @param volumeSet The MutableVolumeSet for calculating VolumeDataDensity
+   * @param deltaMap Map of volume to delta sizes (ongoing operations)
+   */
+  public StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto toDiskBalancerReportProto(
+      MutableVolumeSet volumeSet, Map<HddsVolume, Long> deltaMap) {
     DiskBalancerConfiguration conf = new DiskBalancerConfiguration(threshold,
         bandwidthInMB, parallelThread, stopAfterDiskEven);
     HddsProtos.DiskBalancerConfigurationProto confProto = conf.toProtobufBuilder().build();
@@ -112,6 +124,11 @@ public class DiskBalancerInfo {
     builder.setFailureMoveCount(failureCount);
     builder.setBytesToMove(bytesToMove);
     builder.setBalancedBytes(balancedBytes);
+    
+    // Calculate VolumeDataDensity using standalone utility
+    double volumeDataDensity = VolumeDataDensityCalculation.calculate(volumeSet, deltaMap);
+    builder.setVolumeDataDensity(volumeDataDensity);
+    
     return builder.build();
   }
 
