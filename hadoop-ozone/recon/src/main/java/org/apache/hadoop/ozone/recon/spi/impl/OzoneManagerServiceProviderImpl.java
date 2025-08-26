@@ -618,6 +618,7 @@ public class OzoneManagerServiceProviderImpl
    * @return true or false if sync operation between Recon and OM was successful or failed.
    */
   @VisibleForTesting
+  @SuppressWarnings("methodlength")
   public boolean syncDataFromOM() {
     ReconTaskStatusUpdater fullSnapshotReconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(
         OmSnapshotTaskName.OmSnapshotRequest.name());
@@ -635,6 +636,8 @@ public class OzoneManagerServiceProviderImpl
           // Get updates from OM and apply to local Recon OM DB and update task status in table
           deltaReconTaskStatusUpdater.recordRunStart();
           int loopCount = 0;
+          int reinitQueueFailureCount = 0;
+          final int maxReinitQueueFailures = 3;
           long fromSequenceNumber = currentSequenceNumber;
           long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
           /**
@@ -674,32 +677,45 @@ public class OzoneManagerServiceProviderImpl
               // Check if task reinitialization is needed due to buffer overflow or task failures
               boolean bufferOverflowed = reconTaskController.hasEventBufferOverflowed();
               boolean tasksFailed = reconTaskController.hasDeltaTasksFailed();
-              
+
               if (bufferOverflowed || tasksFailed) {
-                ReconTaskReInitializationEvent.ReInitializationReason reason = bufferOverflowed ? 
-                    ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW : 
+                ReconTaskReInitializationEvent.ReInitializationReason reason = bufferOverflowed ?
+                    ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW :
                     ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES;
 
-                LOG.warn("Detected condition for task reinitialization: {}, queueing async reinitialization event",
-                    reason);
-                
-                metrics.incrNumDeltaRequestsFailed();
-                deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
-                deltaReconTaskStatusUpdater.recordRunCompletion();
+                LOG.warn(
+                    "Detected condition for task reinitialization: {}, creating checkpoint and queueing async " +
+                        "reinitialization event (attempt: {})", reason, reinitQueueFailureCount + 1);
 
-                // Queue async reinitialization event instead of blocking call
+                markDeltaTaskStatusAsFailed(deltaReconTaskStatusUpdater);
+
+                // Queue async reinitialization event - checkpoint creation is handled internally
                 boolean queued = reconTaskController.queueReInitializationEvent(reason);
+                //TODO: Create a metric to track this event buffer overflow or task failure event
                 if (!queued) {
-                  LOG.error("Failed to queue reinitialization event, attempting immediate reinitialization");
-                  // Fallback to sync reinitialization if queueing fails
-                  reconTaskController.reInitializeTasks(omMetadataManager, null);
-                  // Reset flags immediately since this was synchronous
-                  if (bufferOverflowed) {
-                    reconTaskController.resetEventBufferOverflowFlag();
+                  reinitQueueFailureCount++;
+                  LOG.error("Failed to queue reinitialization event either due to failure in checkpoint creation " +
+                          "or queueing the event (failure count: {}). {}",
+                      reinitQueueFailureCount,
+                      reinitQueueFailureCount >= maxReinitQueueFailures ?
+                          "Maximum retry attempts reached, falling back to full snapshot." :
+                          "Will retry in next delta sync.");
+
+                  if (reinitQueueFailureCount >= maxReinitQueueFailures) {
+                    LOG.warn(
+                        "Reinitialization queue failures exceeded maximum attempts ({}), triggering full snapshot " +
+                            "fallback", maxReinitQueueFailures);
+                    // Clear all events in buffer before falling back to full snapshot. Events can be present in queue
+                    // when reinit checkpoint creation fails multiple times because only after successful creation of
+                    // checkpoint, we are clearing the event buffer.
+                    reconTaskController.resetEventBuffer();
+                    reconTaskController.resetEventFlags(reason);
+                    fullSnapshot = true;
                   }
-                  if (tasksFailed) {
-                    reconTaskController.resetDeltaTasksFailureFlag();
-                  }
+                  //TODO: Create a metric to track this failure
+                } else {
+                  // Reset failure counter on successful queueing
+                  reinitQueueFailureCount = 0;
                 }
               }
               
@@ -710,16 +726,13 @@ public class OzoneManagerServiceProviderImpl
               LOG.error("OM DB Delta update sync thread was interrupted and delta sync failed.");
               // We are updating the table even if it didn't run i.e. got interrupted beforehand
               // to indicate that a task was supposed to run, but it didn't.
-              deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
-              deltaReconTaskStatusUpdater.recordRunCompletion();
+              markDeltaTaskStatusAsFailed(deltaReconTaskStatusUpdater);
               Thread.currentThread().interrupt();
               // Since thread is interrupted, we do not fall back to snapshot sync.
               // Return with sync failed status.
               return false;
             } catch (Exception e) {
-              metrics.incrNumDeltaRequestsFailed();
-              deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
-              deltaReconTaskStatusUpdater.recordRunCompletion();
+              markDeltaTaskStatusAsFailed(deltaReconTaskStatusUpdater);
               LOG.warn("Unable to get and apply delta updates from OM: {}, falling back to full snapshot",
                   e.getMessage());
               fullSnapshot = true;
@@ -763,6 +776,12 @@ public class OzoneManagerServiceProviderImpl
     return true;
   }
 
+  private void markDeltaTaskStatusAsFailed(ReconTaskStatusUpdater deltaReconTaskStatusUpdater) {
+    metrics.incrNumDeltaRequestsFailed();
+    deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
+    deltaReconTaskStatusUpdater.recordRunCompletion();
+  }
+
   private void executeFullSnapshot(ReconTaskStatusUpdater fullSnapshotReconTaskUpdater,
                          ReconTaskStatusUpdater deltaReconTaskStatusUpdater) throws InterruptedException, IOException {
     metrics.incrNumSnapshotRequests();
@@ -790,12 +809,16 @@ public class OzoneManagerServiceProviderImpl
       deltaReconTaskStatusUpdater.updateDetails();
 
       // Reinitialize tasks that are listening.
-      LOG.info("Calling reprocess on Recon tasks.");
-      reconTaskController.reInitializeTasks(omMetadataManager, null);
+      LOG.info("Queueing async reinitialization event instead of blocking call");
+      boolean queued = reconTaskController.queueReInitializationEvent(
+          ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+      if (!queued) {
+        LOG.error("Failed to queue reinitialization event for manual trigger, failing the snapshot operation");
+        metrics.incrNumSnapshotRequestsFailed();
+        fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+        return;
+      }
       
-      // Reset event buffer overflow flag after successful full snapshot
-      reconTaskController.resetEventBufferOverflowFlag();
-
       // Update health status in ReconContext
       reconContext.updateHealthStatus(new AtomicBoolean(true));
       reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
@@ -880,5 +903,6 @@ public class OzoneManagerServiceProviderImpl
   public TarExtractor getTarExtractor() {
     return tarExtractor;
   }
+
 }
 

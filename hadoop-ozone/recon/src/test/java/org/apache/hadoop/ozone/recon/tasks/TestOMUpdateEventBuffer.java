@@ -90,8 +90,13 @@ public class TestOMUpdateEventBuffer {
   @Test
   void testCustomReInitializationEvent() {
     // Test that custom reinitialization events can be buffered and polled
-    ReconTaskReInitializationEvent reinitEvent = 
-        new ReconTaskReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
+    // Mock the checkpointed metadata manager required by the constructor
+    org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager mockCheckpointedManager = 
+        org.mockito.Mockito.mock(org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager.class);
+
+    ReconTaskReInitializationEvent reinitEvent =
+        new ReconTaskReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW,
+            mockCheckpointedManager);
     
     assertTrue(eventBuffer.offer(reinitEvent));
     assertEquals(1, eventBuffer.getQueueSize());
@@ -101,6 +106,10 @@ public class TestOMUpdateEventBuffer {
     assertEquals(ReconEvent.EventType.TASK_REINITIALIZATION, polled.getEventType());
     assertEquals(1, polled.getEventCount());
     assertEquals(0, eventBuffer.getQueueSize());
+    
+    // Verify the checkpointed manager is accessible
+    ReconTaskReInitializationEvent reinitEventCast = (ReconTaskReInitializationEvent) polled;
+    assertEquals(mockCheckpointedManager, reinitEventCast.getCheckpointedOMMetadataManager());
   }
 
   @Test

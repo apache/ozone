@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -89,15 +90,40 @@ public interface ReconTaskController {
    * Reset the delta tasks failure flag after reinitialization is completed.
    */
   void resetDeltaTasksFailureFlag();
+
+  /**
+   * Clear all buffered events. Used before queuing a reinitialization event.
+   */
+  void resetEventBuffer();
+
+  /**
+   * Reset event flags used to track buffer overflow and delta task failures.
+   * This is used before queuing a reinitialization event.
+   *
+   * @param reason the reason for reinitialization
+   */
+  void resetEventFlags(ReconTaskReInitializationEvent.ReInitializationReason reason);
   
   /**
    * Queue a task reinitialization event to be processed asynchronously.
-   * This clears the event buffer and queues a reinitialization event.
+   * This method creates a checkpoint of the current OM metadata manager,
+   * clears the event buffer and queues a reinitialization event.
    * 
    * @param reason the reason for reinitialization
    * @return true if the event was successfully queued
    */
   boolean queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason reason);
+
+  /**
+   * Create a checkpoint of the current OM metadata manager.
+   * This method creates a snapshot of the current OM database state 
+   * to prevent data inconsistency during reinitialization.
+   * 
+   * @param omMetaManager the OM metadata manager to checkpoint
+   * @return a checkpointed ReconOMMetadataManager instance
+   * @throws IOException if checkpoint creation fails
+   */
+  ReconOMMetadataManager createOMCheckpoint(ReconOMMetadataManager omMetaManager) throws IOException;
   
   /**
    * Update the current OM metadata manager reference for reinitialization.

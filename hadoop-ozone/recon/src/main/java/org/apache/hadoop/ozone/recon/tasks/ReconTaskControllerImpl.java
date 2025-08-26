@@ -24,7 +24,9 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TA
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,10 +41,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
@@ -73,6 +78,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private ExecutorService eventProcessingExecutor;
   private final AtomicBoolean deltaTasksFailed = new AtomicBoolean(false);
   private volatile ReconOMMetadataManager currentOMMetadataManager;
+  private final OzoneConfiguration configuration;
 
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
@@ -81,6 +87,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
                                  ReconDBProvider reconDBProvider,
                                  ReconContainerMetadataManager reconContainerMetadataManager,
                                  ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
+    this.configuration = configuration;
     this.reconDBProvider = reconDBProvider;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
@@ -123,7 +130,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             20000, eventBuffer.getQueueSize(), eventBuffer.getDroppedBatches());
         
         // Clear buffer and signal full snapshot requirement
-        eventBuffer.clear();
+        resetEventBuffer();
       } else {
         LOG.debug("Buffered event batch with {} events. Buffer queue size: {}", 
             events.getEvents().size(), eventBuffer.getQueueSize());
@@ -450,30 +457,100 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   public void resetDeltaTasksFailureFlag() {
     deltaTasksFailed.set(false);
   }
-  
+
   @Override
   public boolean queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason reason) {
     LOG.info("Queueing task reinitialization event due to: {}", reason);
-    
+
+    try {
+      // Create checkpoint of current OM metadata manager before queueing reinitialization event
+      // This prevents data inconsistency as parallel DB updates will continue on the original
+      // omMetadataManager reference while reinitialization uses the checkpointed snapshot
+      ReconOMMetadataManager checkpointedOMMetadataManager = createOMCheckpoint(currentOMMetadataManager);
+
+      resetEventBuffer();
+
+      // Create and queue the reinitialization event with checkpointed metadata manager
+      ReconTaskReInitializationEvent reinitEvent =
+          new ReconTaskReInitializationEvent(reason, checkpointedOMMetadataManager);
+      boolean queued = eventBuffer.offer(reinitEvent);
+      if (!queued) {
+        // CAUTION: If this failure happens, something is seriously wrong as we just cleared the buffer
+        // and are trying to queue a single event, also since we cleared all other delta events, next delta sync cycle
+        // will not have these lost events as new OMDBUpdatesHandler will be created with last sequence number
+        LOG.error(
+            "Failed to queue reinitialization event. Ideally should not happen, so dropping event and " +
+                "checkpointed data.");
+        // Close the checkpointed metadata manager as it won't be used
+        try {
+          checkpointedOMMetadataManager.stop();
+        } catch (Exception e) {
+          LOG.warn("Failed to close checkpointed OM metadata manager", e);
+        }
+        return false;
+      }
+      resetEventBufferOverflowFlag();
+      resetDeltaTasksFailureFlag();
+      return true;
+    } catch (IOException e) {
+      LOG.error("Failed to create checkpoint for reinitialization", e);
+      return false;
+    }
+  }
+
+  @Override
+  public void resetEventBuffer() {
     // Clear the buffer to discard all pending events
     eventBuffer.clear();
-    
-    // Create and queue the reinitialization event
-    ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(reason);
-    boolean queued = eventBuffer.offer(reinitEvent);
-    
-    if (queued) {
-      LOG.info("Successfully queued reinitialization event");
-    } else {
-      LOG.error("Failed to queue reinitialization event - buffer is full");
-    }
-    
-    return queued;
   }
-  
+
   @Override
   public void updateOMMetadataManager(ReconOMMetadataManager omMetadataManager) {
     this.currentOMMetadataManager = omMetadataManager;
+  }
+
+  @Override
+  public ReconOMMetadataManager createOMCheckpoint(ReconOMMetadataManager omMetaManager) 
+      throws IOException {
+    // Create temporary directory for checkpoint
+    String parentPath = cleanTempCheckPointPath(omMetaManager);
+    
+    // Create checkpoint
+    DBCheckpoint checkpoint = omMetaManager.getStore().getCheckpoint(parentPath, true);
+    
+    // Create a new ReconOmMetadataManagerImpl instance with checkpointed data
+    // Note: We need ReconUtils but it's not available in this class
+    // We'll create the ReconOmMetadataManagerImpl with minimal dependencies
+    ReconOmMetadataManagerImpl checkpointedManager = new ReconOmMetadataManagerImpl(configuration, null);
+    
+    // Initialize the checkpointed manager with the checkpoint location
+    File checkpointDir = checkpoint.getCheckpointLocation().toFile();
+    checkpointedManager.updateOmDB(checkpointDir);
+    
+    return checkpointedManager;
+  }
+
+  /**
+   * Clean and prepare temporary checkpoint path.
+   * Similar to QuotaRepairTask.cleanTempCheckPointPath.
+   * 
+   * @param omMetaManager the OM metadata manager
+   * @return path to temporary checkpoint directory
+   * @throws IOException if directory operations fail
+   */
+  private String cleanTempCheckPointPath(ReconOMMetadataManager omMetaManager) throws IOException {
+    File dbLocation = omMetaManager.getStore().getDbLocation();
+    if (dbLocation == null) {
+      throw new NullPointerException("OM DB location is null");
+    }
+    String tempData = dbLocation.getParent();
+    if (tempData == null) {
+      throw new NullPointerException("Parent OM DB dir is null");
+    }
+    File reinitTmpPath = Paths.get(tempData, "temp-recon-reinit-checkpoint").toFile();
+    FileUtils.deleteDirectory(reinitTmpPath);
+    FileUtils.forceMkdir(reinitTmpPath);
+    return reinitTmpPath.toString();
   }
   
   /**
@@ -484,33 +561,45 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         event.getReason(), event.getTimestamp());
     
     try {
-      // Use the current OM metadata manager for reinitialization
-      if (currentOMMetadataManager != null) {
-        LOG.info("Starting async task reinitialization due to: {}", event.getReason());
-        reInitializeTasks(currentOMMetadataManager, null);
+      // Use the checkpointed OM metadata manager for reinitialization to prevent data inconsistency
+      ReconOMMetadataManager checkpointedOMMetadataManager = event.getCheckpointedOMMetadataManager();
+      if (checkpointedOMMetadataManager != null) {
+        LOG.info("Starting async task reinitialization with checkpointed OM metadata manager due to: {}", 
+                 event.getReason());
+        reInitializeTasks(checkpointedOMMetadataManager, null);
         LOG.info("Completed async task reinitialization");
+        
+        // Close the checkpointed metadata manager after use
+        try {
+          checkpointedOMMetadataManager.stop();
+        } catch (Exception e) {
+          LOG.warn("Failed to close checkpointed OM metadata manager", e);
+        }
       } else {
-        LOG.warn("Current OM metadata manager is null, cannot perform reinitialization");
-        deltaTasksFailed.set(true);
+        LOG.error("Checkpointed OM metadata manager is null, cannot perform reinitialization");
         return;
       }
-      
-      // Reset appropriate flags based on the reason
-      if (event.getReason() == ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW) {
-        resetEventBufferOverflowFlag();
-      } else if (event.getReason() == ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES) {
-        resetDeltaTasksFailureFlag();
-      }
-      
+
+      resetEventFlags(event.getReason());
+
       LOG.info("Completed processing reinitialization event: {}", event.getReason());
       
     } catch (Exception e) {
       LOG.error("Error processing reinitialization event", e);
-      // Set failure flags so the sync thread can try again
-      deltaTasksFailed.set(true);
     }
   }
-  
+
+  @Override
+  public void resetEventFlags(ReconTaskReInitializationEvent.ReInitializationReason reason) {
+    // Reset appropriate flags based on the reason
+    if (reason == ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW ||
+        reason == ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES ||
+        reason == ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER) {
+      resetEventBufferOverflowFlag();
+      resetDeltaTasksFailureFlag();
+    }
+  }
+
   @Override
   public int getEventBufferSize() {
     return eventBuffer.getQueueSize();
