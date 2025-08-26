@@ -29,29 +29,33 @@ public class SCMNodeStat implements NodeStat {
   private LongMetric remaining;
   private LongMetric committed;
   private LongMetric freeSpaceToSpare;
+  private LongMetric pendingDeletions;
 
   public SCMNodeStat() {
-    this(0L, 0L, 0L, 0L, 0L);
+    this(0L, 0L, 0L, 0L, 0L, 0L);
   }
 
   public SCMNodeStat(SCMNodeStat other) {
     this(other.capacity.get(), other.scmUsed.get(), other.remaining.get(),
-        other.committed.get(), other.freeSpaceToSpare.get());
+        other.committed.get(), other.freeSpaceToSpare.get(), other.pendingDeletions.get());
   }
 
   public SCMNodeStat(long capacity, long used, long remaining, long committed,
-                     long freeSpaceToSpare) {
+                     long freeSpaceToSpare, long pendingDeletions) {
     Preconditions.checkArgument(capacity >= 0, "Capacity cannot be " +
         "negative.");
     Preconditions.checkArgument(used >= 0, "used space cannot be " +
         "negative.");
     Preconditions.checkArgument(remaining >= 0, "remaining cannot be " +
         "negative");
+    Preconditions.checkArgument(pendingDeletions >= 0, "pendingDeletions cannot be " +
+        "negative");
     this.capacity = new LongMetric(capacity);
     this.scmUsed = new LongMetric(used);
     this.remaining = new LongMetric(remaining);
     this.committed = new LongMetric(committed);
     this.freeSpaceToSpare = new LongMetric(freeSpaceToSpare);
+    this.pendingDeletions = new LongMetric(pendingDeletions);
   }
 
   /**
@@ -96,6 +100,11 @@ public class SCMNodeStat implements NodeStat {
     return freeSpaceToSpare;
   }
 
+  @Override
+  public LongMetric getPendingDeletions() {
+    return pendingDeletions;
+  }
+
   /**
    * Set the capacity, used and remaining space on a datanode.
    *
@@ -106,7 +115,7 @@ public class SCMNodeStat implements NodeStat {
   @Override
   @VisibleForTesting
   public void set(long newCapacity, long newUsed, long newRemaining,
-                  long newCommitted, long newFreeSpaceToSpare) {
+                  long newCommitted, long newFreeSpaceToSpare, long newPendingDeletions) {
     Preconditions.checkArgument(newCapacity >= 0, "Capacity cannot be " +
         "negative.");
     Preconditions.checkArgument(newUsed >= 0, "used space cannot be " +
@@ -119,6 +128,7 @@ public class SCMNodeStat implements NodeStat {
     this.remaining = new LongMetric(newRemaining);
     this.committed = new LongMetric(newCommitted);
     this.freeSpaceToSpare = new LongMetric(newFreeSpaceToSpare);
+    this.pendingDeletions = new LongMetric(newPendingDeletions);
   }
 
   /**
@@ -135,6 +145,7 @@ public class SCMNodeStat implements NodeStat {
     this.committed.set(this.getCommitted().get() + stat.getCommitted().get());
     this.freeSpaceToSpare.set(this.freeSpaceToSpare.get() +
         stat.getFreeSpaceToSpare().get());
+    this.pendingDeletions.set(this.pendingDeletions.get() + stat.getPendingDeletions().get());
     return this;
   }
 
