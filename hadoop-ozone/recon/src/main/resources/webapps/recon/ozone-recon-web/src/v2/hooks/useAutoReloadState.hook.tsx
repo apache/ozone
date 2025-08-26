@@ -16,42 +16,27 @@
  * limitations under the License.
  */
 
-export type ClusterStateResponse = {
-  missingContainers: number;
-  totalDatanodes: number;
-  healthyDatanodes: number;
-  pipelines: number;
-  storageReport: StorageReport;
-  containers: number;
-  volumes: number;
-  buckets: number;
-  keys: number;
-  openContainers: number;
-  deletedContainers: number;
-  keysPendingDeletion: number;
-  scmServiceId: string;
-  omServiceId: string;
+import { useState, useEffect } from 'react';
+
+export function useAutoReloadState() {
+  const [autoReloadEnabled, setAutoReloadEnabled] = useState<boolean>(true);
+
+  useEffect(() => {
+    // Initialize from session storage
+    const stored = sessionStorage.getItem('autoReloadEnabled');
+    if (stored !== null) {
+      setAutoReloadEnabled(JSON.parse(stored));
+    }
+  }, []);
+
+  const updateAutoReloadState = (enabled: boolean) => {
+    setAutoReloadEnabled(enabled);
+    sessionStorage.setItem('autoReloadEnabled', JSON.stringify(enabled));
+  };
+
+  return {
+    autoReloadEnabled,
+    updateAutoReloadState
+  };
 }
 
-export type TaskStatus = {
-  taskName: string;
-  lastUpdatedTimestamp: number;
-  lastUpdatedSeqNumber: number;
-}
-
-export type KeysSummary = {
-  totalUnreplicatedDataSize: number;
-  totalReplicatedDataSize: number;
-}
-
-export type StorageReport = {
-  capacity: number;
-  used: number;
-  remaining: number;
-  committed: number;
-}
-
-export type OverviewState = {
-  omStatus: string;
-  lastRefreshed: number;
-}

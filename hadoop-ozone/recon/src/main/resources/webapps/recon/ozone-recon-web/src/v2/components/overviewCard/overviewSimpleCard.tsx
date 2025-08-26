@@ -20,6 +20,7 @@ import React from 'react';
 import { Card, Col, Row } from 'antd';
 import { Link } from 'react-router-dom';
 import {
+  CloseCircleOutlined,
   ClusterOutlined,
   ContainerOutlined,
   DatabaseOutlined,
@@ -40,7 +41,7 @@ type IconOptions = {
 
 type OverviewCardProps = {
   icon: string;
-  data: number | React.ReactElement;
+  data: number;
   title: string;
   hoverable?: boolean;
   loading?: boolean;
@@ -122,7 +123,7 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
           View More
         </Link>
       </div>)
-    : title
+    : title;
 
   return (
     <Card
@@ -144,6 +145,6 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
       </Row>
     </Card>
   );
-}
+};
 
 export default OverviewSimpleCard;

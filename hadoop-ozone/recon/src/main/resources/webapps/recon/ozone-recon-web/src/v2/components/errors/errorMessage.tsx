@@ -16,42 +16,17 @@
  * limitations under the License.
  */
 
-export type ClusterStateResponse = {
-  missingContainers: number;
-  totalDatanodes: number;
-  healthyDatanodes: number;
-  pipelines: number;
-  storageReport: StorageReport;
-  containers: number;
-  volumes: number;
-  buckets: number;
-  keys: number;
-  openContainers: number;
-  deletedContainers: number;
-  keysPendingDeletion: number;
-  scmServiceId: string;
-  omServiceId: string;
-}
 
-export type TaskStatus = {
-  taskName: string;
-  lastUpdatedTimestamp: number;
-  lastUpdatedSeqNumber: number;
-}
+import React from 'react';
+import { CloudServerOutlined } from "@ant-design/icons"
 
-export type KeysSummary = {
-  totalUnreplicatedDataSize: number;
-  totalReplicatedDataSize: number;
-}
+const ErrorMessage: React.FC<object> = () => {
+  return (
+    <div className="error-msg">
+      <CloudServerOutlined id="error-icon" />
+      <span id="error-txt">Something went wrong, please refer to the logs for more details</span>    
+    </div>
+  )
+};
 
-export type StorageReport = {
-  capacity: number;
-  used: number;
-  remaining: number;
-  committed: number;
-}
-
-export type OverviewState = {
-  omStatus: string;
-  lastRefreshed: number;
-}
+export default ErrorMessage;

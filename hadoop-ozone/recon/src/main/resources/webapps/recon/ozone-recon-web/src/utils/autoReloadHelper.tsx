@@ -42,6 +42,10 @@ class AutoReloadHelper {
     }
   };
 
+  isPolling = () => {
+    return this.interval > 0;
+  }
+
   handleAutoReloadToggle = (checked: boolean) => {
     sessionStorage.setItem('autoReloadEnabled', JSON.stringify(checked));
     if (checked) {

@@ -16,31 +16,56 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import moment from 'moment';
-import filesize from 'filesize';
-import axios from 'axios';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Row, Col, Button } from 'antd';
-import {
-  CheckCircleFilled,
-  WarningFilled
-} from '@ant-design/icons';
 import { Link } from 'react-router-dom';
+import moment from 'moment';
 
-import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
+import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
 import OverviewSummaryCard from '@/v2/components/overviewCard/overviewSummaryCard';
 import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
-import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
-
-import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { checkResponseError, showDataFetchError } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
-
-import { ClusterStateResponse, OverviewState, StorageReport } from '@/v2/types/overview.types';
-
+import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+import { showDataFetchError } from '@/utils/common';
+import { cancelRequests } from '@/utils/axiosRequestHelper';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
+import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
+import { ClusterStateResponse, KeysSummary, OverviewState, TaskStatus } from '@/v2/types/overview.types';
 import './overview.less';
+import filesize from 'filesize';
+import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
+import SummaryCard from '@/v2/pages/overview/components/SummaryCard';
 
+const DEFAULT_CLUSTER_STATE: ClusterStateResponse = {
+  missingContainers: 0,
+  totalDatanodes: 0,
+  healthyDatanodes: 0,
+  pipelines: 0,
+  storageReport: { capacity: 0, used: 0, remaining: 0, committed: 0 },
+  containers: 0,
+  volumes: 0,
+  buckets: 0,
+  keys: 0,
+  openContainers: 0,
+  deletedContainers: 0,
+  keysPendingDeletion: 0,
+  scmServiceId: 'N/A',
+  omServiceId: 'N/A'
+};
 
+const DEFAULT_TASK_STATUS: TaskStatus[] = [];
+const DEFAULT_OPEN_KEYS_SUMMARY: KeysSummary & {totalOpenKeys: number} = {
+  totalUnreplicatedDataSize: 0,
+  totalReplicatedDataSize: 0,
+  totalOpenKeys: 0
+};
+const DEFAULT_DELETE_PENDING_KEYS_SUMMARY: KeysSummary & {totalDeletedKeys: number} = {
+  totalUnreplicatedDataSize: 0,
+  totalReplicatedDataSize: 0,
+  totalDeletedKeys: 0
+};
+
+// ------------- Helper Functions -------------- //
 const size = filesize.partial({ round: 1 });
 
 const getHealthIcon = (value: string): React.ReactElement => {
@@ -82,165 +107,54 @@ const getSummaryTableValue = (
   return size(value as number)
 }
 
+// ------------- Main Component -------------- //
 const Overview: React.FC<{}> = () => {
-
-  const cancelOverviewSignal = useRef<AbortController>();
   const cancelOMDBSyncSignal = useRef<AbortController>();
-
   const [state, setState] = useState<OverviewState>({
-    loading: false,
-    datanodes: '',
-    pipelines: 0,
-    containers: 0,
-    volumes: 0,
-    buckets: 0,
-    keys: 0,
-    missingContainersCount: 0,
-    lastRefreshed: 0,
-    lastUpdatedOMDBDelta: 0,
-    lastUpdatedOMDBFull: 0,
     omStatus: '',
-    openContainers: 0,
-    deletedContainers: 0,
-    openSummarytotalUnrepSize: 0,
-    openSummarytotalRepSize: 0,
-    openSummarytotalOpenKeys: 0,
-    deletePendingSummarytotalUnrepSize: 0,
-    deletePendingSummarytotalRepSize: 0,
-    deletePendingSummarytotalDeletedKeys: 0,
-    scmServiceId: '',
-    omServiceId: ''
-  })
-  const [storageReport, setStorageReport] = useState<StorageReport>({
-    capacity: 0,
-    used: 0,
-    remaining: 0,
-    committed: 0
-  })
+    lastRefreshed: 0
+  });
 
-  // Component mounted, fetch initial data
-  useEffect(() => {
-    loadOverviewPageData();
-    autoReloadHelper.startPolling();
-    return (() => {
-      // Component will Un-mount
-      autoReloadHelper.stopPolling();
-      cancelRequests([
-        cancelOMDBSyncSignal.current!,
-        cancelOverviewSignal.current!
-      ]);
-    })
-  }, [])
+  // Individual API calls using custom hook (no auto-refresh)
+  const clusterState = useApiData<ClusterStateResponse>(
+    '/api/v1/clusterState',
+    DEFAULT_CLUSTER_STATE,
+    { retryAttempts: 3 }
+  );
 
-  const loadOverviewPageData = () => {
-    setState({
-      ...state,
-      loading: true
-    });
+  const taskStatus = useApiData<TaskStatus[]>(
+    '/api/v1/task/status',
+    DEFAULT_TASK_STATUS,
+    { retryAttempts: 2 }
+  );
 
-    // Cancel any previous pending requests
-    cancelRequests([
-      cancelOMDBSyncSignal.current!,
-      cancelOverviewSignal.current!
-    ]);
+  const openKeysSummary = useApiData<KeysSummary & { totalOpenKeys: number}>(
+    '/api/v1/keys/open/summary',
+    DEFAULT_OPEN_KEYS_SUMMARY,
+    { retryAttempts: 2 }
+  );
 
-    const { requests, controller } = PromiseAllSettledGetHelper([
-      '/api/v1/clusterState',
-      '/api/v1/task/status',
-      '/api/v1/keys/open/summary',
-      '/api/v1/keys/deletePending/summary'
-    ], cancelOverviewSignal.current);
-    cancelOverviewSignal.current = controller;
+  const deletePendingKeysSummary = useApiData<KeysSummary & { totalDeletedKeys: number}>(
+    '/api/v1/keys/deletePending/summary',
+    DEFAULT_DELETE_PENDING_KEYS_SUMMARY,
+    { retryAttempts: 2 }
+  );
 
-    requests.then(axios.spread((
-      clusterStateResponse: Awaited<Promise<any>>,
-      taskstatusResponse: Awaited<Promise<any>>,
-      openResponse: Awaited<Promise<any>>,
-      deletePendingResponse: Awaited<Promise<any>>
-    ) => {
+  const omDBDeltaObject = taskStatus.data?.find((item: TaskStatus) => item.taskName === 'OmDeltaRequest');
+  const omDBFullObject = taskStatus.data?.find((item: TaskStatus) => item.taskName === 'OmSnapshotRequest');
 
-      checkResponseError([
-        clusterStateResponse,
-        taskstatusResponse,
-        openResponse,
-        deletePendingResponse
-      ]);
+  const loadOverviewPageData = useCallback(() => {
+    clusterState.refetch();
+    taskStatus.refetch();
+    openKeysSummary.refetch();
+    deletePendingKeysSummary.refetch();
+    setState(prev => ({ ...prev, lastRefreshed: Number(moment()) }));
+  }, []);
+  
+  const autoReload = useAutoReload(loadOverviewPageData);
 
-      const clusterState: ClusterStateResponse = clusterStateResponse.value?.data ?? {
-        missingContainers: 'N/A',
-        totalDatanodes: 'N/A',
-        healthyDatanodes: 'N/A',
-        pipelines: 'N/A',
-        storageReport: {
-          capacity: 0,
-          used: 0,
-          remaining: 0,
-          committed: 0
-        },
-        containers: 'N/A',
-        volumes: 'N/A',
-        buckets: 'N/A',
-        keys: 'N/A',
-        openContainers: 'N/A',
-        deletedContainers: 'N/A',
-        keysPendingDeletion: 'N/A',
-        scmServiceId: 'N/A',
-        omServiceId: 'N/A',
-      };
-      const taskStatus = taskstatusResponse.value?.data ?? [{
-        taskName: 'N/A',
-        lastUpdatedTimestamp: 0,
-        lastUpdatedSeqNumber: 0
-      }];
-      const missingContainersCount = clusterState.missingContainers;
-      const omDBDeltaObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmDeltaRequest');
-      const omDBFullObject = taskStatus && taskStatus.find((item: any) => item.taskName === 'OmSnapshotRequest');
-
-      setState({
-        ...state,
-        loading: false,
-        datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
-        pipelines: clusterState.pipelines,
-        containers: clusterState.containers,
-        volumes: clusterState.volumes,
-        buckets: clusterState.buckets,
-        keys: clusterState.keys,
-        missingContainersCount: missingContainersCount,
-        openContainers: clusterState.openContainers,
-        deletedContainers: clusterState.deletedContainers,
-        lastRefreshed: Number(moment()),
-        lastUpdatedOMDBDelta: omDBDeltaObject?.lastUpdatedTimestamp,
-        lastUpdatedOMDBFull: omDBFullObject?.lastUpdatedTimestamp,
-        openSummarytotalUnrepSize: openResponse?.value?.data?.totalUnreplicatedDataSize,
-        openSummarytotalRepSize: openResponse?.value?.data?.totalReplicatedDataSize,
-        openSummarytotalOpenKeys: openResponse?.value?.data?.totalOpenKeys,
-        deletePendingSummarytotalUnrepSize: deletePendingResponse?.value?.data?.totalUnreplicatedDataSize,
-        deletePendingSummarytotalRepSize: deletePendingResponse?.value?.data?.totalReplicatedDataSize,
-        deletePendingSummarytotalDeletedKeys: deletePendingResponse?.value?.data?.totalDeletedKeys,
-        scmServiceId: clusterState?.scmServiceId ?? 'N/A',
-        omServiceId: clusterState?.omServiceId ?? 'N/A'
-      });
-      setStorageReport({
-        ...storageReport,
-        ...clusterState.storageReport
-      });
-    })).catch((error: Error) => {
-      setState({
-        ...state,
-        loading: false
-      });
-      showDataFetchError(error.toString());
-    });
-  }
-
-  let autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadOverviewPageData);
-
-  const syncOmData = () => {
-    setState({
-      ...state,
-      loading: true
-    });
-
+  // OM DB Sync function
+  const syncOmData = useCallback(() => {
     const { request, controller } = AxiosGetHelper(
       '/api/v1/triggerdbsync/om',
       cancelOMDBSyncSignal.current,
@@ -250,56 +164,39 @@ const Overview: React.FC<{}> = () => {
 
     request.then(omStatusResponse => {
       const omStatus = omStatusResponse.data;
-      setState({
-        ...state,
-        loading: false,
-        omStatus: omStatus
-      });
+      setState(prev => ({ ...prev, omStatus }));
     }).catch((error: Error) => {
-      setState({
-        ...state,
-        loading: false
-      });
       showDataFetchError(error.toString());
     });
-  };
+  }, []);
 
-  const {
-    loading, datanodes, pipelines,
-    containers, volumes, buckets,
-    openSummarytotalUnrepSize,
-    openSummarytotalRepSize,
-    openSummarytotalOpenKeys,
-    deletePendingSummarytotalUnrepSize,
-    deletePendingSummarytotalRepSize,
-    deletePendingSummarytotalDeletedKeys,
-    keys, missingContainersCount,
-    lastRefreshed, lastUpdatedOMDBDelta,
-    lastUpdatedOMDBFull,
-    omStatus, openContainers,
-    deletedContainers, scmServiceId, omServiceId
-  } = state;
+  useEffect(() => {
+    autoReload.startPolling();
+    
+    return () => {
+      autoReload.stopPolling();
+      cancelRequests([cancelOMDBSyncSignal.current!]);
+    };
+  }, []);
 
   const healthCardIndicators = (
     <>
       <Col span={14}>
         Datanodes
-        {getHealthIcon(datanodes)}
+        {getHealthIcon(`${clusterState.data?.healthyDatanodes}/${clusterState.data?.totalDatanodes}`)}
       </Col>
       <Col span={10}>
         Containers
-        {getHealthIcon(`${(containers - missingContainersCount)}/${containers}`)}
+        {getHealthIcon(`${(clusterState.data?.containers || 0) - (clusterState.data?.missingContainers || 0)}/${clusterState.data?.containers}`)}
       </Col>
     </>
-  )
+  );
 
   const datanodesLink = (
-    <Button
-      type='link'
-      size='small'>
+    <Button type='link' size='small'>
       <Link to='/Datanodes'> View More </Link>
     </Button>
-  )
+  );
 
   const containersLink = (
     <Button
@@ -309,13 +206,34 @@ const Overview: React.FC<{}> = () => {
     </Button>
   )
 
+  const loading = clusterState.loading || taskStatus.loading || openKeysSummary.loading || deletePendingKeysSummary.loading;
+  const {
+    healthyDatanodes,
+    totalDatanodes,
+    containers,
+    missingContainers,
+    storageReport,
+    omServiceId,
+    scmServiceId
+  } = clusterState.data;
+  const {
+    totalReplicatedDataSize: openSummarytotalRepSize,
+    totalUnreplicatedDataSize: openSummarytotalUnrepSize,
+    totalOpenKeys: openSummarytotalOpenKeys,
+  } = openKeysSummary.data ?? {};
+  const {
+    totalReplicatedDataSize: deletePendingSummarytotalRepSize,  
+    totalUnreplicatedDataSize: deletePendingSummarytotalUnrepSize,
+    totalDeletedKeys: deletePendingSummarytotalDeletedKeys
+  } = deletePendingKeysSummary.data ?? {};
+
   return (
     <>
       <div className='page-header-v2'>
         Overview
-        <AutoReloadPanel isLoading={loading} lastRefreshed={lastRefreshed}
-          lastUpdatedOMDBDelta={lastUpdatedOMDBDelta} lastUpdatedOMDBFull={lastUpdatedOMDBFull}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={omStatus} />
+        <AutoReloadPanel isLoading={loading} lastRefreshed={state.lastRefreshed}
+          lastUpdatedOMDBDelta={omDBDeltaObject?.lastUpdatedTimestamp} lastUpdatedOMDBFull={omDBFullObject?.lastUpdatedTimestamp}
+          togglePolling={autoReload.handleAutoReloadToggle} onReload={loadOverviewPageData} omSyncLoad={syncOmData} omStatus={state.omStatus} />
       </div>
       <div className='data-container'>
         <Row
@@ -356,20 +274,21 @@ const Overview: React.FC<{}> = () => {
                 {
                   key: 'datanodes',
                   name: 'Datanodes',
-                  value: datanodes,
+                  value: `${healthyDatanodes}/${totalDatanodes}`,
                   action: datanodesLink
                 },
                 {
                   key: 'containers',
                   name: 'Containers',
-                  value: `${(containers - missingContainersCount)}/${containers}`,
+                  value: `${containers - missingContainers}/${containers}`,
                   action: containersLink
                 }
               ]}
+              error={clusterState.error}
             />
           </Col>
           <Col xs={24} sm={24} md={24} lg={14} xl={14}>
-            <OverviewStorageCard storageReport={storageReport} loading={loading} />
+            <OverviewStorageCard storageReport={storageReport} loading={loading} error={clusterState.error}/>
           </Col>
         </Row>
         <Row gutter={[
@@ -380,44 +299,10 @@ const Overview: React.FC<{}> = () => {
             lg: 16,
             xl: 16
           }, 20]}>
-          <Col flex="1 0 20%">
-            <OverviewSimpleCard
-              title='Volumes'
-              icon='inbox'
-              loading={loading}
-              data={volumes}
-              linkToUrl='/Volumes' />
-          </Col>
-          <Col flex="1 0 20%">
-            <OverviewSimpleCard
-              title='Buckets'
-              icon='folder-open'
-              loading={loading}
-              data={buckets}
-              linkToUrl='/Buckets' />
-          </Col>
-          <Col flex="1 0 20%">
-            <OverviewSimpleCard
-              title='Keys'
-              icon='file-text'
-              loading={loading}
-              data={keys} />
-          </Col>
-          <Col flex="1 0 20%">
-            <OverviewSimpleCard
-              title='Pipelines'
-              icon='deployment-unit'
-              loading={loading}
-              data={pipelines}
-              linkToUrl='/Pipelines' />
-          </Col>
-          <Col flex="1 0 20%">
-            <OverviewSimpleCard
-              title='Deleted Containers'
-              icon='delete'
-              loading={loading}
-              data={deletedContainers} />
-          </Col>
+          <SummaryCard
+            loading={loading}
+            error={clusterState.error}
+            {...clusterState.data} />
         </Row>
         <Row gutter={[
           {
