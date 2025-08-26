@@ -99,14 +99,28 @@ public final class StringUtils {
   }
 
   public static String getLexicographicallyLowerString(String val) {
+    if (val == null || val.isEmpty()) {
+      throw new IllegalArgumentException("Input string must not be null or empty");
+    }
     char[] charVal = val.toCharArray();
-    charVal[charVal.length - 1] -= 1;
+    int lastIdx = charVal.length - 1;
+    if (charVal[lastIdx] == Character.MIN_VALUE) {
+      throw new IllegalArgumentException("Cannot decrement character below Character.MIN_VALUE");
+    }
+    charVal[lastIdx] -= 1;
     return String.valueOf(charVal);
   }
 
   public static String getLexicographicallyHigherString(String val) {
+    if (val == null || val.isEmpty()) {
+      throw new IllegalArgumentException("Input string must not be null or empty");
+    }
     char[] charVal = val.toCharArray();
-    charVal[charVal.length - 1] += 1;
+    int lastIdx = charVal.length - 1;
+    if (charVal[lastIdx] == Character.MAX_VALUE) {
+      throw new IllegalArgumentException("Cannot increment character above Character.MAX_VALUE");
+    }
+    charVal[lastIdx] += 1;
     return String.valueOf(charVal);
   }
 }

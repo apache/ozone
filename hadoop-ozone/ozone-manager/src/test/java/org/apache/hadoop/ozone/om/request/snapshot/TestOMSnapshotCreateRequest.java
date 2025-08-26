@@ -462,7 +462,6 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
         getOmMetadataManager().getVolumeId(dirInfo.getVolumeName()),
         getOmMetadataManager().getBucketId(dirInfo.getVolumeName(), dirInfo.getBucketName()),
         dirInfo.getParentObjectID(), dirInfo.getKeyName());
-    System.out.println("Deleting directory: " + dirKey);
     getOmMetadataManager().getDeletedDirTable().putWithBatch(getBatchOperation(),
         dirKey, dirInfo);
     getOmMetadataManager().getStore().commitBatchOperation(getBatchOperation());

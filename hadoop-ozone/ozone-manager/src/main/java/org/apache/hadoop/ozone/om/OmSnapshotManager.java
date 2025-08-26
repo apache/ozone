@@ -570,8 +570,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName, BatchOperation batchOperation) throws IOException {
 
     // Range delete start key (inclusive)
-    final String keyPreix = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
-    deleteKeysFromTableWithPrefix(keyPreix, omMetadataManager.getDeletedDirTable(), batchOperation);
+    final String keyPrefix = omMetadataManager.getBucketKeyPrefixFSO(volumeName, bucketName);
+    deleteKeysFromTableWithPrefix(keyPrefix, omMetadataManager.getDeletedDirTable(), batchOperation);
   }
 
   @VisibleForTesting
