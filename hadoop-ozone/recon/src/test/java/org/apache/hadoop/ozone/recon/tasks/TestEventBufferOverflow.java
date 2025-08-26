@@ -185,11 +185,12 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     assertFalse(reconTaskController.hasEventBufferOverflowed());
 
     // Queue a reinitialization event directly - checkpoint creation is handled internally
-    boolean queued = reconTaskController.queueReInitializationEvent(
+    ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
 
     // Verify the reinitialization event was queued successfully
-    assertTrue(queued, "Reinitialization event should be successfully queued");
+    assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result,
+        "Reinitialization event should be successfully queued");
 
     // Verify that the checkpoint-based reinitialization mechanism is working
     // The checkpoint creation is now handled internally by the ReconTaskController
@@ -286,10 +287,11 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     
     // Instead of relying on timing with async processing, directly trigger buffer overflow
     // by using the queueReInitializationEvent method which simulates overflow condition
-    boolean reinitQueued = reconTaskController.queueReInitializationEvent(
+    ReconTaskController.ReInitializationResult reinitResult = reconTaskController.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    
-    assertTrue(reinitQueued, "Reinitialization event should be queued successfully");
+
+    assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, reinitResult,
+        "Reinitialization event should be queued successfully");
     
     // After queueing reinit event, buffer should be cleared and have the reinit event
     assertTrue(reconTaskController.getEventBufferSize() >= 0, "Buffer should be cleared with reinit event");
@@ -371,21 +373,28 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     doThrow(new IOException("Checkpoint creation failed"))
         .when(controllerSpy).createOMCheckpoint(any());
     
-    // Test that checkpoint failure results in queueReInitializationEvent returning false
-    boolean result1 = controllerSpy.queueReInitializationEvent(
+    // Test that checkpoint failure results in queueReInitializationEvent returning RETRY_LATER
+    ReconTaskController.ReInitializationResult result1 = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertFalse(result1, "First attempt should fail due to checkpoint creation failure");
+    assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result1,
+        "First attempt should return RETRY_LATER due to checkpoint creation failure");
     
-    boolean result2 = controllerSpy.queueReInitializationEvent(
+    // Wait for retry delay
+    Thread.sleep(2100);
+    ReconTaskController.ReInitializationResult result2 = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertFalse(result2, "Second attempt should fail due to checkpoint creation failure");
+    assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result2,
+        "Second attempt should return RETRY_LATER due to checkpoint creation failure");
     
-    boolean result3 = controllerSpy.queueReInitializationEvent(
+    // Wait for retry delay  
+    Thread.sleep(2100);
+    ReconTaskController.ReInitializationResult result3 = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertFalse(result3, "Third attempt should fail due to checkpoint creation failure");
-    
-    // Verify that createOMCheckpoint was called for each attempt
-    verify(controllerSpy, times(3)).createOMCheckpoint(any());
+    assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result3,
+        "Third attempt should return MAX_RETRIES_EXCEEDED");
+
+    // Verify that createOMCheckpoint was called 6 times (2 attempts per iteration × 3 iterations)
+    verify(controllerSpy, times(6)).createOMCheckpoint(any());
     
     LOG.info("Checkpoint creation failure test completed - verified 3 failed attempts");
   }
@@ -427,31 +436,34 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     doThrow(new IOException("Simulated checkpoint failure"))
         .when(controllerSpy).createOMCheckpoint(any());
     
-    // Simulate the retry loop like in OzoneManagerServiceProviderImpl
-    for (int attempt = 1; attempt <= maxReinitQueueFailures + 1; attempt++) {
-      boolean queued = controllerSpy.queueReInitializationEvent(
+    // Simulate the retry loop - need to wait between iterations  
+    for (int attempt = 1; attempt <= maxReinitQueueFailures; attempt++) {
+      if (attempt > 1) {
+        // Wait for delay between iterations
+        Thread.sleep(2100);
+      }
+      
+      ReconTaskController.ReInitializationResult result = controllerSpy.queueReInitializationEvent(
           ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
       
-      if (!queued) {
+      if (result == ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED) {
+        LOG.info("Max retries exceeded, triggering full snapshot fallback");
+        fullSnapshot = true;
+        break;
+      } else if (result == ReconTaskController.ReInitializationResult.RETRY_LATER) {
         reinitQueueFailureCount++;
         LOG.info("Attempt {} failed, failure count: {}", attempt, reinitQueueFailureCount);
-        
-        if (reinitQueueFailureCount >= maxReinitQueueFailures) {
-          LOG.info("Max retries exceeded, triggering full snapshot fallback");
-          fullSnapshot = true;
-          break;
-        }
       } else {
         reinitQueueFailureCount = 0;
         break;
       }
     }
     
-    // Verify the retry mechanism worked as expected
-    assertEquals(maxReinitQueueFailures, reinitQueueFailureCount, 
-        "Should have exactly 3 failed attempts");
+    // Verify the retry mechanism worked as expected  
+    // reinitQueueFailureCount will be 2 because the third iteration returns MAX_RETRIES_EXCEEDED
+    // and breaks the loop before incrementing the counter
     assertTrue(fullSnapshot, "Should fallback to full snapshot after max retries");
-    verify(controllerSpy, times(maxReinitQueueFailures)).createOMCheckpoint(any());
+    verify(controllerSpy, times(6)).createOMCheckpoint(any()); // 2 attempts per iteration × 3 iterations
     
     LOG.info("Retry mechanism test completed - verified fallback to full snapshot after {} attempts", 
         maxReinitQueueFailures);
@@ -503,17 +515,18 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     int failureCount = 0;
     boolean success = false;
     
-    // First attempt - should fail
-    boolean result1 = controllerSpy.queueReInitializationEvent(
+    // First attempt - should return RETRY_LATER
+    ReconTaskController.ReInitializationResult result1 = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    if (!result1) {
+    if (result1 != ReconTaskController.ReInitializationResult.SUCCESS) {
       failureCount++;
     }
     
-    // Second attempt - should fail
-    boolean result2 = controllerSpy.queueReInitializationEvent(
+    // Second attempt - should return RETRY_LATER (after delay)
+    Thread.sleep(2100);
+    ReconTaskController.ReInitializationResult result2 = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    if (!result2) {
+    if (result2 != ReconTaskController.ReInitializationResult.SUCCESS) {
       failureCount++;
     }
     

@@ -29,6 +29,15 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 public interface ReconTaskController {
 
   /**
+   * Enum representing the result of queueing a reinitialization event.
+   */
+  enum ReInitializationResult {
+    SUCCESS,           // Event was successfully queued
+    RETRY_LATER,       // Failed but should retry in next iteration after delay
+    MAX_RETRIES_EXCEEDED  // Maximum retries exceeded, caller should fallback to full snapshot
+  }
+
+  /**
    * Register API used by tasks to register themselves.
    * @param task task instance
    */
@@ -108,11 +117,12 @@ public interface ReconTaskController {
    * Queue a task reinitialization event to be processed asynchronously.
    * This method creates a checkpoint of the current OM metadata manager,
    * clears the event buffer and queues a reinitialization event.
+   * Includes internal retry logic with timing controls for checkpoint creation.
    * 
    * @param reason the reason for reinitialization
-   * @return true if the event was successfully queued
+   * @return ReInitializationResult indicating success, retry needed, or max retries exceeded
    */
-  boolean queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason reason);
+  ReInitializationResult queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason reason);
 
   /**
    * Create a checkpoint of the current OM metadata manager.

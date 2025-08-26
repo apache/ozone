@@ -636,8 +636,6 @@ public class OzoneManagerServiceProviderImpl
           // Get updates from OM and apply to local Recon OM DB and update task status in table
           deltaReconTaskStatusUpdater.recordRunStart();
           int loopCount = 0;
-          int reinitQueueFailureCount = 0;
-          final int maxReinitQueueFailures = 3;
           long fromSequenceNumber = currentSequenceNumber;
           long diffBetweenOMDbAndReconDBSeqNumber = deltaUpdateLimit + 1;
           /**
@@ -683,39 +681,29 @@ public class OzoneManagerServiceProviderImpl
                     ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW :
                     ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES;
 
-                LOG.warn(
-                    "Detected condition for task reinitialization: {}, creating checkpoint and queueing async " +
-                        "reinitialization event (attempt: {})", reason, reinitQueueFailureCount + 1);
+                LOG.warn("Detected condition for task reinitialization: {}, queueing async reinitialization event",
+                    reason);
 
                 markDeltaTaskStatusAsFailed(deltaReconTaskStatusUpdater);
 
-                // Queue async reinitialization event - checkpoint creation is handled internally
-                boolean queued = reconTaskController.queueReInitializationEvent(reason);
+                // Queue async reinitialization event - checkpoint creation and retry logic is handled internally
+                ReconTaskController.ReInitializationResult result =
+                    reconTaskController.queueReInitializationEvent(reason);
                 //TODO: Create a metric to track this event buffer overflow or task failure event
-                if (!queued) {
-                  reinitQueueFailureCount++;
-                  LOG.error("Failed to queue reinitialization event either due to failure in checkpoint creation " +
-                          "or queueing the event (failure count: {}). {}",
-                      reinitQueueFailureCount,
-                      reinitQueueFailureCount >= maxReinitQueueFailures ?
-                          "Maximum retry attempts reached, falling back to full snapshot." :
-                          "Will retry in next delta sync.");
-
-                  if (reinitQueueFailureCount >= maxReinitQueueFailures) {
-                    LOG.warn(
-                        "Reinitialization queue failures exceeded maximum attempts ({}), triggering full snapshot " +
-                            "fallback", maxReinitQueueFailures);
-                    // Clear all events in buffer before falling back to full snapshot. Events can be present in queue
-                    // when reinit checkpoint creation fails multiple times because only after successful creation of
-                    // checkpoint, we are clearing the event buffer.
-                    reconTaskController.resetEventBuffer();
-                    reconTaskController.resetEventFlags(reason);
-                    fullSnapshot = true;
-                  }
-                  //TODO: Create a metric to track this failure
+                
+                if (result == ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED) {
+                  LOG.warn(
+                      "Reinitialization queue failures exceeded maximum retries, triggering full snapshot fallback");
+                  // Clear all events in buffer before falling back to full snapshot. Events can be present in queue
+                  // when reinit checkpoint creation fails multiple times because only after successful creation of
+                  // checkpoint, we are clearing the event buffer.
+                  reconTaskController.resetEventBuffer();
+                  reconTaskController.resetEventFlags(reason);
+                  fullSnapshot = true;
+                } else if (result == ReconTaskController.ReInitializationResult.RETRY_LATER) {
+                  LOG.debug("Reinitialization event queueing will be retried in next iteration");
                 } else {
-                  // Reset failure counter on successful queueing
-                  reinitQueueFailureCount = 0;
+                  LOG.info("Reinitialization event successfully queued");
                 }
               }
               
@@ -810,10 +798,12 @@ public class OzoneManagerServiceProviderImpl
 
       // Reinitialize tasks that are listening.
       LOG.info("Queueing async reinitialization event instead of blocking call");
-      boolean queued = reconTaskController.queueReInitializationEvent(
+      ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
           ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
-      if (!queued) {
-        LOG.error("Failed to queue reinitialization event for manual trigger, failing the snapshot operation");
+      if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
+        LOG.error(
+            "Failed to queue reinitialization event for manual trigger (result: {}), failing the snapshot operation",
+            result);
         metrics.incrNumSnapshotRequestsFailed();
         fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
         return;
