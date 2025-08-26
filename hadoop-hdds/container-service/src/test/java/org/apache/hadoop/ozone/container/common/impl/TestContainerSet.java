@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -51,7 +52,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerDataScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 
 /**
  * Class used to test ContainerSet operations.
@@ -61,6 +62,8 @@ public class TestContainerSet {
   private static final int FIRST_ID = 2;
 
   private ContainerLayoutVersion layoutVersion;
+
+  private static final String TEST_SCAN = "Test Scan";
 
   private void setLayoutVersion(ContainerLayoutVersion layoutVersion) {
     this.layoutVersion = layoutVersion;
@@ -293,11 +296,11 @@ public class TestContainerSet {
     setLayoutVersion(layout);
     ContainerSet containerSet = createContainerSet();
     // Scan when no handler is registered should not throw an exception.
-    containerSet.scanContainer(FIRST_ID);
+    containerSet.scanContainer(FIRST_ID, TEST_SCAN);
 
     AtomicLong invocationCount = new AtomicLong();
-    OnDemandContainerDataScanner mockScanner = mock(OnDemandContainerDataScanner.class);
-    when(mockScanner.scanContainer(any())).then(inv -> {
+    OnDemandContainerScanner mockScanner = mock(OnDemandContainerScanner.class);
+    when(mockScanner.scanContainer(any(), anyString())).then(inv -> {
       KeyValueContainer c = inv.getArgument(0);
       // If the handler was incorrectly triggered for a non-existent container, this assert would fail.
       assertEquals(FIRST_ID, c.getContainerData().getContainerID());
@@ -307,11 +310,11 @@ public class TestContainerSet {
     containerSet.registerOnDemandScanner(mockScanner);
 
     // Scan of an existing container when a handler is registered should trigger a scan.
-    containerSet.scanContainer(FIRST_ID);
+    containerSet.scanContainer(FIRST_ID, TEST_SCAN);
     assertEquals(1, invocationCount.get());
 
     // Scan of non-existent container should not throw exception or trigger an additional invocation.
-    containerSet.scanContainer(FIRST_ID - 1);
+    containerSet.scanContainer(FIRST_ID - 1, TEST_SCAN);
     assertEquals(1, invocationCount.get());
   }
 
@@ -320,11 +323,11 @@ public class TestContainerSet {
     setLayoutVersion(layout);
     ContainerSet containerSet = createContainerSet();
     // Scan when no handler is registered should not throw an exception.
-    containerSet.scanContainer(FIRST_ID);
+    containerSet.scanContainer(FIRST_ID, TEST_SCAN);
 
     AtomicLong invocationCount = new AtomicLong();
-    OnDemandContainerDataScanner mockScanner = mock(OnDemandContainerDataScanner.class);
-    when(mockScanner.scanContainerWithoutGap(any())).then(inv -> {
+    OnDemandContainerScanner mockScanner = mock(OnDemandContainerScanner.class);
+    when(mockScanner.scanContainerWithoutGap(any(), anyString())).then(inv -> {
       KeyValueContainer c = inv.getArgument(0);
       // If the handler was incorrectly triggered for a non-existent container, this assert would fail.
       assertEquals(FIRST_ID, c.getContainerData().getContainerID());
@@ -334,11 +337,11 @@ public class TestContainerSet {
     containerSet.registerOnDemandScanner(mockScanner);
 
     // Scan of an existing container when a handler is registered should trigger a scan.
-    containerSet.scanContainerWithoutGap(FIRST_ID);
+    containerSet.scanContainerWithoutGap(FIRST_ID, TEST_SCAN);
     assertEquals(1, invocationCount.get());
 
     // Scan of non-existent container should not throw exception or trigger an additional invocation.
-    containerSet.scanContainerWithoutGap(FIRST_ID - 1);
+    containerSet.scanContainerWithoutGap(FIRST_ID - 1, TEST_SCAN);
     assertEquals(1, invocationCount.get());
   }
 

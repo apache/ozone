@@ -41,9 +41,9 @@ List objects with negative max-keys should fail
     ${result} =    Execute AWSS3APICli and checkrc    list-objects-v2 --bucket ${BUCKET} --max-keys -1    255
     Should Contain    ${result}    InvalidArgument
 
-List objects with zero max-keys should fail
-    ${result} =    Execute AWSS3APICli and checkrc    list-objects-v2 --bucket ${BUCKET} --max-keys 0    255
-    Should Contain    ${result}    InvalidArgument
+List objects with zero max-keys should not fail
+    ${result} =    Execute AWSS3APICli and checkrc    list-objects-v2 --bucket ${BUCKET} --max-keys 0    0
+    Should not Contain    ${result}    InvalidArgument
 
 List objects with max-keys exceeding config limit should not return more than limit
     Prepare Many Objects In Bucket    1100
@@ -64,3 +64,9 @@ List objects with max-keys less than config limit should return correct count
     ${count}=     Execute and checkrc    jq -r '.Contents | length' ${tmpfile}    0
     Should Be True    ${count} == 500
     Remove File   ${tmpfile}
+
+Check Bucket Ownership Verification
+    Prepare Many Objects In Bucket                                1
+    ${correct_owner} =    Get bucket owner                        ${BUCKET}
+
+    Execute AWSS3APICli with bucket owner check                   list-objects-v2 --bucket ${BUCKET}  ${correct_owner}

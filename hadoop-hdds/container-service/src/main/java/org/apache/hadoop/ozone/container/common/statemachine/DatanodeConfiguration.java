@@ -258,13 +258,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long blockDeleteMaxLockWaitTimeoutMs = Duration.ofMillis(100).toMillis();
 
   @Config(key = "block.deleting.limit.per.interval",
-      defaultValue = "5000",
+      defaultValue = "20000",
       reconfigurable = true,
       type = ConfigType.INT,
-      tags = { ConfigTag.SCM, ConfigTag.DELETION },
+      tags = { ConfigTag.SCM, ConfigTag.DELETION, DATANODE },
       description = "Number of blocks to be deleted in an interval."
   )
-  private int blockLimitPerInterval = 5000;
+  private int blockLimitPerInterval = 20000;
 
   @Config(key = "block.deleting.max.lock.holding.time",
       defaultValue = "1s",
@@ -294,7 +294,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private long minFreeSpace = getDefaultFreeSpace();
 
   @Config(key = "hdds.datanode.volume.min.free.space.percent",
-      defaultValue = "-1",
+      defaultValue = "0.001", // match HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT
       type = ConfigType.FLOAT,
       tags = { OZONE, CONTAINER, STORAGE, MANAGEMENT },
       description = "This determines the free space percent to be used for closing containers" +

@@ -56,4 +56,8 @@ public class OMUpdateEventBatch {
   public boolean isEmpty() {
     return !getIterator().hasNext();
   }
+
+  public List<OMDBUpdateEvent> getEvents() {
+    return events;
+  }
 }

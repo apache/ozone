@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort.Type;
 import org.apache.hadoop.ozone.recon.ReconContext;
@@ -114,8 +115,6 @@ public class OzoneManagerServiceProviderImpl
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerServiceProviderImpl.class);
   private URLConnectionFactory connectionFactory;
-
-  private int omDBTarProcessorThreadCount; // Number of parallel workers
 
   private File omSnapshotDBParentDir = null;
   private File reconDbDir = null;
@@ -225,7 +224,8 @@ public class OzoneManagerServiceProviderImpl
     this.threadFactory =
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "SyncOM-%d")
             .build();
-    this.omDBTarProcessorThreadCount = Math.max(64, Runtime.getRuntime().availableProcessors());
+    // Number of parallel workers
+    int omDBTarProcessorThreadCount = Math.max(64, Runtime.getRuntime().availableProcessors());
     this.reconContext = reconContext;
     this.taskStatusUpdaterManager = taskStatusUpdaterManager;
     this.omDBLagThreshold = configuration.getLong(RECON_OM_DELTA_UPDATE_LAG_THRESHOLD,
@@ -247,6 +247,8 @@ public class OzoneManagerServiceProviderImpl
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
       LOG.error("Error starting Recon OM Metadata Manager.", ioEx);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.INTERNAL_ERROR);
     } catch (RuntimeException runtimeException) {
       LOG.warn("Unexpected runtime error starting Recon OM Metadata Manager.", runtimeException);
       LOG.warn("Trying to delete existing recon OM snapshot DB and fetch new one.");
@@ -306,9 +308,12 @@ public class OzoneManagerServiceProviderImpl
                 taskStatusUpdaterManager.getTaskStatusUpdater(taskName).getLastUpdatedSeqNumber());
 
           });
+      LOG.info("Re-initializing all tasks again (not just above failed delta tasks) based on updated OM DB snapshot " +
+          "and last updated sequence number because fresh staging DB needs to be created for all tasks.");
+      reconTaskController.reInitializeTasks(omMetadataManager, null);
     }
-    reconTaskController.reInitializeTasks(omMetadataManager, reconOmTaskMap);
     startSyncDataFromOM(initialDelay);
+    LOG.info("Ozone Manager Service Provider is started.");
   }
 
   private void startSyncDataFromOM(long initialDelay) {
@@ -444,6 +449,7 @@ public class OzoneManagerServiceProviderImpl
         try (InputStream inputStream = reconUtils.makeHttpCall(
             connectionFactory, getOzoneManagerSnapshotUrl(), isOmSpnegoEnabled()).getInputStream()) {
           tarExtractor.extractTar(inputStream, untarredDbDir);
+          OmSnapshotUtils.createHardLinks(untarredDbDir, true);
         } catch (IOException | InterruptedException e) {
           reconContext.updateHealthStatus(new AtomicBoolean(false));
           reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
@@ -659,6 +665,30 @@ public class OzoneManagerServiceProviderImpl
               // Pass on DB update events to tasks that are listening.
               reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
                   omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
+              
+              // Check if task reinitialization is needed due to buffer overflow or task failures
+              boolean bufferOverflowed = reconTaskController.hasEventBufferOverflowed();
+              boolean tasksFailed = reconTaskController.hasDeltaTasksFailed();
+              
+              if (bufferOverflowed || tasksFailed) {
+                String reason = bufferOverflowed ? "Event buffer overflow" : "Delta tasks failed after retry";
+                LOG.warn("{}, triggering task reinitialization", reason);
+                
+                metrics.incrNumDeltaRequestsFailed();
+                deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
+                deltaReconTaskStatusUpdater.recordRunCompletion();
+
+                reconTaskController.reInitializeTasks(omMetadataManager, null);
+                
+                // Reset appropriate flags after reinitialization
+                if (bufferOverflowed) {
+                  reconTaskController.resetEventBufferOverflowFlag();
+                }
+                if (tasksFailed) {
+                  reconTaskController.resetDeltaTasksFailureFlag();
+                }
+              }
+              
               currentSequenceNumber = getCurrentOMDBSequenceNumber();
               LOG.debug("Updated current sequence number: {}", currentSequenceNumber);
               loopCount++;
@@ -690,45 +720,7 @@ public class OzoneManagerServiceProviderImpl
 
         if (fullSnapshot) {
           try {
-            metrics.incrNumSnapshotRequests();
-            LOG.info("Obtaining full snapshot from Ozone Manager");
-
-            // Similarly if the interrupt was signalled in between,
-            // we should check before starting snapshot sync.
-            if (Thread.currentThread().isInterrupted()) {
-              throw new InterruptedException("Thread interrupted during snapshot sync.");
-            }
-
-            // Update local Recon OM DB to new snapshot.
-            fullSnapshotReconTaskUpdater.recordRunStart();
-            boolean success = updateReconOmDBWithNewSnapshot();
-            // Update timestamp of successful delta updates query.
-            if (success) {
-              // Keeping last updated sequence number for both full and delta tasks to be same
-              // because sequence number of DB denotes and points to same OM DB copy of Recon,
-              // even though two different tasks are updating the DB at different conditions, but
-              // it tells the sync state with actual OM DB for the same Recon OM DB copy.
-              fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-              deltaReconTaskStatusUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-              fullSnapshotReconTaskUpdater.setLastTaskRunStatus(0);
-              fullSnapshotReconTaskUpdater.recordRunCompletion();
-              deltaReconTaskStatusUpdater.updateDetails();
-
-              // Reinitialize tasks that are listening.
-              LOG.info("Calling reprocess on Recon tasks.");
-              reconTaskController.reInitializeTasks(omMetadataManager, null);
-
-              // Update health status in ReconContext
-              reconContext.updateHealthStatus(new AtomicBoolean(true));
-              reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-            } else {
-              metrics.incrNumSnapshotRequestsFailed();
-              fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
-              fullSnapshotReconTaskUpdater.recordRunCompletion();
-              // Update health status in ReconContext
-              reconContext.updateHealthStatus(new AtomicBoolean(false));
-              reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-            }
+            executeFullSnapshot(fullSnapshotReconTaskUpdater, deltaReconTaskStatusUpdater);
           } catch (InterruptedException intEx) {
             LOG.error("OM DB Snapshot update sync thread was interrupted.");
             fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
@@ -755,6 +747,52 @@ public class OzoneManagerServiceProviderImpl
       return false;
     }
     return true;
+  }
+
+  private void executeFullSnapshot(ReconTaskStatusUpdater fullSnapshotReconTaskUpdater,
+                         ReconTaskStatusUpdater deltaReconTaskStatusUpdater) throws InterruptedException, IOException {
+    metrics.incrNumSnapshotRequests();
+    LOG.info("Obtaining full snapshot from Ozone Manager");
+
+    // Similarly if the interrupt was signalled in between,
+    // we should check before starting snapshot sync.
+    if (Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException("Thread interrupted during snapshot sync.");
+    }
+
+    // Update local Recon OM DB to new snapshot.
+    fullSnapshotReconTaskUpdater.recordRunStart();
+    boolean success = updateReconOmDBWithNewSnapshot();
+    // Update timestamp of successful delta updates query.
+    if (success) {
+      // Keeping last updated sequence number for both full and delta tasks to be same
+      // because sequence number of DB denotes and points to same OM DB copy of Recon,
+      // even though two different tasks are updating the DB at different conditions, but
+      // it tells the sync state with actual OM DB for the same Recon OM DB copy.
+      fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+      deltaReconTaskStatusUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+      fullSnapshotReconTaskUpdater.setLastTaskRunStatus(0);
+      fullSnapshotReconTaskUpdater.recordRunCompletion();
+      deltaReconTaskStatusUpdater.updateDetails();
+
+      // Reinitialize tasks that are listening.
+      LOG.info("Calling reprocess on Recon tasks.");
+      reconTaskController.reInitializeTasks(omMetadataManager, null);
+      
+      // Reset event buffer overflow flag after successful full snapshot
+      reconTaskController.resetEventBufferOverflowFlag();
+
+      // Update health status in ReconContext
+      reconContext.updateHealthStatus(new AtomicBoolean(true));
+      reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+    } else {
+      metrics.incrNumSnapshotRequestsFailed();
+      fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+      fullSnapshotReconTaskUpdater.recordRunCompletion();
+      // Update health status in ReconContext
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+    }
   }
 
   private void printOMDBMetaInfo() {
