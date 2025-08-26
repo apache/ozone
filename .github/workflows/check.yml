@@ -220,6 +220,12 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ inputs.java-version }}
 
+      - name: Setup pnpm version ${{ inputs.pnpm-version }}
+        if: ${{ inputs.pnpm-version }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ inputs.pnpm-version }}
+
       - name: Execute pre-test steps
         if: ${{ inputs.pre-script }}
         run: |

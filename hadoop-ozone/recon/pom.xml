@@ -429,28 +429,28 @@
           <execution>
             <id>set pnpm@${pnpm.version} store path</id>
             <goals>
-              <goal>npx</goal>
+              <goal>pnpm</goal>
             </goals>
             <configuration>
-              <arguments>pnpm@${pnpm.version} config set store-dir ~/.pnpm-store</arguments>
+              <arguments>config set store-dir ~/.pnpm-store</arguments>
             </configuration>
           </execution>
           <execution>
             <id>install frontend dependencies</id>
             <goals>
-              <goal>npx</goal>
+              <goal>pnpm</goal>
             </goals>
             <configuration>
-              <arguments>pnpm@${pnpm.version} install --frozen-lockfile</arguments>
+              <arguments>install --frozen-lockfile</arguments>
             </configuration>
           </execution>
           <execution>
             <id>Build frontend</id>
             <goals>
-              <goal>npx</goal>
+              <goal>pnpm</goal>
             </goals>
             <configuration>
-              <arguments>pnpm@${pnpm.version} run build</arguments>
+              <arguments>run build</arguments>
             </configuration>
           </execution>
         </executions>
