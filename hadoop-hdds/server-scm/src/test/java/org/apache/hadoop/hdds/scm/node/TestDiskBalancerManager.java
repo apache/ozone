@@ -117,6 +117,7 @@ public class TestDiskBalancerManager {
     return DiskBalancerReportProto.newBuilder()
         .setIsRunning(random.nextBoolean())
         .setBalancedBytes(random.nextInt(10000))
+        .setVolumeDataDensity(random.nextDouble())
         .setDiskBalancerConf(
             HddsProtos.DiskBalancerConfigurationProto.newBuilder()
                 .setThreshold(random.nextInt(99))

@@ -285,7 +285,7 @@ public class DiskBalancerManager {
   public DiskBalancerStatus getStatus(DatanodeDetails datanodeDetails) {
     return statusMap.computeIfAbsent(datanodeDetails,
         dn -> new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN, new DiskBalancerConfiguration(),
-            0, 0, 0, 0, Double.NaN));
+            0, 0, 0, 0, 0.0));
   }
 
   @VisibleForTesting
@@ -308,7 +308,7 @@ public class DiskBalancerManager {
     long balancedBytes = reportProto.getBalancedBytes();
     // Use NaN if volumeDataDensity is not available (for backward compatibility with older DNs)
     double volumeDataDensity = reportProto.hasVolumeDataDensity() ? 
-        reportProto.getVolumeDataDensity() : Double.NaN;
+        reportProto.getVolumeDataDensity() : 0.0;
 
     statusMap.put(dn, new DiskBalancerStatus(
         isRunning ? DiskBalancerRunningStatus.RUNNING : DiskBalancerRunningStatus.STOPPED,
