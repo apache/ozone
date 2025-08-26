@@ -49,7 +49,11 @@ import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSu
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -258,9 +262,26 @@ public class HeartbeatEndpointTask
   }
 
   private void addDiskBalancerReport(SCMHeartbeatRequestProto.Builder requestBuilder) {
-    DiskBalancerInfo info = context.getParent().getContainer().getDiskBalancerInfo();
+    OzoneContainer ozoneContainer = context.getParent().getContainer();
+    DiskBalancerInfo info = ozoneContainer.getDiskBalancerInfo();
     if (info != null) {
-      requestBuilder.setDiskBalancerReport(info.toDiskBalancerReportProto());
+      // Get volumeSet and deltaMap for accurate VolumeDataDensity calculation
+      try {
+        MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
+        Map<HddsVolume, Long> deltaMap = null;
+        
+        // Get deltaMap from DiskBalancerService if available
+        DiskBalancerService diskBalancerService = ozoneContainer.getDiskBalancerService();
+        if (diskBalancerService != null) {
+          deltaMap = diskBalancerService.getDeltaSizes();
+        }
+        
+        requestBuilder.setDiskBalancerReport(info.toDiskBalancerReportProto(volumeSet, deltaMap));
+      } catch (Exception e) {
+        // Fallback to basic report if there are any issues
+        LOG.warn("Falling back to basic DiskBalancerReportProto due to: ", e);
+        requestBuilder.setDiskBalancerReport(info.toDiskBalancerReportProto());
+      }
     }
   }
 
