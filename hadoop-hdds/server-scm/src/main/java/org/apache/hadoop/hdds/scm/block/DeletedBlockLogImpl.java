@@ -17,22 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
 import static org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator.DEL_TXN_ID;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
@@ -79,7 +75,6 @@ public class DeletedBlockLogImpl
   private static final Logger LOG =
       LoggerFactory.getLogger(DeletedBlockLogImpl.class);
 
-  private final int maxRetry;
   private final ContainerManager containerManager;
   private final Lock lock;
   // The access to DeletedBlocksTXTable is protected by
@@ -92,7 +87,6 @@ public class DeletedBlockLogImpl
       transactionStatusManager;
   private long scmCommandTimeoutMs = Duration.ofSeconds(300).toMillis();
 
-  private static final int LIST_ALL_FAILED_TRANSACTIONS = -1;
   private long lastProcessedTransactionId = -1;
   private final int logAppenderQueueByteLimit;
   private int deletionFactorPerDatanode;
@@ -102,8 +96,6 @@ public class DeletedBlockLogImpl
       ContainerManager containerManager,
       DBTransactionBuffer dbTxBuffer,
       ScmBlockDeletingServiceMetrics metrics) {
-    maxRetry = conf.getInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY,
-        OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT);
     this.containerManager = containerManager;
     this.lock = new ReentrantLock();
 
@@ -142,37 +134,6 @@ public class DeletedBlockLogImpl
     this.deletionFactorPerDatanode = deleteBlocksFactorPerDatanode;
   }
 
-  @Override
-  public List<DeletedBlocksTransaction> getFailedTransactions(int count,
-      long startTxId) throws IOException {
-    lock.lock();
-    try {
-      final List<DeletedBlocksTransaction> failedTXs = Lists.newArrayList();
-      try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
-               deletedBlockLogStateManager.getReadOnlyIterator()) {
-        if (count == LIST_ALL_FAILED_TRANSACTIONS) {
-          while (iter.hasNext()) {
-            DeletedBlocksTransaction delTX = iter.next().getValue();
-            if (delTX.getCount() == -1) {
-              failedTXs.add(delTX);
-            }
-          }
-        } else {
-          iter.seek(startTxId);
-          while (iter.hasNext() && failedTXs.size() < count) {
-            DeletedBlocksTransaction delTX = iter.next().getValue();
-            if (delTX.getCount() == -1 && delTX.getTxID() >= startTxId) {
-              failedTXs.add(delTX);
-            }
-          }
-        }
-      }
-      return failedTXs;
-    } finally {
-      lock.unlock();
-    }
-  }
-
   /**
    * {@inheritDoc}
    *
@@ -182,62 +143,7 @@ public class DeletedBlockLogImpl
   @Override
   public void incrementCount(List<Long> txIDs)
       throws IOException {
-    lock.lock();
-    try {
-      transactionStatusManager.incrementRetryCount(txIDs, maxRetry);
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   */
-  @Override
-  public int resetCount(List<Long> txIDs) throws IOException {
-    final int batchSize = 1000;
-    int totalProcessed = 0;
-
-    try {
-      if (txIDs != null && !txIDs.isEmpty()) {
-        return resetRetryCount(txIDs);
-      }
-
-      // If txIDs are null or empty, fetch all failed transactions in batches
-      long startTxId = 0;
-      List<DeletedBlocksTransaction> batch;
-
-      do {
-        // Fetch the batch of failed transactions
-        batch = getFailedTransactions(batchSize, startTxId);
-        if (batch.isEmpty()) {
-          break;
-        }
-
-        List<Long> batchTxIDs = batch.stream().map(DeletedBlocksTransaction::getTxID).collect(Collectors.toList());
-        totalProcessed += resetRetryCount(new ArrayList<>(batchTxIDs));
-        // Update startTxId to continue from the last processed transaction
-        startTxId = batch.get(batch.size() - 1).getTxID() + 1;
-      } while (!batch.isEmpty());
-
-    } catch (Exception e) {
-      throw new IOException("Error during transaction reset", e);
-    }
-    return totalProcessed;
-  }
-
-  private int resetRetryCount(List<Long> txIDs) throws IOException {
-    int totalProcessed;
-    lock.lock();
-    try {
-      transactionStatusManager.resetRetryCount(txIDs);
-      totalProcessed = deletedBlockLogStateManager.resetRetryCountOfTransactionInDB(new ArrayList<>(
-          txIDs));
-    } finally {
-      lock.unlock();
-    }
-    return totalProcessed;
+    transactionStatusManager.incrementRetryCount(txIDs);
   }
 
   private DeletedBlocksTransaction constructNewTransaction(
@@ -254,17 +160,15 @@ public class DeletedBlockLogImpl
   public int getNumOfValidTransactions() throws IOException {
     lock.lock();
     try {
-      final AtomicInteger num = new AtomicInteger(0);
+      int count = 0;
       try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> iter =
                deletedBlockLogStateManager.getReadOnlyIterator()) {
         while (iter.hasNext()) {
-          DeletedBlocksTransaction delTX = iter.next().getValue();
-          if (delTX.getCount() > -1) {
-            num.incrementAndGet();
-          }
+          iter.next();
+          count++;
         }
       }
-      return num.get();
+      return count;
     } finally {
       lock.unlock();
     }
@@ -350,16 +254,12 @@ public class DeletedBlockLogImpl
       return;
     }
 
-    DeletedBlocksTransaction updatedTxn =
-        DeletedBlocksTransaction.newBuilder(tx)
-            .setCount(transactionStatusManager.getRetryCount(tx.getTxID()))
-            .build();
     boolean flag = false;
     for (ContainerReplica replica : replicas) {
       final DatanodeID datanodeID = replica.getDatanodeDetails().getID();
       if (!transactionStatusManager.isDuplication(
           datanodeID, tx.getTxID(), commandStatus)) {
-        transactions.addTransactionToDN(datanodeID, updatedTxn);
+        transactions.addTransactionToDN(datanodeID, tx);
         flag = true;
       }
     }
@@ -466,15 +366,14 @@ public class DeletedBlockLogImpl
           keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueOf(txn.getContainerID());
+          final ContainerInfo container = containerManager.getContainer(id);
           try {
             // HDDS-7126. When container is under replicated, it is possible
             // that container is deleted, but transactions are not deleted.
-            if (containerManager.getContainer(id).isDeleted()) {
-              LOG.warn("Container: {} was deleted for the " +
-                  "transaction: {}.", id, txn);
+            if (container.isDeleted()) {
+              LOG.warn("Container: {} was deleted for the transaction: {}.", id, txn);
               txIDs.add(txn.getTxID());
-            } else if (txn.getCount() > -1 && txn.getCount() <= maxRetry
-                && !containerManager.getContainer(id).isOpen()) {
+            } else if (!container.isOpen()) {
               Set<ContainerReplica> replicas = containerManager
                   .getContainerReplicas(
                       ContainerID.valueOf(txn.getContainerID()));
@@ -483,7 +382,7 @@ public class DeletedBlockLogImpl
               } else {
                 metrics.incrSkippedTransaction();
               }
-            } else if (txn.getCount() >= maxRetry || containerManager.getContainer(id).isOpen()) {
+            } else if (containerManager.getContainer(id).isOpen()) {
               metrics.incrSkippedTransaction();
             }
           } catch (ContainerNotFoundException ex) {

@@ -36,7 +36,6 @@ import picocli.CommandLine;
         FinalizeScmUpgradeSubcommand.class,
         FinalizationScmStatusSubcommand.class,
         TransferScmLeaderSubCommand.class,
-        DeletedBlocksTxnCommands.class,
         DecommissionScmSubcommand.class,
         RotateKeySubCommand.class
     })
