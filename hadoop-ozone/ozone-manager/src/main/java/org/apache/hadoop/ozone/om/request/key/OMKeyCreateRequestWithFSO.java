@@ -90,7 +90,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
     Exception exception = null;
-    Result result;
+    Result result = null;
     List<OmDirectoryInfo> missingParentInfos;
     int numKeysCreated = 0;
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
@@ -212,8 +212,6 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               omBucketInfo.copyObject(), volumeId);
 
       result = Result.SUCCESS;
-      long endNanosCreateKeySuccessLatencyNs = Time.monotonicNowNanos();
-      perfMetrics.addCreateKeySuccessLatencyNs(endNanosCreateKeySuccessLatencyNs - createKeyStartTime);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
@@ -221,9 +219,15 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(
               createErrorOMResponse(omResponse, exception), getBucketLayout());
-      long endNanosCreateKeyFailureLatencyNs = Time.monotonicNowNanos();
-      perfMetrics.addCreateKeyFailureLatencyNs(endNanosCreateKeyFailureLatencyNs - createKeyStartTime);
     } finally {
+      long createKeyLatency = Time.monotonicNowNanos() - createKeyStartTime;
+
+      if (Result.SUCCESS.equals(result)) {
+        perfMetrics.addCreateKeySuccessLatencyNs(createKeyLatency);
+      } else {
+        perfMetrics.addCreateKeyFailureLatencyNs(createKeyLatency);
+      }
+      
       if (acquireLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));

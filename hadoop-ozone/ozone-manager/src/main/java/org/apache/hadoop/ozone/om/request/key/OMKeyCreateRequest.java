@@ -343,8 +343,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           omKeyInfo, missingParentInfos, clientID, bucketInfo.copyObject());
 
       result = Result.SUCCESS;
-      long endNanosCreateKeySuccessLatencyNs = Time.monotonicNowNanos();
-      perfMetrics.addCreateKeySuccessLatencyNs(endNanosCreateKeySuccessLatencyNs - createKeyStartTime);
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
@@ -352,9 +350,15 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omResponse.setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
-      long endNanosCreateKeyFailureLatencyNs = Time.monotonicNowNanos();
-      perfMetrics.addCreateKeyFailureLatencyNs(endNanosCreateKeyFailureLatencyNs - createKeyStartTime);
     } finally {
+      long createKeyLatency = Time.monotonicNowNanos() - createKeyStartTime;
+
+      if (Result.SUCCESS.equals(result)) {
+        perfMetrics.addCreateKeySuccessLatencyNs(createKeyLatency);
+      } else {
+        perfMetrics.addCreateKeyFailureLatencyNs(createKeyLatency);
+      }
+      
       if (acquireLock) {
         mergeOmLockDetails(ozoneLockStrategy
             .releaseWriteLock(omMetadataManager, volumeName,
