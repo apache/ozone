@@ -99,7 +99,6 @@ public class TestLeaseRecovery extends OzoneTestBase {
   private static final AtomicInteger FILE_COUNTER = new AtomicInteger();
 
   private MiniOzoneCluster cluster;
-  private OzoneBucket bucket;
 
   private OzoneClient client;
   private final OzoneConfiguration conf = new OzoneConfiguration();
@@ -163,7 +162,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
     client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(client, layout);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, layout);
 
     GenericTestUtils.setLogLevel(XceiverClientGrpc.class, Level.DEBUG);
 

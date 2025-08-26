@@ -84,7 +84,6 @@ import org.junit.jupiter.api.Test;
 public class TestDeleteWithInAdequateDN {
 
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
   private static OzoneClient client;
   private static ObjectStore objectStore;
   private static String volumeName;
@@ -101,7 +100,7 @@ public class TestDeleteWithInAdequateDN {
   public static void init() throws Exception {
     final int numOfDatanodes = 3;
 
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
