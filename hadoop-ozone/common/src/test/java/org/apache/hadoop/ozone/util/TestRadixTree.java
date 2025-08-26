@@ -21,8 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Paths;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -33,19 +33,19 @@ import org.junit.jupiter.api.Test;
 public class TestRadixTree {
 
   static final RadixTree<Integer> ROOT = new RadixTree<>();
-  static final String basePath = "/a";
-  static final Path pathB = Paths.get(basePath, "b");
-  static final Path pathBC = Paths.get(basePath, "b", "c");
-  static final Path pathBCD = Paths.get(basePath, "b", "c", "d");
-  static final Path pathBCDGH = Paths.get(basePath, "b", "c", "d", "g", "h");
+  static final String BASE_PATH = "/a";
+  static final Path PATH_B = Paths.get(BASE_PATH, "b");
+  static final Path PATH_BC = Paths.get(BASE_PATH, "b", "c");
+  static final Path PATH_BCD = Paths.get(BASE_PATH, "b", "c", "d");
+  static final Path PATH_BCDGH = Paths.get(BASE_PATH, "b", "c", "d", "g", "h");
 
   @BeforeAll
   public static void setupRadixTree() {
     // Test prefix paths with an empty tree
     assertTrue(ROOT.isEmpty());
-    assertEquals("/", ROOT.getLongestPrefix(Paths.get(basePath, "b", "c").toString()));
+    assertEquals("/", ROOT.getLongestPrefix(Paths.get(BASE_PATH, "b", "c").toString()));
     assertEquals("/", RadixTree.radixPathToString(
-        ROOT.getLongestPrefixPath(Paths.get(basePath, "g").toString())));
+        ROOT.getLongestPrefixPath(Paths.get(BASE_PATH, "g").toString())));
     // Build Radix tree below for testing.
     //                a
     //                |
@@ -58,12 +58,12 @@ public class TestRadixTree {
     //          g
     //          |
     //          h
-    ROOT.insert(Paths.get(basePath, "b", "c", "d").toString());
-    ROOT.insert(Paths.get(basePath, "b", "c", "d", "g", "h").toString());
-    ROOT.insert(Paths.get(basePath, "b", "c", "f").toString());
-    ROOT.insert(Paths.get(basePath, "b", "e", "g").toString());
-    ROOT.insert(Paths.get(basePath, "b", "e", "dir1").toString());
-    ROOT.insert(Paths.get(basePath, "b", "e", "dir2").toString(), 1000);
+    ROOT.insert(Paths.get(BASE_PATH, "b", "c", "d").toString());
+    ROOT.insert(Paths.get(BASE_PATH, "b", "c", "d", "g", "h").toString());
+    ROOT.insert(Paths.get(BASE_PATH, "b", "c", "f").toString());
+    ROOT.insert(Paths.get(BASE_PATH, "b", "e", "g").toString());
+    ROOT.insert(Paths.get(BASE_PATH, "b", "e", "dir1").toString());
+    ROOT.insert(Paths.get(BASE_PATH, "b", "e", "dir2").toString(), 1000);
   }
 
   /**
@@ -71,30 +71,30 @@ public class TestRadixTree {
    */
   @Test
   public  void testGetLongestPrefix() {
-    assertEquals(pathBC.toString(), ROOT.getLongestPrefix(pathBC.toString()));
-    assertEquals(pathB.toString(), ROOT.getLongestPrefix(pathB.toString()));
-    assertEquals(basePath, ROOT.getLongestPrefix(basePath));
-    assertEquals(Paths.get(basePath, "b", "e", "g").toString(),
+    assertEquals(PATH_BC.toString(), ROOT.getLongestPrefix(PATH_BC.toString()));
+    assertEquals(PATH_B.toString(), ROOT.getLongestPrefix(PATH_B.toString()));
+    assertEquals(BASE_PATH, ROOT.getLongestPrefix(BASE_PATH));
+    assertEquals(Paths.get(BASE_PATH, "b", "e", "g").toString(),
         ROOT.getLongestPrefix(
-            Paths.get(basePath, "b", "e", "g", "h").toString()
+            Paths.get(BASE_PATH, "b", "e", "g", "h").toString()
         )
     );
 
     assertEquals("/", ROOT.getLongestPrefix("/d/b/c"));
-    assertEquals(Paths.get(basePath, "b", "e").toString(),
+    assertEquals(Paths.get(BASE_PATH, "b", "e").toString(),
         ROOT.getLongestPrefix(
-            Paths.get(basePath, "b", "e", "dir3").toString()
+            Paths.get(BASE_PATH, "b", "e", "dir3").toString()
         )
     );
-    assertEquals(pathBCD.toString(),
+    assertEquals(PATH_BCD.toString(),
         ROOT.getLongestPrefix(
-            Paths.get(basePath, "b", "c", "d", "p").toString()
+            Paths.get(BASE_PATH, "b", "c", "d", "p").toString()
         )
     );
 
-    assertEquals(Paths.get(basePath, "b", "c", "f").toString(),
+    assertEquals(Paths.get(BASE_PATH, "b", "c", "f").toString(),
         ROOT.getLongestPrefix(
-            Paths.get(basePath, "b", "c", "f", "p").toString()
+            Paths.get(BASE_PATH, "b", "c", "f", "p").toString()
         )
     );
   }
@@ -102,14 +102,14 @@ public class TestRadixTree {
   @Test
   public void testGetLongestPrefixPath() {
     List<RadixNode<Integer>> lpp = ROOT.getLongestPrefixPath(
-        Paths.get(basePath, "b", "c", "d", "g", "p").toString()
+        Paths.get(BASE_PATH, "b", "c", "d", "g", "p").toString()
     );
     RadixNode<Integer> lpn = lpp.get(lpp.size() - 1);
     assertEquals("g", lpn.getName());
     lpn.setValue(100);
 
     List<RadixNode<Integer>> lpq = ROOT.getLongestPrefixPath(
-        Paths.get(basePath, "b", "c", "d", "g", "q").toString()
+        Paths.get(BASE_PATH, "b", "c", "d", "g", "q").toString()
     );
     RadixNode<Integer> lqn = lpp.get(lpq.size() - 1);
     System.out.print(RadixTree.radixPathToString(lpq));
@@ -118,13 +118,13 @@ public class TestRadixTree {
     assertEquals(100, (int)lqn.getValue());
 
     assertEquals("/a/", RadixTree.radixPathToString(
-        ROOT.getLongestPrefixPath(Paths.get(basePath, "g").toString())));
+        ROOT.getLongestPrefixPath(Paths.get(BASE_PATH, "g").toString())));
   }
 
   @Test
   public void testGetLastNoeInPrefixPath() {
-    assertNull(ROOT.getLastNodeInPrefixPath(Paths.get(basePath, "g").toString()));
-    RadixNode<Integer> ln = ROOT.getLastNodeInPrefixPath(Paths.get(basePath, "b", "e", "dir1").toString());
+    assertNull(ROOT.getLastNodeInPrefixPath(Paths.get(BASE_PATH, "g").toString()));
+    RadixNode<Integer> ln = ROOT.getLastNodeInPrefixPath(Paths.get(BASE_PATH, "b", "e", "dir1").toString());
     assertEquals("dir1", ln.getName());
   }
 
@@ -132,17 +132,17 @@ public class TestRadixTree {
   public void testRemovePrefixPath() {
     // Remove, test and restore
     // Remove partially overlapped path
-    ROOT.removePrefixPath(pathBCDGH.toString());
-    assertEquals(pathBC.toString(), ROOT.getLongestPrefix(pathBCD.toString()));
-    ROOT.insert(pathBCDGH.toString());
+    ROOT.removePrefixPath(PATH_BCDGH.toString());
+    assertEquals(PATH_BC.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
+    ROOT.insert(PATH_BCDGH.toString());
 
     // Remove fully overlapped path
-    ROOT.removePrefixPath(pathBCD.toString());
-    assertEquals(pathBCD.toString(), ROOT.getLongestPrefix(pathBCD.toString()));
-    ROOT.insert(pathBCD.toString());
+    ROOT.removePrefixPath(PATH_BCD.toString());
+    assertEquals(PATH_BCD.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
+    ROOT.insert(PATH_BCD.toString());
 
     // Remove non-existing path
     ROOT.removePrefixPath("/d/a");
-    assertEquals(pathBCD.toString(), ROOT.getLongestPrefix(pathBCD.toString()));
+    assertEquals(PATH_BCD.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
   }
 }
