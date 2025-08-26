@@ -80,8 +80,6 @@ import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
-import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilter;
-import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilterInitializer;
 import org.apache.hadoop.security.authentication.util.SignerSecretProvider;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -647,16 +645,12 @@ public final class HttpServer2 implements FilterContainer {
           LegacyHadoopConfigurationSource.asHadoopConfiguration(builder.conf);
       Map<String, String> filterConfig = getFilterConfigMap(hadoopConf,
           builder.authFilterConfigurationPrefix);
+      // create copy of the config with each <prefix>.<key> also added as hadoop.http.authentication.<key>
+      // (getFilterConfigMap removes prefix)
+      OzoneConfiguration copy = new OzoneConfiguration(hadoopConf);
+      filterConfig.forEach((k, v) -> copy.set("hadoop.http.authentication." + k, v));
       for (FilterInitializer c : initializers) {
-        if ((c instanceof AuthenticationFilterInitializer) && builder.securityEnabled) {
-          addFilter("authentication",
-              AuthenticationFilter.class.getName(), filterConfig);
-        } else if ((c instanceof ProxyUserAuthenticationFilterInitializer) && builder.securityEnabled) {
-          addFilter("authentication",
-              ProxyUserAuthenticationFilter.class.getName(), filterConfig);
-        } else {
-          c.initFilter(this, hadoopConf);
-        }
+        c.initFilter(this, copy);
       }
     }
 
