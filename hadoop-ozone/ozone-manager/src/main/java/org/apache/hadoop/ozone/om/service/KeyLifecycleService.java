@@ -134,6 +134,14 @@ public class KeyLifecycleService extends BackgroundService {
       return queue;
     }
     for (OmLifecycleConfiguration lifecycleConfiguration : lifecycleConfigurationList) {
+      try {
+        lifecycleConfiguration.valid();
+      } catch (OMException e) {
+        LOG.error("Skip invalid lifecycle configuration for {}/{}: LifecycleConfiguration:\n {}",
+            lifecycleConfiguration.getVolume(), lifecycleConfiguration.getBucket(),
+            lifecycleConfiguration.getProtobuf(), e);
+        continue;
+      }
       String bucketKey = omMetadataManager.getBucketKey(lifecycleConfiguration.getVolume(),
           lifecycleConfiguration.getBucket());
       if (lifecycleConfiguration.getRules().stream().anyMatch(r -> r.isEnabled())) {

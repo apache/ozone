@@ -88,6 +88,7 @@ public final class OmLCExpiration implements OmLCAction {
    * @param creationTime The creation time of the lifecycle configuration in milliseconds since epoch
    * @throws OMException if the validation fails
    */
+  @Override
   public void valid(long creationTime) throws OMException {
     boolean hasDays = days != null;
     boolean hasDate = !StringUtils.isBlank(date);
