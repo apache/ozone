@@ -17,12 +17,22 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.net.ssl.HttpsURLConnection;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -65,6 +75,9 @@ public class StorageDistributionEndpoint {
   private final NSSummaryEndpoint nsSummaryEndpoint;
   private final StorageContainerLocationProtocol scmClient;
   private static Logger log = LoggerFactory.getLogger(StorageDistributionEndpoint.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final int HTTP_TIMEOUT_MS = 5000;
+  private Map<DatanodeDetails, Long> blockDeletionMetricsMap = new HashMap<>();
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
@@ -79,6 +92,7 @@ public class StorageDistributionEndpoint {
 
   @GET
   public Response getStorageDistribution() {
+    initializeBlockDeletionMetricsMap();
     List<DatanodeStorageReport> nodeStorageReports = collectDatanodeReports();
     GlobalStorageReport globalStorageReport = calculateGlobalStorageReport();
     Map<String, Long> namespaceMetrics = calculateNamespaceMetrics();
@@ -124,7 +138,7 @@ public class StorageDistributionEndpoint {
       throw new WebApplicationException("Unable to retrieve storage metrics",
           Response.Status.INTERNAL_SERVER_ERROR);
     }
-    long totalPendingAtDnSide = nodeStorageReports.stream().mapToLong(DatanodeStorageReport::getPendingDeletions).sum();
+    long totalPendingAtDnSide = blockDeletionMetricsMap.values().stream().reduce(0L, Long::sum);
 
     DeletionPendingBytesByStage deletionPendingBytesByStage =
         createDeletionPendingBytesByStage(namespaceMetrics.getOrDefault("pendingDirectorySize", 0L),
@@ -191,7 +205,7 @@ public class StorageDistributionEndpoint {
     long totalPending = pendingDirectorySize + pendingKeySize + totalPendingAtScmSide + totalPendingAtDnSide;
     Map<String, Map<String, Long>> stageItems = new HashMap<>();
     Map<String, Long> omMap = new HashMap<>();
-    omMap.put("pendingBytes", pendingDirectorySize + pendingKeySize);
+    omMap.put("totalBytes", pendingDirectorySize + pendingKeySize);
     omMap.put("pendingDirectoryBytes", pendingDirectorySize);
     omMap.put("pendingKeyBytes", pendingKeySize);
     Map<String, Long> scmMap = new HashMap<>();
@@ -204,6 +218,16 @@ public class StorageDistributionEndpoint {
     return new DeletionPendingBytesByStage(totalPending, stageItems);
   }
 
+  private void initializeBlockDeletionMetricsMap() {
+    nodeManager.getNodeStats().keySet().forEach(nodeId -> {
+      try {
+        blockDeletionMetricsMap.put(nodeId, getBlockDeletionMetricsFromDatanode(nodeId));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+  }
+
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     SCMNodeStat nodeStat =
         nodeManager.getNodeStat(datanode).get();
@@ -211,7 +235,106 @@ public class StorageDistributionEndpoint {
     long used = nodeStat.getScmUsed().get();
     long remaining = nodeStat.getRemaining().get();
     long committed = nodeStat.getCommitted().get();
-    long pendingDeletions = 0; // TODO nodeStat.getPendingDeletions().get();
-    return new DatanodeStorageReport(capacity, used, remaining, committed, pendingDeletions);
+    long pendingDeletion = blockDeletionMetricsMap.getOrDefault(datanode, 0L);
+    return new DatanodeStorageReport(capacity, used, remaining, committed, pendingDeletion);
+  }
+
+  private HttpURLConnection makeHttpGetCall(String urlString) throws IOException {
+    Objects.requireNonNull(urlString, "urlString");
+    URL url = new URL(urlString);
+    final HttpURLConnection conn = openURLConnection(url);
+    conn.setRequestMethod("GET");
+    conn.setConnectTimeout(HTTP_TIMEOUT_MS);
+    conn.setReadTimeout(HTTP_TIMEOUT_MS);
+    conn.setRequestProperty("Accept", "application/json");
+    return conn;
+  }
+
+  private HttpURLConnection openURLConnection(URL url) throws IOException {
+    final String protocol = url.getProtocol().toLowerCase(Locale.ROOT);
+    switch (protocol) {
+    case "https":
+      return (HttpsURLConnection) url.openConnection();
+    case "http":
+      return (HttpURLConnection) url.openConnection();
+    default:
+      throw new IOException("Unsupported protocol: " + protocol + " for URL: " + url);
+    }
+  }
+
+  /** Parse block deletion metrics from JMX JSON response. */
+  private long parseBlockDeletionMetrics(String jsonResponse) {
+    if (jsonResponse == null || jsonResponse.isEmpty()) {
+      return 0L;
+    }
+    try {
+      JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
+      JsonNode beans = root.get("beans");
+      if (beans != null && beans.isArray()) {
+        for (JsonNode bean : beans) {
+          String name = bean.path("name").asText("");
+          if (name.contains("BlockDeletingService")) {
+            return extractBlockDeletionMetrics(bean);
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse block deletion metrics JSON: {}", e.toString());
+    }
+    return 0L;
+  }
+
+  /** Extract block deletion metrics from JMX bean node. */
+  private long extractBlockDeletionMetrics(JsonNode beanNode) {
+    return beanNode.path("TotalPendingBlockBytes").asLong(0L);
+  }
+
+  private long getBlockDeletionMetricsFromDatanode(DatanodeDetails datanode) throws IOException {
+    // Construct metrics URL for DataNode JMX endpoint
+    String metricsUrl = String.format("http://%s:%d/jmx?qry=Hadoop:service=HddsDatanode,name=BlockDeletingService",
+        datanode.getIpAddress(),
+        datanode.getPort(DatanodeDetails.Port.Name.HTTP).getValue());
+
+    HttpURLConnection conn = makeHttpGetCall(metricsUrl);
+    try {
+      String jsonResponse = getResponseData(conn);
+      return parseBlockDeletionMetrics(jsonResponse);
+    } finally {
+      try {
+        conn.disconnect();
+      } catch (Exception ignored) {
+        // no-op
+      }
+    }
+  }
+
+  private String getResponseData(HttpURLConnection conn) throws IOException {
+    int code = conn.getResponseCode();
+    // 2xx: read normal body
+    if (code >= 200 && code < 300) {
+      return readStream(conn.getInputStream());
+    }
+    String err = null;
+    try {
+      if (conn.getErrorStream() != null) {
+        err = readStream(conn.getErrorStream());
+      }
+    } catch (IOException ignored) {
+      // ignore read errors on error stream
+    }
+    log.warn("HTTP {} from {}. Error body: {}", code, conn.getURL(), err);
+    return "";
+  }
+
+  /** Small utility to read an entire stream as a UTF-8 String. */
+  private String readStream(java.io.InputStream in) throws IOException {
+    StringBuilder sb = new StringBuilder();
+    try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = br.readLine()) != null) {
+        sb.append(line).append('\n');
+      }
+    }
+    return sb.toString();
   }
 }
