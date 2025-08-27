@@ -796,6 +796,9 @@ public class OzoneManagerServiceProviderImpl
       fullSnapshotReconTaskUpdater.recordRunCompletion();
       deltaReconTaskStatusUpdater.updateDetails();
 
+      // Update the current OM metadata manager in task controller
+      reconTaskController.updateOMMetadataManager(omMetadataManager);
+
       // Reinitialize tasks that are listening.
       LOG.info("Queueing async reinitialization event instead of blocking call");
       ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
