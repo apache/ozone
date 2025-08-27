@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.fs.ozone.OzoneTrashPolicy.CURRENT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -25,6 +28,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVIC
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -38,6 +42,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -53,6 +58,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -62,12 +68,15 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.FaultInjectorImpl;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.OzoneTrash;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
+import org.apache.hadoop.ozone.om.TrashOzoneFileSystem;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -92,6 +101,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Lifecyc
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
@@ -99,6 +110,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -128,7 +140,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       LoggerFactory.getLogger(TestKeyLifecycleService.class);
   private static final AtomicInteger OBJECT_COUNTER = new AtomicInteger();
   private static final AtomicInteger OBJECT_ID_COUNTER = new AtomicInteger();
-  private static final int KEY_COUNT = 10;
+  private static final int KEY_COUNT = 2;
   private static final int EXPIRE_SECONDS = 2;
   private static final int SERVICE_INTERVAL = 300;
   private static final int WAIT_CHECK_INTERVAL = 50;
@@ -194,6 +206,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
     @AfterEach
     void resume() {
+      keyLifecycleService.setOzoneTrash(null);
     }
 
     @AfterAll
@@ -294,7 +307,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       long initialKeyCount = getKeyCount(bucketLayout);
 
       // Create the key
-      createVolumeAndBucket(volumeName, bucketName, bucketLayout, false);
+      createVolumeAndBucket(volumeName, bucketName, bucketLayout,
+          UserGroupInformation.getCurrentUser().getShortUserName());
       OmKeyArgs keyArg = createAndCommitKey(volumeName, bucketName, uniqueObjectName(prefix), 1, null);
 
       // create Lifecycle configuration
@@ -879,7 +893,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       long initialNumDeletedDir = metrics.getNumDirDeleted().value();
 
       // Create the directory
-      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, false);
+      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
+          UserGroupInformation.getCurrentUser().getShortUserName());
       createDirectory(volumeName, bucketName, dirName);
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
@@ -1264,6 +1279,98 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.setLogLevel(KeyLifecycleService.getLog(), Level.INFO);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
+
+    @Test
+    void testMoveToTrash() throws IOException,
+        TimeoutException, InterruptedException {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      String prefix = "key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+      long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
+      // create keys
+      String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
+      List<OmKeyArgs> keyList =
+          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, KEY_COUNT, 1, prefix, null);
+      // check there are keys in keyTable
+      Thread.sleep(SERVICE_INTERVAL);
+      assertEquals(KEY_COUNT, keyList.size());
+      GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      // enabled trash
+      final float trashInterval = 0.5f; // 30 seconds, 0.5 * (60 * 1000) ms
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>)
+              () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+
+      // create Lifecycle configuration
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
+
+      GenericTestUtils.waitFor(() ->
+          (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 5000);
+      assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
+      deleteLifecyclePolicy(volumeName, bucketName);
+      // verify trash directory has the right native ACL
+      List<KeyInfoWithVolumeContext> dirList = new ArrayList<>();
+      dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX));
+      dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX + bucketOwner));
+      dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX + bucketOwner +
+          OzoneConsts.OM_KEY_PREFIX + CURRENT));
+      for (KeyInfoWithVolumeContext dir : dirList) {
+        List<OzoneAcl> aclList = dir.getKeyInfo().getAcls();
+        for (OzoneAcl acl : aclList) {
+          if (acl.getType() == IAccessAuthorizer.ACLIdentityType.USER ||
+              acl.getType() == IAccessAuthorizer.ACLIdentityType.GROUP) {
+            assertEquals(bucketOwner, acl.getName());
+            assertTrue(acl.getAclList().contains(ALL));
+          }
+        }
+      }
+
+      GenericTestUtils.LogCapturer log =
+          GenericTestUtils.LogCapturer.captureLogs(
+              LoggerFactory.getLogger(KeyLifecycleService.class));
+
+      // keys under trash directory is counted in getKeyCount()
+      assertEquals(KEY_COUNT, getKeyCount(FILE_SYSTEM_OPTIMIZED));
+      // create new policy to test rule with prefix ".Trash/" is ignored during lifecycle evaluation
+      now = ZonedDateTime.now(ZoneOffset.UTC);
+      date = now.plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX,
+          null, date.toString(), true);
+
+      GenericTestUtils.waitFor(
+          () -> log.getOutput().contains("Skip rule") &&
+              log.getOutput().contains("as its prefix starts with " + TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX),
+          WAIT_CHECK_INTERVAL, 5000);
+      deleteLifecyclePolicy(volumeName, bucketName);
+
+      // create new policy to test rule with prefix ".Trash" is ignored during lifecycle evaluation
+      now = ZonedDateTime.now(ZoneOffset.UTC);
+      date = now.plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, TRASH_PREFIX,
+          null, date.toString(), true);
+
+      GenericTestUtils.waitFor(
+          () -> log.getOutput().contains("Skip evaluate trash directory " + TRASH_PREFIX), WAIT_CHECK_INTERVAL, 5000);
+      deleteLifecyclePolicy(volumeName, bucketName);
+
+      // create new policy to test trash directory is skipped during lifecycle evaluation
+      now = ZonedDateTime.now(ZoneOffset.UTC);
+      date = now.plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "",
+          null, date.toString(), true);
+
+      GenericTestUtils.waitFor(
+          () -> log.getOutput().contains("No expired keys/dirs found for bucket"), WAIT_CHECK_INTERVAL, 5000);
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
   }
 
   /**
@@ -1319,7 +1426,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.LogCapturer log =
           GenericTestUtils.LogCapturer.captureLogs(
               LoggerFactory.getLogger(KeyLifecycleService.class));
-      createVolumeAndBucket(volumeName, bucketName, bucketLayout, false);
+      createVolumeAndBucket(volumeName, bucketName, bucketLayout,
+          UserGroupInformation.getCurrentUser().getShortUserName());
       assertNotNull(writeClient.getBucketInfo(volumeName, bucketName));
 
       // create Lifecycle configuration
@@ -1462,8 +1570,15 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   private List<OmKeyArgs> createKeys(String volume, String bucket, BucketLayout bucketLayout,
       int keyCount, int numBlocks, String keyPrefix, Map<String, String> tags) throws IOException {
+    return  createKeys(volume, bucket, bucketLayout, UserGroupInformation.getCurrentUser().getShortUserName(),
+        keyCount, numBlocks, keyPrefix, tags);
+  }
+
+  @SuppressWarnings("parameternumber")
+  private List<OmKeyArgs> createKeys(String volume, String bucket, BucketLayout bucketLayout, String owner,
+      int keyCount, int numBlocks, String keyPrefix, Map<String, String> tags) throws IOException {
     // Create Volume and Bucket
-    createVolumeAndBucket(volume, bucket, bucketLayout, false);
+    createVolumeAndBucket(volume, bucket, bucketLayout, owner);
     List<OmKeyArgs> keyList = new ArrayList<>();
     for (int x = 0; x < keyCount; x++) {
       final String keyName = uniqueObjectName(keyPrefix);
@@ -1543,7 +1658,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
   }
 
   private void createVolumeAndBucket(String volumeName,
-      String bucketName, BucketLayout bucketLayout, boolean isVersioningEnabled) throws IOException {
+      String bucketName, BucketLayout bucketLayout, String owner) throws IOException {
     // cheat here, just create a volume and bucket entry so that we can
     // create the keys, we put the same data for key and value since the
     // system does not decode the object
@@ -1558,8 +1673,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
     OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName)
-            .setIsVersionEnabled(isVersioningEnabled)
             .setBucketLayout(bucketLayout)
+            .setOwner(owner)
             .setObjectID(OBJECT_ID_COUNTER.incrementAndGet())
             .build());
   }

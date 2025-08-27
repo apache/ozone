@@ -70,16 +70,21 @@ public final class KeyLifecycleServiceMetrics {
   @Metric("Execution time of a success task for a bucket")
   private MutableRate taskLatencyMs;
 
-  @Metric("Number of key iterated of a success task for a bucket")
+  // following metrics are updated by both success and failure tasks
+  @Metric("Number of key iterated")
   private MutableGaugeLong numKeyIterated;
-  @Metric("Number of dir iterated of a success task for a bucket")
+  @Metric("Number of dir iterated")
   private MutableGaugeLong numDirIterated;
   @Metric("Total directories deleted")
   private MutableGaugeLong numDirDeleted;
   @Metric("Total keys deleted")
   private MutableGaugeLong numKeyDeleted;
+  @Metric("Total keys renamed")
+  private MutableGaugeLong numKeyRenamed;
   @Metric("Total size of keys deleted")
   private MutableGaugeLong sizeKeyDeleted;
+  @Metric("Total size of keys renamed")
+  private MutableGaugeLong sizeKeyRenamed;
 
   public void incrNumSkippedTask() {
     numSkippedTask.incr();
@@ -101,8 +106,16 @@ public final class KeyLifecycleServiceMetrics {
     numKeyDeleted.incr(keyCount);
   }
 
+  public void incrNumKeyRenamed(long keyCount) {
+    numKeyRenamed.incr(keyCount);
+  }
+
   public void incrSizeKeyDeleted(long size) {
     sizeKeyDeleted.incr(size);
+  }
+
+  public void incrSizeKeyRenamed(long size) {
+    sizeKeyRenamed.incr(size);
   }
 
   public MutableGaugeLong getNumDirDeleted() {
@@ -113,8 +126,16 @@ public final class KeyLifecycleServiceMetrics {
     return numKeyDeleted;
   }
 
+  public MutableGaugeLong getNumKeyRenamed() {
+    return numKeyRenamed;
+  }
+
   public MutableGaugeLong getSizeKeyDeleted() {
     return sizeKeyDeleted;
+  }
+
+  public MutableGaugeLong getSizeKeyRenamed() {
+    return sizeKeyRenamed;
   }
 
   public MutableGaugeLong getNumDirIterated() {
