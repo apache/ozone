@@ -44,9 +44,25 @@ public class ReconNamespaceSummaryManagerImpl
   @Inject
   public ReconNamespaceSummaryManagerImpl(ReconDBProvider reconDBProvider, NSSummaryTask nsSummaryTask)
           throws IOException {
-    namespaceDbStore = reconDBProvider.getDbStore();
+    this(reconDBProvider.getDbStore(), nsSummaryTask);
+  }
+
+  private ReconNamespaceSummaryManagerImpl(DBStore dbStore, NSSummaryTask nsSummaryTask)
+      throws IOException {
+    namespaceDbStore = dbStore;
     this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
     this.nsSummaryTask = nsSummaryTask;
+  }
+
+  @Override
+  public ReconNamespaceSummaryManager getStagedNsSummaryManager(DBStore dbStore) throws IOException {
+    return new ReconNamespaceSummaryManagerImpl(dbStore, nsSummaryTask);
+  }
+
+  @Override
+  public void reinitialize(ReconDBProvider reconDBProvider) throws IOException {
+    namespaceDbStore = reconDBProvider.getDbStore();
+    this.nsSummaryTable = NAMESPACE_SUMMARY.getTable(namespaceDbStore);
   }
 
   @Override

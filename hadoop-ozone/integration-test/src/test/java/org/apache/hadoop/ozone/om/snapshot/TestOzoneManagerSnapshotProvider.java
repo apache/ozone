@@ -44,11 +44,12 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOzoneManagerSnapshotProvider {
 
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final int NUM_OF_OMS = 3;
+
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
-  private String omServiceId;
-  private int numOfOMs = 3;
 
   private OzoneClient client;
 
@@ -58,14 +59,13 @@ public class TestOzoneManagerSnapshotProvider {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    omServiceId = "om-service-test1";
     conf.setBoolean(OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY, true);
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setNumOfOzoneManagers(numOfOMs)
+        .setOMServiceId(OM_SERVICE_ID)
+        .setNumOfOzoneManagers(NUM_OF_OMS)
         .build();
     cluster.waitForClusterToBeReady();
-    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();
   }
 

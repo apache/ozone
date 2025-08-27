@@ -158,7 +158,6 @@ public class TestKeyManagerImpl {
   private static File dir;
   private static PrefixManager prefixManager;
   private static KeyManagerImpl keyManager;
-  private static NodeManager nodeManager;
   private static StorageContainerManager scm;
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
   private static StorageContainerLocationProtocol mockScmContainerClient;
@@ -184,7 +183,7 @@ public class TestKeyManagerImpl {
         conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
-    nodeManager = new MockNodeManager(true, 10);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
     NodeSchema[] schemas = new NodeSchema[]
         {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager schemaManager = NodeSchemaManager.getInstance();
@@ -194,7 +193,7 @@ public class TestKeyManagerImpl {
       node.setNetworkName(node.getUuidString());
       clusterMap.add(node);
     });
-    ((MockNodeManager)nodeManager).setNetworkTopology(clusterMap);
+    ((MockNodeManager) nodeManager).setNetworkTopology(clusterMap);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setNetworkTopology(clusterMap);
