@@ -36,9 +36,10 @@ public interface OmLCAction {
    * Validates the action configuration.
    * Each concrete action implementation must define its own validation logic.
    *
+   * @param creationTime The creation time of the lifecycle configuration in milliseconds since epoch
    * @throws OMException if the validation fails
    */
-  void valid() throws OMException;
+  void valid(long creationTime) throws OMException;
 
   /**
    * Returns the action type.

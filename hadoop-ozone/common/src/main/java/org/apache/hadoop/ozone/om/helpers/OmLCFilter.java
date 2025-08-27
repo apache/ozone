@@ -205,7 +205,6 @@ public final class OmLCFilter {
     private String tagKey = null;
     private String tagValue = null;
     private OmLifecycleRuleAndOperator andOperator = null;
-    private BucketLayout bucketLayout;
 
     public Builder setPrefix(String lcPrefix) {
       this.prefix = lcPrefix;
@@ -223,15 +222,8 @@ public final class OmLCFilter {
       return this;
     }
 
-    public Builder setBucketLayout(BucketLayout layout) {
-      this.bucketLayout = layout;
-      return this;
-    }
-
     public OmLCFilter build() throws OMException {
-      OmLCFilter omLCFilter = new OmLCFilter(this);
-      omLCFilter.valid(bucketLayout);
-      return omLCFilter;
+      return new OmLCFilter(this);
     }
   }
 }

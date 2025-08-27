@@ -59,15 +59,17 @@ class TestOmLifecycleRuleAndOperator {
   @Test
   public void testInValidAndOperator() {
     OmLifecycleRuleAndOperator.Builder andOperator1 = getOmLCAndOperatorBuilder("prefix", null);
-    assertOMException(andOperator1::build, INVALID_REQUEST, "'Prefix' alone is not allowed");
+    assertOMException(() -> andOperator1.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "'Prefix' alone is not allowed");
 
     OmLifecycleRuleAndOperator.Builder andOperator2 =
         getOmLCAndOperatorBuilder(null, Collections.singletonMap("tag1", "value1"));
-    assertOMException(andOperator2::build, INVALID_REQUEST,
+    assertOMException(() -> andOperator2.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "If 'Tags' are specified without 'Prefix', there should be more than one tag");
 
     OmLifecycleRuleAndOperator.Builder andOperator3 = getOmLCAndOperatorBuilder(null, null);
-    assertOMException(andOperator3::build, INVALID_REQUEST, "Either 'Tags' or 'Prefix' must be specified.");
+    assertOMException(() -> andOperator3.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "Either 'Tags' or 'Prefix' must be specified.");
   }
 
   @Test

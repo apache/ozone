@@ -2126,22 +2126,23 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
       String bucketName) throws IOException {
     Preconditions.checkNotNull(bucketName);
+    OmLifecycleConfiguration value = null;
     try {
       String bucketKey = getBucketKey(volumeName, bucketName);
-      OmLifecycleConfiguration value = getLifecycleConfigurationTable().get(bucketKey);
-
+      value = getLifecycleConfigurationTable().get(bucketKey);
       if (value == null) {
         LOG.debug("lifecycle configuration of bucket /{}/{} not found.",
             volumeName, bucketName);
         throw new OMException("Lifecycle configuration not found",
             LIFECYCLE_CONFIGURATION_NOT_FOUND);
       }
+      value.valid();
       return value;
     } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Exception while getting lifecycle configuration for " +
-            "bucket: /{}/{}", volumeName, bucketName, ex);
-      }
+      LOG.error("Exception while getting lifecycle configuration for " +
+          "bucket: /{}/{}, LifecycleConfiguration {}", volumeName, bucketName,
+          value != null ? value.getProtobuf() : "", ex);
+
       throw ex;
     }
   }
