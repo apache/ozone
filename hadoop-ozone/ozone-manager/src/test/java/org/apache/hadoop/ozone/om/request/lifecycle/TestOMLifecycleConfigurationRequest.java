@@ -123,6 +123,7 @@ public class TestOMLifecycleConfigurationRequest {
     String prefix = "prefix/";
     LifecycleConfiguration.Builder builder = LifecycleConfiguration.newBuilder()
         .setBucketLayout(BucketLayoutProto.OBJECT_STORE)
+        .setCreationTime(System.currentTimeMillis())
         .setVolume(volumeName)
         .setBucket(bucketName);
 
