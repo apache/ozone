@@ -34,6 +34,7 @@ import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Message;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -766,9 +768,9 @@ public class TestStateContext {
     StateContext ctx = createSubject(ozoneConfiguration);
     
     ctx.setTermOfLeaderSCM(1L);
-    SCMCommand<?> cmd1 = ReplicateContainerCommand.forTest(1);
-    SCMCommand<?> cmd2 = ReplicateContainerCommand.forTest(1);
-    SCMCommand<?> cmd3 = ReplicateContainerCommand.forTest(1);
+    SCMCommand<?> cmd1 = new DeleteBlocksCommand(new ArrayList<>());
+    SCMCommand<?> cmd2 = new DeleteBlocksCommand(new ArrayList<>());
+    SCMCommand<?> cmd3 = new DeleteBlocksCommand(new ArrayList<>());
     cmd1.setTerm(1L);
     cmd2.setTerm(1L);
     cmd3.setTerm(1L);
@@ -804,7 +806,7 @@ public class TestStateContext {
     StateContext ctx = createSubject();
     // Initialize with term 1
     ctx.setTermOfLeaderSCM(1L);
-    SCMCommand<?> cmd1 = ReplicateContainerCommand.forTest(1);
+    SCMCommand<?> cmd1 = new DeleteBlocksCommand(new ArrayList<>());
     cmd1.setTerm(1L);
     CommandStatus status1 = getCommandStatus(cmd1,
         StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
@@ -813,7 +815,7 @@ public class TestStateContext {
     
     // Update leader SCM term to make previous commands stale
     ctx.setTermOfLeaderSCM(2L);
-    SCMCommand<?> cmd2 = ReplicateContainerCommand.forTest(1);
+    SCMCommand<?> cmd2 = new DeleteBlocksCommand(new ArrayList<>());
     cmd2.setTerm(2L);
     CommandStatus status2 = getCommandStatus(cmd2,
         StorageContainerDatanodeProtocolProtos.CommandStatus.Status.PENDING);
