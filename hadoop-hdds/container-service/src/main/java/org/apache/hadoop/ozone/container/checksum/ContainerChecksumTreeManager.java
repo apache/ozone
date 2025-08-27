@@ -48,7 +48,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
-import org.apache.hadoop.ozone.container.checksum.BlockMerkleTreeWriter.ChunkMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -135,15 +134,15 @@ public class ContainerChecksumTreeManager {
   }
 
   /**
-   * Merges child chunk information from two deleted blocks with different checksums.
-   * This handles cases where a peer deletes a block that is completely missing some chunks
-   * so that the checksums can still converge.
+   * Selects the deleted block with the greater checksum from two deleted blocks with different checksums.
+   * Since both blocks are deleted, we don't need to merge chunk information - just keep the one
+   * with the higher checksum as the canonical representation.
    * 
    * @param ourDeletedBlock Our version of the deleted block
    * @param peerDeletedBlock Peer's version of the deleted block
-   * @return A merged BlockMerkleTree with combined chunk information
+   * @return The BlockMerkleTree with the greater checksum
    */
-  public static ContainerProtos.BlockMerkleTree mergeDeletedBlockChunks(
+  public static ContainerProtos.BlockMerkleTree mergeDeletedBlockMerkleTree(
       ContainerProtos.BlockMerkleTree ourDeletedBlock,
       ContainerProtos.BlockMerkleTree peerDeletedBlock) {
     
@@ -152,20 +151,12 @@ public class ContainerChecksumTreeManager {
           ourDeletedBlock.getBlockID() + " vs " + peerDeletedBlock.getBlockID());
     }
 
-    // Use BlockMerkleTreeWriter to merge chunks properly
-    BlockMerkleTreeWriter mergedWriter = new BlockMerkleTreeWriter(ourDeletedBlock.getBlockID());
-    
-    // Add chunks from our block
-    for (ContainerProtos.ChunkMerkleTree chunk : ourDeletedBlock.getChunkMerkleTreeList()) {
-      mergedWriter.addChunks(new ChunkMerkleTreeWriter(chunk));
+    // Return the block with the greater checksum instead of merging chunks
+    if (ourDeletedBlock.getDataChecksum() >= peerDeletedBlock.getDataChecksum()) {
+      return ourDeletedBlock;
+    } else {
+      return peerDeletedBlock;
     }
-    
-    // Add chunks from peer block (this will overwrite any chunks at the same offset)
-    for (ContainerProtos.ChunkMerkleTree chunk : peerDeletedBlock.getChunkMerkleTreeList()) {
-      mergedWriter.addChunks(new ChunkMerkleTreeWriter(chunk));
-    }
-    
-    return mergedWriter.toProto();
   }
 
   /**
@@ -296,14 +287,14 @@ public class ContainerChecksumTreeManager {
           // Both blocks are deleted - check for checksum mismatch and add to differences if different
           if (thisBlockMerkleTree.getDataChecksum() != peerBlockMerkleTree.getDataChecksum()) {
             LOG.info("Checksum mismatch detected between deleted blocks for block {} in container {}. " +
-                "Our checksum: {}, peer checksum: {}. Merging chunk information to converge checksums.",
+                "Our checksum: {}, peer checksum: {}. Selecting block with greater checksum to converge checksums.",
                 thisBlockMerkleTree.getBlockID(), thisChecksumInfo.getContainerID(),
                 thisBlockMerkleTree.getDataChecksum(), peerBlockMerkleTree.getDataChecksum());
             
-            // Merge the deleted blocks and add to differences for caller to handle
-            ContainerProtos.BlockMerkleTree mergedBlock = mergeDeletedBlockChunks(
+            // Select the deleted block with greater checksum and add to differences for caller to handle
+            ContainerProtos.BlockMerkleTree mergedDeletedBlock = mergeDeletedBlockMerkleTree(
                 thisBlockMerkleTree, peerBlockMerkleTree);
-            report.addDeletedBlockDifference(mergedBlock);
+            report.addDeletedBlockDifference(mergedDeletedBlock);
           }
         } else if (!thisBlockDeleted && !peerBlockDeleted &&
             thisBlockMerkleTree.getDataChecksum() != peerBlockMerkleTree.getDataChecksum()) {
