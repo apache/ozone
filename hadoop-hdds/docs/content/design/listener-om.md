@@ -2,9 +2,9 @@
 title: "Listener Ozone Manager"
 summary: Read-only Ozone Manager to scale out read performance.
 date: 2025-08-27
-jira: HDDS-3847
-status: draft
-author: Gemini
+jira: HDDS-11523
+status: implementing
+author: Janus Chow, Wei-Chiu Chuang
 ---
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
