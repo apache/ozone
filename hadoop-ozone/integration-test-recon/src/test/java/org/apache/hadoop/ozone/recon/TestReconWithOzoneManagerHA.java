@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -133,7 +134,11 @@ public class TestReconWithOzoneManagerHA {
 
     // Wait for async event processing to complete
     // Events are processed asynchronously, so wait for processing to finish
-    recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+    CompletableFuture<Void> completableFuture =
+        recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+    while (!completableFuture.isDone()) {
+      Thread.sleep(100);
+    }
 
     final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
         (ReconContainerMetadataManagerImpl) recon.getReconServer().getReconContainerMetadataManager();

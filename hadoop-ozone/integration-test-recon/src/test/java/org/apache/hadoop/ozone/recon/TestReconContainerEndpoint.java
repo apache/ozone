@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -109,8 +110,12 @@ public class TestReconContainerEndpoint {
 
     // Wait for async event processing to complete
     // Events are processed asynchronously, so wait for processing to finish
-    recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
-    
+    CompletableFuture<Void> completableFuture =
+        recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+    while (!completableFuture.isDone()) {
+      Thread.sleep(100);
+    }
+
     //Search for the bucket from the bucket table and verify its FSO
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volName, bucketName);
     assertNotNull(bucketInfo);
@@ -174,7 +179,11 @@ public class TestReconContainerEndpoint {
 
     // Wait for async event processing to complete
     // Events are processed asynchronously, so wait for processing to finish
-    recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+    CompletableFuture<Void> completableFuture =
+        recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+    while (!completableFuture.isDone()) {
+      Thread.sleep(100);
+    }
 
     // Search for the bucket from the bucket table and verify its OBS
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volumeName, obsBucketName);
