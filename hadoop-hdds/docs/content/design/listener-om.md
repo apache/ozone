@@ -1,12 +1,12 @@
 ---
 title: "Listener Ozone Manager"
-weight: 2
-menu:
-   main:
-      parent: Features
 summary: Read-only Ozone Manager to scale out read performance.
+date: 2025-08-27
+jira: HDDS-3847
+status: draft
+author: Gemini
 ---
-<!---
+<!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
   this work for additional information regarding copyright ownership.
@@ -41,7 +41,7 @@ Clients can be configured to send read requests to Listener OMs. This allows rea
 
 ## Best Practices
 
-*   **Recommended Cluster Topology:** For a production environment, it is recommended to have a minimum of 3 voting OMs (1 leader and 2 followers) for high availability. You can then add one or more Listener OMs to this cluster. It is not recommended to have a setup with less than 3 voting OMs, for example, 1 leader + listener OMs, or 1 leader + 1 follower + listeners.
+*   **Recommended Cluster Topology:** For a production environment, you can have 1 or 3 voting OMs. A setup with 2 voting OMs will not work as Ratis requires an odd number of voting members for quorum. You can add any number of Listener OMs to this cluster. For high availability, 3 voting OMs are recommended.
 *   **Deploy multiple Listener OMs for high availability:** To ensure that your read requests can still be served in the event of a Listener OM failure, it is recommended to deploy multiple Listener OMs.
 *   **Monitor the load on your Listener OMs:** It is important to monitor the load on your Listener OMs to ensure that they are not becoming a bottleneck.
 *   **Decommissioning a Listener OM:** A Listener OM can be decommissioned. The process is the same as decommissioning a regular OM. Once the Listener OM is decommissioned, it is removed from the OM HA Ring and does not receive Ratis transactions.
@@ -91,7 +91,7 @@ To configure a Listener OM, you need to perform the following steps:
 
 2.  **Bootstrap the Listener OM:** Before a new Listener OM can be started, it needs to be bootstrapped. This is the same process as bootstrapping a regular OM. For more details, please refer to the [OM High Availability]({{< ref "../feature/OM-HA.md#om-bootstrap" >}}) documentation.
 
-3.  **Configure clients to use Listener OMs:** To configure clients to use Listener OMs, you need to add the same `ozone-site.xml` configuration to the client.
+
 
 ## Consistency Guarantees
 
