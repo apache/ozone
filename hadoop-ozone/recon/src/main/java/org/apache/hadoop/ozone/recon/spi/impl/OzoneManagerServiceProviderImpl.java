@@ -513,7 +513,7 @@ public class OzoneManagerServiceProviderImpl
     LOG.info("Attempting to update Recon OM DB with new snapshot located at: {}",
         dbSnapshot.getCheckpointLocation());
     try {
-      omMetadataManager.updateOmDB(dbSnapshot.getCheckpointLocation().toFile());
+      omMetadataManager.updateOmDB(dbSnapshot.getCheckpointLocation().toFile(), true);
       LOG.info("Successfully updated Recon OM DB with new snapshot.");
       return true;
     } catch (IOException e) {

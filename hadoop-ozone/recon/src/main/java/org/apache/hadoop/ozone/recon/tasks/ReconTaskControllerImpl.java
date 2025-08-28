@@ -598,11 +598,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     // Create a new ReconOmMetadataManagerImpl instance with checkpointed data
     // Note: We need ReconUtils but it's not available in this class
     // We'll create the ReconOmMetadataManagerImpl with minimal dependencies
-    ReconOmMetadataManagerImpl checkpointedManager = new ReconOmMetadataManagerImpl(configuration, null);
+    ReconOmMetadataManagerImpl checkpointedManager = new ReconOmMetadataManagerImpl(configuration);
     
     // Initialize the checkpointed manager with the checkpoint location
     File checkpointDir = checkpoint.getCheckpointLocation().toFile();
-    checkpointedManager.updateOmDB(checkpointDir);
+    checkpointedManager.updateOmDB(checkpointDir, false);
     
     return checkpointedManager;
   }
