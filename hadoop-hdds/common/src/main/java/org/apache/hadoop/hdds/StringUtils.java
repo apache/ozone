@@ -99,10 +99,14 @@ public final class StringUtils {
   }
 
   /**
-   * Get the upper bound of a key. Eg. "a" -> "b", "a/b" -> "a/c", "a/b/c" -> "a/b/d".
-   * Usually used to get the upper bound of a key for pagination.
-   * @param key The key to get the upper bound of.
-   * @return The upper bound of the key.
+   * Returns the exclusive upper bound string for the given key, suitable for
+   * range scans and pagination.
+   * <p>
+   * Examples: {@code "a" -> "b"}, {@code "a/b" -> "a/c"}, {@code "a/b/c" -> "a/b/d"}.
+   * </p>
+   *
+   * @param key the key to get the upper bound of (non-null); if empty, returns an empty string
+   * @return the upper bound of the key (exclusive)
    */
   public static String getKeyUpperBound(String key) {
     if (key.isEmpty()) {
