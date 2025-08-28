@@ -117,22 +117,13 @@ Ozone uses three distinct types of policies to manage how and where data is writ
 
 ### 1. Pipeline Creation Policy
 
-This policy selects a set of datanodes to form a new pipeline. Its purpose is to ensure new pipelines are internally fault-tolerant by spreading their nodes across racks. This is the primary mechanism for topology awareness on the write path for open containers.
+This policy selects a set of datanodes to form a new pipeline. Its purpose is to ensure new pipelines are internally fault-tolerant by spreading their nodes across racks, while also balancing the number of pipelines across the datanodes. This is the primary mechanism for topology awareness on the write path for open containers.
 
 The policy is configured by the `ozone.scm.pipeline.placement.impl` property in `ozone-site.xml`.
 
-*   **`SCMContainerPlacementRackAware` (Default)**
-    *   **Function:** Distributes the datanodes of a pipeline across racks for fault tolerance (e.g., for a 3-node pipeline, it aims for at least two racks). Similar to HDFS placement. [1]
-    *   **Use Cases:** Production clusters needing rack-level fault tolerance.
-    *   **Limitations:** Designed for single-layer rack topologies (e.g., `/rack/node`). Not recommended for multi-layer hierarchies (e.g., `/dc/row/rack/node`) as it may not interpret deeper levels correctly. [1]
-
-*   **`SCMContainerPlacementRandom`**
-    *   **Function:** Randomly selects healthy, available DataNodes, ignoring rack topology. [1, 4]
-    *   **Use Cases:** Small/dev/test clusters where rack fault tolerance is not critical.
-
-*   **`SCMContainerPlacementCapacity`**
-    *   **Function:** Selects DataNodes by available capacity (favors lower disk utilization) to balance disk usage across the cluster. [5, 6]
-    *   **Use Cases:** Heterogeneous storage clusters or where even disk utilization is key.
+*   **`PipelinePlacementPolicy` (Default)**
+    *   **Function:** This is the default and only supported policy for pipeline creation. It chooses datanodes based on load balancing (pipeline count per node) and network topology. It filters out nodes that are too heavily engaged in other pipelines and then selects nodes to ensure rack diversity. This policy is recommended for most production environments.
+    *   **Use Cases:** General purpose pipeline creation in a rack-aware cluster.
 
 ### 2. Pipeline Selection (Load Balancing) Policy
 
@@ -165,7 +156,7 @@ This directs clients (replicated data) to read from topologically closest DataNo
 ## Summary of Best Practices
 
 *   **Accurate Topology:** Maintain an accurate, up-to-date topology map (static or dynamic script); this is foundational.
-*   **Pipeline Creation:** For production rack fault tolerance, use the default `SCMContainerPlacementRackAware` policy for `ozone.scm.pipeline.placement.impl`.
+*   **Pipeline Creation:** For production environments, use the default `PipelinePlacementPolicy` for `ozone.scm.pipeline.placement.impl` to ensure both rack fault tolerance and pipeline load balancing.
 *   **Pipeline Selection:** The default `RandomPipelineChoosePolicy` for `hdds.scm.pipeline.choose.policy.impl` is suitable for general load balancing.
 *   **Read Operations:** Enable `ozone.network.topology.aware.read` with accurate topology.
 *   **Monitor & Validate:** Regularly monitor placement and balance; use tools like Recon to verify topology awareness.
