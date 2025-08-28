@@ -97,4 +97,17 @@ public final class StringUtils {
   public static byte[] string2Bytes(String str) {
     return str.getBytes(UTF8);
   }
+
+  /**
+   * Get the upper bound of a key. Eg. "a" -> "b", "a/b" -> "a/c", "a/b/c" -> "a/b/d".
+   * Usually used to get the upper bound of a key for pagination.
+   * @param key The key to get the upper bound of.
+   * @return The upper bound of the key.
+   */
+  public static String getKeyUpperBound(String key) {
+    if (key.isEmpty()) {
+      return key;
+    }
+    return key.substring(0, key.length() - 1) + (char)(key.charAt(key.length() - 1) + 1);
+  }
 }
