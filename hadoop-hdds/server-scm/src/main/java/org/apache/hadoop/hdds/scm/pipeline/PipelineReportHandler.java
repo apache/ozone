@@ -51,7 +51,6 @@ public class PipelineReportHandler implements
   private final PipelineManager pipelineManager;
   private final SafeModeManager scmSafeModeManager;
   private final SCMContext scmContext;
-  private final SCMPipelineMetrics metrics;
 
   public PipelineReportHandler(SafeModeManager scmSafeModeManager,
                                PipelineManager pipelineManager,
@@ -61,7 +60,6 @@ public class PipelineReportHandler implements
     this.scmSafeModeManager = scmSafeModeManager;
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
-    this.metrics = SCMPipelineMetrics.create();
   }
 
   @Override
