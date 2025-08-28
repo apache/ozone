@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -38,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Shell;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import picocli.CommandLine;
 
 /**
@@ -46,10 +49,14 @@ import picocli.CommandLine;
 
 @CommandLine.Command(
     name = "verify",
-    description = "Run checks to verify data across replicas. By default prints only the keys with failed checks.")
+    description = "Run checks to verify data across replicas. By default prints only the keys with failed checks. " +
+        "Optionally you can filter keys by replication type (RATIS, EC) and factor.")
 public class ReplicasVerify extends Handler {
   @CommandLine.Mixin
   private ScmOption scmOption;
+
+  @CommandLine.Mixin
+  private ShellReplicationOptions replication;
 
   @CommandLine.Parameters(arity = "1",
       description = Shell.OZONE_URI_DESCRIPTION)
@@ -148,6 +155,11 @@ public class ReplicasVerify extends Handler {
     OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
         volumeName, bucketName, keyName, false);
 
+    // Check if key should be processed based on replication config
+    if (!shouldProcessKeyByReplicationType(keyInfo)) {
+      return;
+    }
+
     ObjectNode keyNode = JsonUtils.createObjectNode(null);
     keyNode.put("volumeName", volumeName);
     keyNode.put("bucketName", bucketName);
@@ -214,6 +226,26 @@ public class ReplicasVerify extends Handler {
     if (!keyPass || allResults) {
       keysArray.add(keyNode);
     }
+  }
+
+  /**
+   * Check if the key should be processed based on replication config.
+   * @param keyInfo the key to check
+   * @return true if the key should be processed, false if it should be skipped
+   */
+  private boolean shouldProcessKeyByReplicationType(OmKeyInfo keyInfo) {
+    Optional<ReplicationConfig> filterConfig = replication.fromParams(getConf());
+    if (!filterConfig.isPresent()) {
+      // No filter specified, include all keys
+      return true;
+    }
+
+    ReplicationConfig keyReplicationConfig = keyInfo.getReplicationConfig();
+    ReplicationConfig filter = filterConfig.get();
+
+    // Process key only if both replication type and factor match
+    return keyReplicationConfig.getReplicationType().equals(filter.getReplicationType())
+        && keyReplicationConfig.getReplication().equals(filter.getReplication());
   }
 
   static class Verification {

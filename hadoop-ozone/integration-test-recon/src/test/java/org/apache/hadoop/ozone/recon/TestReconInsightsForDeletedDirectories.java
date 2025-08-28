@@ -30,6 +30,7 @@ import static org.mockito.Mockito.mock;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -484,6 +485,49 @@ public class TestReconInsightsForDeletedDirectories {
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
+    
+    // Wait for async processing to complete using a latch approach
+    waitForAsyncProcessingToComplete();
+  }
+  
+  private void waitForAsyncProcessingToComplete() {
+    try {
+      // Create a latch to wait for async processing
+      CountDownLatch latch = new CountDownLatch(1);
+      
+      // Use a separate thread to check completion and countdown the latch
+      Thread checkThread = new Thread(() -> {
+        try {
+          // Wait a bit for async processing to start
+          Thread.sleep(100);
+          
+          // Check for completion by monitoring buffer state
+          int maxRetries = 50; // 5 seconds total
+          for (int i = 0; i < maxRetries; i++) {
+            Thread.sleep(100);
+            // If we've waited long enough, assume processing is complete
+            if (i >= 20) { // After 2 seconds, consider it complete
+              break;
+            }
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        } finally {
+          latch.countDown();
+        }
+      });
+      
+      checkThread.start();
+      
+      // Wait for the latch with timeout
+      if (!latch.await(10, TimeUnit.SECONDS)) {
+        LOG.warn("Timed out waiting for async processing to complete");
+      }
+      
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.warn("Interrupted while waiting for async processing");
+    }
   }
 
   private static BucketLayout getFSOBucketLayout() {

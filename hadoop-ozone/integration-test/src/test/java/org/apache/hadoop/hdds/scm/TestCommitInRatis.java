@@ -51,15 +51,14 @@ import org.junit.jupiter.params.provider.EnumSource;
  * This class tests the 2 way and 3 way commit in Ratis.
  */
 public class TestCommitInRatis {
+  private static final String VOLUME_NAME = "watchforcommithandlingtest";
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+
   private MiniOzoneCluster cluster;
   private OzoneClient client;
-  private ObjectStore objectStore;
-  private String volumeName;
-  private String bucketName;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
@@ -71,11 +70,6 @@ public class TestCommitInRatis {
    * @throws IOException
    */
   private void startCluster(OzoneConfiguration conf) throws Exception {
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
-
     // Make sure the pipeline does not get destroyed quickly
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 60000,
         TimeUnit.SECONDS);
@@ -92,10 +86,10 @@ public class TestCommitInRatis {
     conf.setFromObject(raftClientConfig);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     conf.setQuietMode(false);
@@ -105,11 +99,9 @@ public class TestCommitInRatis {
     cluster.waitForClusterToBeReady();
     // the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
-    objectStore = client.getObjectStore();
-    volumeName = "watchforcommithandlingtest";
-    bucketName = volumeName;
-    objectStore.createVolume(volumeName);
-    objectStore.getVolume(volumeName).createBucket(bucketName);
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume(VOLUME_NAME);
+    objectStore.getVolume(VOLUME_NAME).createBucket(VOLUME_NAME);
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();
   }
