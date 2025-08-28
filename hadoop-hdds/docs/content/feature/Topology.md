@@ -136,11 +136,26 @@ The policy is configured by `hdds.scm.pipeline.choose.policy.impl` in `ozone-sit
 *   **`RoundRobinPipelineChoosePolicy`:** Selects pipelines in a round-robin order. This is mainly for debugging and testing.
 *   **`HealthyPipelineChoosePolicy`:** Randomly selects pipelines but only returns a healthy one.
 
+Note: When configuring these values, include the full class name prefix: for example, org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy
+
 ### 3. Closed Container Replication Policy
 
-This policy is used only when SCM needs to create an **additional replica of a closed container**. This happens during re-replication (after a node failure) or container balancing. Its scope is narrow compared to the pipeline creation and selection policies.
+This is configured using the `ozone.scm.container.placement.impl` property in `ozone-site.xml`. The available policies are:
 
-This is configured using the `ozone.scm.container.placement.impl` property in `ozone-site.xml`. The available policies are the same as for Pipeline Creation (e.g., `SCMContainerPlacementRackAware`, `SCMContainerPlacementRandom`).
+*   **`SCMContainerPlacementRackAware` (Default)**
+    *   **Function:** Distributes the datanodes of a pipeline across racks for fault tolerance (e.g., for a 3-node pipeline, it aims for at least two racks). Similar to HDFS placement. [1]
+    *   **Use Cases:** Production clusters needing rack-level fault tolerance.
+    *   **Limitations:** Designed for single-layer rack topologies (e.g., `/rack/node`). Not recommended for multi-layer hierarchies (e.g., `/dc/row/rack/node`) as it may not interpret deeper levels correctly. [1]
+
+*   **`SCMContainerPlacementRandom`**
+    *   **Function:** Randomly selects healthy, available DataNodes, ignoring rack topology. [3]
+    *   **Use Cases:** Small/dev/test clusters where rack fault tolerance is not critical.
+
+*   **`SCMContainerPlacementCapacity`**
+    *   **Function:** Selects DataNodes by available capacity (favors lower disk utilization) to balance disk usage across the cluster. [4]
+    *   **Use Cases:** Heterogeneous storage clusters or where even disk utilization is key.
+
+Note: When configuring these values, include the full class name prefix: for example, org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity
 
 ## Optimizing Read Paths
 
