@@ -131,6 +131,10 @@ public class TestReconWithOzoneManagerHA {
     // Sync data to Recon
     impl.syncDataFromOM();
 
+    // Wait for async event processing to complete
+    // Events are processed asynchronously, so wait for processing to finish
+    recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+
     final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
         (ReconContainerMetadataManagerImpl) recon.getReconServer().getReconContainerMetadataManager();
     try (Table.KeyValueIterator<ContainerKeyPrefix, Integer> iterator

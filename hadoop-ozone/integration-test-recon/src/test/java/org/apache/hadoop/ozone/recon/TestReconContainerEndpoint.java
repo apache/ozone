@@ -107,6 +107,10 @@ public class TestReconContainerEndpoint {
         recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
 
+    // Wait for async event processing to complete
+    // Events are processed asynchronously, so wait for processing to finish
+    recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+    
     //Search for the bucket from the bucket table and verify its FSO
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volName, bucketName);
     assertNotNull(bucketInfo);
@@ -167,6 +171,10 @@ public class TestReconContainerEndpoint {
         (OzoneManagerServiceProviderImpl) recon.getReconServer()
             .getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
+
+    // Wait for async event processing to complete
+    // Events are processed asynchronously, so wait for processing to finish
+    recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
 
     // Search for the bucket from the bucket table and verify its OBS
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volumeName, obsBucketName);

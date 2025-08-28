@@ -701,6 +701,35 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
   
   /**
+   * Wait for all currently buffered events to be processed asynchronously.
+   * This method returns a CompletableFuture that completes when the event buffer becomes empty.
+   * Useful for testing to ensure async processing is complete before assertions.
+   * 
+   * @return CompletableFuture that completes when buffer is empty
+   */
+  @VisibleForTesting
+  @Override
+  public CompletableFuture<Void> waitForEventBufferEmpty() {
+    return CompletableFuture.runAsync(() -> {
+      while (eventBuffer.getQueueSize() > 0) {
+        try {
+          Thread.sleep(100); // Small interval polling
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException("Interrupted while waiting for event buffer to empty", e);
+        }
+      }
+      // Give a bit more time for final processing after buffer is empty
+      try {
+        Thread.sleep(500);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted during final wait", e);
+      }
+    });
+  }
+  
+  /**
    * Clean up any pre-existing checkpoint directories from previous runs.
    * This method looks for and removes any leftover temporary checkpoint directories
    * that may not have been cleaned up properly during previous shutdowns.
