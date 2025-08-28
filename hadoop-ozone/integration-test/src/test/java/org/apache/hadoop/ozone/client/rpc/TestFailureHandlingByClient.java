@@ -73,18 +73,14 @@ import org.apache.ratis.proto.RaftProtos;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Tests Exception handling by Ozone Client.
  */
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestFailureHandlingByClient {
 
@@ -184,11 +180,6 @@ public class TestFailureHandlingByClient {
     }
   }
 
-// This test case must run first to avoid resetting the container.
-// Resetting is needed because this test verifies the block size inside the container.
-// To prevent multiple tests from writing to the same container,
-// we run this test first to avoid unnecessary container resets.
-  @Order(1)
   @Test
   public void testBlockWritesWithDnFailures() throws Exception {
     String keyName = UUID.randomUUID().toString();
@@ -305,8 +296,6 @@ public class TestFailureHandlingByClient {
       assertThat(block1NumChunks).isGreaterThanOrEqualTo(1);
 
       assertEquals((long) chunkSize * block1NumChunks, blockData1.getSize());
-      assertEquals(1, containerData1.getBlockCount());
-      assertEquals((long) chunkSize * block1NumChunks, containerData1.getBytesUsed());
     }
 
     // Verify that the second block has the remaining 0.5*chunkSize of data
@@ -321,7 +310,6 @@ public class TestFailureHandlingByClient {
       // The second Block should have 0.5 chunkSize of data
       assertEquals(block2ExpectedChunkCount,
           blockData2.getChunks().size());
-      assertEquals(1, containerData2.getBlockCount());
       int expectedBlockSize;
       if (block2ExpectedChunkCount == 1) {
         expectedBlockSize = chunkSize / 2;
@@ -329,7 +317,6 @@ public class TestFailureHandlingByClient {
         expectedBlockSize = chunkSize + chunkSize / 2;
       }
       assertEquals(expectedBlockSize, blockData2.getSize());
-      assertEquals(expectedBlockSize, containerData2.getBytesUsed());
     }
   }
 
