@@ -226,7 +226,6 @@ public class TestOneReplicaPipelineSafeModeRule {
         reports.add(PipelineReport.newBuilder()
                 .setPipelineID(pipelineID)
                 .setIsLeader(true)
-                .setBytesWritten(0)
                 .build());
       }
       PipelineReportsProto.Builder pipelineReportsProto =

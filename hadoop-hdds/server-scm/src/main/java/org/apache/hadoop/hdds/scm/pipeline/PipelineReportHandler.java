@@ -154,7 +154,6 @@ public class PipelineReportHandler implements
         RatisReplicationConfig.hasFactor(pipeline.getReplicationConfig(),
             ReplicationFactor.ONE)) {
       pipeline.setLeaderId(dn.getID());
-      metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }
   }
 
