@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.hdds.StringUtils.getKeyUpperBound;
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -1532,7 +1532,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       // - If upload-id-marker is specified,
       // any multipart uploads for a key equal to the key-marker might also be included,
       // provided those multipart uploads have upload IDs lexicographically greater than the specified upload-id-marker.
-      prefix = getKeyUpperBound(prefix);
+      prefix = getLexicographicallyHigherString(prefix);
     }
     String seekKey = OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
