@@ -98,20 +98,29 @@ public final class StringUtils {
     return str.getBytes(UTF8);
   }
 
-  /**
-   * Returns the exclusive upper bound string for the given key, suitable for
-   * range scans and pagination.
-   * <p>
-   * Examples: {@code "a" -> "b"}, {@code "a/b" -> "a/c"}, {@code "a/b/c" -> "a/b/d"}.
-   * </p>
-   *
-   * @param key the key to get the upper bound of (non-null); if empty, returns an empty string
-   * @return the upper bound of the key (exclusive)
-   */
-  public static String getKeyUpperBound(String key) {
-    if (key.isEmpty()) {
-      return key;
+  public static String getLexicographicallyLowerString(String val) {
+    if (val == null || val.isEmpty()) {
+      throw new IllegalArgumentException("Input string must not be null or empty");
     }
-    return key.substring(0, key.length() - 1) + (char)(key.charAt(key.length() - 1) + 1);
+    char[] charVal = val.toCharArray();
+    int lastIdx = charVal.length - 1;
+    if (charVal[lastIdx] == Character.MIN_VALUE) {
+      throw new IllegalArgumentException("Cannot decrement character below Character.MIN_VALUE");
+    }
+    charVal[lastIdx] -= 1;
+    return String.valueOf(charVal);
+  }
+
+  public static String getLexicographicallyHigherString(String val) {
+    if (val == null || val.isEmpty()) {
+      throw new IllegalArgumentException("Input string must not be null or empty");
+    }
+    char[] charVal = val.toCharArray();
+    int lastIdx = charVal.length - 1;
+    if (charVal[lastIdx] == Character.MAX_VALUE) {
+      throw new IllegalArgumentException("Cannot increment character above Character.MAX_VALUE");
+    }
+    charVal[lastIdx] += 1;
+    return String.valueOf(charVal);
   }
 }
