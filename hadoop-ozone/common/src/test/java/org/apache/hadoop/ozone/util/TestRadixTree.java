@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 public class TestRadixTree {
 
   static final RadixTree<Integer> ROOT = new RadixTree<>();
-  static final String BASE_PATH = "/a";
+  static final String BASE_PATH = "a";
   static final Path PATH_B = Paths.get(BASE_PATH, "b");
   static final Path PATH_BC = Paths.get(BASE_PATH, "b", "c");
   static final Path PATH_BCD = Paths.get(BASE_PATH, "b", "c", "d");
@@ -80,7 +80,7 @@ public class TestRadixTree {
         )
     );
 
-    assertEquals("/", ROOT.getLongestPrefix("/d/b/c"));
+    assertEquals("/", ROOT.getLongestPrefix("d/b/c"));
     assertEquals(Paths.get(BASE_PATH, "b", "e").toString(),
         ROOT.getLongestPrefix(
             Paths.get(BASE_PATH, "b", "e", "dir3").toString()
@@ -117,7 +117,7 @@ public class TestRadixTree {
     assertEquals("g", lqn.getName());
     assertEquals(100, (int)lqn.getValue());
 
-    assertEquals("/a/", RadixTree.radixPathToString(
+    assertEquals(BASE_PATH, RadixTree.radixPathToString(
         ROOT.getLongestPrefixPath(Paths.get(BASE_PATH, "g").toString())));
   }
 
@@ -142,7 +142,7 @@ public class TestRadixTree {
     ROOT.insert(PATH_BCD.toString());
 
     // Remove non-existing path
-    ROOT.removePrefixPath("/d/a");
+    ROOT.removePrefixPath("d/a");
     assertEquals(PATH_BCD.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
   }
 }
