@@ -986,14 +986,12 @@ public class KeyManagerImpl implements KeyManager {
       OmMultipartUploadList.Builder resultBuilder = OmMultipartUploadList.newBuilder();
 
       if (withPagination && multipartUploadKeys.size() == maxUploads + 1) {
-        int lastIndex = multipartUploadKeys.size() - 1;
-        OmMultipartUpload lastUpload = multipartUploadKeys.get(lastIndex);
-        resultBuilder.setNextKeyMarker(lastUpload.getKeyName())
-            .setNextUploadIdMarker(lastUpload.getUploadId())
+        // Per spec, next markers should be the last element of the returned list, not the lookahead.
+        multipartUploadKeys.remove(multipartUploadKeys.size() - 1);
+        OmMultipartUpload lastReturned = multipartUploadKeys.get(multipartUploadKeys.size() - 1);
+        resultBuilder.setNextKeyMarker(lastReturned.getKeyName())
+            .setNextUploadIdMarker(lastReturned.getUploadId())
             .setIsTruncated(true);
-
-        // remove next upload from the list
-        multipartUploadKeys.remove(lastIndex);
       }
 
       return resultBuilder
