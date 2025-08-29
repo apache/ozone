@@ -60,10 +60,8 @@ public class TestContainerDeletionChoosingPolicy {
   @TempDir
   private File tempFile;
   private String path;
-  private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
   private OzoneConfiguration conf;
-  private BlockDeletingService blockDeletingService;
   // the service timeout
   private static final int SERVICE_TIMEOUT_IN_MILLISECONDS = 0;
   private static final int SERVICE_INTERVAL_IN_MILLISECONDS = 1000;
@@ -102,7 +100,7 @@ public class TestContainerDeletionChoosingPolicy {
           containerSet.getContainerMapCopy())
               .containsKey(data.getContainerID());
     }
-    blockDeletingService = getBlockDeletingService();
+    BlockDeletingService blockDeletingService = getBlockDeletingService();
 
     int blockLimitPerInterval = 5;
     ContainerDeletionChoosingPolicy deletionPolicy =
@@ -159,7 +157,7 @@ public class TestContainerDeletionChoosingPolicy {
     KeyValueContainerData closingData = createContainerWithState(layout,
         ContainerProtos.ContainerDataProto.State.CLOSING);
 
-    blockDeletingService = getBlockDeletingService();
+    BlockDeletingService blockDeletingService = getBlockDeletingService();
     ContainerDeletionChoosingPolicy deletionPolicy =
         new TopNOrderedContainerDeletionChoosingPolicy();
 
@@ -239,7 +237,7 @@ public class TestContainerDeletionChoosingPolicy {
     }
     numberOfBlocks.sort(Collections.reverseOrder());
     int blockLimitPerInterval = 5;
-    blockDeletingService = getBlockDeletingService();
+    BlockDeletingService blockDeletingService = getBlockDeletingService();
     ContainerDeletionChoosingPolicy deletionPolicy =
         new TopNOrderedContainerDeletionChoosingPolicy();
     List<ContainerBlockInfo> result0 = blockDeletingService
@@ -281,10 +279,10 @@ public class TestContainerDeletionChoosingPolicy {
   }
 
   private BlockDeletingService getBlockDeletingService() {
-    ozoneContainer = mock(OzoneContainer.class);
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getWriteChannel()).thenReturn(null);
-    blockDeletingService = new BlockDeletingService(ozoneContainer,
+    BlockDeletingService blockDeletingService = new BlockDeletingService(ozoneContainer,
         SERVICE_INTERVAL_IN_MILLISECONDS, SERVICE_TIMEOUT_IN_MILLISECONDS,
         TimeUnit.MILLISECONDS, 10, conf, new ContainerChecksumTreeManager(conf));
     return blockDeletingService;
