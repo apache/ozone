@@ -66,10 +66,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -632,17 +630,11 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param store AOS or snapshot DB for uncompacted or compacted snapshot respectively.
    * @return a Map of (table, set of SST files corresponding to the table)
    */
-  private static Map<String, Set<String>> getSnapshotSSTFileList(RDBStore store)
+  private static List<LiveFileMetaData> getSnapshotSSTFileList(RDBStore store)
       throws IOException {
-    Map<String, Set<String>> sstFileList = new HashMap<>();
-    List<LiveFileMetaData> liveFileMetaDataList = store.getDb().getLiveFilesMetaData();
-    liveFileMetaDataList.forEach(lfm -> {
-      String cfName = StringUtils.bytes2String(lfm.columnFamilyName());
-      if (COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT.contains(cfName)) {
-        sstFileList.computeIfAbsent(cfName, k -> new HashSet<>()).add(lfm.fileName());
-      }
-    });
-    return sstFileList;
+    return store.getDb().getLiveFilesMetaData().stream()
+        .filter(lfm -> COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT.contains(StringUtils.bytes2String(lfm.columnFamilyName())))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -656,7 +648,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       throws IOException {
     Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(omMetadataManager, snapshotInfo));
     Files.deleteIfExists(snapshotLocalDataPath);
-    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(store));
+    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(store),
+        snapshotInfo.getPathPreviousSnapshotId());
     snapshotLocalDataYaml.writeToYaml(snapshotLocalDataPath.toFile());
   }
 

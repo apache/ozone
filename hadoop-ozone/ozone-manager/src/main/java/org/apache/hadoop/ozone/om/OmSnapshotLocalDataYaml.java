@@ -22,23 +22,32 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.UUID;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.ozone.compaction.log.SstFileInfo;
+import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.TypeDescription;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.AbstractConstruct;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.introspector.BeanAccess;
+import org.yaml.snakeyaml.introspector.Property;
 import org.yaml.snakeyaml.introspector.PropertyUtils;
 import org.yaml.snakeyaml.nodes.MappingNode;
 import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.NodeTuple;
+import org.yaml.snakeyaml.nodes.ScalarNode;
 import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.representer.Represent;
 import org.yaml.snakeyaml.representer.Representer;
 
 /**
@@ -51,12 +60,14 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
   private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataYaml.class);
 
   public static final Tag SNAPSHOT_YAML_TAG = new Tag("OmSnapshotLocalData");
+  public static final Tag SNAPSHOT_VERSION_META_TAG = new Tag("VersionMeta");
+  public static final Tag SST_FILE_INFO_TAG = new Tag("SstFileInfo");
 
   /**
    * Creates a new OmSnapshotLocalDataYaml with default values.
    */
-  public OmSnapshotLocalDataYaml(Map<String, Set<String>> uncompactedSSTFileList) {
-    super(uncompactedSSTFileList);
+  public OmSnapshotLocalDataYaml(List<LiveFileMetaData> liveFileMetaDatas, UUID previousSnapshotId) {
+    super(liveFileMetaDatas, previousSnapshotId);
   }
 
   /**
@@ -91,7 +102,7 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
     snapshotDataCopy.setChecksum(null);
 
     // Get the YAML representation
-    final Yaml yaml = getYamlForSnapshotLocalData();
+    final Yaml yaml = OmSnapshotLocalDataYamlProvider.getInstance();
 
     // Compute new checksum
     snapshotDataCopy.computeAndSetChecksum(yaml);
@@ -109,6 +120,63 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
   }
 
   /**
+   * Representer class to define which fields need to be stored in yaml file.
+   */
+  private static class OmSnapshotLocalDataRepresenter extends Representer {
+
+    OmSnapshotLocalDataRepresenter(DumperOptions options) {
+      super(options);
+      this.addClassTag(OmSnapshotLocalDataYaml.class, SNAPSHOT_YAML_TAG);
+      this.addClassTag(VersionMeta.class, SNAPSHOT_VERSION_META_TAG);
+      this.addClassTag(SstFileInfo.class, SST_FILE_INFO_TAG);
+      representers.put(SstFileInfo.class, new RepresentSstFileInfo());
+      representers.put(VersionMeta.class, new RepresentVersionMeta());
+      representers.put(UUID.class, data ->
+          new ScalarNode(Tag.STR, data.toString(), null, null, DumperOptions.ScalarStyle.PLAIN));
+    }
+
+    private class RepresentSstFileInfo implements Represent {
+      @Override
+      public Node representData(Object data) {
+        SstFileInfo info = (SstFileInfo) data;
+        Map<String, Object> map = new java.util.LinkedHashMap<>();
+        map.put(OzoneConsts.OM_SST_FILE_INFO_FILE_NAME, info.getFileName());
+        map.put(OzoneConsts.OM_SST_FILE_INFO_START_KEY, info.getStartKey());
+        map.put(OzoneConsts.OM_SST_FILE_INFO_END_KEY, info.getEndKey());
+        map.put(OzoneConsts.OM_SST_FILE_INFO_COL_FAMILY, info.getColumnFamily());
+
+        // Explicitly create a mapping node with the desired tag
+        return representMapping(SST_FILE_INFO_TAG, map, DumperOptions.FlowStyle.BLOCK);
+      }
+    }
+
+    // New inner class for VersionMeta
+    private class RepresentVersionMeta implements Represent {
+      @Override
+      public Node representData(Object data) {
+        VersionMeta meta = (VersionMeta) data;
+        Map<String, Object> map = new java.util.LinkedHashMap<>();
+        map.put(OzoneConsts.OM_SLD_VERSION_META_PREV_SNAP_VERSION, meta.getPreviousSnapshotVersion());
+        map.put(OzoneConsts.OM_SLD_VERSION_META_SST_FILES, meta.getSstFiles());
+
+        return representMapping(SNAPSHOT_VERSION_META_TAG, map, DumperOptions.FlowStyle.BLOCK);
+      }
+    }
+
+
+    /**
+     * Omit properties with null value.
+     */
+    @Override
+    protected NodeTuple representJavaBeanProperty(
+        Object bean, Property property, Object value, Tag tag) {
+      return value == null
+          ? null
+          : super.representJavaBeanProperty(bean, property, value, tag);
+    }
+  }
+
+  /**
    * Constructor class for OmSnapshotLocalData.
    * This is used when parsing YAML files into OmSnapshotLocalDataYaml objects.
    */
@@ -117,6 +185,37 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
       super(new LoaderOptions());
       //Adding our own specific constructors for tags.
       this.yamlConstructors.put(SNAPSHOT_YAML_TAG, new ConstructSnapshotLocalData());
+      this.yamlConstructors.put(SNAPSHOT_VERSION_META_TAG, new ConstructVersionMeta());
+      this.yamlConstructors.put(SST_FILE_INFO_TAG, new ConstructSstFileInfo());
+      TypeDescription omDesc = new TypeDescription(OmSnapshotLocalDataYaml.class);
+      omDesc.putMapPropertyType(OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO, Integer.class, VersionMeta.class);
+      this.addTypeDescription(omDesc);
+      TypeDescription versionMetaDesc = new TypeDescription(VersionMeta.class);
+      versionMetaDesc.putListPropertyType(OzoneConsts.OM_SLD_VERSION_META_SST_FILES, SstFileInfo.class);
+      this.addTypeDescription(versionMetaDesc);
+    }
+
+    private final class ConstructSstFileInfo extends AbstractConstruct {
+      @Override
+      public Object construct(Node node) {
+        MappingNode mnode = (MappingNode) node;
+        Map<Object, Object> nodes = constructMapping(mnode);
+        return new SstFileInfo((String) nodes.get(OzoneConsts.OM_SST_FILE_INFO_FILE_NAME),
+            (String) nodes.get(OzoneConsts.OM_SST_FILE_INFO_START_KEY),
+            (String) nodes.get(OzoneConsts.OM_SST_FILE_INFO_END_KEY),
+            (String) nodes.get(OzoneConsts.OM_SST_FILE_INFO_COL_FAMILY));
+      }
+    }
+
+    private final class ConstructVersionMeta extends AbstractConstruct {
+
+      @Override
+      public Object construct(Node node) {
+        MappingNode mnode = (MappingNode) node;
+        Map<Object, Object> nodes = constructMapping(mnode);
+        return new VersionMeta((Integer) nodes.get(OzoneConsts.OM_SLD_VERSION_META_PREV_SNAP_VERSION),
+            (List<SstFileInfo>) nodes.get(OzoneConsts.OM_SLD_VERSION_META_SST_FILES));
+      }
     }
 
     private final class ConstructSnapshotLocalData extends AbstractConstruct {
@@ -125,10 +224,8 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
-
-        Map<String, Set<String>> uncompactedSSTFileList =
-            (Map<String, Set<String>>) nodes.get(OzoneConsts.OM_SLD_UNCOMPACTED_SST_FILE_LIST);
-        OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml(uncompactedSSTFileList);
+        UUID prevSnapId = UUID.fromString((String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID));
+        OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml(Collections.emptyList(), prevSnapId);
 
         // Set version from YAML
         Integer version = (Integer) nodes.get(OzoneConsts.OM_SLD_VERSION);
@@ -149,11 +246,10 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
         snapshotLocalData.setLastCompactionTime(lastCompactionTime);
 
         snapshotLocalData.setNeedsCompaction((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_COMPACTION, false));
-
-        Map<Integer, Map<String, Set<String>>> compactedSSTFileList =
-            (Map<Integer, Map<String, Set<String>>>) nodes.get(OzoneConsts.OM_SLD_COMPACTED_SST_FILE_LIST);
-        if (compactedSSTFileList != null) {
-          snapshotLocalData.setCompactedSSTFileList(compactedSSTFileList);
+        Map<Integer, VersionMeta> versionMetaMap =
+            (Map<Integer, VersionMeta>) nodes.get(OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO);
+        if (versionMetaMap != null) {
+          snapshotLocalData.setVersionSstFileInfos(versionMetaMap);
         }
 
         String checksum = (String) nodes.get(OzoneConsts.OM_SLD_CHECKSUM);
@@ -172,7 +268,7 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * @return YAML string representation
    */
   public String getYaml() {
-    final Yaml yaml = getYamlForSnapshotLocalData();
+    final Yaml yaml = OmSnapshotLocalDataYamlProvider.getInstance();
     return yaml.dump(this);
   }
 
@@ -183,7 +279,7 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    */
   public void writeToYaml(File yamlFile) throws IOException {
     // Create Yaml
-    final Yaml yaml = getYamlForSnapshotLocalData();
+    final Yaml yaml = OmSnapshotLocalDataYamlProvider.getInstance();
     // Compute Checksum and update SnapshotData
     computeAndSetChecksum(yaml);
     // Write the SnapshotData with checksum to Yaml file.
@@ -204,44 +300,13 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
   }
 
   /**
-   * Returns a Yaml representation of the snapshot properties.
-   * @return Yaml representation of snapshot properties
-   */
-  public static Yaml getYamlForSnapshotLocalData() {
-    PropertyUtils propertyUtils = new PropertyUtils();
-    propertyUtils.setBeanAccess(BeanAccess.FIELD);
-    propertyUtils.setAllowReadOnlyProperties(true);
-
-    DumperOptions options = new DumperOptions();
-    Representer representer = new Representer(options);
-    representer.setPropertyUtils(propertyUtils);
-    representer.addClassTag(OmSnapshotLocalDataYaml.class, SNAPSHOT_YAML_TAG);
-
-    SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
-    return new Yaml(snapshotDataConstructor, representer);
-  }
-
-  /**
    * Read the YAML content InputStream, and return OmSnapshotLocalDataYaml instance.
    * @throws IOException
    */
   public static OmSnapshotLocalDataYaml getFromYamlStream(InputStream input) throws IOException {
     OmSnapshotLocalDataYaml dataYaml;
-
-    PropertyUtils propertyUtils = new PropertyUtils();
-    propertyUtils.setBeanAccess(BeanAccess.FIELD);
-    propertyUtils.setAllowReadOnlyProperties(true);
-
-    DumperOptions options = new DumperOptions();
-    Representer representer = new Representer(options);
-    representer.setPropertyUtils(propertyUtils);
-
-    SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
-
-    Yaml yaml = new Yaml(snapshotDataConstructor, representer);
-
     try {
-      dataYaml = yaml.load(input);
+      dataYaml = OmSnapshotLocalDataYamlProvider.getInstance().load(input);
     } catch (YAMLException ex) {
       // Unchecked exception. Convert to IOException
       throw new IOException(ex);
@@ -255,5 +320,27 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
     }
 
     return dataYaml;
+  }
+
+  private static class OmSnapshotLocalDataYamlProvider {
+    private static volatile Yaml instance = getInstance();
+
+    public static Yaml getInstance() {
+      if (instance == null) {
+        synchronized (OmSnapshotLocalDataYamlProvider.class) {
+          if (instance == null) {
+            PropertyUtils propertyUtils = new PropertyUtils();
+            propertyUtils.setBeanAccess(BeanAccess.FIELD);
+            propertyUtils.setAllowReadOnlyProperties(true);
+            DumperOptions options = new DumperOptions();
+            Representer representer = new OmSnapshotLocalDataRepresenter(options);
+            representer.setPropertyUtils(propertyUtils);
+            SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
+            instance = new Yaml(snapshotDataConstructor, representer);
+          }
+        }
+      }
+      return instance;
+    }
   }
 }
