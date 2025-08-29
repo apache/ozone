@@ -25,9 +25,11 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,10 +46,12 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
@@ -110,6 +114,10 @@ public class HddsVolume extends StorageVolume {
   private final int volumeTestFailureTolerance;
   private AtomicInteger volumeTestFailureCount;
   private Queue<Boolean> volumeTestResultQueue;
+
+  private final AtomicLong cachedPendingDeletionBytes = new AtomicLong(0);
+  private final AtomicBoolean updateInProgress = new AtomicBoolean(false);
+  private volatile long lastPendingDeletionUpdate = 0;
 
   /**
    * Builder for HddsVolume.
@@ -203,6 +211,7 @@ public class HddsVolume extends StorageVolume {
     StorageLocationReport.Builder builder = super.reportBuilder();
     if (!builder.isFailed()) {
       builder.setCommitted(getCommittedBytes())
+          .setPendingDeletions(getPendingDeletionBytes())
           .setFreeSpaceToSpare(getFreeSpaceToSpare(builder.getCapacity()));
     }
     return builder;
@@ -396,6 +405,48 @@ public class HddsVolume extends StorageVolume {
    */
   public long getCommittedBytes() {
     return committedBytes.get();
+  }
+
+  /**
+   * return the pending deletion size per volume.
+   * @return bytes of deletion pending
+   */
+  public long getPendingDeletionBytes() {
+    if (controller == null) {
+      return 0;
+    }
+    long currentTime = System.currentTimeMillis();
+    // setting cache update time as 5 times of BlockDeletionInterval
+    long pendingDeletionCacheIntervalMs = getDatanodeConfig().getBlockDeletionInterval().getSeconds() * 5 * 1000;
+    if (currentTime - lastPendingDeletionUpdate >= pendingDeletionCacheIntervalMs &&
+        updateInProgress.compareAndSet(false, true)) {
+      CompletableFuture.runAsync(this::updatePendingDeletionBytes);
+    }
+    return cachedPendingDeletionBytes.get();
+  }
+
+  private void updatePendingDeletionBytes() {
+    try {
+      if (controller == null) {
+        return;
+      }
+      long pendingDeletionBytes = 0;
+      Iterator<Container<?>> containerIterator = controller.getContainers(this);
+      while (containerIterator.hasNext()) {
+        Container<?> container = containerIterator.next();
+        if (container.getContainerData() instanceof KeyValueContainerData) {
+          KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+          pendingDeletionBytes += containerData.getBlockPendingDeletionBytes();
+        }
+      }
+      cachedPendingDeletionBytes.set(pendingDeletionBytes);
+      lastPendingDeletionUpdate = System.currentTimeMillis();
+    } catch (Exception e) {
+      LOG.warn("Failed to update pending deletion bytes for volume {}",
+          getStorageID(), e);
+    } finally {
+      updateInProgress.set(false);
+    }
   }
 
   public long getFreeSpaceToSpare(long volumeCapacity) {

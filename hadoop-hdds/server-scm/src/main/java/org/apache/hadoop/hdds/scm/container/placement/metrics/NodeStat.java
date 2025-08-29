@@ -53,6 +53,8 @@ interface NodeStat {
    */
   LongMetric getFreeSpaceToSpare();
 
+  LongMetric getPendingDeletions();
+
   /**
    * Set the total/used/remaining space.
    * @param capacity - total space.
@@ -61,7 +63,7 @@ interface NodeStat {
    */
   @VisibleForTesting
   void set(long capacity, long used, long remain, long committed,
-           long freeSpaceToSpare);
+           long freeSpaceToSpare, long pendingDeletions);
 
   /**
    * Adding of the stat.
