@@ -93,7 +93,7 @@
     <guava.version>33.4.8-jre</guava.version>
     <guice.version>6.0.0</guice.version>
     <hadoop-thirdparty.version>1.4.0</hadoop-thirdparty.version>
-    <hadoop.version>3.4.1</hadoop.version>
+    <hadoop.version>3.4.2</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
     <hamcrest.version>2.2</hamcrest.version>
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
