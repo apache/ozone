@@ -84,6 +84,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
@@ -495,8 +496,14 @@ public final class OmSnapshotManager implements AutoCloseable {
     } else {
       dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
     }
-    // Create the snapshot local property file.
-    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager, snapshotInfo, store);
+    OmSnapshotManager omSnapshotManager =
+        ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshotSupplier =
+             omSnapshotManager.getSnapshot(snapshotInfo.getSnapshotId())) {
+      // Create the snapshot local property file.
+      OmSnapshotManager.createNewOmSnapshotLocalDataFile(
+          (RDBStore) omSnapshotSupplier.get().getMetadataManager().getStore(), snapshotInfo);
+    }
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
     // Snapshot create is processed as a single transaction and
@@ -609,16 +616,12 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   /**
    * Creates and writes snapshot local properties to a YAML file with uncompacted SST file list.
-   * @param omMetadataManager the metadata manager
-   * @param snapshotInfo The metadata of snapshot to be created
-   * @param store The store used to get uncompacted SST file list from.
+   * @param snapshotStore snapshot metadata manager.
    */
-  public static void createNewOmSnapshotLocalDataFile(
-      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo, RDBStore store)
-      throws IOException {
-    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(omMetadataManager, snapshotInfo));
+  public static void createNewOmSnapshotLocalDataFile(RDBStore snapshotStore, SnapshotInfo snapshotInfo) throws IOException {
+    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(snapshotStore.getDbLocation().toPath()));
     Files.deleteIfExists(snapshotLocalDataPath);
-    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(store),
+    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(snapshotStore),
         snapshotInfo.getPathPreviousSnapshotId());
     snapshotLocalDataYaml.writeToYaml(snapshotLocalDataPath.toFile());
   }
