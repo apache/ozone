@@ -62,8 +62,6 @@ public class TestSendContainerRequestHandler {
 
   private OzoneConfiguration conf;
 
-  private VolumeChoosingPolicy volumeChoosingPolicy;
-
   private ContainerSet containerSet;
   private MutableVolumeSet volumeSet;
   private ContainerImporter importer;
@@ -75,7 +73,7 @@ public class TestSendContainerRequestHandler {
   void setup() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
-    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     containerSet = newContainerSet(0);
     volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);

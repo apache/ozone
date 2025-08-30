@@ -317,12 +317,12 @@ class TestOmSnapshotManager {
     assertTrue(snapshotYaml.toFile().createNewFile());
     assertEquals(0, Files.size(snapshotYaml));
     // Create a new YAML file for the snapshot
-    OmSnapshotManager.createNewOmSnapshotLocalDataFile(mockedStore, snapshotInfo);
+    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager, mockedStore, snapshotInfo);
     // Verify that previous file was overwritten
     assertTrue(Files.exists(snapshotYaml));
     assertTrue(Files.size(snapshotYaml) > 0);
     // Verify the contents of the YAML file
-    OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(snapshotYaml.toFile());
+    OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, snapshotYaml.toFile());
     assertNotNull(localData);
     assertEquals(0, localData.getVersion());
     assertEquals(uncompactedVersionMeta, localData.getVersionSstFileInfos().get(0));
