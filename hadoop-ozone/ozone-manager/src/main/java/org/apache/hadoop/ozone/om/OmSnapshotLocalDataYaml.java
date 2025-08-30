@@ -26,9 +26,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.commons.pool2.BasePooledObjectFactory;
+import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.compaction.log.SstFileInfo;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +88,7 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * @return true if the checksum is valid, false otherwise
    * @throws IOException if there's an error computing the checksum
    */
-  public static boolean verifyChecksum(OmSnapshotLocalData snapshotData)
+  public static boolean verifyChecksum(OmSnapshotManager snapshotManager, OmSnapshotLocalData snapshotData)
       throws IOException {
     Preconditions.checkNotNull(snapshotData, "snapshotData cannot be null");
 
@@ -102,21 +106,20 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
     snapshotDataCopy.setChecksum(null);
 
     // Get the YAML representation
-    final Yaml yaml = OmSnapshotLocalDataYamlProvider.getInstance();
+    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
+      // Compute new checksum
+      snapshotDataCopy.computeAndSetChecksum(yaml.get());
 
-    // Compute new checksum
-    snapshotDataCopy.computeAndSetChecksum(yaml);
+      // Compare the stored and computed checksums
+      String computedChecksum = snapshotDataCopy.getChecksum();
+      boolean isValid = storedChecksum.equals(computedChecksum);
 
-    // Compare the stored and computed checksums
-    String computedChecksum = snapshotDataCopy.getChecksum();
-    boolean isValid = storedChecksum.equals(computedChecksum);
-
-    if (!isValid) {
-      LOG.warn("Checksum verification failed for snapshot local data. " +
-          "Stored: {}, Computed: {}", storedChecksum, computedChecksum);
+      if (!isValid) {
+        LOG.warn("Checksum verification failed for snapshot local data. " +
+            "Stored: {}, Computed: {}", storedChecksum, computedChecksum);
+      }
+      return isValid;
     }
-
-    return isValid;
   }
 
   /**
@@ -267,9 +270,10 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * (without triggering checksum computation or persistence).
    * @return YAML string representation
    */
-  public String getYaml() {
-    final Yaml yaml = OmSnapshotLocalDataYamlProvider.getInstance();
-    return yaml.dump(this);
+  public String getYaml(OmSnapshotManager snapshotManager) throws IOException {
+    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
+      return yaml.get().dump(this);
+    }
   }
 
   /**
@@ -277,13 +281,14 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * @param yamlFile The file to write to
    * @throws IOException If there's an error writing to the file
    */
-  public void writeToYaml(File yamlFile) throws IOException {
+  public void writeToYaml(OmSnapshotManager snapshotManager, File yamlFile) throws IOException {
     // Create Yaml
-    final Yaml yaml = OmSnapshotLocalDataYamlProvider.getInstance();
-    // Compute Checksum and update SnapshotData
-    computeAndSetChecksum(yaml);
-    // Write the SnapshotData with checksum to Yaml file.
-    YamlUtils.dump(yaml, this, yamlFile, LOG);
+    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
+      // Compute Checksum and update SnapshotData
+      computeAndSetChecksum(yaml.get());
+      // Write the SnapshotData with checksum to Yaml file.
+      YamlUtils.dump(yaml.get(), this, yamlFile, LOG);
+    }
   }
 
   /**
@@ -292,10 +297,11 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * @return A new OmSnapshotLocalDataYaml instance
    * @throws IOException If there's an error reading the file
    */
-  public static OmSnapshotLocalDataYaml getFromYamlFile(File yamlFile) throws IOException {
+  public static OmSnapshotLocalDataYaml getFromYamlFile(OmSnapshotManager snapshotManager, File yamlFile)
+      throws IOException {
     Preconditions.checkNotNull(yamlFile, "yamlFile cannot be null");
     try (InputStream inputFileStream = Files.newInputStream(yamlFile.toPath())) {
-      return getFromYamlStream(inputFileStream);
+      return getFromYamlStream(snapshotManager, inputFileStream);
     }
   }
 
@@ -303,10 +309,11 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * Read the YAML content InputStream, and return OmSnapshotLocalDataYaml instance.
    * @throws IOException
    */
-  public static OmSnapshotLocalDataYaml getFromYamlStream(InputStream input) throws IOException {
+  public static OmSnapshotLocalDataYaml getFromYamlStream(OmSnapshotManager snapshotManager,
+      InputStream input) throws IOException {
     OmSnapshotLocalDataYaml dataYaml;
-    try {
-      dataYaml = OmSnapshotLocalDataYamlProvider.getInstance().load(input);
+    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
+      dataYaml = yaml.get().load(input);
     } catch (YAMLException ex) {
       // Unchecked exception. Convert to IOException
       throw new IOException(ex);
@@ -322,25 +329,39 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
     return dataYaml;
   }
 
-  private static class OmSnapshotLocalDataYamlProvider {
-    private static volatile Yaml instance = getInstance();
+  /**
+   * Factory class for constructing and pooling instances of the Yaml object.
+   * This class extends BasePooledObjectFactory to support object pooling,
+   * minimizing the expense of repeatedly creating and destroying Yaml instances.
+   *
+   * The Yaml instances created by this factory are customized to use a specific
+   * set of property and serialization/deserialization configurations.
+   * - BeanAccess is configured to access fields directly, allowing manipulation
+   *   of private fields in objects.
+   * - The PropertyUtils allows read-only properties to be accessed.
+   * - Custom Representer and Constructor classes tailored to the OmSnapshotLocalData
+   *   data structure are employed to customize how objects are represented in YAML.
+   *
+   * This class provides thread-safe pooling and management of Yaml instances,
+   * ensuring efficient resource usage in high-concurrency environments.
+   */
+  public static class YamlFactory extends BasePooledObjectFactory<Yaml> {
 
-    public static Yaml getInstance() {
-      if (instance == null) {
-        synchronized (OmSnapshotLocalDataYamlProvider.class) {
-          if (instance == null) {
-            PropertyUtils propertyUtils = new PropertyUtils();
-            propertyUtils.setBeanAccess(BeanAccess.FIELD);
-            propertyUtils.setAllowReadOnlyProperties(true);
-            DumperOptions options = new DumperOptions();
-            Representer representer = new OmSnapshotLocalDataRepresenter(options);
-            representer.setPropertyUtils(propertyUtils);
-            SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
-            instance = new Yaml(snapshotDataConstructor, representer);
-          }
-        }
-      }
-      return instance;
+    @Override
+    public Yaml create() {
+      PropertyUtils propertyUtils = new PropertyUtils();
+      propertyUtils.setBeanAccess(BeanAccess.FIELD);
+      propertyUtils.setAllowReadOnlyProperties(true);
+      DumperOptions options = new DumperOptions();
+      Representer representer = new OmSnapshotLocalDataRepresenter(options);
+      representer.setPropertyUtils(propertyUtils);
+      SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
+      return new Yaml(snapshotDataConstructor, representer);
+    }
+
+    @Override
+    public PooledObject<Yaml> wrap(Yaml yaml) {
+      return new DefaultPooledObject<>(yaml);
     }
   }
 }
