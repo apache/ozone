@@ -208,10 +208,16 @@ public final class OzoneConsts {
   public static final String OM_SLD_VERSION = "version";
   public static final String OM_SLD_CHECKSUM = "checksum";
   public static final String OM_SLD_IS_SST_FILTERED = "isSSTFiltered";
-  public static final String OM_SLD_UNCOMPACTED_SST_FILE_LIST = "uncompactedSSTFileList";
   public static final String OM_SLD_LAST_COMPACTION_TIME = "lastCompactionTime";
   public static final String OM_SLD_NEEDS_COMPACTION = "needsCompaction";
-  public static final String OM_SLD_COMPACTED_SST_FILE_LIST = "compactedSSTFileList";
+  public static final String OM_SLD_VERSION_SST_FILE_INFO = "versionSstFileInfos";
+  public static final String OM_SLD_PREV_SNAP_ID = "previousSnapshotId";
+  public static final String OM_SLD_VERSION_META_SST_FILES = "sstFiles";
+  public static final String OM_SLD_VERSION_META_PREV_SNAP_VERSION = "previousSnapshotVersion";
+  public static final String OM_SST_FILE_INFO_FILE_NAME = "fileName";
+  public static final String OM_SST_FILE_INFO_START_KEY = "startKey";
+  public static final String OM_SST_FILE_INFO_END_KEY = "endKey";
+  public static final String OM_SST_FILE_INFO_COL_FAMILY = "columnFamily";
 
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
