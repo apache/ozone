@@ -49,6 +49,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -58,11 +59,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -90,7 +93,9 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -1678,5 +1683,35 @@ public class SCMClientProtocolServer implements
       AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.RECONCILE_CONTAINER, auditMap, ex));
       throw ex;
     }
+  }
+
+  @Override
+  public StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto getVolumeInfos() throws IOException {
+    GetVolumeInfosResponseProto.Builder getVolumeInfosResponseBuilder =
+        GetVolumeInfosResponseProto.newBuilder();
+    NodeManager scmNodeManager = scm.getScmNodeManager();
+    List<? extends DatanodeDetails> allNodes = scmNodeManager.getAllNodes();
+    // If the filtered list is empty, we will return directly.
+    if (CollectionUtils.isEmpty(allNodes)) {
+      return getVolumeInfosResponseBuilder.build();
+    }
+    // We convert it to a list of VolumeInfoProto.
+    List<VolumeInfoProto> volumeInfos = convertToVolumeInfos(allNodes);
+    if (CollectionUtils.isNotEmpty(volumeInfos)) {
+      getVolumeInfosResponseBuilder.addAllVolumeInfos(volumeInfos);
+    }
+    return getVolumeInfosResponseBuilder.build();
+  }
+
+  private List<VolumeInfoProto> convertToVolumeInfos(List<? extends DatanodeDetails> allNodes) {
+    List<VolumeInfoProto> result = new ArrayList<>();
+    for (DatanodeDetails datanode : allNodes) {
+      DatanodeInfo detail = (DatanodeInfo) datanode;
+      List<VolumeInfoProto> volumeInfos = detail.getVolumeInfos();
+      if (CollectionUtils.isNotEmpty(volumeInfos)) {
+        result.addAll(volumeInfos);
+      }
+    }
+    return result;
   }
 }
