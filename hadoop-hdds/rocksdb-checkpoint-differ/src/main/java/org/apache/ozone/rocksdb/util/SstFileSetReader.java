@@ -19,12 +19,15 @@ package org.apache.ozone.rocksdb.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.PriorityQueue;
 import java.util.Spliterator;
 import java.util.Spliterators;
 import java.util.function.Function;
@@ -233,70 +236,180 @@ public class SstFileSetReader {
     }
   }
 
-  private abstract static class MultipleSstFileIterator<T> implements ClosableIterator<T> {
+  /**
+   * A wrapper class that holds an iterator and its current value for heap operations.
+   */
+  private static class HeapEntryWithFileIdx<T extends Comparable<T>>
+      implements Comparable<HeapEntryWithFileIdx<T>> {
+    private final ClosableIterator<T> iterator;
+    private T currentKey;
+    // To ensure stable ordering for identical keys
+    private final int fileIndex;
 
-    private final Iterator<String> fileNameIterator;
+    HeapEntryWithFileIdx(ClosableIterator<T> iterator, int fileIndex) {
+      this.iterator = iterator;
+      this.fileIndex = fileIndex;
+      advance();
+    }
 
-    private String currentFile;
-    private ClosableIterator<T> currentFileIterator;
+    void close() {
+      iterator.close();
+    }
+
+    boolean advance() {
+      if (iterator.hasNext()) {
+        currentKey = iterator.next();
+        return true;
+      } else {
+        currentKey = null;
+        return false;
+      }
+    }
+
+    T getCurrentKey() {
+      return currentKey;
+    }
+
+    @Override
+    public int compareTo(@Nonnull HeapEntryWithFileIdx<T> other) {
+      if (this.currentKey == null && other.currentKey == null) {
+        return 0;
+      }
+      if (this.currentKey == null) {
+        return 1;
+      }
+      if (other.currentKey == null) {
+        return -1;
+      }
+
+      int result = this.currentKey.compareTo(other.currentKey);
+      if (result == 0) {
+        // For identical keys, prefer the one from the file with the higher index
+        return Integer.compare(other.fileIndex, this.fileIndex);
+      }
+      return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (obj == null || getClass() != obj.getClass()) {
+        return false;
+      }
+
+      HeapEntryWithFileIdx<T> other = (HeapEntryWithFileIdx<T>) obj;
+
+      if (this.currentKey == null && other.currentKey == null) {
+        return this.fileIndex == other.fileIndex;
+      }
+      if (this.currentKey == null || other.currentKey == null) {
+        return false;
+      }
+
+      return this.currentKey.equals(other.currentKey) && this.fileIndex == other.fileIndex;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(iterator, currentKey, fileIndex);
+    }
+  }
+
+  private abstract static class MultipleSstFileIterator<T extends Comparable<T>> implements ClosableIterator<T> {
+    private final Collection<String> files;
+    private final PriorityQueue<HeapEntryWithFileIdx<T>> minHeap;
+    private final List<HeapEntryWithFileIdx<T>> allIterators;
+    private T lastReturnedValue;
 
     private MultipleSstFileIterator(Collection<String> files) {
-      this.fileNameIterator = files.iterator();
+      this.files = files;
+      this.minHeap = new PriorityQueue<>();
+      this.allIterators = new ArrayList<>();
+      this.lastReturnedValue = null;
       init();
+      initMinHeap();
     }
 
     protected abstract void init();
 
     protected abstract ClosableIterator<T> getKeyIteratorForFile(String file) throws RocksDBException, IOException;
 
+    private void initMinHeap() {
+      try {
+        int fileIndex = 0;
+        for (String file : files) {
+          ClosableIterator<T> iterator = getKeyIteratorForFile(file);
+          HeapEntryWithFileIdx<T> entry = new HeapEntryWithFileIdx<>(iterator, fileIndex++);
+          allIterators.add(entry);
+
+          if (entry.getCurrentKey() != null) {
+            minHeap.offer(entry);
+          }
+        }
+      } catch (IOException | RocksDBException e) {
+        // Clean up any opened iterators
+        close();
+        throw new RuntimeException("Failed to initialize SST file iterators", e);
+      }
+    }
+
     @Override
     public boolean hasNext() {
-      try {
-        do {
-          if (Objects.nonNull(currentFileIterator) && currentFileIterator.hasNext()) {
-            return true;
-          }
-        } while (moveToNextFile());
-      } catch (IOException | RocksDBException e) {
-        // TODO: [Snapshot] This exception has to be handled by the caller.
-        //  We have to do better exception handling.
-        throw new RuntimeException(e);
+      // Skip duplicates, keep advancing until we find a different key or run out of entries
+      while (!minHeap.isEmpty()) {
+        HeapEntryWithFileIdx<T> topEntry = minHeap.peek();
+        if (topEntry == null) {
+          break;
+        }
+        T currentValue = topEntry.getCurrentKey();
+
+        // If this is a new value (different from last returned), we have a next element
+        if (lastReturnedValue == null || !Objects.equals(currentValue, lastReturnedValue)) {
+          return true;
+        }
+
+        // Skip this duplicate entry
+        HeapEntryWithFileIdx<T> entry = minHeap.poll();
+        if (entry != null && entry.advance()) {
+          minHeap.offer(entry);
+        }
       }
+
       return false;
     }
 
     @Override
     public T next() {
-      if (hasNext()) {
-        return currentFileIterator.next();
+      if (!hasNext()) {
+        throw new NoSuchElementException("No more elements found.");
       }
-      throw new NoSuchElementException("No more elements found.");
+
+      assert minHeap.peek() != null;
+      // Get current key from heap
+      T currentKey = minHeap.peek().getCurrentKey();
+
+      // Advance all entries with the same key (from different files)
+      // and keep the one with the highest file index
+      while (!minHeap.isEmpty() && Objects.equals(minHeap.peek().getCurrentKey(), currentKey)) {
+        HeapEntryWithFileIdx<T> entry = minHeap.poll();
+        if (entry.advance()) {
+          minHeap.offer(entry);
+        }
+      }
+
+      lastReturnedValue = currentKey;
+      return currentKey;
     }
 
     @Override
-    public void close() throws UncheckedIOException {
-      try {
-        closeCurrentFile();
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
+    public void close() {
+      minHeap.clear();
+      for (HeapEntryWithFileIdx<T> entry : allIterators) {
+        entry.close();
       }
-    }
-
-    private boolean moveToNextFile() throws IOException, RocksDBException {
-      if (fileNameIterator.hasNext()) {
-        closeCurrentFile();
-        currentFile = fileNameIterator.next();
-        this.currentFileIterator = getKeyIteratorForFile(currentFile);
-        return true;
-      }
-      return false;
-    }
-
-    private void closeCurrentFile() throws IOException {
-      if (currentFile != null) {
-        currentFileIterator.close();
-        currentFile = null;
-      }
+      allIterators.clear();
     }
   }
 
