@@ -22,9 +22,12 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TASK_THREAD_COUNT_KEY;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,10 +42,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
@@ -72,6 +78,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private final OMUpdateEventBuffer eventBuffer;
   private ExecutorService eventProcessingExecutor;
   private final AtomicBoolean deltaTasksFailed = new AtomicBoolean(false);
+  private volatile ReconOMMetadataManager currentOMMetadataManager;
+  private final OzoneConfiguration configuration;
+  
+  // Retry logic for checkpoint creation
+  private int iterationRetryCount = 0;
+  private long lastCheckpointRetryTimestamp = 0;
+  private static final int MAX_ITERATION_RETRIES = 3;
+  private static final long RETRY_DELAY_MS = 2000; // 2 seconds
 
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
@@ -80,6 +94,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
                                  ReconDBProvider reconDBProvider,
                                  ReconContainerMetadataManager reconContainerMetadataManager,
                                  ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
+    this.configuration = configuration;
     this.reconDBProvider = reconDBProvider;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
@@ -122,7 +137,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             20000, eventBuffer.getQueueSize(), eventBuffer.getDroppedBatches());
         
         // Clear buffer and signal full snapshot requirement
-        eventBuffer.clear();
+        resetEventBuffer();
       } else {
         LOG.debug("Buffered event batch with {} events. Buffer queue size: {}", 
             events.getEvents().size(), eventBuffer.getQueueSize());
@@ -263,6 +278,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public synchronized void start() {
     LOG.info("Starting Recon Task Controller.");
+    
+    // Clean up any pre-existing checkpoint directories from previous runs
+    cleanupPreExistingCheckpoints();
+    
     executorService = Executors.newFixedThreadPool(threadCount,
         new ThreadFactoryBuilder().setNameFormat("ReconTaskThread-%d")
             .build());
@@ -356,10 +375,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     
     while (!Thread.currentThread().isInterrupted()) {
       try {
-        OMUpdateEventBatch eventBatch = eventBuffer.poll(1000); // 1 second timeout
-        if (eventBatch != null && !eventBatch.isEmpty()) {
-          LOG.debug("Processing buffered event batch with {} events", eventBatch.getEvents().size());
-          processEventBatchDirectly(eventBatch);
+        ReconEvent event = eventBuffer.poll(1000); // 1 second timeout
+        if (event != null) {
+          LOG.debug("Processing buffered event of type {} with {} events", 
+              event.getEventType(), event.getEventCount());
+          processReconEvent(event);
         }
       } catch (Exception e) {
         LOG.error("Error in async event processing thread", e);
@@ -371,38 +391,55 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
   
   /**
-   * Process a single event batch directly (used by async processing thread).
+   * Process a single Recon event (used by async processing thread).
    */
-  private void processEventBatchDirectly(OMUpdateEventBatch events) {
+  private void processReconEvent(ReconEvent event) {
+    switch (event.getEventType()) {
+    case OM_UPDATE_BATCH:
+      processOMUpdateBatch((OMUpdateEventBatch) event);
+      break;
+    case TASK_REINITIALIZATION:
+      processReInitializationEvent((ReconTaskReInitializationEvent) event);
+      break;
+    default:
+      LOG.warn("Unknown event type: {}", event.getEventType());
+      break;
+    }
+  }
+  
+  /**
+   * Process an OM update batch event (used by async processing thread).
+   */
+  private void processOMUpdateBatch(OMUpdateEventBatch events) {
     if (events.isEmpty()) {
       return;
     }
-    
+
     Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks = new ArrayList<>();
     List<ReconOmTask.TaskResult> failedTasks = new ArrayList<>();
-    
+
     for (Map.Entry<String, ReconOmTask> taskEntry : reconOmTasks.entrySet()) {
       ReconOmTask task = taskEntry.getValue();
       ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(task.getTaskName());
       taskStatusUpdater.recordRunStart();
       tasks.add(new NamedCallableTask<>(task.getTaskName(), () -> task.process(events, Collections.emptyMap())));
     }
-    
+
     processTasks(tasks, events, failedTasks);
-    
+
     // Handle failed tasks with retry logic
     List<ReconOmTask.TaskResult> retryFailedTasks = new ArrayList<>();
     if (!failedTasks.isEmpty()) {
       LOG.warn("Some tasks failed while processing buffered events, retrying...");
       tasks.clear();
-      
+
       for (ReconOmTask.TaskResult taskResult : failedTasks) {
         ReconOmTask task = reconOmTasks.get(taskResult.getTaskName());
         tasks.add(new NamedCallableTask<>(task.getTaskName(),
             () -> task.process(events, taskResult.getSubTaskSeekPositions())));
       }
       processTasks(tasks, events, retryFailedTasks);
-      
+
       if (!retryFailedTasks.isEmpty()) {
         LOG.warn("Some tasks still failed after retry while processing buffered events, signaling for " +
             "task reinitialization");
@@ -430,5 +467,360 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public void resetDeltaTasksFailureFlag() {
     deltaTasksFailed.set(false);
+  }
+
+  @Override
+  public ReconTaskController.ReInitializationResult queueReInitializationEvent(
+      ReconTaskReInitializationEvent.ReInitializationReason reason) {
+    LOG.info("Queueing task reinitialization event due to: {} (iteration retry count: {})", reason,
+        iterationRetryCount);
+
+    // Check if we should retry based on timing for iteration-based retries
+    long currentTime = System.currentTimeMillis();
+    if (iterationRetryCount > 0) {
+      // Check if 2 seconds have passed since last iteration
+      long timeSinceLastRetry = currentTime - lastCheckpointRetryTimestamp;
+      if (timeSinceLastRetry < RETRY_DELAY_MS) {
+        LOG.debug("Skipping checkpoint creation retry, only {}ms since last iteration (need {}ms)", 
+            timeSinceLastRetry, RETRY_DELAY_MS);
+        return ReconTaskController.ReInitializationResult.RETRY_LATER;
+      }
+      LOG.info("Attempting retry for checkpoint creation (iteration: {}, delay: {}ms)", 
+          iterationRetryCount + 1, timeSinceLastRetry);
+    }
+
+    // Try checkpoint creation with immediate retry capability
+    ReconOMMetadataManager checkpointedOMMetadataManager = null;
+    boolean checkpointCreated = false;
+    
+    // First attempt
+    try {
+      LOG.info("Attempting checkpoint creation (iteration: {}, attempt: 1)", iterationRetryCount + 1);
+      checkpointedOMMetadataManager = createOMCheckpoint(currentOMMetadataManager);
+      checkpointCreated = true;
+      LOG.info("Checkpoint creation succeeded on first attempt");
+    } catch (IOException e) {
+      LOG.warn("First checkpoint creation attempt failed: {}", e.getMessage());
+      
+      // Immediate retry within the same iteration
+      try {
+        LOG.info("Attempting immediate retry for checkpoint creation (iteration: {}, attempt: 2)",
+            iterationRetryCount + 1);
+        checkpointedOMMetadataManager = createOMCheckpoint(currentOMMetadataManager);
+        checkpointCreated = true;
+        LOG.info("Checkpoint creation succeeded on immediate retry");
+      } catch (IOException retryException) {
+        LOG.error("Immediate retry for checkpoint creation also failed: {}", retryException.getMessage());
+        // Both attempts in this iteration failed
+        handleIterationFailure(currentTime);
+        return getIterationRetryResult();
+      }
+    }
+    // Proceed with queueing the event
+    resetEventBuffer();
+
+    // Create and queue the reinitialization event with checkpointed metadata manager
+    ReconTaskReInitializationEvent reinitEvent =
+        new ReconTaskReInitializationEvent(reason, checkpointedOMMetadataManager);
+    boolean queued = eventBuffer.offer(reinitEvent);
+    if (!queued) {
+      // CAUTION: If this failure happens, something is seriously wrong as we just cleared the buffer
+      // and are trying to queue a single event, also since we cleared all other delta events, next delta sync cycle
+      // will not have these lost events as new OMDBUpdatesHandler will be created with last sequence number
+      LOG.error("Failed to queue reinitialization event. Ideally should not happen, so dropping event and " +
+          "checkpointed data.");
+      // Clean up the checkpointed metadata manager and its files as it won't be used
+      cleanupCheckpoint(checkpointedOMMetadataManager);
+      handleIterationFailure(currentTime);
+      return getIterationRetryResult();
+    }
+    
+    // Success - reset retry counters and flags
+    LOG.info("Successfully queued reinitialization event after {} iteration(s)", iterationRetryCount + 1);
+    iterationRetryCount = 0;
+    lastCheckpointRetryTimestamp = 0;
+    resetEventBufferOverflowFlag();
+    resetDeltaTasksFailureFlag();
+    return ReconTaskController.ReInitializationResult.SUCCESS;
+  }
+  
+  /**
+   * Handle iteration failure by updating retry counters.
+   */
+  private void handleIterationFailure(long currentTime) {
+    iterationRetryCount++;
+    lastCheckpointRetryTimestamp = currentTime;
+    LOG.error("Checkpoint creation failed in iteration {} (both immediate attempts failed)", iterationRetryCount);
+  }
+  
+  /**
+   * Determine the appropriate retry result based on current iteration retry count.
+   */
+  private ReconTaskController.ReInitializationResult getIterationRetryResult() {
+    if (iterationRetryCount >= MAX_ITERATION_RETRIES) {
+      LOG.warn("Maximum iteration retries ({}) exceeded, resetting counters and signaling full snapshot fallback", 
+          MAX_ITERATION_RETRIES);
+      iterationRetryCount = 0;
+      lastCheckpointRetryTimestamp = 0;
+      return ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED;
+    } else {
+      return ReconTaskController.ReInitializationResult.RETRY_LATER;
+    }
+  }
+
+  @Override
+  public void resetEventBuffer() {
+    // Clear the buffer to discard all pending events
+    eventBuffer.clear();
+  }
+
+  @Override
+  public void updateOMMetadataManager(ReconOMMetadataManager omMetadataManager) {
+    LOG.info("Updating OM metadata manager");
+    
+    // Clean up any pre-existing checkpoint directories when setting new manager
+    if (omMetadataManager != null) {
+      cleanupPreExistingCheckpoints();
+    }
+    
+    this.currentOMMetadataManager = omMetadataManager;
+  }
+
+  @Override
+  public ReconOMMetadataManager createOMCheckpoint(ReconOMMetadataManager omMetaManager) 
+      throws IOException {
+    // Create temporary directory for checkpoint
+    String parentPath = cleanTempCheckPointPath(omMetaManager);
+    
+    // Create checkpoint
+    DBCheckpoint checkpoint = omMetaManager.getStore().getCheckpoint(parentPath, true);
+    
+    // Create a new ReconOmMetadataManagerImpl instance with checkpointed data
+    // Note: We need ReconUtils but it's not available in this class
+    // We'll create the ReconOmMetadataManagerImpl with minimal dependencies
+    ReconOmMetadataManagerImpl checkpointedManager = new ReconOmMetadataManagerImpl(configuration);
+    
+    // Initialize the checkpointed manager with the checkpoint location
+    File checkpointDir = checkpoint.getCheckpointLocation().toFile();
+    checkpointedManager.updateOmDB(checkpointDir, false);
+    
+    return checkpointedManager;
+  }
+
+  /**
+   * Clean and prepare temporary checkpoint path.
+   * Similar to QuotaRepairTask.cleanTempCheckPointPath.
+   * 
+   * @param omMetaManager the OM metadata manager
+   * @return path to temporary checkpoint directory
+   * @throws IOException if directory operations fail
+   */
+  private String cleanTempCheckPointPath(ReconOMMetadataManager omMetaManager) throws IOException {
+    File dbLocation = omMetaManager.getStore().getDbLocation();
+    if (dbLocation == null) {
+      throw new NullPointerException("OM DB location is null");
+    }
+    String tempData = dbLocation.getParent();
+    if (tempData == null) {
+      throw new NullPointerException("Parent OM DB dir is null");
+    }
+    File reinitTmpPath = Paths.get(tempData, "temp-recon-reinit-checkpoint").toFile();
+    FileUtils.deleteDirectory(reinitTmpPath);
+    FileUtils.forceMkdir(reinitTmpPath);
+    return reinitTmpPath.toString();
+  }
+  
+  /**
+   * Process a task reinitialization event asynchronously.
+   */
+  private void processReInitializationEvent(ReconTaskReInitializationEvent event) {
+    LOG.info("Processing reinitialization event: reason={}, timestamp={}", 
+        event.getReason(), event.getTimestamp());
+    
+    try {
+      // Use the checkpointed OM metadata manager for reinitialization to prevent data inconsistency
+      ReconOMMetadataManager checkpointedOMMetadataManager = event.getCheckpointedOMMetadataManager();
+      if (checkpointedOMMetadataManager != null) {
+        LOG.info("Starting async task reinitialization with checkpointed OM metadata manager due to: {}", 
+                 event.getReason());
+        reInitializeTasks(checkpointedOMMetadataManager, null);
+        LOG.info("Completed async task reinitialization");
+        
+        // Clean up the checkpointed metadata manager and its files after use
+        cleanupCheckpoint(checkpointedOMMetadataManager);
+      } else {
+        LOG.error("Checkpointed OM metadata manager is null, cannot perform reinitialization");
+        return;
+      }
+
+      resetEventFlags(event.getReason());
+
+      LOG.info("Completed processing reinitialization event: {}", event.getReason());
+      
+    } catch (Exception e) {
+      LOG.error("Error processing reinitialization event", e);
+    }
+  }
+
+  @Override
+  public void resetEventFlags(ReconTaskReInitializationEvent.ReInitializationReason reason) {
+    // Reset appropriate flags based on the reason
+    if (reason == ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW ||
+        reason == ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES ||
+        reason == ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER) {
+      resetEventBufferOverflowFlag();
+      resetDeltaTasksFailureFlag();
+    }
+  }
+
+  @Override
+  public int getEventBufferSize() {
+    return eventBuffer.getQueueSize();
+  }
+  
+  @Override
+  public long getDroppedBatches() {
+    return eventBuffer.getDroppedBatches();
+  }
+  
+  /**
+   * Reset retry counters - for testing purposes.
+   */
+  @VisibleForTesting
+  void resetRetryCounters() {
+    iterationRetryCount = 0;
+    lastCheckpointRetryTimestamp = 0;
+  }
+  
+  /**
+   * Get current iteration retry count - for testing purposes.
+   */
+  @VisibleForTesting  
+  int getIterationRetryCount() {
+    return iterationRetryCount;
+  }
+  
+  /**
+   * Wait for all currently buffered events to be processed asynchronously.
+   * This method returns a CompletableFuture that completes when the event buffer becomes empty.
+   * Useful for testing to ensure async processing is complete before assertions.
+   * 
+   * @return CompletableFuture that completes when buffer is empty
+   */
+  @VisibleForTesting
+  @Override
+  public CompletableFuture<Void> waitForEventBufferEmpty() {
+    return CompletableFuture.runAsync(() -> {
+      while (eventBuffer.getQueueSize() > 0) {
+        try {
+          Thread.sleep(100); // Small interval polling
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException("Interrupted while waiting for event buffer to empty", e);
+        }
+      }
+      // Give a bit more time for final processing after buffer is empty
+      try {
+        Thread.sleep(500);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted during final wait", e);
+      }
+    });
+  }
+  
+  /**
+   * Clean up any pre-existing checkpoint directories from previous runs.
+   * This method looks for and removes any leftover temporary checkpoint directories
+   * that may not have been cleaned up properly during previous shutdowns.
+   */
+  private void cleanupPreExistingCheckpoints() {
+    try {
+      if (currentOMMetadataManager == null) {
+        LOG.debug("No current OM metadata manager, skipping pre-existing checkpoint cleanup");
+        return;
+      }
+      
+      // Get the base directory where checkpoints are created
+      File dbLocation = currentOMMetadataManager.getStore().getDbLocation();
+      if (dbLocation == null || dbLocation.getParent() == null) {
+        LOG.debug("Cannot determine checkpoint base directory, skipping pre-existing checkpoint cleanup");
+        return;
+      }
+      
+      String baseDirectory = dbLocation.getParent();
+      File baseDir = new File(baseDirectory);
+      
+      if (!baseDir.exists() || !baseDir.isDirectory()) {
+        LOG.debug("Base directory {} does not exist, skipping pre-existing checkpoint cleanup", baseDirectory);
+        return;
+      }
+      
+      // Look for temporary checkpoint directories matching our naming pattern
+      File[] checkpointDirs = baseDir.listFiles((dir, name) -> 
+          name.startsWith("temp-recon-reinit-checkpoint"));
+      
+      if (checkpointDirs != null && checkpointDirs.length > 0) {
+        LOG.info("Found {} pre-existing checkpoint directories to clean up", checkpointDirs.length);
+        
+        for (File checkpointDir : checkpointDirs) {
+          try {
+            if (checkpointDir.exists() && checkpointDir.isDirectory()) {
+              FileUtils.deleteDirectory(checkpointDir);
+              LOG.info("Cleaned up pre-existing checkpoint directory: {}", checkpointDir);
+            }
+          } catch (IOException e) {
+            LOG.warn("Failed to clean up pre-existing checkpoint directory: {}", checkpointDir, e);
+          }
+        }
+      } else {
+        LOG.debug("No pre-existing checkpoint directories found");
+      }
+      
+    } catch (Exception e) {
+      LOG.warn("Failed to cleanup pre-existing checkpoint directories", e);
+    }
+  }
+  
+  /**
+   * Cleanup checkpointed OM metadata manager and associated checkpoint files.
+   * This method closes the database connections and removes the temporary checkpoint files.
+   * 
+   * @param checkpointedManager the checkpointed OM metadata manager to clean up
+   */
+  private void cleanupCheckpoint(ReconOMMetadataManager checkpointedManager) {
+    if (checkpointedManager == null) {
+      return;
+    }
+    try {
+      // Get the checkpoint location before closing
+      File checkpointLocation = null;
+      try {
+        if (checkpointedManager.getStore() != null && 
+            checkpointedManager.getStore().getDbLocation() != null) {
+          // The checkpoint location is typically the parent directory of the DB location
+          checkpointLocation = checkpointedManager.getStore().getDbLocation().getParentFile();
+        }
+      } catch (Exception e) {
+        LOG.warn("Failed to get checkpoint location for cleanup", e);
+      }
+      
+      // Close the database connections first
+      checkpointedManager.stop();
+      LOG.debug("Closed checkpointed OM metadata manager database connections");
+      
+      // Clean up the checkpoint files if we have the location
+      if (checkpointLocation != null && checkpointLocation.exists()) {
+        try {
+          FileUtils.deleteDirectory(checkpointLocation);
+          LOG.debug("Cleaned up checkpoint directory: {}", checkpointLocation);
+        } catch (IOException e) {
+          LOG.warn("Failed to cleanup checkpoint directory: {}", checkpointLocation, e);
+        }
+      }
+      
+    } catch (Exception e) {
+      LOG.warn("Failed to cleanup checkpointed OM metadata manager", e);
+    }
   }
 }

@@ -72,6 +72,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     this.ozoneConfiguration = configuration;
   }
 
+  public ReconOmMetadataManagerImpl(OzoneConfiguration configuration) {
+    super(false);
+    this.ozoneConfiguration = configuration;
+  }
+
   @Override
   public void start(OzoneConfiguration configuration) throws IOException {
     LOG.info("Starting ReconOMMetadataManagerImpl");
@@ -82,16 +87,17 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     if (lastKnownOMSnapshot != null) {
       LOG.info("Last known snapshot for OM : {}",
           lastKnownOMSnapshot.getAbsolutePath());
-      initializeNewRdbStore(lastKnownOMSnapshot);
+      initializeNewRdbStore(lastKnownOMSnapshot, true);
     }
   }
 
   /**
    * Replace existing DB instance with new one.
    *
-   * @param dbFile new DB file location.
+   * @param dbFile          new DB file location.
+   * @param addCacheMetrics
    */
-  private void initializeNewRdbStore(File dbFile) throws IOException {
+  private void initializeNewRdbStore(File dbFile, boolean addCacheMetrics) throws IOException {
     try {
       setStore(DBStoreBuilder.newBuilder(ozoneConfiguration, OMDBDefinition.get(), dbFile).build());
       LOG.info("Created OM DB handle from snapshot at {}.",
@@ -100,7 +106,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
-      initializeOmTables(TableCache.CacheType.FULL_CACHE, true);
+      initializeOmTables(TableCache.CacheType.FULL_CACHE, addCacheMetrics);
       omTablesInitialized = true;
     }
   }
@@ -112,7 +118,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   }
 
   @Override
-  public void updateOmDB(File newDbLocation) throws IOException {
+  public void updateOmDB(File newDbLocation, boolean addCacheMetrics) throws IOException {
     if (getStore() != null) {
       File oldDBLocation = getStore().getDbLocation();
       if (oldDBLocation.exists()) {
@@ -123,7 +129,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     }
     DBStore current = getStore();
     try {
-      initializeNewRdbStore(newDbLocation);
+      initializeNewRdbStore(newDbLocation, addCacheMetrics);
     } finally {
       // Always close DBStore if it's replaced.
       if (current != null && current != getStore()) {

@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
@@ -506,7 +507,7 @@ public class TestOzoneManagerServiceProviderImpl {
     assertTrue(capturedValues.contains(OmSnapshotRequest.name()));
     assertTrue(capturedValues.contains(OmDeltaRequest.name()));
     verify(reconTaskControllerMock, times(1))
-        .reInitializeTasks(omMetadataManager, null);
+        .queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
     assertEquals(1, metrics.getNumSnapshotRequests());
   }
 
@@ -578,12 +579,21 @@ public class TestOzoneManagerServiceProviderImpl {
     assertTrue(capturedValues.contains(OmSnapshotRequest.name()));
     assertTrue(capturedValues.contains(OmDeltaRequest.name()));
     verify(reconTaskControllerMock, times(1))
-        .reInitializeTasks(omMetadataManager, null);
+        .queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
     assertEquals(1, metrics.getNumSnapshotRequests());
   }
 
   private ReconTaskController getMockTaskController() {
-    return mock(ReconTaskController.class);
+    ReconTaskController mockController = mock(ReconTaskController.class);
+    // Mock the new methods added to ReconTaskController interface
+    when(mockController.queueReInitializationEvent(any())).thenReturn(
+        ReconTaskController.ReInitializationResult.SUCCESS);
+    try {
+      when(mockController.createOMCheckpoint(any())).thenReturn(mock(ReconOMMetadataManager.class));
+    } catch (IOException e) {
+      // This shouldn't happen in tests
+    }
+    return mockController;
   }
 
   private ReconUtils getMockReconUtils() throws IOException {

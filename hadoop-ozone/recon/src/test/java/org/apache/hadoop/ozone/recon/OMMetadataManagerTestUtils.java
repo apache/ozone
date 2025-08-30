@@ -145,7 +145,7 @@ public final class OMMetadataManagerTestUtils {
     reconOMMetaMgr.start(configuration);
 
     reconOMMetaMgr.updateOmDB(
-        checkpoint.getCheckpointLocation().toFile());
+        checkpoint.getCheckpointLocation().toFile(), true);
     return reconOMMetaMgr;
   }
 

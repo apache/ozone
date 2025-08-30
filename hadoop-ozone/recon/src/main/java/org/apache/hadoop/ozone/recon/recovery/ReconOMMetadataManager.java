@@ -37,9 +37,11 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
   /**
    * Refresh the DB instance to point to a new location. Get rid of the old
    * DB instance.
-   * @param dbLocation New location of the OM Snapshot DB.
+   *
+   * @param dbLocation      New location of the OM Snapshot DB.
+   * @param addCacheMetrics
    */
-  void updateOmDB(File dbLocation) throws IOException;
+  void updateOmDB(File dbLocation, boolean addCacheMetrics) throws IOException;
 
   /**
    * Get the most recent sequence number from the Ozone Manager Metadata

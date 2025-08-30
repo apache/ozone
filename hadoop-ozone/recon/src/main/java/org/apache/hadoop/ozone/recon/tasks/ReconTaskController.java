@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 
@@ -25,6 +28,15 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
  * Controller used by Recon to manage Tasks that are waiting on Recon events.
  */
 public interface ReconTaskController {
+
+  /**
+   * Enum representing the result of queueing a reinitialization event.
+   */
+  enum ReInitializationResult {
+    SUCCESS,           // Event was successfully queued
+    RETRY_LATER,       // Failed but should retry in next iteration after delay
+    MAX_RETRIES_EXCEEDED  // Maximum retries exceeded, caller should fallback to full snapshot
+  }
 
   /**
    * Register API used by tasks to register themselves.
@@ -88,4 +100,71 @@ public interface ReconTaskController {
    * Reset the delta tasks failure flag after reinitialization is completed.
    */
   void resetDeltaTasksFailureFlag();
+
+  /**
+   * Clear all buffered events. Used before queuing a reinitialization event.
+   */
+  void resetEventBuffer();
+
+  /**
+   * Reset event flags used to track buffer overflow and delta task failures.
+   * This is used before queuing a reinitialization event.
+   *
+   * @param reason the reason for reinitialization
+   */
+  void resetEventFlags(ReconTaskReInitializationEvent.ReInitializationReason reason);
+  
+  /**
+   * Queue a task reinitialization event to be processed asynchronously.
+   * This method creates a checkpoint of the current OM metadata manager,
+   * clears the event buffer and queues a reinitialization event.
+   * Includes internal retry logic with timing controls for checkpoint creation.
+   * 
+   * @param reason the reason for reinitialization
+   * @return ReInitializationResult indicating success, retry needed, or max retries exceeded
+   */
+  ReInitializationResult queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason reason);
+
+  /**
+   * Create a checkpoint of the current OM metadata manager.
+   * This method creates a snapshot of the current OM database state 
+   * to prevent data inconsistency during reinitialization.
+   * 
+   * @param omMetaManager the OM metadata manager to checkpoint
+   * @return a checkpointed ReconOMMetadataManager instance
+   * @throws IOException if checkpoint creation fails
+   */
+  ReconOMMetadataManager createOMCheckpoint(ReconOMMetadataManager omMetaManager) throws IOException;
+  
+  /**
+   * Update the current OM metadata manager reference for reinitialization.
+   * 
+   * @param omMetadataManager the current OM metadata manager
+   */
+  void updateOMMetadataManager(ReconOMMetadataManager omMetadataManager);
+  
+  /**
+   * Get the current size of the event buffer.
+   * 
+   * @return the number of events currently in the buffer
+   */
+  @VisibleForTesting
+  int getEventBufferSize();
+  
+  /**
+   * Get the number of batches that have been dropped due to buffer overflow.
+   * This is used by the overflow detection logic.
+   * 
+   * @return the number of dropped batches
+   */
+  long getDroppedBatches();
+
+  /**
+   * Wait for all currently buffered events to be processed.
+   * This returns a CompletableFuture that completes when the event buffer is empty.
+   * Used in testing to ensure all events are processed before assertions.
+   *
+   * @return CompletableFuture that completes when event buffer is empty
+   */
+  CompletableFuture<Void> waitForEventBufferEmpty();
 }
