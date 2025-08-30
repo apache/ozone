@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.io.file.PathUtils.copyDirectory;
+import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.utils.HAUtils.getExistingFiles;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
@@ -46,6 +47,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
@@ -61,6 +63,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -80,6 +83,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.compaction.log.SstFileInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
@@ -268,6 +272,8 @@ class TestOmSnapshotManager {
     LiveFileMetaData lfm = mock(LiveFileMetaData.class);
     when(lfm.columnFamilyName()).thenReturn(cfname.getBytes(StandardCharsets.UTF_8));
     when(lfm.fileName()).thenReturn(fileName);
+    when(lfm.smallestKey()).thenReturn(string2Bytes("k1"));
+    when(lfm.largestKey()).thenReturn(string2Bytes("k2"));
     return lfm;
   }
 
@@ -275,13 +281,20 @@ class TestOmSnapshotManager {
   public void testCreateNewSnapshotLocalYaml() throws IOException {
     SnapshotInfo snapshotInfo = createSnapshotInfo("vol1", "buck1");
 
-    Map<String, Set<String>> expUncompactedSSTFileList = new HashMap<>();
-    expUncompactedSSTFileList.put(KEY_TABLE, Stream.of("kt1.sst", "kt2.sst").collect(Collectors.toSet()));
-    expUncompactedSSTFileList.put(FILE_TABLE, Stream.of("ft1.sst", "ft2.sst").collect(Collectors.toSet()));
-    expUncompactedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1.sst", "dt2.sst").collect(Collectors.toSet()));
+    Map<String, List<String>> expUncompactedSSTFileList = new TreeMap<>();
+    OmSnapshotLocalData.VersionMeta uncompactedVersionMeta = new OmSnapshotLocalData.VersionMeta(0,
+        ImmutableList.of(new SstFileInfo("dt1.sst", "k1", "k2", DIRECTORY_TABLE),
+            new SstFileInfo("dt2.sst", "k1", "k2", DIRECTORY_TABLE),
+            new SstFileInfo("ft1.sst", "k1", "k2", FILE_TABLE),
+            new SstFileInfo("ft2.sst", "k1", "k2", FILE_TABLE),
+            new SstFileInfo("kt1.sst", "k1", "k2", KEY_TABLE),
+            new SstFileInfo("kt2.sst", "k1", "k2", KEY_TABLE)));
+    expUncompactedSSTFileList.put(KEY_TABLE, Stream.of("kt1.sst", "kt2.sst").collect(Collectors.toList()));
+    expUncompactedSSTFileList.put(FILE_TABLE, Stream.of("ft1.sst", "ft2.sst").collect(Collectors.toList()));
+    expUncompactedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1.sst", "dt2.sst").collect(Collectors.toList()));
 
     List<LiveFileMetaData> mockedLiveFiles = new ArrayList<>();
-    for (Map.Entry<String, Set<String>> entry : expUncompactedSSTFileList.entrySet()) {
+    for (Map.Entry<String, List<String>> entry : expUncompactedSSTFileList.entrySet()) {
       String cfname = entry.getKey();
       for (String fname : entry.getValue()) {
         mockedLiveFiles.add(createMockLiveFileMetadata(cfname, fname));
@@ -303,19 +316,19 @@ class TestOmSnapshotManager {
     assertTrue(snapshotYaml.toFile().createNewFile());
     assertEquals(0, Files.size(snapshotYaml));
     // Create a new YAML file for the snapshot
-    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager, snapshotInfo, mockedStore);
+    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager, omMetadataManager, snapshotInfo, mockedStore);
     // Verify that previous file was overwritten
     assertTrue(Files.exists(snapshotYaml));
     assertTrue(Files.size(snapshotYaml) > 0);
     // Verify the contents of the YAML file
-    OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(snapshotYaml.toFile());
+    OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, snapshotYaml.toFile());
     assertNotNull(localData);
     assertEquals(0, localData.getVersion());
-    assertEquals(expUncompactedSSTFileList, localData.getUncompactedSSTFileList());
+    assertEquals(uncompactedVersionMeta, localData.getVersionSstFileInfos().get(0));
     assertFalse(localData.getSstFiltered());
     assertEquals(0L, localData.getLastCompactionTime());
     assertFalse(localData.getNeedsCompaction());
-    assertTrue(localData.getCompactedSSTFileList().isEmpty());
+    assertEquals(1, localData.getVersionSstFileInfos().size());
 
     // Cleanup
     Files.delete(snapshotYaml);
