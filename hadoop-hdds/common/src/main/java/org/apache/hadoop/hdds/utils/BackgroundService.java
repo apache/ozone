@@ -126,7 +126,8 @@ public abstract class BackgroundService {
     this.unit = newUnit;
   }
 
-  protected synchronized long getIntervalMillis() {
+  @VisibleForTesting
+  public synchronized long getIntervalMillis() {
     return this.unit.toMillis(interval);
   }
 
