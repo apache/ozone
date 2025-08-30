@@ -118,7 +118,6 @@ public final class StringToSignProducer {
     }
     strToSign.append(signatureInfo.getDateTime()).append(NEWLINE);
     strToSign.append(credentialScope).append(NEWLINE);
-
     String canonicalRequest = buildCanonicalRequest(
         scheme,
         method,
