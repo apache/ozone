@@ -2799,6 +2799,33 @@ function ozone_validate_classpath_util
   fi
 }
 
+## @description Add items from .classpath file to the classpath
+## @audience private
+## @stability evolving
+## @replaceable no
+function ozone_add_classpath_from_file() {
+  local classpath_file="$1"
+
+  if [[ ! -e "$classpath_file" ]]; then
+    echo "Skip non-existent classpath file: $classpath_file" >&2
+    return
+  fi
+
+  local classpath
+  # shellcheck disable=SC1090,SC2086
+  source "$classpath_file"
+  local original_ifs=$IFS
+  IFS=':'
+
+  local jar
+  # shellcheck disable=SC2154
+  for jar in $classpath; do
+    ozone_add_classpath "$jar"
+  done
+
+  IFS=$original_ifs
+}
+
 ## @description Add all the required jar files to the classpath
 ## @audience private
 ## @stability evolving
@@ -2818,15 +2845,7 @@ function ozone_assemble_classpath() {
     echo "ERROR: Classpath file descriptor $CLASSPATH_FILE is missing"
     exit 255
   fi
-  # shellcheck disable=SC1090,SC2086
-  source "$CLASSPATH_FILE"
-  OIFS=$IFS
-  IFS=':'
-
-  # shellcheck disable=SC2154
-  for jar in $classpath; do
-    ozone_add_classpath "$jar"
-  done
+  ozone_add_classpath_from_file "$CLASSPATH_FILE"
   ozone_add_classpath "${OZONE_HOME}/share/ozone/web"
 
   #Add optional jars to the classpath
@@ -2835,9 +2854,6 @@ function ozone_assemble_classpath() {
   if [[ -d "$OPTIONAL_CLASSPATH_DIR" ]]; then
     ozone_add_classpath "$OPTIONAL_CLASSPATH_DIR/*"
   fi
-
-  # TODO can be moved earlier? (after 'for jar in $classpath' loop)
-  IFS=$OIFS
 }
 
 ## @description  Fallback to value of `oldvar` if `newvar` is undefined
