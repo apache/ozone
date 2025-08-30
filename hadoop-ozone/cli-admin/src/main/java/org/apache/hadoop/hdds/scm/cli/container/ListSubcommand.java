@@ -182,6 +182,7 @@ public class ListSubcommand extends ScmSubcommand {
     } while (fetchedCount > 0);
   }
 
+  // TODO HDDS-13593 Remove this in favor of JsonUtils#getStdoutSequenceWriter.
   private static class NonClosingOutputStream extends OutputStream {
 
     private final OutputStream delegate;

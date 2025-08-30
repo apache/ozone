@@ -36,12 +36,19 @@ Container is closed
 
 Container checksums should match
     [arguments]    ${container}    ${expected_checksum}
-    ${data_checksum1} =  Execute     ozone admin container info "${container}" --json | jq -r '.replicas[0].dataChecksum' | head -n1
-    ${data_checksum2} =  Execute     ozone admin container info "${container}" --json | jq -r '.replicas[1].dataChecksum' | head -n1
-    ${data_checksum3} =  Execute     ozone admin container info "${container}" --json | jq -r '.replicas[2].dataChecksum' | head -n1
+    ${data_checksum1} =  Execute     ozone admin container reconcile --status "${container}" | jq -r '.[].replicas[0].dataChecksum'
+    ${data_checksum2} =  Execute     ozone admin container reconcile --status "${container}" | jq -r '.[].replicas[1].dataChecksum'
+    ${data_checksum3} =  Execute     ozone admin container reconcile --status "${container}" | jq -r '.[].replicas[2].dataChecksum'
                          Should be equal as strings    ${data_checksum1}    ${expected_checksum}
                          Should be equal as strings    ${data_checksum2}    ${expected_checksum}
                          Should be equal as strings    ${data_checksum3}    ${expected_checksum}
+    # Verify that container info shows the same checksums as reconcile status
+    ${info_checksum1} =  Execute     ozone admin container info "${container}" --json | jq -r '.replicas[0].dataChecksum'
+    ${info_checksum2} =  Execute     ozone admin container info "${container}" --json | jq -r '.replicas[1].dataChecksum'
+    ${info_checksum3} =  Execute     ozone admin container info "${container}" --json | jq -r '.replicas[2].dataChecksum'
+                         Should be equal as strings    ${data_checksum1}    ${info_checksum1}
+                         Should be equal as strings    ${data_checksum2}    ${info_checksum2}
+                         Should be equal as strings    ${data_checksum3}    ${info_checksum3}
 
 *** Test Cases ***
 Create container
@@ -181,10 +188,9 @@ Reset user
 Cannot reconcile open container
     # At this point we should have an open Ratis Three container.
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -n1
+    # Reconciling and querying status of open containers is not supported
     Execute and check rc    ozone admin container reconcile "${container}"    255
-    # The container should not yet have any replica checksums since it is still open.
-    # 0 is the hex value of an empty checksum.
-    Container checksums should match    ${container}    0
+    Execute and check rc    ozone admin container reconcile --status "${container}"    255
 
 Close container
     ${container} =      Execute          ozone admin container list --state OPEN | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
@@ -196,9 +202,8 @@ Close container
     Wait until keyword succeeds    1min    10sec    Container is closed    ${container}
 
 Reconcile closed container
-    # Check that info does not show replica checksums, since manual reconciliation has not yet been triggered.
     ${container} =      Execute          ozone admin container list --state CLOSED | jq -r '.[] | select(.replicationConfig.replicationFactor == "THREE") | .containerID' | head -1
-    ${data_checksum} =  Execute          ozone admin container info "${container}" --json | jq -r '.replicas[].dataChecksum' | head -n1
+    ${data_checksum} =  Execute          ozone admin container reconcile --status "${container}" | jq -r '.[].replicas[0].dataChecksum'
     # Once the container is closed, the data checksum should be populated
     Should Not Be Equal As Strings    0    ${data_checksum}
     Container checksums should match    ${container}    ${data_checksum}
