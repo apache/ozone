@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
 import org.apache.ozone.compaction.log.SstFileInfo;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.rocksdb.LiveFileMetaData;
@@ -74,11 +75,15 @@ public class TestOmSnapshotLocalDataYaml {
 
   private static final Instant NOW = Instant.now();
 
-  @BeforeEach
-  public void setUp() throws IOException {
-    assertTrue(new File(testRoot).mkdirs());
+  @BeforeAll
+  public static void setupClassMocks() throws IOException {
     omSnapshotManager = mock(OmSnapshotManager.class);
     when(omSnapshotManager.getSnapshotLocalYaml()).thenReturn(YAML_SUPPLIER);
+  }
+
+  @BeforeEach
+  public void setUp() {
+    assertTrue(new File(testRoot).mkdirs());
   }
 
   @AfterEach
