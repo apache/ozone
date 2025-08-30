@@ -62,8 +62,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 public class TestContainerStateManager {
 
   private ContainerStateManager containerStateManager;
-  private PipelineManager pipelineManager;
-  private SCMHAManager scmhaManager;
   @TempDir
   private File testDir;
   private DBStore dbStore;
@@ -72,10 +70,10 @@ public class TestContainerStateManager {
   @BeforeEach
   public void init() throws IOException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    pipelineManager = mock(PipelineManager.class);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
     pipeline = Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
             .setId(PipelineID.randomId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(

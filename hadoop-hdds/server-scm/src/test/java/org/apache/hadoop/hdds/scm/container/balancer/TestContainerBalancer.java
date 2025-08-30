@@ -65,7 +65,6 @@ public class TestContainerBalancer {
   private StorageContainerManager scm;
   private ContainerBalancerConfiguration balancerConfiguration;
   private Map<String, ByteString> serviceToConfigMap = new HashMap<>();
-  private StatefulServiceStateManager serviceStateManager;
   private OzoneConfiguration conf;
 
   /**
@@ -79,7 +78,7 @@ public class TestContainerBalancer {
         5, TimeUnit.SECONDS);
     conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 2, TimeUnit.SECONDS);
     scm = mock(StorageContainerManager.class);
-    serviceStateManager = mock(StatefulServiceStateManagerImpl.class);
+    StatefulServiceStateManager serviceStateManager = mock(StatefulServiceStateManagerImpl.class);
     balancerConfiguration =
         conf.getObject(ContainerBalancerConfiguration.class);
     balancerConfiguration.setThreshold(10);
