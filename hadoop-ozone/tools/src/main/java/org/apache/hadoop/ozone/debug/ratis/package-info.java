@@ -15,28 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.segmentparser;
-
-import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import picocli.CommandLine;
-
 /**
- * Command line utility to parse and dump any generic ratis segment file.
+ * Ratis debug related commands.
  */
-@CommandLine.Command(
-    name = "generic",
-    description = "dump generic ratis segment file",
-    mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class)
-public class GenericRatisLogParser extends BaseLogParser
-    implements Callable<Void> {
-  @CommandLine.ParentCommand
-  private RatisLogParser logParser;
-
-  @Override
-  public Void call() throws Exception {
-    parseRatisLogs(null);
-    return null;
-  }
-}
+package org.apache.hadoop.ozone.debug.ratis;
