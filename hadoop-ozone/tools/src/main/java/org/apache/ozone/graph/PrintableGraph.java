@@ -27,7 +27,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import javax.imageio.ImageIO;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.ozone.rocksdiff.CompactionNode;
 import org.jgrapht.Graph;
 import org.jgrapht.ext.JGraphXAdapter;

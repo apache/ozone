@@ -305,7 +305,6 @@ Apache License 2.0
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
    commons-codec:commons-codec
-   commons-collections:commons-collections
    commons-daemon:commons-daemon
    commons-digester:commons-digester
    commons-httpclient:commons-httpclient
@@ -366,6 +365,7 @@ Apache License 2.0
    net.java.dev.jna:jna-platform
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
+   org.apache.commons:commons-collections4
    org.apache.commons:commons-lang3
    org.apache.commons:commons-text
    org.apache.curator:curator-client

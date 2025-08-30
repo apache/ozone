@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.collections.map.DefaultedMap;
+import org.apache.commons.collections4.map.DefaultedMap;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.net;
 
-import static org.apache.commons.collections.EnumerationUtils.toList;
+import static org.apache.commons.collections4.EnumerationUtils.toList;
 
 import java.io.File;
 import java.io.FileNotFoundException;
