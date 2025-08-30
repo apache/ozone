@@ -326,10 +326,6 @@
             <configuration>
               <includes>
                 <include>**/*.class</include>
-                <include>**/lib*.dylib</include>
-                <include>**/lib*.so</include>
-                <include>**/lib*.jnilib</include>
-                <include>**/lib*.dll</include>
               </includes>
             </configuration>
           </plugin>

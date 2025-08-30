@@ -77,15 +77,15 @@ public class TestOmSnapshotLocalDataYaml {
     dataYaml.setSstFiltered(true);
 
     // Set last compaction time
-    dataYaml.setLastCompactionTime(NOW.toEpochMilli());
+    dataYaml.setLastDefragTime(NOW.toEpochMilli());
 
     // Set needs compaction flag
-    dataYaml.setNeedsCompaction(true);
+    dataYaml.setNeedsDefragmentation(true);
 
     // Add some compacted SST files
-    dataYaml.addCompactedSSTFileList(1, "table1", Collections.singleton("compacted-sst1"));
-    dataYaml.addCompactedSSTFileList(1, "table2", Collections.singleton("compacted-sst2"));
-    dataYaml.addCompactedSSTFileList(2, "table1", Collections.singleton("compacted-sst3"));
+    dataYaml.addDefraggedSSTFileList(1, "table1", Collections.singleton("compacted-sst1"));
+    dataYaml.addDefraggedSSTFileList(1, "table2", Collections.singleton("compacted-sst2"));
+    dataYaml.addDefraggedSSTFileList(2, "table1", Collections.singleton("compacted-sst3"));
 
     File yamlFile = new File(testRoot, yamlFilePath);
 
@@ -109,7 +109,7 @@ public class TestOmSnapshotLocalDataYaml {
     assertEquals(42, snapshotData.getVersion());
     assertTrue(snapshotData.getSstFiltered());
 
-    Map<String, Set<String>> uncompactedFiles = snapshotData.getUncompactedSSTFileList();
+    Map<String, Set<String>> uncompactedFiles = snapshotData.getNotDefraggedSSTFileList();
     assertEquals(2, uncompactedFiles.size());
     assertEquals(2, uncompactedFiles.get("table1").size());
     assertEquals(1, uncompactedFiles.get("table2").size());
@@ -117,10 +117,10 @@ public class TestOmSnapshotLocalDataYaml {
     assertTrue(uncompactedFiles.get("table1").contains("sst2"));
     assertTrue(uncompactedFiles.get("table2").contains("sst3"));
 
-    assertEquals(NOW.toEpochMilli(), snapshotData.getLastCompactionTime());
-    assertTrue(snapshotData.getNeedsCompaction());
+    assertEquals(NOW.toEpochMilli(), snapshotData.getLastDefragTime());
+    assertTrue(snapshotData.getNeedsDefragmentation());
 
-    Map<Integer, Map<String, Set<String>>> compactedFiles = snapshotData.getCompactedSSTFileList();
+    Map<Integer, Map<String, Set<String>>> compactedFiles = snapshotData.getDefraggedSSTFileList();
     assertEquals(2, compactedFiles.size());
     assertTrue(compactedFiles.containsKey(1));
     assertTrue(compactedFiles.containsKey(2));
@@ -129,6 +129,44 @@ public class TestOmSnapshotLocalDataYaml {
     assertTrue(compactedFiles.get(1).get("table1").contains("compacted-sst1"));
     assertTrue(compactedFiles.get(1).get("table2").contains("compacted-sst2"));
     assertTrue(compactedFiles.get(2).get("table1").contains("compacted-sst3"));
+  }
+
+  private void setValuesToYaml(File yamlFile) throws IOException {
+    // Read from YAML file
+    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
+
+    // Update version
+    snapshotData.setVersion(1);
+    // Update SST filtered flag
+//    snapshotData.setSstFiltered(false);
+    // Update last defrag time
+    snapshotData.setLastDefragTime(-1L);
+    // Update needs defragmentation flag
+    snapshotData.setNeedsDefragmentation(true);
+
+    // Write updated data back to file
+    snapshotData.writeToYaml(yamlFile);
+
+    // Read back the updated data
+    snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
+
+    // Verify updated data
+    assertEquals(1, snapshotData.getVersion());
+    assertEquals(-1, snapshotData.getLastDefragTime());
+    assertTrue(snapshotData.getNeedsDefragmentation());
+  }
+
+  @Test
+  public void testUpdateYaml() throws IOException {
+    setValuesToYaml(new File("../../hadoop-ozone/dist/target/" +
+        "data-om/metadata/db.snapshots/checkpointState/" +
+        "om.db-d39279ce-cab6-44e0-839a-2baecb8c283a.yaml"));
+    setValuesToYaml(new File("../../hadoop-ozone/dist/target/" +
+        "data-om/metadata/db.snapshots/checkpointState/" +
+        "om.db-77b75627-5534-4db4-88e5-1661aceae92f.yaml"));
+    setValuesToYaml(new File("../../hadoop-ozone/dist/target/" +
+        "data-om/metadata/db.snapshots/checkpointState/" +
+        "om.db-6639d124-6615-4ced-9af6-3dabd680727b.yaml"));
   }
 
   @Test
@@ -141,9 +179,9 @@ public class TestOmSnapshotLocalDataYaml {
 
     // Update snapshot data
     dataYaml.setSstFiltered(false);
-    dataYaml.setNeedsCompaction(false);
-    dataYaml.addUncompactedSSTFileList("table3", Collections.singleton("sst4"));
-    dataYaml.addCompactedSSTFileList(3, "table3", Collections.singleton("compacted-sst4"));
+    dataYaml.setNeedsDefragmentation(false);
+    dataYaml.addNotDefraggedSSTFileList("table3", Collections.singleton("sst4"));
+    dataYaml.addDefraggedSSTFileList(3, "table3", Collections.singleton("compacted-sst4"));
 
     // Write updated data back to file
     dataYaml.writeToYaml(yamlFile);
@@ -153,14 +191,14 @@ public class TestOmSnapshotLocalDataYaml {
 
     // Verify updated data
     assertThat(dataYaml.getSstFiltered()).isFalse();
-    assertThat(dataYaml.getNeedsCompaction()).isFalse();
-
-    Map<String, Set<String>> uncompactedFiles = dataYaml.getUncompactedSSTFileList();
+    assertThat(dataYaml.getNeedsDefragmentation()).isFalse();
+    // TODO: Fix variable names
+    Map<String, Set<String>> uncompactedFiles = dataYaml.getNotDefraggedSSTFileList();
     assertEquals(3, uncompactedFiles.size());
     assertTrue(uncompactedFiles.containsKey("table3"));
     assertTrue(uncompactedFiles.get("table3").contains("sst4"));
-
-    Map<Integer, Map<String, Set<String>>> compactedFiles = dataYaml.getCompactedSSTFileList();
+    // TODO: Fix variable names
+    Map<Integer, Map<String, Set<String>>> compactedFiles = dataYaml.getDefraggedSSTFileList();
     assertEquals(3, compactedFiles.size());
     assertTrue(compactedFiles.containsKey(3));
     assertTrue(compactedFiles.get(3).containsKey("table3"));
@@ -204,9 +242,9 @@ public class TestOmSnapshotLocalDataYaml {
     assertThat(content).contains(OzoneConsts.OM_SLD_VERSION);
     assertThat(content).contains(OzoneConsts.OM_SLD_CHECKSUM);
     assertThat(content).contains(OzoneConsts.OM_SLD_IS_SST_FILTERED);
-    assertThat(content).contains(OzoneConsts.OM_SLD_UNCOMPACTED_SST_FILE_LIST);
-    assertThat(content).contains(OzoneConsts.OM_SLD_LAST_COMPACTION_TIME);
-    assertThat(content).contains(OzoneConsts.OM_SLD_NEEDS_COMPACTION);
-    assertThat(content).contains(OzoneConsts.OM_SLD_COMPACTED_SST_FILE_LIST);
+    assertThat(content).contains(OzoneConsts.OM_SLD_NOT_DEFRAGGED_SST_FILE_LIST);
+    assertThat(content).contains(OzoneConsts.OM_SLD_LAST_DEFRAG_TIME);
+    assertThat(content).contains(OzoneConsts.OM_SLD_NEEDS_DEFRAGMENTATION);
+    assertThat(content).contains(OzoneConsts.OM_SLD_DEFRAGGED_SST_FILE_LIST);
   }
 }

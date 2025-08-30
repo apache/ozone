@@ -139,6 +139,7 @@ public class RDBStore implements DBStore {
         checkpointsParentDir = checkpointsParentDirPath.toString();
         Files.createDirectories(checkpointsParentDirPath);
 
+        // TODO: scm, dn, etc. don't need this. Only om does
         Path snapshotsParentDirPath =
             Paths.get(dbLocation.getParent(), OM_SNAPSHOT_CHECKPOINT_DIR);
         snapshotsParentDir = snapshotsParentDirPath.toString();
