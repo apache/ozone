@@ -118,8 +118,7 @@ public class TestECKeyOutputStream {
     configuration.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 60, TimeUnit.SECONDS);
     configuration.setTimeDuration("hdds.ratis.raft.server.rpc.slowness.timeout", 300,
         TimeUnit.SECONDS);
-    configuration.set("ozone.replication.allowed-configs", "(^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4)-" +
-        "(512|1024|2048|4096|1)k)$)");
+    configuration.set("ozone.replication.allowed-configs", "");
     configuration.setTimeDuration(
         "hdds.ratis.raft.server.notification.no-leader.timeout", 300,
         TimeUnit.SECONDS);
@@ -190,7 +189,6 @@ public class TestECKeyOutputStream {
   }
 
   @Test
-  @Unhealthy("HDDS-11821")
   public void testECKeyCreatetWithDatanodeIdChange()
       throws Exception {
     AtomicReference<Boolean> failed = new AtomicReference<>(false);
@@ -213,9 +211,10 @@ public class TestECKeyOutputStream {
       ObjectStore store = client1.getObjectStore();
       store.createVolume(volumeName);
       store.getVolume(volumeName).createBucket(bucketName);
+      int chunk = 10;
       OzoneOutputStream key = TestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
-          ECReplicationConfig.EcCodec.RS, 1024), inputSize, store, volumeName, bucketName);
-      byte[] b = new byte[6 * 1024];
+          ECReplicationConfig.EcCodec.RS, chunk), inputSize, store, volumeName, bucketName);
+      byte[] b = new byte[6 * chunk];
       ECKeyOutputStream groupOutputStream = (ECKeyOutputStream) key.getOutputStream();
       List<OmKeyLocationInfo> locationInfoList = groupOutputStream.getLocationInfoList();
       while (locationInfoList.isEmpty()) {
@@ -225,7 +224,6 @@ public class TestECKeyOutputStream {
         key.write(b);
         key.flush();
       }
-
       assertEquals(1, locationInfoList.size());
 
       OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
