@@ -49,11 +49,13 @@ import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSu
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.DiskBalancerCommand;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
@@ -144,6 +146,7 @@ public class HeartbeatEndpointTask
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
       addQueuedCommandCounts(requestBuilder);
+      addDiskBalancerReport(requestBuilder);
       SCMHeartbeatRequestProto request = requestBuilder.build();
       LOG.debug("Sending heartbeat message : {}", request);
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
@@ -252,6 +255,13 @@ public class HeartbeatEndpointTask
           .addCount(entry.getValue());
     }
     requestBuilder.setCommandQueueReport(reportProto.build());
+  }
+
+  private void addDiskBalancerReport(SCMHeartbeatRequestProto.Builder requestBuilder) {
+    DiskBalancerInfo info = context.getParent().getContainer().getDiskBalancerInfo();
+    if (info != null) {
+      requestBuilder.setDiskBalancerReport(info.toDiskBalancerReportProto());
+    }
   }
 
   /**
@@ -387,6 +397,12 @@ public class HeartbeatEndpointTask
         ReconcileContainerCommand reconcileContainerCommand =
             ReconcileContainerCommand.getFromProtobuf(commandResponseProto.getReconcileContainerCommandProto());
         processCommonCommand(commandResponseProto, reconcileContainerCommand);
+        break;
+      case diskBalancerCommand:
+        DiskBalancerCommand diskBalancerCommand =
+            DiskBalancerCommand.getFromProtobuf(
+                commandResponseProto.getDiskBalancerCommandProto());
+        processCommonCommand(commandResponseProto, diskBalancerCommand);
         break;
       default:
         throw new IllegalArgumentException("Unknown response : "
