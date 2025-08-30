@@ -25,6 +25,10 @@
   <name>Apache Ozone Mini Cluster</name>
   <description>Apache Ozone Mini Cluster for Integration Tests</description>
 
+  <properties>
+    <maven.javadoc.skip>true</maven.javadoc.skip>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.google.guava</groupId>
