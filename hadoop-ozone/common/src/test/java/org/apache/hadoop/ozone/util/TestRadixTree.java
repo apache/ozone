@@ -71,28 +71,28 @@ public class TestRadixTree {
    */
   @Test
   public  void testGetLongestPrefix() {
-    assertEquals(PATH_BC.toString(), ROOT.getLongestPrefix(PATH_BC.toString()));
-    assertEquals(PATH_B.toString(), ROOT.getLongestPrefix(PATH_B.toString()));
-    assertEquals(BASE_PATH, ROOT.getLongestPrefix(BASE_PATH));
-    assertEquals(Paths.get(BASE_PATH, "b", "e", "g").toString(),
+    assertEquals("/" + PATH_BC.toString(), ROOT.getLongestPrefix(PATH_BC.toString()));
+    assertEquals("/" + PATH_B.toString(), ROOT.getLongestPrefix(PATH_B.toString()));
+    assertEquals("/" + BASE_PATH, ROOT.getLongestPrefix(BASE_PATH));
+    assertEquals("/" + Paths.get(BASE_PATH, "b", "e", "g").toString(),
         ROOT.getLongestPrefix(
             Paths.get(BASE_PATH, "b", "e", "g", "h").toString()
         )
     );
 
     assertEquals("/", ROOT.getLongestPrefix("d/b/c"));
-    assertEquals(Paths.get(BASE_PATH, "b", "e").toString(),
+    assertEquals("/" + Paths.get(BASE_PATH, "b", "e").toString(),
         ROOT.getLongestPrefix(
             Paths.get(BASE_PATH, "b", "e", "dir3").toString()
         )
     );
-    assertEquals(PATH_BCD.toString(),
+    assertEquals("/" + PATH_BCD.toString(),
         ROOT.getLongestPrefix(
             Paths.get(BASE_PATH, "b", "c", "d", "p").toString()
         )
     );
 
-    assertEquals(Paths.get(BASE_PATH, "b", "c", "f").toString(),
+    assertEquals("/" + Paths.get(BASE_PATH, "b", "c", "f").toString(),
         ROOT.getLongestPrefix(
             Paths.get(BASE_PATH, "b", "c", "f", "p").toString()
         )
@@ -102,14 +102,14 @@ public class TestRadixTree {
   @Test
   public void testGetLongestPrefixPath() {
     List<RadixNode<Integer>> lpp = ROOT.getLongestPrefixPath(
-        Paths.get(BASE_PATH, "b", "c", "d", "g", "p").toString()
+        "/" + Paths.get(BASE_PATH, "b", "c", "d", "g", "p").toString()
     );
     RadixNode<Integer> lpn = lpp.get(lpp.size() - 1);
     assertEquals("g", lpn.getName());
     lpn.setValue(100);
 
     List<RadixNode<Integer>> lpq = ROOT.getLongestPrefixPath(
-        Paths.get(BASE_PATH, "b", "c", "d", "g", "q").toString()
+        "/" + Paths.get(BASE_PATH, "b", "c", "d", "g", "q").toString()
     );
     RadixNode<Integer> lqn = lpp.get(lpq.size() - 1);
     System.out.print(RadixTree.radixPathToString(lpq));
@@ -117,14 +117,14 @@ public class TestRadixTree {
     assertEquals("g", lqn.getName());
     assertEquals(100, (int)lqn.getValue());
 
-    assertEquals(BASE_PATH, RadixTree.radixPathToString(
+    assertEquals("/" + BASE_PATH + "/", RadixTree.radixPathToString(
         ROOT.getLongestPrefixPath(Paths.get(BASE_PATH, "g").toString())));
   }
 
   @Test
   public void testGetLastNoeInPrefixPath() {
-    assertNull(ROOT.getLastNodeInPrefixPath(Paths.get(BASE_PATH, "g").toString()));
-    RadixNode<Integer> ln = ROOT.getLastNodeInPrefixPath(Paths.get(BASE_PATH, "b", "e", "dir1").toString());
+    assertNull(ROOT.getLastNodeInPrefixPath("/" + Paths.get(BASE_PATH, "g").toString()));
+    RadixNode<Integer> ln = ROOT.getLastNodeInPrefixPath("/" + Paths.get(BASE_PATH, "b", "e", "dir1").toString());
     assertEquals("dir1", ln.getName());
   }
 
@@ -133,16 +133,16 @@ public class TestRadixTree {
     // Remove, test and restore
     // Remove partially overlapped path
     ROOT.removePrefixPath(PATH_BCDGH.toString());
-    assertEquals(PATH_BC.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
+    assertEquals("/" + PATH_BC.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
     ROOT.insert(PATH_BCDGH.toString());
 
     // Remove fully overlapped path
     ROOT.removePrefixPath(PATH_BCD.toString());
-    assertEquals(PATH_BCD.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
+    assertEquals("/" + PATH_BCD.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
     ROOT.insert(PATH_BCD.toString());
 
     // Remove non-existing path
     ROOT.removePrefixPath("d/a");
-    assertEquals(PATH_BCD.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
+    assertEquals("/" + PATH_BCD.toString(), ROOT.getLongestPrefix(PATH_BCD.toString()));
   }
 }
