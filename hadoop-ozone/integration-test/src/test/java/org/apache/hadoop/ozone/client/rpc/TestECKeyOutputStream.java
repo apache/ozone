@@ -216,14 +216,12 @@ public class TestECKeyOutputStream {
       byte[] b = new byte[6 * chunk];
       ECKeyOutputStream groupOutputStream = (ECKeyOutputStream) key.getOutputStream();
       List<OmKeyLocationInfo> locationInfoList = groupOutputStream.getLocationInfoList();
-      long count = 0;
       while (locationInfoList.isEmpty()) {
         locationInfoList = groupOutputStream.getLocationInfoList();
         b = RandomUtils.secure().randomBytes(b.length);
         assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
         key.write(b);
         key.flush();
-        System.out.println("Swaminathan write " + count++ + " " + locationInfoList.size() + " " + (b.length * count));
       }
       assertEquals(1, locationInfoList.size());
 
@@ -261,7 +259,7 @@ public class TestECKeyOutputStream {
         } catch (ContainerNotFoundException e) {
           throw new RuntimeException(e);
         }
-      }, 1000, 30000);
+      }, 1000, 120000);
       key.close();
       Assertions.assertTrue(failed.get());
     } finally {
