@@ -2072,6 +2072,17 @@
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
+                    <reason>Use commons-collections v4</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.commons.collections.**</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
                     <reason>Use Jackson 2 (com.fasterxml.jackson)</reason>
                     <bannedImports>
                       <bannedImport>org.codehaus.jackson.**</bannedImport>
