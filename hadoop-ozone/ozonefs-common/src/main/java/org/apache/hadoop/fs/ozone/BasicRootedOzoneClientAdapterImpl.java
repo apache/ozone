@@ -1074,7 +1074,7 @@ public class BasicRootedOzoneClientAdapterImpl
         owner,
         null,
         getBlockLocations(null),
-        false,
+        keyInfo.isEncrypted(),
         OzoneClientUtils.isKeyErasureCode(keyInfo)
     );
   }
