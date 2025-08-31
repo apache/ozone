@@ -103,7 +103,8 @@ public class TestECKeyOutputStream {
   private static int inputSize = dataBlocks * chunkSize;
   private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
 
-  private static void initConf(OzoneConfiguration configuration, int chunkSize) {
+  private static void initConf(OzoneConfiguration configuration, int chunkSize, int flushSize, int maxFlushSize,
+      int blockSize) {
     OzoneClientConfig clientConfig = configuration.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
@@ -151,7 +152,7 @@ public class TestECKeyOutputStream {
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
-    initConf(conf, chunkSize);
+    initConf(conf, chunkSize, flushSize, maxFlushSize, blockSize);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
         .build();
@@ -204,7 +205,7 @@ public class TestECKeyOutputStream {
           });
       int chunk = 10;
       OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-      initConf(ozoneConfiguration, chunk * 2);
+      initConf(ozoneConfiguration, chunk * 2, chunk * 4, chunk * 8, chunk * 16);
       miniOzoneCluster.set(MiniOzoneCluster.newBuilder(ozoneConfiguration).setNumDatanodes(10).build());
       miniOzoneCluster.get().waitForClusterToBeReady();
       client1 = miniOzoneCluster.get().newClient();
