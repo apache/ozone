@@ -17,10 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.LinkedList;
+import java.util.List;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -31,7 +29,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
  */
 public class ContainerEntry {
   private final ContainerInfo info;
-  private final Map<DatanodeID, ContainerReplica> replicas = new HashMap<>();
+  private final List<ContainerReplica> replicas = new LinkedList<>();
 
   ContainerEntry(ContainerInfo info) {
     this.info = info;
@@ -41,15 +39,31 @@ public class ContainerEntry {
     return info;
   }
 
-  public Set<ContainerReplica> getReplicas() {
-    return new HashSet<>(replicas.values());
+  public List<ContainerReplica> getReplicas() {
+    return replicas;
   }
 
   public ContainerReplica put(ContainerReplica r) {
-    return replicas.put(r.getDatanodeDetails().getID(), r);
+    DatanodeID id = r.getDatanodeDetails().getID();
+    for (int i = 0; i < replicas.size(); i++) {
+      ContainerReplica old = replicas.get(i);
+      if (old.getDatanodeDetails().getID().equals(id)) {
+        replicas.set(i, r);
+        return old;
+      }
+    }
+    replicas.add(r);
+    return null;
   }
 
   public ContainerReplica removeReplica(DatanodeID datanodeID) {
-    return replicas.remove(datanodeID);
+    for (int i = 0; i < replicas.size(); i++) {
+      ContainerReplica r = replicas.get(i);
+      if (r.getDatanodeDetails().getID().equals(datanodeID)) {
+        replicas.remove(i);
+        return r;
+      }
+    }
+    return null;
   }
 }
