@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.RandomUtils;
@@ -243,19 +244,20 @@ public class TestECKeyOutputStream {
             }
           });
       locationInfoList = groupOutputStream.getLocationInfoList();
-      int count = 0;
+      AtomicInteger count = new AtomicInteger(0);
       while (locationInfoList.size() == 1) {
         locationInfoList = groupOutputStream.getLocationInfoList();
         b = RandomUtils.secure().randomBytes(b.length);
         assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
         key.write(b);
         key.flush();
-        System.out.println("Swaminathan Write chunk " + count++ + " total data written " + count * chunk);
+        System.out.println("Swaminathan Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk);
       }
       assertEquals(2, locationInfoList.size());
       assertNotEquals(locationInfoList.get(1).getPipeline().getId(), pipeline.getId());
       GenericTestUtils.waitFor(() -> {
         try {
+          System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written ");
           return miniOzoneCluster.get().getStorageContainerManager().getContainerManager()
               .getContainer(ContainerID.valueOf(containerId)).getState().equals(
                   HddsProtos.LifeCycleState.CLOSED);
