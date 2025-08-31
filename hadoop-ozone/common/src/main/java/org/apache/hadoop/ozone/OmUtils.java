@@ -378,19 +378,24 @@ public final class OmUtils {
         getDecommissionedNodeIds(conf, decommissionNodesKeyWithServiceIdSuffix);
     nodeIds.removeAll(decommissionedNodeIds);
 
-    // Exclude listener nodes if configured.
+    return nodeIds;
+  }
+
+  public static Collection<String> getListenerOMNodeIds(
+      ConfigurationSource conf, String omServiceId) {
     String listenerNodesKeyWithServiceIdSuffix =
         ConfUtils.addKeySuffixes(OZONE_OM_LISTENER_NODES_KEY, omServiceId);
-    HashSet<String> serviceIds = new HashSet<>(
-        conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
-    Collection<String> listenerNodeIds =
-        conf.getTrimmedStringCollection(listenerNodesKeyWithServiceIdSuffix);
-    if (listenerNodeIds.isEmpty() && serviceIds.size() == 1) {
-      listenerNodeIds = conf.getTrimmedStringCollection(
-          OZONE_OM_LISTENER_NODES_KEY);
-    }
-    nodeIds.removeAll(listenerNodeIds);
+    HashSet<String> listenerNodeIds = new HashSet<>(
+        conf.getTrimmedStringCollection(listenerNodesKeyWithServiceIdSuffix));
+    listenerNodeIds.addAll(conf.getTrimmedStringCollection(OZONE_OM_LISTENER_NODES_KEY));
+    return listenerNodeIds;
+  }
 
+  public static Collection<String> getActiveNonListenerOMNodeIds(
+      ConfigurationSource conf, String omServiceId) {
+    HashSet<String> nodeIds = new HashSet<>(
+        getActiveOMNodeIds(conf, omServiceId));
+    nodeIds.removeAll(getListenerOMNodeIds(conf, omServiceId));
     return nodeIds;
   }
 
