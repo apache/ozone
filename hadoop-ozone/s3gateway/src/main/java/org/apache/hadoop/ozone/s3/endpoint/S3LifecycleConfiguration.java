@@ -257,7 +257,6 @@ public class S3LifecycleConfiguration {
       OmLifecycleConfiguration.Builder builder = new OmLifecycleConfiguration.Builder()
           .setVolume(ozoneBucket.getVolumeName())
           .setBucketLayout(ozoneBucket.getBucketLayout())
-          .setCreationTime(System.currentTimeMillis())
           .setBucket(ozoneBucket.getName());
 
       for (Rule rule : getRules()) {
