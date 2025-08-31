@@ -242,12 +242,14 @@ public class TestECKeyOutputStream {
             }
           });
       locationInfoList = groupOutputStream.getLocationInfoList();
+      int count = 0;
       while (locationInfoList.size() == 1) {
         locationInfoList = groupOutputStream.getLocationInfoList();
         b = RandomUtils.secure().randomBytes(b.length);
         assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
         key.write(b);
         key.flush();
+        System.out.println("Swaminathan Write chunk " + count++ + " total data written " + count * chunk);
       }
       assertEquals(2, locationInfoList.size());
       assertNotEquals(locationInfoList.get(1).getPipeline().getId(), pipeline.getId());
