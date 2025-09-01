@@ -257,14 +257,18 @@ public class TestECKeyOutputStream {
       assertEquals(1, locationInfoList.size());
       System.out.println("Swaminathan Cheking write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk +
           "\t" + dnWithReplicaIndex1.getUuidString() + "\t" + locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()));
-      while (locationInfoList.size() == 1) {
-        locationInfoList = groupOutputStream.getLocationInfoList();
-        b = RandomUtils.secure().randomBytes(b.length);
-        assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
-        key.write(b);
-        key.flush();
-        System.out.println("Swaminathan Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk);
-      }
+      GenericTestUtils.waitFor(() -> {
+        try {
+          assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
+          key.write(RandomUtils.secure().randomBytes(chunk));
+          key.flush();
+          System.out.println("Swaminathan Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk);
+          return groupOutputStream.getLocationInfoList().size() > 1;
+        } catch (IOException e) {
+          return false;
+        }
+      }, 1, 300000);
+
       System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk + locationInfoList.size() + "\t" +
           locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()) + "\t" + dnWithReplicaIndex1.getUuidString());
       assertEquals(2, locationInfoList.size());
