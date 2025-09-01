@@ -268,7 +268,7 @@ public class TestECKeyOutputStream {
           return false;
         }
       }, 1, 300000);
-
+      locationInfoList = groupOutputStream.getLocationInfoList();
       System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk + locationInfoList.size() + "\t" +
           locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()) + "\t" + dnWithReplicaIndex1.getUuidString());
       assertEquals(2, locationInfoList.size());
