@@ -244,6 +244,8 @@ public class TestECKeyOutputStream {
           .thenAnswer(i -> {
             if (!failed.get()) {
               // Change dnId for one write chunk request.
+              System.out.println("Swaminathan1 Getting Datanode 1 total data written \t");
+              new RuntimeException().printStackTrace();
               failed.set(true);
               return dnWithReplicaIndex1.getUuidString() + "_failed";
             } else {
