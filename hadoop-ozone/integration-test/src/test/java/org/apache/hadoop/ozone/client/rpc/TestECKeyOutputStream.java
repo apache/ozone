@@ -258,11 +258,12 @@ public class TestECKeyOutputStream {
       assertEquals(1, locationInfoList.size());
       System.out.println("Swaminathan Cheking write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk +
           "\t" + dnWithReplicaIndex1.getUuidString() + "\t" + locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()));
+      OzoneOutputStream finalKey = key;
       GenericTestUtils.waitFor(() -> {
         try {
-          assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
-          key.write(RandomUtils.secure().randomBytes(chunk));
-          key.flush();
+          assertInstanceOf(ECKeyOutputStream.class, finalKey.getOutputStream());
+          finalKey.write(RandomUtils.secure().randomBytes(chunk));
+          finalKey.flush();
           System.out.println("Swaminathan Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk);
           return groupOutputStream.getLocationInfoList().size() > 1;
         } catch (IOException e) {
