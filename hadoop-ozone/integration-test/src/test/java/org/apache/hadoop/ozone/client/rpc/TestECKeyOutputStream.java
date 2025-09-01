@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +38,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.RandomUtils;
@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -104,8 +105,7 @@ public class TestECKeyOutputStream {
   private static int inputSize = dataBlocks * chunkSize;
   private static byte[][] inputChunks = new byte[dataBlocks][chunkSize];
 
-  private static void initConf(OzoneConfiguration configuration, int chunkSize, int flushSize, int maxFlushSize,
-      int blockSize) {
+  private static void initConf(OzoneConfiguration configuration) {
     OzoneClientConfig clientConfig = configuration.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(false);
@@ -119,7 +119,8 @@ public class TestECKeyOutputStream {
     configuration.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 60, TimeUnit.SECONDS);
     configuration.setTimeDuration("hdds.ratis.raft.server.rpc.slowness.timeout", 300,
         TimeUnit.SECONDS);
-    configuration.set("ozone.replication.allowed-configs", "");
+    configuration.set("ozone.replication.allowed-configs", "(^((STANDALONE|RATIS)/(ONE|THREE))|(EC/(3-2|6-3|10-4)-" +
+        "(512|1024|2048|4096|1)k)$)");
     configuration.setTimeDuration(
         "hdds.ratis.raft.server.notification.no-leader.timeout", 300,
         TimeUnit.SECONDS);
@@ -135,7 +136,11 @@ public class TestECKeyOutputStream {
     configuration.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     configuration.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     configuration.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-
+    ReplicationManager.ReplicationManagerConfiguration rmConfig = conf
+        .getObject(
+            ReplicationManager.ReplicationManagerConfiguration.class);
+    rmConfig.setInterval(Duration.ofSeconds(5));
+    configuration.setFromObject(rmConfig);
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
@@ -153,7 +158,7 @@ public class TestECKeyOutputStream {
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
-    initConf(conf, chunkSize, flushSize, maxFlushSize, blockSize);
+    initConf(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
         .build();
@@ -204,9 +209,8 @@ public class TestECKeyOutputStream {
             handlers.put(handler.getDatanodeId(), handler);
             return handler;
           });
-      int chunk = 10;
       OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-      initConf(ozoneConfiguration, chunk * 2, chunk * 4, chunk * 8, chunk * 16);
+      initConf(ozoneConfiguration);
       miniOzoneCluster.set(MiniOzoneCluster.newBuilder(ozoneConfiguration).setNumDatanodes(10).build());
       miniOzoneCluster.get().waitForClusterToBeReady();
       client1 = miniOzoneCluster.get().newClient();
@@ -214,8 +218,8 @@ public class TestECKeyOutputStream {
       store.createVolume(volumeName);
       store.getVolume(volumeName).createBucket(bucketName);
       OzoneOutputStream key = TestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
-          ECReplicationConfig.EcCodec.RS, chunk), inputSize, store, volumeName, bucketName);
-      byte[] b = new byte[6 * chunk];
+          ECReplicationConfig.EcCodec.RS, 1024), inputSize, store, volumeName, bucketName);
+      byte[] b = new byte[6 * 1024];
       ECKeyOutputStream groupOutputStream = (ECKeyOutputStream) key.getOutputStream();
       List<OmKeyLocationInfo> locationInfoList = groupOutputStream.getLocationInfoList();
       while (locationInfoList.isEmpty()) {
@@ -225,6 +229,7 @@ public class TestECKeyOutputStream {
         key.write(b);
         key.flush();
       }
+
       assertEquals(1, locationInfoList.size());
 
       OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
@@ -244,20 +249,17 @@ public class TestECKeyOutputStream {
             }
           });
       locationInfoList = groupOutputStream.getLocationInfoList();
-      AtomicInteger count = new AtomicInteger(0);
       while (locationInfoList.size() == 1) {
         locationInfoList = groupOutputStream.getLocationInfoList();
         b = RandomUtils.secure().randomBytes(b.length);
         assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
         key.write(b);
         key.flush();
-        System.out.println("Swaminathan Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk);
       }
       assertEquals(2, locationInfoList.size());
       assertNotEquals(locationInfoList.get(1).getPipeline().getId(), pipeline.getId());
       GenericTestUtils.waitFor(() -> {
         try {
-          System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written ");
           return miniOzoneCluster.get().getStorageContainerManager().getContainerManager()
               .getContainer(ContainerID.valueOf(containerId)).getState().equals(
                   HddsProtos.LifeCycleState.CLOSED);
