@@ -213,7 +213,7 @@ public class TestECKeyOutputStream {
           });
       int chunk = 10;
       OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-      initConf(ozoneConfiguration, chunk * 2, chunk * 4, chunk * 8, chunk * 16);
+      initConf(ozoneConfiguration, chunk * 2, chunk * 4, chunk * 8, chunk * 10000);
       miniOzoneCluster.set(MiniOzoneCluster.newBuilder(ozoneConfiguration).setNumDatanodes(10).build());
       miniOzoneCluster.get().waitForClusterToBeReady();
       client1 = miniOzoneCluster.get().newClient();
