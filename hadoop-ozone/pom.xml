@@ -151,7 +151,6 @@
             <configuration>
               <forkCount>${testsThreadCount}</forkCount>
               <reuseForks>false</reuseForks>
-              <redirectTestOutputToFile>false</redirectTestOutputToFile>
               <!-- @argLine is filled by jacoco maven plugin. @{} means late evaluation -->
               <argLine>${maven-surefire-plugin.argLine} @{argLine} -DminiClusterDedicatedDirs=true</argLine>
               <systemPropertyVariables>

@@ -2250,12 +2250,14 @@ public class KeyValueHandler extends Handler {
    */
   private boolean validateRequestDatanodeId(Integer containerReplicaIdx, String requestDatanodeUUID)
       throws StorageContainerException {
-    LOG.info("Swaminathan checking replicaIdx : {} requestDatanodeId : {} currentDatanodeId: {}",
-        containerReplicaIdx, requestDatanodeUUID, this.getDatanodeId());
-    if (containerReplicaIdx != null && containerReplicaIdx > 0 && !requestDatanodeUUID.equals(this.getDatanodeId())) {
+    String datanodeId = this.getDatanodeId();
+    LOG.info("Swaminathan checking replicaIdx : {} requestDatanodeId : {} currentDatanodeId: {} assert: {}",
+        containerReplicaIdx, requestDatanodeUUID, datanodeId,
+        (containerReplicaIdx != null && containerReplicaIdx > 0 && !requestDatanodeUUID.equals(datanodeId)));
+    if (containerReplicaIdx != null && containerReplicaIdx > 0 && !requestDatanodeUUID.equals(datanodeId)) {
       throw new StorageContainerException(
           String.format("Request is trying to write to node with uuid : %s but the current nodeId is: %s .",
-              requestDatanodeUUID, this.getDatanodeId()), INVALID_ARGUMENT);
+              requestDatanodeUUID, datanodeId), INVALID_ARGUMENT);
     }
     return true;
   }
