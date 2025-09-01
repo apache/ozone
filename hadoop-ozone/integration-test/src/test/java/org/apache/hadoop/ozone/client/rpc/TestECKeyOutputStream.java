@@ -263,7 +263,9 @@ public class TestECKeyOutputStream {
       assertNotEquals(locationInfoList.get(1).getPipeline().getId(), pipeline.getId());
       GenericTestUtils.waitFor(() -> {
         try {
-          System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written ");
+          System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written \t"
+              + miniOzoneCluster.get().getStorageContainerManager().getContainerManager()
+              .getContainer(ContainerID.valueOf(containerId)).getState());
           return miniOzoneCluster.get().getStorageContainerManager().getContainerManager()
               .getContainer(ContainerID.valueOf(containerId)).getState().equals(
                   HddsProtos.LifeCycleState.CLOSED);
