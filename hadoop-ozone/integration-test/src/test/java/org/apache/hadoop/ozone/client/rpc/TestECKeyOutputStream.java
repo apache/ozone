@@ -255,6 +255,8 @@ public class TestECKeyOutputStream {
       locationInfoList = groupOutputStream.getLocationInfoList();
       AtomicInteger count = new AtomicInteger(0);
       assertEquals(1, locationInfoList.size());
+      System.out.println("Swaminathan Cheking write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk +
+          "\t" + dnWithReplicaIndex1.getUuidString() + "\t" + locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()));
       while (locationInfoList.size() == 1) {
         locationInfoList = groupOutputStream.getLocationInfoList();
         b = RandomUtils.secure().randomBytes(b.length);
@@ -264,7 +266,7 @@ public class TestECKeyOutputStream {
         System.out.println("Swaminathan Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk);
       }
       System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk + locationInfoList.size() + "\t" +
-          locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()));
+          locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()) + "\t" + dnWithReplicaIndex1.getUuidString());
       assertEquals(2, locationInfoList.size());
       assertNotEquals(locationInfoList.get(1).getPipeline().getId(), pipeline.getId());
       GenericTestUtils.waitFor(() -> {
