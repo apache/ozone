@@ -202,6 +202,7 @@ public class TestECKeyOutputStream {
     AtomicReference<Boolean> failed = new AtomicReference<>(false);
     AtomicReference<MiniOzoneCluster> miniOzoneCluster = new AtomicReference<>();
     OzoneClient client1 = null;
+    OzoneOutputStream key = null;
     try (MockedStatic<Handler> mockedHandler = Mockito.mockStatic(Handler.class, Mockito.CALLS_REAL_METHODS)) {
       Map<String, Handler> handlers = new HashMap<>();
       mockedHandler.when(() -> Handler
@@ -220,7 +221,7 @@ public class TestECKeyOutputStream {
       ObjectStore store = client1.getObjectStore();
       store.createVolume(volumeName);
       store.getVolume(volumeName).createBucket(bucketName);
-      OzoneOutputStream key = TestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
+      key = TestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
           ECReplicationConfig.EcCodec.RS, chunk), inputSize, store, volumeName, bucketName);
       byte[] b = new byte[6 * chunk];
       ECKeyOutputStream groupOutputStream = (ECKeyOutputStream) key.getOutputStream();
@@ -285,9 +286,9 @@ public class TestECKeyOutputStream {
           throw new RuntimeException(e);
         }
       }, 1000, 120000);
-      key.close();
       Assertions.assertTrue(failed.get());
     } finally {
+      IOUtils.closeQuietly(key);
       IOUtils.closeQuietly(client1);
       if (miniOzoneCluster.get() != null) {
         miniOzoneCluster.get().shutdown();
