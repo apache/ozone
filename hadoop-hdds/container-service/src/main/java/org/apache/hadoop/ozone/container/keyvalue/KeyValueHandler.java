@@ -2250,6 +2250,7 @@ public class KeyValueHandler extends Handler {
    */
   private boolean validateRequestDatanodeId(Integer containerReplicaIdx, String requestDatanodeUUID)
       throws StorageContainerException {
+    LOG.info("Swaminathan checking requestDatanodeId : {} currentDatanodeId: {}", requestDatanodeUUID, this.getDatanodeId());
     if (containerReplicaIdx != null && containerReplicaIdx > 0 && !requestDatanodeUUID.equals(this.getDatanodeId())) {
       throw new StorageContainerException(
           String.format("Request is trying to write to node with uuid : %s but the current nodeId is: %s .",

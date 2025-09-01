@@ -252,6 +252,7 @@ public class TestECKeyOutputStream {
           });
       locationInfoList = groupOutputStream.getLocationInfoList();
       AtomicInteger count = new AtomicInteger(0);
+      assertEquals(1, locationInfoList.size());
       while (locationInfoList.size() == 1) {
         locationInfoList = groupOutputStream.getLocationInfoList();
         b = RandomUtils.secure().randomBytes(b.length);
