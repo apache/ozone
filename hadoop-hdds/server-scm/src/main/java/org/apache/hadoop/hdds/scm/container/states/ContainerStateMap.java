@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.NavigableMap;
 import java.util.Objects;
@@ -122,10 +121,7 @@ public class ContainerStateMap {
     Set<ContainerReplica> getReplicas(ContainerID id) {
       Objects.requireNonNull(id, "id == null");
       final ContainerEntry entry = map.get(id);
-      if (entry == null) {
-        return null;
-      }
-      return new HashSet<>(entry.getReplicas());
+      return entry == null ? null : entry.getReplicas();
     }
 
     /**
