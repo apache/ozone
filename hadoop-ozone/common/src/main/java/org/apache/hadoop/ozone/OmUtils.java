@@ -381,16 +381,32 @@ public final class OmUtils {
     return nodeIds;
   }
 
+  /**
+   * Returns a collection of OM node IDs configured as listeners
+   * for the given OM service ID. The result aggregates IDs from both
+   * the service-specific and global listener configuration keys.
+   *
+   * @param conf        Configuration source to read OM node settings.
+   * @param omServiceId The OM service ID to scope the search.
+   * @return A collection of OM node IDs configured as listeners.
+   */
   public static Collection<String> getListenerOMNodeIds(
       ConfigurationSource conf, String omServiceId) {
-    String listenerNodesKeyWithServiceIdSuffix =
-        ConfUtils.addKeySuffixes(OZONE_OM_LISTENER_NODES_KEY, omServiceId);
+    String listenerNodesKeyWithServiceIdSuffix = ConfUtils.addKeySuffixes(OZONE_OM_LISTENER_NODES_KEY, omServiceId);
     HashSet<String> listenerNodeIds = new HashSet<>(
         conf.getTrimmedStringCollection(listenerNodesKeyWithServiceIdSuffix));
     listenerNodeIds.addAll(conf.getTrimmedStringCollection(OZONE_OM_LISTENER_NODES_KEY));
     return listenerNodeIds;
   }
 
+  /**
+   * Returns active OM node IDs that are not listener nodes for the given service
+   * ID.
+   *
+   * @param conf        Configuration source
+   * @param omServiceId OM service ID
+   * @return Collection of active non-listener node IDs
+   */
   public static Collection<String> getActiveNonListenerOMNodeIds(
       ConfigurationSource conf, String omServiceId) {
     HashSet<String> nodeIds = new HashSet<>(
