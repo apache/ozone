@@ -139,7 +139,7 @@ public class TestECKeyOutputStream {
     ReplicationManager.ReplicationManagerConfiguration rmConfig = conf
         .getObject(
             ReplicationManager.ReplicationManagerConfiguration.class);
-    rmConfig.setInterval(Duration.ofSeconds(5));
+    rmConfig.setInterval(Duration.ofSeconds(1));
     configuration.setFromObject(rmConfig);
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
