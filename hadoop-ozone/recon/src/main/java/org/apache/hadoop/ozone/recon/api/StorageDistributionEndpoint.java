@@ -17,32 +17,22 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
-import javax.net.ssl.HttpsURLConnection;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DeletionPendingBytesByStage;
@@ -75,8 +65,6 @@ public class StorageDistributionEndpoint {
   private final NSSummaryEndpoint nsSummaryEndpoint;
   private final StorageContainerLocationProtocol scmClient;
   private static Logger log = LoggerFactory.getLogger(StorageDistributionEndpoint.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final int HTTP_TIMEOUT_MS = 5000;
   private Map<DatanodeDetails, Long> blockDeletionMetricsMap = new HashMap<>();
 
   @Inject
@@ -219,7 +207,11 @@ public class StorageDistributionEndpoint {
   private void initializeBlockDeletionMetricsMap() {
     nodeManager.getNodeStats().keySet().forEach(nodeId -> {
       try {
-        blockDeletionMetricsMap.put(nodeId, getBlockDeletionMetricsFromDatanode(nodeId));
+        long dnPending = ReconUtils.getMetricsFromDatanode(nodeId,
+                "HddsDatanode",
+                 "BlockDeletingService",
+              "TotalPendingBlockBytes");
+        blockDeletionMetricsMap.put(nodeId, dnPending);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -235,104 +227,5 @@ public class StorageDistributionEndpoint {
     long committed = nodeStat.getCommitted().get();
     long pendingDeletion = blockDeletionMetricsMap.getOrDefault(datanode, 0L);
     return new DatanodeStorageReport(capacity, used, remaining, committed, pendingDeletion);
-  }
-
-  private HttpURLConnection makeHttpGetCall(String urlString) throws IOException {
-    Objects.requireNonNull(urlString, "urlString");
-    URL url = new URL(urlString);
-    final HttpURLConnection conn = openURLConnection(url);
-    conn.setRequestMethod("GET");
-    conn.setConnectTimeout(HTTP_TIMEOUT_MS);
-    conn.setReadTimeout(HTTP_TIMEOUT_MS);
-    conn.setRequestProperty("Accept", "application/json");
-    return conn;
-  }
-
-  private HttpURLConnection openURLConnection(URL url) throws IOException {
-    final String protocol = url.getProtocol().toLowerCase(Locale.ROOT);
-    switch (protocol) {
-    case "https":
-      return (HttpsURLConnection) url.openConnection();
-    case "http":
-      return (HttpURLConnection) url.openConnection();
-    default:
-      throw new IOException("Unsupported protocol: " + protocol + " for URL: " + url);
-    }
-  }
-
-  /** Parse block deletion metrics from JMX JSON response. */
-  private long parseBlockDeletionMetrics(String jsonResponse) {
-    if (jsonResponse == null || jsonResponse.isEmpty()) {
-      return 0L;
-    }
-    try {
-      JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
-      JsonNode beans = root.get("beans");
-      if (beans != null && beans.isArray()) {
-        for (JsonNode bean : beans) {
-          String name = bean.path("name").asText("");
-          if (name.contains("BlockDeletingService")) {
-            return extractBlockDeletionMetrics(bean);
-          }
-        }
-      }
-    } catch (Exception e) {
-      log.warn("Failed to parse block deletion metrics JSON: {}", e.toString());
-    }
-    return 0L;
-  }
-
-  /** Extract block deletion metrics from JMX bean node. */
-  private long extractBlockDeletionMetrics(JsonNode beanNode) {
-    return beanNode.path("TotalPendingBlockBytes").asLong(0L);
-  }
-
-  private long getBlockDeletionMetricsFromDatanode(DatanodeDetails datanode) throws IOException {
-    // Construct metrics URL for DataNode JMX endpoint
-    String metricsUrl = String.format("http://%s:%d/jmx?qry=Hadoop:service=HddsDatanode,name=BlockDeletingService",
-        datanode.getIpAddress(),
-        datanode.getPort(DatanodeDetails.Port.Name.HTTP).getValue());
-
-    HttpURLConnection conn = makeHttpGetCall(metricsUrl);
-    try {
-      String jsonResponse = getResponseData(conn);
-      return parseBlockDeletionMetrics(jsonResponse);
-    } finally {
-      try {
-        conn.disconnect();
-      } catch (Exception ignored) {
-        // no-op
-      }
-    }
-  }
-
-  private String getResponseData(HttpURLConnection conn) throws IOException {
-    int code = conn.getResponseCode();
-    // 2xx: read normal body
-    if (code >= 200 && code < 300) {
-      return readStream(conn.getInputStream());
-    }
-    String err = null;
-    try {
-      if (conn.getErrorStream() != null) {
-        err = readStream(conn.getErrorStream());
-      }
-    } catch (IOException ignored) {
-      // ignore read errors on error stream
-    }
-    log.warn("HTTP {} from {}. Error body: {}", code, conn.getURL(), err);
-    return "";
-  }
-
-  /** Small utility to read an entire stream as a UTF-8 String. */
-  private String readStream(java.io.InputStream in) throws IOException {
-    StringBuilder sb = new StringBuilder();
-    try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-      String line;
-      while ((line = br.readLine()) != null) {
-        sb.append(line).append('\n');
-      }
-    }
-    return sb.toString();
   }
 }

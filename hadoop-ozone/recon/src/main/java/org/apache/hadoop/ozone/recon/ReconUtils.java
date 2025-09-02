@@ -27,14 +27,19 @@ import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import jakarta.annotation.Nonnull;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.text.ParseException;
@@ -45,17 +50,21 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
 import java.util.stream.Collectors;
+import javax.net.ssl.HttpsURLConnection;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -849,5 +858,106 @@ public class ReconUtils {
       pathBuilder.append(OM_KEY_PREFIX).append(id);
     }
     return pathBuilder.toString();
+  }
+
+  private static HttpURLConnection makeHttpGetCall(String urlString) throws IOException {
+    Objects.requireNonNull(urlString, "urlString");
+    URL url = new URL(urlString);
+    final HttpURLConnection conn = openURLConnection(url);
+    conn.setRequestMethod("GET");
+    conn.setConnectTimeout(HTTP_TIMEOUT_MS);
+    conn.setReadTimeout(HTTP_TIMEOUT_MS);
+    conn.setRequestProperty("Accept", "application/json");
+    return conn;
+  }
+
+  private static HttpURLConnection openURLConnection(URL url) throws IOException {
+    final String protocol = url.getProtocol().toLowerCase(Locale.ROOT);
+    switch (protocol) {
+    case "https":
+      return (HttpsURLConnection) url.openConnection();
+    case "http":
+      return (HttpURLConnection) url.openConnection();
+    default:
+      throw new IOException("Unsupported protocol: " + protocol + " for URL: " + url);
+    }
+  }
+
+  public static long getMetricsFromDatanode(DatanodeDetails datanode, String service, String name, String keyName)
+      throws IOException {
+    // Construct metrics URL for DataNode JMX endpoint
+    String metricsUrl = String.format("http://%s:%d/jmx?qry=Hadoop:service=%s,name=%s",
+        datanode.getIpAddress(),
+        datanode.getPort(DatanodeDetails.Port.Name.HTTP).getValue(),
+        service,
+        name);
+
+    HttpURLConnection conn = makeHttpGetCall(metricsUrl);
+    try {
+      String jsonResponse = getResponseData(conn);
+      return parseMetrics(jsonResponse, name, keyName);
+    } finally {
+      try {
+        conn.disconnect();
+      } catch (Exception ignored) {
+        // no-op
+      }
+    }
+  }
+
+  private static String getResponseData(HttpURLConnection conn) throws IOException {
+    int code = conn.getResponseCode();
+    // 2xx: read normal body
+    if (code >= 200 && code < 300) {
+      return readStream(conn.getInputStream());
+    }
+    String err = null;
+    try {
+      if (conn.getErrorStream() != null) {
+        err = readStream(conn.getErrorStream());
+      }
+    } catch (IOException ignored) {
+      // ignore read errors on error stream
+    }
+    log.warn("HTTP {} from {}. Error body: {}", code, conn.getURL(), err);
+    return "";
+  }
+
+  /** Small utility to read an entire stream as a UTF-8 String. */
+  private static String readStream(java.io.InputStream in) throws IOException {
+    StringBuilder sb = new StringBuilder();
+    try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = br.readLine()) != null) {
+        sb.append(line).append('\n');
+      }
+    }
+    return sb.toString();
+  }
+
+  private static long parseMetrics(String jsonResponse, String serviceName, String keyName) {
+    if (jsonResponse == null || jsonResponse.isEmpty()) {
+      return 0L;
+    }
+    try {
+      JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
+      JsonNode beans = root.get("beans");
+      if (beans != null && beans.isArray()) {
+        for (JsonNode bean : beans) {
+          String name = bean.path("name").asText("");
+          if (name.contains(serviceName)) {
+            return extractMetrics(bean, keyName);
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse block deletion metrics JSON: {}", e.toString());
+    }
+    return 0L;
+  }
+
+  /** Extract block deletion metrics from JMX bean node. */
+  private static long extractMetrics(JsonNode beanNode, String keyName) {
+    return beanNode.path(keyName).asLong(0L);
   }
 }
