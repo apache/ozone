@@ -29,6 +29,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -80,22 +81,52 @@ public class StorageDistributionEndpoint {
 
   @GET
   public Response getStorageDistribution() {
-    initializeBlockDeletionMetricsMap();
-    List<DatanodeStorageReport> nodeStorageReports = collectDatanodeReports();
-    GlobalStorageReport globalStorageReport = calculateGlobalStorageReport();
-    Map<String, Long> namespaceMetrics = calculateNamespaceMetrics();
-    StorageCapacityDistributionResponse response = buildStorageDistributionResponse(
-        nodeStorageReports, globalStorageReport, namespaceMetrics);
-    return Response.ok(response).build();
+    try {
+      initializeBlockDeletionMetricsMap();
+      List<DatanodeStorageReport> nodeStorageReports = collectDatanodeReports();
+      GlobalStorageReport globalStorageReport = calculateGlobalStorageReport();
+
+      Map<String, Long> namespaceMetrics = new HashMap<>();
+      try {
+        namespaceMetrics = calculateNamespaceMetrics();
+      } catch (Exception e) {
+        log.error("Error calculating namespace metrics", e);
+        // Initialize with default values
+        namespaceMetrics.put("totalUsedNamespace", 0L);
+        namespaceMetrics.put("totalOpenKeySize", 0L);
+        namespaceMetrics.put("totalCommittedSize", 0L);
+        namespaceMetrics.put("pendingDirectorySize", 0L);
+        namespaceMetrics.put("pendingKeySize", 0L);
+      }
+
+      StorageCapacityDistributionResponse response = buildStorageDistributionResponse(
+              nodeStorageReports, globalStorageReport, namespaceMetrics);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      log.error("Error getting storage distribution", e);
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+              .entity("Error retrieving storage distribution: " + e.getMessage())
+              .build();
+    }
   }
 
   private GlobalStorageReport calculateGlobalStorageReport() {
-    SCMNodeStat stats = nodeManager.getStats();
-    return new GlobalStorageReport(
-        stats.getScmUsed().get(),
-        stats.getRemaining().get(),
-        stats.getCapacity().get()
-    );
+    try {
+      SCMNodeStat stats = nodeManager.getStats();
+      if (stats == null) {
+        log.warn("Node manager stats are null, returning default values");
+        return new GlobalStorageReport(0L, 0L, 0L);
+      }
+
+      long scmUsed = stats.getScmUsed() != null ? stats.getScmUsed().get() : 0L;
+      long remaining = stats.getRemaining() != null ? stats.getRemaining().get() : 0L;
+      long capacity = stats.getCapacity() != null ? stats.getCapacity().get() : 0L;
+
+      return new GlobalStorageReport(scmUsed, remaining, capacity);
+    } catch (Exception e) {
+      log.error("Error calculating global storage report", e);
+      return new GlobalStorageReport(0L, 0L, 0L);
+    }
   }
 
   private Map<String, Long> calculateNamespaceMetrics() {
@@ -115,36 +146,51 @@ public class StorageDistributionEndpoint {
   }
 
   private StorageCapacityDistributionResponse buildStorageDistributionResponse(
-      List<DatanodeStorageReport> nodeStorageReports,
-      GlobalStorageReport storageMetrics,
-      Map<String, Long> namespaceMetrics) {
+          List<DatanodeStorageReport> nodeStorageReports,
+          GlobalStorageReport storageMetrics,
+          Map<String, Long> namespaceMetrics) {
     DeletedBlocksTransactionSummary scmSummary = null;
     try {
       scmSummary = scmClient.getDeletedBlockSummary();
     } catch (IOException e) {
       log.warn("Failed to get deleted block summary from SCM", e);
     }
-    long totalPendingAtDnSide = blockDeletionMetricsMap.values().stream().reduce(0L, Long::sum);
+
+    long totalPendingAtDnSide = 0L;
+    try {
+      totalPendingAtDnSide = blockDeletionMetricsMap.values().stream().reduce(0L, Long::sum);
+    } catch (Exception e) {
+      log.warn("Error calculating pending deletion metrics", e);
+    }
 
     DeletionPendingBytesByStage deletionPendingBytesByStage =
-        createDeletionPendingBytesByStage(namespaceMetrics.getOrDefault("pendingDirectorySize", 0L),
-            namespaceMetrics.getOrDefault("pendingKeySize", 0L),
-            scmSummary != null ? scmSummary.getTotalBlockReplicatedSize() : 0L,
-            totalPendingAtDnSide);
+            createDeletionPendingBytesByStage(
+                    namespaceMetrics.getOrDefault("pendingDirectorySize", 0L),
+                    namespaceMetrics.getOrDefault("pendingKeySize", 0L),
+                    scmSummary != null ? scmSummary.getTotalBlockReplicatedSize() : 0L,
+                    totalPendingAtDnSide);
+
+    // Safely get values from namespaceMetrics with null checks
+    Long totalUsedNamespace = namespaceMetrics.get("totalUsedNamespace");
+    Long totalOpenKeySize = namespaceMetrics.get("totalOpenKeySize");
+    Long totalCommittedSize = namespaceMetrics.get("totalCommittedSize");
+
     return StorageCapacityDistributionResponse.newBuilder()
-        .setDataNodeUsage(nodeStorageReports)
-        .setGlobalStorage(storageMetrics)
-        .setGlobalNamespace(new GlobalNamespaceReport(namespaceMetrics.get("totalUsedNamespace"), 0))
-        .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
-            namespaceMetrics.get("totalOpenKeySize"),
-            namespaceMetrics.get("totalCommittedSize"),
-            deletionPendingBytesByStage))
-        .build();
+            .setDataNodeUsage(nodeStorageReports)
+            .setGlobalStorage(storageMetrics)
+            .setGlobalNamespace(new GlobalNamespaceReport(
+                    totalUsedNamespace != null ? totalUsedNamespace : 0L, 0))
+            .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
+                    totalOpenKeySize != null ? totalOpenKeySize : 0L,
+                    totalCommittedSize != null ? totalCommittedSize : 0L,
+                    deletionPendingBytesByStage))
+            .build();
   }
 
   private List<DatanodeStorageReport> collectDatanodeReports() {
     return nodeManager.getAllNodes().stream()
         .map(this::getStorageReport)
+        .filter(report -> report != null) // Filter out null reports
         .collect(Collectors.toList());
   }
 
@@ -209,8 +255,8 @@ public class StorageDistributionEndpoint {
       try {
         long dnPending = ReconUtils.getMetricsFromDatanode(nodeId,
                 "HddsDatanode",
-                 "BlockDeletingService",
-              "TotalPendingBlockBytes");
+                "BlockDeletingService",
+                "TotalPendingBlockBytes");
         blockDeletionMetricsMap.put(nodeId, dnPending);
       } catch (IOException e) {
         throw new RuntimeException(e);
@@ -219,13 +265,29 @@ public class StorageDistributionEndpoint {
   }
 
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
-    SCMNodeStat nodeStat =
-        nodeManager.getNodeStat(datanode).get();
-    long capacity = nodeStat.getCapacity().get();
-    long used = nodeStat.getScmUsed().get();
-    long remaining = nodeStat.getRemaining().get();
-    long committed = nodeStat.getCommitted().get();
-    long pendingDeletion = blockDeletionMetricsMap.getOrDefault(datanode, 0L);
-    return new DatanodeStorageReport(capacity, used, remaining, committed, pendingDeletion);
+    try {
+      SCMNodeMetric nodeMetric = nodeManager.getNodeStat(datanode);
+      if (nodeMetric == null) {
+        log.warn("Node statistics not available for datanode: {}", datanode);
+        return null; // Return null for unavailable nodes
+      }
+
+      SCMNodeStat nodeStat = nodeMetric.get();
+      if (nodeStat == null) {
+        log.warn("Node stat is null for datanode: {}", datanode);
+        return null; // Return null for unavailable stats
+      }
+
+      long capacity = nodeStat.getCapacity() != null ? nodeStat.getCapacity().get() : 0L;
+      long used = nodeStat.getScmUsed() != null ? nodeStat.getScmUsed().get() : 0L;
+      long remaining = nodeStat.getRemaining() != null ? nodeStat.getRemaining().get() : 0L;
+      long committed = nodeStat.getCommitted() != null ? nodeStat.getCommitted().get() : 0L;
+      long pendingDeletion = blockDeletionMetricsMap.getOrDefault(datanode, 0L);
+
+      return new DatanodeStorageReport(capacity, used, remaining, committed, pendingDeletion);
+    } catch (Exception e) {
+      log.error("Error getting storage report for datanode: {}", datanode, e);
+      return null; // Return null on any error
+    }
   }
 }
