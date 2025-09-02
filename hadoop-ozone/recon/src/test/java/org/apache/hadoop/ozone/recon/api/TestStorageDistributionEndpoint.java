@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -47,6 +49,8 @@ import org.apache.hadoop.ozone.recon.api.types.GlobalStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.UsedSpaceBreakDown;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -60,6 +64,7 @@ class StorageDistributionEndpointTest {
   private OMDBInsightEndpoint mockOmdbInsightEndpoint;
   private NSSummaryEndpoint mockNsSummaryEndpoint;
   private StorageContainerLocationProtocol mockScmClient;
+  private GlobalStatsDao globalStatsDao;
   private OzoneStorageContainerManager mockReconScm;
   private DatanodeInfo datanodeDetails;
   private SCMNodeStat mockNodeStat;
@@ -71,7 +76,7 @@ class StorageDistributionEndpointTest {
     setupMockDependencies();
     setupSuccessfulScenario();
     StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, mockScmClient);
+        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
     Response response = endpoint.getStorageDistribution();
 
     assertNotNull(response);
@@ -102,7 +107,7 @@ class StorageDistributionEndpointTest {
     setupMockDependencies();
     setupScmExceptionScenario();
     StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, mockScmClient);
+        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -130,7 +135,7 @@ class StorageDistributionEndpointTest {
     setupMockDependencies();
     when(mockNodeManager.getAllNodes()).thenReturn(Collections.emptyList());
     StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, mockScmClient);
+        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -143,7 +148,7 @@ class StorageDistributionEndpointTest {
     setupMockDependencies();
     when(mockNodeManager.getNodeStat(datanodeDetails)).thenReturn(null);
     StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, mockScmClient);
+        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -156,7 +161,7 @@ class StorageDistributionEndpointTest {
     setupMockDependencies();
     when(mockNodeManager.getStats()).thenReturn(null);
     StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, mockScmClient);
+        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -169,7 +174,7 @@ class StorageDistributionEndpointTest {
     setupMockDependencies();
     setupUnreachableNodesScenario();
     StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, mockScmClient);
+        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -182,7 +187,7 @@ class StorageDistributionEndpointTest {
     setupMockDependencies();
     setupJmxMetricsFailureScenario();
     StorageDistributionEndpoint endpoint = new StorageDistributionEndpoint(mockReconScm, mockOmdbInsightEndpoint,
-        mockNsSummaryEndpoint, mockScmClient);
+        mockNsSummaryEndpoint, globalStatsDao, mockScmClient);
     Response response = endpoint.getStorageDistribution();
     assertNotNull(response);
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -199,6 +204,8 @@ class StorageDistributionEndpointTest {
     when(mockReconScm.getScmNodeManager()).thenReturn(mockNodeManager);
     datanodeDetails = mock(DatanodeInfo.class);
     mockNodeStat = mock(SCMNodeStat.class);
+    globalStatsDao = mock(GlobalStatsDao.class);
+    when(globalStatsDao.findById(any())).thenReturn(new GlobalStats("test", 0L, new Timestamp(10000L)));
     when(mockNodeManager.getAllNodes()).thenReturn(Collections.singletonList(datanodeDetails));
     when(mockNodeManager.getNodeStat(datanodeDetails)).thenReturn(new SCMNodeMetric(mockNodeStat));
     when(mockNodeStat.getCapacity()).thenReturn(new LongMetric(5000L));
