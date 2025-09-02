@@ -1298,7 +1298,7 @@ public class SCMClientProtocolServer implements
     } catch (IllegalContainerBalancerStateException e) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.STOP_CONTAINER_BALANCER, null, e));
-      throw new IOException(e.getMessage());
+      throw new IOException(e.getMessage(), e);
     }
   }
 
