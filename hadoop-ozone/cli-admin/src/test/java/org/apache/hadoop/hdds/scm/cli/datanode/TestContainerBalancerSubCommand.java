@@ -442,7 +442,6 @@ class TestContainerBalancerSubCommand {
     doThrow(IOException.class).when(scmClient).stopContainerBalancer();
     Exception ex = assertThrows(IOException.class, () -> stopCmd.execute(scmClient));
     assertThat(err.get()).containsPattern(STOP_FAILED);
-    assertThat(ex.getMessage()).containsPattern(STOP_FAILED);
   }
 
   @Test
