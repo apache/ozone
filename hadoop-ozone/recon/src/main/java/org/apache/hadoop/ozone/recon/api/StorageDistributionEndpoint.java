@@ -130,20 +130,18 @@ public class StorageDistributionEndpoint {
       List<DatanodeStorageReport> nodeStorageReports,
       GlobalStorageReport storageMetrics,
       Map<String, Long> namespaceMetrics) {
-    DeletedBlocksTransactionSummary scmSummary;
+    DeletedBlocksTransactionSummary scmSummary = null;
     try {
       scmSummary = scmClient.getDeletedBlockSummary();
     } catch (IOException e) {
-      log.error("Failed to get deleted block summary from SCM", e);
-      throw new WebApplicationException("Unable to retrieve storage metrics",
-          Response.Status.INTERNAL_SERVER_ERROR);
+      log.warn("Failed to get deleted block summary from SCM", e);
     }
     long totalPendingAtDnSide = blockDeletionMetricsMap.values().stream().reduce(0L, Long::sum);
 
     DeletionPendingBytesByStage deletionPendingBytesByStage =
         createDeletionPendingBytesByStage(namespaceMetrics.getOrDefault("pendingDirectorySize", 0L),
             namespaceMetrics.getOrDefault("pendingKeySize", 0L),
-            scmSummary.getTotalBlockReplicatedSize(),
+            scmSummary != null ? scmSummary.getTotalBlockReplicatedSize() : 0L,
             totalPendingAtDnSide);
     return StorageCapacityDistributionResponse.newBuilder()
         .setDataNodeUsage(nodeStorageReports)

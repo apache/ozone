@@ -123,7 +123,7 @@ class StorageDistributionEndpointTest {
     assertEquals(300L, usedSpaceBreakDown.getCommittedBytes());
 
     DeletionPendingBytesByStage deletionBreakdown = usedSpaceBreakDown.getDeletionPendingBytesByStage();
-    assertEquals(50L, deletionBreakdown.getByStage().get("OM").get("pendingBytes"));
+    assertEquals(50L, deletionBreakdown.getByStage().get("OM").get("totalBytes"));
     assertEquals(75L, deletionBreakdown.getByStage().get("SCM").get("pendingBytes"));
     assertEquals(0L, deletionBreakdown.getByStage().get("DN").get("pendingBytes"));
   }
