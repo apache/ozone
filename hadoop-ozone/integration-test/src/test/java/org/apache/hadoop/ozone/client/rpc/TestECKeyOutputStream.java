@@ -243,10 +243,15 @@ public class TestECKeyOutputStream {
               .findFirst().get();
       Mockito.when(handlers.get(dnWithReplicaIndex1.getUuidString()).getDatanodeId())
           .thenAnswer(i -> {
-            System.out.println("Swaminathan1 Getting Datanode 1 total data written \t");
-            new RuntimeException().printStackTrace();
-            failed.set(true);
-            return dnWithReplicaIndex1.getUuidString() + "_failed";
+            if (groupOutputStream.getLocationInfoList().size() == 1) {
+              // Change dnId for one write chunk request.
+              System.out.println("Swaminathan1 Getting Datanode 1 total data written \t");
+              new RuntimeException().printStackTrace();
+              failed.set(true);
+              return dnWithReplicaIndex1.getUuidString() + "_failed";
+            } else {
+              return dnWithReplicaIndex1.getUuidString();
+            }
           });
       locationInfoList = groupOutputStream.getLocationInfoList();
       AtomicInteger count = new AtomicInteger(0);
