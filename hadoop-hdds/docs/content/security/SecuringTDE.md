@@ -67,16 +67,16 @@ For example:
 
 ### Creating an Encrypted Bucket
 
-Use the Ozone shell `ozone sh bucket create` command with the `-k` (or `--key`) option to specify the encryption key:
+Use the Ozone shell `ozone sh bucket create` command with the `-k` (or `--bucketkey`) option to specify the encryption key:
 
 ```shell
-  ozone sh bucket create --key <key_name> /<volume_name>/<bucket_name>
+  ozone sh bucket create --bucketkey <key_name> /<volume_name>/<bucket_name>
 ```
 
 For example:
 
 ```shell
-  ozone sh bucket create --key enckey /vol1/encrypted_bucket
+  ozone sh bucket create --bucketkey enckey /vol1/encrypted_bucket
 ```
 
 Now, all data written to `/vol1/encrypted_bucket` will be encrypted at rest. As long as the client is configured correctly to use the key, such encryption is completely transparent to the end users.
