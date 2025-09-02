@@ -132,13 +132,13 @@ When creating an encrypted bucket that will be accessed via S3G:
     The `/s3v` volume is the default volume for S3 buckets.
 
 ```shell
-  ozone sh bucket create --key <key_name> /s3v/<bucket_name> --layout=OBJECT_STORE
+  ozone sh bucket create --bucketkey <key_name> /s3v/<bucket_name> --layout=OBJECT_STORE
 ```
 
 2.  **Alternatively, create an encrypted bucket elsewhere and link it:**
 
 ```shell
-  ozone sh bucket create --key <key_name> /<volume_name>/<bucket_name> --layout=OBJECT_STORE
+  ozone sh bucket create --bucketkey <key_name> /<volume_name>/<bucket_name> --layout=OBJECT_STORE
   ozone sh bucket link /<volume_name>/<bucket_name> /s3v/<link_name>
 ```
 
