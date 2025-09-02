@@ -63,9 +63,13 @@ public class ContainerMerkleTreeWriter {
     id2Block = new TreeMap<>();
     for (ContainerProtos.BlockMerkleTree blockTree: fromTree.getBlockMerkleTreeList()) {
       long blockID = blockTree.getBlockID();
-      addBlock(blockID);
-      for (ContainerProtos.ChunkMerkleTree chunkTree: blockTree.getChunkMerkleTreeList()) {
-        addChunks(blockID, chunkTree);
+      if (blockTree.getDeleted()) {
+        setDeletedBlock(blockID, blockTree.getDataChecksum());
+      } else {
+        addBlock(blockID);
+        for (ContainerProtos.ChunkMerkleTree chunkTree: blockTree.getChunkMerkleTreeList()) {
+          addChunks(blockID, chunkTree);
+        }
       }
     }
   }
@@ -98,7 +102,7 @@ public class ContainerMerkleTreeWriter {
   }
 
   private void addChunks(long blockID, ChunkMerkleTreeWriter chunkWriter) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new).addChunks(chunkWriter);
+    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::empty).addChunks(chunkWriter);
   }
 
   /**
@@ -108,7 +112,16 @@ public class ContainerMerkleTreeWriter {
    * @param blockID The ID of the empty block to add to the tree
    */
   public void addBlock(long blockID) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new);
+    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::empty);
+  }
+
+  public void addDeletedBlock(long blockID) {
+    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::deleted);
+  }
+
+  // TODO once checksum object is in use, take that instead.
+  public void setDeletedBlock(long blockID, long dataChecksum) {
+    id2Block.computeIfAbsent(blockID, id -> BlockMerkleTreeWriter.deleted(id, dataChecksum));
   }
 
   /**
@@ -145,10 +158,26 @@ public class ContainerMerkleTreeWriter {
     // Chunk order in the checksum is determined by their offset.
     private final SortedMap<Long, ChunkMerkleTreeWriter> offset2Chunk;
     private final long blockID;
+    private final boolean deleted;
+    private final long dataChecksum;
 
-    BlockMerkleTreeWriter(long blockID) {
+    public static BlockMerkleTreeWriter deleted(long blockID) {
+      return new BlockMerkleTreeWriter(blockID, true, 0);
+    }
+
+    public static BlockMerkleTreeWriter deleted(long blockID, long dataChecksum) {
+      return new BlockMerkleTreeWriter(blockID, true, dataChecksum);
+    }
+
+    public static BlockMerkleTreeWriter empty(long blockID) {
+      return new BlockMerkleTreeWriter(blockID, false, 0);
+    }
+
+    private BlockMerkleTreeWriter(long blockID, boolean deleted, long dataChecksum) {
       this.blockID = blockID;
       this.offset2Chunk = new TreeMap<>();
+      this.deleted = deleted;
+      this.dataChecksum = dataChecksum;
     }
 
     /**
@@ -171,6 +200,23 @@ public class ContainerMerkleTreeWriter {
      */
     public ContainerProtos.BlockMerkleTree toProto() {
       ContainerProtos.BlockMerkleTree.Builder blockTreeBuilder = ContainerProtos.BlockMerkleTree.newBuilder();
+      if (offset2Chunk.isEmpty()) {
+        blockTreeBuilder.setDataChecksum(dataChecksum);
+      } else {
+        setDataChecksumFromChunks(blockTreeBuilder);
+      }
+
+      if (deleted) {
+        blockTreeBuilder.clearChunkMerkleTree();
+      }
+
+      return blockTreeBuilder
+          .setBlockID(blockID)
+          .setDeleted(deleted)
+          .build();
+    }
+
+    private void setDataChecksumFromChunks(ContainerProtos.BlockMerkleTree.Builder blockTreeBuilder) {
       ChecksumByteBuffer checksumImpl = CHECKSUM_BUFFER_SUPPLIER.get();
       // Allocate space for block ID + all chunk checksums
       ByteBuffer blockChecksumBuffer = ByteBuffer.allocate(Long.BYTES * (1 + offset2Chunk.size()));
@@ -189,11 +235,7 @@ public class ContainerMerkleTreeWriter {
       }
       blockChecksumBuffer.flip();
       checksumImpl.update(blockChecksumBuffer);
-
-      return blockTreeBuilder
-          .setBlockID(blockID)
-          .setDataChecksum(checksumImpl.getValue())
-          .build();
+      blockTreeBuilder.setDataChecksum(checksumImpl.getValue());
     }
   }
 
