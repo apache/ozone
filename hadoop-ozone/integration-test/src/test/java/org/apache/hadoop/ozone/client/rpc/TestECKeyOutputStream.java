@@ -85,12 +85,14 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /**
  * Tests key output stream.
  */
+@Timeout(300)
 public class TestECKeyOutputStream {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
