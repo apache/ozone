@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.tasks;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 
@@ -159,12 +158,4 @@ public interface ReconTaskController {
    */
   long getDroppedBatches();
 
-  /**
-   * Wait for all currently buffered events to be processed.
-   * This returns a CompletableFuture that completes when the event buffer is empty.
-   * Used in testing to ensure all events are processed before assertions.
-   *
-   * @return CompletableFuture that completes when event buffer is empty
-   */
-  CompletableFuture<Void> waitForEventBufferEmpty();
 }

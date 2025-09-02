@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import javax.inject.Inject;
@@ -32,6 +33,7 @@ import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -72,9 +74,27 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     this.ozoneConfiguration = configuration;
   }
 
-  public ReconOmMetadataManagerImpl(OzoneConfiguration configuration) {
-    super(false);
+  private ReconOmMetadataManagerImpl(OzoneConfiguration configuration, File dir, String name) throws IOException {
+    super(configuration, dir, name);
     this.ozoneConfiguration = configuration;
+  }
+
+  @Override
+  public ReconOMMetadataManager createCheckpointReconMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
+    Path path = checkpoint.getCheckpointLocation();
+    Path parent = path.getParent();
+    if (parent == null) {
+      throw new IllegalStateException("DB checkpoint parent path should not "
+          + "have been null. Checkpoint path is " + path);
+    }
+    File dir = parent.toFile();
+    Path name = path.getFileName();
+    if (name == null) {
+      throw new IllegalStateException("DB checkpoint dir name should not "
+          + "have been null. Checkpoint path is " + path);
+    }
+    return new ReconOmMetadataManagerImpl(conf, dir, name.toString());
   }
 
   @Override

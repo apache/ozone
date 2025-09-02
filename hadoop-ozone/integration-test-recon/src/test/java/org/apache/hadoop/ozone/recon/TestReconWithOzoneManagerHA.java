@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +61,7 @@ public class TestReconWithOzoneManagerHA {
   private static final String VOL_NAME = "testrecon";
   private OzoneClient client;
   private ReconService recon;
+  private TestReconOmMetaManagerUtils omMetaManagerUtils = new TestReconOmMetaManagerUtils();
 
   @BeforeEach
   public void setup() throws Exception {
@@ -134,8 +136,10 @@ public class TestReconWithOzoneManagerHA {
 
     // Wait for async event processing to complete
     // Events are processed asynchronously, so wait for processing to finish
+    ReconTaskControllerImpl reconTaskController =
+        (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     while (!completableFuture.isDone()) {
       Thread.sleep(100);
     }

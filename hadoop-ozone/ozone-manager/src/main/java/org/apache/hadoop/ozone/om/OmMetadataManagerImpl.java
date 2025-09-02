@@ -213,16 +213,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     perfMetrics = null;
   }
 
-  /**
-   * For ReconOmMetadataManager to avoid calling OMLockMetrics.create call.
-   */
-  protected OmMetadataManagerImpl(boolean skipLockMetrics) {
-    LOG.info("OmMetadataManagerImpl: skipLockMetrics = {}", skipLockMetrics);
-    this.lock = new OmReadOnlyLock();
-    this.omEpoch = 0;
-    perfMetrics = null;
-  }
-
   public static OmMetadataManagerImpl createCheckpointMetadataManager(
       OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
     Path path = checkpoint.getCheckpointLocation();
@@ -248,7 +238,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @param name - Checkpoint directory name.
    * @throws IOException
    */
-  private OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
+  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
       throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;

@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -124,5 +125,15 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
    * @throws IOException
    */
   Table<String, ReconBasicOmKeyInfo> getKeyTableBasic(BucketLayout bucketLayout) throws IOException;
+
+  /**
+   * Create a ReconOMMetadataManager instance given an OM DB checkpoint.
+   * @param conf - OzoneConfiguration
+   * @param checkpoint - DBCheckpoint
+   * @return ReconOMMetadataManager instance
+   * @throws IOException
+   */
+  ReconOMMetadataManager createCheckpointReconMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException;
 
 }

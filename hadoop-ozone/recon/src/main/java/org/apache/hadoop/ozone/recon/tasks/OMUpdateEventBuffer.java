@@ -111,6 +111,28 @@ public class OMUpdateEventBuffer {
     totalBufferedEvents.set(0);
     // Note: We don't reset droppedBatches here to maintain overflow detection
   }
+  
+  /**
+   * Drain all buffered events to the provided collection.
+   * 
+   * @param drainedEvents Collection to drain events into
+   * @return number of events drained
+   */
+  @VisibleForTesting
+  public int drainTo(java.util.Collection<? super ReconEvent> drainedEvents) {
+    int drained = eventQueue.drainTo(drainedEvents);
+    if (drained > 0) {
+      // Update total buffered events count
+      long totalEventCount = drainedEvents.stream()
+          .filter(event -> event instanceof ReconEvent)
+          .mapToLong(event -> ((ReconEvent) event).getEventCount())
+          .sum();
+      totalBufferedEvents.addAndGet(-totalEventCount);
+      LOG.debug("Drained {} events from buffer. Remaining queue size: {}, Total buffered events: {}", 
+          drained, eventQueue.size(), totalBufferedEvents.get());
+    }
+    return drained;
+  }
 
   /**
    * Reset the dropped batches counter. Used after full snapshot is triggered.

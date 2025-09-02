@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,7 @@ public class TestReconContainerEndpoint {
   private OzoneClient client;
   private ObjectStore store;
   private ReconService recon;
+  private TestReconOmMetaManagerUtils omMetaManagerUtils = new TestReconOmMetaManagerUtils();
 
   @BeforeEach
   public void init() throws Exception {
@@ -110,8 +112,10 @@ public class TestReconContainerEndpoint {
 
     // Wait for async event processing to complete
     // Events are processed asynchronously, so wait for processing to finish
+    ReconTaskControllerImpl reconTaskController =
+        (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     while (!completableFuture.isDone()) {
       Thread.sleep(100);
     }
@@ -179,8 +183,10 @@ public class TestReconContainerEndpoint {
 
     // Wait for async event processing to complete
     // Events are processed asynchronously, so wait for processing to finish
+    ReconTaskControllerImpl reconTaskController =
+        (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
-        recon.getReconServer().getReconTaskController().waitForEventBufferEmpty();
+        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
     while (!completableFuture.isDone()) {
       Thread.sleep(100);
     }

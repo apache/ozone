@@ -809,6 +809,7 @@ public class OzoneManagerServiceProviderImpl
             result);
         metrics.incrNumSnapshotRequestsFailed();
         fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+        fullSnapshotReconTaskUpdater.recordRunCompletion();
         return;
       }
       
