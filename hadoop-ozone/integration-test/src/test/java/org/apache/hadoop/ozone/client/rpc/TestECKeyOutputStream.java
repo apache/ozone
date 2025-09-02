@@ -201,10 +201,6 @@ public class TestECKeyOutputStream {
   @Test
   public void testECKeyCreatetWithDatanodeIdChange()
       throws Exception {
-    AtomicReference<Boolean> failed = new AtomicReference<>(false);
-    AtomicReference<MiniOzoneCluster> miniOzoneCluster = new AtomicReference<>();
-    OzoneClient client1 = null;
-    OzoneOutputStream key = null;
     try (MockedStatic<Handler> mockedHandler = Mockito.mockStatic(Handler.class, Mockito.CALLS_REAL_METHODS)) {
       Map<String, Handler> handlers = new HashMap<>();
       mockedHandler.when(() -> Handler
@@ -214,87 +210,93 @@ public class TestECKeyOutputStream {
             handlers.put(handler.getDatanodeId(), handler);
             return handler;
           });
-      int chunk = 10;
-      OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-      initConf(ozoneConfiguration, chunk, chunk * 2, chunk * 4, chunk * 10000);
-      miniOzoneCluster.set(MiniOzoneCluster.newBuilder(ozoneConfiguration).setNumDatanodes(10).build());
-      miniOzoneCluster.get().waitForClusterToBeReady();
-      client1 = miniOzoneCluster.get().newClient();
-      ObjectStore store = client1.getObjectStore();
-      store.createVolume(volumeName);
-      store.getVolume(volumeName).createBucket(bucketName);
-      key = TestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
-          ECReplicationConfig.EcCodec.RS, chunk), inputSize, store, volumeName, bucketName);
-      byte[] b = new byte[6 * chunk];
-      ECKeyOutputStream groupOutputStream = (ECKeyOutputStream) key.getOutputStream();
-      List<OmKeyLocationInfo> locationInfoList = groupOutputStream.getLocationInfoList();
-      while (locationInfoList.isEmpty()) {
-        locationInfoList = groupOutputStream.getLocationInfoList();
-        b = RandomUtils.secure().randomBytes(b.length);
-        assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
-        key.write(b);
-        key.flush();
-      }
-      assertEquals(1, locationInfoList.size());
+      AtomicReference<Boolean> failed = new AtomicReference<>(false);
+      AtomicReference<MiniOzoneCluster> miniOzoneCluster = new AtomicReference<>();
+      OzoneClient client1 = null;
+      OzoneOutputStream key = null;
+      try {
+        int chunk = 10;
+        OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+        initConf(ozoneConfiguration, chunk, chunk * 2, chunk * 4, chunk * 10000);
+        miniOzoneCluster.set(MiniOzoneCluster.newBuilder(ozoneConfiguration).setNumDatanodes(10).build());
+        miniOzoneCluster.get().waitForClusterToBeReady();
+        client1 = miniOzoneCluster.get().newClient();
+        ObjectStore store = client1.getObjectStore();
+        store.createVolume(volumeName);
+        store.getVolume(volumeName).createBucket(bucketName);
+        key = TestHelper.createKey(keyString, new ECReplicationConfig(3, 2,
+            ECReplicationConfig.EcCodec.RS, chunk), inputSize, store, volumeName, bucketName);
+        byte[] b = new byte[6 * chunk];
+        ECKeyOutputStream groupOutputStream = (ECKeyOutputStream) key.getOutputStream();
+        List<OmKeyLocationInfo> locationInfoList = groupOutputStream.getLocationInfoList();
+        while (locationInfoList.isEmpty()) {
+          locationInfoList = groupOutputStream.getLocationInfoList();
+          b = RandomUtils.secure().randomBytes(b.length);
+          assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
+          key.write(b);
+          key.flush();
+        }
+        assertEquals(1, locationInfoList.size());
 
-      OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
-      long containerId = omKeyLocationInfo.getContainerID();
-      Pipeline pipeline = omKeyLocationInfo.getPipeline();
-      DatanodeDetails dnWithReplicaIndex1 =
-          pipeline.getReplicaIndexes().entrySet().stream().filter(e -> e.getValue() == 1).map(Map.Entry::getKey)
-              .findFirst().get();
-      Mockito.when(handlers.get(dnWithReplicaIndex1.getUuidString()).getDatanodeId())
-          .thenAnswer(i -> {
-            if (groupOutputStream.getLocationInfoList().size() == 1) {
-              // Change dnId for one write chunk request.
-              System.out.println("Swaminathan1 Getting Datanode 1 total data written \t");
-              new RuntimeException().printStackTrace();
-              failed.set(true);
-              return dnWithReplicaIndex1.getUuidString() + "_failed";
-            } else {
-              return dnWithReplicaIndex1.getUuidString();
-            }
-          });
-      locationInfoList = groupOutputStream.getLocationInfoList();
-      AtomicInteger count = new AtomicInteger(0);
-      assertEquals(1, locationInfoList.size());
-      System.out.println("Swaminathan Cheking write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk +
-          "\t" + dnWithReplicaIndex1.getUuidString() + "\t" + locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()));
-      OzoneOutputStream finalKey = key;
-      GenericTestUtils.waitFor(() -> {
-        try {
-          assertInstanceOf(ECKeyOutputStream.class, finalKey.getOutputStream());
-          finalKey.write(RandomUtils.secure().randomBytes(chunk));
-          finalKey.flush();
-          System.out.println("Swaminathan Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk);
-          return groupOutputStream.getLocationInfoList().size() > 1;
-        } catch (IOException e) {
-          return false;
+        OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+        long containerId = omKeyLocationInfo.getContainerID();
+        Pipeline pipeline = omKeyLocationInfo.getPipeline();
+        DatanodeDetails dnWithReplicaIndex1 =
+            pipeline.getReplicaIndexes().entrySet().stream().filter(e -> e.getValue() == 1).map(Map.Entry::getKey)
+                .findFirst().get();
+        Mockito.when(handlers.get(dnWithReplicaIndex1.getUuidString()).getDatanodeId())
+            .thenAnswer(i -> {
+              if (groupOutputStream.getLocationInfoList().size() == 1) {
+                // Change dnId for one write chunk request.
+                System.out.println("Swaminathan1 Getting Datanode 1 total data written \t");
+                new RuntimeException().printStackTrace();
+                failed.set(true);
+                return dnWithReplicaIndex1.getUuidString() + "_failed";
+              } else {
+                return dnWithReplicaIndex1.getUuidString();
+              }
+            });
+        locationInfoList = groupOutputStream.getLocationInfoList();
+        AtomicInteger count = new AtomicInteger(0);
+        assertEquals(1, locationInfoList.size());
+        System.out.println("Swaminathan Cheking write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk +
+            "\t" + dnWithReplicaIndex1.getUuidString() + "\t" + locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()));
+        OzoneOutputStream finalKey = key;
+        GenericTestUtils.waitFor(() -> {
+          try {
+            assertInstanceOf(ECKeyOutputStream.class, finalKey.getOutputStream());
+            finalKey.write(RandomUtils.secure().randomBytes(chunk));
+            finalKey.flush();
+            System.out.println("Swaminathan Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk);
+            return groupOutputStream.getLocationInfoList().size() > 1;
+          } catch (IOException e) {
+            return false;
+          }
+        }, 1, 300000);
+        locationInfoList = groupOutputStream.getLocationInfoList();
+        System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk + locationInfoList.size() + "\t" +
+            locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()) + "\t" + dnWithReplicaIndex1.getUuidString());
+        assertEquals(2, locationInfoList.size());
+        assertNotEquals(locationInfoList.get(1).getPipeline().getId(), pipeline.getId());
+        GenericTestUtils.waitFor(() -> {
+          try {
+            System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written \t" + containerId + "\t"
+                + miniOzoneCluster.get().getStorageContainerManager().getContainerManager()
+                .getContainer(ContainerID.valueOf(containerId)).getState());
+            return miniOzoneCluster.get().getStorageContainerManager().getContainerManager()
+                .getContainer(ContainerID.valueOf(containerId)).getState().equals(
+                    HddsProtos.LifeCycleState.CLOSED);
+          } catch (ContainerNotFoundException e) {
+            throw new RuntimeException(e);
+          }
+        }, 1000, 120000);
+        Assertions.assertTrue(failed.get());
+      } finally {
+        IOUtils.closeQuietly(key);
+        IOUtils.closeQuietly(client1);
+        if (miniOzoneCluster.get() != null) {
+          miniOzoneCluster.get().shutdown();
         }
-      }, 1, 300000);
-      locationInfoList = groupOutputStream.getLocationInfoList();
-      System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written " + count.get() * chunk + locationInfoList.size() + "\t" +
-          locationInfoList.stream().map(l -> l.getBlockID().getContainerBlockID()).collect(Collectors.toList()) + "\t" + dnWithReplicaIndex1.getUuidString());
-      assertEquals(2, locationInfoList.size());
-      assertNotEquals(locationInfoList.get(1).getPipeline().getId(), pipeline.getId());
-      GenericTestUtils.waitFor(() -> {
-        try {
-          System.out.println("Swaminathan1 Write chunk " + count.incrementAndGet() + " total data written \t" + containerId + "\t"
-              + miniOzoneCluster.get().getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueOf(containerId)).getState());
-          return miniOzoneCluster.get().getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueOf(containerId)).getState().equals(
-                  HddsProtos.LifeCycleState.CLOSED);
-        } catch (ContainerNotFoundException e) {
-          throw new RuntimeException(e);
-        }
-      }, 1000, 120000);
-      Assertions.assertTrue(failed.get());
-    } finally {
-      IOUtils.closeQuietly(key);
-      IOUtils.closeQuietly(client1);
-      if (miniOzoneCluster.get() != null) {
-        miniOzoneCluster.get().shutdown();
       }
     }
   }
