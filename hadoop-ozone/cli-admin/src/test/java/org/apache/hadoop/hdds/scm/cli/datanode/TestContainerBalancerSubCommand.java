@@ -440,7 +440,7 @@ class TestContainerBalancerSubCommand {
   public void testContainerBalancerStopSubcommandInvalidState() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     doThrow(IOException.class).when(scmClient).stopContainerBalancer();
-    Exception ex = assertThrows(IOException.class, () -> stopCmd.execute(scmClient));
+    assertThrows(IOException.class, () -> stopCmd.execute(scmClient));
     assertThat(err.get()).containsPattern(STOP_FAILED);
   }
 
