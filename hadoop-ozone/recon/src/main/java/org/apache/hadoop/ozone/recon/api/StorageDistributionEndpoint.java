@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +45,9 @@ import org.apache.hadoop.ozone.recon.api.types.GlobalStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.UsedSpaceBreakDown;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
+import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,16 +73,19 @@ public class StorageDistributionEndpoint {
   private final StorageContainerLocationProtocol scmClient;
   private static Logger log = LoggerFactory.getLogger(StorageDistributionEndpoint.class);
   private Map<DatanodeDetails, Long> blockDeletionMetricsMap = new HashMap<>();
+  private GlobalStatsDao globalStatsDao;
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
                                      OMDBInsightEndpoint omDbInsightEndpoint,
                                      NSSummaryEndpoint nsSummaryEndpoint,
+                                     GlobalStatsDao globalStatsDao,
                                      StorageContainerLocationProtocol scmClient) {
     this.nodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
     this.omdbInsightEndpoint = omDbInsightEndpoint;
     this.nsSummaryEndpoint = nsSummaryEndpoint;
     this.scmClient = scmClient;
+    this.globalStatsDao = globalStatsDao;
   }
 
   @GET
@@ -97,6 +106,7 @@ public class StorageDistributionEndpoint {
         namespaceMetrics.put("totalCommittedSize", 0L);
         namespaceMetrics.put("pendingDirectorySize", 0L);
         namespaceMetrics.put("pendingKeySize", 0L);
+        namespaceMetrics.put("totalKeys", 0L);
       }
 
       StorageCapacityDistributionResponse response = buildStorageDistributionResponse(
@@ -137,11 +147,27 @@ public class StorageDistributionEndpoint {
     long pendingDirectorySize = totalPendingAtOmSide.getOrDefault("pendingDirectorySize", 0L);
     long pendingKeySize = totalPendingAtOmSide.getOrDefault("pendingKeySize", 0L);
     long totalUsedNamespace = pendingDirectorySize + pendingKeySize + totalOpenKeySize + totalCommittedSize;
+
+    long totalKeys = 0L;
+    // Keys from OBJECT_STORE buckets.
+    GlobalStats keyRecord = globalStatsDao.findById(
+            OmTableInsightTask.getTableCountKeyFromTable(KEY_TABLE));
+    // Keys from FILE_SYSTEM_OPTIMIZED buckets
+    GlobalStats fileRecord = globalStatsDao.findById(
+            OmTableInsightTask.getTableCountKeyFromTable(FILE_TABLE));
+    if (keyRecord != null) {
+      totalKeys += keyRecord.getValue();
+    }
+    if (fileRecord != null) {
+      totalKeys += fileRecord.getValue();
+    }
+
     metrics.put("pendingDirectorySize", pendingDirectorySize);
     metrics.put("pendingKeySize", pendingKeySize);
     metrics.put("totalOpenKeySize", totalOpenKeySize);
     metrics.put("totalCommittedSize", totalCommittedSize);
     metrics.put("totalUsedNamespace", totalUsedNamespace);
+    metrics.put("totalKeys", totalKeys);
     return metrics;
   }
 
@@ -174,12 +200,14 @@ public class StorageDistributionEndpoint {
     Long totalUsedNamespace = namespaceMetrics.get("totalUsedNamespace");
     Long totalOpenKeySize = namespaceMetrics.get("totalOpenKeySize");
     Long totalCommittedSize = namespaceMetrics.get("totalCommittedSize");
+    Long totalKeys = namespaceMetrics.get("totalKeys");
 
     return StorageCapacityDistributionResponse.newBuilder()
             .setDataNodeUsage(nodeStorageReports)
             .setGlobalStorage(storageMetrics)
             .setGlobalNamespace(new GlobalNamespaceReport(
-                    totalUsedNamespace != null ? totalUsedNamespace : 0L, 0))
+                    totalUsedNamespace != null ? totalUsedNamespace : 0L,
+                    totalKeys != null ? totalKeys : 0L))
             .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
                     totalOpenKeySize != null ? totalOpenKeySize : 0L,
                     totalCommittedSize != null ? totalCommittedSize : 0L,
