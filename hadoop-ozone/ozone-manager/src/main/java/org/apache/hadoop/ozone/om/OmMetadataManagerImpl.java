@@ -1028,8 +1028,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     } else {
       seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
     }
-    int currentCount = 0;
-
 
     TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
@@ -1057,6 +1055,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         cacheKeyMap.put(key, omKeyInfo);
       }
     }
+
+    int currentCount = 0;
     long readFromRDbStartNs, readFromRDbStopNs = 0;
     // Get maxKeys from DB if it has.
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
@@ -1075,7 +1075,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           CacheValue<OmKeyInfo> cacheValue =
               keyTable.getCacheValue(new CacheKey<>(kv.getKey()));
           if (cacheValue == null || cacheValue.getCacheValue() != null) {
-            cacheKeyMap.put(kv.getKey(), kv.getValue());
+            // We use putIfAbsent since cache entry should be more up-to-date and should not be overwritten
+            //  by the outdated DB entry
+            cacheKeyMap.putIfAbsent(kv.getKey(), kv.getValue());
             currentCount++;
           }
         } else {
