@@ -415,42 +415,41 @@
           <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
           <installDirectory>target</installDirectory>
           <workingDirectory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web</workingDirectory>
+          <nodeVersion>v${nodejs.version}</nodeVersion>
+          <pnpmVersion>${pnpm.version}</pnpmVersion>
         </configuration>
         <executions>
           <execution>
             <id>Install node and npm locally to the project</id>
             <goals>
-              <goal>install-node-and-npm</goal>
+              <goal>install-node-and-pnpm</goal>
             </goals>
-            <configuration>
-              <nodeVersion>v${nodejs.version}</nodeVersion>
-            </configuration>
           </execution>
           <execution>
             <id>set pnpm@${pnpm.version} store path</id>
             <goals>
-              <goal>npx</goal>
+              <goal>pnpm</goal>
             </goals>
             <configuration>
-              <arguments>pnpm@${pnpm.version} config set store-dir ~/.pnpm-store</arguments>
+              <arguments>config set store-dir ~/.pnpm-store</arguments>
             </configuration>
           </execution>
           <execution>
             <id>install frontend dependencies</id>
             <goals>
-              <goal>npx</goal>
+              <goal>pnpm</goal>
             </goals>
             <configuration>
-              <arguments>pnpm@${pnpm.version} install --frozen-lockfile</arguments>
+              <arguments>install --frozen-lockfile</arguments>
             </configuration>
           </execution>
           <execution>
             <id>Build frontend</id>
             <goals>
-              <goal>npx</goal>
+              <goal>pnpm</goal>
             </goals>
             <configuration>
-              <arguments>pnpm@${pnpm.version} run build</arguments>
+              <arguments>run build</arguments>
             </configuration>
           </execution>
         </executions>

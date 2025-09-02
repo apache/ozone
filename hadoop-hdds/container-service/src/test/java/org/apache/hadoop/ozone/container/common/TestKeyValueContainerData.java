@@ -42,12 +42,11 @@ public class TestKeyValueContainerData {
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
 
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
   private OzoneConfiguration conf;
 
   private void initVersionInfo(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }

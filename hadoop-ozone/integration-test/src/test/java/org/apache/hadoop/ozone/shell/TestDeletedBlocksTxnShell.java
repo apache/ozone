@@ -68,13 +68,14 @@ public class TestDeletedBlocksTxnShell {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestDeletedBlocksTxnShell.class);
 
+  private static final String SCM_SERVICE_ID = "scm-service-test1";
+  private static final int NUM_OF_SCMS = 3;
+
   private final PrintStream originalOut = System.out;
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String scmServiceId;
   private File txnFile;
-  private int numOfSCMs = 3;
 
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
@@ -89,14 +90,13 @@ public class TestDeletedBlocksTxnShell {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    scmServiceId = "scm-service-test1";
 
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setSCMServiceId(scmServiceId)
-        .setNumOfStorageContainerManagers(numOfSCMs)
-        .setNumOfActiveSCMs(numOfSCMs)
+        .setSCMServiceId(SCM_SERVICE_ID)
+        .setNumOfStorageContainerManagers(NUM_OF_SCMS)
+        .setNumOfActiveSCMs(NUM_OF_SCMS)
         .setNumOfOzoneManagers(1)
         .build();
     cluster.waitForClusterToBeReady();

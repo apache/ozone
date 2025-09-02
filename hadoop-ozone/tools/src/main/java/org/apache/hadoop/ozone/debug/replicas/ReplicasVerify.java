@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -49,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Shell;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import picocli.CommandLine;
 
@@ -58,10 +61,14 @@ import picocli.CommandLine;
 
 @CommandLine.Command(
     name = "verify",
-    description = "Run checks to verify data across replicas. By default prints only the keys with failed checks.")
+    description = "Run checks to verify data across replicas. By default prints only the keys with failed checks. " +
+        "Optionally you can filter keys by replication type (RATIS, EC) and factor.")
 public class ReplicasVerify extends Handler {
   @CommandLine.Mixin
   private ScmOption scmOption;
+
+  @CommandLine.Mixin
+  private ShellReplicationOptions replication;
 
   @CommandLine.Parameters(arity = "1",
       description = Shell.OZONE_URI_DESCRIPTION)
@@ -120,7 +127,7 @@ public class ReplicasVerify extends Handler {
     } else {
       verificationScope = "All Volumes";
     }
-    
+
     replicaVerifiers = new ArrayList<>();
 
     addVerifier(verification.doExecuteChecksums, () -> {
@@ -221,6 +228,11 @@ public class ReplicasVerify extends Handler {
     OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
         volumeName, bucketName, keyName, false);
 
+    // Check if key should be processed based on replication config
+    if (!shouldProcessKeyByReplicationType(keyInfo)) {
+      return;
+    }
+
     ObjectNode keyNode = JsonUtils.createObjectNode(null);
     keyNode.put("volumeName", volumeName);
     keyNode.put("bucketName", bucketName);
@@ -319,7 +331,7 @@ public class ReplicasVerify extends Handler {
     if (endTime == 0) {
       endTime = System.nanoTime();
     }
-    
+
     long execTimeNanos = endTime - startTime;
     String execTime = DurationFormatUtils.formatDuration(TimeUnit.NANOSECONDS.toMillis(execTimeNanos), DURATION_FORMAT);
 
@@ -343,7 +355,7 @@ public class ReplicasVerify extends Handler {
     out.println();
     out.println("Keys passed verification: " + totalKeysPassed);
     out.println("Keys failed verification: " + totalKeysFailed);
-    
+
     if (!failuresByType.isEmpty() && totalKeysFailed > 0) {
       out.println();
       for (String verificationType : verificationTypes) {
@@ -354,16 +366,36 @@ public class ReplicasVerify extends Handler {
       }
       out.println("Note: A key may fail multiple verification types, so total may exceed overall failures.");
     }
-    
+
     out.println();
     out.println("Total Execution time: " + execTime);
-    
+
     if (exception != null) {
       out.println();
       out.println("Exception: " + exception.getClass().getSimpleName() + ": " + exception.getMessage());
     }
-    
+
     out.println("***************************************************");
+  }
+
+  /**
+   * Check if the key should be processed based on replication config.
+   * @param keyInfo the key to check
+   * @return true if the key should be processed, false if it should be skipped
+   */
+  private boolean shouldProcessKeyByReplicationType(OmKeyInfo keyInfo) {
+    Optional<ReplicationConfig> filterConfig = replication.fromParams(getConf());
+    if (!filterConfig.isPresent()) {
+      // No filter specified, include all keys
+      return true;
+    }
+
+    ReplicationConfig keyReplicationConfig = keyInfo.getReplicationConfig();
+    ReplicationConfig filter = filterConfig.get();
+
+    // Process key only if both replication type and factor match
+    return keyReplicationConfig.getReplicationType().equals(filter.getReplicationType())
+        && keyReplicationConfig.getReplication().equals(filter.getReplication());
   }
 
   static class Verification {
@@ -379,9 +411,10 @@ public class ReplicasVerify extends Handler {
     private boolean doExecuteBlockExistence;
 
     @CommandLine.Option(names = "--container-state",
-        description = "Check the container and replica states. " +
-            "Containers in [DELETING, DELETED] states, or " +
-            "it's replicas in [DELETED, UNHEALTHY, INVALID] states fail the check.",
+        description = "Check the container and replica states." +
+            " Containers must be in [OPEN, CLOSING, QUASI_CLOSED, CLOSED] states," +
+            " and it's replicas must be in [OPEN, CLOSING, QUASI_CLOSED, CLOSED] states" +
+            " to pass the check. Any other states will fail the verification.",
         defaultValue = "false")
     private boolean doExecuteReplicaState;
 

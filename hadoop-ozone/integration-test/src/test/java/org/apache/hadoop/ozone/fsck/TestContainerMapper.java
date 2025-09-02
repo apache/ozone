@@ -57,7 +57,6 @@ public class TestContainerMapper {
   private static Path dbPath;
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
-  private static ObjectStore store = null;
   private static String volName = UUID.randomUUID().toString();
   private static String bucketName = UUID.randomUUID().toString();
   private static OzoneConfiguration conf;
@@ -78,7 +77,7 @@ public class TestContainerMapper {
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
-    store = ozClient.getObjectStore();
+    ObjectStore store = ozClient.getObjectStore();
     store.createVolume(volName);
     OzoneVolume volume = store.getVolume(volName);
     // TODO: HDDS-5463
