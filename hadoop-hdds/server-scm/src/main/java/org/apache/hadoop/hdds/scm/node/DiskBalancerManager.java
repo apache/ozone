@@ -306,7 +306,6 @@ public class DiskBalancerManager {
     long failureMoveCount = reportProto.getFailureMoveCount();
     long bytesToMove = reportProto.getBytesToMove();
     long balancedBytes = reportProto.getBalancedBytes();
-    // Use NaN if volumeDataDensity is not available (for backward compatibility with older DNs)
     double volumeDataDensity = reportProto.hasVolumeDataDensity() ? 
         reportProto.getVolumeDataDensity() : 0.0;
 

@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -122,7 +123,6 @@ public class DiskBalancerService extends BackgroundService {
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
-  private long bytesToMove;
   private long containerDefaultSize;
 
   /**
@@ -403,7 +403,6 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     if (queue.isEmpty()) {
-      bytesToMove = 0;
       if (stopAfterDiskEven) {
         LOG.info("Disk balancer is stopped due to disk even as" +
             " the property StopAfterDiskEven is set to true.");
@@ -416,8 +415,6 @@ public class DiskBalancerService extends BackgroundService {
         }
       }
       metrics.incrIdleLoopNoAvailableVolumePairCount();
-    } else {
-      bytesToMove = calculateBytesToMove(volumeSet);
     }
 
     return queue;
@@ -621,24 +618,39 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
+    // Calculate volumeDataDensity
+    double volumeDatadensity = 0.0;
+    volumeDatadensity = DiskBalancerVolumeCalculation.calculateVolumeDataDensity(volumeSet, deltaSizes);
+
+    long bytesToMove = 0;
+    if (this.operationalState == DiskBalancerOperationalState.RUNNING) {
+      // this calculates live changes in bytesToMove
+      // calculate bytes to move if the balancer is in a running state, else 0.
+      bytesToMove = calculateBytesToMove(volumeSet);
+    }
+
     return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
         parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes());
+        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDatadensity);
   }
 
   public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
-    // If there are no available volumes, return 0 bytes to move
-    if (inputVolumeSet.getVolumesList().isEmpty()) {
+    // Create truly immutable volumes to ensure consistency
+    ImmutableList<HddsVolume> volumes = DiskBalancerVolumeCalculation.getImmutableVolumeSet(inputVolumeSet);
+    
+    // If there are no available volumes or only one volume, return 0 bytes to move
+    if (volumes.isEmpty() || volumes.size() < 2) {
       return 0;
     }
 
-    double idealUsage = inputVolumeSet.getIdealUsage();
+    // Calculate ideal usage
+    double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(volumes);
     double normalizedThreshold = threshold / 100.0;
 
     long totalBytesToMove = 0;
 
     // Calculate excess data in overused volumes
-    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
+    for (HddsVolume volume : volumes) {
       SpaceUsageSource usage = volume.getCurrentUsage();
 
       if (usage.getCapacity() == 0) {
