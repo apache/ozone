@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.container.checksum;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Supplier;
@@ -53,25 +56,6 @@ public class ContainerMerkleTreeWriter {
    */
   public ContainerMerkleTreeWriter() {
     id2Block = new TreeMap<>();
-  }
-
-  /**
-   * Constructs a writer for a container merkle tree which initially contains all the information from the specified
-   * proto.
-   */
-  public ContainerMerkleTreeWriter(ContainerProtos.ContainerMerkleTree fromTree) {
-    id2Block = new TreeMap<>();
-    for (ContainerProtos.BlockMerkleTree blockTree: fromTree.getBlockMerkleTreeList()) {
-      long blockID = blockTree.getBlockID();
-      if (blockTree.getDeleted()) {
-        setDeletedBlock(blockID, blockTree.getDataChecksum());
-      } else {
-        addBlock(blockID);
-        for (ContainerProtos.ChunkMerkleTree chunkTree: blockTree.getChunkMerkleTreeList()) {
-          addChunks(blockID, chunkTree);
-        }
-      }
-    }
   }
 
   /**
@@ -124,6 +108,31 @@ public class ContainerMerkleTreeWriter {
     id2Block.computeIfAbsent(blockID, id -> BlockMerkleTreeWriter.deleted(id, dataChecksum));
   }
 
+  public void clearData() {
+    id2Block.entrySet().removeIf(entry -> !entry.getValue().isDeleted());
+  }
+
+  /**
+   * Merges the content from the provided tree with this tree writer.
+   * If the incoming tree has marked a block as deleted, the deletion flag and its checksum will replace any block
+   * entry in the tree currently.
+   * If the incoming tree has a block that this tree already has but a different set of chunks, the new chunks will be
+   * added to the existing block.
+   */
+  public void merge(ContainerProtos.ContainerMerkleTree otherTree) {
+    for (ContainerProtos.BlockMerkleTree otherBlockTree: otherTree.getBlockMerkleTreeList()) {
+      long blockID = otherBlockTree.getBlockID();
+      if (otherBlockTree.getDeleted()) {
+        setDeletedBlock(blockID, otherBlockTree.getDataChecksum());
+      } else {
+        addBlock(blockID);
+        for (ContainerProtos.ChunkMerkleTree chunkTree: otherBlockTree.getChunkMerkleTreeList()) {
+          addChunks(blockID, chunkTree);
+        }
+      }
+    }
+  }
+
   /**
    * Uses chunk hashes to compute all remaining hashes in the tree, and returns it as a protobuf object. No checksum
    * computation for the tree happens outside of this method.
@@ -161,12 +170,12 @@ public class ContainerMerkleTreeWriter {
     private final boolean deleted;
     private final long dataChecksum;
 
-    public static BlockMerkleTreeWriter deleted(long blockID) {
-      return new BlockMerkleTreeWriter(blockID, true, 0);
-    }
-
     public static BlockMerkleTreeWriter deleted(long blockID, long dataChecksum) {
       return new BlockMerkleTreeWriter(blockID, true, dataChecksum);
+    }
+
+    public static BlockMerkleTreeWriter deleted(long blockID) {
+      return new BlockMerkleTreeWriter(blockID, true, 0);
     }
 
     public static BlockMerkleTreeWriter empty(long blockID) {
@@ -190,6 +199,10 @@ public class ContainerMerkleTreeWriter {
       for (ChunkMerkleTreeWriter chunk: chunks) {
         offset2Chunk.put(chunk.getOffset(), chunk);
       }
+    }
+
+    public boolean isDeleted() {
+      return deleted;
     }
 
     /**
