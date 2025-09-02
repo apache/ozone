@@ -490,7 +490,7 @@
           <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>properties-maven-plugin</artifactId>
-            <version>1.1.0</version>
+            <!-- <version>1.1.0</version> -->
             <executions>
               <execution>
                 <id>read-distro</id>
@@ -509,7 +509,6 @@
           <plugin>
             <groupId>org.vafer</groupId>
             <artifactId>jdeb</artifactId>
-            <version>1.14</version>
             <configuration>
               <controlDir>${basedir}/src/main/package/deb/control</controlDir>
               <deb>${project.build.directory}/ozone_${project.version}-${linux.distro}_${deb.arch}.deb</deb>
