@@ -807,45 +807,4 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   public OMUpdateEventBuffer getEventBuffer() {
     return eventBuffer;
   }
-  
-  /**
-   * Find tasks that have sequence number mismatches with the Delta task and need reinitialization.
-   * This method encapsulates the logic from OzoneManagerServiceProviderImpl lines 286-314.
-   * 
-   * @param deltaTaskStatusUpdater The status updater for the OmDeltaRequest task
-   * @return Map of tasks that need reinitialization due to sequence number mismatches
-   */
-  private Map<String, ReconOmTask> findTasksRequiringReinitialization(
-      ReconTaskStatusUpdater deltaTaskStatusUpdater) {
-    
-    Map<String, ReconOmTask> reconOmTaskMap = reconOmTasks
-        .entrySet()
-        .stream()
-        .filter(entry -> {
-          String taskName = entry.getKey();
-          ReconTaskStatusUpdater taskStatusUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
-
-          return !taskName.equals("OmDeltaRequest")  // Condition 1
-              && !taskName.equals("OmSnapshotRequest")  // Condition 2
-              &&
-              taskStatusUpdater.getLastUpdatedSeqNumber().compareTo(
-                  deltaTaskStatusUpdater.getLastUpdatedSeqNumber()) < 0; // Condition 3
-        })
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        
-    if (!reconOmTaskMap.isEmpty()) {
-      LOG.info("Task name and last updated sequence number of tasks, that are not matching with " +
-          "the last updated sequence number of OmDeltaRequest task:");
-      LOG.info("{} -> {}", deltaTaskStatusUpdater.getTaskName(), deltaTaskStatusUpdater.getLastUpdatedSeqNumber());
-      reconOmTaskMap.keySet()
-          .forEach(taskName -> {
-            LOG.info("{} -> {}", taskName,
-                taskStatusUpdaterManager.getTaskStatusUpdater(taskName).getLastUpdatedSeqNumber());
-          });
-      LOG.info("Re-initializing all tasks again (not just above failed delta tasks) based on updated OM DB snapshot " +
-          "and last updated sequence number because fresh staging DB needs to be created for all tasks.");
-    }
-    
-    return reconOmTaskMap;
-  }
 }
