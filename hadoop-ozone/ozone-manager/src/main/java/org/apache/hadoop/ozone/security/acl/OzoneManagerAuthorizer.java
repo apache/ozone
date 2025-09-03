@@ -15,30 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs;
+package org.apache.hadoop.ozone.security.acl;
+
+import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.PrefixManager;
 
 /**
- * FIXME: Hack: This is copied from Hadoop 3.3.6. Remove this interface once
- * we drop Hadoop 3.1, 3.2 support.
- * An identical copy from org.apache.hadoop.hdfs.protocol.HdfsConstants
- * .SafeModeAction, that helps
- * the other file system implementation to define {@link SafeMode}.
+ * A subinterface of {@link IAccessAuthorizer} specifically for Ozone Manager.
  */
-public enum SafeModeAction {
-  /**
-   * Starting entering into safe mode.
-   */
-  ENTER,
-  /**
-   * Gracefully exit from safe mode.
-   */
-  LEAVE,
-  /**
-   * Force Exit from safe mode.
-   */
-  FORCE_EXIT,
-  /**
-   * Get the status of the safe mode.
-   */
-  GET;
+public interface OzoneManagerAuthorizer extends IAccessAuthorizer {
+  /** Configure this authorizer. */
+  OzoneManagerAuthorizer configure(OzoneManager om, KeyManager km, PrefixManager pm);
 }

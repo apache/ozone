@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.util.SeekableIterator;
 
 /**
@@ -56,6 +58,21 @@ public interface ReconContainerMetadataManager {
   @Deprecated
   void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
                                 Integer count) throws IOException;
+
+  /**
+   * Returns staged DB container metadata manager.
+   *
+   * @param stagedReconDbStore staged Recon DB store
+   * @return ReconContainerMetadataManager
+   */
+  ReconContainerMetadataManager getStagedReconContainerMetadataManager(DBStore stagedReconDbStore);
+
+  /**
+   * reinitialize the ReconContainerMetadataManage.
+   *
+   * @param reconDBProvider recon DB provider to reinitialize with.
+   */
+  void reinitialize(ReconDBProvider reconDBProvider);
 
   /**
    * Store the container to Key prefix mapping into a batch.

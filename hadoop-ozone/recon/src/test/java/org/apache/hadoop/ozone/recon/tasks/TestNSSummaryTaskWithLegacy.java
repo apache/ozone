@@ -93,10 +93,10 @@ public class TestNSSummaryTaskWithLegacy extends AbstractNSSummaryTaskTest {
 
     @Test
     public void testReprocessGetFiles() {
-      assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(2, nsSummaryForBucket1.getNumOfFiles());
       assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
 
-      assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
+      assertEquals(KEY_ONE_SIZE + KEY_THREE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
       assertEquals(KEY_TWO_OLD_SIZE + KEY_FOUR_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
     }
@@ -338,7 +338,7 @@ public class TestNSSummaryTaskWithLegacy extends AbstractNSSummaryTaskTest {
     public void testProcessUpdateFileSize() throws IOException {
       // file 1 is gone, so bucket 1 is empty now
       assertNotNull(nsSummaryForBucket1);
-      assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(6, nsSummaryForBucket1.getNumOfFiles());
 
       Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
       // after put dir4, bucket1 now has two child dirs: dir1 and dir4

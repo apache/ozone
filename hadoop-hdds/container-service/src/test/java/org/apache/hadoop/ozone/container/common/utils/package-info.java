@@ -15,14 +15,5 @@
  * limitations under the License.
  */
 
-/**
- * Interface definitions borrowed from Hadoop 3.3.6.
- * FIXME: Hack: This is copied from Hadoop 3.3.6. Remove this interface once
- * we drop Hadoop 3.1, 3.2 support.
- */
-@InterfaceAudience.Private
-@InterfaceStability.Evolving
-package org.apache.hadoop.fs;
-
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
+/** Tests for Common container utils. */
+package org.apache.hadoop.ozone.container.common.utils;
