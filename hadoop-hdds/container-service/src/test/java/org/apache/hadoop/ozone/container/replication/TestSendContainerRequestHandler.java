@@ -93,8 +93,8 @@ public class TestSendContainerRequestHandler {
 
     // Mock the space reservation logic to be independent of the
     // importer's implementation details.
-    doAnswer(invocation -> 2 * (long) invocation.getArgument(0))
-        .when(importer).getRequiredReplicationSpace(anyLong());
+    when(importer.getRequiredReplicationSpace(anyLong()))
+        .thenAnswer(invocation -> 2 * (long) invocation.getArgument(0));
     when(importer.getDefaultReplicationSpace()).thenReturn(2 * containerMaxSize);
   }
 
