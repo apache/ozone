@@ -48,7 +48,7 @@
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
     <commons-cli.version>1.8.0</commons-cli.version>
     <commons-codec.version>1.18.0</commons-codec.version>
-    <commons-collections.version>3.2.2</commons-collections.version>
+    <commons-collections.version>4.4</commons-collections.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-configuration2.version>2.12.0</commons-configuration2.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
@@ -480,11 +480,6 @@
         <version>${commons-codec.version}</version>
       </dependency>
       <dependency>
-        <groupId>commons-collections</groupId>
-        <artifactId>commons-collections</artifactId>
-        <version>${commons-collections.version}</version>
-      </dependency>
-      <dependency>
         <groupId>commons-daemon</groupId>
         <artifactId>commons-daemon</artifactId>
         <version>${commons-daemon.version}</version>
@@ -676,6 +671,11 @@
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna-platform</artifactId>
         <version>${java.dev.jna.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-collections4</artifactId>
+        <version>${commons-collections.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
@@ -2064,6 +2064,17 @@
                     <reason>Use commons-lang v3</reason>
                     <bannedImports>
                       <bannedImport>org.apache.commons.lang.**</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use commons-collections v4</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.commons.collections.**</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
