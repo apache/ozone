@@ -293,15 +293,22 @@ public class ContainerChecksumTreeManager {
     }
   }
 
-  // Called by scanner and reconcile
-  public ContainerProtos.ContainerChecksumInfo mergeDeletedBlocks(ContainerData data, ContainerMerkleTreeWriter treeWriter) throws IOException {
-    // Use the live blocks from the incoming writer, merge them with deleted blocks from the proto.
-    return write(data, treeWriter::mergeDeletedBlocks);
+  /**
+   * Called by the container scanner and reconciliation to update the merkle tree persisted to disk.
+   * For live (non-deleted) blocks, only those in the incoming treeWriter parameter are used.
+   * For deleted blocks, those in the incoming treeWriter are merged with those on disk.
+   */
+  public ContainerProtos.ContainerChecksumInfo updateTree(ContainerData data, ContainerMerkleTreeWriter treeWriter)
+      throws IOException {
+    return write(data, treeWriter::update);
   }
 
-
-  // Called by block deletion.
-  public ContainerProtos.ContainerChecksumInfo merge(ContainerData data, ContainerMerkleTreeWriter treeWriter) throws IOException {
+  /**
+   * Called by block deletion to update the merkle tree persisted to disk.
+   * The sets of live and deleted blocks are merged into one tree.
+   */
+  public ContainerProtos.ContainerChecksumInfo mergeTree(ContainerData data, ContainerMerkleTreeWriter treeWriter)
+      throws IOException {
     return write(data, treeWriter::merge);
   }
 
@@ -323,7 +330,7 @@ public class ContainerChecksumTreeManager {
   /**
    * Writes the specified container merkle tree to the specified container's checksum file.
    * Concurrent writes to the same file are coordinated internally.
-   * TODO
+   * TODO update javadoc
    */
   private ContainerProtos.ContainerChecksumInfo write(ContainerData data,
       Function<ContainerProtos.ContainerMerkleTree, ContainerProtos.ContainerMerkleTree> mergeFunction) throws IOException {
@@ -331,17 +338,18 @@ public class ContainerChecksumTreeManager {
     Lock fileLock = getLock(containerID);
     fileLock.lock();
     try {
-      // Merge the incoming merkle tree with the content already on the disk.
       ContainerProtos.ContainerChecksumInfo currentChecksumInfo = readOrCreate(data);
-
-      // Write the updated merkle tree to the file.
       ContainerProtos.ContainerChecksumInfo.Builder newChecksumInfoBuilder = currentChecksumInfo.toBuilder();
-      newChecksumInfoBuilder.setContainerID(containerID);
+
+      // Merge the incoming merkle tree with the content already on the disk.
       ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
           () -> mergeFunction.apply(currentChecksumInfo.getContainerMerkleTree()));
-      newChecksumInfoBuilder.setContainerMerkleTree(treeProto);
-      ContainerProtos.ContainerChecksumInfo newChecksumInfo = newChecksumInfoBuilder.build();
+      ContainerProtos.ContainerChecksumInfo newChecksumInfo = newChecksumInfoBuilder
+          .setContainerMerkleTree(treeProto)
+          .setContainerID(containerID)
+          .build();
 
+      // Write the updated merkle tree to the file.
       File checksumFile = getContainerChecksumFile(data);
       File tmpChecksumFile = getTmpContainerChecksumFile(data);
 

@@ -231,7 +231,7 @@ public class BlockDeletingTask implements BackgroundTask {
       // Mark blocks as deleted in the container checksum tree.
       // Data for these blocks does not need to be copied during container reconciliation if container replicas diverge.
       // Do this before the delete transactions are removed from the database.
-      checksumTreeManager.merge(containerData, treeWriter);
+      checksumTreeManager.mergeTree(containerData, treeWriter);
 
       // Once chunks in the blocks are deleted... remove the blockID from
       // blockDataTable.
@@ -370,7 +370,7 @@ public class BlockDeletingTask implements BackgroundTask {
       // Data for these blocks does not need to be copied if container replicas diverge during container reconciliation.
       // Do this before the delete transactions are removed from the database.
       // TODO need to get block data
-      checksumTreeManager.markBlocksAsDeleted(containerData, crr.getDeletedBlocks());
+//      checksumTreeManager.merge(containerData, crr.getDeletedBlocks());
 
       // Once blocks are deleted... remove the blockID from blockDataTable
       // and also remove the transactions from txnTable.

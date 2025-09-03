@@ -1460,7 +1460,7 @@ public class KeyValueHandler extends Handler {
     // merkle tree.
     long originalDataChecksum = containerData.getDataChecksum();
     boolean hadDataChecksum = !containerData.needsDataChecksum();
-    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.mergeDeletedBlocks(containerData, treeWriter);
+    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.updateTree(containerData, treeWriter);
     long updatedDataChecksum = updateChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
     if (updatedDataChecksum != originalDataChecksum) {
@@ -1634,6 +1634,7 @@ public class KeyValueHandler extends Handler {
         long numMissingBlocksRepaired = 0;
         long numCorruptChunksRepaired = 0;
         long numMissingChunksRepaired = 0;
+        long numDivergedDeletedBlocksUpdated = 0;
 
         LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
             containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
@@ -1711,6 +1712,12 @@ public class KeyValueHandler extends Handler {
           }
         }
 
+        // Merge block deletes from the peer that do not match our list of deleted blocks.
+        for (ContainerDiffReport.DeletedBlock deletedBlock : diffReport.getDeletedBlocks()) {
+          updatedTreeWriter.setDeletedBlock(deletedBlock.getBlockID(), deletedBlock.getDataChecksum());
+          numDivergedDeletedBlocksUpdated++;
+        }
+
         // Based on repaired done with this peer, write the updated merkle tree to the container.
         // This updated tree will be used when we reconcile with the next peer.
         ContainerProtos.ContainerChecksumInfo previousChecksumInfo = latestChecksumInfo;
@@ -1721,7 +1728,10 @@ public class KeyValueHandler extends Handler {
         long previousDataChecksum = ContainerChecksumTreeManager.getDataChecksum(previousChecksumInfo);
         long latestDataChecksum = ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo);
         if (previousDataChecksum == latestDataChecksum) {
-          if (numCorruptChunksRepaired != 0 || numMissingBlocksRepaired != 0 || numMissingChunksRepaired != 0) {
+          if (numCorruptChunksRepaired != 0 ||
+              numMissingBlocksRepaired != 0 ||
+              numMissingChunksRepaired != 0 ||
+              numDivergedDeletedBlocksUpdated != 0) {
             // This condition should never happen.
             LOG.error("Checksum of container was not updated but blocks were repaired.");
           }
@@ -1732,11 +1742,13 @@ public class KeyValueHandler extends Handler {
                   ".\nMissing blocks repaired: {}/{}\n" +
                   "Missing chunks repaired: {}/{}\n" +
                   "Corrupt chunks repaired:  {}/{}\n" +
+                  "Diverged deleted blocks updated:  {}/{}\n" +
                   "Time taken: {} ms",
               containerID, peer, checksumToString(previousDataChecksum), checksumToString(latestDataChecksum),
               numMissingBlocksRepaired, diffReport.getMissingBlocks().size(),
               numMissingChunksRepaired, diffReport.getMissingChunks().size(),
               numCorruptChunksRepaired, diffReport.getCorruptChunks().size(),
+              numDivergedDeletedBlocksUpdated, diffReport.getNumDeletedBlocks(),
               duration);
         }
 

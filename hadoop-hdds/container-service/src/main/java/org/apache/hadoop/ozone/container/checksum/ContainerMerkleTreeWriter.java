@@ -108,7 +108,8 @@ public class ContainerMerkleTreeWriter {
     id2Block.put(blockID, blockWriter);
   }
 
-  public ContainerProtos.ContainerMerkleTree mergeDeletedBlocks(ContainerProtos.ContainerMerkleTree existingTree) {
+  public ContainerProtos.ContainerMerkleTree update(
+      ContainerProtos.ContainerMerkleTree existingTree) {
     return merge(existingTree, false);
   }
 
@@ -133,7 +134,8 @@ public class ContainerMerkleTreeWriter {
    * scanner's value because it would again diverge from the peer due to data that is expected to be deleted.
    * This would cause the checksum to oscillate back and forth until the block is deleted, instead of converging.
    */
-  private ContainerProtos.ContainerMerkleTree merge(ContainerProtos.ContainerMerkleTree existingTree, boolean mergeLiveBlocks) {
+  private ContainerProtos.ContainerMerkleTree merge(ContainerProtos.ContainerMerkleTree existingTree,
+      boolean mergeLiveBlocks) {
     for (ContainerProtos.BlockMerkleTree existingBlockTree: existingTree.getBlockMerkleTreeList()) {
       long blockID = existingBlockTree.getBlockID();
       BlockMerkleTreeWriter ourBlockTree = id2Block.get(blockID);
