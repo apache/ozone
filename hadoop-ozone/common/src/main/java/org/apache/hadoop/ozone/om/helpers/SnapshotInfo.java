@@ -85,6 +85,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private long exclusiveSizeDeltaFromDirDeepCleaning;
   private long exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
   private boolean deepCleanedDeletedDir;
+  private ByteString createTransactionInfo;
   private ByteString lastTransactionInfo;
 
   private SnapshotInfo(Builder b) {
@@ -110,6 +111,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.exclusiveReplicatedSizeDeltaFromDirDeepCleaning = b.exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
     this.deepCleanedDeletedDir = b.deepCleanedDeletedDir;
     this.lastTransactionInfo = b.lastTransactionInfo;
+    this.createTransactionInfo = b.createTransactionInfo;
   }
 
   public static Codec<SnapshotInfo> getCodec() {
@@ -240,7 +242,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setExclusiveSizeDeltaFromDirDeepCleaning(exclusiveSizeDeltaFromDirDeepCleaning)
         .setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(exclusiveReplicatedSizeDeltaFromDirDeepCleaning)
         .setDeepCleanedDeletedDir(deepCleanedDeletedDir)
-        .setLastTransactionInfo(lastTransactionInfo);
+        .setLastTransactionInfo(lastTransactionInfo)
+        .setCreateTransactionInfo(createTransactionInfo);
   }
 
   /**
@@ -268,6 +271,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private long exclusiveSizeDeltaFromDirDeepCleaning;
     private long exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
     private boolean deepCleanedDeletedDir;
+    private ByteString createTransactionInfo;
     private ByteString lastTransactionInfo;
 
     public Builder() {
@@ -400,6 +404,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
+    public Builder setCreateTransactionInfo(ByteString createTransactionInfo) {
+      this.createTransactionInfo = createTransactionInfo;
+      return this;
+    }
+
     public Builder setLastTransactionInfo(ByteString lastTransactionInfo) {
       this.lastTransactionInfo = lastTransactionInfo;
       return this;
@@ -443,6 +452,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
 
     if (lastTransactionInfo != null) {
       sib.setLastTransactionInfo(lastTransactionInfo);
+    }
+
+    if (createTransactionInfo != null) {
+      sib.setCreateTransactionInfo(createTransactionInfo);
     }
 
     sib.setSnapshotPath(snapshotPath)
@@ -524,6 +537,10 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
 
     if (snapshotInfoProto.hasLastTransactionInfo()) {
       osib.setLastTransactionInfo(snapshotInfoProto.getLastTransactionInfo());
+    }
+
+    if (snapshotInfoProto.hasCreateTransactionInfo()) {
+      osib.setCreateTransactionInfo(snapshotInfoProto.getCreateTransactionInfo());
     }
 
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
@@ -639,6 +656,14 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return lastTransactionInfo;
   }
 
+  public ByteString getCreateTransactionInfo() {
+    return createTransactionInfo;
+  }
+
+  public void setCreateTransactionInfo(ByteString createTransactionInfo) {
+    this.createTransactionInfo = createTransactionInfo;
+  }
+
   public void setLastTransactionInfo(ByteString lastTransactionInfo) {
     this.lastTransactionInfo = lastTransactionInfo;
   }
@@ -712,7 +737,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         exclusiveSize == that.exclusiveSize &&
         exclusiveReplicatedSize == that.exclusiveReplicatedSize &&
         deepCleanedDeletedDir == that.deepCleanedDeletedDir &&
-        Objects.equals(lastTransactionInfo, that.lastTransactionInfo);
+        Objects.equals(lastTransactionInfo, that.lastTransactionInfo) &&
+        Objects.equals(createTransactionInfo, that.createTransactionInfo);
   }
 
   @Override
@@ -723,7 +749,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         globalPreviousSnapshotId, snapshotPath, checkpointDir,
         deepClean, sstFiltered,
         referencedSize, referencedReplicatedSize,
-        exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir, lastTransactionInfo);
+        exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir, lastTransactionInfo, createTransactionInfo);
   }
 
   /**
@@ -759,6 +785,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         ", exclusiveReplicatedSizeDeltaFromDirDeepCleaning: '" + exclusiveReplicatedSizeDeltaFromDirDeepCleaning +
         "', deepCleanedDeletedDir: '" + deepCleanedDeletedDir + '\'' +
         ", lastTransactionInfo: '" + lastTransactionInfo + '\'' +
+        ", createTransactionInfo: '" + createTransactionInfo + '\'' +
         '}';
   }
 
