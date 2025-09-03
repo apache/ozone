@@ -62,6 +62,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
@@ -649,28 +651,114 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
   }
 
-  public static boolean isDuplicateTransaction(long containerId, KeyValueContainerData containerData,
-      DeletedBlocksTransaction delTX, BlockDeletingServiceMetrics metrics) {
+  public boolean isDuplicateTransaction(long containerId, KeyValueContainerData containerData,
+      DeletedBlocksTransaction delTX, BlockDeletingServiceMetrics metrics) throws IOException {
     boolean duplicate = false;
 
     if (delTX.getTxID() < containerData.getDeleteTransactionId()) {
+      // Out of order transaction - need to check if it's already processed
       if (metrics != null) {
         metrics.incOutOfOrderDeleteBlockTransactionCount();
       }
-      LOG.debug(String.format("Delete blocks for containerId: %d"
-              + " is received out of order, %d < %d", containerId, delTX.getTxID(),
-          containerData.getDeleteTransactionId()));
+
+      // Check if this transaction exists in delete_txn table
+      try (DBHandle containerDB = BlockUtils.getDB(containerData, conf)) {
+        // Check based on schema version
+        String schemaVersion = containerData.getSupportedSchemaVersionOrDefault();
+        boolean txnExistsInDeleteTable = false;
+
+        if (containerDB.getStore() instanceof DatanodeStoreSchemaThreeImpl) {
+          DatanodeStoreSchemaThreeImpl schemaThreeStore = (DatanodeStoreSchemaThreeImpl) containerDB.getStore();
+          Table<String, DeletedBlocksTransaction> delTxTable = schemaThreeStore.getDeleteTransactionTable();
+          txnExistsInDeleteTable = delTxTable.get(String.valueOf(delTX.getTxID())) != null;
+        } else if (containerDB.getStore() instanceof DatanodeStoreSchemaTwoImpl) {
+          DatanodeStoreSchemaTwoImpl schemaTwoStore = (DatanodeStoreSchemaTwoImpl) containerDB.getStore();
+          Table<Long, DeletedBlocksTransaction> delTxTable = schemaTwoStore.getDeleteTransactionTable();
+          txnExistsInDeleteTable = delTxTable.get(delTX.getTxID()) != null;
+        }
+
+        if (txnExistsInDeleteTable) {
+          // Transaction already exists in delete_txn table, mark as duplicate
+          duplicate = true;
+          LOG.info("Delete transaction with txID {} for containerId {} found in delete_txn table, " +
+              "marking as duplicate", delTX.getTxID(), containerId);
+        } else {
+          // Check if blocks are already deleted from block table
+          boolean allBlocksDeleted = checkIfBlocksAlreadyDeleted(containerData, delTX, containerDB);
+          if (allBlocksDeleted) {
+            duplicate = true;
+            LOG.info("Delete transaction with txID {} for containerId {} has all blocks already deleted, " +
+                "marking as duplicate", delTX.getTxID(), containerId);
+          } else {
+            LOG.debug("Delete blocks for containerId {} is received out of order, {} < {}, " +
+                    "but not all blocks are deleted yet", containerId, delTX.getTxID(),
+                containerData.getDeleteTransactionId());
+          }
+        }
+      } catch (IOException e) {
+        LOG.warn("Failed to check duplicate transaction for txID {} in container {}",
+            delTX.getTxID(), containerId, e);
+        // In case of error, don't mark as duplicate to be safe
+        duplicate = false;
+      }
+
     } else if (delTX.getTxID() == containerData.getDeleteTransactionId()) {
       duplicate = true;
-      LOG.info(String.format("Delete blocks with txID %d for containerId: %d"
-              + " is retried.", delTX.getTxID(), containerId));
+      LOG.info("Delete blocks with txID {} for containerId {} is retried",
+          delTX.getTxID(), containerId);
     } else {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Processing Container : {}, DB path : {}, transaction {}",
+        LOG.debug("Processing Container: {}, DB path: {}, transaction {}",
             containerId, containerData.getMetadataPath(), delTX.getTxID());
       }
     }
+
     return duplicate;
+  }
+
+  /**
+   * Checks if all blocks in the transaction are already deleted from the block table.
+   * This handles the case where blocks may have been deleted but transaction wasn't
+   * recorded in delete_txn table due to retry scenarios.
+   */
+  private static boolean checkIfBlocksAlreadyDeleted(KeyValueContainerData containerData,
+                         DeletedBlocksTransaction delTX, DBHandle containerDB) throws IOException {
+
+    String schemaVersion = containerData.getSupportedSchemaVersionOrDefault();
+
+    // For schema V1, check if blocks exist in block table or deleting state
+    if (SCHEMA_V1.equals(schemaVersion)) {
+      Table<String, BlockData> blockDataTable = containerDB.getStore().getBlockDataTable();
+      Table<String, ChunkInfoList> deletedBlocksTable = containerDB.getStore().getDeletedBlocksTable();
+
+      for (Long blockId : delTX.getLocalIDList()) {
+        String blockKey = containerData.getBlockKey(blockId);
+        String deletingKey = containerData.getDeletingBlockKey(blockId);
+
+        // If block exists in block table or deleting state, it's not fully deleted
+        if (blockDataTable.get(blockKey) != null || blockDataTable.get(deletingKey) != null) {
+          return false;
+        }
+
+        // Check if block exists in deleted blocks table (may indicate partial deletion)
+        if (deletedBlocksTable.get(blockKey) != null) {
+          return false;
+        }
+      }
+      return true; // All blocks are deleted
+    } else {
+      // For schema V2 and V3, blocks are handled differently
+      // Check if blocks exist in block data table
+      Table<String, BlockData> blockDataTable = containerDB.getStore().getBlockDataTable();
+
+      for (Long blockId : delTX.getLocalIDList()) {
+        String blockKey = containerData.getBlockKey(blockId);
+        if (blockDataTable.get(blockKey) != null) {
+          return false; // Block still exists
+        }
+      }
+      return true; // All blocks are deleted
+    }
   }
 
   @Override
