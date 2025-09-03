@@ -395,7 +395,6 @@ public final class OmUtils {
     String listenerNodesKeyWithServiceIdSuffix = ConfUtils.addKeySuffixes(OZONE_OM_LISTENER_NODES_KEY, omServiceId);
     HashSet<String> listenerNodeIds = new HashSet<>(
         conf.getTrimmedStringCollection(listenerNodesKeyWithServiceIdSuffix));
-    listenerNodeIds.addAll(conf.getTrimmedStringCollection(OZONE_OM_LISTENER_NODES_KEY));
     return listenerNodeIds;
   }
 
