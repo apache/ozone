@@ -211,16 +211,16 @@ public class ContainerMerkleTreeWriter {
     private boolean deleted;
     private long dataChecksum;
 
-    public BlockMerkleTreeWriter(long blockID) {
+    BlockMerkleTreeWriter(long blockID) {
       this.blockID = blockID;
       this.offset2Chunk = new TreeMap<>();
       this.deleted = false;
       this.dataChecksum = 0;
     }
 
-    public void markDeleted(long dataChecksum) {
+    public void markDeleted(long deletedDataChecksum) {
       this.deleted = true;
-      this.dataChecksum = dataChecksum;
+      this.dataChecksum = deletedDataChecksum;
     }
 
     public void markDeleted() {

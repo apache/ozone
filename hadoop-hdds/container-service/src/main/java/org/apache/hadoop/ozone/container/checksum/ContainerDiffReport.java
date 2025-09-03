@@ -132,6 +132,10 @@ public class ContainerDiffReport {
         " Diverged Deleted Blocks: " + getNumDeletedBlocks();
   }
 
+  /**
+   * Represents a block that has been deleted in a peer whose metadata we need to add to our container replica's
+   * merkle tree.
+   */
   public static class DeletedBlock {
     private final long blockID;
     private final long dataChecksum;

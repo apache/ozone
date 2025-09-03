@@ -57,14 +57,14 @@ public class ContainerChecksumTreeManager {
   // Used to coordinate writes to each container's checksum file.
   // Each container ID is mapped to a stripe.
   // The file is atomically renamed into place, so readers do not need coordination.
-  private final Striped<Lock> fileLock;
+  private final Striped<Lock> fileLocks;
   private final ContainerMerkleTreeMetrics metrics;
 
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
   public ContainerChecksumTreeManager(ConfigurationSource conf) {
-    fileLock = SimpleStriped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
+    fileLocks = SimpleStriped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
         () -> new ReentrantLock(true));
     metrics = ContainerMerkleTreeMetrics.create();
   }
@@ -275,7 +275,7 @@ public class ContainerChecksumTreeManager {
   }
 
   private Lock getLock(long containerID) {
-    return fileLock.get(containerID);
+    return fileLocks.get(containerID);
   }
 
   /**
@@ -332,8 +332,8 @@ public class ContainerChecksumTreeManager {
    * Concurrent writes to the same file are coordinated internally.
    * TODO update javadoc
    */
-  private ContainerProtos.ContainerChecksumInfo write(ContainerData data,
-      Function<ContainerProtos.ContainerMerkleTree, ContainerProtos.ContainerMerkleTree> mergeFunction) throws IOException {
+  private ContainerProtos.ContainerChecksumInfo write(ContainerData data, Function<ContainerProtos.ContainerMerkleTree,
+      ContainerProtos.ContainerMerkleTree> mergeFunction) throws IOException {
     long containerID = data.getContainerID();
     Lock fileLock = getLock(containerID);
     fileLock.lock();
