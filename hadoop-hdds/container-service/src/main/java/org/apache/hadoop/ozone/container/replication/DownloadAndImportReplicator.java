@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -72,33 +71,28 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     LOG.info("Starting replication of container {} from {} using {}",
         containerID, sourceDatanodes, compression);
     HddsVolume targetVolume = null;
-    long spaceReserved = containerImporter.getDefaultReplicationSpace();
+    
+    // Use replicate size from command if available, otherwise use default
+    long spaceReserved = 0;
+    Long replicateSize = task.getReplicateSize();
+    if (replicateSize != null) {
+      spaceReserved = containerImporter.getRequiredReplicationSpace(replicateSize);
+    } else {
+      // Fallback to default (backward compatibility)
+      spaceReserved = containerImporter.getDefaultReplicationSpace();
+    }
 
     try {
-      targetVolume = containerImporter.chooseNextVolume();
+      targetVolume = containerImporter.chooseNextVolume(spaceReserved);
+
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.
-      Pair<Path, Long> downloadResult =
+      Path tarFilePath =
           downloader.getContainerDataFromReplicas(containerID, sourceDatanodes,
               ContainerImporter.getUntarDirectory(targetVolume), compression);
-      if (downloadResult == null || downloadResult.getLeft() == null) {
+      if (tarFilePath == null) {
         task.setStatus(Status.FAILED);
         return;
-      }
-
-      Path tarFilePath = downloadResult.getLeft();
-      Long actualContainerSize = downloadResult.getRight();
-
-      if (actualContainerSize != null) {
-        long actualSpaceNeeded = containerImporter.getRequiredReplicationSpace(actualContainerSize);
-        long spaceAdjustment = actualSpaceNeeded - spaceReserved;
-
-        if (spaceAdjustment > 0) {
-          targetVolume.incCommittedBytes(spaceAdjustment);
-          spaceReserved = actualSpaceNeeded;
-          LOG.info("Container {} space adjusted by {} bytes (actual size: {} bytes)",
-              containerID, spaceAdjustment, actualContainerSize);
-        }
       }
 
       long bytes = Files.size(tarFilePath);

@@ -72,7 +72,6 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -337,7 +336,7 @@ public class TestReplicationSupervisor {
     when(
         moc.getContainerDataFromReplicas(anyLong(), anyList(),
             any(Path.class), any()))
-        .thenReturn(Pair.of(res, null));
+        .thenReturn(res);
 
     final String testDir = tempFile.getPath();
     MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
@@ -407,7 +406,7 @@ public class TestReplicationSupervisor {
     when(
         moc.getContainerDataFromReplicas(anyLong(), anyList(),
             any(Path.class), any()))
-        .thenReturn(Pair.of(tarFile.toPath(), null));
+        .thenReturn(tarFile.toPath());
 
     ContainerImporter importer =
         new ContainerImporter(conf, set, controllerMock, volumeSet, volumeChoosingPolicy);
@@ -582,7 +581,7 @@ public class TestReplicationSupervisor {
       SimpleContainerDownloader moc = mock(SimpleContainerDownloader.class);
       Path res = Paths.get("file:/tmp/no-such-file");
       when(moc.getContainerDataFromReplicas(anyLong(), anyList(),
-          any(Path.class), any())).thenReturn(Pair.of(res, null));
+          any(Path.class), any())).thenReturn(res);
 
       final String testDir = tempFile.getPath();
       MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);

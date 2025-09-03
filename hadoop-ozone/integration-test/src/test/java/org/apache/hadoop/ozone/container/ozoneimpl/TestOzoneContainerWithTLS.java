@@ -59,7 +59,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -403,10 +402,10 @@ public class TestOzoneContainerWithTLS {
     LogCapturer logCapture = captureLogs(SimpleContainerDownloader.class);
     SimpleContainerDownloader downloader =
         new SimpleContainerDownloader(conf, caClient);
-    Pair<Path, Long> result = downloader.getContainerDataFromReplicas(containerId,
+    Path file = downloader.getContainerDataFromReplicas(containerId,
         sourceDatanodes, tempFolder.resolve("tmp"), NO_COMPRESSION);
     downloader.close();
-    assertNull(result);
+    assertNull(file);
     assertThat(logCapture.getOutput())
         .contains("java.security.cert.CertificateExpiredException");
   }
@@ -417,7 +416,7 @@ public class TestOzoneContainerWithTLS {
       SimpleContainerDownloader downloader =
           new SimpleContainerDownloader(conf, caClient);
       Path file = downloader.getContainerDataFromReplicas(cId, sourceDatanodes,
-          tempFolder.resolve("tmp"), NO_COMPRESSION).getLeft();
+          tempFolder.resolve("tmp"), NO_COMPRESSION);
       downloader.close();
       assertNotNull(file);
     }

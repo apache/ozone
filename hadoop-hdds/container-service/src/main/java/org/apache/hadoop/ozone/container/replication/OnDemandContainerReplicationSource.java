@@ -61,14 +61,4 @@ public class OnDemandContainerReplicationSource
         container.getContainerType(), containerId, destination,
         new TarContainerPacker(compression));
   }
-
-  @Override
-  public Long getContainerSize(long containerId) throws IOException {
-    Container container = controller.getContainer(containerId);
-    if (container == null) {
-      throw new StorageContainerException("Container " + containerId +
-          " is not found.", CONTAINER_NOT_FOUND);
-    }
-    return container.getContainerData().getBytesUsed();
-  }
 }

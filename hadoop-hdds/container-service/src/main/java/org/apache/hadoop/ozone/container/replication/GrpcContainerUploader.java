@@ -54,8 +54,8 @@ public class GrpcContainerUploader implements ContainerUploader {
 
   @Override
   public OutputStream startUpload(long containerId, DatanodeDetails target,
-      CompletableFuture<Void> callback, CopyContainerCompression compression, Long containerSize)
-      throws IOException {
+      CompletableFuture<Void> callback, CopyContainerCompression compression,
+      Long replicateSize) throws IOException {
     GrpcReplicationClient client = createReplicationClient(target, compression);
     try {
       // gRPC runtime always provides implementation of CallStreamObserver
@@ -68,7 +68,7 @@ public class GrpcContainerUploader implements ContainerUploader {
               (CallStreamObserver<SendContainerRequest>) client.upload(
               responseObserver), responseObserver);
       return new SendContainerOutputStream(requestStream, containerId,
-          GrpcReplicationService.BUFFER_SIZE, compression, containerSize) {
+          GrpcReplicationService.BUFFER_SIZE, compression, replicateSize) {
         @Override
         public void close() throws IOException {
           try {
