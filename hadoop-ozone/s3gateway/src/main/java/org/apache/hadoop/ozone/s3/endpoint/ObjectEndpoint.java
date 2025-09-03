@@ -134,6 +134,7 @@ import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.RangeHeader;
 import org.apache.hadoop.ozone.s3.util.RangeHeaderParserUtil;
@@ -183,6 +184,8 @@ public class ObjectEndpoint extends EndpointBase {
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
+  @Inject
+  private SignatureInfo signatureInfo;
 
   public ObjectEndpoint() {
     overrideQueryParameter = ImmutableMap.<String, String>builder()
@@ -1556,7 +1559,7 @@ public class ObjectEndpoint extends EndpointBase {
    */
   private S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(
       InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
-    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath);
+    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, signatureInfo.isSignPayload());
     final InputStream chunkInputStream;
     final long effectiveLength;
     if (hasMultiChunksPayload(amzContentSha256Header)) {
