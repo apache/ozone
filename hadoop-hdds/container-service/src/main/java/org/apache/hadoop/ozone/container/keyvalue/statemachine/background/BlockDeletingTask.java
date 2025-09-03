@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
@@ -200,21 +201,26 @@ public class BlockDeletingTask implements BackgroundTask {
           .getHandler(container.getContainerType()));
 
       long releasedBytes = 0;
+      ContainerMerkleTreeWriter treeWriter = new ContainerMerkleTreeWriter();
       for (Table.KeyValue<String, BlockData> entry : toDeleteBlocks) {
         String blockName = entry.getKey();
+        BlockData blockData = entry.getValue();
         LOG.debug("Deleting block {}", blockName);
-        if (entry.getValue() == null) {
+        if (blockData == null) {
           LOG.warn("Missing delete block(Container = " +
               container.getContainerData().getContainerID() +
               ", Block = " + blockName);
           continue;
         }
         try {
-          handler.deleteBlock(container, entry.getValue());
-          releasedBytes += KeyValueContainerUtil.getBlockLength(
-              entry.getValue());
-          succeedBlockIDs.add(entry.getValue().getLocalID());
+          handler.deleteBlock(container, blockData);
+          releasedBytes += KeyValueContainerUtil.getBlockLength(blockData);
+          long blockID = blockData.getLocalID();
+          succeedBlockIDs.add(blockID);
           succeedBlockDBKeys.add(blockName);
+
+          treeWriter.setDeletedBlock(blockID, blockData);
+          treeWriter.addChunks(blockID, true, blockData.getChunks());
         } catch (InvalidProtocolBufferException e) {
           LOG.error("Failed to parse block info for block {}", blockName, e);
         } catch (IOException e) {
@@ -225,7 +231,7 @@ public class BlockDeletingTask implements BackgroundTask {
       // Mark blocks as deleted in the container checksum tree.
       // Data for these blocks does not need to be copied during container reconciliation if container replicas diverge.
       // Do this before the delete transactions are removed from the database.
-      checksumTreeManager.markBlocksAsDeleted(containerData, succeedBlockIDs);
+      checksumTreeManager.merge(containerData, treeWriter);
 
       // Once chunks in the blocks are deleted... remove the blockID from
       // blockDataTable.
@@ -363,6 +369,7 @@ public class BlockDeletingTask implements BackgroundTask {
       // Mark blocks as deleted in the container checksum tree.
       // Data for these blocks does not need to be copied if container replicas diverge during container reconciliation.
       // Do this before the delete transactions are removed from the database.
+      // TODO need to get block data
       checksumTreeManager.markBlocksAsDeleted(containerData, crr.getDeletedBlocks());
 
       // Once blocks are deleted... remove the blockID from blockDataTable

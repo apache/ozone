@@ -1460,8 +1460,7 @@ public class KeyValueHandler extends Handler {
     // merkle tree.
     long originalDataChecksum = containerData.getDataChecksum();
     boolean hadDataChecksum = !containerData.needsDataChecksum();
-    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.writeContainerDataTree(containerData,
-        treeWriter);
+    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.mergeDeletedBlocks(containerData, treeWriter);
     long updatedDataChecksum = updateChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
     if (updatedDataChecksum != originalDataChecksum) {
@@ -1619,7 +1618,7 @@ public class KeyValueHandler extends Handler {
 
     // Obtain the original checksum info before reconciling with any peers.
     ContainerProtos.ContainerChecksumInfo originalChecksumInfo = checksumManager.read(containerData);
-    if (!originalChecksumInfo.hasContainerMerkleTree()) {
+    if (!ContainerChecksumTreeManager.hasDataChecksum(originalChecksumInfo)) {
       // Try creating the merkle tree from RocksDB metadata if it is not present.
       originalChecksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
     }
@@ -1653,8 +1652,8 @@ public class KeyValueHandler extends Handler {
 
         // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with
         // the next peer.
-        ContainerMerkleTreeWriter updatedTreeWriter =
-            new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
+        ContainerMerkleTreeWriter updatedTreeWriter = new ContainerMerkleTreeWriter();
+        updatedTreeWriter.merge(latestChecksumInfo.getContainerMerkleTree());
         ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
         Pipeline pipeline = createSingleNodePipeline(peer);
 
