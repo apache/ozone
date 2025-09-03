@@ -76,6 +76,8 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -105,6 +107,14 @@ public class TestOzoneManagerServiceProviderImpl {
     ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdates());
     commonUtils = new CommonUtils();
     reconContext = new ReconContext(configuration, new ReconUtils());
+  }
+
+  @AfterEach
+  public void tearDown() {
+    if (configuration != null) {
+      configuration.clear();
+    }
+
   }
 
   @Test
@@ -155,6 +165,9 @@ public class TestOzoneManagerServiceProviderImpl {
 
       // Verifying if context error GET_OM_DB_SNAPSHOT_FAILED is removed
       assertFalse(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+      omMetadataManager.stop();
+      reconOMMetadataManager.stop();
+      reconTaskController.stop();
     }
   }
 
@@ -191,6 +204,9 @@ public class TestOzoneManagerServiceProviderImpl {
 
     // Verifying if context error GET_OM_DB_SNAPSHOT_FAILED is added
     assertTrue(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+    omMetadataManager.stop();
+    reconOMMetadataManager.stop();
+    reconTaskController.stop();
   }
 
   @Test
@@ -234,6 +250,8 @@ public class TestOzoneManagerServiceProviderImpl {
       assertNotNull(reconOMMetadataManager.getKeyTable(getBucketLayout())
           .get("/sampleVol/bucketOne/key_two"));
     }
+    omMetadataManager.stop();
+    reconOMMetadataManager.stop();
   }
 
   @Test
@@ -283,6 +301,9 @@ public class TestOzoneManagerServiceProviderImpl {
       ozoneManagerServiceProvider2.getTarExtractor().start();
       assertTrue(ozoneManagerServiceProvider2.updateReconOmDBWithNewSnapshot());
     }
+    omMetadataManager.stop();
+    reconOMMetadataManager.stop();
+    reconTaskController.stop();
   }
 
   @Test
@@ -398,6 +419,8 @@ public class TestOzoneManagerServiceProviderImpl {
         "bucketOne", "key_two");
     assertTrue(ozoneManagerServiceProvider.getOMMetadataManagerInstance()
         .getKeyTable(getBucketLayout()).isExist(fullKey));
+    omMetadataManager.stop();
+    sourceOMMetadataMgr.stop();
   }
 
   @Test
@@ -476,6 +499,8 @@ public class TestOzoneManagerServiceProviderImpl {
         "bucketOne", "key_two");
     assertFalse(ozoneManagerServiceProvider.getOMMetadataManagerInstance()
         .getKeyTable(getBucketLayout()).isExist(fullKey));
+    omMetadataManager.stop();
+    sourceOMMetadataMgr.stop();
   }
 
   @Test
@@ -510,6 +535,8 @@ public class TestOzoneManagerServiceProviderImpl {
     verify(reconTaskControllerMock, times(1))
         .queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
     assertEquals(1, metrics.getNumSnapshotRequests());
+    omMetadataManager.stop();
+    reconTaskControllerMock.stop();
   }
 
   @Test
@@ -547,6 +574,8 @@ public class TestOzoneManagerServiceProviderImpl {
         .consumeOMEvents(any(OMUpdateEventBatch.class),
             any(OMMetadataManager.class));
     assertEquals(0, metrics.getNumSnapshotRequests());
+    omMetadataManager.stop();
+    reconTaskControllerMock.stop();
   }
 
   @Test
@@ -582,6 +611,8 @@ public class TestOzoneManagerServiceProviderImpl {
     verify(reconTaskControllerMock, times(1))
         .queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
     assertEquals(1, metrics.getNumSnapshotRequests());
+    omMetadataManager.stop();
+    reconTaskControllerMock.stop();
   }
 
   private ReconTaskController getMockTaskController() {
