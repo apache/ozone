@@ -150,7 +150,7 @@ class TestGrpcReplicationService {
     }).when(importer).importContainer(anyLong(), any(), any(), any());
     doReturn(true).when(importer).isAllowedContainerImport(eq(
         CONTAINER_ID));
-    when(importer.chooseNextVolume()).thenReturn(new HddsVolume.Builder(
+    when(importer.chooseNextVolume(anyLong())).thenReturn(new HddsVolume.Builder(
         Files.createDirectory(tempDir.resolve("ImporterDir")).toString()).conf(
         conf).build());
 
@@ -173,7 +173,7 @@ class TestGrpcReplicationService {
     Path result = downloader.getContainerDataFromReplicas(
         CONTAINER_ID,
         Collections.singletonList(datanode), downloadDir,
-        CopyContainerCompression.NO_COMPRESSION).getLeft();
+        CopyContainerCompression.NO_COMPRESSION);
 
     assertTrue(result.toString().startsWith(downloadDir.toString()));
 

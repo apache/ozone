@@ -126,19 +126,11 @@ public class GrpcReplicationService extends
         "with compression {}", containerID, compression);
     OutputStream outputStream = null;
     try {
-      // Get container size before creating stream
-      Long containerSize = null;
-      try {
-        containerSize = source.getContainerSize(containerID);
-      } catch (Exception e) {
-        LOG.warn("Could not get container size for {}, proceeding without size info", containerID, e);
-      }
-
       outputStream = new CopyContainerResponseStream(
           // gRPC runtime always provides implementation of CallStreamObserver
           // that allows flow control.
           (CallStreamObserver<CopyContainerResponseProto>) responseObserver,
-          containerID, BUFFER_SIZE, containerSize);
+          containerID, BUFFER_SIZE);
       source.copyData(containerID, outputStream, compression);
     } catch (IOException e) {
       LOG.warn("Error streaming container {}", containerID, e);

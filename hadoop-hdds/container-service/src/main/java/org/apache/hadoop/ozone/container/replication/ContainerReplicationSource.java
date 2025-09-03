@@ -48,17 +48,4 @@ public interface ContainerReplicationSource {
       CopyContainerCompression compression)
       throws IOException;
 
-  /**
-   * Get the actual size of the container in bytes.
-   * This is used for space reservation during replication.
-   *
-   * @param containerId ID of the container
-   * @return actual container size in bytes, or null if size cannot be determined
-   * @throws IOException if container is not found or size cannot be retrieved
-   */
-  default Long getContainerSize(long containerId) throws IOException {
-    // Default implementation returns null for backward compatibility
-    return null;
-  }
-
 }

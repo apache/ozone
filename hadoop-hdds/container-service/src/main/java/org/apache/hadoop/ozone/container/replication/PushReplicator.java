@@ -56,21 +56,13 @@ public class PushReplicator implements ContainerReplicator {
     LOG.info("Starting replication of container {} to {} using {}",
         containerID, target, compression);
 
-    // Get container size before starting upload (same as pull replication)
-    Long containerSize = null;
-    try {
-      containerSize = source.getContainerSize(containerID);
-      LOG.info("Container {} actual size: {} bytes", containerID, containerSize);
-    } catch (Exception e) {
-      LOG.warn("Could not get container size for {}, proceeding without size info", containerID, e);
-    }
-
     source.prepare(containerID);
 
     CountingOutputStream output = null;
     try {
+      Long replicateSize = task.getReplicateSize();
       output = new CountingOutputStream(
-          uploader.startUpload(containerID, target, fut, compression, containerSize));
+          uploader.startUpload(containerID, target, fut, compression, replicateSize));
       source.copyData(containerID, output, compression);
       fut.get();
 

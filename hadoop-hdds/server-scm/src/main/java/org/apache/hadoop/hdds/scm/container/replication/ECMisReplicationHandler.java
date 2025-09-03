@@ -83,6 +83,7 @@ public class ECMisReplicationHandler extends MisReplicationHandler {
           // For EC containers, we need to track the replica index which is
           // to be replicated, so add it to the command.
           cmd.setReplicaIndex(replica.getReplicaIndex());
+          cmd.setReplicateSize(containerInfo.getUsedBytes());
           replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
         }
         commandsSent++;

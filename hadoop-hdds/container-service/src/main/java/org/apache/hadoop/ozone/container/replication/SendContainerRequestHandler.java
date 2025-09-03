@@ -54,7 +54,6 @@ class SendContainerRequestHandler
   private Path path;
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
-  private Long actualContainerSize = null;
   private long spaceReserved = 0;
   private boolean firstRequest = true;
 
@@ -87,9 +86,15 @@ class SendContainerRequestHandler
 
       if (containerId == -1) {
         containerId = req.getContainerID();
-        spaceReserved = importer.getDefaultReplicationSpace();
+        
+        // Use replicate size if available, otherwise fall back to default
+        if (firstRequest && req.hasReplicateSize()) {
+          spaceReserved = importer.getRequiredReplicationSpace(req.getReplicateSize());
+        } else {
+          spaceReserved = importer.getDefaultReplicationSpace();
+        }
 
-        volume = importer.chooseNextVolume();
+        volume = importer.chooseNextVolume(spaceReserved);
 
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
@@ -99,22 +104,8 @@ class SendContainerRequestHandler
 
         LOG.info("Accepting container {}", req.getContainerID());
       }
-
-      if (firstRequest) {
-        firstRequest = false;
-        if (req.hasActualContainerSize()) {
-          actualContainerSize = req.getActualContainerSize();
-          long actualSpaceNeeded = importer.getRequiredReplicationSpace(actualContainerSize);
-          long spaceAdjustment = actualSpaceNeeded - spaceReserved;
-
-          if (spaceAdjustment > 0) {
-            volume.incCommittedBytes(spaceAdjustment);
-            spaceReserved = actualSpaceNeeded;
-            LOG.info("Container {} space adjusted by {} bytes (actual size: {} bytes)",
-                containerId, spaceAdjustment, actualContainerSize);
-          }
-        }
-      }
+      
+      firstRequest = false;
 
       assertSame(containerId, req.getContainerID(), "containerID");
 

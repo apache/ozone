@@ -43,6 +43,9 @@ public final class ReplicateContainerCommand
   private ReplicationCommandPriority priority =
       ReplicationCommandPriority.NORMAL;
 
+  // Actual container size in bytes
+  private Long replicateSize;
+
   public static ReplicateContainerCommand fromSources(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
     return new ReplicateContainerCommand(containerID, sourceDatanodes, null);
@@ -82,6 +85,14 @@ public final class ReplicateContainerCommand
     this.priority = priority;
   }
 
+  public void setReplicateSize(Long replicateSize) {
+    this.replicateSize = replicateSize;
+  }
+
+  public Long getReplicateSize() {
+    return replicateSize;
+  }
+
   @Override
   public Type getType() {
     return SCMCommandProto.Type.replicateContainerCommand;
@@ -105,6 +116,12 @@ public final class ReplicateContainerCommand
       builder.setTarget(targetDatanode.getProtoBufMessage());
     }
     builder.setPriority(priority);
+    
+    // Add replicate size if available
+    if (replicateSize != null) {
+      builder.setReplicateSize(replicateSize);
+    }
+    
     return builder.build();
   }
 
@@ -131,6 +148,12 @@ public final class ReplicateContainerCommand
     if (protoMessage.hasPriority()) {
       cmd.setPriority(protoMessage.getPriority());
     }
+    
+    // Add replicate size handling for backward compatibility
+    if (protoMessage.hasReplicateSize()) {
+      cmd.setReplicateSize(protoMessage.getReplicateSize());
+    }
+    
     return cmd;
   }
 
@@ -164,6 +187,9 @@ public final class ReplicateContainerCommand
         .append(", deadlineMsSinceEpoch: ").append(getDeadline());
     sb.append(", containerId=").append(getContainerID());
     sb.append(", replicaIndex=").append(getReplicaIndex());
+    if (replicateSize != null) {
+      sb.append(", replicateSize=").append(replicateSize);
+    }
     if (targetDatanode != null) {
       sb.append(", targetNode=").append(targetDatanode);
     } else {

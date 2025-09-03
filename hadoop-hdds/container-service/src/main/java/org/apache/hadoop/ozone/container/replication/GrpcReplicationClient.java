@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
@@ -98,7 +97,7 @@ public class GrpcReplicationClient implements AutoCloseable {
     LOG.debug("{}: created", this);
   }
 
-  public CompletableFuture<Pair<Path, Long>> download(long containerId, Path dir) {
+  public CompletableFuture<Path> download(long containerId, Path dir) {
     CopyContainerRequestProto request =
         CopyContainerRequestProto.newBuilder()
             .setContainerID(containerId)
@@ -107,7 +106,7 @@ public class GrpcReplicationClient implements AutoCloseable {
             .setCompression(compression.toProto())
             .build();
 
-    CompletableFuture<Pair<Path, Long>> response = new CompletableFuture<>();
+    CompletableFuture<Path> response = new CompletableFuture<>();
 
     Path destinationPath = dir
         .resolve(ContainerUtils.getContainerTarName(containerId));
@@ -152,14 +151,12 @@ public class GrpcReplicationClient implements AutoCloseable {
   public static class StreamDownloader
       implements StreamObserver<CopyContainerResponseProto> {
 
-    private final CompletableFuture<Pair<Path, Long>> response;
+    private final CompletableFuture<Path> response;
     private final long containerId;
     private final OutputStream stream;
-    private Long actualContainerSize = null;
     private final Path outputPath;
-    private boolean firstChunk = true;
 
-    public StreamDownloader(long containerId, CompletableFuture<Pair<Path, Long>> response,
+    public StreamDownloader(long containerId, CompletableFuture<Path> response,
         Path outputPath) {
       this.response = response;
       this.containerId = containerId;
@@ -178,18 +175,6 @@ public class GrpcReplicationClient implements AutoCloseable {
     @Override
     public void onNext(CopyContainerResponseProto chunk) {
       try {
-        // Capture container size from first chunk
-        if (firstChunk) {
-          firstChunk = false;
-          if (chunk.hasActualContainerSize()) {
-            actualContainerSize = chunk.getActualContainerSize();
-            LOG.info("Container {} actual size received: {} bytes",
-                containerId, actualContainerSize);
-          } else {
-            LOG.info("Container {} actual size not provided, will use default", containerId);
-          }
-        }
-
         chunk.getData().writeTo(stream);
       } catch (IOException e) {
         LOG.error("Failed to write the stream buffer to {} for container {}",
@@ -226,7 +211,7 @@ public class GrpcReplicationClient implements AutoCloseable {
       try {
         stream.close();
         LOG.info("Container {} is downloaded to {}", containerId, outputPath);
-        response.complete(Pair.of(outputPath, actualContainerSize));
+        response.complete(outputPath);
       } catch (IOException e) {
         LOG.error("Downloaded container {} OK, but failed to close {}",
             containerId, outputPath, e);
