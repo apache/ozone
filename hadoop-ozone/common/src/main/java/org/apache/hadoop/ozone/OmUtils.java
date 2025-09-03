@@ -438,19 +438,6 @@ public final class OmUtils {
   }
 
   /**
-   * Get a collection of listener omNodeIds for the given omServiceId.
-   */
-  public static Collection<String> getListenerOMNodeIds(ConfigurationSource conf,
-      String omServiceId) {
-    String listenerNodesKey = ConfUtils.addKeySuffixes(
-        OZONE_OM_LISTENER_NODES_KEY, omServiceId);
-    Collection<String> listenerNodeIds = conf.getTrimmedStringCollection(
-        listenerNodesKey);
-
-    return listenerNodeIds;
-  }
-
-  /**
    * Get a collection of all omNodeIds (active and decommissioned) for a
    * gived omServiceId.
    */
