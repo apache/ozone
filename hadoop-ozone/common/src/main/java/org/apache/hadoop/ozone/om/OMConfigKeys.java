@@ -62,6 +62,8 @@ public final class OMConfigKeys {
       "ozone.om.node.id";
   public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
       "ozone.om.decommissioned.nodes";
+  public static final String OZONE_OM_LISTENER_NODES_KEY =
+      "ozone.om.listener.nodes";
 
   public static final String OZONE_OM_FEATURES_DISABLED =
       "ozone.om.features.disabled";
@@ -639,7 +641,7 @@ public final class OMConfigKeys {
   /**
    * Configuration properties for Compaction Service.
    */
-  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
+  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.om.compaction.service.enabled";
   public static final boolean OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT = false;
   public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
       "ozone.om.compaction.service.run.interval";

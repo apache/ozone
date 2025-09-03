@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -76,6 +77,7 @@ public class NSSummaryTask implements ReconOmTask {
 
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager reconOMMetadataManager;
+  private final OzoneConfiguration ozoneConfiguration;
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
@@ -98,6 +100,7 @@ public class NSSummaryTask implements ReconOmTask {
                        ozoneConfiguration) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+    this.ozoneConfiguration = ozoneConfiguration;
     long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
@@ -110,6 +113,14 @@ public class NSSummaryTask implements ReconOmTask {
         ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
     this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold);
+  }
+
+  @Override
+  public NSSummaryTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    ReconNamespaceSummaryManager stagedNsSummaryManager =
+        reconNamespaceSummaryManager.getStagedNsSummaryManager(stagedReconDbStore);
+    return new NSSummaryTask(stagedNsSummaryManager, stagedOmMetadataManager, ozoneConfiguration);
   }
 
   @Override

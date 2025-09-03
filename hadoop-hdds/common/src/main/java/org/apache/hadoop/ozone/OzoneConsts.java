@@ -88,6 +88,7 @@ public final class OzoneConsts {
   public static final Path ROOT_PATH = Paths.get(OZONE_ROOT);
 
   public static final String CONTAINER_EXTENSION = ".container";
+  public static final String CONTAINER_DATA_CHECKSUM_EXTENSION = ".tree";
   public static final String CONTAINER_META_PATH = "metadata";
   public static final String CONTAINER_TEMPORARY_CHUNK_PREFIX = "tmp";
   public static final String CONTAINER_CHUNK_NAME_DELIMITER = ".";
@@ -141,6 +142,7 @@ public final class OzoneConsts {
   public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
   public static final String PENDING_DELETE_BLOCK_COUNT =
       "#PENDINGDELETEBLOCKCOUNT";
+  public static final String CONTAINER_DATA_CHECKSUM = "#DATACHECKSUM";
 
   /**
    * OM LevelDB prefixes.

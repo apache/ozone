@@ -92,7 +92,6 @@ public final class TestSecretKeySnapshot {
   private File workDir;
   private File ozoneKeytab;
   private File spnegoKeytab;
-  private String host;
   private MiniOzoneHAClusterImpl cluster;
 
   @BeforeEach
@@ -160,8 +159,8 @@ public final class TestSecretKeySnapshot {
 
   private void setSecureConfig() throws IOException {
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
+    String host = InetAddress.getLocalHost().getCanonicalHostName()
+                      .toLowerCase();
 
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
 
