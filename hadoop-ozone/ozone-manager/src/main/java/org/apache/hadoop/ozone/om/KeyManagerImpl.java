@@ -80,6 +80,7 @@ import static org.apache.hadoop.util.Time.monotonicNow;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -173,7 +174,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
-import org.apache.hadoop.util.Lists;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -186,7 +186,6 @@ import org.slf4j.LoggerFactory;
 public class KeyManagerImpl implements KeyManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyManagerImpl.class);
-  public static final int DISABLE_VALUE = -1;
 
   /**
    * A SCM block client, used to talk to SCM to allocate block during putKey.
@@ -214,7 +213,7 @@ public class KeyManagerImpl implements KeyManager {
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OzoneConfiguration conf, OMPerformanceMetrics metrics) {
-    this (om, scmClient, om.getMetadataManager(), conf,
+    this(om, scmClient, om.getMetadataManager(), conf,
         om.getBlockTokenMgr(), om.getKmsProvider(), metrics);
   }
 
@@ -306,21 +305,7 @@ public class KeyManagerImpl implements KeyManager {
 
     if (snapshotSstFilteringService == null &&
         ozoneManager.isFilesystemSnapshotEnabled()) {
-
-      long serviceInterval = configuration.getTimeDuration(
-          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
-          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      long serviceTimeout = configuration.getTimeDuration(
-          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
-          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      if (isSstFilteringSvcEnabled()) {
-        snapshotSstFilteringService =
-            new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
-                serviceTimeout, ozoneManager, configuration);
-        snapshotSstFilteringService.start();
-      }
+      startSnapshotSstFilteringService(configuration);
     }
 
     if (snapshotDeletingService == null &&
@@ -368,6 +353,42 @@ public class KeyManagerImpl implements KeyManager {
     dnsToSwitchMapping =
         ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
             : new CachedDNSToSwitchMapping(newInstance));
+  }
+
+  /**
+   * Start the snapshot SST filtering service if interval is not set to disabled value.
+   * @param conf
+   */
+  public void startSnapshotSstFilteringService(OzoneConfiguration conf) {
+    if (isSstFilteringSvcEnabled()) {
+      long serviceInterval = conf.getTimeDuration(
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
+          TimeUnit.MILLISECONDS);
+      long serviceTimeout = conf.getTimeDuration(
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT,
+          OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT,
+          TimeUnit.MILLISECONDS);
+
+      snapshotSstFilteringService =
+          new SstFilteringService(serviceInterval, TimeUnit.MILLISECONDS,
+              serviceTimeout, ozoneManager, conf);
+      snapshotSstFilteringService.start();
+    } else {
+      LOG.info("SstFilteringService is disabled.");
+    }
+  }
+
+  /**
+   * Stop the snapshot SST filtering service if it is running.
+   */
+  public void stopSnapshotSstFilteringService() {
+    if (snapshotSstFilteringService != null) {
+      snapshotSstFilteringService.shutdown();
+      snapshotSstFilteringService = null;
+    } else {
+      LOG.info("SstFilteringService is already stopped or not started.");
+    }
   }
 
   private void startCompactionService(OzoneConfiguration configuration,
@@ -710,19 +731,21 @@ public class KeyManagerImpl implements KeyManager {
 
   @Override
   public PendingKeysDeletion getPendingDeletionKeys(
-      final CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, final int count,
-      int ratisByteLimit) throws IOException {
-    return getPendingDeletionKeys(null, null, null, filter, count, ratisByteLimit);
+      final CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter, final int count)
+      throws IOException {
+    return getPendingDeletionKeys(null, null, null, filter, count);
   }
 
   @Override
   public PendingKeysDeletion getPendingDeletionKeys(
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
-      int count, int ratisByteLimit) throws IOException {
+      int count) throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
-    long serializedSize = 0;
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
+    Map<String, Long> keyBlockReplicatedSize = new HashMap<>();
+    int notReclaimableKeyCount = 0;
+
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
@@ -735,7 +758,6 @@ public class KeyManagerImpl implements KeyManager {
         delKeyIter.seek(startKey);
       }
       int currentCount = 0;
-      boolean maxReqSizeExceeded = false;
       while (delKeyIter.hasNext() && currentCount < count) {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
@@ -752,26 +774,12 @@ public class KeyManagerImpl implements KeyManager {
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
                   .addAllBlockIDs(blockIDS).build();
-              int keyBlockSerializedSize = keyBlocks.getProto().getSerializedSize();
-              serializedSize += keyBlockSerializedSize;
-              if (serializedSize > ratisByteLimit) {
-                maxReqSizeExceeded = true;
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug(
-                      "Total size of cumulative keys and rename entries in the snapshotRenamedTable in a cycle " +
-                          "crossed 90% ratis limit, serialized size of keys: {}",
-                      serializedSize);
-                }
-                break;
-              }
+              keyBlockReplicatedSize.put(keyBlocks.getGroupID(), info.getReplicatedSize());
               blockGroupList.add(keyBlocks);
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);
             }
-          }
-          if (maxReqSizeExceeded) {
-            break;
           }
 
           List<OmKeyInfo> notReclaimableKeyInfoList = notReclaimableKeyInfo.getOmKeyInfoList();
@@ -782,19 +790,19 @@ public class KeyManagerImpl implements KeyManager {
             keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
           }
           keyBlocksList.addAll(blockGroupList);
+          notReclaimableKeyCount += notReclaimableKeyInfoList.size();
         }
       }
     }
-    return new PendingKeysDeletion(keyBlocksList, keysToModify);
+    return new PendingKeysDeletion(keyBlocksList, keysToModify, keyBlockReplicatedSize, notReclaimableKeyCount);
   }
 
   private <V, R> List<KeyValue<String, R>> getTableEntries(String startKey,
           TableIterator<String, ? extends KeyValue<String, V>> tableIterator,
           Function<V, R> valueFunction,
           CheckedFunction<KeyValue<String, V>, Boolean, IOException> filter,
-          int size, int ratisLimit) throws IOException {
+          int size) throws IOException {
     List<KeyValue<String, R>> entries = new ArrayList<>();
-    int consumedSize = 0;
     /* Seek to the start key if it's not null. The next key in queue is ensured to start with the bucket
          prefix, {@link org.apache.hadoop.hdds.utils.db.Table#iterator(bucketPrefix)} would ensure this.
     */
@@ -807,13 +815,8 @@ public class KeyManagerImpl implements KeyManager {
     while (tableIterator.hasNext() && currentCount < size) {
       KeyValue<String, V> kv = tableIterator.next();
       if (kv != null && filter.apply(kv)) {
-        consumedSize += kv.getValueByteSize();
-        entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue()), kv.getValueByteSize()));
+        entries.add(Table.newKeyValue(kv.getKey(), valueFunction.apply(kv.getValue())));
         currentCount++;
-        if (consumedSize > ratisLimit) {
-          LOG.info("Serialized size exceeded the ratis limit, current serailized size : {}", consumedSize);
-          break;
-        }
       }
     }
     return entries;
@@ -834,12 +837,11 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public List<KeyValue<String, String>> getRenamesKeyEntries(
       String volume, String bucket, String startKey,
-      CheckedFunction<KeyValue<String, String>, Boolean, IOException> filter, int size, int ratisLimit)
-      throws IOException {
+      CheckedFunction<KeyValue<String, String>, Boolean, IOException> filter, int size) throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends KeyValue<String, String>>
              renamedKeyIter = metadataManager.getSnapshotRenamedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size, ratisLimit);
+      return getTableEntries(startKey, renamedKeyIter, Function.identity(), filter, size);
     }
   }
 
@@ -885,11 +887,11 @@ public class KeyManagerImpl implements KeyManager {
   public List<KeyValue<String, List<OmKeyInfo>>> getDeletedKeyEntries(
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter,
-      int size, int ratisLimit) throws IOException {
+      int size) throws IOException {
     Optional<String> bucketPrefix = getBucketPrefix(volume, bucket, false);
     try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
              delKeyIter = metadataManager.getDeletedTable().iterator(bucketPrefix.orElse(""))) {
-      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size, ratisLimit);
+      return getTableEntries(startKey, delKeyIter, RepeatedOmKeyInfo::cloneOmKeyInfoList, filter, size);
     }
   }
 
@@ -963,7 +965,8 @@ public class KeyManagerImpl implements KeyManager {
         .getTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
             OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
-    return serviceInterval != DISABLE_VALUE;
+    // any interval <= 0 causes IllegalArgumentException from scheduleWithFixedDelay
+    return serviceInterval > 0;
   }
   
   @Override
@@ -983,14 +986,12 @@ public class KeyManagerImpl implements KeyManager {
       OmMultipartUploadList.Builder resultBuilder = OmMultipartUploadList.newBuilder();
 
       if (withPagination && multipartUploadKeys.size() == maxUploads + 1) {
-        int lastIndex = multipartUploadKeys.size() - 1;
-        OmMultipartUpload lastUpload = multipartUploadKeys.get(lastIndex);
-        resultBuilder.setNextKeyMarker(lastUpload.getKeyName())
-            .setNextUploadIdMarker(lastUpload.getUploadId())
+        // Per spec, next markers should be the last element of the returned list, not the lookahead.
+        multipartUploadKeys.remove(multipartUploadKeys.size() - 1);
+        OmMultipartUpload lastReturned = multipartUploadKeys.get(multipartUploadKeys.size() - 1);
+        resultBuilder.setNextKeyMarker(lastReturned.getKeyName())
+            .setNextUploadIdMarker(lastReturned.getUploadId())
             .setIsTruncated(true);
-
-        // remove next upload from the list
-        multipartUploadKeys.remove(lastIndex);
       }
 
       return resultBuilder

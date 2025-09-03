@@ -16,22 +16,22 @@
  * limitations under the License.
  */
 
-import React, {useRef, useState} from 'react';
-import {AxiosError} from 'axios';
-import {Alert, Button, Tooltip} from 'antd';
-import {InfoCircleFilled, ReloadOutlined,} from '@ant-design/icons';
-import {ValueType} from 'react-select';
+import React, { useRef, useState } from 'react';
+import { AxiosError } from 'axios';
+import { Alert, Button, Tooltip } from 'antd';
+import { InfoCircleFilled, ReloadOutlined, } from '@ant-design/icons';
+import { ValueType } from 'react-select';
 
-import DUMetadata from '@/v2/components/duMetadata/duMetadata';
-import DUPieChart from '@/v2/components/plots/duPieChart';
-import SingleSelect, {Option} from '@/v2/components/select/singleSelect';
+import NUMetadata from '@/v2/components/nuMetadata/nuMetadata';
+import NUPieChart from '@/v2/components/plots/nuPieChart';
+import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import DUBreadcrumbNav from '@/v2/components/duBreadcrumbNav/duBreadcrumbNav';
-import {showDataFetchError} from '@/utils/common';
-import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
+import { showDataFetchError, showInfoNotification } from '@/utils/common';
+import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
 
-import {DUResponse} from '@/v2/types/diskUsage.types';
+import { NUResponse } from '@/v2/types/namespaceUsage.types';
 
-import './diskUsage.less';
+import './namespaceUsage.less';
 
 const LIMIT_OPTIONS: Option[] = [
   { label: '5', value: '5' },
@@ -41,10 +41,10 @@ const LIMIT_OPTIONS: Option[] = [
   { label: '30', value: '30' }
 ]
 
-const DiskUsage: React.FC<{}> = () => {
+const NamespaceUsage: React.FC<{}> = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [limit, setLimit] = useState<Option>(LIMIT_OPTIONS[1]);
-  const [duResponse, setDUResponse] = useState<DUResponse>({
+  const [duResponse, setDUResponse] = useState<NUResponse>({
     status: '',
     path: '/',
     subPathCount: 0,
@@ -57,6 +57,7 @@ const DiskUsage: React.FC<{}> = () => {
   const cancelPieSignal = useRef<AbortController>();
 
   function loadData(path: string) {
+    console.log("Loading data at: ", path);
     setLoading(true);
     const { request, controller } = AxiosGetHelper(
       `/api/v1/namespace/usage?path=${path}&files=true&sortSubPaths=true`,
@@ -65,11 +66,17 @@ const DiskUsage: React.FC<{}> = () => {
     cancelPieSignal.current = controller;
 
     request.then(response => {
-      const duResponse: DUResponse = response.data;
+      const duResponse: NUResponse = response.data;
+      console.log(duResponse);
       const status = duResponse.status;
       if (status === 'PATH_NOT_FOUND') {
         setLoading(false);
         showDataFetchError(`Invalid Path: ${path}`);
+        return;
+      }
+
+      if (status === 'INITIALIZING') {
+        showInfoNotification("Information being initialized", "Namespace Summary is being initialized, please wait.")
         return;
       }
 
@@ -115,7 +122,7 @@ const DiskUsage: React.FC<{}> = () => {
               justifyContent: 'space-between',
             }}>
             <DUBreadcrumbNav
-              path={duResponse.path}
+              path={duResponse.path ?? '/'}
               subPaths={duResponse.subPaths}
               updateHandler={loadData} />
             <Tooltip
@@ -134,7 +141,7 @@ const DiskUsage: React.FC<{}> = () => {
               onChange={handleLimitChange} />
           </div>
           <div className='du-content'>
-            <DUPieChart
+            <NUPieChart
               loading={loading}
               limit={Number.parseInt(limit.value)}
               path={duResponse.path}
@@ -142,7 +149,7 @@ const DiskUsage: React.FC<{}> = () => {
               subPaths={duResponse.subPaths}
               sizeWithReplica={duResponse.sizeWithReplica}
               size={duResponse.size} />
-            <DUMetadata path={duResponse.path} />
+            <NUMetadata path={duResponse.path} />
           </div>
         </div>
       </div>
@@ -150,4 +157,4 @@ const DiskUsage: React.FC<{}> = () => {
   );
 }
 
-export default DiskUsage;
+export default NamespaceUsage;

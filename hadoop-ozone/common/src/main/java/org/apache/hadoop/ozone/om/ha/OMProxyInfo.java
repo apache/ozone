@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
  * Class to store OM proxy information.
  */
 public class OMProxyInfo {
-  private String serviceId;
   private String nodeId;
   private String rpcAddrStr;
   private InetSocketAddress rpcAddr;
@@ -38,7 +37,6 @@ public class OMProxyInfo {
       LoggerFactory.getLogger(OMProxyInfo.class);
 
   OMProxyInfo(String serviceID, String nodeID, String rpcAddress) {
-    this.serviceId = serviceID;
     this.nodeId = nodeID;
     this.rpcAddrStr = rpcAddress;
     this.rpcAddr = NetUtils.createSocketAddr(rpcAddrStr);
@@ -46,7 +44,7 @@ public class OMProxyInfo {
       LOG.warn("OzoneManager address {} for serviceID {} remains unresolved " +
               "for node ID {} Check your ozone-site.xml file to ensure ozone " +
               "manager addresses are configured properly.",
-          rpcAddress, serviceId, nodeId);
+          rpcAddress, serviceID, nodeId);
       this.dtService = null;
     } else {
 

@@ -312,8 +312,8 @@
     <name>hdds.container.ratis.segment.size</name>
     <value>64MB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The size of the raft segment file used
-      by Apache Ratis on datanodes. (64 MB by default)
+    <description>The size of the raft segment file used by Apache Ratis
+      on datanodes. (64 MB by default)
     </description>
   </property>
   <property>
@@ -776,6 +776,16 @@
       SCM wraps up many blocks in a deletion transaction and sends that to data
       node for physical deletion periodically. This property determines how many
       times SCM is going to retry sending a deletion operation to the data node.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
+    <value>8</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      Factor with which number of delete blocks sent to each datanode in every interval.
+      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
+      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
     </description>
   </property>
   <property>
@@ -1525,7 +1535,7 @@
   </property>
 
   <property>
-    <name>ozone.compaction.service.enabled</name>
+    <name>ozone.om.compaction.service.enabled</name>
     <value>false</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
@@ -2153,10 +2163,10 @@
 
   <property>
     <name>ozone.om.ratis.segment.size</name>
-    <value>4MB</value>
+    <value>64MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the raft segment used by Apache Ratis on OM.
-      (4 MB by default)
+      (64 MB by default)
     </description>
   </property>
 
@@ -2165,7 +2175,7 @@
     <value>4MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on OM.(4 MB by default)
+      used by Apache Ratis on OM. (4 MB by default)
     </description>
   </property>
 
@@ -3488,6 +3498,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.om.event.buffer.capacity</name>
+    <value>20000</value>
+    <tag>OZONE, RECON, OM, PERFORMANCE</tag>
+    <description>
+      Maximum capacity of the event buffer used by Recon to queue OM delta updates
+      during task reinitialization. When tasks are being reprocessed on staging DB,
+      this buffer holds incoming delta updates to prevent blocking the OM sync process.
+      If the buffer overflows, task reinitialization will be triggered.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>
@@ -3856,10 +3877,10 @@
   </property>
   <property>
     <name>ozone.scm.ha.ratis.segment.size</name>
-    <value>4MB</value>
+    <value>64MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the raft segment used by Apache Ratis on
-      SCM. (4 MB by default)
+      SCM. (64 MB by default)
     </description>
   </property>
   <property>
@@ -3867,7 +3888,7 @@
     <value>4MB</value>
     <tag>SCM, OZONE, HA, RATIS</tag>
     <description>The size of the buffer which is preallocated for
-      raft segment used by Apache Ratis on SCM.(4 MB by default)
+      raft segment used by Apache Ratis on SCM. (4 MB by default)
     </description>
   </property>
   <property>
@@ -3996,7 +4017,7 @@
   </property>
   <property>
     <name>ozone.scm.ha.dbtransactionbuffer.flush.interval</name>
-    <value>600s</value>
+    <value>60s</value>
     <tag>SCM, OZONE</tag>
     <description>Wait duration for flush of buffered transaction.</description>
   </property>
