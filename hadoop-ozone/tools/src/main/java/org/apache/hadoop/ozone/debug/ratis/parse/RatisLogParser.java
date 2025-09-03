@@ -37,8 +37,9 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true)
 public class RatisLogParser extends BaseLogParser implements Callable<Void> {
   @CommandLine.Option(names = {"--role"},
-      required = true,
-      description = "Component role for parsing. Values: om, scm, datanode, generic")
+      defaultValue = "generic",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS,
+      description = "Component role for parsing. Values: om, scm, datanode")
   private String role;
 
   private static final RaftGroupId DUMMY_PIPELINE_ID =
@@ -65,13 +66,10 @@ public class RatisLogParser extends BaseLogParser implements Callable<Void> {
       System.out.println("Using Dummy PipelineID:" + DUMMY_PIPELINE_ID + "\n\n");
       parseRatisLogs(RatisLogParser::smToContainerLogString);
       break;
-    case "generic":
+    default:
       System.out.println("Dumping Generic Ratis Log");
       parseRatisLogs(null);
       break;
-    default:
-      System.err.println("Invalid role: " + role + ". Supported roles are: om, scm, datanode, generic");
-      return null;
     }
     return null;
   }

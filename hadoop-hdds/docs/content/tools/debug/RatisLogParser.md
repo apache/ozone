@@ -22,14 +22,14 @@ weight: 5
   limitations under the License.
 -->
 
-The Ratis log parser tool takes a role and a segment file as input and gives a human-readable output.
+The Ratis log parser tool takes a segment file as input and gives a human-readable output.
 It can be used to parse Ratis logs from different components by specifying the corresponding role.
 ```bash
-Usage: ozone debug ratis parse [-hV] [--verbose] --role=<role> -s=<segmentFile>
+Usage: ozone debug ratis parse [-hV] [--verbose] [--role=<role>] -s=<segmentFile>
 Shell for printing Ratis Log in understandable text
   -h, --help          Show this help message and exit.
-      --role=<role>   Dump the specified role ratis segment file. Format: [om,
-                        scm, datanode, generic]
+      --role=<role>   Component role for parsing. Values: om, scm, datanode
+                        Default: generic
   -s, --segmentPath, --segment-path=<segmentFile>
                       Path of the segment file
   -V, --version       Print version information and exit.
