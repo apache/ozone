@@ -117,8 +117,9 @@ public class ContainerMerkleTreeMetrics {
   }
 
   public void incrementDivergedDeletedBlocksIdentified(long value) {
-    this.numCorruptChunksIdentified.incr(value);
+    this.numDivergedDeletedBlocksIdentified.incr(value);
   }
+
 
   public MutableRate getWriteContainerMerkleTreeLatencyNS() {
     return this.merkleTreeWriteLatencyNS;
