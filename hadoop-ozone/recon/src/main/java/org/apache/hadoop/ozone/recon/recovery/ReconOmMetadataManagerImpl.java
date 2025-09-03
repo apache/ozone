@@ -74,8 +74,10 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     this.ozoneConfiguration = configuration;
   }
 
-  private ReconOmMetadataManagerImpl(OzoneConfiguration configuration, File dir, String name) throws IOException {
+  private ReconOmMetadataManagerImpl(OzoneConfiguration configuration, File dir, String name, ReconUtils reconUtils)
+      throws IOException {
     super(configuration, dir, name);
+    this.reconUtils = reconUtils;
     this.ozoneConfiguration = configuration;
   }
 
@@ -94,7 +96,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       throw new IllegalStateException("DB checkpoint dir name should not "
           + "have been null. Checkpoint path is " + path);
     }
-    return new ReconOmMetadataManagerImpl(conf, dir, name.toString());
+    return new ReconOmMetadataManagerImpl(conf, dir, name.toString(), new ReconUtils());
   }
 
   @Override

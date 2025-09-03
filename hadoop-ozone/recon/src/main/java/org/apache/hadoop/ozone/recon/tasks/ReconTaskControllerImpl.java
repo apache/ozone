@@ -35,12 +35,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -80,10 +83,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private volatile ReconOMMetadataManager currentOMMetadataManager;
   private final OzoneConfiguration configuration;
   
-  // Retry logic for checkpoint creation
-  private int eventProcessRetryCount = 0;
-  private long lastCheckpointRetryTimestamp = 0;
-  private static final int MAX_EVENT_PROCESS_RETRIES = 3;
+  // Retry logic for event processing failures
+  private AtomicInteger eventProcessRetryCount = new AtomicInteger(0);
+  private AtomicLong lastRetryTimestamp = new AtomicLong(0);
+  private static final int MAX_EVENT_PROCESS_RETRIES = 6;
   private static final long RETRY_DELAY_MS = 2000; // 2 seconds
 
   @Inject
@@ -456,8 +459,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   public boolean hasEventBufferOverflowed() {
     return eventBuffer.getDroppedBatches() > 0;
   }
-  
-  @Override
+
+  /**
+   * Reset the event buffer overflow flag after full snapshot is completed.
+   */
   public void resetEventBufferOverflowFlag() {
     eventBuffer.resetDroppedBatches();
   }
@@ -466,8 +471,10 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   public boolean hasTasksFailed() {
     return tasksFailed.get();
   }
-  
-  @Override
+
+  /**
+   * Reset the task(s) failure flag after reinitialization is completed.
+   */
   public void resetTasksFailureFlag() {
     tasksFailed.compareAndSet(true, false);
   }
@@ -476,11 +483,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   public synchronized ReconTaskController.ReInitializationResult queueReInitializationEvent(
       ReconTaskReInitializationEvent.ReInitializationReason reason) {
     LOG.info("Queueing task reinitialization event due to: {} (retry attempt count: {})", reason,
-        eventProcessRetryCount);
+        eventProcessRetryCount.get());
 
-    Long currentTime = validateRetryCountAndDelay();
-    if (currentTime == null) {
-      return ReInitializationResult.RETRY_LATER;
+    ReInitializationResult reInitializationResult = validateRetryCountAndDelay();
+    if (reInitializationResult == ReInitializationResult.MAX_RETRIES_EXCEEDED) {
+      return reInitializationResult;
     }
 
     // Drain all events in buffer and cleanup any existing checkpoints before falling back to full snapshot.
@@ -492,13 +499,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     ReconOMMetadataManager checkpointedOMMetadataManager = null;
     
     try {
-      LOG.info("Attempting checkpoint creation (retry attempt: {})", eventProcessRetryCount + 1);
+      LOG.info("Attempting checkpoint creation (retry attempt: {})", eventProcessRetryCount.get() + 1);
       checkpointedOMMetadataManager = createOMCheckpoint(currentOMMetadataManager);
       LOG.info("Checkpoint creation succeeded");
     } catch (IOException e) {
       LOG.error("Checkpoint creation failed: {}", e.getMessage());
-      handleEventFailure(currentTime);
-      return getEventRetryResult();
+      handleEventFailure();
+      return ReInitializationResult.RETRY_LATER;
     }
 
     // Create and queue the reinitialization event with checkpointed metadata manager
@@ -509,37 +516,37 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     // so that we can resume queuing the delta events.
     if (queued) {
       resetEventFlags();
-      resetRetryCounters();
       // Success - reset retry counters and flags
-      LOG.info("Successfully queued reinitialization event after {} retries", eventProcessRetryCount + 1);
+      LOG.info("Successfully queued reinitialization event after {} retries", eventProcessRetryCount.get() + 1);
       return ReconTaskController.ReInitializationResult.SUCCESS;
     }
     return null;
   }
 
-  private Long validateRetryCountAndDelay() {
+  private ReconTaskController.ReInitializationResult validateRetryCountAndDelay() {
     // Check if we should retry based on timing for iteration-based retries
     long currentTime = System.currentTimeMillis();
-    if (eventProcessRetryCount > 0) {
+    if (eventProcessRetryCount.get() > 0) {
       // Check if 2 seconds have passed since last iteration
-      long timeSinceLastRetry = currentTime - lastCheckpointRetryTimestamp;
+      long timeSinceLastRetry = currentTime - lastRetryTimestamp.get();
       if (timeSinceLastRetry < RETRY_DELAY_MS) {
-        LOG.debug("Skipping checkpoint creation retry, only {}ms since last retry attempt (need {}ms)",
+        LOG.debug("Skipping retry, only {}ms since last retry attempt (need {}ms)",
             timeSinceLastRetry, RETRY_DELAY_MS);
-        return null;
+        return ReInitializationResult.RETRY_LATER;
       }
-      LOG.info("Attempting retry for checkpoint creation (retry attempt count: {}, delay: {}ms)",
-          eventProcessRetryCount + 1, timeSinceLastRetry);
+      LOG.info("Attempting retry (retry attempt count: {}, delay: {}ms)",
+          eventProcessRetryCount.get() + 1, timeSinceLastRetry);
     }
-    return currentTime;
+    return getEventRetryResult();
   }
 
   /**
    * Handle iteration failure by updating retry counters.
    */
-  private void handleEventFailure(long currentTime) {
-    eventProcessRetryCount++;
-    lastCheckpointRetryTimestamp = currentTime;
+  private void handleEventFailure() {
+    long currentTime = System.currentTimeMillis();
+    lastRetryTimestamp.set(currentTime);
+    eventProcessRetryCount.getAndIncrement();
     LOG.error("Event processing failed {} times.", eventProcessRetryCount);
   }
   
@@ -547,15 +554,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * Determine the appropriate retry result based on current event retry count.
    */
   private ReconTaskController.ReInitializationResult getEventRetryResult() {
-    if (eventProcessRetryCount >= MAX_EVENT_PROCESS_RETRIES) {
+    if (eventProcessRetryCount.get() >= MAX_EVENT_PROCESS_RETRIES) {
       LOG.warn("Maximum iteration retries ({}) exceeded, resetting counters and signaling full snapshot fallback",
           MAX_EVENT_PROCESS_RETRIES);
-      eventProcessRetryCount = 0;
-      lastCheckpointRetryTimestamp = 0;
+      resetRetryCounters();
       return ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED;
-    } else {
-      return ReconTaskController.ReInitializationResult.RETRY_LATER;
     }
+    return null;
   }
 
   public void drainEventBufferAndCleanExistingCheckpoints() {
@@ -583,17 +588,19 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public void updateOMMetadataManager(ReconOMMetadataManager omMetadataManager) {
     LOG.info("Updating OM metadata manager");
-    
-    // Clean up any pre-existing checkpoint directories when setting new manager
-    if (omMetadataManager != null) {
-      cleanupPreExistingCheckpoints();
-    }
-    
     this.currentOMMetadataManager = omMetadataManager;
   }
 
-  @Override
-  public ReconOMMetadataManager createOMCheckpoint(ReconOMMetadataManager omMetaManager) 
+  /**
+   * Create a checkpoint of the current OM metadata manager.
+   * This method creates a snapshot of the current OM database state
+   * to prevent data inconsistency during reinitialization.
+   *
+   * @param omMetaManager the OM metadata manager to checkpoint
+   * @return a checkpointed ReconOMMetadataManager instance
+   * @throws IOException if checkpoint creation fails
+   */
+  public ReconOMMetadataManager createOMCheckpoint(ReconOMMetadataManager omMetaManager)
       throws IOException {
     // Create temporary directory for checkpoint
     String parentPath = cleanTempCheckPointPath(omMetaManager);
@@ -622,7 +629,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       throw new NullPointerException("Parent OM DB dir is null");
     }
     File reinitTmpPath =
-        Paths.get(tempData, "temp-recon-reinit-checkpoint" + "_" + System.currentTimeMillis()).toFile();
+        Paths.get(tempData, "temp-recon-reinit-checkpoint" + "_" + UUID.randomUUID()).toFile();
     FileUtils.deleteDirectory(reinitTmpPath);
     FileUtils.forceMkdir(reinitTmpPath);
     return reinitTmpPath.toString();
@@ -635,35 +642,34 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     LOG.info("Processing reinitialization event: reason={}, timestamp={}", 
         event.getReason(), event.getTimestamp());
     resetTasksFailureFlag();
+    // Use the checkpointed OM metadata manager for reinitialization to prevent data inconsistency
+    ReconOMMetadataManager checkpointedOMMetadataManager = event.getCheckpointedOMMetadataManager();
     try {
-      // Use the checkpointed OM metadata manager for reinitialization to prevent data inconsistency
-      ReconOMMetadataManager checkpointedOMMetadataManager = event.getCheckpointedOMMetadataManager();
       if (checkpointedOMMetadataManager != null) {
         LOG.info("Starting async task reinitialization with checkpointed OM metadata manager due to: {}",
                  event.getReason());
         boolean isRunSuccessful = reInitializeTasks(checkpointedOMMetadataManager, null);
         if (!isRunSuccessful) {
           // Setting this taskFailed flag as true here will block consuming delta events and stop buffering events
-          // in eventBuffer until we successfully queue a reinit event and also reprocess all the tasks of
-          // the reinit event succeed.
+          // in eventBuffer until we successfully queue a new reinit event again.
           tasksFailed.compareAndSet(false, true);
+          handleEventFailure();
           LOG.error("Task reinitialization failed, tasksFailed flag set to true");
         } else {
           resetEventFlags();
           resetRetryCounters();
           LOG.info("Completed async task reinitialization");
         }
-        
-        // Clean up the checkpointed metadata manager and its files after use
-        cleanupCheckpoint(checkpointedOMMetadataManager);
       } else {
         LOG.error("Checkpointed OM metadata manager is null, cannot perform reinitialization");
         return;
       }
       LOG.info("Completed processing reinitialization event: {}", event.getReason());
-
     } catch (Exception e) {
       LOG.error("Error processing reinitialization event", e);
+    } finally {
+      // Clean up the checkpointed metadata manager and its files after use
+      cleanupCheckpoint(checkpointedOMMetadataManager);
     }
   }
 
@@ -688,8 +694,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    */
   @VisibleForTesting
   void resetRetryCounters() {
-    eventProcessRetryCount = 0;
-    lastCheckpointRetryTimestamp = 0;
+    eventProcessRetryCount.set(0);
+    lastRetryTimestamp.set(0);
   }
   
   /**
@@ -697,7 +703,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    */
   @VisibleForTesting  
   int getEventProcessRetryCount() {
-    return eventProcessRetryCount;
+    return eventProcessRetryCount.get();
   }
   
   /**

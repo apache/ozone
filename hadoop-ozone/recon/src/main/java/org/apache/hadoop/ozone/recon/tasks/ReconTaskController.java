@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -86,21 +85,11 @@ public interface ReconTaskController {
   boolean hasEventBufferOverflowed();
 
   /**
-   * Reset the event buffer overflow flag after full snapshot is completed.
-   */
-  void resetEventBufferOverflowFlag();
-
-  /**
    * Check if task(s) have failed and need reinitialization.
    * 
    * @return true if task(s) failed after retry
    */
   boolean hasTasksFailed();
-
-  /**
-   * Reset the task(s) failure flag after reinitialization is completed.
-   */
-  void resetTasksFailureFlag();
 
   /**
    * Queue a task reinitialization event to be processed asynchronously.
@@ -113,17 +102,6 @@ public interface ReconTaskController {
    */
   ReInitializationResult queueReInitializationEvent(ReconTaskReInitializationEvent.ReInitializationReason reason);
 
-  /**
-   * Create a checkpoint of the current OM metadata manager.
-   * This method creates a snapshot of the current OM database state 
-   * to prevent data inconsistency during reinitialization.
-   * 
-   * @param omMetaManager the OM metadata manager to checkpoint
-   * @return a checkpointed ReconOMMetadataManager instance
-   * @throws IOException if checkpoint creation fails
-   */
-  ReconOMMetadataManager createOMCheckpoint(ReconOMMetadataManager omMetaManager) throws IOException;
-  
   /**
    * Update the current OM metadata manager reference for reinitialization.
    * 

@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
@@ -584,7 +585,7 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   private ReconTaskController getMockTaskController() {
-    ReconTaskController mockController = mock(ReconTaskController.class);
+    ReconTaskControllerImpl mockController = mock(ReconTaskControllerImpl.class);
     // Mock the new methods added to ReconTaskController interface
     when(mockController.queueReInitializationEvent(any())).thenReturn(
         ReconTaskController.ReInitializationResult.SUCCESS);
