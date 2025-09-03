@@ -117,8 +117,6 @@ public class OzoneManagerServiceProviderImpl
       LoggerFactory.getLogger(OzoneManagerServiceProviderImpl.class);
   private URLConnectionFactory connectionFactory;
 
-  private int omDBTarProcessorThreadCount; // Number of parallel workers
-
   private File omSnapshotDBParentDir = null;
   private File reconDbDir = null;
   private String omDBSnapshotUrl;
@@ -227,7 +225,8 @@ public class OzoneManagerServiceProviderImpl
     this.threadFactory =
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "SyncOM-%d")
             .build();
-    this.omDBTarProcessorThreadCount = Math.max(64, Runtime.getRuntime().availableProcessors());
+    // Number of parallel workers
+    int omDBTarProcessorThreadCount = Math.max(64, Runtime.getRuntime().availableProcessors());
     this.reconContext = reconContext;
     this.taskStatusUpdaterManager = taskStatusUpdaterManager;
     this.omDBLagThreshold = configuration.getLong(RECON_OM_DELTA_UPDATE_LAG_THRESHOLD,

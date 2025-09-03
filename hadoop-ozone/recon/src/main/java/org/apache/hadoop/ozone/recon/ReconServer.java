@@ -82,7 +82,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   private ReconDBProvider reconDBProvider;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OzoneStorageContainerManager reconStorageContainerManager;
-  private ReconSafeModeManager reconSafeModeMgr;
   private OzoneConfiguration configuration;
   private ReconStorageConfig reconStorage;
   private CertificateClient certClient;
@@ -147,8 +146,8 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
 
-      this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
-      this.reconSafeModeMgr.setInSafeMode(true);
+      ReconSafeModeManager reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
+      reconSafeModeMgr.setInSafeMode(true);
       httpServer = injector.getInstance(ReconHttpServer.class);
       this.ozoneManagerServiceProvider =
           injector.getInstance(OzoneManagerServiceProvider.class);

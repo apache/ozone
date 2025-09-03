@@ -59,7 +59,6 @@ import org.junit.jupiter.api.Test;
 public class TestClosePipelineCommandHandler {
 
   private OzoneContainer ozoneContainer;
-  private StateContext stateContext;
   private SCMConnectionManager connectionManager;
   private RaftClient raftClient;
   private GroupManagementApi raftClientGroupManager;
@@ -83,7 +82,7 @@ public class TestClosePipelineCommandHandler {
     final PipelineID pipelineID = PipelineID.randomId();
     final SCMCommand<ClosePipelineCommandProto> command =
         new ClosePipelineCommand(pipelineID);
-    stateContext = ContainerTestUtils.getMockContext(currentDatanode, conf);
+    StateContext stateContext = ContainerTestUtils.getMockContext(currentDatanode, conf);
 
     final boolean shouldDeleteRatisLogDirectory = true;
     XceiverServerRatis writeChannel = mock(XceiverServerRatis.class);
@@ -115,7 +114,7 @@ public class TestClosePipelineCommandHandler {
     final PipelineID pipelineID = PipelineID.randomId();
     final SCMCommand<ClosePipelineCommandProto> command =
         new ClosePipelineCommand(pipelineID);
-    stateContext = ContainerTestUtils.getMockContext(currentDatanode, conf);
+    StateContext stateContext = ContainerTestUtils.getMockContext(currentDatanode, conf);
 
     XceiverServerRatis writeChannel = mock(XceiverServerRatis.class);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);

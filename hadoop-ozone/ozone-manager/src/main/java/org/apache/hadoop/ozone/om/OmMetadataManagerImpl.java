@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -1027,8 +1028,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     } else {
       seekPrefix = getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
     }
-    int currentCount = 0;
-
 
     TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> iterator =
@@ -1056,6 +1055,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         cacheKeyMap.put(key, omKeyInfo);
       }
     }
+
+    int currentCount = 0;
     long readFromRDbStartNs, readFromRDbStopNs = 0;
     // Get maxKeys from DB if it has.
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
@@ -1074,7 +1075,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           CacheValue<OmKeyInfo> cacheValue =
               keyTable.getCacheValue(new CacheKey<>(kv.getKey()));
           if (cacheValue == null || cacheValue.getCacheValue() != null) {
-            cacheKeyMap.put(kv.getKey(), kv.getValue());
+            // We use putIfAbsent since cache entry should be more up-to-date and should not be overwritten
+            //  by the outdated DB entry
+            cacheKeyMap.putIfAbsent(kv.getKey(), kv.getValue());
             currentCount++;
           }
         } else {
@@ -1506,6 +1509,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return count;
   }
 
+  /**
+   * Get the merged and paginated list of multipart upload keys from cache and DB.
+   * Only return at most maxUploads + 1 keys (lexicographical order).
+   */
   @Override
   public List<OmMultipartUpload> getMultipartUploadKeys(
       String volumeName, String bucketName, String prefix, String keyMarker,
@@ -1522,6 +1529,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       if (StringUtils.isNotBlank(uploadIdMarker)) {
         prefix = prefix + OM_KEY_PREFIX + uploadIdMarker;
       }
+      // - If upload-id-marker is not specified,
+      // only the keys lexicographically greater than the specified key-marker will be included in the list.
+      // - If upload-id-marker is specified,
+      // any multipart uploads for a key equal to the key-marker might also be included,
+      // provided those multipart uploads have upload IDs lexicographically greater than the specified upload-id-marker.
+      prefix = getLexicographicallyHigherString(prefix);
     }
     String seekKey = OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
 
@@ -1551,6 +1564,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         iterator = getMultipartInfoTable().iterator(prefixKey)) {
       iterator.seek(seekKey);
 
+      // Try to get maxUploads + 1 keys to check if the list is truncated.
       while (iterator.hasNext() && (noPagination || dbKeysCount < maxUploads + 1)) {
         KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
         // If it is marked for abort, skip it.
