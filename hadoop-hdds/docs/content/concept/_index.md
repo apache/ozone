@@ -26,10 +26,8 @@ weight: 3
 {{<jumbotron title="Ozone Architecture">}}
 
 Ozone's architectural elements are explained in the following pages. The
-metadata layer, data layer, protocol bus, replication layer and Recon are
+metadata layer, data layer, protocol bus, replication layer and Recon  are
 discussed in the following pages. These concepts are useful if you want to
 understand how ozone works in depth.
-
-*   [RocksDB](RocksDB.md)
 
 {{</jumbotron>}}
