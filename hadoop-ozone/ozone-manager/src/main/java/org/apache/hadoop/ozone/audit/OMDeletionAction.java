@@ -18,11 +18,15 @@
 package org.apache.hadoop.ozone.audit;
 
 /**
- * Enum to define Audit Action types for system audit in OzoneManager. This will in addition to OMAction
- * as present for request.
+ * Enum to define Audit Action types for OM Deletion Services.
  */
-public enum OMSystemAction implements AuditAction {
-  STARTUP;
+public enum OMDeletionAction implements AuditAction {
+
+  DIRECTORY_DELETION,
+  KEY_DELETION,
+  SNAPSHOT_DELETION,
+  SNAPSHOT_MOVE_DEL_KEYS,
+  SNAPSHOT_PURGE;
 
   @Override
   public String getAction() {

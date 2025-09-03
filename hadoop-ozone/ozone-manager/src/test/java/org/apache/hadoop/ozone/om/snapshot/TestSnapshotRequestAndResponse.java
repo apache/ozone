@@ -167,6 +167,12 @@ public class TestSnapshotRequestAndResponse {
     AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+
+    AuditMessage mockAuditMessage = mock(AuditMessage.class);
+    when(mockAuditMessage.getOp()).thenReturn("MOCK_OP");
+    when(ozoneManager.buildAuditMessageForSuccess(any(), any())).thenReturn(mockAuditMessage);
+    when(ozoneManager.buildAuditMessageForFailure(any(), any(), any())).thenReturn(mockAuditMessage);
+
     batchOperation = omMetadataManager.getStore().initBatchOperation();
 
     volumeName = UUID.randomUUID().toString();

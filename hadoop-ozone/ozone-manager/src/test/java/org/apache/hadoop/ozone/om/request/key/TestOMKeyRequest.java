@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -162,6 +163,11 @@ public class TestOMKeyRequest {
         new OmBucketInfo.Builder().setVolumeName("").setBucketName("").build());
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
+    AuditMessage mockAuditMessage = mock(AuditMessage.class);
+    when(mockAuditMessage.getOp()).thenReturn("MOCK_OP");
+    when(ozoneManager.buildAuditMessageForSuccess(any(), any())).thenReturn(mockAuditMessage);
+    when(ozoneManager.buildAuditMessageForFailure(any(), any(), any())).thenReturn(mockAuditMessage);
+
     setupReplicationConfigValidation(ozoneManager, ozoneConfiguration);
 
     scmClient = mock(ScmClient.class);
@@ -223,8 +229,14 @@ public class TestOMKeyRequest {
           return allocatedBlocks;
         });
 
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(1L)
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
+        .setPipelineID(pipeline.getId())
+        .build();
     ContainerWithPipeline containerWithPipeline =
-        new ContainerWithPipeline(Mockito.mock(ContainerInfo.class), pipeline);
+        new ContainerWithPipeline(containerInfo, pipeline);
     when(scmContainerLocationProtocol.getContainerWithPipeline(anyLong())).thenReturn(containerWithPipeline);
 
     volumeName = UUID.randomUUID().toString();
