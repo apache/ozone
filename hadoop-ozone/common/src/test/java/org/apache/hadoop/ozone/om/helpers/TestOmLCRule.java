@@ -47,6 +47,7 @@ class TestOmLCRule {
 
   @Test
   public void testCreateValidOmLCRule() throws OMException {
+    long currentTime = System.currentTimeMillis();
     OmLCExpiration exp = new OmLCExpiration.Builder()
         .setDays(30)
         .build();
@@ -56,13 +57,14 @@ class TestOmLCRule {
         .setEnabled(true)
         .setPrefix("/spark/logs")
         .setAction(exp);
-    assertDoesNotThrow(r1::build);
+    assertDoesNotThrow(() -> r1.build().valid(BucketLayout.DEFAULT, currentTime));
 
     OmLCRule.Builder r2 = new OmLCRule.Builder()
         .setEnabled(true)
         .setPrefix("")
         .setAction(exp);
     OmLCRule omLCRule = assertDoesNotThrow(r2::build);
+    assertDoesNotThrow(() -> omLCRule.valid(BucketLayout.DEFAULT, currentTime));
 
     // Empty id should generate a 48 (default) bit one.
     assertEquals(OmLCRule.LC_ID_LENGTH, omLCRule.getId().length(),
@@ -71,6 +73,7 @@ class TestOmLCRule {
 
   @Test
   public void testCreateInValidOmLCRule() throws OMException {
+    long currentTime = System.currentTimeMillis();
     OmLCExpiration exp = new OmLCExpiration.Builder()
         .setDays(30)
         .build();
@@ -81,26 +84,28 @@ class TestOmLCRule {
     OmLCRule.Builder r1 = new OmLCRule.Builder()
         .setId(new String(id))
         .setAction(exp);
-    assertOMException(r1::build, INVALID_REQUEST, "ID length should not exceed allowed limit of 255");
+    assertOMException(() -> r1.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "ID length should not exceed allowed limit of 255");
 
     OmLCRule.Builder r2 = new OmLCRule.Builder()
         .setId("remove Spark logs after 30 days")
         .setEnabled(true)
         .setPrefix("/spark/logs")
         .setAction(null);
-    assertOMException(r2::build, INVALID_REQUEST,
+    assertOMException(() -> r2.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
         "At least one action needs to be specified in a rule");
 
     OmLCRule.Builder r3 = new OmLCRule.Builder()
         .setEnabled(true)
         .setAction(exp);
 
-    assertOMException(r3::build, INVALID_REQUEST,
+    assertOMException(() -> r3.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
         "Filter and Prefix cannot both be null.");
   }
 
   @Test
   public void testMultipleActionsInRule() throws OMException {
+    long currentTime = System.currentTimeMillis();
     OmLCExpiration expiration1 = new OmLCExpiration.Builder()
         .setDays(30)
         .build();
@@ -118,11 +123,13 @@ class TestOmLCRule {
 
     OmLCRule.Builder rule = builder.setActions(actions);
 
-    assertOMException(rule::build, INVALID_REQUEST, "A rule can have at most one Expiration action");
+    assertOMException(() -> rule.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "A rule can have at most one Expiration action");
   }
 
   @Test
   public void testRuleWithAndOperatorFilter() throws OMException {
+    long currentTime = System.currentTimeMillis();
     Map<String, String> tags = ImmutableMap.of("app", "hadoop", "env", "test");
     OmLifecycleRuleAndOperator andOperator = getOmLCAndOperatorBuilder("/logs/", tags).build();
     OmLCFilter filter = getOmLCFilterBuilder(null, null, andOperator).build();
@@ -134,12 +141,14 @@ class TestOmLCRule {
         .setAction(new OmLCExpiration.Builder().setDays(30).build());
 
     OmLCRule rule = assertDoesNotThrow(builder::build);
+    assertDoesNotThrow(() -> rule.valid(BucketLayout.DEFAULT, currentTime));
     assertTrue(rule.isPrefixEnable());
     assertTrue(rule.isTagEnable());
   }
 
   @Test
   public void testRuleWithTagFilter() throws OMException {
+    long currentTime = System.currentTimeMillis();
     OmLCFilter filter = getOmLCFilterBuilder(null, Pair.of("app", "hadoop"), null).build();
 
     OmLCRule.Builder builder = new OmLCRule.Builder()
@@ -149,6 +158,7 @@ class TestOmLCRule {
         .setAction(new OmLCExpiration.Builder().setDays(30).build());
 
     OmLCRule rule = assertDoesNotThrow(builder::build);
+    assertDoesNotThrow(() -> rule.valid(BucketLayout.DEFAULT, currentTime));
     assertFalse(rule.isPrefixEnable());
     assertTrue(rule.isTagEnable());
   }
@@ -174,7 +184,7 @@ class TestOmLCRule {
         .setBucket("bucket")
         .setRules(rules);
 
-    assertOMException(config::build, INVALID_REQUEST, "Duplicate rule IDs found");
+    assertOMException(() -> config.build().valid(), INVALID_REQUEST, "Duplicate rule IDs found");
   }
 
   @Test

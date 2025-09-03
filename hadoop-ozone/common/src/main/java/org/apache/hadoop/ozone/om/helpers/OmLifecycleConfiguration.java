@@ -130,7 +130,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     }
 
     for (OmLCRule rule : rules) {
-      rule.valid(bucketLayout);
+      rule.valid(bucketLayout, creationTime);
     }
   }
 
@@ -213,9 +213,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
         .setBucketLayout(layout)
         .setRules(rulesList);
 
-    if (lifecycleConfiguration.hasCreationTime()) {
-      builder.setCreationTime(lifecycleConfiguration.getCreationTime());
-    }
+    builder.setCreationTime(lifecycleConfiguration.getCreationTime());
     if (lifecycleConfiguration.hasObjectID()) {
       builder.setObjectID(lifecycleConfiguration.getObjectID());
     }
@@ -258,8 +256,8 @@ public final class OmLifecycleConfiguration extends WithObjectID
       return this;
     }
 
-    public Builder setCreationTime(long ctime) {
-      this.creationTime = ctime;
+    public Builder setCreationTime(long creationTime) {
+      this.creationTime = creationTime;
       return this;
     }
 
@@ -286,7 +284,11 @@ public final class OmLifecycleConfiguration extends WithObjectID
     }
 
     public OmLifecycleConfiguration build() throws OMException {
-      OmLifecycleConfiguration omLifecycleConfiguration = new OmLifecycleConfiguration(this);
+      return new OmLifecycleConfiguration(this);
+    }
+
+    public OmLifecycleConfiguration buildAndValid() throws OMException {
+      OmLifecycleConfiguration omLifecycleConfiguration = build();
       omLifecycleConfiguration.valid();
       return omLifecycleConfiguration;
     }

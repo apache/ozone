@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
@@ -474,7 +475,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
   /**
    * @return list all LifecycleConfigurations.
    */
-  List<OmLifecycleConfiguration> listLifecycleConfigurations();
+  List<OmLifecycleConfiguration> listLifecycleConfigurations() throws OMException;
 
   /**
    * Fetches the lifecycle configuration by bucketName.

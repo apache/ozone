@@ -30,6 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.google.common.collect.ImmutableMap;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -71,14 +73,14 @@ public class TestOmLifeCycleConfiguration {
     List<OmLCRule> rules = Collections.singletonList(rule);
 
     OmLifecycleConfiguration.Builder lcc0 = getOmLifecycleConfiguration(null, "bucket", rules);
-    assertOMException(lcc0::build, INVALID_REQUEST, "Volume cannot be blank");
+    assertOMException(() -> lcc0.buildAndValid(), INVALID_REQUEST, "Volume cannot be blank");
 
     OmLifecycleConfiguration.Builder lcc1 = getOmLifecycleConfiguration("volume", null, rules);
-    assertOMException(lcc1::build, INVALID_REQUEST, "Bucket cannot be blank");
+    assertOMException(() -> lcc1.buildAndValid(), INVALID_REQUEST, "Bucket cannot be blank");
 
     OmLifecycleConfiguration.Builder lcc3 = getOmLifecycleConfiguration(
         "volume", "bucket", Collections.emptyList());
-    assertOMException(lcc3::build, INVALID_REQUEST,
+    assertOMException(() -> lcc3.buildAndValid(), INVALID_REQUEST,
         "At least one rules needs to be specified in a lifecycle configuration");
 
     List<OmLCRule> rules4 = new ArrayList<>(
@@ -92,7 +94,7 @@ public class TestOmLifeCycleConfiguration {
       rules4.add(r);
     }
     OmLifecycleConfiguration.Builder lcc4 = getOmLifecycleConfiguration("volume", "bucket", rules4);
-    assertOMException(lcc4::build, INVALID_REQUEST,
+    assertOMException(() -> lcc4.buildAndValid(), INVALID_REQUEST,
         "The number of lifecycle rules must not exceed the allowed limit of");
   }
 
@@ -193,7 +195,7 @@ public class TestOmLifeCycleConfiguration {
         .build();
 
     assertFalse(rule.isEnabled());
-    assertDoesNotThrow(() -> rule.valid(BucketLayout.DEFAULT));
+    assertDoesNotThrow(() -> rule.valid(BucketLayout.DEFAULT, System.currentTimeMillis()));
   }
 
   @Test
@@ -223,6 +225,42 @@ public class TestOmLifeCycleConfiguration {
     assertEquals(config.getRules().get(0).getId(), ruleFromProto.getId());
     assertEquals(config.getRules().get(0).getEffectivePrefix(), ruleFromProto.getEffectivePrefix());
     assertEquals(30, ruleFromProto.getExpiration().getDays());
+  }
+
+  @Test
+  public void testOMStartupWithPastExpirationDate() throws OMException {
+    // Simulate a lifecycle configuration with expiration date in the past
+    // This scenario can happen when OM restarts after some time has passed
+    // since the lifecycle configuration was created.
+    
+    // Create a rule with expiration date that is in the past (simulating old config)
+    String pastDate = getFutureDateString(-1); // A date clearly in the past (1 day ago)
+    OmLCExpiration pastExpiration = new OmLCExpiration.Builder()
+        .setDate(pastDate)
+        .build();
+    
+    OmLCRule ruleWithPastDate = new OmLCRule.Builder()
+        .setId("test-rule-past-date")
+        .setPrefix("/old-logs/")
+        .setEnabled(true)
+        .addAction(pastExpiration)
+        .build();
+    
+    OmLifecycleConfiguration config = new OmLifecycleConfiguration.Builder()
+        .setVolume("test-volume")
+        .setBucket("test-bucket")
+        .setBucketLayout(BucketLayout.DEFAULT)
+        // An Expiration was created two days ago and expired 1 day ago, should be valid
+        .setCreationTime(ZonedDateTime.now(ZoneOffset.UTC).minusDays(2).toInstant().toEpochMilli())
+        .addRule(ruleWithPastDate)
+        .setObjectID(123456L)
+        .setUpdateID(78910L)
+        .build();
+    
+    LifecycleConfiguration proto = config.getProtobuf();
+    OmLifecycleConfiguration configFromProto = assertDoesNotThrow(() ->
+        OmLifecycleConfiguration.getFromProtobuf(proto));
+    assertDoesNotThrow(configFromProto::valid);
   }
 
 }

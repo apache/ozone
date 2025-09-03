@@ -263,7 +263,7 @@ public class S3LifecycleConfiguration {
         builder.addRule(convertToOmRule(rule));
       }
 
-      return builder.build();
+      return builder.buildAndValid();
     } catch (Exception ex) {
       if (ex instanceof IllegalStateException) {
         throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);

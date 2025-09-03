@@ -152,9 +152,11 @@ public final class OmLCRule {
    * - Filter must be valid
    * - There must be at most one Expiration action per rule
    *
+   * @param bucketLayout The bucket layout for validation
+   * @param creationTime The creation time of the lifecycle configuration in milliseconds since epoch
    * @throws OMException if the validation fails
    */
-  public void valid(BucketLayout bucketLayout) throws OMException {
+  public void valid(BucketLayout bucketLayout, Long creationTime) throws OMException {
     if (id.length() > LC_ID_MAX_LENGTH) {
       throw new OMException("ID length should not exceed allowed limit of " + LC_ID_MAX_LENGTH,
           OMException.ResultCodes.INVALID_REQUEST);
@@ -175,7 +177,7 @@ public final class OmLCRule {
         throw new OMException("A rule can have at most one Expiration action.",
             OMException.ResultCodes.INVALID_REQUEST);
       }
-      action.valid();
+      action.valid(creationTime);
     }
 
     if (prefix != null && filter != null) {
@@ -304,7 +306,7 @@ public final class OmLCRule {
       builder.setFilter(OmLCFilter.getFromProtobuf(lifecycleRule.getFilter(), layout));
     }
 
-    return builder.setBucketLayout(layout).build();
+    return builder.build();
   }
 
   @Override
@@ -329,7 +331,6 @@ public final class OmLCRule {
     private boolean enabled;
     private List<OmLCAction> actions = new ArrayList<>();
     private OmLCFilter filter;
-    private BucketLayout bucketLayout;
 
     public Builder setId(String lcId) {
       this.id = lcId;
@@ -378,15 +379,8 @@ public final class OmLCRule {
       return filter;
     }
 
-    public Builder setBucketLayout(BucketLayout layout) {
-      this.bucketLayout = layout;
-      return this;
-    }
-
     public OmLCRule build() throws OMException {
-      OmLCRule omLCRule = new OmLCRule(this);
-      omLCRule.valid(bucketLayout);
-      return omLCRule;
+      return new OmLCRule(this);
     }
   }
 }
