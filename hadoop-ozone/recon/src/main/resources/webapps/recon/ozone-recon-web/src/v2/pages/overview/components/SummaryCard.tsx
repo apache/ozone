@@ -1,7 +1,7 @@
 import React from 'react';
 import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
 import { Col } from 'antd';
-import ErrorMessage from '@/v2/components/errors/errorMessage';
+import ErrorMessage from '@/v2/components/errors/errorCard';
 
 type SummaryCardProps = {
   loading: boolean;
@@ -33,44 +33,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
 
   return (
     <>
-      <Col flex="1 0 20%">
-        <OverviewSimpleCard
-          title='Volumes'
-          icon='inbox'
-          loading={loading}
-          data={volumes}
-          linkToUrl='/Volumes' />
-      </Col>
-      <Col flex="1 0 20%">
-        <OverviewSimpleCard
-          title='Buckets'
-          icon='folder-open'
-          loading={loading}
-          data={buckets}
-          linkToUrl='/Buckets' />
-      </Col>
-      <Col flex="1 0 20%">
-        <OverviewSimpleCard
-          title='Keys'
-          icon='file-text'
-          loading={loading}
-          data={keys} />
-      </Col>
-      <Col flex="1 0 20%">
-        <OverviewSimpleCard
-          title='Pipelines'
-          icon='deployment-unit'
-          loading={loading}
-          data={pipelines}
-          linkToUrl='/Pipelines' />
-      </Col>
-      <Col flex="1 0 20%">
-        <OverviewSimpleCard
-          title='Deleted Containers'
-          icon='delete'
-          loading={loading}
-          data={deletedContainers} />
-      </Col>
+      
     </>
   )
 }

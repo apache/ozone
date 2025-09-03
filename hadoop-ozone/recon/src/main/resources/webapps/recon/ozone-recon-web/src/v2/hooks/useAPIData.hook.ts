@@ -12,7 +12,8 @@ export interface UseApiDataOptions {
   retryAttempts?: number;
   retryDelay?: number;
   initialFetch?: boolean;
-}
+  onError?: (error: string) => void;
+};
 
 export function useApiData<T>(
   url: string,
@@ -25,7 +26,8 @@ export function useApiData<T>(
   const {
     retryAttempts = 3,
     retryDelay = 1000,
-    initialFetch = true
+    initialFetch = true,
+    onError
   } = options;
 
   const [state, setState] = useState<ApiState<T>>({
@@ -43,6 +45,7 @@ export function useApiData<T>(
   const urlRef = useRef(url);
   const retryAttemptsRef = useRef(retryAttempts);
   const retryDelayRef = useRef(retryDelay);
+  const onErrorRef = useRef(onError);
 
   // Update refs when props change
   useEffect(() => {
@@ -56,6 +59,11 @@ export function useApiData<T>(
   useEffect(() => {
     retryDelayRef.current = retryDelay;
   }, [retryDelay]);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+
 
   const fetchData = async (isRetry = false) => {
     if (!isRetry) {
@@ -103,6 +111,10 @@ export function useApiData<T>(
           fetchData(true);
         }, retryDelayRef.current * retryCountRef.current);
         return;
+      }
+
+      if (onErrorRef.current) {
+        onErrorRef.current(errorMessage);
       }
 
       setState({

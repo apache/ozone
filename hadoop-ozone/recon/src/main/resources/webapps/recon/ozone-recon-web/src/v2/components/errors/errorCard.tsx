@@ -18,15 +18,35 @@
 
 
 import React from 'react';
-import { CloudServerOutlined } from "@ant-design/icons"
+import { DisconnectOutlined } from "@ant-design/icons"
+import { Card } from 'antd';
 
-const ErrorMessage: React.FC<object> = () => {
+type ErrorCardProps = {
+  title: string;
+  compact?: boolean;
+};
+
+// ------------- Styles -------------- //
+const cardHeadStyle: React.CSSProperties = { fontSize: '14px' };
+const compactCardBodyStyle: React.CSSProperties = {
+  padding: '24px',
+  justifyTracks: 'space-between'
+}
+const cardBodyStyle: React.CSSProperties = {
+  padding: '80px'
+}
+
+const ErrorCard: React.FC<ErrorCardProps> = ({ title, compact }) => {
   return (
-    <div className="error-msg">
-      <CloudServerOutlined id="error-icon" />
-      <span id="error-txt">Something went wrong, please refer to the logs for more details</span>    
-    </div>
+    <Card
+      size='small'
+      title={title}
+      headStyle={cardHeadStyle}
+      bodyStyle={(compact) ? compactCardBodyStyle : cardBodyStyle}
+      data-testid={`error-${title}`}>
+      <DisconnectOutlined id="error-icon" />
+    </Card>
   )
 };
 
-export default ErrorMessage;
+export default ErrorCard;

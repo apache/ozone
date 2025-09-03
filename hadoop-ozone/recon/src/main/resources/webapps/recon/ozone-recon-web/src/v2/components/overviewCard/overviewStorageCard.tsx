@@ -24,7 +24,8 @@ import EChart from '@/v2/components/eChart/eChart';
 import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrapper';
 
 import { StorageReport } from '@/v2/types/overview.types';
-import ErrorMessage from '@/v2/components/errors/errorMessage';
+import ErrorMessage from '@/v2/components/errors/errorCard';
+import ErrorCard from '@/v2/components/errors/errorCard';
 
 // ------------- Types -------------- //
 type OverviewStorageCardProps = {
@@ -80,18 +81,7 @@ const OverviewStorageCard: React.FC<OverviewStorageCardProps> = ({
 }) => {
 
   if (error) {
-    return (
-      <Card
-        size='small'
-        className={'overview-card'}
-        loading={loading}
-        hoverable={false}
-        title='Cluster Capacity'
-        headStyle={cardHeadStyle}
-        bodyStyle={cardBodyStyle}>
-          <ErrorMessage />
-      </Card>
-    )
+    return <ErrorCard title='Cluster Capacity' />
   }
 
   const {

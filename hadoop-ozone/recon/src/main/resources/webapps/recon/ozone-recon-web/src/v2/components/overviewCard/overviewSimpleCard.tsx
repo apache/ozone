@@ -20,7 +20,6 @@ import React from 'react';
 import { Card, Col, Row } from 'antd';
 import { Link } from 'react-router-dom';
 import {
-  CloseCircleOutlined,
   ClusterOutlined,
   ContainerOutlined,
   DatabaseOutlined,
@@ -32,6 +31,7 @@ import {
   QuestionCircleOutlined
 } from '@ant-design/icons';
 import { numberWithCommas } from '@/utils/common';
+import ErrorCard from '@/v2/components/errors/errorCard';
 
 
 // ------------- Types -------------- //
@@ -46,6 +46,7 @@ type OverviewCardProps = {
   hoverable?: boolean;
   loading?: boolean;
   linkToUrl?: string;
+  error?: string | null;
 }
 
 // ------------- Styles -------------- //
@@ -110,8 +111,13 @@ const OverviewSimpleCard: React.FC<OverviewCardProps> = ({
   title = '',
   hoverable = false,
   loading = false,
-  linkToUrl = ''
+  linkToUrl = '',
+  error
 }) => {
+
+  if (error) {
+    return <ErrorCard title={title} compact={true}/>
+  }
 
   const titleElement = (linkToUrl)
     ? (

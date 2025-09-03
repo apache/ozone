@@ -34,7 +34,6 @@ import { ClusterStateResponse, KeysSummary, OverviewState, TaskStatus } from '@/
 import './overview.less';
 import filesize from 'filesize';
 import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
-import SummaryCard from '@/v2/pages/overview/components/SummaryCard';
 
 const DEFAULT_CLUSTER_STATE: ClusterStateResponse = {
   missingContainers: 0,
@@ -119,25 +118,25 @@ const Overview: React.FC<{}> = () => {
   const clusterState = useApiData<ClusterStateResponse>(
     '/api/v1/clusterState',
     DEFAULT_CLUSTER_STATE,
-    { retryAttempts: 3 }
+    { retryAttempts: 2, onError: (error) => showDataFetchError(error) }
   );
 
   const taskStatus = useApiData<TaskStatus[]>(
     '/api/v1/task/status',
     DEFAULT_TASK_STATUS,
-    { retryAttempts: 2 }
+    { retryAttempts: 2, onError: (error) => showDataFetchError(error) }
   );
 
   const openKeysSummary = useApiData<KeysSummary & { totalOpenKeys: number}>(
     '/api/v1/keys/open/summary',
     DEFAULT_OPEN_KEYS_SUMMARY,
-    { retryAttempts: 2 }
+    { retryAttempts: 2, onError: (error) => showDataFetchError(error) }
   );
 
   const deletePendingKeysSummary = useApiData<KeysSummary & { totalDeletedKeys: number}>(
     '/api/v1/keys/deletePending/summary',
     DEFAULT_DELETE_PENDING_KEYS_SUMMARY,
-    { retryAttempts: 2 }
+    { retryAttempts: 2, onError: (error) => showDataFetchError(error) }
   );
 
   const omDBDeltaObject = taskStatus.data?.find((item: TaskStatus) => item.taskName === 'OmDeltaRequest');
@@ -213,6 +212,11 @@ const Overview: React.FC<{}> = () => {
     containers,
     missingContainers,
     storageReport,
+    volumes,
+    buckets,
+    keys,
+    pipelines,
+    deletedContainers,
     omServiceId,
     scmServiceId
   } = clusterState.data;
@@ -251,6 +255,7 @@ const Overview: React.FC<{}> = () => {
               title='Health'
               data={healthCardIndicators}
               showHeader={true}
+              loading={clusterState.loading}
               columns={[
                 {
                   title: '',
@@ -299,10 +304,49 @@ const Overview: React.FC<{}> = () => {
             lg: 16,
             xl: 16
           }, 20]}>
-          <SummaryCard
-            loading={loading}
-            error={clusterState.error}
-            {...clusterState.data} />
+          <Col flex="1 0 20%">
+            <OverviewSimpleCard
+              title='Volumes'
+              icon='inbox'
+              loading={clusterState.loading}
+              data={volumes}
+              linkToUrl='/Volumes'
+              error={clusterState.error} />
+          </Col>
+          <Col flex="1 0 20%">
+            <OverviewSimpleCard
+              title='Buckets'
+              icon='folder-open'
+              loading={clusterState.loading}
+              data={buckets}
+              linkToUrl='/Buckets'
+              error={clusterState.error} />
+          </Col>
+          <Col flex="1 0 20%">
+            <OverviewSimpleCard
+              title='Keys'
+              icon='file-text'
+              loading={clusterState.loading}
+              data={keys}
+              error={clusterState.error} />
+          </Col>
+          <Col flex="1 0 20%">
+            <OverviewSimpleCard
+              title='Pipelines'
+              icon='deployment-unit'
+              loading={clusterState.loading}
+              data={pipelines}
+              linkToUrl='/Pipelines'
+              error={clusterState.error} />
+          </Col>
+          <Col flex="1 0 20%">
+            <OverviewSimpleCard
+              title='Deleted Containers'
+              icon='delete'
+              loading={clusterState.loading}
+              data={deletedContainers}
+              error={clusterState.error} />
+          </Col>
         </Row>
         <Row gutter={[
           {
@@ -315,7 +359,7 @@ const Overview: React.FC<{}> = () => {
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
             <OverviewSummaryCard
               title='Open Keys Summary'
-              loading={loading}
+              loading={openKeysSummary.loading}
               columns={[
                 {
                   title: 'Name',
@@ -350,12 +394,13 @@ const Overview: React.FC<{}> = () => {
                 }
               ]}
               linkToUrl='/Om'
-              state={{activeTab: '2'}} />
+              state={{activeTab: '2'}}
+              error={openKeysSummary.error} />
           </Col>
           <Col xs={24} sm={24} md={24} lg={12} xl={12}>
             <OverviewSummaryCard
               title='Delete Pending Keys Summary'
-              loading={loading}
+              loading={deletePendingKeysSummary.loading}
               columns={[
                 {
                   title: 'Name',
@@ -390,7 +435,8 @@ const Overview: React.FC<{}> = () => {
                 }
               ]}
               linkToUrl='/Om'
-              state={{activeTab: '3'}} />
+              state={{activeTab: '3'}}
+              error={deletePendingKeysSummary.error} />
           </Col>
         </Row>
         <span style={{ paddingLeft: '8px' }}>
