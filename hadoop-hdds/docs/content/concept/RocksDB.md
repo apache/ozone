@@ -95,7 +95,7 @@ Ozone provides a set of general RocksDB configurations that apply to all service
 These settings, defined in `ozone-default.xml`, apply specifically to the Ozone Manager.
 
 *   `ozone.om.db.max.open.files`: The total number of files that a RocksDB can open in the OM. Default: `-1` (unlimited).
-*   `ozone.compaction.service.enabled`: Enable or disable a background job that periodically compacts rocksdb tables flagged for compaction. Default: `false`.
+*   `ozone.om.compaction.service.enabled`: Enable or disable a background job that periodically compacts rocksdb tables flagged for compaction. Default: `false`.
 *   `ozone.om.compaction.service.run.interval`: The interval for the OM's compaction service. Default: `6h`.
 *   `ozone.om.compaction.service.timeout`: Timeout for the OM's compaction service. Default: `10m`.
 *   `ozone.om.compaction.service.columnfamilies`: A comma-separated list of column families to be compacted by the service. Default: `keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable`.
