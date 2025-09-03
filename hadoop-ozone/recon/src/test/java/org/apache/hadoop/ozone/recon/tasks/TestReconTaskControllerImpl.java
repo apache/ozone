@@ -330,7 +330,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result,
         "Reinitialization event should be successfully queued");
     assertFalse(reconTaskController.hasEventBufferOverflowed(), "Buffer overflow flag should be reset");
-    assertFalse(reconTaskController.hasDeltaTasksFailed(), "Delta tasks failure flag should be reset");
+    assertFalse(reconTaskController.hasTasksFailed(), "Delta tasks failure flag should be reset");
   }
   
   @Test
@@ -364,7 +364,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   }
   
   @Test
-  public void testResetEventBuffer() throws Exception {
+  public void testDrainEventBufferAndCleanExistingCheckpoints() throws Exception {
     // Stop the async processing first to prevent events from being consumed
     reconTaskController.stop();
     
@@ -401,7 +401,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertTrue(testController.getEventBufferSize() > 0, "Buffer should have events");
     
     // Reset buffer
-    testController.resetEventBuffer();
+    testController.drainEventBufferAndCleanExistingCheckpoints();
     assertEquals(0, testController.getEventBufferSize(), "Buffer should be empty after reset");
   }
   
@@ -410,17 +410,17 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
     
     // Test resetting flags for different reasons
-    controllerImpl.resetEventFlags(ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
+    controllerImpl.resetEventFlags();
     assertFalse(controllerImpl.hasEventBufferOverflowed());
-    assertFalse(controllerImpl.hasDeltaTasksFailed());
+    assertFalse(controllerImpl.hasTasksFailed());
     
-    controllerImpl.resetEventFlags(ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES);
+    controllerImpl.resetEventFlags();
     assertFalse(controllerImpl.hasEventBufferOverflowed());
-    assertFalse(controllerImpl.hasDeltaTasksFailed());
+    assertFalse(controllerImpl.hasTasksFailed());
     
-    controllerImpl.resetEventFlags(ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    controllerImpl.resetEventFlags();
     assertFalse(controllerImpl.hasEventBufferOverflowed());
-    assertFalse(controllerImpl.hasDeltaTasksFailed());
+    assertFalse(controllerImpl.hasTasksFailed());
   }
   
   @Test
@@ -473,35 +473,39 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   }
   
   @Test
-  public void testNewRetryLogicWithImmediateRetry() throws Exception {
-    // Set up controller with mocked dependencies
+  public void testNewRetryLogicWithSuccessfulCheckpoint() throws Exception {
+    // Set up properly mocked ReconOMMetadataManager with required dependencies
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
+    DBStore mockDBStore = mock(DBStore.class);
+    File mockDbLocation = mock(File.class);
+    DBCheckpoint mockCheckpoint = mock(DBCheckpoint.class);
+    Path mockCheckpointPath = Paths.get("/tmp/test/checkpoint");
+    
+    when(mockOMMetadataManager.getStore()).thenReturn(mockDBStore);
+    when(mockDBStore.getDbLocation()).thenReturn(mockDbLocation);
+    when(mockDbLocation.getParent()).thenReturn("/tmp/test");
+    when(mockDBStore.getCheckpoint(any(String.class), any(Boolean.class))).thenReturn(mockCheckpoint);
+    when(mockCheckpoint.getCheckpointLocation()).thenReturn(mockCheckpointPath);
+    
+    // Mock the createCheckpointReconMetadataManager method
+    ReconOMMetadataManager mockCheckpointedManager = mock(ReconOMMetadataManager.class);
+    when(mockOMMetadataManager.createCheckpointReconMetadataManager(any(), any())).thenReturn(mockCheckpointedManager);
+    
     ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
     controllerImpl.updateOMMetadataManager(mockOMMetadataManager);
     
     // Reset any previous retry state
     controllerImpl.resetRetryCounters();
     
-    // Create a spy to mock checkpoint creation failure for testing new retry logic
-    ReconTaskControllerImpl controllerSpy = spy(controllerImpl);
-    
-    // Configure to fail on first call but succeed on immediate retry (second call)
-    doThrow(new IOException("First attempt failed"))
-        .doReturn(mock(ReconOMMetadataManager.class))
-        .when(controllerSpy).createOMCheckpoint(any());
-    
-    // Test that immediate retry works within the same iteration
-    ReconTaskController.ReInitializationResult result = controllerSpy.queueReInitializationEvent(
+    // Test that checkpoint creation succeeds
+    ReconTaskController.ReInitializationResult result = controllerImpl.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
     
     assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result, 
-        "Should succeed on immediate retry within same iteration");
-    
-    // Verify that createOMCheckpoint was called twice (first attempt + immediate retry)
-    verify(controllerSpy, times(2)).createOMCheckpoint(any());
+        "Should succeed on first attempt");
     
     // Verify retry count is reset after success
-    assertEquals(0, controllerSpy.getIterationRetryCount(), "Retry count should be reset after success");
+    assertEquals(0, controllerImpl.getEventProcessRetryCount(), "Retry count should be reset after success");
   }
   
   @Test
@@ -527,7 +531,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
     assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result1, 
         "First iteration should return RETRY_LATER");
-    assertEquals(1, controllerSpy.getIterationRetryCount(), "Should have 1 iteration retry");
+    assertEquals(1, controllerSpy.getEventProcessRetryCount(), "Should have 1 iteration retry");
     
     // Second iteration - should return RETRY_LATER after both attempts fail
     // Need to wait for delay or this will return RETRY_LATER due to timing
@@ -536,7 +540,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
     assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result2,
         "Second iteration should return RETRY_LATER");
-    assertEquals(2, controllerSpy.getIterationRetryCount(), "Should have 2 iteration retries");
+    assertEquals(2, controllerSpy.getEventProcessRetryCount(), "Should have 2 iteration retries");
     
     // Third iteration - should return MAX_RETRIES_EXCEEDED after both attempts fail
     Thread.sleep(2100); // Wait slightly more than 2 seconds
@@ -544,10 +548,179 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
     assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result3,
         "Third iteration should return MAX_RETRIES_EXCEEDED");
-    assertEquals(0, controllerSpy.getIterationRetryCount(), "Retry count should be reset after max exceeded");
+    assertEquals(0, controllerSpy.getEventProcessRetryCount(), "Retry count should be reset after max exceeded");
     
-    // Verify that createOMCheckpoint was called 6 times total (2 attempts per iteration × 3 iterations)
-    verify(controllerSpy, times(6)).createOMCheckpoint(any());
+    // Verify that createOMCheckpoint was called 3 times total (1 attempt per iteration × 3 iterations)
+    verify(controllerSpy, times(3)).createOMCheckpoint(any());
+  }
+
+  @Test
+  public void testProcessReInitializationEventWithTaskFailuresAndRetry() throws Exception {
+    // Set up properly mocked ReconOMMetadataManager with required dependencies
+    ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
+    DBStore mockDBStore = mock(DBStore.class);
+    File mockDbLocation = mock(File.class);
+    DBCheckpoint mockCheckpoint = mock(DBCheckpoint.class);
+    Path mockCheckpointPath = Paths.get("/tmp/test/checkpoint");
+    
+    when(mockOMMetadataManager.getStore()).thenReturn(mockDBStore);
+    when(mockDBStore.getDbLocation()).thenReturn(mockDbLocation);
+    when(mockDbLocation.getParent()).thenReturn("/tmp/test");
+    when(mockDBStore.getCheckpoint(any(String.class), any(Boolean.class))).thenReturn(mockCheckpoint);
+    when(mockCheckpoint.getCheckpointLocation()).thenReturn(mockCheckpointPath);
+    when(mockOMMetadataManager.createCheckpointReconMetadataManager(any(), any())).thenReturn(mockOMMetadataManager);
+    
+    ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
+    controllerImpl.updateOMMetadataManager(mockOMMetadataManager);
+    
+    // Create a spy to control reInitializeTasks behavior
+    ReconTaskControllerImpl controllerSpy = spy(controllerImpl);
+    
+    // Mock reInitializeTasks to fail on first call, succeed on second call
+    when(controllerSpy.reInitializeTasks(any(ReconOMMetadataManager.class), any()))
+        .thenReturn(false)  // First call fails
+        .thenReturn(true);  // Second call succeeds
+    
+    // Stop async processing to control event processing manually
+    controllerSpy.stop();
+    
+    // Create and manually process a reinitialization event
+    ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES,
+        mockOMMetadataManager);
+    
+    // Verify initial state
+    assertFalse(controllerSpy.hasTasksFailed(), "tasksFailed should be false initially");
+    
+    // Manually invoke processReInitializationEvent to test the retry logic
+    controllerSpy.processReconEvent(reinitEvent);
+    
+    // Wait for processing
+    Thread.sleep(100);
+    
+    // Verify that reInitializeTasks was called and tasksFailed flag is set due to failure
+    verify(controllerSpy, times(1)).reInitializeTasks(any(ReconOMMetadataManager.class), any());
+    assertTrue(controllerSpy.hasTasksFailed(), "tasksFailed should be true after reInitializeTasks failure");
+    
+    // Simulate the natural retry mechanism - this is what would happen in the scheduled syncDataFromOM
+    // when it detects hasTasksFailed() == true
+    
+    // Reset the spy call count for cleaner verification
+    org.mockito.Mockito.clearInvocations(controllerSpy);
+    
+    // Now simulate the scheduled thread detecting tasksFailed and queueing another reinitialization
+    // This simulates the behavior in OzoneManagerServiceProviderImpl#syncDataFromOM lines 680-692
+    assertTrue(controllerSpy.hasTasksFailed(), "tasksFailed should still be true, triggering retry");
+    
+    // Queue another reinitialization event (simulating what syncDataFromOM does)
+    ReconTaskController.ReInitializationResult result = controllerSpy.queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES);
+    
+    assertEquals(ReconTaskController.ReInitializationResult.SUCCESS, result, 
+        "Second reinitialization should be queued successfully");
+    
+    // Process the second reinitialization event
+    ReconTaskReInitializationEvent secondReinitEvent = new ReconTaskReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES,
+        mockOMMetadataManager);
+    
+    controllerSpy.processReconEvent(secondReinitEvent);
+    
+    // Wait for processing
+    Thread.sleep(100);
+    
+    // Verify that reInitializeTasks was called again and this time succeeded
+    verify(controllerSpy, times(1)).reInitializeTasks(any(ReconOMMetadataManager.class), any());
+    
+    // Verify that tasksFailed flag is now reset because reInitializeTasks succeeded
+    assertFalse(controllerSpy.hasTasksFailed(), "tasksFailed should be false after successful reinitialization");
+  }
+  
+  @Test
+  public void testTasksFailedFlagBlocksDeltaEvents() throws Exception {
+    ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
+    
+    // Initially, tasks should not be failed
+    assertFalse(controllerImpl.hasTasksFailed(), "tasksFailed should be false initially");
+    
+    // Test the main functionality: when tasksFailed is true, events are not buffered
+    // Set tasksFailed flag to true (simulating reinitialization failure)
+    controllerImpl.getTasksFailedFlag().set(true);
+    assertTrue(controllerImpl.hasTasksFailed(), "tasksFailed should be true now");
+    
+    // Create a mock event using the same pattern as working tests
+    OMUpdateEventBatch mockBatch = mock(OMUpdateEventBatch.class);
+    when(mockBatch.isEmpty()).thenReturn(false);
+    when(mockBatch.getEvents()).thenReturn(new ArrayList<>());
+    when(mockBatch.getEventType()).thenReturn(ReconEvent.EventType.OM_UPDATE_BATCH);
+    when(mockBatch.getEventCount()).thenReturn(1);
+    
+    // Stop async processing to prevent any interference
+    controllerImpl.stop();
+    
+    // Get buffer size when events should be blocked
+    int bufferSizeWithTasksFailed = controllerImpl.getEventBufferSize();
+    
+    // Try to consume events when tasksFailed is true - they should be blocked
+    controllerImpl.consumeOMEvents(mockBatch, mock(OMMetadataManager.class));
+    
+    // Verify buffer size didn't change (events were blocked)
+    assertEquals(bufferSizeWithTasksFailed, controllerImpl.getEventBufferSize(),
+        "Events should be blocked when tasksFailed is true");
+    
+    // Reset tasksFailed flag and verify events can be buffered again
+    controllerImpl.getTasksFailedFlag().set(false);
+    assertFalse(controllerImpl.hasTasksFailed(), "tasksFailed should be false now");
+    
+    // Note: We can't easily test buffer size increase due to async processing, 
+    // but we've verified the blocking behavior which is the main test objective
+  }
+  
+  @Test
+  public void testProcessReInitializationEventWithCheckpointedManager() throws Exception {
+    // Set up properly mocked ReconOMMetadataManager with required dependencies
+    ReconOMMetadataManager mockCurrentManager = mock(ReconOMMetadataManager.class);
+    ReconOMMetadataManager mockCheckpointedManager = mock(ReconOMMetadataManager.class);
+    DBStore mockDBStore = mock(DBStore.class);
+    File mockDbLocation = mock(File.class);
+    
+    when(mockCheckpointedManager.getStore()).thenReturn(mockDBStore);
+    when(mockDBStore.getDbLocation()).thenReturn(mockDbLocation);
+    when(mockDbLocation.getParentFile()).thenReturn(mockDbLocation);
+    
+    ReconTaskControllerImpl controllerImpl = (ReconTaskControllerImpl) reconTaskController;
+    controllerImpl.updateOMMetadataManager(mockCurrentManager);
+    
+    // Create a spy to control reInitializeTasks behavior
+    ReconTaskControllerImpl controllerSpy = spy(controllerImpl);
+    when(controllerSpy.reInitializeTasks(any(ReconOMMetadataManager.class), any()))
+        .thenReturn(true);  // Succeed
+    
+    // Stop async processing to control event processing manually
+    controllerSpy.stop();
+    
+    // Create reinitialization event with checkpointed manager
+    ReconTaskReInitializationEvent reinitEvent = new ReconTaskReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW,
+        mockCheckpointedManager);
+    
+    // Verify initial state - tasksFailed should be false
+    assertFalse(controllerSpy.hasTasksFailed(), "tasksFailed should be false initially");
+    
+    // Process the reinitialization event
+    controllerSpy.processReconEvent(reinitEvent);
+    
+    // Wait for processing
+    Thread.sleep(100);
+    
+    // Verify that reInitializeTasks was called with the checkpointed manager
+    verify(controllerSpy, times(1)).reInitializeTasks(mockCheckpointedManager, null);
+    
+    // Verify that tasksFailed flag remains false because reInitializeTasks succeeded
+    assertFalse(controllerSpy.hasTasksFailed(), "tasksFailed should remain false after successful reinitialization");
+    
+    // Verify cleanup was called on the checkpointed manager
+    verify(mockCheckpointedManager, times(1)).stop();
   }
 
   /**

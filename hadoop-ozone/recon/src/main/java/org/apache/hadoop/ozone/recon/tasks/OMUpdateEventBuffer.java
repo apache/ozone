@@ -124,7 +124,6 @@ public class OMUpdateEventBuffer {
     if (drained > 0) {
       // Update total buffered events count
       long totalEventCount = drainedEvents.stream()
-          .filter(event -> event instanceof ReconEvent)
           .mapToLong(event -> ((ReconEvent) event).getEventCount())
           .sum();
       totalBufferedEvents.addAndGet(-totalEventCount);

@@ -674,7 +674,7 @@ public class OzoneManagerServiceProviderImpl
               
               // Check if task reinitialization is needed due to buffer overflow or task failures
               boolean bufferOverflowed = reconTaskController.hasEventBufferOverflowed();
-              boolean tasksFailed = reconTaskController.hasDeltaTasksFailed();
+              boolean tasksFailed = reconTaskController.hasTasksFailed();
 
               if (bufferOverflowed || tasksFailed) {
                 ReconTaskReInitializationEvent.ReInitializationReason reason = bufferOverflowed ?
@@ -689,16 +689,16 @@ public class OzoneManagerServiceProviderImpl
                 // Queue async reinitialization event - checkpoint creation and retry logic is handled internally
                 ReconTaskController.ReInitializationResult result =
                     reconTaskController.queueReInitializationEvent(reason);
+                if (null == result) {
+                  LOG.error("ReInitializationResult is null, something went wrong in queueing reinitialization event");
+                  fullSnapshot = true;
+                  continue;
+                }
                 //TODO: Create a metric to track this event buffer overflow or task failure event
                 
                 if (result == ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED) {
                   LOG.warn(
                       "Reinitialization queue failures exceeded maximum retries, triggering full snapshot fallback");
-                  // Clear all events in buffer before falling back to full snapshot. Events can be present in queue
-                  // when reinit checkpoint creation fails multiple times because only after successful creation of
-                  // checkpoint, we are clearing the event buffer.
-                  reconTaskController.resetEventBuffer();
-                  reconTaskController.resetEventFlags(reason);
                   fullSnapshot = true;
                 } else if (result == ReconTaskController.ReInitializationResult.RETRY_LATER) {
                   LOG.debug("Reinitialization event queueing will be retried in next iteration");

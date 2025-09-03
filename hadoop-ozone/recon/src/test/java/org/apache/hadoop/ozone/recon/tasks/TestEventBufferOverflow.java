@@ -247,6 +247,10 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     when(mockDBStore.getCheckpoint(any(String.class), any(Boolean.class))).thenReturn(mockCheckpoint);
     when(mockCheckpoint.getCheckpointLocation()).thenReturn(mockCheckpointPath);
     
+    // Mock the createCheckpointReconMetadataManager method
+    ReconOMMetadataManager mockCheckpointedManager = mock(ReconOMMetadataManager.class);
+    when(mockOMMetadataManager.createCheckpointReconMetadataManager(any(), any())).thenReturn(mockCheckpointedManager);
+    
     // Set up latches to coordinate test phases
     CountDownLatch reinitStartedLatch = new CountDownLatch(1);
     CountDownLatch reinitCompletedLatch = new CountDownLatch(1);
@@ -393,8 +397,8 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result3,
         "Third attempt should return MAX_RETRIES_EXCEEDED");
 
-    // Verify that createOMCheckpoint was called 6 times (2 attempts per iteration × 3 iterations)
-    verify(controllerSpy, times(6)).createOMCheckpoint(any());
+    // Verify that createOMCheckpoint was called 3 times (1 attempt per iteration × 3 iterations)
+    verify(controllerSpy, times(3)).createOMCheckpoint(any());
     
     LOG.info("Checkpoint creation failure test completed - verified 3 failed attempts");
   }
@@ -463,7 +467,7 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     // reinitQueueFailureCount will be 2 because the third iteration returns MAX_RETRIES_EXCEEDED
     // and breaks the loop before incrementing the counter
     assertTrue(fullSnapshot, "Should fallback to full snapshot after max retries");
-    verify(controllerSpy, times(6)).createOMCheckpoint(any()); // 2 attempts per iteration × 3 iterations
+    verify(controllerSpy, times(3)).createOMCheckpoint(any()); // 1 attempt per iteration × 3 iterations
     
     LOG.info("Retry mechanism test completed - verified fallback to full snapshot after {} attempts", 
         maxReinitQueueFailures);
@@ -567,7 +571,7 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     assertTrue(reconTaskController.getEventBufferSize() > 0, "Buffer should contain events");
     
     // Reset buffer
-    reconTaskController.resetEventBuffer();
+    reconTaskController.drainEventBufferAndCleanExistingCheckpoints();
     
     // Verify buffer is empty
     assertEquals(0, reconTaskController.getEventBufferSize(), "Buffer should be empty after reset");
@@ -595,25 +599,22 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
         mock(ReconNamespaceSummaryManager.class));
 
     // Test resetting flags for each reason
-    reconTaskController.resetEventFlags(
-        ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
+    reconTaskController.resetEventFlags();
     assertFalse(reconTaskController.hasEventBufferOverflowed(), 
         "Buffer overflow flag should be reset");
-    assertFalse(reconTaskController.hasDeltaTasksFailed(), 
+    assertFalse(reconTaskController.hasTasksFailed(),
         "Delta tasks failed flag should be reset");
         
-    reconTaskController.resetEventFlags(
-        ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES);
+    reconTaskController.resetEventFlags();
     assertFalse(reconTaskController.hasEventBufferOverflowed(), 
         "Buffer overflow flag should be reset");
-    assertFalse(reconTaskController.hasDeltaTasksFailed(), 
+    assertFalse(reconTaskController.hasTasksFailed(),
         "Delta tasks failed flag should be reset");
         
-    reconTaskController.resetEventFlags(
-        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+    reconTaskController.resetEventFlags();
     assertFalse(reconTaskController.hasEventBufferOverflowed(), 
         "Buffer overflow flag should be reset");
-    assertFalse(reconTaskController.hasDeltaTasksFailed(), 
+    assertFalse(reconTaskController.hasTasksFailed(),
         "Delta tasks failed flag should be reset");
         
     LOG.info("Reset event flags test completed successfully");

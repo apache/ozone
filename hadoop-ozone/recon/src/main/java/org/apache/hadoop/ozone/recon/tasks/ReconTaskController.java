@@ -54,11 +54,13 @@ public interface ReconTaskController {
    * Reinitializes the registered Recon OM tasks with a new OM Metadata Manager instance.
    *
    * @param omMetadataManager the OM Metadata Manager instance to be used for reinitialization.
-   * @param reconOmTaskMap a map of Recon OM tasks, which we would like to reinitialize.
-   *                       If {@code reconOmTaskMap} is null, all registered Recon OM tasks
-   *                       will be reinitialized.
+   * @param reconOmTaskMap    a map of Recon OM tasks, which we would like to reinitialize.
+   *                          If {@code reconOmTaskMap} is null, all registered Recon OM tasks
+   *                          will be reinitialized.
+   * @return                  returns true if all specified tasks were successfully reinitialized,
+   *                          false if any task failed to reinitialize.
    */
-  void reInitializeTasks(ReconOMMetadataManager omMetadataManager, Map<String, ReconOmTask> reconOmTaskMap);
+  boolean reInitializeTasks(ReconOMMetadataManager omMetadataManager, Map<String, ReconOmTask> reconOmTaskMap);
 
   /**
    * Get set of registered tasks.
@@ -89,30 +91,17 @@ public interface ReconTaskController {
   void resetEventBufferOverflowFlag();
 
   /**
-   * Check if delta tasks have failed and need reinitialization.
+   * Check if task(s) have failed and need reinitialization.
    * 
-   * @return true if delta tasks failed after retry
+   * @return true if task(s) failed after retry
    */
-  boolean hasDeltaTasksFailed();
+  boolean hasTasksFailed();
 
   /**
-   * Reset the delta tasks failure flag after reinitialization is completed.
+   * Reset the task(s) failure flag after reinitialization is completed.
    */
-  void resetDeltaTasksFailureFlag();
+  void resetTasksFailureFlag();
 
-  /**
-   * Clear all buffered events. Used before queuing a reinitialization event.
-   */
-  void resetEventBuffer();
-
-  /**
-   * Reset event flags used to track buffer overflow and delta task failures.
-   * This is used before queuing a reinitialization event.
-   *
-   * @param reason the reason for reinitialization
-   */
-  void resetEventFlags(ReconTaskReInitializationEvent.ReInitializationReason reason);
-  
   /**
    * Queue a task reinitialization event to be processed asynchronously.
    * This method creates a checkpoint of the current OM metadata manager,
