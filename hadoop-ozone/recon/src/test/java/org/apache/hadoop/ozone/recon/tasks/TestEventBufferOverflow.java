@@ -377,30 +377,32 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     doThrow(new IOException("Checkpoint creation failed"))
         .when(controllerSpy).createOMCheckpoint(any());
     
-    // Test that checkpoint failure results in queueReInitializationEvent returning RETRY_LATER
-    ReconTaskController.ReInitializationResult result1 = controllerSpy.queueReInitializationEvent(
-        ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result1,
-        "First attempt should return RETRY_LATER due to checkpoint creation failure");
+    // Test multiple attempts until MAX_RETRIES_EXCEEDED (MAX_EVENT_PROCESS_RETRIES = 6)
+    // Need 7 attempts total: 6 RETRY_LATER + 1 MAX_RETRIES_EXCEEDED
+    ReconTaskController.ReInitializationResult result;
     
-    // Wait for retry delay
-    Thread.sleep(2100);
-    ReconTaskController.ReInitializationResult result2 = controllerSpy.queueReInitializationEvent(
-        ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result2,
-        "Second attempt should return RETRY_LATER due to checkpoint creation failure");
+    // Attempts 1-6: should return RETRY_LATER
+    for (int i = 1; i <= 6; i++) {
+      if (i > 1) {
+        Thread.sleep(2100); // Wait for retry delay
+      }
+      result = controllerSpy.queueReInitializationEvent(
+          ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
+      assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result,
+          "Attempt " + i + " should return RETRY_LATER due to checkpoint creation failure");
+    }
     
-    // Wait for retry delay  
+    // Attempt 7: should return MAX_RETRIES_EXCEEDED
     Thread.sleep(2100);
-    ReconTaskController.ReInitializationResult result3 = controllerSpy.queueReInitializationEvent(
+    result = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result3,
-        "Third attempt should return MAX_RETRIES_EXCEEDED");
+    assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result,
+        "Seventh attempt should return MAX_RETRIES_EXCEEDED");
 
-    // Verify that createOMCheckpoint was called 3 times (1 attempt per iteration × 3 iterations)
-    verify(controllerSpy, times(3)).createOMCheckpoint(any());
+    // Verify that createOMCheckpoint was called 6 times (checkpoint creation is skipped when MAX_RETRIES_EXCEEDED)
+    verify(controllerSpy, times(6)).createOMCheckpoint(any());
     
-    LOG.info("Checkpoint creation failure test completed - verified 3 failed attempts");
+    LOG.info("Checkpoint creation failure test completed - verified 6 failed attempts");
   }
   
   /**
@@ -432,7 +434,8 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     
     // Simulate the retry mechanism by tracking failure counts
     int reinitQueueFailureCount = 0;
-    final int maxReinitQueueFailures = 3;
+    // Need 7 attempts for MAX_RETRIES_EXCEEDED (6 RETRY_LATER + 1 MAX_RETRIES_EXCEEDED)
+    final int maxReinitQueueFailures = 7;
     boolean fullSnapshot = false;
     
     // Create a spy that fails checkpoint creation
@@ -464,10 +467,11 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     }
     
     // Verify the retry mechanism worked as expected  
-    // reinitQueueFailureCount will be 2 because the third iteration returns MAX_RETRIES_EXCEEDED
+    // reinitQueueFailureCount will be 6 because the seventh iteration returns MAX_RETRIES_EXCEEDED
     // and breaks the loop before incrementing the counter
     assertTrue(fullSnapshot, "Should fallback to full snapshot after max retries");
-    verify(controllerSpy, times(3)).createOMCheckpoint(any()); // 1 attempt per iteration × 3 iterations
+    // 6 attempts (checkpoint creation is skipped on 7th attempt)
+    verify(controllerSpy, times(6)).createOMCheckpoint(any());
     
     LOG.info("Retry mechanism test completed - verified fallback to full snapshot after {} attempts", 
         maxReinitQueueFailures);

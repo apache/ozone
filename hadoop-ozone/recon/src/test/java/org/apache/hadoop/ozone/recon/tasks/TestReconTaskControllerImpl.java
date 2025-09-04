@@ -523,35 +523,33 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     doThrow(new IOException("Checkpoint creation always fails"))
         .when(controllerSpy).createOMCheckpoint(any());
     
-    // Test multiple iterations until max retries exceeded
-    ReconTaskController.ReInitializationResult result1, result2, result3;
+    // Test multiple iterations until max retries exceeded (MAX_EVENT_PROCESS_RETRIES = 6)
+    // Need 7 total iterations because count check happens before increment
+    ReconTaskController.ReInitializationResult result;
     
-    // First iteration - should return RETRY_LATER after both attempts fail
-    result1 = controllerSpy.queueReInitializationEvent(
-        ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result1, 
-        "First iteration should return RETRY_LATER");
-    assertEquals(1, controllerSpy.getEventProcessRetryCount(), "Should have 1 iteration retry");
+    // Iterations 1-6: should return RETRY_LATER and increment retry count
+    for (int i = 1; i <= 6; i++) {
+      if (i > 1) {
+        Thread.sleep(2100); // Wait for retry delay
+      }
+      result = controllerSpy.queueReInitializationEvent(
+          ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
+      assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result,
+          "Iteration " + i + " should return RETRY_LATER");
+      assertEquals(i, controllerSpy.getEventProcessRetryCount(), "Should have " + i + " iteration retries");
+    }
     
-    // Second iteration - should return RETRY_LATER after both attempts fail
-    // Need to wait for delay or this will return RETRY_LATER due to timing
-    Thread.sleep(2100); // Wait slightly more than 2 seconds
-    result2 = controllerSpy.queueReInitializationEvent(
+    // Iteration 7: should return MAX_RETRIES_EXCEEDED (eventProcessRetryCount is now 6,
+    // which >= MAX_EVENT_PROCESS_RETRIES)
+    Thread.sleep(2100); // Wait for retry delay
+    result = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertEquals(ReconTaskController.ReInitializationResult.RETRY_LATER, result2,
-        "Second iteration should return RETRY_LATER");
-    assertEquals(2, controllerSpy.getEventProcessRetryCount(), "Should have 2 iteration retries");
-    
-    // Third iteration - should return MAX_RETRIES_EXCEEDED after both attempts fail
-    Thread.sleep(2100); // Wait slightly more than 2 seconds
-    result3 = controllerSpy.queueReInitializationEvent(
-        ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW);
-    assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result3,
-        "Third iteration should return MAX_RETRIES_EXCEEDED");
+    assertEquals(ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED, result,
+        "Seventh iteration should return MAX_RETRIES_EXCEEDED");
     assertEquals(0, controllerSpy.getEventProcessRetryCount(), "Retry count should be reset after max exceeded");
     
-    // Verify that createOMCheckpoint was called 3 times total (1 attempt per iteration × 3 iterations)
-    verify(controllerSpy, times(3)).createOMCheckpoint(any());
+    // Verify that createOMCheckpoint was called 6 times (checkpoint creation is skipped when MAX_RETRIES_EXCEEDED)
+    verify(controllerSpy, times(6)).createOMCheckpoint(any());
   }
 
   @Test

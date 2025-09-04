@@ -512,8 +512,7 @@ public class TestOzoneManagerServiceProviderImpl {
         initializeEmptyOmMetadataManager(dirOmMetadata), dirReconMetadata);
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
-    doNothing().when(reconTaskControllerMock)
-        .reInitializeTasks(omMetadataManager, null);
+    when(reconTaskControllerMock.reInitializeTasks(omMetadataManager, null)).thenReturn(true);
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = getMockTaskStatusUpdaterManager();
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
@@ -587,8 +586,7 @@ public class TestOzoneManagerServiceProviderImpl {
         initializeNewOmMetadataManager(dirOmMetadata), dirReconMetadata);
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
-    doNothing().when(reconTaskControllerMock)
-        .reInitializeTasks(omMetadataManager, null);
+    when(reconTaskControllerMock.reInitializeTasks(omMetadataManager, null)).thenReturn(true);
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = getMockTaskStatusUpdaterManager();
 
     OzoneManagerProtocol protocol = getMockOzoneManagerClientWithThrow();
