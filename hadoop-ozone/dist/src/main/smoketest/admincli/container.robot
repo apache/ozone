@@ -94,9 +94,9 @@ Container info
                         Should contain   ${output}   Datanodes
 
 Container info should fail with invalid container ID
-    ${output} =         Execute          ozone admin container info "${CONTAINER}" -2 0.5 abc
-                        Should contain   ${output}   Container IDs must be positive integers
-                        Should contain   ${output}   Invalid container ID: -2 0.5 abc
+    ${output} =         Execute And Ignore Error          ozone admin container info "${CONTAINER}" -2 0.5 abc
+                        Should contain   ${output}        Container IDs must be positive integers.
+                        Should contain   ${output}        Invalid container IDs: -2 0.5 abc
 
 Verbose container info
     ${output} =         Execute          ozone admin --verbose container info "${CONTAINER}"
