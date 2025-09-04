@@ -146,11 +146,11 @@ public class ContainerImporter {
     }
   }
 
-  HddsVolume chooseNextVolume(long spaceReserved) throws IOException {
+  HddsVolume chooseNextVolume(long spaceToReserve) throws IOException {
     // Choose volume that can hold both container in tmp and dest directory
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        spaceReserved);
+        spaceToReserve);
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

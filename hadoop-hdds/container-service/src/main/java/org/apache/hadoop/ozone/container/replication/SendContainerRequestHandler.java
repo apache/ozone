@@ -54,8 +54,7 @@ class SendContainerRequestHandler
   private Path path;
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
-  private long spaceReserved = 0;
-  private boolean firstRequest = true;
+  private long spaceToReserve = 0;
 
   SendContainerRequestHandler(
       ContainerImporter importer,
@@ -88,13 +87,13 @@ class SendContainerRequestHandler
         containerId = req.getContainerID();
         
         // Use replicate size if available, otherwise fall back to default
-        if (firstRequest && req.hasReplicateSize()) {
-          spaceReserved = importer.getRequiredReplicationSpace(req.getReplicateSize());
+        if (req.hasReplicateSize()) {
+          spaceToReserve = importer.getRequiredReplicationSpace(req.getReplicateSize());
         } else {
-          spaceReserved = importer.getDefaultReplicationSpace();
+          spaceToReserve = importer.getDefaultReplicationSpace();
         }
 
-        volume = importer.chooseNextVolume(spaceReserved);
+        volume = importer.chooseNextVolume(spaceToReserve);
 
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
@@ -104,8 +103,6 @@ class SendContainerRequestHandler
 
         LOG.info("Accepting container {}", req.getContainerID());
       }
-      
-      firstRequest = false;
 
       assertSame(containerId, req.getContainerID(), "containerID");
 
@@ -129,8 +126,8 @@ class SendContainerRequestHandler
       deleteTarball();
       responseObserver.onError(t);
     } finally {
-      if (volume != null && spaceReserved > 0) {
-        volume.incCommittedBytes(-spaceReserved);
+      if (volume != null && spaceToReserve > 0) {
+        volume.incCommittedBytes(-spaceToReserve);
       }
     }
   }
@@ -158,8 +155,8 @@ class SendContainerRequestHandler
         responseObserver.onError(t);
       }
     } finally {
-      if (volume != null && spaceReserved > 0) {
-        volume.incCommittedBytes(-spaceReserved);
+      if (volume != null && spaceToReserve > 0) {
+        volume.incCommittedBytes(-spaceToReserve);
       }
     }
   }
