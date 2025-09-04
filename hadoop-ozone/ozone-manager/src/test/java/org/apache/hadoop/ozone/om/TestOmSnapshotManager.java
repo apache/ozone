@@ -776,7 +776,8 @@ class TestOmSnapshotManager {
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
 
     assertThat(logCapturer.getOutput()).contains(
-        "for snapshot " + first.getName() + " already exists.");
+        "for snapshot " + first.getName() +
+            " (volume: " + first.getVolumeName() + ", bucket: " + first.getBucketName() + ") already exists.");
   }
 
   private SnapshotInfo createSnapshotInfo(String volumeName,
