@@ -610,6 +610,9 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // This simulates the behavior in OzoneManagerServiceProviderImpl#syncDataFromOM lines 680-692
     assertTrue(controllerSpy.hasTasksFailed(), "tasksFailed should still be true, triggering retry");
     
+    // Wait for retry delay before attempting to queue again (RETRY_DELAY_MS = 2000)
+    Thread.sleep(2100);
+    
     // Queue another reinitialization event (simulating what syncDataFromOM does)
     ReconTaskController.ReInitializationResult result = controllerSpy.queueReInitializationEvent(
         ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES);
