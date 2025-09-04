@@ -91,14 +91,26 @@ public class ContainerMerkleTreeWriter {
     id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new);
   }
 
-  // Used when reconciling deleted blocks
+  /**
+   * Creates a deleted block entry in the merkle tree and assigns the block this fixed checksum.
+   * If the block already exists with child data it is overwritten.
+   *
+   * This method is used on the reconciliation path to update the data checksum used for a deleted block based on a
+   * peer's value.
+   */
   public void setDeletedBlock(long blockID, long dataChecksum) {
     BlockMerkleTreeWriter blockWriter = new BlockMerkleTreeWriter(blockID);
     blockWriter.markDeleted(dataChecksum);
     id2Block.put(blockID, blockWriter);
   }
 
-  // Used by block deleting service
+  /**
+   * Creates a deleted block entry in the merkle tree and assigns the block a checksum computed from the chunk metadata
+   * in the provided BlockData object.
+   *
+   * This method is used by the block deleting service to add a marker to the tree for a block that has been deleted so
+   * that the deletion does not alter the data checksum.
+   */
   public void setDeletedBlock(long blockID, BlockData blockData) {
     BlockMerkleTreeWriter blockWriter = new BlockMerkleTreeWriter(blockID);
     for (ContainerProtos.ChunkInfo chunkInfo: blockData.getChunks()) {
@@ -196,7 +208,7 @@ public class ContainerMerkleTreeWriter {
         .setDataChecksum(checksumImpl.getValue());
   }
 
-  private ContainerProtos.ContainerMerkleTree toProto() {
+  public ContainerProtos.ContainerMerkleTree toProto() {
     return toProtoBuilder().build();
   }
 
