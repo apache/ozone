@@ -306,7 +306,7 @@ public class KeyLifecycleService extends BackgroundService {
               expiredKeyList, false);
         } else if (ozoneTrash != null) {
           // move keys to trash
-          // TODO: add unit test in next patch
+          // TODO: move directory to trash in next patch
           moveKeysToTrash(bucket, expiredKeyList);
         } else {
           sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList, false);
@@ -527,6 +527,16 @@ public class KeyLifecycleService extends BackgroundService {
         Table<String, OmKeyInfo> keyTable, List<OmLCRule> ruleList, LimitedExpiredObjectList expiredKeyList) {
       String volumeName = bucketInfo.getVolumeName();
       String bucketName = bucketInfo.getBucketName();
+
+      if (bucketInfo.getBucketLayout() == BucketLayout.LEGACY) {
+        List<OmLCRule> prefixStartsWithTrashRuleList =
+            ruleList.stream().filter(r -> r.isPrefixEnable() && r.getEffectivePrefix().startsWith(
+                TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX)).collect(Collectors.toList());
+        ruleList.removeAll(prefixStartsWithTrashRuleList);
+        prefixStartsWithTrashRuleList.stream().forEach(
+            r -> LOG.info("Skip rule {} as its prefix starts with {}", r, TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX));
+      }
+
       // use bucket name as key iterator prefix
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
                keyTable.iterator(omMetadataManager.getBucketKey(volumeName, bucketName))) {
@@ -534,6 +544,11 @@ public class KeyLifecycleService extends BackgroundService {
           Table.KeyValue<String, OmKeyInfo> keyValue = keyTblItr.next();
           OmKeyInfo key = keyValue.getValue();
           numKeyIterated++;
+          if (bucketInfo.getBucketLayout() == BucketLayout.LEGACY &&
+              key.getKeyName().startsWith(TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX)) {
+            LOG.info("Skip evaluate trash directory {} and all its child files and sub directories", TRASH_PREFIX);
+            continue;
+          }
           for (OmLCRule rule : ruleList) {
             if (rule.match(key)) {
               // mark key as expired, check next key
@@ -567,7 +582,7 @@ public class KeyLifecycleService extends BackgroundService {
      * If prefix is /dir1/dir2, but dir1 doesn't exist, then it will return exception.
      * If prefix is /dir1/dir2, but dir2 doesn't exist, then it will return a list with dir1 only.
      * If prefix is /dir1/dir2, although dir1 exists, but get(dir1) failed with IOException,
-     *   then it will return exception too.
+     * then it will return exception too.
      */
     private List<OmDirectoryInfo> getDirList(OmVolumeArgs volume, OmBucketInfo bucket, String prefix, String bucketKey)
         throws IOException {
@@ -779,20 +794,21 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     private String checkAndCreateTrashDirectoryIfNeeded(OmBucketInfo bucket) throws IOException {
-      String trashRoot = TRASH_PREFIX + OM_KEY_PREFIX + bucket.getOwner();
-      String trashCurrent = trashRoot + OM_KEY_PREFIX + CURRENT;
-      OmKeyArgs key = new OmKeyArgs.Builder().setVolumeName(bucket.getVolumeName())
-          .setBucketName(bucket.getBucketName()).setKeyName(trashCurrent).setOwnerName(bucket.getOwner()).build();
+      String userTrashRoot = TRASH_PREFIX + OM_KEY_PREFIX + bucket.getOwner();
+      String userTrashCurrent = userTrashRoot + OM_KEY_PREFIX + CURRENT;
       try {
+        OmKeyArgs key = new OmKeyArgs.Builder().setVolumeName(bucket.getVolumeName())
+            .setBucketName(bucket.getBucketName()).setKeyName(userTrashCurrent)
+            .setOwnerName(bucket.getOwner()).build();
         ozoneManager.getFileStatus(key);
-        return trashCurrent;
+        return userTrashCurrent;
       } catch (IOException e) {
         if (e instanceof OMException &&
             (((OMException) e).getResult() == OMException.ResultCodes.FILE_NOT_FOUND ||
                 ((OMException) e).getResult() == OMException.ResultCodes.DIRECTORY_NOT_FOUND)) {
           // create the trash/Current directory for user
           KeyArgs keyArgs = KeyArgs.newBuilder().setVolumeName(bucket.getVolumeName())
-              .setBucketName(bucket.getBucketName()).setKeyName(trashCurrent)
+              .setBucketName(bucket.getBucketName()).setKeyName(userTrashCurrent)
               .setOwnerName(bucket.getOwner()).setRecursive(true).build();
           OMRequest omRequest = OMRequest.newBuilder().setCreateDirectoryRequest(
                   CreateDirectoryRequest.newBuilder().setKeyArgs(keyArgs))
@@ -817,17 +833,18 @@ public class KeyLifecycleService extends BackgroundService {
             if (omResponse != null) {
               if (!omResponse.getSuccess()) {
                 LOG.error("CreateDirectory request failed with {}, path: {}",
-                    omResponse.getMessage(), trashCurrent);
-                throw new IOException("Failed to create trash directory " + trashCurrent);
+                    omResponse.getMessage(), userTrashCurrent);
+                throw new IOException("Failed to create trash directory " + userTrashCurrent);
               }
-              return trashCurrent;
+              LOG.error("Create trash current directory: {}", userTrashCurrent);
+              return userTrashCurrent;
             }
           } catch (InterruptedException | IOException e1) {
-            LOG.error("Failed to send CreateDirectoryRequest for {}", trashCurrent, e1);
-            throw new IOException("Failed to send CreateDirectoryRequest request for " + trashCurrent);
+            LOG.error("Failed to send CreateDirectoryRequest for {}", userTrashCurrent, e1);
+            throw new IOException("Failed to send CreateDirectoryRequest request for " + userTrashCurrent);
           }
         }
-        LOG.error("Failed to get trash current directory {} status", trashCurrent, e);
+        LOG.error("Failed to get trash current directory {} status", userTrashCurrent, e);
         throw e;
       }
     }

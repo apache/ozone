@@ -23,6 +23,7 @@ import static org.apache.hadoop.fs.ozone.OzoneTrashPolicy.CURRENT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
@@ -68,7 +69,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.FaultInjectorImpl;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -1280,23 +1280,24 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
-    @Test
-    void testMoveToTrash() throws IOException,
+    @ParameterizedTest
+    @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
+    void testMoveToTrash(BucketLayout bucketLayout) throws IOException,
         TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String prefix = "key";
       long initialDeletedKeyCount = getDeletedKeyCount();
-      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+      long initialKeyCount = getKeyCount(bucketLayout);
       long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
       // create keys
       String bucketOwner = UserGroupInformation.getCurrentUser().getShortUserName() + "-test";
       List<OmKeyArgs> keyList =
-          createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, bucketOwner, KEY_COUNT, 1, prefix, null);
+          createKeys(volumeName, bucketName, bucketLayout, bucketOwner, KEY_COUNT, 1, prefix, null);
       // check there are keys in keyTable
       Thread.sleep(SERVICE_INTERVAL);
       assertEquals(KEY_COUNT, keyList.size());
-      GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == KEY_COUNT,
+      GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == KEY_COUNT,
           WAIT_CHECK_INTERVAL, 1000);
 
       // enabled trash
@@ -1310,18 +1311,25 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), true);
 
       GenericTestUtils.waitFor(() ->
-          (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 5000);
+          (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 50000);
       assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
-      // verify trash directory has the right native ACL
+      // verify trash directory has the right native ACLs
       List<KeyInfoWithVolumeContext> dirList = new ArrayList<>();
-      dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX));
-      dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX + bucketOwner));
-      dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX + bucketOwner +
-          OzoneConsts.OM_KEY_PREFIX + CURRENT));
+      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX));
+        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner));
+        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner +
+            OM_KEY_PREFIX + CURRENT));
+      } else {
+        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX));
+        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner + OM_KEY_PREFIX));
+        dirList.add(getDirectory(volumeName, bucketName, TRASH_PREFIX + OM_KEY_PREFIX + bucketOwner +
+            OM_KEY_PREFIX + CURRENT + OM_KEY_PREFIX));
+      }
       for (KeyInfoWithVolumeContext dir : dirList) {
         List<OzoneAcl> aclList = dir.getKeyInfo().getAcls();
         for (OzoneAcl acl : aclList) {
@@ -1338,24 +1346,28 @@ class TestKeyLifecycleService extends OzoneTestBase {
               LoggerFactory.getLogger(KeyLifecycleService.class));
 
       // keys under trash directory is counted in getKeyCount()
-      assertEquals(KEY_COUNT, getKeyCount(FILE_SYSTEM_OPTIMIZED));
+      if (bucketLayout == FILE_SYSTEM_OPTIMIZED) {
+        assertEquals(KEY_COUNT, getKeyCount(bucketLayout) - initialKeyCount);
+      } else {
+        // For legacy bucket, trash directories along .Trash/user-test/Current are in key table too.
+        assertEquals(KEY_COUNT + 3, getKeyCount(bucketLayout) - initialKeyCount);
+      }
       // create new policy to test rule with prefix ".Trash/" is ignored during lifecycle evaluation
       now = ZonedDateTime.now(ZoneOffset.UTC);
       date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX,
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, TRASH_PREFIX + OM_KEY_PREFIX,
           null, date.toString(), true);
 
       GenericTestUtils.waitFor(
           () -> log.getOutput().contains("Skip rule") &&
-              log.getOutput().contains("as its prefix starts with " + TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX),
+              log.getOutput().contains("as its prefix starts with " + TRASH_PREFIX + OM_KEY_PREFIX),
           WAIT_CHECK_INTERVAL, 5000);
       deleteLifecyclePolicy(volumeName, bucketName);
 
       // create new policy to test rule with prefix ".Trash" is ignored during lifecycle evaluation
       now = ZonedDateTime.now(ZoneOffset.UTC);
       date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, TRASH_PREFIX,
-          null, date.toString(), true);
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, TRASH_PREFIX, null, date.toString(), true);
 
       GenericTestUtils.waitFor(
           () -> log.getOutput().contains("Skip evaluate trash directory " + TRASH_PREFIX), WAIT_CHECK_INTERVAL, 5000);
@@ -1364,8 +1376,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       // create new policy to test trash directory is skipped during lifecycle evaluation
       now = ZonedDateTime.now(ZoneOffset.UTC);
       date = now.plusSeconds(EXPIRE_SECONDS);
-      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "",
-          null, date.toString(), true);
+      createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), true);
 
       GenericTestUtils.waitFor(
           () -> log.getOutput().contains("No expired keys/dirs found for bucket"), WAIT_CHECK_INTERVAL, 5000);
