@@ -486,7 +486,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         eventProcessRetryCount.get());
 
     ReInitializationResult reInitializationResult = validateRetryCountAndDelay();
-    if (reInitializationResult == ReInitializationResult.MAX_RETRIES_EXCEEDED) {
+    if (null != reInitializationResult) {
       return reInitializationResult;
     }
 
@@ -547,6 +547,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     long currentTime = System.currentTimeMillis();
     lastRetryTimestamp.set(currentTime);
     eventProcessRetryCount.getAndIncrement();
+    tasksFailed.compareAndSet(false, true);
     LOG.error("Event processing failed {} times.", eventProcessRetryCount);
   }
   
@@ -587,7 +588,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   @Override
   public void updateOMMetadataManager(ReconOMMetadataManager omMetadataManager) {
-    LOG.info("Updating OM metadata manager");
+    LOG.debug("Updating OM metadata manager");
     this.currentOMMetadataManager = omMetadataManager;
   }
 
@@ -652,11 +653,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         if (!isRunSuccessful) {
           // Setting this taskFailed flag as true here will block consuming delta events and stop buffering events
           // in eventBuffer until we successfully queue a new reinit event again.
-          tasksFailed.compareAndSet(false, true);
           handleEventFailure();
           LOG.error("Task reinitialization failed, tasksFailed flag set to true");
         } else {
-          resetEventFlags();
           resetRetryCounters();
           LOG.info("Completed async task reinitialization");
         }
@@ -683,8 +682,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   public int getEventBufferSize() {
     return eventBuffer.getQueueSize();
   }
-  
-  @Override
+
+  /**
+   * Get the number of batches that have been dropped due to buffer overflow.
+   * This is used by the overflow detection logic.
+   *
+   * @return the number of dropped batches
+   */
+  @VisibleForTesting
   public long getDroppedBatches() {
     return eventBuffer.getDroppedBatches();
   }

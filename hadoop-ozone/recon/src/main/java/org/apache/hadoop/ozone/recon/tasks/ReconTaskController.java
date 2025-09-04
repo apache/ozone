@@ -116,13 +116,4 @@ public interface ReconTaskController {
    */
   @VisibleForTesting
   int getEventBufferSize();
-  
-  /**
-   * Get the number of batches that have been dropped due to buffer overflow.
-   * This is used by the overflow detection logic.
-   * 
-   * @return the number of dropped batches
-   */
-  long getDroppedBatches();
-
 }
