@@ -56,24 +56,20 @@ public class TestDownloadAndImportReplicator {
   @TempDir
   private File tempDir;
 
-  private OzoneConfiguration conf;
-  private VolumeChoosingPolicy volumeChoosingPolicy;
-  private ContainerSet containerSet;
   private MutableVolumeSet volumeSet;
-  private ContainerImporter importer;
   private SimpleContainerDownloader downloader;
   private DownloadAndImportReplicator replicator;
   private long containerMaxSize;
 
   @BeforeEach
   void setup() throws IOException {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
-    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
-    containerSet = newContainerSet(0);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+    ContainerSet containerSet = newContainerSet(0);
     volumeSet = new MutableVolumeSet("test", conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    importer = new ContainerImporter(conf, containerSet,
+    ContainerImporter importer = new ContainerImporter(conf, containerSet,
         mock(ContainerController.class), volumeSet, volumeChoosingPolicy);
     downloader = mock(SimpleContainerDownloader.class);
     replicator = new DownloadAndImportReplicator(conf, containerSet, importer,

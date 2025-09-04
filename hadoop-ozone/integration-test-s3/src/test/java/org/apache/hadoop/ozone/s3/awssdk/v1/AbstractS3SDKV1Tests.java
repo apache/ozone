@@ -110,8 +110,8 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
-import org.apache.hadoop.ozone.s3.S3GatewayService;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
@@ -194,7 +194,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
    * @throws Exception exception thrown when waiting for the cluster to be ready.
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
-    S3GatewayService s3g = new S3GatewayService();
+    MultiS3GatewayService s3g = new MultiS3GatewayService(5);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .addService(s3g)
         .setNumDatanodes(5)
@@ -815,6 +815,17 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       assertEquals(result.getKeyMarker(), keyMarker);
       assertEquals(result.getMaxUploads(), 10);
 
+      // Verify next markers content
+      if (result.isTruncated()) {
+        MultipartUpload lastUploadOnPage = result.getMultipartUploads()
+            .get(result.getMultipartUploads().size() - 1);
+        assertEquals(lastUploadOnPage.getKey(), result.getNextKeyMarker());
+        assertEquals(lastUploadOnPage.getUploadId(), result.getNextUploadIdMarker());
+      } else {
+        assertNull(result.getNextKeyMarker());
+        assertNull(result.getNextUploadIdMarker());
+      }
+
       // Update markers for next page
       keyMarker = result.getNextKeyMarker();
       uploadIdMarker = result.getNextUploadIdMarker();
@@ -849,6 +860,51 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         prefixResult.getMultipartUploads().stream()
             .map(MultipartUpload::getKey)
             .collect(Collectors.toList()));
+  }
+
+  @Test
+  public void testListMultipartUploadsPaginationCornerCases() {
+    final String bucketName = getBucketName();
+    final String keyA = getKeyName("samekey");
+    final String keyB = getKeyName("after");
+
+    s3Client.createBucket(bucketName);
+
+    // Create multiple MPUs for the same key to verify upload-id-marker semantics
+    List<String> keyAUploadIds = new ArrayList<>();
+    keyAUploadIds.add(initiateMultipartUpload(bucketName, keyA, null, null, null));
+    keyAUploadIds.add(initiateMultipartUpload(bucketName, keyA, null, null, null));
+    keyAUploadIds.add(initiateMultipartUpload(bucketName, keyA, null, null, null));
+    // Also create another key to ensure listing proceeds past keyA
+    initiateMultipartUpload(bucketName, keyB, null, null, null);
+
+    // Sort upload IDs lexicographically to match listing order for the same key
+    Collections.sort(keyAUploadIds);
+
+    // Case 1: key-marker=keyA and upload-id-marker set to the lowest uploadId
+    // Per spec, same-key uploads MAY be included if uploadId > marker
+    ListMultipartUploadsRequest request1 = new ListMultipartUploadsRequest(bucketName)
+        .withKeyMarker(keyA)
+        .withUploadIdMarker(keyAUploadIds.get(0))
+        .withMaxUploads(100);
+    MultipartUploadListing result1 = s3Client.listMultipartUploads(request1);
+
+    List<MultipartUpload> uploads1 = result1.getMultipartUploads();
+    // Collect same-key uploads and verify none are <= marker
+    List<String> sameKeyIds1 = uploads1.stream()
+        .filter(u -> keyA.equals(u.getKey()))
+        .map(MultipartUpload::getUploadId)
+        .collect(Collectors.toList());
+    assertThat(sameKeyIds1).allSatisfy(id -> assertTrue(id.compareTo(keyAUploadIds.get(0)) > 0));
+
+    // Case 2: key-marker=keyA and upload-id-marker set to the highest uploadId
+    // Expect no same-key (keyA) uploads to be returned
+    ListMultipartUploadsRequest request2 = new ListMultipartUploadsRequest(bucketName)
+        .withKeyMarker(keyA)
+        .withUploadIdMarker(keyAUploadIds.get(2))
+        .withMaxUploads(100);
+    MultipartUploadListing result2 = s3Client.listMultipartUploads(request2);
+    assertTrue(result2.getMultipartUploads().stream().noneMatch(u -> keyA.equals(u.getKey())));
   }
 
   @Test
@@ -1029,6 +1085,62 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
              content.getBytes(StandardCharsets.UTF_8).length)) {
       IOUtils.copy(s3is, bos);
       assertEquals(content, bos.toString("UTF-8"));
+    }
+  }
+
+  @Test
+  public void testPresignedUrlHead() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+
+    // Set the presigned URL to expire after one hour.
+    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+
+    // Test HeadObject presigned URL
+    GeneratePresignedUrlRequest generatePresignedUrlRequest =
+        new GeneratePresignedUrlRequest(bucketName, keyName)
+            .withMethod(HttpMethod.HEAD)
+            .withExpiration(expiration);
+    URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+    URL presignedUrl = new URL(url.toExternalForm());
+    HttpURLConnection connection = null;
+    try {
+      connection = (HttpURLConnection) presignedUrl.openConnection();
+      connection.setRequestMethod("HEAD");
+
+      int responseCode = connection.getResponseCode();
+      assertEquals(200, responseCode, "HeadObject presigned URL should return 200 OK");
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
+
+    // Test HeadBucket presigned URL
+    GeneratePresignedUrlRequest generateBucketPresignedUrlRequest =
+        new GeneratePresignedUrlRequest(bucketName, null)
+            .withMethod(HttpMethod.HEAD)
+            .withExpiration(expiration);
+    URL bucketUrl = s3Client.generatePresignedUrl(generateBucketPresignedUrlRequest);
+
+    URL presignedBucketUrl = new URL(bucketUrl.toExternalForm());
+    HttpURLConnection bucketConnection = null;
+    try {
+      bucketConnection = (HttpURLConnection) presignedBucketUrl.openConnection();
+      bucketConnection.setRequestMethod("HEAD");
+
+      int bucketResponseCode = bucketConnection.getResponseCode();
+      assertEquals(200, bucketResponseCode, "HeadBucket presigned URL should return 200 OK");
+    } finally {
+      if (bucketConnection != null) {
+        bucketConnection.disconnect();
+      }
     }
   }
 

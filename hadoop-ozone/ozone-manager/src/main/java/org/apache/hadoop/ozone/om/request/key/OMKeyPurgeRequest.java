@@ -91,8 +91,11 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         // redundant tombstone entry in the deletedTable. It is better to skip the transaction.
         UUID expectedPreviousSnapshotId = purgeKeysRequest.getExpectedPreviousSnapshotID().hasUuid()
             ? fromProtobuf(purgeKeysRequest.getExpectedPreviousSnapshotID().getUuid()) : null;
-        validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
-            expectedPreviousSnapshotId);
+        if (!validatePreviousSnapshotId(fromSnapshotInfo, omMetadataManager.getSnapshotChainManager(),
+            expectedPreviousSnapshotId)) {
+          return new OMKeyPurgeResponse(createErrorOMResponse(omResponse,
+              new OMException("Snapshot validation failed", OMException.ResultCodes.INVALID_REQUEST)));
+        }
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OmKeyPurge. ", e);

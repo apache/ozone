@@ -24,9 +24,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMDeletionAction;
@@ -100,25 +97,19 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       List<SnapshotMoveKeyInfos> reclaimKeysList = moveDeletedKeysRequest.getReclaimKeysList();
       List<HddsProtos.KeyValue> renamedKeysList = moveDeletedKeysRequest.getRenamedKeysList();
       List<String> movedDirs = moveDeletedKeysRequest.getDeletedDirsToMoveList();
-      Map<String, String> auditParams = new LinkedHashMap<>();
 
-      // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
-      fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
-      omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()),
-          CacheValue.get(context.getIndex(), fromSnapshot));
-      if (nextSnapshot != null) {
-        nextSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
-        omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(nextSnapshot.getTableKey()),
-            CacheValue.get(context.getIndex(), nextSnapshot));
-        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_ID, nextSnapshot.getSnapshotId().toString());
-        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_TABLE_KEY, nextSnapshot.getTableKey());
-      }
+      OMSnapshotMoveUtils.updateCache(ozoneManager, fromSnapshot, nextSnapshot, context);
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
           omResponse.build(), fromSnapshot, nextSnapshot,
           nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);
-      
+
+      Map<String, String> auditParams = new LinkedHashMap<>();
       auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_ID, fromSnapshot.getSnapshotId().toString());
       auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY, fromSnapshot.getTableKey());
+      if (nextSnapshot != null) {
+        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_ID, nextSnapshot.getSnapshotId().toString());
+        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_TABLE_KEY, nextSnapshot.getTableKey());
+      }
       auditParams.put(AUDIT_PARAM_KEYS_MOVED, String.valueOf(nextDBKeysList.size()));
       auditParams.put(AUDIT_PARAM_RENAMED_KEYS_MOVED, String.valueOf(renamedKeysList.size()));
       auditParams.put(AUDIT_PARAM_DIRS_MOVED, String.valueOf(movedDirs.size()));

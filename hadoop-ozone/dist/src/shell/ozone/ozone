@@ -193,7 +193,7 @@ function ozonecmd_case
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     daemonlog)
-      OZONE_CLASSNAME=org.apache.hadoop.log.LogLevel
+      OZONE_CLASSNAME=org.apache.hadoop.hdds.utils.LogLevel
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     insight)

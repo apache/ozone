@@ -34,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -140,7 +139,7 @@ public class TestCloseContainer {
     // Checksum file exists after container close
     for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
       GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, container), 100, 5000);
-      assertTrue(containerChecksumFileExists(hddsDatanode, container.getContainerID()));
+      GenericTestUtils.waitFor(() -> containerChecksumFileExists(hddsDatanode, container.getContainerID()), 100, 5000);
     }
 
     long originalSeq = container.getSequenceId();
@@ -197,7 +196,7 @@ public class TestCloseContainer {
     // Checksum file exists after container close
     for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
       GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, container), 100, 5000);
-      assertTrue(containerChecksumFileExists(hddsDatanode, container.getContainerID()));
+      GenericTestUtils.waitFor(() -> containerChecksumFileExists(hddsDatanode, container.getContainerID()), 100, 5000);
     }
 
     for (ContainerReplica replica : getContainerReplicas(container)) {
@@ -229,8 +228,8 @@ public class TestCloseContainer {
     // Checksum file exists after container close and matches the expected container
     // merkle tree for all the datanodes
     for (HddsDatanodeService hddsDatanode : hddsDatanodes) {
-      GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, containerInfo1), 100, 5000);
-      assertTrue(containerChecksumFileExists(hddsDatanode, containerInfo1.getContainerID()));
+      GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, containerInfo1) &&
+          containerChecksumFileExists(hddsDatanode, containerInfo1.getContainerID()), 100, 5000);
       OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
       Container<?> container1 = ozoneContainer.getController().getContainer(containerInfo1.getContainerID());
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerMerkleTreeTestUtils.readChecksumFile(
@@ -256,8 +255,8 @@ public class TestCloseContainer {
     // Checksum file exists after container close and matches the expected container
     // merkle tree for all the datanodes
     for (HddsDatanodeService hddsDatanode : hddsDatanodes) {
-      GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, containerInfo2), 100, 5000);
-      assertTrue(containerChecksumFileExists(hddsDatanode, containerInfo2.getContainerID()));
+      GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, containerInfo2) &&
+          containerChecksumFileExists(hddsDatanode, containerInfo2.getContainerID()), 100, 5000);
       OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
       Container<?> container2 = ozoneContainer.getController().getContainer(containerInfo2.getContainerID());
       ContainerProtos.ContainerChecksumInfo containerChecksumInfo = ContainerMerkleTreeTestUtils.readChecksumFile(
@@ -274,12 +273,12 @@ public class TestCloseContainer {
     assertNotEquals(prevExpectedChecksumInfo1.getContainerID(), prevExpectedChecksumInfo2.getContainerID());
     assertNotEquals(prevExpectedChecksumInfo1.getContainerMerkleTree().getDataChecksum(),
         prevExpectedChecksumInfo2.getContainerMerkleTree().getDataChecksum());
-    for (ContainerReplica replica : getContainerReplicas(containerInfo1)) {
-      assertNotEquals(0, replica.getDataChecksum());
-    }
-    for (ContainerReplica replica : getContainerReplicas(containerInfo2)) {
-      assertNotEquals(0, replica.getDataChecksum());
-    }
+
+    // Wait for SCM to receive container reports with non-zero checksums for all replicas
+    GenericTestUtils.waitFor(() -> getContainerReplicas(containerInfo1).stream()
+            .allMatch(r -> r.getDataChecksum() != 0), 200, 5000);
+    GenericTestUtils.waitFor(() -> getContainerReplicas(containerInfo2).stream()
+            .allMatch(r -> r.getDataChecksum() != 0), 200, 5000);
   }
 
   private boolean checkContainerCloseInDatanode(HddsDatanodeService hddsDatanode,
