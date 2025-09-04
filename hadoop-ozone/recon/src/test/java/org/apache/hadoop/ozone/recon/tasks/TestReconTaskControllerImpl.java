@@ -173,16 +173,14 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertThat(completed).isTrue();
     
     // Wait for task status to be recorded after the exception
-    CountDownLatch statusRecordLatch = new CountDownLatch(1);
-    CompletableFuture.runAsync(() -> {
+    GenericTestUtils.waitFor(() -> {
       try {
-        GenericTestUtils.waitFor(() -> true, 100, 500);
+        ReconTaskStatus status = reconTaskStatusDao.findById("MockTask");
+        return status != null && status.getLastTaskRunStatus() == -1;
       } catch (Exception e) {
-        // Continue regardless
+        return false;
       }
-      statusRecordLatch.countDown();
-    });
-    assertTrue(statusRecordLatch.await(1, TimeUnit.SECONDS), "Status recording should complete");
+    }, 100, 5000);
     
     verify(reconOmTaskMock, times(1))
         .process(any(), anyMap());
