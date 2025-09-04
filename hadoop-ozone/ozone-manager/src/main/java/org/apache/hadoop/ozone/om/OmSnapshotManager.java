@@ -412,8 +412,8 @@ public final class OmSnapshotManager implements AutoCloseable {
           if (!flushed) {
             throw new OMException("Unable to load snapshot. " +
                 "Create Snapshot Txn '" + snapshotInfo.getTableKey() +
-                "' has not been flushed yet. Please wait a few more seconds before " +
-                "retrying", TIMEOUT);
+                "' with txnId : '" + TransactionInfo.fromByteString(snapshotInfo.getCreateTransactionInfo()) +
+                "' has not been flushed yet. Please wait a few more seconds before retrying", TIMEOUT);
           }
           snapshotMetadataManager = new OmMetadataManagerImpl(conf,
               snapshotInfo.getCheckpointDirName(), maxOpenSstFilesInSnapshotDb);
