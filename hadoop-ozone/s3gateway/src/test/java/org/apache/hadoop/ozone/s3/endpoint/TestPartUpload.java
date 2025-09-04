@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -61,6 +62,7 @@ public class TestPartUpload {
 
   private ObjectEndpoint rest;
   private OzoneClient client;
+  private SignatureInfo signatureInfo;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -75,9 +77,13 @@ public class TestPartUpload {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
 
+    signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
+        .setSignatureInfo(signatureInfo)
         .build();
   }
 
@@ -156,6 +162,7 @@ public class TestPartUpload {
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
+        .setSignatureInfo(signatureInfo)
         .build();
     String keyName = UUID.randomUUID().toString();
 
@@ -219,6 +226,7 @@ public class TestPartUpload {
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(clientStub)
+        .setSignatureInfo(signatureInfo)
         .build();
 
     objectEndpoint = spy(objectEndpoint);

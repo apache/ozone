@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -75,10 +76,15 @@ public class TestObjectTaggingDelete {
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
     headers = Mockito.mock(HttpHeaders.class);
+
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    Mockito.when(signatureInfo.isSignPayload()).thenReturn(true);
+
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setConfig(config)
         .setHeaders(headers)
+        .setSignatureInfo(signatureInfo)
         .build();
 
     body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));

@@ -89,8 +89,9 @@ public abstract class EndpointBase implements Auditor {
 
   @Inject
   private OzoneClient client;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   @Inject
-  private SignatureInfo signatureInfo;
+  protected SignatureInfo signatureInfo;
   @Inject
   private RequestIdentifier requestIdentifier;
 
@@ -451,7 +452,7 @@ public abstract class EndpointBase implements Auditor {
       Map<String, String> auditMap) {
     auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
     auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
-    
+
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)
         .withParams(auditMap);
@@ -501,6 +502,12 @@ public abstract class EndpointBase implements Auditor {
     this.requestIdentifier = requestIdentifier;
   }
 
+  @VisibleForTesting
+  public void setSignatureInfo(SignatureInfo signatureInfo) {
+    this.signatureInfo = signatureInfo;
+  }
+
+  @VisibleForTesting
   public OzoneClient getClient() {
     return client;
   }
