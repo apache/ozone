@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon;
 
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBuffer;
+import org.apache.ozone.test.GenericTestUtils;
 
 /**
  * Test Recon Utility methods.
@@ -34,20 +35,11 @@ public class TestReconOmMetaManagerUtils {
    */
   public CompletableFuture<Void> waitForEventBufferEmpty(OMUpdateEventBuffer eventBuffer) {
     return CompletableFuture.runAsync(() -> {
-      while (eventBuffer.getQueueSize() > 0) {
-        try {
-          Thread.sleep(100); // Small interval polling
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new RuntimeException("Interrupted while waiting for event buffer to empty", e);
-        }
-      }
-      // Give a bit more time for final processing after buffer is empty
       try {
+        GenericTestUtils.waitFor(() -> eventBuffer.getQueueSize() == 0, 100, 30000);
         Thread.sleep(500);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException("Interrupted during final wait", e);
+      } catch (Exception e) {
+        throw new RuntimeException("Error waiting for event buffer to empty", e);
       }
     });
   }

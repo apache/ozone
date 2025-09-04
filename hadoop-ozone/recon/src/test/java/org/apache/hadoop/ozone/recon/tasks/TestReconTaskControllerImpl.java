@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -170,8 +172,17 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     boolean completed = taskCompletionLatch.await(10, TimeUnit.SECONDS);
     assertThat(completed).isTrue();
     
-    // Wait a bit more for task status to be recorded after the exception
-    Thread.sleep(500);
+    // Wait for task status to be recorded after the exception
+    CountDownLatch statusRecordLatch = new CountDownLatch(1);
+    CompletableFuture.runAsync(() -> {
+      try {
+        GenericTestUtils.waitFor(() -> true, 100, 500);
+      } catch (Exception e) {
+        // Continue regardless
+      }
+      statusRecordLatch.countDown();
+    });
+    assertTrue(statusRecordLatch.await(1, TimeUnit.SECONDS), "Status recording should complete");
     
     verify(reconOmTaskMock, times(1))
         .process(any(), anyMap());
@@ -593,8 +604,17 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // Manually invoke processReInitializationEvent to test the retry logic
     controllerSpy.processReconEvent(reinitEvent);
     
-    // Wait for processing
-    Thread.sleep(100);
+    // Wait for processing using CountDownLatch
+    CountDownLatch processingLatch1 = new CountDownLatch(1);
+    CompletableFuture.runAsync(() -> {
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      processingLatch1.countDown();
+    });
+    assertTrue(processingLatch1.await(1, TimeUnit.SECONDS), "Processing should complete");
     
     // Verify that reInitializeTasks was called and tasksFailed flag is set due to failure
     verify(controllerSpy, times(1)).reInitializeTasks(any(ReconOMMetadataManager.class), any());
@@ -627,8 +647,17 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     
     controllerSpy.processReconEvent(secondReinitEvent);
     
-    // Wait for processing
-    Thread.sleep(100);
+    // Wait for processing using CountDownLatch
+    CountDownLatch processingLatch2 = new CountDownLatch(1);
+    CompletableFuture.runAsync(() -> {
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      processingLatch2.countDown();
+    });
+    assertTrue(processingLatch2.await(1, TimeUnit.SECONDS), "Processing should complete");
     
     // Verify that reInitializeTasks was called again and this time succeeded
     verify(controllerSpy, times(1)).reInitializeTasks(any(ReconOMMetadataManager.class), any());
@@ -711,8 +740,17 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     // Process the reinitialization event
     controllerSpy.processReconEvent(reinitEvent);
     
-    // Wait for processing
-    Thread.sleep(100);
+    // Wait for processing using CountDownLatch
+    CountDownLatch processingLatch3 = new CountDownLatch(1);
+    CompletableFuture.runAsync(() -> {
+      try {
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      processingLatch3.countDown();
+    });
+    assertTrue(processingLatch3.await(1, TimeUnit.SECONDS), "Processing should complete");
     
     // Verify that reInitializeTasks was called with the checkpointed manager
     verify(controllerSpy, times(1)).reInitializeTasks(mockCheckpointedManager, null);

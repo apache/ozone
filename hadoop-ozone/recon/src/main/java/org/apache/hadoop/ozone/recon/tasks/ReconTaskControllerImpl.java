@@ -623,11 +623,11 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private String cleanTempCheckPointPath(ReconOMMetadataManager omMetaManager) throws IOException {
     File dbLocation = omMetaManager.getStore().getDbLocation();
     if (dbLocation == null) {
-      throw new NullPointerException("OM DB location is null");
+      throw new IOException("OM DB location is null");
     }
     String tempData = dbLocation.getParent();
     if (tempData == null) {
-      throw new NullPointerException("Parent OM DB dir is null");
+      throw new IOException("Parent OM DB dir is null");
     }
     File reinitTmpPath =
         Paths.get(tempData, "temp-recon-reinit-checkpoint" + "_" + UUID.randomUUID()).toFile();

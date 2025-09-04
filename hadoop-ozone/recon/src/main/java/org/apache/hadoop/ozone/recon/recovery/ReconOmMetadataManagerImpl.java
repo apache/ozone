@@ -87,13 +87,13 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     Path path = checkpoint.getCheckpointLocation();
     Path parent = path.getParent();
     if (parent == null) {
-      throw new IllegalStateException("DB checkpoint parent path should not "
+      throw new IOException("DB checkpoint parent path should not "
           + "have been null. Checkpoint path is " + path);
     }
     File dir = parent.toFile();
     Path name = path.getFileName();
     if (name == null) {
-      throw new IllegalStateException("DB checkpoint dir name should not "
+      throw new IOException("DB checkpoint dir name should not "
           + "have been null. Checkpoint path is " + path);
     }
     return new ReconOmMetadataManagerImpl(conf, dir, name.toString(), new ReconUtils());

@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -116,9 +117,7 @@ public class TestReconContainerEndpoint {
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
         omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
-    while (!completableFuture.isDone()) {
-      Thread.sleep(100);
-    }
+    GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
 
     //Search for the bucket from the bucket table and verify its FSO
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volName, bucketName);
@@ -187,9 +186,7 @@ public class TestReconContainerEndpoint {
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
         omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
-    while (!completableFuture.isDone()) {
-      Thread.sleep(100);
-    }
+    GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
 
     // Search for the bucket from the bucket table and verify its OBS
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volumeName, obsBucketName);

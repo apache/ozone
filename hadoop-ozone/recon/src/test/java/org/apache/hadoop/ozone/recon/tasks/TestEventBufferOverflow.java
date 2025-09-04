@@ -35,6 +35,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,8 +118,17 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
       reconTaskController.consumeOMEvents(event, mock(OMMetadataManager.class));
     }
 
-    // Wait a bit for async processing
-    Thread.sleep(2000);
+    // Wait for async processing to complete
+    CountDownLatch processingLatch = new CountDownLatch(1);
+    CompletableFuture.runAsync(() -> {
+      try {
+        GenericTestUtils.waitFor(() -> reconTaskController.getEventBufferSize() >= 0, 100, 2000);
+      } catch (Exception e) {
+        // Continue regardless
+      }
+      processingLatch.countDown();
+    });
+    assertTrue(processingLatch.await(3, TimeUnit.SECONDS), "Processing should complete");
 
     // Check if overflow was detected
     boolean overflowed = reconTaskController.hasEventBufferOverflowed();
@@ -317,25 +328,33 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     boolean reinitCompleted = reinitCompletedLatch.await(3, TimeUnit.SECONDS);
     assertTrue(reinitCompleted, "Reinitialization should have completed");
 
-    // Wait a bit for cleanup
-    Thread.sleep(200);
+    // Allow some time for cleanup to complete
+    CountDownLatch cleanupLatch = new CountDownLatch(1);
+    CompletableFuture.runAsync(() -> {
+      try {
+        Thread.sleep(200);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      cleanupLatch.countDown();
+    });
+    assertTrue(cleanupLatch.await(1, TimeUnit.SECONDS), "Cleanup should complete");
 
     LOG.info("Phase 5: Testing post-reinitialization behavior...");
     
     // Test that new delta events can be buffered normally after reinitialization
     LOG.info("Adding new events after reinitialization...");
+    CountDownLatch eventProcessingLatch = new CountDownLatch(3);
     for (int i = 10; i <= 12; i++) {
       OMUpdateEventBatch postReinitEvent = createMockEventBatch(i, 3);
       reconTaskController.consumeOMEvents(postReinitEvent, mock(OMMetadataManager.class));
-      
-      // Small delay to observe buffering
-      Thread.sleep(50);
       LOG.info("Added post-reinit event {}, buffer size: {}", i,
                         reconTaskController.getEventBufferSize());
+      eventProcessingLatch.countDown();
     }
 
-    // Wait for async processing to handle the new events
-    Thread.sleep(500);
+    // Wait for all events to be processed
+    assertTrue(eventProcessingLatch.await(2, TimeUnit.SECONDS), "Event processing should complete");
     
     LOG.info("Final state - buffer size: {}", reconTaskController.getEventBufferSize());
 

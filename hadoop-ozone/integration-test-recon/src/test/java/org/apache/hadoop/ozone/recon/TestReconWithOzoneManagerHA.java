@@ -140,9 +140,7 @@ public class TestReconWithOzoneManagerHA {
         (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
     CompletableFuture<Void> completableFuture =
         omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
-    while (!completableFuture.isDone()) {
-      Thread.sleep(100);
-    }
+    GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
 
     final ReconContainerMetadataManagerImpl reconContainerMetadataManager =
         (ReconContainerMetadataManagerImpl) recon.getReconServer().getReconContainerMetadataManager();
