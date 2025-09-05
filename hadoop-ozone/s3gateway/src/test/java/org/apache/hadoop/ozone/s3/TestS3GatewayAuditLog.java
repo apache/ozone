@@ -39,9 +39,11 @@ import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +90,9 @@ public class TestS3GatewayAuditLog {
         .setRequestId(requestIdentifier)
         .build();
 
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    Mockito.when(signatureInfo.isSignPayload()).thenReturn(true);
+
     rootEndpoint = EndpointBuilder.newRootEndpointBuilder()
         .setClient(clientStub)
         .setRequestId(requestIdentifier)
@@ -103,6 +108,7 @@ public class TestS3GatewayAuditLog {
         .setBase(keyEndpoint)
         .setClient(clientStub)
         .setRequestId(requestIdentifier)
+        .setSignatureInfo(signatureInfo)
         .build();
   }
 

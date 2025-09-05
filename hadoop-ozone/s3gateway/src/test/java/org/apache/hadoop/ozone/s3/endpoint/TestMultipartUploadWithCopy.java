@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -125,10 +126,14 @@ public class TestMultipartUploadWithCopy {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
 
+    SignatureInfo signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
     REST.setOzoneConfiguration(new OzoneConfiguration());
     REST.setRequestIdentifier(new RequestIdentifier());
+    REST.setSignatureInfo(signatureInfo);
   }
 
   @Test

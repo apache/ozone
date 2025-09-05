@@ -1556,7 +1556,7 @@ public class ObjectEndpoint extends EndpointBase {
    */
   private S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(
       InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
-    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath);
+    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, signatureInfo.isSignPayload());
     final InputStream chunkInputStream;
     final long effectiveLength;
     if (hasMultiChunksPayload(amzContentSha256Header)) {
