@@ -637,7 +637,7 @@ public final class OzoneConfigKeys {
 
   public static final long
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
-      TimeUnit.HOURS.toMillis(1);
+      TimeUnit.MINUTES.toMillis(10);
 
   public static final String
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE =
