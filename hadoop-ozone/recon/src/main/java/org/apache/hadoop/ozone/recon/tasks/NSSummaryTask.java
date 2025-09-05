@@ -200,22 +200,28 @@ public class NSSummaryTask implements ReconOmTask {
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     // Unified control for all NSS tree rebuild operations
-    RebuildState currentState = REBUILD_STATE.get();
-    if (currentState == RebuildState.RUNNING) {
+    // Use compareAndSet for true atomic lock acquisition - only one thread can succeed
+    if (!REBUILD_STATE.compareAndSet(RebuildState.IDLE, RebuildState.RUNNING) &&
+        !REBUILD_STATE.compareAndSet(RebuildState.FAILED, RebuildState.RUNNING)) {
+      // Failed to acquire lock - another thread is running or we're already running
       LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
       return buildTaskResult(false);
     }
-    
-    if (!REBUILD_STATE.compareAndSet(currentState, RebuildState.RUNNING)) {
-      LOG.info("Failed to acquire rebuild lock, another thread may have started rebuild.");
-      return buildTaskResult(false);
-    }
 
+    // Successfully acquired the lock (transitioned from IDLE or FAILED to RUNNING)
     LOG.info("Starting NSSummary tree reprocess with unified control...");
-    long startTime = System.nanoTime(); // Record start time
+    long startTime = System.nanoTime();
     
     try {
-      return executeReprocess(omMetadataManager, startTime);
+      TaskResult result = executeReprocess(omMetadataManager, startTime);
+      if (result.isTaskSuccess()) {
+        REBUILD_STATE.set(RebuildState.IDLE);
+        LOG.info("NSSummary tree reprocess completed successfully, state reset to IDLE.");
+      } else {
+        REBUILD_STATE.set(RebuildState.FAILED);
+        LOG.warn("NSSummary tree reprocess failed, state set to FAILED.");
+      }
+      return result;
     } catch (Exception e) {
       LOG.error("NSSummary reprocess failed with exception.", e);
       REBUILD_STATE.set(RebuildState.FAILED);
@@ -232,6 +238,7 @@ public class NSSummaryTask implements ReconOmTask {
 
     try {
       // reinit Recon RocksDB's namespace CF.
+      LOG.error("Current Thread: {} - Clearing NSSummary table in Recon DB.", Thread.currentThread().getName());
       reconNamespaceSummaryManager.clearNSSummaryTable();
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ", ioEx);
@@ -306,7 +313,10 @@ public class NSSummaryTask implements ReconOmTask {
    */
   @VisibleForTesting
   public static void resetRebuildState() {
+    // Only reset to IDLE if currently FAILED - never interrupt a RUNNING operation
     REBUILD_STATE.set(RebuildState.IDLE);
+    // If state is RUNNING, leave it alone to prevent race conditions
+    // If state is already IDLE, no change needed
   }
 
   /**
