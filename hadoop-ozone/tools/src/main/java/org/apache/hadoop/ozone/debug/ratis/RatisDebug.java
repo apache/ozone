@@ -15,7 +15,23 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.debug.ratis;
+
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.apache.hadoop.ozone.debug.ratis.parse.RatisLogParser;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
+
 /**
- * Command line utility for dump ratis log files.
+ * Ratis debug related commands.
  */
-package org.apache.hadoop.ozone.debug.segmentparser;
+@CommandLine.Command(
+    name = "ratis",
+    description = "Debug commands related to Ratis.",
+    subcommands = {
+        RatisLogParser.class
+    }
+)
+@MetaInfServices(DebugSubcommand.class)
+public class RatisDebug implements DebugSubcommand {
+}
