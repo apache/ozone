@@ -142,7 +142,6 @@ public class ReconUtils {
         log.error("Async NSSummary tree rebuild failed.", e);
       }
     });
-    
     return true;
   }
 
