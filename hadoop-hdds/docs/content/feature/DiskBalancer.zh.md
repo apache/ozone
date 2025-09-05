@@ -37,9 +37,9 @@ summary: 数据节点的磁盘平衡器.
 
 ![Disk Even](diskBalancer.png)
 
-## 功能标记
+## 功能标志
 
-磁盘平衡器功能已通过功能标记引入。默认情况下，此功能处于禁用状态，以防止其在经过全面测试之前运行。
+磁盘平衡器功能已通过功能标志引入。默认情况下，此功能处于禁用状态。
 
 可以通过在“ozone-site.xml”配置文件中将以下属性设置为“true”来**启用**该功能：
 `hdds.datanode.disk.balancer.enabled = false`

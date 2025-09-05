@@ -43,8 +43,7 @@ A disk is considered a candidate for balancing if its
 
 ## Feature Flag
 
-The Disk Balancer feature is introduced with a feature flag. By default, this feature is disabled to prevent it from
-running until it has undergone thorough testing.
+The Disk Balancer feature is introduced with a feature flag. By default, this feature is disabled.
 
 The feature can be **enabled** by setting the following property to `true` in the `ozone-site.xml` configuration file:
 `hdds.datanode.disk.balancer.enabled = false`
@@ -52,10 +51,7 @@ The feature can be **enabled** by setting the following property to `true` in th
 ## Command Line Usage
 The DiskBalancer is managed through the `ozone admin datanode diskbalancer` command.
 
-**Note:** This command is hidden from the main help message (`ozone admin datanode --help`). This is because the feature
-is currently considered experimental and is disabled by default. Hiding the command prevents accidental use and keeps
-the help output clean for general users. The command is, however, fully functional for those who wish to enable and use
-the feature.
+**注意：**此命令在主帮助消息（“ozone admin datanode --help”）中隐藏。这是因为该功能目前处于实验阶段，默认禁用。不过，对于希望启用和使用该功能的用户来说，该命令功能齐全。
 
 ### **Start DiskBalancer**
 To start diskBalancer on all Datanodes with default configurations :
