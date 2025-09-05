@@ -15,38 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3secret;
+package org.apache.hadoop.ozone.s3web.s3sts;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import javax.ws.rs.NameBinding;
 
 /**
- * Response with S3 secrets.
+ * Annotation to disable S3 STS Endpoint.
  */
-@XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "S3Secret")
-public class S3SecretResponse {
-  @XmlElement(name = "awsAccessKey")
-  private String awsAccessKey;
-
-  @XmlElement(name = "awsSecret")
-  private String awsSecret;
-
-  public String getAwsAccessKey() {
-    return awsAccessKey;
-  }
-
-  public String getAwsSecret() {
-    return awsSecret;
-  }
-
-  public void setAwsAccessKey(String awsAccessKey) {
-    this.awsAccessKey = awsAccessKey;
-  }
-
-  public void setAwsSecret(String awsSecret) {
-    this.awsSecret = awsSecret;
-  }
+@NameBinding
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface S3STSEnabled {
 }
+
+
