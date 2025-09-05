@@ -70,7 +70,6 @@ public class TestInfoSubCommand {
 
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
-  private ByteArrayInputStream inContent;
   private final PrintStream originalOut = System.out;
   private final PrintStream originalErr = System.err;
   private final InputStream originalIn = System.in;
@@ -128,7 +127,7 @@ public class TestInfoSubCommand {
   @Test
   public void testContainersCanBeReadFromStdin() throws IOException {
     String input = "1\n123\n456\ninvalid\n789\n";
-    inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
+    ByteArrayInputStream inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
     System.setIn(inContent);
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -155,7 +154,7 @@ public class TestInfoSubCommand {
   public void testContainersCanBeReadFromStdinJson()
       throws IOException {
     String input = "1\n123\n456\ninvalid\n789\n";
-    inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
+    ByteArrayInputStream inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
     System.setIn(inContent);
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);

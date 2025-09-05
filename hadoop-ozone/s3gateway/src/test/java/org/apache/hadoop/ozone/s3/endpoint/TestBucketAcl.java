@@ -49,7 +49,6 @@ public class TestBucketAcl {
   private static final String BUCKET_NAME = OzoneConsts.S3_BUCKET;
   private OzoneClient client;
 
-  private HttpServletRequest servletRequest;
   private Map<String, String[]> parameterMap;
   private HttpHeaders headers;
   private BucketEndpoint bucketEndpoint;
@@ -60,7 +59,7 @@ public class TestBucketAcl {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    servletRequest = mock(HttpServletRequest.class);
+    HttpServletRequest servletRequest = mock(HttpServletRequest.class);
     parameterMap = mock(Map.class);
     headers = mock(HttpHeaders.class);
     when(servletRequest.getParameterMap()).thenReturn(parameterMap);

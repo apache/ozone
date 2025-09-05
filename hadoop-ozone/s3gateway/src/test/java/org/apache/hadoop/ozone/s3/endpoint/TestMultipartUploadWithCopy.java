@@ -72,7 +72,6 @@ public class TestMultipartUploadWithCopy {
   private static final String EXISTING_KEY_CONTENT = "testkey";
   private static final OzoneClient CLIENT = new OzoneClientStub();
   private static final long DELAY_MS = 2000;
-  private static long sourceKeyLastModificationTime;
   private static String beforeSourceKeyModificationTimeStr;
   private static String afterSourceKeyModificationTimeStr;
   private static String futureTimeStr;
@@ -99,10 +98,10 @@ public class TestMultipartUploadWithCopy {
       stream.write(keyContent);
     }
 
-    sourceKeyLastModificationTime = CLIENT.getObjectStore()
-        .getS3Bucket(OzoneConsts.S3_BUCKET)
-        .getKey(EXISTING_KEY)
-        .getModificationTime().toEpochMilli();
+    long sourceKeyLastModificationTime = CLIENT.getObjectStore()
+                                             .getS3Bucket(OzoneConsts.S3_BUCKET)
+                                             .getKey(EXISTING_KEY)
+                                             .getModificationTime().toEpochMilli();
     beforeSourceKeyModificationTimeStr =
         OzoneUtils.formatTime(sourceKeyLastModificationTime - 1000);
     afterSourceKeyModificationTimeStr =

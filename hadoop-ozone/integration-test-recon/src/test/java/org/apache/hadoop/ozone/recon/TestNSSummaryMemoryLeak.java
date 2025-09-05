@@ -124,15 +124,12 @@ public class TestNSSummaryMemoryLeak {
 
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
-  private static String volumeName;
-  private static String bucketName;
   private static OzoneClient client;
   private static ReconService recon;
-  private static OzoneConfiguration conf;
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     // Configure delays for testing
     conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1000000);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000, TimeUnit.MILLISECONDS);
@@ -149,8 +146,8 @@ public class TestNSSummaryMemoryLeak {
     // Create FSO bucket for testing
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
+    String volumeName = bucket.getVolumeName();
+    String bucketName = bucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);

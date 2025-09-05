@@ -312,12 +312,10 @@ public class TestRocksDBCheckpointDiffer {
   private File metadataDirDir;
   private File compactionLogDir;
   private File sstBackUpDir;
-  private ConfigurationSource config;
   private ExecutorService executorService = Executors.newCachedThreadPool();
   private RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private ManagedRocksDB activeRocksDB;
 
-  private ManagedDBOptions dbOptions;
   private ColumnFamilyHandle keyTableCFHandle;
   private ColumnFamilyHandle directoryTableCFHandle;
   private ColumnFamilyHandle fileTableCFHandle;
@@ -354,7 +352,7 @@ public class TestRocksDBCheckpointDiffer {
     sstBackUpDir = new File(METADATA_DIR_NAME, SST_BACK_UP_DIR_NAME);
     createDir(sstBackUpDir, METADATA_DIR_NAME + "/" + SST_BACK_UP_DIR_NAME);
 
-    config = mock(ConfigurationSource.class);
+    ConfigurationSource config = mock(ConfigurationSource.class);
 
     when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
@@ -387,7 +385,7 @@ public class TestRocksDBCheckpointDiffer {
     cfOpts.optimizeUniversalStyleCompaction();
     List<ColumnFamilyDescriptor> cfDescriptors = getCFDescriptorList(cfOpts);
     List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
-    dbOptions = new ManagedDBOptions();
+    ManagedDBOptions dbOptions = new ManagedDBOptions();
     dbOptions.setCreateIfMissing(true);
     dbOptions.setCreateMissingColumnFamilies(true);
 

@@ -39,14 +39,13 @@ import org.junit.jupiter.api.Test;
 public class TestBucketPut {
 
   private String bucketName = OzoneConsts.BUCKET;
-  private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
   @BeforeEach
   public void setup() throws Exception {
 
     //Create client stub and object store stub.
-    clientStub = new OzoneClientStub();
+    OzoneClient clientStub = new OzoneClientStub();
 
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()

@@ -75,7 +75,6 @@ public class TestS3GatewayMetrics {
   private static final String ACL_MARKER = "acl";
   private static final String CONTENT = "0123456789";
   private S3GatewayMetrics metrics;
-  private ContainerRequestContext context;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -104,7 +103,7 @@ public class TestS3GatewayMetrics {
     keyEndpoint.setHeaders(headers);
     metrics = bucketEndpoint.getMetrics();
 
-    context = mock(ContainerRequestContext.class);
+    ContainerRequestContext context = mock(ContainerRequestContext.class);
     when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
     when(context.getUriInfo().getQueryParameters())
         .thenReturn(new MultivaluedHashMap<>());

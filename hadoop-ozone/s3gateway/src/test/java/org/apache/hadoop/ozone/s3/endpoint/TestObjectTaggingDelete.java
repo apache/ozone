@@ -61,11 +61,8 @@ public class TestObjectTaggingDelete {
   private static final String CONTENT = "0123456789";
   private static final String BUCKET_NAME = "b1";
   private static final String KEY_WITH_TAG = "keyWithTag";
-  private HttpHeaders headers;
   private ObjectEndpoint rest;
   private OzoneClient client;
-  private ByteArrayInputStream body;
-  private ContainerRequestContext context;
 
   @BeforeEach
   public void init() throws OS3Exception, IOException {
@@ -74,14 +71,14 @@ public class TestObjectTaggingDelete {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setConfig(config)
         .setHeaders(headers)
         .build();
 
-    body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+    ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
@@ -90,7 +87,7 @@ public class TestObjectTaggingDelete {
         1, null, null, null, body);
 
 
-    context = Mockito.mock(ContainerRequestContext.class);
+    ContainerRequestContext context = Mockito.mock(ContainerRequestContext.class);
     Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
     Mockito.when(context.getUriInfo().getQueryParameters())
         .thenReturn(new MultivaluedHashMap<>());

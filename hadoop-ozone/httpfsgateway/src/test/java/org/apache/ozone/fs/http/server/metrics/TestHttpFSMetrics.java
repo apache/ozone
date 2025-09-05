@@ -52,7 +52,6 @@ public class TestHttpFSMetrics {
   private static FileSystem mockFs = mock(FileSystem.class);
   private static FSDataOutputStream fsDataOutputStream = mock(FSDataOutputStream.class);
 
-  private HttpFSServerWebApp webApp;
   private HttpFSServerMetrics metrics;
   private Configuration conf;
   private UserGroupInformation ugi;
@@ -74,7 +73,7 @@ public class TestHttpFSMetrics {
     conf = new Configuration();
     conf.setBoolean(FILE_SYSTEM_SERVICE_CREATED, true);
 
-    webApp = new HttpFSServerWebApp();
+    HttpFSServerWebApp webApp = new HttpFSServerWebApp();
     webApp.init();
     webApp.setService(MockFileSystemAccessService.class);
 

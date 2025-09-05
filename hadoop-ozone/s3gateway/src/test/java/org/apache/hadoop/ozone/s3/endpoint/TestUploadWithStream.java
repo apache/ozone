@@ -62,7 +62,6 @@ public class TestUploadWithStream {
   private ObjectEndpoint rest;
 
   private OzoneClient client;
-  private ContainerRequestContext context;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -79,7 +78,7 @@ public class TestUploadWithStream {
     conf.setStorageSize(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, 1,
         StorageUnit.BYTES);
 
-    context = mock(ContainerRequestContext.class);
+    ContainerRequestContext context = mock(ContainerRequestContext.class);
     when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
     when(context.getUriInfo().getQueryParameters())
         .thenReturn(new MultivaluedHashMap<>());
