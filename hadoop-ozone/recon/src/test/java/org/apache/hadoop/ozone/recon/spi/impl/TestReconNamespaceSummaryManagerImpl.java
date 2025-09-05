@@ -48,14 +48,13 @@ public class TestReconNamespaceSummaryManagerImpl {
   @TempDir()
   private static Path temporaryFolder;
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
   private static int[] testBucket;
   private static final Set<Long> TEST_CHILD_DIR =
           new HashSet<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());

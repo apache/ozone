@@ -64,7 +64,6 @@ public class TestContainerKeyMapperTask {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
   private OzoneConfiguration omConfiguration;
 
   private static final String FSO_KEY_NAME = "dir1/file7";
@@ -82,7 +81,7 @@ public class TestContainerKeyMapperTask {
   public void setUp() throws Exception {
     omMetadataManager = initializeNewOmMetadataManager(
         temporaryFolder.resolve("JunitOmDBDir").toFile());
-    ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         temporaryFolder.resolve("JunitOmMetadataDir").toFile());
     omConfiguration = new OzoneConfiguration();

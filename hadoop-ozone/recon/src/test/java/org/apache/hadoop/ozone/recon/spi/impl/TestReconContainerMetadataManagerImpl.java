@@ -50,7 +50,6 @@ public class TestReconContainerMetadataManagerImpl {
   @TempDir()
   private static Path temporaryFolder;
   private static ReconContainerMetadataManager reconContainerMetadataManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
 
   private String keyPrefix1 = "V3/B1/K1";
   private String keyPrefix2 = "V3/B1/K2";
@@ -58,7 +57,7 @@ public class TestReconContainerMetadataManagerImpl {
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());

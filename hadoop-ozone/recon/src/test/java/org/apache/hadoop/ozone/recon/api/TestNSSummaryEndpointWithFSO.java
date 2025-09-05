@@ -121,7 +121,6 @@ public class TestNSSummaryEndpointWithFSO {
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private OzoneConfiguration ozoneConfiguration;
   private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
@@ -358,7 +357,7 @@ public class TestNSSummaryEndpointWithFSO {
 
   @BeforeEach
   public void setUp() throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         10);
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(

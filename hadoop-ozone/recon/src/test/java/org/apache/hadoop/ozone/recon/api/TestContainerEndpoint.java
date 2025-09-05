@@ -122,7 +122,6 @@ public class TestContainerEndpoint {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerEndpoint.class);
 
-  private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconContainerManager reconContainerManager;
   private ContainerStateManager containerStateManager;
@@ -190,7 +189,7 @@ public class TestContainerEndpoint {
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
 
-    ozoneStorageContainerManager =
+    OzoneStorageContainerManager ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     reconContainerManager = (ReconContainerManager)
         ozoneStorageContainerManager.getContainerManager();

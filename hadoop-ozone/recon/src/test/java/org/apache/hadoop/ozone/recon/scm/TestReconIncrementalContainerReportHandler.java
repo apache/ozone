@@ -63,7 +63,6 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestReconIncrementalContainerReportHandler
     extends AbstractReconContainerManagerTest {
-  private HDDSLayoutVersionManager versionManager;
 
   @Test
   public void testProcessICR(@TempDir Path scmPath)
@@ -94,7 +93,7 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion())

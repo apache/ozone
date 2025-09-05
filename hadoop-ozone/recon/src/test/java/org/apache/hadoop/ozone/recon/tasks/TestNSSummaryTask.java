@@ -136,10 +136,6 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
 
     private NSSummary nsSummaryForBucket1;
     private NSSummary nsSummaryForBucket2;
-    private NSSummary nsSummaryForBucket3;
-
-    private OMDBUpdateEvent keyEvent1;
-    private OMDBUpdateEvent keyEvent2;
 
     @BeforeEach
     public void setUp() throws IOException {
@@ -152,8 +148,7 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
       nsSummaryForBucket2 =
           getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
       assertNotNull(nsSummaryForBucket2);
-      nsSummaryForBucket3 =
-          getReconNamespaceSummaryManager().getNSSummary(BUCKET_THREE_OBJECT_ID);
+      NSSummary nsSummaryForBucket3 = getReconNamespaceSummaryManager().getNSSummary(BUCKET_THREE_OBJECT_ID);
       assertNotNull(nsSummaryForBucket3);
     }
 
@@ -165,28 +160,28 @@ public class TestNSSummaryTask extends AbstractNSSummaryTaskTest {
               OM_KEY_PREFIX + FILE_FIVE;
       OmKeyInfo omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_TWO, KEY_FIVE,
           FILE_FIVE, KEY_FIVE_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_FIVE_SIZE);
-      keyEvent1 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
-          .setKey(omPutKey)
-          .setValue(omPutKeyInfo)
-          .setTable(getOmMetadataManager().getKeyTable(getLegacyBucketLayout())
-              .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
-          .build();
+      OMDBUpdateEvent keyEvent1 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omPutKey)
+                                      .setValue(omPutKeyInfo)
+                                      .setTable(getOmMetadataManager().getKeyTable(getLegacyBucketLayout())
+                                                    .getName())
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+                                      .build();
 
       // delete file 1 under bucket 1
       String omDeleteKey = BUCKET_ONE_OBJECT_ID + OM_KEY_PREFIX + FILE_ONE;
       OmKeyInfo omDeleteInfo = buildOmKeyInfo(
           VOL, BUCKET_ONE, KEY_ONE, FILE_ONE,
           KEY_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID);
-      keyEvent2 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
-          .setKey(omDeleteKey)
-          .setValue(omDeleteInfo)
-          .setTable(getOmMetadataManager().getKeyTable(getFSOBucketLayout())
-              .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
-          .build();
+      OMDBUpdateEvent keyEvent2 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omDeleteKey)
+                                      .setValue(omDeleteInfo)
+                                      .setTable(getOmMetadataManager().getKeyTable(getFSOBucketLayout())
+                                                    .getName())
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+                                      .build();
 
       return new OMUpdateEventBatch(Arrays.asList(keyEvent1, keyEvent2), 0L);
     }

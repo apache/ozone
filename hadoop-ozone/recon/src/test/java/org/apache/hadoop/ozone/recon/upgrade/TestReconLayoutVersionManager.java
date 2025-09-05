@@ -55,7 +55,6 @@ public class TestReconLayoutVersionManager {
   private ReconLayoutVersionManager layoutVersionManager;
   private MockedStatic<ReconLayoutFeature> mockedEnum;
   private MockedStatic<ReconUpgradeAction.UpgradeActionType> mockedEnumUpgradeActionType;
-  private ReconStorageContainerManagerFacade scmFacadeMock;
   private DataSource mockDataSource;
   private Connection mockConnection;
 
@@ -81,7 +80,7 @@ public class TestReconLayoutVersionManager {
         .thenReturn(Optional.of(action2));
 
     // Common mocks for all tests
-    scmFacadeMock = mock(ReconStorageContainerManagerFacade.class);
+    ReconStorageContainerManagerFacade scmFacadeMock = mock(ReconStorageContainerManagerFacade.class);
     mockDataSource = mock(DataSource.class);
     mockConnection = mock(Connection.class);
 

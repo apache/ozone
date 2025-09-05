@@ -79,7 +79,6 @@ public class TestReconPipelineManager {
   private OzoneConfiguration conf;
   private SCMStorageConfig scmStorageConfig;
   private DBStore store;
-  private HDDSLayoutVersionManager versionManager;
   private SCMHAManager scmhaManager;
   private SCMContext scmContext;
 
@@ -130,7 +129,7 @@ public class TestReconPipelineManager {
 
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion())
@@ -184,7 +183,7 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion())
@@ -211,7 +210,7 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     NodeManager nodeManager =

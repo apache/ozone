@@ -62,7 +62,6 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   private FileSizeCountTaskOBS fileSizeCountTaskOBS;
   private FileSizeCountTaskFSO fileSizeCountTaskFSO;
   private DSLContext dslContext;
-  private UtilizationSchemaDefinition utilizationSchemaDefinition;
 
   public TestFileSizeCountTask() {
     super();
@@ -71,7 +70,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   @BeforeEach
   public void setUp() {
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
-    utilizationSchemaDefinition = getSchemaDefinition(UtilizationSchemaDefinition.class);
+    UtilizationSchemaDefinition utilizationSchemaDefinition = getSchemaDefinition(UtilizationSchemaDefinition.class);
     // Create separate task instances.
     fileSizeCountTaskOBS = new FileSizeCountTaskOBS(fileCountBySizeDao, utilizationSchemaDefinition);
     fileSizeCountTaskFSO = new FileSizeCountTaskFSO(fileCountBySizeDao, utilizationSchemaDefinition);
