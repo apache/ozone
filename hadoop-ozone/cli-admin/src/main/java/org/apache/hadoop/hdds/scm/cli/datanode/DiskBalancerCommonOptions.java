@@ -33,7 +33,8 @@ public class DiskBalancerCommonOptions {
   @CommandLine.Option(names = {"-d", "--datanodes"},
       description = "Run commands on specific datanodes, the content can be " +
           "a list of hostnames or IPs. " +
-          "Examples: hostname1,hostname2,hostname3 or ip1,ip2,ip3")
+          "Examples: hostname1,hostname2,hostname3 or ip1,ip2,ip3",
+      split = ",")
   private List<String> datanodes = new ArrayList<>();
 
   /**

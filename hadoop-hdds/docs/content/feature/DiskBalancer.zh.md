@@ -37,8 +37,18 @@ summary: 数据节点的磁盘平衡器.
 
 ![Disk Even](diskBalancer.png)
 
+## 功能标志
+
+磁盘平衡器功能已通过功能标志引入。默认情况下，此功能处于禁用状态。
+
+可以通过在“ozone-site.xml”配置文件中将以下属性设置为“true”来**启用**该功能：
+`hdds.datanode.disk.balancer.enabled = false`
+
 ## 命令行用法
 DiskBalancer 通过 `ozone admin datanode diskbalancer` 命令进行管理。
+
+**注意：**此命令在主帮助信息（`ozone admin datanode --help`）中隐藏。这是因为该功能目前处于实验阶段，默认禁用。隐藏该命令可防止意外使用，
+并为普通用户提供清晰的帮助输出。但是，对于希望启用和使用该功能的用户，该命令仍然完全可用。
 
 ### **启动 DiskBalancer**
 要在所有 Datanode 上使用默认配置启动 DiskBalancer，请执行以下操作：
