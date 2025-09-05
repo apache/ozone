@@ -300,15 +300,7 @@ public class SstFileSetReader {
       }
 
       HeapEntryWithFileIdx<T> other = (HeapEntryWithFileIdx<T>) obj;
-
-      if (this.currentKey == null && other.currentKey == null) {
-        return this.fileIndex == other.fileIndex;
-      }
-      if (this.currentKey == null || other.currentKey == null) {
-        return false;
-      }
-
-      return this.currentKey.equals(other.currentKey) && this.fileIndex == other.fileIndex;
+      return compareTo(other) == 0;
     }
 
     @Override
@@ -321,13 +313,11 @@ public class SstFileSetReader {
     private final Collection<String> files;
     private final PriorityQueue<HeapEntryWithFileIdx<T>> minHeap;
     private final List<HeapEntryWithFileIdx<T>> allIterators;
-    private T lastReturnedValue;
 
     private MultipleSstFileIterator(Collection<String> files) {
       this.files = files;
       this.minHeap = new PriorityQueue<>();
       this.allIterators = new ArrayList<>();
-      this.lastReturnedValue = null;
       init();
       initMinHeap();
     }
@@ -357,27 +347,7 @@ public class SstFileSetReader {
 
     @Override
     public boolean hasNext() {
-      // Skip duplicates, keep advancing until we find a different key or run out of entries
-      while (!minHeap.isEmpty()) {
-        HeapEntryWithFileIdx<T> topEntry = minHeap.peek();
-        if (topEntry == null) {
-          break;
-        }
-        T currentValue = topEntry.getCurrentKey();
-
-        // If this is a new value (different from last returned), we have a next element
-        if (lastReturnedValue == null || !Objects.equals(currentValue, lastReturnedValue)) {
-          return true;
-        }
-
-        // Skip this duplicate entry
-        HeapEntryWithFileIdx<T> entry = minHeap.poll();
-        if (entry != null && entry.advance()) {
-          minHeap.offer(entry);
-        }
-      }
-
-      return false;
+      return !minHeap.isEmpty();
     }
 
     @Override
@@ -399,7 +369,6 @@ public class SstFileSetReader {
         }
       }
 
-      lastReturnedValue = currentKey;
       return currentKey;
     }
 
