@@ -31,12 +31,14 @@ public class ContainerDiffReport {
   private final List<ContainerProtos.BlockMerkleTree> missingBlocks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks;
+  private final List<ContainerProtos.BlockMerkleTree> deletedBlocksDifferences;
   private final long containerID;
 
   public ContainerDiffReport(long containerID) {
     this.missingBlocks = new ArrayList<>();
     this.missingChunks = new HashMap<>();
     this.corruptChunks = new HashMap<>();
+    this.deletedBlocksDifferences = new ArrayList<>();
     this.containerID = containerID;
   }
 
@@ -68,6 +70,13 @@ public class ContainerDiffReport {
   }
 
   /**
+   * @param deletedBlockMerkleTree The block merkle tree of the deleted block that differs between peers.
+   */
+  public void addDeletedBlockDifference(ContainerProtos.BlockMerkleTree deletedBlockMerkleTree) {
+    this.deletedBlocksDifferences.add(deletedBlockMerkleTree);
+  }
+
+  /**
    * @return A list of BlockMerkleTree objects that were reported as missing.
    */
   public List<ContainerProtos.BlockMerkleTree> getMissingBlocks() {
@@ -86,6 +95,13 @@ public class ContainerDiffReport {
    */
   public Map<Long, List<ContainerProtos.ChunkMerkleTree>> getCorruptChunks() {
     return corruptChunks;
+  }
+
+  /**
+   * @return A list of BlockMerkleTree objects for deleted blocks that differ between peers.
+   */
+  public List<ContainerProtos.BlockMerkleTree> getDeletedBlocksDifferences() {
+    return deletedBlocksDifferences;
   }
 
   /**
@@ -109,11 +125,16 @@ public class ContainerDiffReport {
     return missingBlocks.size();
   }
 
+  public long getNumDeletedBlocksDifferences() {
+    return deletedBlocksDifferences.size();
+  }
+
   @Override
   public String toString() {
     return "Diff report for container " + containerID + ":" +
         " Missing Blocks: " + getNumMissingBlocks() +
         " Missing Chunks: " + getNumMissingChunks() + " chunks from " + missingChunks.size() + " blocks" +
-        " Corrupt Chunks: " + getNumCorruptChunks() + " chunks from " + corruptChunks.size() + " blocks";
+        " Corrupt Chunks: " + getNumCorruptChunks() + " chunks from " + corruptChunks.size() + " blocks" +
+        " Deleted Blocks Differences: " + getNumDeletedBlocksDifferences();
   }
 }

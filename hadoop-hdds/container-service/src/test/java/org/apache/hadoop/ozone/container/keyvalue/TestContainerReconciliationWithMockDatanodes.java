@@ -239,15 +239,15 @@ public class TestContainerReconciliationWithMockDatanodes {
    */
   public enum FailureLocation {
     GET_CONTAINER_CHECKSUM_INFO("getContainerChecksumInfo"),
-    GET_BLOCK("getBlock"), 
+    GET_BLOCK("getBlock"),
     READ_CHUNK("readChunk");
-    
+
     private final String methodName;
-    
+
     FailureLocation(String methodName) {
       this.methodName = methodName;
     }
-    
+
     public String getMethodName() {
       return methodName;
     }
@@ -267,45 +267,45 @@ public class TestContainerReconciliationWithMockDatanodes {
   @ParameterizedTest
   @MethodSource("failureLocations")
   public void testContainerReconciliationWithPeerFailure(FailureLocation failureLocation) throws Exception {
-    LOG.info("Testing container reconciliation with peer failure in {} for container {}", 
+    LOG.info("Testing container reconciliation with peer failure in {} for container {}",
         failureLocation.getMethodName(), CONTAINER_ID);
-    
+
     // Introduce corruption in the first datanode
     MockDatanode corruptedNode = datanodes.get(0);
     MockDatanode healthyNode1 = datanodes.get(1);
     MockDatanode healthyNode2 = datanodes.get(2);
     corruptedNode.introduceCorruption(CONTAINER_ID, 1, 1, false);
-    
+
     // Use synchronous on-demand scans to re-build the merkle trees after corruption.
     datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
-    
+
     // Without reconciliation, checksums should be different.
     assertUniqueChecksumCount(CONTAINER_ID, datanodes, 2);
     waitForExpectedScanCount(1);
-    
+
     // Create a failing peer - we'll make the second datanode fail during the specified operation
     DatanodeDetails failingPeerDetails = healthyNode1.getDnDetails();
     // Mock the failure for the specific method based on the failure mode
     mockContainerProtocolCalls(failureLocation, failingPeerDetails);
-    
+
     // Now reconcile the corrupted node with its peers (including the failing one)
     List<DatanodeDetails> peers = Arrays.asList(failingPeerDetails, healthyNode2.getDnDetails());
     corruptedNode.reconcileContainer(dnClient, peers, CONTAINER_ID);
-    
+
     // Wait for scan to complete - but this time we only expect the corrupted node to have a scan
     // triggered by reconciliation, so we wait specifically for that one
     try {
       GenericTestUtils.waitFor(() -> corruptedNode.getOnDemandScanCount() == 2, 100, 5_000);
     } catch (TimeoutException ex) {
-      LOG.warn("Timed out waiting for on-demand scan after reconciliation. Current count: {}", 
+      LOG.warn("Timed out waiting for on-demand scan after reconciliation. Current count: {}",
           corruptedNode.getOnDemandScanCount());
     }
-    
+
     // The corrupted node should still be repaired because it was able to reconcile with the healthy peer
     // even though one peer failed
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
-    
+
     // Restore the original mock behavior for other tests
     mockContainerProtocolCalls();
   }
@@ -332,6 +332,55 @@ public class TestContainerReconciliationWithMockDatanodes {
     }
     // Even failure of Reconciliation should have triggered a second on-demand scan for each replica.
     waitForExpectedScanCount(2);
+  }
+
+  @Test
+  public void testReconciliationWithPeerDeletedBlocksNotInOurList() throws Exception {
+    MockDatanode sourceDatanode = datanodes.get(0);
+    MockDatanode peerDatanode = datanodes.get(1);
+    // Use a different container ID to avoid conflicts with other tests
+    long newContainerID = CONTAINER_ID + 1000;
+
+    // Create containers with different block sets to simulate the scenario:
+    // - Source: has blocks 0-6 (will learn about deleted blocks from peer)
+    // - Peer: initially has blocks 0-9, then deletes blocks 7-9
+    sourceDatanode.addContainerWithBlocks(newContainerID, 7);
+    peerDatanode.addContainerWithBlocks(newContainerID, 10);
+
+    // Simulate peer having deleted blocks 7-9
+    KeyValueContainer peerContainer = peerDatanode.getContainer(newContainerID);
+    List<BlockData> peerDeletedBlocks = new ArrayList<>();
+    for (long blockId = 7; blockId < 10; blockId++) {
+      BlockData block = peerDatanode.handler.getBlockManager().getBlock(peerContainer,
+          new BlockID(newContainerID, blockId));
+      peerDeletedBlocks.add(block);
+    }
+
+    // Add peer's deleted blocks to its container metadata
+    peerDatanode.handler.getChecksumManager().markBlocksAsDeleted(peerContainer.getContainerData(), peerDeletedBlocks);
+    long sourceChecksumBefore = sourceDatanode.checkAndGetDataChecksum(newContainerID);
+    long peerChecksumBefore = peerDatanode.checkAndGetDataChecksum(newContainerID);
+    assertNotEquals(sourceChecksumBefore, peerChecksumBefore, "Checksums should differ before reconciliation");
+
+    // Perform reconciliation - source datanode reconciles with peer
+    List<DatanodeDetails> peersForSource = Collections.singletonList(peerDatanode.getDnDetails());
+    sourceDatanode.reconcileContainer(dnClient, peersForSource, newContainerID);
+
+    long sourceChecksumAfter = sourceDatanode.checkAndGetDataChecksum(newContainerID);
+    long peerChecksumAfter = peerDatanode.checkAndGetDataChecksum(newContainerID);
+    assertEquals(sourceChecksumAfter, peerChecksumAfter, "Checksums should match after reconciliation");
+
+    // Verify the source datanode learned about peer's deleted blocks
+    ContainerProtos.ContainerChecksumInfo sourceChecksumInfo = sourceDatanode.handler.getChecksumManager()
+        .read(sourceDatanode.getContainer(newContainerID).getContainerData());
+    List<Long> sourceDeletedBlockIds = sourceChecksumInfo.getDeletedBlocksList().stream()
+        .map(ContainerProtos.BlockMerkleTree::getBlockID)
+        .collect(Collectors.toList());
+
+    // Verify source now has the peer's deleted blocks in its deleted list
+    assertTrue(sourceDeletedBlockIds.contains(7L));
+    assertTrue(sourceDeletedBlockIds.contains(8L));
+    assertTrue(sourceDeletedBlockIds.contains(9L));
   }
 
   /**
