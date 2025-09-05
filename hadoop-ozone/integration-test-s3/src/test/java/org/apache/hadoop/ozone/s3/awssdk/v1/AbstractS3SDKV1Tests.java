@@ -815,6 +815,17 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       assertEquals(result.getKeyMarker(), keyMarker);
       assertEquals(result.getMaxUploads(), 10);
 
+      // Verify next markers content
+      if (result.isTruncated()) {
+        MultipartUpload lastUploadOnPage = result.getMultipartUploads()
+            .get(result.getMultipartUploads().size() - 1);
+        assertEquals(lastUploadOnPage.getKey(), result.getNextKeyMarker());
+        assertEquals(lastUploadOnPage.getUploadId(), result.getNextUploadIdMarker());
+      } else {
+        assertNull(result.getNextKeyMarker());
+        assertNull(result.getNextUploadIdMarker());
+      }
+
       // Update markers for next page
       keyMarker = result.getNextKeyMarker();
       uploadIdMarker = result.getNextUploadIdMarker();
@@ -849,6 +860,51 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         prefixResult.getMultipartUploads().stream()
             .map(MultipartUpload::getKey)
             .collect(Collectors.toList()));
+  }
+
+  @Test
+  public void testListMultipartUploadsPaginationCornerCases() {
+    final String bucketName = getBucketName();
+    final String keyA = getKeyName("samekey");
+    final String keyB = getKeyName("after");
+
+    s3Client.createBucket(bucketName);
+
+    // Create multiple MPUs for the same key to verify upload-id-marker semantics
+    List<String> keyAUploadIds = new ArrayList<>();
+    keyAUploadIds.add(initiateMultipartUpload(bucketName, keyA, null, null, null));
+    keyAUploadIds.add(initiateMultipartUpload(bucketName, keyA, null, null, null));
+    keyAUploadIds.add(initiateMultipartUpload(bucketName, keyA, null, null, null));
+    // Also create another key to ensure listing proceeds past keyA
+    initiateMultipartUpload(bucketName, keyB, null, null, null);
+
+    // Sort upload IDs lexicographically to match listing order for the same key
+    Collections.sort(keyAUploadIds);
+
+    // Case 1: key-marker=keyA and upload-id-marker set to the lowest uploadId
+    // Per spec, same-key uploads MAY be included if uploadId > marker
+    ListMultipartUploadsRequest request1 = new ListMultipartUploadsRequest(bucketName)
+        .withKeyMarker(keyA)
+        .withUploadIdMarker(keyAUploadIds.get(0))
+        .withMaxUploads(100);
+    MultipartUploadListing result1 = s3Client.listMultipartUploads(request1);
+
+    List<MultipartUpload> uploads1 = result1.getMultipartUploads();
+    // Collect same-key uploads and verify none are <= marker
+    List<String> sameKeyIds1 = uploads1.stream()
+        .filter(u -> keyA.equals(u.getKey()))
+        .map(MultipartUpload::getUploadId)
+        .collect(Collectors.toList());
+    assertThat(sameKeyIds1).allSatisfy(id -> assertTrue(id.compareTo(keyAUploadIds.get(0)) > 0));
+
+    // Case 2: key-marker=keyA and upload-id-marker set to the highest uploadId
+    // Expect no same-key (keyA) uploads to be returned
+    ListMultipartUploadsRequest request2 = new ListMultipartUploadsRequest(bucketName)
+        .withKeyMarker(keyA)
+        .withUploadIdMarker(keyAUploadIds.get(2))
+        .withMaxUploads(100);
+    MultipartUploadListing result2 = s3Client.listMultipartUploads(request2);
+    assertTrue(result2.getMultipartUploads().stream().noneMatch(u -> keyA.equals(u.getKey())));
   }
 
   @Test
