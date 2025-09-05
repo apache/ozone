@@ -56,7 +56,6 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG = RatisReplicationConfig.getInstance(THREE);
   private ContainerInfo container;
   private ReplicationManager replicationManager;
-  private ReplicationManagerMetrics metrics;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private QuasiClosedStuckOverReplicationHandler handler;
   private final DatanodeID origin1 = DatanodeID.randomID();
@@ -74,7 +73,7 @@ public class TestQuasiClosedStuckOverReplicationHandler {
     when(replicationManager.getConfig())
         .thenReturn(ozoneConfiguration.getObject(
             ReplicationManager.ReplicationManagerConfiguration.class));
-    metrics = ReplicationManagerMetrics.create(replicationManager);
+    ReplicationManagerMetrics metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);
 
     /*

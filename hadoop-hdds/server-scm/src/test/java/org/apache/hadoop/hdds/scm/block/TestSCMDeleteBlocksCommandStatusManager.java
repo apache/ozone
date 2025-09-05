@@ -43,7 +43,6 @@ import org.junit.jupiter.api.Test;
 public class TestSCMDeleteBlocksCommandStatusManager {
 
   private SCMDeleteBlocksCommandStatusManager manager;
-  private ScmBlockDeletingServiceMetrics metrics;
   private DatanodeID dnId1;
   private DatanodeID dnId2;
   private long scmCmdId1;
@@ -57,7 +56,7 @@ public class TestSCMDeleteBlocksCommandStatusManager {
 
   @BeforeEach
   public void setup() throws Exception {
-    metrics = mock(ScmBlockDeletingServiceMetrics.class);
+    ScmBlockDeletingServiceMetrics metrics = mock(ScmBlockDeletingServiceMetrics.class);
     manager = new SCMDeleteBlocksCommandStatusManager(metrics);
     // Create test data
     dnId1 = DatanodeID.randomID();

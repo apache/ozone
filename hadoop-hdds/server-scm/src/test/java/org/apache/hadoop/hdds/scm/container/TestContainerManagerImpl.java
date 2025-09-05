@@ -82,7 +82,6 @@ public class TestContainerManagerImpl {
   private ContainerManager containerManager;
   private SCMHAManager scmhaManager;
   private SequenceIdGenerator sequenceIdGen;
-  private NodeManager nodeManager;
   private ContainerReplicaPendingOps pendingOpsMock;
   private PipelineManager pipelineManager;
 
@@ -97,7 +96,7 @@ public class TestContainerManagerImpl {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    nodeManager = new MockNodeManager(true, 10);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
     pipelineManager = new MockPipelineManager(dbStore, scmhaManager, nodeManager);

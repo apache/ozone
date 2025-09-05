@@ -103,7 +103,6 @@ public class TestReplicationManagerScenarios {
   private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
 
   private OzoneConfiguration configuration;
-  private ReplicationManager replicationManager;
   private ContainerManager containerManager;
   private PlacementPolicy ratisPlacementPolicy;
   private PlacementPolicy ecPlacementPolicy;
@@ -269,7 +268,7 @@ public class TestReplicationManagerScenarios {
     conf.setMaintenanceRemainingRedundancy(scenario.getEcMaintenanceRedundancy());
     conf.setMaintenanceReplicaMinimum(scenario.getRatisMaintenanceMinimum());
     configuration.setFromObject(conf);
-    replicationManager = createReplicationManager();
+    ReplicationManager replicationManager = createReplicationManager();
 
     ContainerInfo containerInfo = scenario.buildContainerInfo();
     loadPendingOps(containerInfo, scenario);
