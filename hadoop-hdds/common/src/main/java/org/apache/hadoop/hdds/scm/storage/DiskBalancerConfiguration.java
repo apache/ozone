@@ -53,7 +53,7 @@ public final class DiskBalancerConfiguration {
           " of the entire datanode) no more than the threshold.")
   private double threshold = 10d;
 
-  @Config(key = "max.disk.throughput.mb.per.sec", type = ConfigType.LONG,
+  @Config(key = "max.disk.throughputInMBPerSec", type = ConfigType.LONG,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "The max balance speed.")
   private long diskBandwidthInMB = 10;
