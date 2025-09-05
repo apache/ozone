@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
@@ -43,6 +44,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import java.io.File;
 import java.io.IOException;
@@ -50,6 +52,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -63,6 +66,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -124,6 +128,7 @@ public class TestKeyValueContainer {
   // This preserves the column family options in the container options
   // cache for testContainersShareColumnFamilyOptions.
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static final String DEFAULT_CF_NAME = StringUtils.bytes2String((DEFAULT_COLUMN_FAMILY));
 
   private void setVersionInfo(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
@@ -649,7 +654,7 @@ public class TestKeyValueContainer {
     assertFalse(keyValueContainer.getContainerFile().exists(),
         "Container File still exists");
 
-    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
+    if (isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
       assertTrue(keyValueContainer.getContainerDBFile().exists());
     } else {
       assertFalse(keyValueContainer.getContainerDBFile().exists(),
@@ -765,21 +770,23 @@ public class TestKeyValueContainer {
     ConfigurationSource conf = new OzoneConfiguration();
 
     // Make sure ColumnFamilyOptions are same for a particular db profile
+    Path dbPath = Paths.get(CONTAINER_DB_NAME);
     for (Supplier<DatanodeDBProfile> dbProfileSupplier : new Supplier[] {
         DatanodeDBProfile.Disk::new, DatanodeDBProfile.SSD::new }) {
       // ColumnFamilyOptions should be same across configurations
+      OzoneConfiguration config = new OzoneConfiguration();
       ColumnFamilyOptions columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(new OzoneConfiguration());
+          .getColumnFamilyOptions(config, dbPath, DEFAULT_CF_NAME);
       ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(new OzoneConfiguration());
+          .getColumnFamilyOptions(config, dbPath, DEFAULT_CF_NAME);
       assertEquals(columnFamilyOptions1, columnFamilyOptions2);
 
       // ColumnFamilyOptions should be same when queried multiple times
       // for a particulat configuration
       columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(conf);
+          .getColumnFamilyOptions(config, dbPath, DEFAULT_CF_NAME);
       columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(conf);
+          .getColumnFamilyOptions(config, dbPath, DEFAULT_CF_NAME);
       assertEquals(columnFamilyOptions1, columnFamilyOptions2);
     }
 
@@ -787,10 +794,10 @@ public class TestKeyValueContainer {
     DatanodeDBProfile diskProfile = new DatanodeDBProfile.Disk();
     DatanodeDBProfile ssdProfile = new DatanodeDBProfile.SSD();
     assertNotEquals(
-        diskProfile.getColumnFamilyOptions(new OzoneConfiguration()),
-        ssdProfile.getColumnFamilyOptions(new OzoneConfiguration()));
-    assertNotEquals(diskProfile.getColumnFamilyOptions(conf),
-        ssdProfile.getColumnFamilyOptions(conf));
+        diskProfile.getColumnFamilyOptions(new OzoneConfiguration(), dbPath, DEFAULT_CF_NAME),
+        ssdProfile.getColumnFamilyOptions(new OzoneConfiguration(), dbPath, DEFAULT_CF_NAME));
+    assertNotEquals(diskProfile.getColumnFamilyOptions(conf, dbPath, DEFAULT_CF_NAME),
+        ssdProfile.getColumnFamilyOptions(conf, dbPath, DEFAULT_CF_NAME));
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -830,14 +837,14 @@ public class TestKeyValueContainer {
     }
 
     // DBOtions should be different, except SCHEMA-V3
-    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
+    if (isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
       assertEquals(
-          outProfile1.getDBOptions().compactionReadaheadSize(),
-          outProfile2.getDBOptions().compactionReadaheadSize());
+          outProfile1.getDBOptions(null).compactionReadaheadSize(),
+          outProfile2.getDBOptions(null).compactionReadaheadSize());
     } else {
       assertNotEquals(
-          outProfile1.getDBOptions().compactionReadaheadSize(),
-          outProfile2.getDBOptions().compactionReadaheadSize());
+          outProfile1.getDBOptions(null).compactionReadaheadSize(),
+          outProfile2.getDBOptions(null).compactionReadaheadSize());
     }
   }
 
@@ -874,7 +881,7 @@ public class TestKeyValueContainer {
   void testAutoCompactionSmallSstFile(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
+    assumeTrue(isSameSchemaVersion(schemaVersion, SCHEMA_V3));
     // Create a new HDDS volume
     String volumeDirPath =
         Files.createDirectory(folder.toPath().resolve("volumeDir")).toFile()
@@ -953,10 +960,10 @@ public class TestKeyValueContainer {
 
       // Check sst files
       DatanodeStore dnStore = DatanodeStoreCache.getInstance().getDB(
-          hddsVolume.getDbParentDir() + "/" + OzoneConsts.CONTAINER_DB_NAME,
-              CONF).getStore();
+          hddsVolume.getDbParentDir() + "/" + CONTAINER_DB_NAME,
+          CONF).getStore();
       List<LiveFileMetaData> fileMetaDataList1 =
-          ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
+          ((RDBStore) (dnStore.getStore())).getDb().getLiveFilesMetaData();
       // When using Table.loadFromFile() in loadKVContainerData(),
       // there were as many SST files generated as the number of imported containers
       // After moving away from using Table.loadFromFile(), no SST files are generated unless the db is force flushed
