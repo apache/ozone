@@ -94,18 +94,18 @@ public abstract class TestRandomKeyGenerator implements NonHATests.TestCase {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator(cluster().getConf());
     CommandLine cmd = new CommandLine(randomKeyGenerator);
-    cmd.execute("--num-of-volumes", "10",
+    cmd.execute("--num-of-volumes", "1",
         "--num-of-buckets", "1",
-        "--num-of-keys", "10",
+        "--num-of-keys", "10000",
         "--num-of-threads", "10",
-        "--key-size", "10KB",
+        "--key-size", "1B",
         "--factor", "THREE",
         "--type", "RATIS"
     );
 
-    assertEquals(10, randomKeyGenerator.getNumberOfVolumesCreated());
-    assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
-    assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(10000, randomKeyGenerator.getNumberOfKeysAdded());
   }
 
   @Test

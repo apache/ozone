@@ -53,6 +53,18 @@ OZONE-SITE.XML_hdds.scm.replication.over.replicated.interval=5s
 OZONE-SITE.XML_hdds.scm.wait.time.after.safemode.exit=30s
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
+# Increase diff page size to improve efficiency
+# Note this is server side setting, client needs to specify larger page size as well, default is 1000
+OZONE-SITE.XML_ozone.om.snapshot.diff.max.page.size=10000
+
+OZONE-SITE.XML_hadoop.hdds.db.rocksdb.WAL_ttl_seconds=0
+OZONE-SITE.XML_hadoop.hdds.db.rocksdb.WAL_size_limit_MB=0MB
+
+# Enable Ozone snapshot defragmentation service but set it to run once per day to
+# effectively stop it from running periodically
+OZONE-SITE.XML_ozone.snapshot.defrag.service.interval=24h
+#OZONE-SITE.XML_ozone.snapshot.defrag.limit.per.task=5
+
 OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
 
 OZONE-SITE.XML_ozone.fs.hsync.enabled=true
