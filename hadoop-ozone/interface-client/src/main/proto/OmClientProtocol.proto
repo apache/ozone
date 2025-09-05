@@ -896,6 +896,7 @@ message SnapshotInfo {
   optional uint64 exclusiveSizeDeltaFromDirDeepCleaning = 21;
   // snapshot exclusive size after replication
   optional uint64 exclusiveReplicatedSizeDeltaFromDirDeepCleaning = 22;
+  optional bytes createTransactionInfo = 23;
 }
 
 message SnapshotDiffJobProto {
@@ -1201,6 +1202,7 @@ message BasicKeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
     optional string eTag = 8;
     optional string ownerName = 9;
+    optional bool isEncrypted = 10;
 }
 
 message DirectoryInfo {

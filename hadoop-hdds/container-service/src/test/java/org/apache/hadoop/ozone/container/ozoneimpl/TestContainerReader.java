@@ -105,7 +105,6 @@ public class TestContainerReader {
   private long blockLen = 1024;
 
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
   private KeyValueHandler keyValueHandler;
 
   @TempDir
@@ -843,7 +842,7 @@ public class TestContainerReader {
   private void setLayoutAndSchemaVersion(
       ContainerTestVersionInfo versionInfo) {
     layout = versionInfo.getLayout();
-    schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
