@@ -48,7 +48,6 @@ public class OneReplicaPipelineSafeModeRule extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OneReplicaPipelineSafeModeRule.class);
-  private static final String NAME = "AtleastOneDatanodeReportedRule";
 
   private int thresholdCount;
   private final Set<PipelineID> reportedPipelineIDSet = new HashSet<>();
@@ -59,7 +58,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
   public OneReplicaPipelineSafeModeRule(EventQueue eventQueue, PipelineManager pipelineManager,
       SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
-    super(safeModeManager, NAME, eventQueue);
+    super(safeModeManager, eventQueue);
 
     pipelinePercent =
         configuration.getDouble(
