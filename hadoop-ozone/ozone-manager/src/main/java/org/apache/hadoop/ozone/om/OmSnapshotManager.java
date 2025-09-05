@@ -72,10 +72,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -84,6 +82,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -118,6 +117,7 @@ import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * This class is used to manage/create OM snapshots.
@@ -186,6 +186,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
   private final List<ColumnFamilyHandle> columnFamilyHandles;
   private final SnapshotDiffCleanupService snapshotDiffCleanupService;
+  private final GenericObjectPool<Yaml> yamlPool;
 
   private final int maxPageSize;
 
@@ -196,7 +197,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
 
   public OmSnapshotManager(OzoneManager ozoneManager) {
-
+    this.yamlPool = new GenericObjectPool<>(new OmSnapshotLocalDataYaml.YamlFactory());
     boolean isFilesystemSnapshotEnabled =
         ozoneManager.isFilesystemSnapshotEnabled();
     LOG.info("Ozone filesystem snapshot feature is {}.",
@@ -514,8 +515,10 @@ public final class OmSnapshotManager implements AutoCloseable {
     } else {
       dbCheckpoint = store.getSnapshot(snapshotInfo.getCheckpointDirName());
     }
+    OmSnapshotManager omSnapshotManager =
+        ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
     // Create the snapshot local property file.
-    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omMetadataManager, snapshotInfo, store);
+    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager, omMetadataManager, snapshotInfo, store);
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
     // Snapshot create is processed as a single transaction and
@@ -620,17 +623,11 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param store AOS or snapshot DB for uncompacted or compacted snapshot respectively.
    * @return a Map of (table, set of SST files corresponding to the table)
    */
-  private static Map<String, Set<String>> getSnapshotSSTFileList(RDBStore store)
+  private static List<LiveFileMetaData> getSnapshotSSTFileList(RDBStore store)
       throws IOException {
-    Map<String, Set<String>> sstFileList = new HashMap<>();
-    List<LiveFileMetaData> liveFileMetaDataList = store.getDb().getLiveFilesMetaData();
-    liveFileMetaDataList.forEach(lfm -> {
-      String cfName = StringUtils.bytes2String(lfm.columnFamilyName());
-      if (COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT.contains(cfName)) {
-        sstFileList.computeIfAbsent(cfName, k -> new HashSet<>()).add(lfm.fileName());
-      }
-    });
-    return sstFileList;
+    return store.getDb().getLiveFilesMetaData().stream()
+        .filter(lfm -> COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT.contains(StringUtils.bytes2String(lfm.columnFamilyName())))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -639,13 +636,14 @@ public final class OmSnapshotManager implements AutoCloseable {
    * @param snapshotInfo The metadata of snapshot to be created
    * @param store The store used to get uncompacted SST file list from.
    */
-  public static void createNewOmSnapshotLocalDataFile(
+  public static void createNewOmSnapshotLocalDataFile(OmSnapshotManager snapshotManager,
       OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo, RDBStore store)
       throws IOException {
     Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(omMetadataManager, snapshotInfo));
     Files.deleteIfExists(snapshotLocalDataPath);
-    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(store));
-    snapshotLocalDataYaml.writeToYaml(snapshotLocalDataPath.toFile());
+    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(store),
+        snapshotInfo.getPathPreviousSnapshotId());
+    snapshotLocalDataYaml.writeToYaml(snapshotManager, snapshotLocalDataPath.toFile());
   }
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
@@ -687,6 +685,26 @@ public final class OmSnapshotManager implements AutoCloseable {
       String bucketName,
       String snapshotName) throws IOException {
     return getSnapshot(volumeName, bucketName, snapshotName, true);
+  }
+
+  public UncheckedAutoCloseableSupplier<Yaml> getSnapshotLocalYaml() throws IOException {
+    try {
+      Yaml yaml = yamlPool.borrowObject();
+      return new UncheckedAutoCloseableSupplier<Yaml>() {
+
+        @Override
+        public void close() {
+          yamlPool.returnObject(yaml);
+        }
+
+        @Override
+        public Yaml get() {
+          return yaml;
+        }
+      };
+    } catch (Exception e) {
+      throw new IOException("Failed to get snapshot local yaml", e);
+    }
   }
 
   private UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(
@@ -1176,6 +1194,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
     if (options != null) {
       options.close();
+    }
+    if (yamlPool != null) {
+      yamlPool.close();
     }
   }
 
