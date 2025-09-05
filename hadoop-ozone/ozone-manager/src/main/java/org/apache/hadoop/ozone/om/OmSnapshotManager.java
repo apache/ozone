@@ -530,12 +530,13 @@ public final class OmSnapshotManager implements AutoCloseable {
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
 
     if (dbCheckpoint != null && snapshotDirExist) {
-      LOG.info("Checkpoint : {} for snapshot {} already exists.",
-          dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+      LOG.info("Checkpoint: {} for snapshot {} already exists.",
+          dbCheckpoint.getCheckpointLocation(), snapshotInfo.getTableKey());
       return dbCheckpoint;
     } else if (dbCheckpoint != null) {
-      LOG.info("Created checkpoint : {} for snapshot {}",
-          dbCheckpoint.getCheckpointLocation(), snapshotInfo.getName());
+      LOG.info("Created checkpoint: {} for snapshot {}",
+          dbCheckpoint.getCheckpointLocation(),
+          snapshotInfo.getTableKey());
     }
 
     return dbCheckpoint;
