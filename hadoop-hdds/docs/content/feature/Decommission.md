@@ -65,6 +65,65 @@ ozone admin datanode recommission [-hV] [-id=<scmServiceId>]
        [--scm=<scm>] [<hosts>...]
 ```
 
+### Tuning and Monitoring Decommissioning
+
+The process of decommissioning a DataNode involves replicating all its containers to other DataNodes in the cluster. The speed of this process can be tuned, and its progress can be monitored using several configuration properties and metrics.
+
+#### Configuration Properties
+
+Administrators can adjust the following properties in `ozone-site.xml` to control the container replication speed during decommissioning. They are grouped by the component where they are primarily configured.
+
+##### SCM-Side Properties
+
+*   **`hdds.scm.replication.datanode.replication.limit`**
+    *   **Purpose**: Defines the base limit for concurrent replication commands that the SCM will *send* to a single DataNode.
+    *   **Default**: `20`.
+    *   **Details**: The effective limit for a decommissioning DataNode is this value multiplied by `hdds.datanode.replication.outofservice.limit.factor`.
+
+##### DataNode-Side Properties
+
+*   **`hdds.datanode.replication.outofservice.limit.factor`**
+    *   **Purpose**: A multiplier to increase replication capacity for `DECOMMISSIONING` or `MAINTENANCE` nodes. This is a key property for tuning decommission speed.
+    *   **Default**: `2.0`.
+    *   **Details**: Although this is a DataNode property, it must also be set in the SCM's configuration. The SCM uses it to send more replication commands, and the DataNode uses it to increase its internal resources (threads and queues) to handle the increased load.
+
+*   **`hdds.datanode.replication.queue.limit`**
+    *   **Purpose**: Sets the base size of the queue for incoming replication requests on a DataNode.
+    *   **Default**: `4096`.
+    *   **Details**: For decommissioning nodes, this limit is scaled by `hdds.datanode.replication.outofservice.limit.factor`.
+
+*   **`hdds.datanode.replication.streams.limit`**
+    *   **Purpose**: Sets the base number of threads for the replication thread pool on a DataNode.
+    *   **Default**: `10`.
+    *   **Details**: For decommissioning nodes, this limit is also scaled by `hdds.datanode.replication.outofservice.limit.factor`.
+
+By tuning these properties, administrators can balance the decommissioning speed against the impact on the cluster's performance.
+
+#### Metrics
+
+The following metrics can be used to monitor the progress of DataNode decommissioning.
+
+##### SCM-side Metrics (`ReplicationManagerMetrics`)
+
+These metrics are available on the SCM and provide a cluster-wide view of the replication process. During decommissioning, you should see an increase in these metrics.
+
+*   `InflightReplication`: The number of container replication requests currently in progress.
+*   `replicationCmdsSentTotal`: The total number of replication commands sent to datanodes.
+*   `replicasCreatedTotal`: The total number of container replicas successfully created.
+*   `replicationBytesCompletedTotal`: The total volume of data replicated.
+*   `replicateContainerCmdsDeferredTotal`: The number of replication commands deferred because source datanodes were overloaded. If this value is high, it might indicate that the source datanodes (including the decommissioning one) are too busy.
+
+##### Datanode-side Metrics (`ContainerReplicator` metrics, via `MeasuredReplicator`)
+
+These metrics are available on each DataNode. For a decommissioning node, they show its activity as a source of replicas. For other nodes, they show their activity as targets.
+
+*   `success`: The number of successful replication tasks.
+*   `transferredBytes`: The total bytes transferred for successful replications.
+*   `failure`: The number of failed replication tasks.
+*   `queueTime`: The time tasks spend in the replication queue. A high value might indicate the datanode is overloaded.
+
+By monitoring these metrics, administrators can get a clear picture of the decommissioning progress and identify potential bottlenecks.
+
 # OM Decommission
 
 Ozone Manager (OM) decommissioning is the process in which you gracefully remove one of the OM from the OM HA Ring.
