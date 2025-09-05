@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM_EXTENS
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.primitives.UnsignedBytes;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -39,6 +41,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -175,23 +178,54 @@ public class ContainerChecksumTreeManager {
     boolean thisBlockDeleted = thisBlockMerkleTree.getDeleted();
     boolean peerBlockDeleted = peerBlockMerkleTree.getDeleted();
 
-    if (!thisBlockDeleted && !peerBlockDeleted) {
-      // Neither our nor peer's block is deleted. Walk the chunk list to find differences.
-      compareChunkMerkleTrees(thisBlockMerkleTree, peerBlockMerkleTree, report);
-    } else if (!thisBlockDeleted && peerBlockDeleted) {
-      // Our block has not yet been deleted, but peer's block has been.
-      // Mark our block as deleted to bring it in sync with the peer.
-      // Our block deleting service will eventually catch up.
-      // TODO HDDS-11765 Add support for deleting blocks from our replica when a peer has already deleted the block.
-      report.addDeletedBlock(peerBlockMerkleTree);
-    } else if (thisBlockDeleted && peerBlockDeleted) {
-      // Both us and peer's block is deleted. Since there is no data corresponding
-      // TODO lexigraphical max
-      if (thisBlockMerkleTree.getDataChecksum() < peerBlockMerkleTree.getDataChecksum()) {
+    if (thisBlockDeleted) {
+      // Our block has been deleted.
+      if (peerBlockDeleted && compareDataChecksums(thisBlockMerkleTree, peerBlockMerkleTree) < 0) {
+        // If the peer's block is also deleted, use the largest checksum value as the winner so that the values converge
+        // since there is no data corresponding to this block.
         report.addDeletedBlock(peerBlockMerkleTree);
       }
+      // Else, either the peer has not deleted the block or they have a lower checksum for their deleted block.
+      // The peer needs to update their block.
+    } else {
+      if (peerBlockDeleted) {
+        // Our block has not yet been deleted, but peer's block has been.
+        // Mark our block as deleted to bring it in sync with the peer.
+        // Our block deleting service will eventually catch up.
+        // TODO HDDS-11765 Add support for deleting blocks from our replica when a peer has already deleted the block.
+        report.addDeletedBlock(peerBlockMerkleTree);
+      } else {
+        // Neither our nor peer's block is deleted. Walk the chunk list to find differences.
+        compareChunkMerkleTrees(thisBlockMerkleTree, peerBlockMerkleTree, report);
+      }
     }
-    // Else, our block is deleted but the peer's is not. Peer needs to update their block.
+  }
+
+  /**
+   * Compares the data checksums of two block merkle trees lexicographically as big-endian binary strings.
+   */
+  private static int compareDataChecksums(ContainerProtos.BlockMerkleTree tree1,
+      ContainerProtos.BlockMerkleTree tree2) {
+    long checksum1 = tree1.getDataChecksum();
+    long checksum2 = tree2.getDataChecksum();
+
+    if (checksum1 == checksum2) {
+      return 0;
+    }
+
+    final int lowest8bitMask = 0xFF;
+    final int lsbIndex = Long.BYTES - 1;
+    for (int i = lsbIndex; i >= 0; i--) {
+      byte byte1 = (byte) ((checksum1 >>> (i * Byte.SIZE)) & lowest8bitMask);
+      byte byte2 = (byte) ((checksum2 >>> (i * Byte.SIZE)) & lowest8bitMask);
+
+      int cmp = UnsignedBytes.compare(byte1, byte2);
+      if (cmp != 0) {
+        return cmp;
+      }
+    }
+
+    return 0;
   }
 
   private void compareChunkMerkleTrees(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
@@ -307,9 +341,11 @@ public class ContainerChecksumTreeManager {
    * Called by block deletion to update the merkle tree persisted to disk.
    * The sets of live and deleted blocks are merged into one tree.
    */
-  public ContainerProtos.ContainerChecksumInfo mergeTree(ContainerData data, ContainerMerkleTreeWriter treeWriter)
-      throws IOException {
-    return write(data, treeWriter::merge);
+  public void addDeletedBlocks(ContainerData data, Collection<BlockData> blocks) throws IOException {
+    write(data, existingTree -> {
+      ContainerMerkleTreeWriter treeWriter = new ContainerMerkleTreeWriter(existingTree);
+      return treeWriter.addDeletedBlocks(blocks, existingTree.hasDataChecksum());
+    });
   }
 
   /**

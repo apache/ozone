@@ -1654,7 +1654,7 @@ public class KeyValueHandler extends Handler {
         // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with
         // the next peer.
         ContainerMerkleTreeWriter updatedTreeWriter = new ContainerMerkleTreeWriter();
-        updatedTreeWriter.merge(latestChecksumInfo.getContainerMerkleTree());
+        updatedTreeWriter.update(latestChecksumInfo.getContainerMerkleTree());
         ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
         Pipeline pipeline = createSingleNodePipeline(peer);
 
