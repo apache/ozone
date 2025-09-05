@@ -60,7 +60,6 @@ public class TestOMTenantCreateRequest {
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
-  private AuditLogger auditLogger;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -78,7 +77,7 @@ public class TestOMTenantCreateRequest {
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
     when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
-    auditLogger = mock(AuditLogger.class);
+    AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 

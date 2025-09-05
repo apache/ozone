@@ -69,7 +69,6 @@ public class TestOzoneManagerRatisServer {
 
   private OzoneConfiguration conf;
   private OzoneManagerRatisServer omRatisServer;
-  private String omID;
   private String clientId = UUID.randomUUID().toString();
   private static final long RATIS_RPC_TIMEOUT = 500L;
   private OMMetadataManager omMetadataManager;
@@ -86,7 +85,7 @@ public class TestOzoneManagerRatisServer {
   @BeforeEach
   public void init(@TempDir Path metaDirPath) throws Exception {
     conf = new OzoneConfiguration();
-    omID = UUID.randomUUID().toString();
+    String omID = UUID.randomUUID().toString();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
