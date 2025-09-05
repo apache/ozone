@@ -1138,16 +1138,16 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     bucket.deleteKeys(keysToDelete);
 
     String consoleOutput = output.get();
-    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
-        ", key=key1, dataSize=" + valueLength + ", replicationConfig=RATIS/THREE");
-    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
-        ", key=key2, dataSize=" + valueLength + ", replicationConfig=EC{rs-3-2-1024k}");
-    assertThat(consoleOutput).contains("op=DELETE_KEY {volume=" + volumeName + ", bucket=" + bucketName +
-        ", key=dir1, Transaction");
-    assertThat(consoleOutput).contains("op=DELETE_KEYS {volume=" + volumeName + ", bucket=" + bucketName +
-        ", deletedKeysList={key=dir1/key4, dataSize=" + valueLength +
+    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"key\":\"key1\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"RATIS/THREE");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"key\":\"key2\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"EC{rs-3-2-1024k}");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"key\":\"dir1\",\"Transaction\"");
+    assertThat(consoleOutput).contains("op=DELETE_KEYS {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"deletedKeysList\":\"{key=dir1/key4, dataSize=" + valueLength +
         ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + valueLength +
-        ", replicationConfig=EC{rs-3-2-1024k}}, unDeletedKeysList=");
+        ", replicationConfig=EC{rs-3-2-1024k}}\",\"unDeletedKeysList\"");
   }
 
   protected void verifyReplication(String volumeName, String bucketName,
