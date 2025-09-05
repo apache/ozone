@@ -32,8 +32,8 @@ import picocli.CommandLine.Command;
  * To start:
  *      ozone admin datanode diskbalancer start
  *      [ -t/--threshold {@literal <threshold>}]
- *      [ -b/--bandwidthInMB {@literal <bandwidthInMB>}]
- *      [ -p/--parallelThread {@literal <parallelThread>}]
+ *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
+ *      [ -p/--parallel-thread {@literal <parallelThread>}]
  *      [ -s/--stop-after-disk-even {@literal <stopAfterDiskEven>}]
  *      [ -a/--all {@literal <alldatanodes>}]
  *      [ -d/--datanodes {@literal <datanodes>}]
@@ -78,9 +78,11 @@ import picocli.CommandLine.Command;
 
 @Command(
     name = "diskbalancer",
-    description = "DiskBalancer specific operations",
+    description = "DiskBalancer specific operations. It is disabled by default." +
+        " To enable it, set 'hdds.datanode.disk.balancer.enabled' as true",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
+    hidden = true,
     subcommands = {
         DiskBalancerStartSubcommand.class,
         DiskBalancerStopSubcommand.class,

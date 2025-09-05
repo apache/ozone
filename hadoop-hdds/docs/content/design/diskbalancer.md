@@ -129,6 +129,11 @@ The feature can be enabled by setting the following property to `true` in the `o
 Developers who wish to test or use the Disk Balancer must explicitly enable it. Once the feature is 
 considered stable, the default value may be changed to `true` in a future release.
 
+**Note:** This command is hidden from the main help message (`ozone admin datanode --help`). This is because the feature
+is currently considered experimental and is disabled by default. Hiding the command prevents accidental use and keeps
+the help output clean for general users. The command is, however, fully functional for those who wish to enable and use
+the feature.
+
 ## DiskBalancer Metrics
 
 The DiskBalancer service exposes JMX metrics on each Datanode for real-time monitoring. These metrics provide insights
