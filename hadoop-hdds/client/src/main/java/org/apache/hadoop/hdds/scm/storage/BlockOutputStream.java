@@ -914,7 +914,8 @@ public class BlockOutputStream extends OutputStream {
         .build();
 
     long flushPos = totalWriteChunkLength;
-
+    LOG.info("Writing chunk {} length {} at offset {}",
+        chunkInfo.getChunkName(), effectiveChunkSize, offset);
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} length {} at offset {}",
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
