@@ -54,6 +54,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -688,24 +689,38 @@ public class OzoneManagerServiceProviderImpl
                 // Queue async reinitialization event - checkpoint creation and retry logic is handled internally
                 ReconTaskController.ReInitializationResult result =
                     reconTaskController.queueReInitializationEvent(reason);
-                if (null == result) {
-                  LOG.error("ReInitializationResult is null, something went wrong in queueing reinitialization event");
-                  fullSnapshot = true;
-                  continue;
-                }
+
                 //TODO: Create a metric to track this event buffer overflow or task failure event
-                
-                if (result == ReconTaskController.ReInitializationResult.MAX_RETRIES_EXCEEDED) {
-                  LOG.warn(
-                      "Reinitialization queue failures exceeded maximum retries, triggering full snapshot fallback");
+                boolean triggerFullSnapshot =
+                    Optional.ofNullable(result)
+                        .map(r -> {
+                          switch (r) {
+                          case MAX_RETRIES_EXCEEDED:
+                            LOG.warn(
+                                "Reinitialization queue failures exceeded maximum retries, triggering full snapshot " +
+                                    "fallback");
+                            return true;
+
+                          case RETRY_LATER:
+                            LOG.debug("Reinitialization event queueing will be retried in next iteration");
+                            return false;
+
+                          default:
+                            LOG.info("Reinitialization event successfully queued");
+                            return false;
+                          }
+                        })
+                        .orElseGet(() -> {
+                          LOG.error(
+                              "ReInitializationResult is null, something went wrong in queueing reinitialization " +
+                                  "event");
+                          return true;
+                        });
+
+                if (triggerFullSnapshot) {
                   fullSnapshot = true;
-                } else if (result == ReconTaskController.ReInitializationResult.RETRY_LATER) {
-                  LOG.debug("Reinitialization event queueing will be retried in next iteration");
-                } else {
-                  LOG.info("Reinitialization event successfully queued");
                 }
               }
-              
               currentSequenceNumber = getCurrentOMDBSequenceNumber();
               LOG.debug("Updated current sequence number: {}", currentSequenceNumber);
               loopCount++;
