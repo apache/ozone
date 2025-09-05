@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.SNAPSHOT_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.UUID;
@@ -172,7 +173,9 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           ((RDBStore) omMetadataManager.getStore()).getDb()
               .getLatestSequenceNumber();
       snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
-      snapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
+      ByteString txnBytes = TransactionInfo.valueOf(context.getTermIndex()).toByteString();
+      snapshotInfo.setCreateTransactionInfo(txnBytes);
+      snapshotInfo.setLastTransactionInfo(txnBytes);
       // Snapshot referenced size should be bucket's used bytes
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
