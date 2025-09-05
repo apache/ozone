@@ -101,26 +101,28 @@ By tuning these properties, administrators can balance the decommissioning speed
 
 #### Metrics
 
-The following metrics can be used to monitor the progress of DataNode decommissioning.
+The following metrics can be used to monitor the progress of DataNode decommissioning. The names in parentheses are the corresponding Prometheus metric names, which may vary slightly depending on the metrics sink configuration.
 
 ##### SCM-side Metrics (`ReplicationManagerMetrics`)
 
-These metrics are available on the SCM and provide a cluster-wide view of the replication process. During decommissioning, you should see an increase in these metrics.
+These metrics are available on the SCM and provide a cluster-wide view of the replication process. During decommissioning, you should see an increase in these metrics. The name in parentheses is the corresponding Prometheus metric name.
 
-*   `InflightReplication`: The number of container replication requests currently in progress.
-*   `replicationCmdsSentTotal`: The total number of replication commands sent to datanodes.
-*   `replicasCreatedTotal`: The total number of container replicas successfully created.
-*   `replicationBytesCompletedTotal`: The total volume of data replicated.
-*   `replicateContainerCmdsDeferredTotal`: The number of replication commands deferred because source datanodes were overloaded. If this value is high, it might indicate that the source datanodes (including the decommissioning one) are too busy.
+*   `InflightReplication` (`replication_manager_metrics_inflight_replication`): The number of container replication requests currently in progress.
+*   `replicationCmdsSentTotal` (`replication_manager_metrics_replication_cmds_sent_total`): The total number of replication commands sent to datanodes.
+*   `replicasCreatedTotal` (`replication_manager_metrics_replicas_created_total`): The total number of container replicas successfully created.
+*   `replicateContainerCmdsDeferredTotal` (`replication_manager_metrics_replicate_container_cmds_deferred_total`): The number of replication commands deferred because source datanodes were overloaded. If this value is high, it might indicate that the source datanodes (including the decommissioning one) are too busy.
 
-##### Datanode-side Metrics (`ContainerReplicator` metrics, via `MeasuredReplicator`)
+##### Datanode-side Metrics (`MeasuredReplicator` metrics)
 
-These metrics are available on each DataNode. For a decommissioning node, they show its activity as a source of replicas. For other nodes, they show their activity as targets.
+These metrics are available on each DataNode. For a decommissioning node, they show its activity as a source of replicas. For other nodes, they show their activity as targets. The name in parentheses is the corresponding Prometheus metric name.
 
-*   `success`: The number of successful replication tasks.
-*   `transferredBytes`: The total bytes transferred for successful replications.
-*   `failure`: The number of failed replication tasks.
-*   `queueTime`: The time tasks spend in the replication queue. A high value might indicate the datanode is overloaded.
+*   `success` (`measured_replicator_success`): The number of successful replication tasks.
+*   `successTime` (`measured_replicator_success_time`): The total time spent on successful replication tasks.
+*   `transferredBytes` (`measured_replicator_transferred_bytes`): The total bytes transferred for successful replications.
+*   `failure` (`measured_replicator_failure`): The number of failed replication tasks.
+*   `failureTime` (`measured_replicator_failure_time`): The total time spent on failed replication tasks.
+*   `failureBytes` (`measured_replicator_failure_bytes`): The total bytes that failed to be transferred.
+*   `queueTime` (`measured_replicator_queue_time`): The total time tasks spend in the replication queue. A high value might indicate the datanode is overloaded.
 
 By monitoring these metrics, administrators can get a clear picture of the decommissioning progress and identify potential bottlenecks.
 
