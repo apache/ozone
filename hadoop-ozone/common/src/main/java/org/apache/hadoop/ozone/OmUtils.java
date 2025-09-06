@@ -382,6 +382,22 @@ public final class OmUtils {
   }
 
   /**
+   * Returns active OM node IDs that are not listener nodes for the given service
+   * ID.
+   *
+   * @param conf        Configuration source
+   * @param omServiceId OM service ID
+   * @return Collection of active non-listener node IDs
+   */
+  public static Collection<String> getActiveNonListenerOMNodeIds(
+      ConfigurationSource conf, String omServiceId) {
+    Collection<String> nodeIds = getActiveOMNodeIds(conf, omServiceId);
+    Collection<String> listenerNodeIds = getListenerOMNodeIds(conf, omServiceId);
+    nodeIds.removeAll(listenerNodeIds);
+    return nodeIds;
+  }
+
+  /**
    * Returns a collection of configured nodeId's that are to be decommissioned.
    * Aggregate results from both config keys - with and without serviceId
    * suffix. If ozone.om.service.ids contains a single service ID, then a config
@@ -410,10 +426,8 @@ public final class OmUtils {
       String omServiceId) {
     String listenerNodesKey = ConfUtils.addKeySuffixes(
         OZONE_OM_LISTENER_NODES_KEY, omServiceId);
-    Collection<String> listenerNodeIds = conf.getTrimmedStringCollection(
+    return conf.getTrimmedStringCollection(
         listenerNodesKey);
-
-    return listenerNodeIds;
   }
 
   /**

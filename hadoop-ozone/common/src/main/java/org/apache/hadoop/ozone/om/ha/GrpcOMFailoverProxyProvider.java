@@ -67,7 +67,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
   protected void loadOMClientConfigs(ConfigurationSource config, String omSvcId)
       throws IOException {
 
-    Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config, omSvcId);
+    Collection<String> omNodeIds = OmUtils.getActiveNonListenerOMNodeIds(config, omSvcId);
     Map<String, ProxyInfo<T>> omProxies = new HashMap<>();
     List<String> omNodeIDList = new ArrayList<>();
     Map<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
