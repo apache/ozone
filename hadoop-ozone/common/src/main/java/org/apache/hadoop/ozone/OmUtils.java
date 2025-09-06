@@ -391,9 +391,9 @@ public final class OmUtils {
    */
   public static Collection<String> getActiveNonListenerOMNodeIds(
       ConfigurationSource conf, String omServiceId) {
-    HashSet<String> nodeIds = new HashSet<>(
-        getActiveOMNodeIds(conf, omServiceId));
-    nodeIds.removeAll(getListenerOMNodeIds(conf, omServiceId));
+    Collection<String> nodeIds = getActiveOMNodeIds(conf, omServiceId);
+    Collection<String> listenerNodeIds = getListenerOMNodeIds(conf, omServiceId);
+    nodeIds.removeAll(listenerNodeIds);
     return nodeIds;
   }
 
