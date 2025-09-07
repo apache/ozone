@@ -79,8 +79,6 @@ public class TestReconInsightsForDeletedDirectories {
 
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
-  private static String volumeName;
-  private static String bucketName;
   private static OzoneClient client;
   private static ReconService recon;
 
@@ -102,8 +100,8 @@ public class TestReconInsightsForDeletedDirectories {
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
+    String volumeName = bucket.getVolumeName();
+    String bucketName = bucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);

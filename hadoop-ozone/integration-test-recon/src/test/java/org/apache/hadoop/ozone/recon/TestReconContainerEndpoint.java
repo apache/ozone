@@ -54,7 +54,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestReconContainerEndpoint {
 
-  private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
   private OzoneClient client;
   private ObjectStore store;
@@ -63,7 +62,7 @@ public class TestReconContainerEndpoint {
 
   @BeforeEach
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     recon = new ReconService(conf);
