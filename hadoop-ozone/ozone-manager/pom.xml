@@ -453,17 +453,24 @@
         <groupId>dev.aspectj</groupId>
         <artifactId>aspectj-maven-plugin</artifactId>
         <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
+          <source>${maven.compiler.source}</source>
+          <target>${maven.compiler.target}</target>
           <argumentFileDirectory>${project.build.directory}/aspectj-build</argumentFileDirectory>
         </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjtools</artifactId>
+            <version>${aspectj.version}</version>
+          </dependency>
+        </dependencies>
         <executions>
           <execution>
             <goals>
               <goal>compile</goal>
             </goals>
             <configuration>
-              <complianceLevel>1.8</complianceLevel>
+              <complianceLevel>${maven.compiler.source}</complianceLevel>
             </configuration>
           </execution>
         </executions>

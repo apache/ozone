@@ -33,6 +33,7 @@
     <aopalliance.version>1.0</aopalliance.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
+    <aspectj.java9.version>1.9.24</aspectj.java9.version>
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.4</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
@@ -2688,7 +2689,10 @@
       </activation>
       <properties>
         <!-- supported since Java 9 -->
+        <aspectj.version>${aspectj.java9.version}</aspectj.version>
         <maven.compiler.release>${javac.version}</maven.compiler.release>
+        <maven.compiler.source>${javac.version}</maven.compiler.source>
+        <maven.compiler.target>${javac.version}</maven.compiler.target>
       </properties>
     </profile>
     <profile>
