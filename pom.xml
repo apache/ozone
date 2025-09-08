@@ -2697,8 +2697,8 @@
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.shade.skip>true</maven.shade.skip>
         <mdep.analyze.skip>true</mdep.analyze.skip>
-        <skip.installnodenpm>true</skip.installnodenpm>
-        <skip.npx>true</skip.npx>
+        <skip.installnodepnpm>true</skip.installnodepnpm>
+        <skip.pnpm>true</skip.pnpm>
         <skipDocs>true</skipDocs>
         <test>void</test>
       </properties>
@@ -2711,8 +2711,8 @@
         </property>
       </activation>
       <properties>
-        <skip.installnodenpm>true</skip.installnodenpm>
-        <skip.npx>true</skip.npx>
+        <skip.installnodepnpm>true</skip.installnodepnpm>
+        <skip.pnpm>true</skip.pnpm>
       </properties>
     </profile>
     <!-- The following profiles define test splits for CI -->
