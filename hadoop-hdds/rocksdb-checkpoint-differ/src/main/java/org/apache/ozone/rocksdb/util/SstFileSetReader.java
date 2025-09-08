@@ -20,11 +20,10 @@ package org.apache.ozone.rocksdb.util;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import jakarta.annotation.Nonnull;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.PriorityQueue;
@@ -240,7 +239,7 @@ public class SstFileSetReader {
    * A wrapper class that holds an iterator and its current value for heap operations.
    */
   private static class HeapEntryWithFileIdx<T extends Comparable<T>>
-      implements Comparable<HeapEntryWithFileIdx<T>> {
+      implements Comparable<HeapEntryWithFileIdx<T>>, Closeable {
     private final ClosableIterator<T> iterator;
     private T currentKey;
     // To ensure stable ordering for identical keys
@@ -252,7 +251,7 @@ public class SstFileSetReader {
       advance();
     }
 
-    void close() {
+    public void close() {
       iterator.close();
     }
 
@@ -309,33 +308,38 @@ public class SstFileSetReader {
     }
   }
 
+  /**
+   * The MultipleSstFileIterator class is an abstract base for iterating over multiple SST files.
+   * It uses a PriorityQueue to merge keys from all files in sorted order.
+   * Each file's iterator is wrapped in a HeapEntryWithFileIdx object,
+   * which ensures stable ordering for identical keys by considering the file index.
+   * @param <T>
+   */
   private abstract static class MultipleSstFileIterator<T extends Comparable<T>> implements ClosableIterator<T> {
-    private final Collection<String> files;
     private final PriorityQueue<HeapEntryWithFileIdx<T>> minHeap;
-    private final List<HeapEntryWithFileIdx<T>> allIterators;
 
-    private MultipleSstFileIterator(Collection<String> files) {
-      this.files = files;
+    private MultipleSstFileIterator(Collection<String> sstFiles) {
       this.minHeap = new PriorityQueue<>();
-      this.allIterators = new ArrayList<>();
       init();
-      initMinHeap();
+      initMinHeap(sstFiles);
     }
 
     protected abstract void init();
 
     protected abstract ClosableIterator<T> getKeyIteratorForFile(String file) throws RocksDBException, IOException;
 
-    private void initMinHeap() {
+    private void initMinHeap(Collection<String> files) {
       try {
         int fileIndex = 0;
         for (String file : files) {
           ClosableIterator<T> iterator = getKeyIteratorForFile(file);
           HeapEntryWithFileIdx<T> entry = new HeapEntryWithFileIdx<>(iterator, fileIndex++);
-          allIterators.add(entry);
 
           if (entry.getCurrentKey() != null) {
             minHeap.offer(entry);
+          } else {
+            // No valid entries, close the iterator
+            entry.close();
           }
         }
       } catch (IOException | RocksDBException e) {
@@ -374,12 +378,11 @@ public class SstFileSetReader {
 
     @Override
     public void close() {
-      minHeap.clear();
-      for (HeapEntryWithFileIdx<T> entry : allIterators) {
-        entry.close();
+      while (!minHeap.isEmpty()) {
+        minHeap.poll().close();
       }
-      allIterators.clear();
     }
   }
 
 }
+
