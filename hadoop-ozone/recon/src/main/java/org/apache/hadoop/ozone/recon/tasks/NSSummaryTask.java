@@ -120,8 +120,7 @@ public class NSSummaryTask implements ReconOmTask {
       throws IOException {
     ReconNamespaceSummaryManager stagedNsSummaryManager =
         reconNamespaceSummaryManager.getStagedNsSummaryManager(stagedReconDbStore);
-    NSSummaryTask stagedTask = new NSSummaryTask(stagedNsSummaryManager, stagedOmMetadataManager, ozoneConfiguration);
-    return stagedTask;
+    return new NSSummaryTask(stagedNsSummaryManager, stagedOmMetadataManager, ozoneConfiguration);
   }
 
   @Override

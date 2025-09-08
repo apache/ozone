@@ -49,8 +49,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -96,15 +94,6 @@ public class ReconUtils {
 
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
-
-  // Use NSSummaryTask's unified rebuild control instead of separate tracking
-  private static final ExecutorService NSSUMMARY_REBUILD_EXECUTOR =
-      Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r);
-        t.setName("RebuildNSSummaryThread");
-        t.setDaemon(true); // Optional: allows JVM to exit without waiting
-        return t;
-      });
 
   public ReconUtils() {
   }

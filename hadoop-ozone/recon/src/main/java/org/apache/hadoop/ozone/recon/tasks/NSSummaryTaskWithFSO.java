@@ -58,7 +58,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
                               ReconOMMetadataManager
                               reconOMMetadataManager,
                               long nsSummaryFlushToDBMaxThreshold) {
-    super(reconNamespaceSummaryManager, reconOMMetadataManager);
+    super(reconNamespaceSummaryManager,
+        reconOMMetadataManager);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
 
