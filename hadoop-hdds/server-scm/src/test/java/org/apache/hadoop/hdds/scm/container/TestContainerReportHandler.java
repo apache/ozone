@@ -97,7 +97,6 @@ public class TestContainerReportHandler {
   @TempDir
   private File testDir;
   private DBStore dbStore;
-  private SCMHAManager scmhaManager;
   private PipelineManager pipelineManager;
 
   @BeforeEach
@@ -106,7 +105,7 @@ public class TestContainerReportHandler {
     nodeManager = new MockNodeManager(true, 10);
     containerManager = mock(ContainerManager.class);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
