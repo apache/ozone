@@ -116,6 +116,30 @@ test_cross_compatibility() {
     done
   done
 
+  # Add checkpoint compatibility tests
+  echo ""
+  echo "=========================================="
+  echo "Running checkpoint compatibility tests"
+  echo "=========================================="
+  
+  # Test 2.0.0 client (if available)
+  for client_version in "$@"; do
+    if [[ "${client_version}" == "2.0.0" ]]; then
+      echo "Testing 2.0.0 client against ${cluster_version} cluster"
+      client _test_checkpoint_compatibility
+      break  # Only test 2.0 once
+    fi
+  done
+  
+  # Test current client (if different from 2.0.0 and available)
+  for client_version in "$@"; do
+    if [[ "${client_version}" == "${current_version}" ]]; then
+      echo "Testing ${current_version} client against ${cluster_version} cluster"
+      client _test_checkpoint_compatibility
+      break  # Only test current version once
+    fi
+  done
+
   KEEP_RUNNING=false stop_docker_env
 }
 

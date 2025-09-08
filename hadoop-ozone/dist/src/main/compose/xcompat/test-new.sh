@@ -27,26 +27,3 @@ source "${COMPOSE_DIR}/lib.sh"
 
 # current cluster with various clients
 COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}
-
-# Run checkpoint compatibility tests specifically for 2.0 client
-echo ""
-echo "=========================================="
-echo "Running checkpoint compatibility tests with 2.0 client"
-echo "=========================================="
-
-COMPOSE_FILE=new-cluster.yaml:clients.yaml
-
-echo "Starting current cluster for checkpoint testing..."
-OZONE_KEEP_RESULTS=true start_docker_env 5
-
-execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
-
-# Basic initialization similar to _init
-container=scm
-execute_command_in_container ${container} kinit -k -t /etc/security/keytabs/testuser.keytab testuser/scm@EXAMPLE.COM
-execute_command_in_container ${container} ozone freon ockg -n1 -t1 -p warmup
-
-# Test 2.0 client against current cluster
-client_version="2.0.0" cluster_version=${current_version} client _test_checkpoint_compatibility
-
-KEEP_RUNNING=false stop_docker_env
