@@ -1,0 +1,176 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
+x-common-config:
+  &common-config
+  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+  volumes:
+    - ../..:/opt/hadoop
+  env_file:
+    - docker-config
+
+x-replication:
+  &replication
+  OZONE-SITE.XML_ozone.server.default.replication: ${OZONE_REPLICATION_FACTOR:-1}
+
+services:
+  datanode:
+    <<: *common-config
+    ports:
+      - 19864
+      - 9882
+    environment:
+      <<: *replication
+    command: ["ozone","datanode"]
+  om1:
+    <<: *common-config
+    environment:
+      WAITFOR: scm3:9894
+      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      <<: *replication
+    ports:
+      - 9874:9874
+      - 9862
+    hostname: om1
+    command: ["ozone","om"]
+  om2:
+    <<: *common-config
+    environment:
+      WAITFOR: scm3:9894
+      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      <<: *replication
+    ports:
+      - 9874
+      - 9862
+    hostname: om2
+    command: ["ozone","om"]
+  om3:
+    <<: *common-config
+    environment:
+      WAITFOR: scm3:9894
+      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      <<: *replication
+    ports:
+      - 9874
+      - 9862
+    hostname: om3
+    command: ["ozone","om"]
+  scm1:
+    <<: *common-config
+    ports:
+      - 9876:9876
+    environment:
+      ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+      <<: *replication
+    command: ["ozone","scm"]
+  scm2:
+    <<: *common-config
+    ports:
+      - 9876
+    environment:
+      WAITFOR: scm1:9894
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+      <<: *replication
+    command: ["ozone","scm"]
+  scm3:
+    <<: *common-config
+    ports:
+      - 9876
+    environment:
+      WAITFOR: scm2:9894
+      ENSURE_SCM_BOOTSTRAPPED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+      <<: *replication
+    command: ["ozone","scm"]
+  httpfs:
+    <<: *common-config
+    environment:
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
+      <<: *replication
+    ports:
+      - 14000:14000
+    command: [ "ozone","httpfs" ]
+  s3g:
+    <<: *common-config
+    environment:
+      <<: *replication
+    ports:
+      - 9878:9878
+    command: ["ozone","s3g"]
+  recon:
+    <<: *common-config
+    ports:
+      - 9888:9888
+    environment:
+      <<: *replication
+    command: ["ozone","recon"]
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka-1:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka-1
+    container_name: kafka-1
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+
+  kafka-2:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka-2
+    container_name: kafka-2
+    ports:
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:29092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+
+  kafka-3:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka-3
+    container_name: kafka-3
+    ports:
+      - "9094:9094"
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:29092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9094
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
