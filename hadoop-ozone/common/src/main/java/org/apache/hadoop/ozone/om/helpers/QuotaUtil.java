@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -59,6 +60,9 @@ public final class QuotaUtil {
           fullStripes * rc.getParity() * rc.getEcChunkSize()
               + partialFirstChunk * rc.getParity();
       return dataSize + replicationOverhead;
+    } else if (repConfig.getReplicationType() == STAND_ALONE) {
+      // For replication type STAND_ALONE, the replicated size is the same as data size.
+      return dataSize;
     } else {
       LOG.warn("Unknown replication type '{}'. Returning original data size.",
           repConfig.getReplicationType());

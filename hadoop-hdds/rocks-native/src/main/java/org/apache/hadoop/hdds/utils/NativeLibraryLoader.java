@@ -125,7 +125,8 @@ public class NativeLibraryLoader {
         System.loadLibrary(libraryName);
         loaded = true;
       } catch (Throwable e) {
-
+        LOG.debug("Failed to load library {} using System.loadLibrary, " +
+            "trying to load from jar", libraryName, e);
       }
       if (!loaded) {
         Pair<Optional<File>, List<File>> files = copyResourceFromJarToTemp(libraryName, dependentFiles);

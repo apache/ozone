@@ -208,10 +208,11 @@ public final class OzoneConsts {
   public static final String OM_SLD_VERSION = "version";
   public static final String OM_SLD_CHECKSUM = "checksum";
   public static final String OM_SLD_IS_SST_FILTERED = "isSSTFiltered";
-  public static final String OM_SLD_UNCOMPACTED_SST_FILE_LIST = "uncompactedSSTFileList";
-  public static final String OM_SLD_LAST_COMPACTION_TIME = "lastCompactionTime";
-  public static final String OM_SLD_NEEDS_COMPACTION = "needsCompaction";
-  public static final String OM_SLD_COMPACTED_SST_FILE_LIST = "compactedSSTFileList";
+  public static final String OM_SLD_NOT_DEFRAGGED_SST_FILE_LIST = "notDefraggedSSTFileList";
+  public static final String OM_SLD_LAST_DEFRAG_TIME = "lastDefragTime";
+  public static final String OM_SLD_NEEDS_DEFRAGMENTATION = "needsDefragmentation";
+  public static final String OM_SLD_DEFRAGGED_SST_FILE_LIST = "defraggedSSTFileList";
+  public static final String OM_SLD_DB_CHECKPOINT_DIR = "dbCheckpointDir";
 
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
@@ -509,6 +510,7 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
   public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "checkpointState";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DEFRAGED_DIR = "checkpointStateDefragged";
   public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "diffState";
 

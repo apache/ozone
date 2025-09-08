@@ -216,6 +216,9 @@ public final class DBStoreBuilder {
       ManagedWriteOptions writeOptions = new ManagedWriteOptions();
       writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
+      // Disable WAL to reduce disk write, for testing only
+      writeOptions.setDisableWAL(true);
+
       File dbFile = getDBFile();
       if (!dbFile.getParentFile().exists()) {
         throw new RocksDatabaseException("The DB destination directory should exist.");
@@ -399,6 +402,9 @@ public final class DBStoreBuilder {
     // RocksDB log settings.
     dbOptions.setMaxLogFileSize(rocksDBConfiguration.getMaxLogFileSize());
     dbOptions.setKeepLogFileNum(rocksDBConfiguration.getKeepLogFileNum());
+    // Disable WAL archival (for more accurate RocksDB size measurements when there aren't too many keys)
+    rocksDBConfiguration.setWalTTL(0);
+    rocksDBConfiguration.setWalSizeLimit(0);
 
     // Apply WAL settings.
     dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
