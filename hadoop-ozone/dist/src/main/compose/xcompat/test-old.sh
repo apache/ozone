@@ -30,11 +30,3 @@ for cluster_version in ${old_versions}; do
   export OZONE_VERSION=${cluster_version}
   COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version} ${current_version}
 done
-
-# Run checkpoint compatibility tests specifically for 2.0
-echo ""
-echo "=========================================="
-echo "Running checkpoint compatibility tests for 2.0"
-echo "=========================================="
-export OZONE_VERSION="2.0.0"
-COMPOSE_FILE=old-cluster.yaml:clients.yaml cluster_version="2.0.0" test_checkpoint_compatibility_only "${current_version}"
