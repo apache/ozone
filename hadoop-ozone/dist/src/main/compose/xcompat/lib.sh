@@ -73,6 +73,15 @@ _read() {
     compatibility/read.robot
 }
 
+_test_checkpoint_compatibility() {
+  _kinit
+  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-checkpoint" \
+    -v CLIENT_VERSION:${client_version} \
+    -v CLUSTER_VERSION:${cluster_version} \
+    -v TEST_DATA_DIR:/testdata \
+    compatibility/checkpoint.robot
+}
+
 test_cross_compatibility() {
   echo "Starting ${cluster_version} cluster with COMPOSE_FILE=${COMPOSE_FILE}"
 
