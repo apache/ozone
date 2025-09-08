@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OperationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -315,6 +316,15 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           StringCodec.get(),
           CompactionLogEntry.getCodec());
 
+  public static final String OPERATION_INFO_TABLE = "operationInfoTable";
+  /** operationnfoTable: txId :- OperationInfo. */
+  public static final DBColumnFamilyDefinition<String, OperationInfo> OPERATION_INFO_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(OPERATION_INFO_TABLE,
+          StringCodec.get(), // txid (left zeropadded)
+          OperationInfo.getCodec());
+
+
+
   //---------------------------------------------------------------------------
   private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
       = DBColumnFamilyDefinition.newUnmodifiableMap(
@@ -339,7 +349,8 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           TENANT_STATE_TABLE_DEF,
           TRANSACTION_INFO_TABLE_DEF,
           USER_TABLE_DEF,
-          VOLUME_TABLE_DEF);
+          VOLUME_TABLE_DEF,
+          OPERATION_INFO_TABLE_DEF);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 

@@ -97,6 +97,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.OperationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -161,6 +162,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private TypedTable<String, SnapshotInfo> snapshotInfoTable;
   private TypedTable<String, String> snapshotRenamedTable;
   private TypedTable<String, CompactionLogEntry> compactionLogTable;
+  private TypedTable<String, OperationInfo> operationInfoTable;
 
   private OzoneManager ozoneManager;
 
@@ -463,6 +465,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
+
+    operationInfoTable = initializer.get(OMDBDefinition.OPERATION_INFO_TABLE_DEF);
   }
 
   /**
@@ -1273,6 +1277,58 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return result;
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<OperationInfo> listOperationInfo(final String startKey,
+                                               final int maxResults)
+      throws IOException {
+    List<OperationInfo> results = new ArrayList<>();
+
+    Table.KeyValue<String, OperationInfo> operationInfoRow;
+    try (TableIterator<String, ? extends Table.KeyValue<String, OperationInfo>>
+            tableIterator = getOperationInfoTable().iterator()) {
+
+      boolean skipFirst = false;
+      if (StringUtils.isNotBlank(startKey)) {
+        // TODO: what happens if the seek position is no longer
+        // available?  Do we go to the end of the list
+        // or the first key > startKey
+        tableIterator.seek(startKey);
+        skipFirst = true;
+      }
+
+      while (tableIterator.hasNext() && results.size() < maxResults) {
+        operationInfoRow = tableIterator.next();
+        // this is the first loop iteration after the seek so we
+        // need to skip the record we seeked to (if it is still
+        // present)
+        if (skipFirst) {
+          skipFirst = false;
+          // NOTE: I'm assuming that we need to conditionally do this
+          // only if it is equal to what we wanted to seek to (hence
+          if (!Objects.equals(startKey, operationInfoRow.getKey())) {
+            // when we have a startKey we expect the first result
+            // to be that startKey.  If it is not then we can infer that
+            // the startKey was already cleaned up and therefore we have
+            // missed some records somehow and this needs flagged to the
+            // caller.
+            // TODO: we should throw a custom exception here (instead of
+            // IOException) that needs to be handled appropriately by
+            // callers
+            throw new IOException(
+                "Missing rows - start key not found (startKey=" + startKey
+                + ", foundKey=" + operationInfoRow.getKey() + ")");
+          }
+        } else {
+          results.add(operationInfoRow.getValue());
+        }
+      }
+    }
+    return results;
+  }
+
   private PersistedUserVolumeInfo getVolumesByUser(String userNameKey)
       throws OMException {
     try {
@@ -1630,6 +1686,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, CompactionLogEntry> getCompactionLogTable() {
     return compactionLogTable;
+  }
+
+  @Override
+  public Table<String, OperationInfo> getOperationInfoTable() {
+    return operationInfoTable;
   }
 
   /**
