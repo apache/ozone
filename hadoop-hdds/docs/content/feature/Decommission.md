@@ -110,7 +110,7 @@ These metrics are available on the SCM and provide a cluster-wide view of the re
 *   `InflightReplication` (`replication_manager_metrics_inflight_replication`): The number of container replication requests currently in progress.
 *   `replicationCmdsSentTotal` (`replication_manager_metrics_replication_cmds_sent_total`): The total number of replication commands sent to DataNodes.
 *   `replicasCreatedTotal` (`replication_manager_metrics_replicas_created_total`): The total number of container replicas successfully created.
-*   `replicateContainerCmdsDeferredTotal` (`replication_manager_metrics_replicate_container_cmds_deferred_total`): The number of replication commands deferred because source datanodes were overloaded. If this value is high, it might indicate that the source datanodes (including the decommissioning one) are too busy.
+*   `replicateContainerCmdsDeferredTotal` (`replication_manager_metrics_replicate_container_cmds_deferred_total`): The number of replication commands deferred because source DataNodes were overloaded. If this value is high, it might indicate that the source DataNodes (including the decommissioning one) are too busy.
 
 ##### Datanode-side Metrics (`MeasuredReplicator` metrics)
 
