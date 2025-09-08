@@ -122,7 +122,7 @@ These metrics are available on each DataNode. For a decommissioning node, they s
 *   `failure` (`measured_replicator_failure`): The number of failed replication tasks.
 *   `failureTime` (`measured_replicator_failure_time`): The total time spent on failed replication tasks.
 *   `failureBytes` (`measured_replicator_failure_bytes`): The total bytes that failed to be transferred.
-*   `queueTime` (`measured_replicator_queue_time`): The total time tasks spend in the replication queue. A high value might indicate the datanode is overloaded.
+*   `queueTime` (`measured_replicator_queue_time`): The total time tasks spend in the replication queue. A high value might indicate the DataNode is overloaded.
 
 By monitoring these metrics, administrators can get a clear picture of the decommissioning progress and identify potential bottlenecks.
 
