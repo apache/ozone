@@ -72,7 +72,6 @@ public class TestDirectoryDeletingService {
 
   @TempDir
   private Path folder;
-  private OzoneManagerProtocol writeClient;
   private OzoneManager om;
   private String volumeName;
   private String bucketName;
@@ -115,7 +114,7 @@ public class TestDirectoryDeletingService {
     OmTestManagers omTestManagers
         = new OmTestManagers(conf);
     KeyManager keyManager = omTestManagers.getKeyManager();
-    writeClient = omTestManagers.getWriteClient();
+    OzoneManagerProtocol writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
