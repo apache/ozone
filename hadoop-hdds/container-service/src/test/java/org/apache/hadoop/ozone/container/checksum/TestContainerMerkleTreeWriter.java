@@ -69,9 +69,8 @@ class TestContainerMerkleTreeWriter {
 
     // Build the expected tree proto using the test code.
     ContainerProtos.ChunkMerkleTree chunkTree = buildExpectedChunkTree(chunk);
-    ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID,
-        Collections.singletonList(chunkTree));
-    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
+    ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID, chunkTree);
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(blockTree);
 
     // Use the ContainerMerkleTreeWriter to build the same tree.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
@@ -106,8 +105,8 @@ class TestContainerMerkleTreeWriter {
 
     // Build the expected tree proto using the test code.
     ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID,
-        Arrays.asList(buildExpectedChunkTree(chunk1), buildExpectedChunkTree(chunk3)));
-    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
+        buildExpectedChunkTree(chunk1), buildExpectedChunkTree(chunk3));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(blockTree);
 
     // Use the ContainerMerkleTree to build the same tree.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
@@ -218,8 +217,8 @@ class TestContainerMerkleTreeWriter {
   @Test
   public void testBuildTreeWithEmptyBlock() {
     final long blockID = 1;
-    ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID, Collections.emptyList());
-    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
+    ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID);
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(blockTree);
 
     // Use the ContainerMerkleTree to build the same tree.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
@@ -236,8 +235,8 @@ class TestContainerMerkleTreeWriter {
     // Build the expected proto.
     ContainerProtos.ChunkInfo chunk1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     ContainerProtos.BlockMerkleTree blockTree = buildExpectedBlockTree(blockID,
-        Collections.singletonList(buildExpectedChunkTree(chunk1)));
-    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(Collections.singletonList(blockTree));
+        buildExpectedChunkTree(chunk1));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(blockTree);
 
     // Use the ContainerMerkleTree to build the same tree, calling addBlock in between adding chunks.
     ContainerMerkleTreeWriter actualTree = new ContainerMerkleTreeWriter();
@@ -266,11 +265,10 @@ class TestContainerMerkleTreeWriter {
 
     // Build the expected tree proto using the test code.
     ContainerProtos.BlockMerkleTree blockTree1 = buildExpectedBlockTree(blockID1,
-        Arrays.asList(buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2)));
+        buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2));
     ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3,
-        Arrays.asList(buildExpectedChunkTree(b3c1), buildExpectedChunkTree(b3c2)));
-    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(
-        Arrays.asList(blockTree1, blockTree3));
+        buildExpectedChunkTree(b3c1), buildExpectedChunkTree(b3c2));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(blockTree1, blockTree3);
 
     // Use the ContainerMerkleTree to build the same tree.
     // Add blocks and chunks out of order to test sorting.
@@ -299,13 +297,12 @@ class TestContainerMerkleTreeWriter {
 
     // Build the expected tree proto using the test code.
     ContainerProtos.BlockMerkleTree blockTree1 = buildExpectedBlockTree(blockID1,
-        Arrays.asList(buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2), buildExpectedChunkTree(b1c3)));
+        buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2), buildExpectedChunkTree(b1c3));
     ContainerProtos.BlockMerkleTree blockTree2 = buildExpectedBlockTree(blockID2,
-        Arrays.asList(buildExpectedChunkTree(b2c1), buildExpectedChunkTree(b2c2)));
+        buildExpectedChunkTree(b2c1), buildExpectedChunkTree(b2c2));
     ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3,
-        Arrays.asList(buildExpectedChunkTree(b3c1), buildExpectedChunkTree(b3c2)));
-    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(
-        Arrays.asList(blockTree1, blockTree2, blockTree3));
+        buildExpectedChunkTree(b3c1), buildExpectedChunkTree(b3c2));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(blockTree1, blockTree2, blockTree3);
 
     // Use the ContainerMerkleTree to build the same tree.
     // Test building by adding chunks to the blocks individually and out of order.
@@ -420,15 +417,14 @@ class TestContainerMerkleTreeWriter {
     ContainerProtos.ChunkInfo b2c1 = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     ContainerProtos.ChunkInfo b2c2 = buildChunk(config, 1, ByteBuffer.wrap(new byte[]{1, 2, 3}));
     ContainerProtos.BlockMerkleTree blockTree1 = buildExpectedBlockTree(blockID1,
-        Arrays.asList(buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2), buildExpectedChunkTree(b1c3)));
+        buildExpectedChunkTree(b1c1), buildExpectedChunkTree(b1c2), buildExpectedChunkTree(b1c3));
     ContainerProtos.BlockMerkleTree blockTree2 = buildExpectedBlockTree(blockID2,
-        Arrays.asList(buildExpectedChunkTree(b2c1), buildExpectedChunkTree(b2c2)));
+        buildExpectedChunkTree(b2c1), buildExpectedChunkTree(b2c2));
     // Test that an empty block is preserved during tree conversion.
-    ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3, Collections.emptyList());
+    ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3);
     // Test that a deleted block is preserved during tree conversion.
     ContainerProtos.BlockMerkleTree blockTree4 = buildExpectedDeletedBlockTree(blockID4, deletedBlockChecksum);
-    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(
-        Arrays.asList(blockTree1, blockTree2, blockTree3, blockTree4));
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(blockTree1, blockTree2, blockTree3, blockTree4);
 
     ContainerMerkleTreeWriter treeWriter = new ContainerMerkleTreeWriter(expectedTree);
     ContainerProtos.ContainerMerkleTree actualTree = treeWriter.toProto();
@@ -439,10 +435,9 @@ class TestContainerMerkleTreeWriter {
     treeWriter.addChunks(blockID3, false, b3c1);
     treeWriter.addBlock(blockID5);
 
-    blockTree3 = buildExpectedBlockTree(blockID3, Collections.singletonList(buildExpectedChunkTree(b3c1, false)));
-    ContainerProtos.BlockMerkleTree blockTree5 = buildExpectedBlockTree(blockID5, Collections.emptyList());
-    ContainerProtos.ContainerMerkleTree expectedUpdatedTree = buildExpectedContainerTree(
-        Arrays.asList(blockTree1, blockTree2, blockTree3, blockTree4, blockTree5));
+    blockTree3 = buildExpectedBlockTree(blockID3, buildExpectedChunkTree(b3c1, false));
+    ContainerProtos.BlockMerkleTree blockTree5 = buildExpectedBlockTree(blockID5);
+    ContainerProtos.ContainerMerkleTree expectedUpdatedTree = buildExpectedContainerTree(blockTree1, blockTree2, blockTree3, blockTree4, blockTree5);
 
     assertTreesSortedAndMatch(expectedUpdatedTree, treeWriter.toProto());
   }
@@ -595,26 +590,178 @@ class TestContainerMerkleTreeWriter {
     assertNotEquals(liveBlockChecksum, finalBlock.getDataChecksum());
   }
 
+  /**
+   * If both trees contain a block and ours is live while existing is deleted,
+   * the deleted one supersedes and its checksum should be used.
+   */
+  @Test
+  public void testUpdateConflictExistingDeleted() {
+    final long blockID = 1L;
 
-  private ContainerProtos.ContainerMerkleTree buildExpectedContainerTree(List<ContainerProtos.BlockMerkleTree> blocks) {
+    // Our writer has a live block
+    ContainerMerkleTreeWriter writer = new ContainerMerkleTreeWriter();
+    ContainerProtos.ChunkInfo chunk = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{1, 2, 3}));
+    writer.addChunks(blockID, true, chunk);
+
+    // Existing tree marks the same block as deleted with a specific checksum
+    final long deletedChecksum = 987654321L;
+    ContainerProtos.BlockMerkleTree existingDeleted = buildExpectedDeletedBlockTree(blockID, deletedChecksum);
+    ContainerProtos.ContainerMerkleTree existingTree = ContainerProtos.ContainerMerkleTree.newBuilder()
+        .addBlockMerkleTree(existingDeleted)
+        .build();
+
+    ContainerProtos.ContainerMerkleTree result = writer.update(existingTree);
+
+    // Expect the deleted state from existing to override the live state in writer
+    ContainerProtos.ContainerMerkleTree expected = buildExpectedContainerTree(
+        buildExpectedDeletedBlockTree(blockID, deletedChecksum));
+    assertTreesSortedAndMatch(expected, result);
+  }
+
+  /**
+   * If both trees contain the same live block, our writer's value wins.
+   */
+  @Test
+  public void testUpdateConflictBothLive() {
+    final long blockID = 1L;
+
+    // Our writer live block with one set of chunks
+    ContainerMerkleTreeWriter writer = new ContainerMerkleTreeWriter();
+    ContainerProtos.ChunkInfo ourChunk = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{10, 20, 30}));
+    writer.addChunks(blockID, true, ourChunk);
+
+    // Existing tree has same blockID but different content
+    ContainerProtos.ChunkInfo existingChunk = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{7, 8, 9}));
+    ContainerProtos.BlockMerkleTree existingLive = buildExpectedBlockTree(blockID,
+        buildExpectedChunkTree(existingChunk));
+    ContainerProtos.ContainerMerkleTree existingTree = ContainerProtos.ContainerMerkleTree.newBuilder()
+        .addBlockMerkleTree(existingLive)
+        .build();
+
+    ContainerProtos.ContainerMerkleTree result = writer.update(existingTree);
+
+    // Expect our writer's live block to be preserved
+    ContainerProtos.ContainerMerkleTree expected = buildExpectedContainerTree(
+        buildExpectedBlockTree(blockID, buildExpectedChunkTree(ourChunk)));
+    assertTreesSortedAndMatch(expected, result);
+  }
+
+  /**
+   * If our writer has a deleted block and the existing tree has it as live,
+   * our deleted value wins since we have the latest information.
+   */
+  @Test
+  public void testUpdateConflictExistingLive() {
+    final long blockID = 3L;
+
+    // Our writer marks the block as deleted
+    final long ourDeletedChecksum = 12345L;
+    ContainerMerkleTreeWriter writer = new ContainerMerkleTreeWriter();
+    writer.setDeletedBlock(blockID, ourDeletedChecksum);
+
+    // Existing tree has a live version of the block
+    ContainerProtos.ChunkInfo existingChunk = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{4, 5, 6}));
+    ContainerProtos.BlockMerkleTree existingLive = buildExpectedBlockTree(blockID,
+        buildExpectedChunkTree(existingChunk));
+    ContainerProtos.ContainerMerkleTree existingTree = ContainerProtos.ContainerMerkleTree.newBuilder()
+        .addBlockMerkleTree(existingLive)
+        .build();
+
+    ContainerProtos.ContainerMerkleTree result = writer.update(existingTree);
+
+    // Expect our deleted entry to be preserved
+    ContainerProtos.ContainerMerkleTree expected = buildExpectedContainerTree(
+        buildExpectedDeletedBlockTree(blockID, ourDeletedChecksum));
+    assertTreesSortedAndMatch(expected, result);
+  }
+
+  /**
+   * If both the writer's tree and existing tree have deleted versions of a block, our writer's checksum wins.
+   */
+  @Test
+  public void testUpdateConflictBothDeleted() {
+    final long blockID = 4L;
+    final long ourDeletedChecksum = 111L;
+    final long existingDeletedChecksum = 222L;
+
+    ContainerMerkleTreeWriter writer = new ContainerMerkleTreeWriter();
+    writer.setDeletedBlock(blockID, ourDeletedChecksum);
+
+    ContainerProtos.BlockMerkleTree existingDeleted = buildExpectedDeletedBlockTree(blockID, existingDeletedChecksum);
+    ContainerProtos.ContainerMerkleTree existingTree = ContainerProtos.ContainerMerkleTree.newBuilder()
+        .addBlockMerkleTree(existingDeleted)
+        .build();
+
+    ContainerProtos.ContainerMerkleTree result = writer.update(existingTree);
+
+    ContainerProtos.ContainerMerkleTree expected = buildExpectedContainerTree(
+        buildExpectedDeletedBlockTree(blockID, ourDeletedChecksum));
+    assertTreesSortedAndMatch(expected, result);
+  }
+
+  /**
+   * Merge the existing tree with the tree writer by:
+   * - including deleted blocks from the existing tree into our tree writer.
+   * - ignoring live blocks from the existing tree and overwriting them with our tree writer.
+   */
+  @Test
+  public void testUpdateMergesTrees() {
+    final long existingLiveBlockID = 6L;
+    final long existingDeletedBlockID = 5L;
+    final long existingDeletedChecksum = 555L;
+    final long ourLiveBlockID = 7L;
+    final long ourDeletedBlockID = 8L;
+    final long ourDeletedChecksum = 444L;
+
+    // Our writer contains a live block not present in the existing tree
+    ContainerMerkleTreeWriter writer = new ContainerMerkleTreeWriter();
+    ContainerProtos.ChunkInfo ourLiveChunk = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{9, 9, 9}));
+    writer.addChunks(ourLiveBlockID, true, ourLiveChunk);
+    // Our writer also includes a deleted block not present in the existing tree
+    writer.setDeletedBlock(ourDeletedBlockID, ourDeletedChecksum);
+
+    // Existing tree contains a deleted block (should be included) and a live block (should be ignored)
+    ContainerProtos.BlockMerkleTree existingDeleted = buildExpectedDeletedBlockTree(existingDeletedBlockID, existingDeletedChecksum);
+    ContainerProtos.ChunkInfo existingLiveChunk = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{7, 7, 7}));
+    ContainerProtos.BlockMerkleTree existingLiveBlock = buildExpectedBlockTree(existingLiveBlockID,
+        buildExpectedChunkTree(existingLiveChunk));
+    ContainerProtos.ContainerMerkleTree existingTree = ContainerProtos.ContainerMerkleTree.newBuilder()
+        .addBlockMerkleTree(existingDeleted)
+        .addBlockMerkleTree(existingLiveBlock)
+        .build();
+
+    ContainerProtos.ContainerMerkleTree result = writer.update(existingTree);
+
+    // Expect union: our live block + existing deleted block, but not the existing live block
+    ContainerProtos.ContainerMerkleTree expected = buildExpectedContainerTree(
+        buildExpectedBlockTree(ourLiveBlockID, buildExpectedChunkTree(ourLiveChunk)),
+        buildExpectedDeletedBlockTree(existingDeletedBlockID, existingDeletedChecksum),
+        buildExpectedDeletedBlockTree(ourDeletedBlockID, ourDeletedChecksum));
+    assertTreesSortedAndMatch(expected, result);
+  }
+
+  private ContainerProtos.ContainerMerkleTree buildExpectedContainerTree(
+      ContainerProtos.BlockMerkleTree... blocks) {
+    List<ContainerProtos.BlockMerkleTree> blockList = Arrays.asList(blocks);
     return ContainerProtos.ContainerMerkleTree.newBuilder()
-        .addAllBlockMerkleTree(blocks)
+        .addAllBlockMerkleTree(blockList)
         .setDataChecksum(computeExpectedChecksum(
-            blocks.stream()
+            blockList.stream()
                 .map(ContainerProtos.BlockMerkleTree::getDataChecksum)
                 .collect(Collectors.toList())))
         .build();
   }
 
   private ContainerProtos.BlockMerkleTree buildExpectedBlockTree(long blockID,
-      List<ContainerProtos.ChunkMerkleTree> chunks) {
-    List<Long> itemsToChecksum = chunks.stream().map(ContainerProtos.ChunkMerkleTree::getDataChecksum)
+      ContainerProtos.ChunkMerkleTree... chunks) {
+    List<ContainerProtos.ChunkMerkleTree> chunkList = Arrays.asList(chunks);
+    List<Long> itemsToChecksum = chunkList.stream().map(ContainerProtos.ChunkMerkleTree::getDataChecksum)
         .collect(Collectors.toList());
     itemsToChecksum.add(0, blockID);
     return ContainerProtos.BlockMerkleTree.newBuilder()
         .setBlockID(blockID)
         .setDataChecksum(computeExpectedChecksum(itemsToChecksum))
-        .addAllChunkMerkleTree(chunks)
+        .addAllChunkMerkleTree(chunkList)
         .setDeleted(false)
         .build();
   }
