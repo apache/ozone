@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -385,5 +387,14 @@ public final class ContainerMerkleTreeTestUtils {
           "the one in the checksum file.");
       assertEquals(dbDataChecksum, dataChecksum);
     }
+  }
+
+  public static BlockData buildBlockData(ConfigurationSource config, long containerID, long blockID) {
+    BlockData blockData = new BlockData(new BlockID(containerID, blockID));
+    byte byteValue = 0;
+    blockData.addChunk(buildChunk(config, 0, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+    blockData.addChunk(buildChunk(config, 1, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+    blockData.addChunk(buildChunk(config, 2, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+    return blockData;
   }
 }
