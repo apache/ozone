@@ -299,13 +299,6 @@ public class ReconUtils {
             "deletion, returning empty string for path construction.");
         throw new ServiceNotReadyException("Service is initializing. Please try again later.");
       }
-      if (nsSummary.getParentId() == -1) {
-        // Trigger async rebuild using unified control mechanism
-        triggerAsyncNSSummaryRebuild(reconNamespaceSummaryManager, omMetadataManager);
-        log.warn(
-            "NSSummary tree corruption detected, rebuild triggered. Returning empty string for path construction.");
-        throw new ServiceNotReadyException("Service is initializing. Please try again later.");
-      }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
       if (!nsSummary.getDirName().isEmpty()) {
         pathSegments.add(nsSummary.getDirName());

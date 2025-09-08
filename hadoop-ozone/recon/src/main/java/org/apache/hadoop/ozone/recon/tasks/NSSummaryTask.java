@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
@@ -41,6 +42,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.metrics.NSSummaryMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -81,6 +83,7 @@ public class NSSummaryTask implements ReconOmTask {
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
+  private final NSSummaryMetrics nsSummaryMetrics;
 
   /**
    * Rebuild state enum to track NSSummary tree rebuild status.
@@ -101,18 +104,19 @@ public class NSSummaryTask implements ReconOmTask {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
     this.ozoneConfiguration = ozoneConfiguration;
+    this.nsSummaryMetrics = NSSummaryMetrics.create();
     long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
 
     this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        nsSummaryFlushToDBMaxThreshold);
+        nsSummaryFlushToDBMaxThreshold, nsSummaryMetrics);
     this.nsSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager, reconOMMetadataManager,
-        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold);
+        ozoneConfiguration, nsSummaryFlushToDBMaxThreshold, nsSummaryMetrics);
     this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
-        reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold);
+        reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold, nsSummaryMetrics);
   }
 
   @Override
@@ -120,7 +124,8 @@ public class NSSummaryTask implements ReconOmTask {
       throws IOException {
     ReconNamespaceSummaryManager stagedNsSummaryManager =
         reconNamespaceSummaryManager.getStagedNsSummaryManager(stagedReconDbStore);
-    return new NSSummaryTask(stagedNsSummaryManager, stagedOmMetadataManager, ozoneConfiguration);
+    NSSummaryTask stagedTask = new NSSummaryTask(stagedNsSummaryManager, stagedOmMetadataManager, ozoneConfiguration);
+    return stagedTask;
   }
 
   @Override
@@ -205,9 +210,14 @@ public class NSSummaryTask implements ReconOmTask {
       LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
       return buildTaskResult(false);
     }
-    
+
     if (!REBUILD_STATE.compareAndSet(currentState, RebuildState.RUNNING)) {
-      LOG.info("Failed to acquire rebuild lock, another thread may have started rebuild.");
+      // Check if another thread successfully started the rebuild
+      if (REBUILD_STATE.get() == RebuildState.RUNNING) {
+        LOG.info("Rebuild already in progress by another thread, returning success");
+        return buildTaskResult(true);
+      }
+      LOG.info("Failed to acquire rebuild lock, unknown state");
       return buildTaskResult(false);
     }
 
@@ -218,6 +228,7 @@ public class NSSummaryTask implements ReconOmTask {
       return executeReprocess(omMetadataManager, startTime);
     } catch (Exception e) {
       LOG.error("NSSummary reprocess failed with exception.", e);
+      nsSummaryMetrics.incrReprocessFailuresTotal();
       REBUILD_STATE.set(RebuildState.FAILED);
       return buildTaskResult(false);
     }
@@ -235,6 +246,7 @@ public class NSSummaryTask implements ReconOmTask {
       reconNamespaceSummaryManager.clearNSSummaryTable();
     } catch (IOException ioEx) {
       LOG.error("Unable to clear NSSummary table in Recon DB. ", ioEx);
+      nsSummaryMetrics.incrReprocessFailuresTotal();
       REBUILD_STATE.set(RebuildState.FAILED);
       return buildTaskResult(false);
     }
@@ -250,33 +262,62 @@ public class NSSummaryTask implements ReconOmTask {
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat("Recon-NSSummaryTask-%d")
         .build();
-    ExecutorService executorService = Executors.newFixedThreadPool(2,
+    ExecutorService executorService = Executors.newFixedThreadPool(3,
         threadFactory);
     boolean success = false;
     try {
+      // Update active threads gauge
+      if (executorService instanceof ThreadPoolExecutor) {
+        ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executorService;
+        nsSummaryMetrics.setExecutorActiveThreads(threadPoolExecutor.getActiveCount());
+      }
+      
       results = executorService.invokeAll(tasks);
       for (Future<Boolean> result : results) {
         if (result.get().equals(false)) {
           LOG.error("NSSummary reprocess failed for one of the sub-tasks.");
+          nsSummaryMetrics.incrReprocessFailuresTotal();
           REBUILD_STATE.set(RebuildState.FAILED);
           return buildTaskResult(false);
         }
       }
       success = true;
-      
-    } catch (InterruptedException | ExecutionException ex) {
-      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
+
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      LOG.error("NSSummaryTask was interrupted.", ex);
+      nsSummaryMetrics.incrReprocessFailuresTotal();
       REBUILD_STATE.set(RebuildState.FAILED);
       return buildTaskResult(false);
-      
+    } catch (ExecutionException ex) {
+      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex.getCause());
+      nsSummaryMetrics.incrReprocessFailuresTotal();
+      REBUILD_STATE.set(RebuildState.FAILED);
+      return buildTaskResult(false);
     } finally {
       executorService.shutdown();
+      // Deterministic resource cleanup with timeout
+      try {
+        // get() ensures the work is done. awaitTermination ensures the workers are also verifiably gone.
+        // It turns an asynchronous shutdown into a synchronous, deterministic one
+        if (!executorService.awaitTermination(5, TimeUnit.MINUTES)) {
+          LOG.warn("Executor service for NSSummaryTask did not terminate in the specified time.");
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException ex) {
+        LOG.error("NSSummaryTask executor service termination was interrupted.", ex);
+        executorService.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
 
       long endTime = System.nanoTime();
       // Convert to milliseconds
       long durationInMillis =
           TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
 
+      // Update metrics
+      nsSummaryMetrics.updateReprocessDurationMs(durationInMillis);
+      
       // Log performance metrics
       LOG.info("NSSummary reprocess execution time: {} milliseconds", durationInMillis);
       
@@ -285,6 +326,9 @@ public class NSSummaryTask implements ReconOmTask {
         REBUILD_STATE.set(RebuildState.IDLE);
         LOG.info("NSSummary tree reprocess completed successfully with unified control.");
       }
+      
+      // Reset active threads gauge
+      nsSummaryMetrics.setExecutorActiveThreads(0);
     }
 
     return buildTaskResult(true);

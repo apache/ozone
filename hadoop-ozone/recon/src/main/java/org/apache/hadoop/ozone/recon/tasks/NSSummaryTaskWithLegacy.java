@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.NSSummaryMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -65,6 +66,23 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
                                  long nsSummaryFlushToDBMaxThreshold) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
+    // true if FileSystemPaths enabled
+    enableFileSystemPaths = ozoneConfiguration
+        .getBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS,
+            OmConfig.Defaults.ENABLE_FILESYSTEM_PATHS);
+    this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
+  }
+
+  public NSSummaryTaskWithLegacy(ReconNamespaceSummaryManager
+                                 reconNamespaceSummaryManager,
+                                 ReconOMMetadataManager
+                                 reconOMMetadataManager,
+                                 OzoneConfiguration
+                                 ozoneConfiguration,
+                                 long nsSummaryFlushToDBMaxThreshold,
+                                 NSSummaryMetrics nsSummaryMetrics) {
+    super(reconNamespaceSummaryManager,
+        reconOMMetadataManager, nsSummaryMetrics);
     // true if FileSystemPaths enabled
     enableFileSystemPaths = ozoneConfiguration
         .getBoolean(OmConfig.Keys.ENABLE_FILESYSTEM_PATHS,

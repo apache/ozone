@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.metrics.NSSummaryMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
@@ -42,6 +43,7 @@ public class NSSummaryTaskDbEventHandler {
       LoggerFactory.getLogger(NSSummaryTaskDbEventHandler.class);
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private NSSummaryMetrics nsSummaryMetrics;
 
   public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
                                      reconNamespaceSummaryManager,
@@ -51,12 +53,29 @@ public class NSSummaryTaskDbEventHandler {
     this.reconOMMetadataManager = reconOMMetadataManager;
   }
 
+  public NSSummaryTaskDbEventHandler(ReconNamespaceSummaryManager
+                                     reconNamespaceSummaryManager,
+                                     ReconOMMetadataManager
+                                     reconOMMetadataManager,
+                                     NSSummaryMetrics nsSummaryMetrics) {
+    this(reconNamespaceSummaryManager, reconOMMetadataManager);
+    this.nsSummaryMetrics = nsSummaryMetrics;
+  }
+
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
     return reconNamespaceSummaryManager;
   }
 
   public ReconOMMetadataManager getReconOMMetadataManager() {
     return reconOMMetadataManager;
+  }
+
+  public NSSummaryMetrics getNSSummaryMetrics() {
+    return nsSummaryMetrics;
+  }
+
+  public void setNSSummaryMetrics(NSSummaryMetrics metrics) {
+    this.nsSummaryMetrics = metrics;
   }
 
   private void updateNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap, Collection<Long> objectIdsToBeDeleted)
@@ -239,9 +258,18 @@ public class NSSummaryTaskDbEventHandler {
 
   protected boolean flushAndCommitNSToDB(Map<Long, NSSummary> nsSummaryMap) {
     try {
+      // Record batch size before flushing
+      if (nsSummaryMetrics != null) {
+        nsSummaryMetrics.updateDbFlushSize(nsSummaryMap.size());
+      }
+      
       updateNSSummariesToDB(nsSummaryMap, Collections.emptyList());
     } catch (IOException e) {
       LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      // Record flush failure
+      if (nsSummaryMetrics != null) {
+        nsSummaryMetrics.incrDbFlushFailure();
+      }
       return false;
     } finally {
       nsSummaryMap.clear();
@@ -259,9 +287,18 @@ public class NSSummaryTaskDbEventHandler {
   protected boolean flushAndCommitUpdatedNSToDB(Map<Long, NSSummary> nsSummaryMap,
                                                 Collection<Long> objectIdsToBeDeleted) {
     try {
+      // Record batch size before flushing
+      if (nsSummaryMetrics != null) {
+        nsSummaryMetrics.updateDbFlushSize(nsSummaryMap.size() + objectIdsToBeDeleted.size());
+      }
+      
       updateNSSummariesToDB(nsSummaryMap, objectIdsToBeDeleted);
     } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      LOG.error("Unable to write Namespace Summary data in Recon DB. batchSize={}", nsSummaryMap.size(), e);
+      // Record flush failure
+      if (nsSummaryMetrics != null) {
+        nsSummaryMetrics.incrDbFlushFailure();
+      }
       return false;
     } finally {
       nsSummaryMap.clear();
