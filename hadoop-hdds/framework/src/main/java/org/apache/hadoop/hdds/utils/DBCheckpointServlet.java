@@ -282,7 +282,8 @@ public class DBCheckpointServlet extends HttpServlet
     Set<String> sstFilesToExclude = new HashSet<>();
     if (filesInExclusionParam != null) {
       sstFilesToExclude.addAll(
-          Arrays.stream(filesInExclusionParam).filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX)).distinct().collect(Collectors.toList()));
+          Arrays.stream(filesInExclusionParam).filter(s -> s.endsWith(ROCKSDB_SST_SUFFIX))
+              .distinct().collect(Collectors.toList()));
       logSstFileList(sstFilesToExclude, "Received list of {} SST files to be excluded{}: {}", 5);
     }
     return sstFilesToExclude;
