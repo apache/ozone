@@ -511,7 +511,9 @@ public class TestPipelinePlacementPolicy {
 
   @Test
   public void testValidatePlacementPolicySingleRackInCluster() {
-    nodeManager = new MockNodeManager(cluster, new ArrayList<>(),
+    NetworkTopologyImpl localCluster = initTopology();
+
+    nodeManager = new MockNodeManager(localCluster, new ArrayList<>(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
@@ -524,7 +526,7 @@ public class TestPipelinePlacementPolicy {
     dns.add(MockDatanodeDetails
         .createDatanodeDetails("host3", "/rack1"));
     for (DatanodeDetails dn : dns) {
-      cluster.add(dn);
+      localCluster.add(dn);
     }
     ContainerPlacementStatus status =
         placementPolicy.validateContainerPlacement(dns, 3);
