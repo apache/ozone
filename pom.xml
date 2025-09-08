@@ -33,7 +33,8 @@
     <aopalliance.version>1.0</aopalliance.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
-    <aspectj.java9.version>1.9.24</aspectj.java9.version>
+    <aspectj.java11.version>1.9.20</aspectj.java11.version>
+    <aspectj.java21.version>1.9.24</aspectj.java21.version>
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.4</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
@@ -2683,13 +2684,24 @@
       </properties>
     </profile>
     <profile>
-      <id>java9-or-later</id>
+      <id>java11-20</id>
+      <activation><jdk>[11,20]</jdk></activation>
+      <properties>
+        <aspectj.version>${aspectj.java11.version}</aspectj.version>
+        <!-- supported since Java 9 -->
+        <maven.compiler.release>${javac.version}</maven.compiler.release>
+        <maven.compiler.source>${javac.version}</maven.compiler.source>
+        <maven.compiler.target>${javac.version}</maven.compiler.target>
+      </properties>
+    </profile>
+    <profile>
+      <id>java21-or-later</id>
       <activation>
-        <jdk>[9,]</jdk>
+        <jdk>[21,]</jdk>
       </activation>
       <properties>
+        <aspectj.version>${aspectj.java21.version}</aspectj.version>
         <!-- supported since Java 9 -->
-        <aspectj.version>${aspectj.java9.version}</aspectj.version>
         <maven.compiler.release>${javac.version}</maven.compiler.release>
         <maven.compiler.source>${javac.version}</maven.compiler.source>
         <maven.compiler.target>${javac.version}</maven.compiler.target>
