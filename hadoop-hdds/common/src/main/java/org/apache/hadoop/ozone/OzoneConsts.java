@@ -76,7 +76,7 @@ public final class OzoneConsts {
   public static final String OZONE_DB_CHECKPOINT_HTTP_ENDPOINT =
       "/dbCheckpoint";
   public static final String OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2 =
-      "/dbCheckpointv2";
+      "/v2/dbCheckpoint";
 
   // Ozone File System scheme
   public static final String OZONE_URI_SCHEME = "o3fs";
