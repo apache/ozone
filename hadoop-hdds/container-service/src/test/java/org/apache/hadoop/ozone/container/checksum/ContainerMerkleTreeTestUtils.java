@@ -75,6 +75,7 @@ public final class ContainerMerkleTreeTestUtils {
 
       assertEquals(expectedBlockTree.getBlockID(), actualBlockTree.getBlockID());
       assertEquals(expectedBlockTree.getDataChecksum(), actualBlockTree.getDataChecksum());
+      assertEquals(expectedBlockTree.getDeleted(), actualBlockTree.getDeleted());
 
       long prevChunkOffset = -1;
       for (int chunkIndex = 0; chunkIndex < expectedBlockTree.getChunkMerkleTreeCount(); chunkIndex++) {
