@@ -119,33 +119,6 @@ public class ReconUtils {
     return org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.getRebuildState();
   }
 
-  /**
-   * Convenience method to trigger asynchronous NSSummary tree rebuild.
-   * Uses the unified control mechanism in NSSummaryTask.
-   * 
-   * @param reconNamespaceSummaryManager The namespace summary manager
-   * @param omMetadataManager The OM metadata manager
-   * @return true if rebuild was triggered successfully, false otherwise
-   */
-  public static boolean triggerAsyncNSSummaryRebuild(
-      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-      ReconOMMetadataManager omMetadataManager) {
-
-    // Submit rebuild task to single thread executor for async execution
-    NSSUMMARY_REBUILD_EXECUTOR.submit(() -> {
-      try {
-
-        // This will go through NSSummaryTask's unified control mechanism
-        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-        log.info("Async NSSummary tree rebuild completed successfully.");
-      } catch (Exception e) {
-        log.error("Async NSSummary tree rebuild failed.", e);
-      }
-    });
-    
-    return true;
-  }
-
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
   }
