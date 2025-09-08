@@ -86,6 +86,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -161,6 +162,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private TypedTable<String, SnapshotInfo> snapshotInfoTable;
   private TypedTable<String, String> snapshotRenamedTable;
   private TypedTable<String, CompactionLogEntry> compactionLogTable;
+  private TypedTable<String, OmCompletedRequestInfo> completedRequestInfoTable;
 
   private OzoneManager ozoneManager;
 
@@ -463,6 +465,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
+
+    completedRequestInfoTable = initializer.get(OMDBDefinition.COMPLETED_REQUEST_INFO_TABLE_DEF);
   }
 
   /**
@@ -1273,6 +1277,58 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return result;
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<OmCompletedRequestInfo> listCompletedRequestInfo(final String startKey,
+                                                               final int maxResults)
+      throws IOException {
+    List<OmCompletedRequestInfo> results = new ArrayList<>();
+
+    Table.KeyValue<String, OmCompletedRequestInfo> completedRequestInfoRow;
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmCompletedRequestInfo>>
+            tableIterator = getCompletedRequestInfoTable().iterator()) {
+
+      boolean skipFirst = false;
+      if (StringUtils.isNotBlank(startKey)) {
+        // TODO: what happens if the seek position is no longer
+        // available?  Do we go to the end of the list
+        // or the first key > startKey
+        tableIterator.seek(startKey);
+        skipFirst = true;
+      }
+
+      while (tableIterator.hasNext() && results.size() < maxResults) {
+        completedRequestInfoRow = tableIterator.next();
+        // this is the first loop iteration after the seek so we
+        // need to skip the record we seeked to (if it is still
+        // present)
+        if (skipFirst) {
+          skipFirst = false;
+          // NOTE: I'm assuming that we need to conditionally do this
+          // only if it is equal to what we wanted to seek to (hence
+          if (!Objects.equals(startKey, completedRequestInfoRow.getKey())) {
+            // when we have a startKey we expect the first result
+            // to be that startKey.  If it is not then we can infer that
+            // the startKey was already cleaned up and therefore we have
+            // missed some records somehow and this needs flagged to the
+            // caller.
+            // TODO: we should throw a custom exception here (instead of
+            // IOException) that needs to be handled appropriately by
+            // callers
+            throw new IOException(
+                "Missing rows - start key not found (startKey=" + startKey
+                + ", foundKey=" + completedRequestInfoRow.getKey() + ")");
+          }
+        } else {
+          results.add(completedRequestInfoRow.getValue());
+        }
+      }
+    }
+    return results;
+  }
+
   private PersistedUserVolumeInfo getVolumesByUser(String userNameKey)
       throws OMException {
     try {
@@ -1630,6 +1686,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, CompactionLogEntry> getCompactionLogTable() {
     return compactionLogTable;
+  }
+
+  @Override
+  public Table<String, OmCompletedRequestInfo> getCompletedRequestInfoTable() {
+    return completedRequestInfoTable;
   }
 
   /**

@@ -50,6 +50,8 @@ OZONE-SITE.XML_ozone.recon.https-address=0.0.0.0:9889
 OZONE-SITE.XML_hdds.container.ratis.datastream.enabled=true
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
+OZONE-SITE.XML_ozone.om.plugin.destination.kafka=true
+OZONE-SITE.XML_ozone.om.plugin.destination.kafka.classname=org.apache.hadoop.ozone.om.eventlistener.OMEventListenerKafkaPublisher
 OZONE-SITE.XML_ozone.notify.kafka.topic=test123
 OZONE-SITE.XML_ozone.notify.kafka.bootstrap.servers=kafka-3:29092,kafka-1:29092,kafka-2:29092
 OZONE-SITE.XML_ozone.notify.kafka.key.serializer=org.apache.kafka.common.serialization.StringSerializer
