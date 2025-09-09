@@ -739,27 +739,38 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
                                        Map<String, String> userMetadata)
       throws IOException {
     URL createMultipartUploadPresignedUrl = presignCreateMultipartUpload.url();
-    HttpURLConnection createMultiPartUploadConnection =
-        (HttpURLConnection) createMultipartUploadPresignedUrl.openConnection();
-    createMultiPartUploadConnection.setDoOutput(true);
-    createMultiPartUploadConnection.setRequestMethod("POST");
-    presignCreateMultipartUpload.signedHeaders().forEach((key, values) -> {
-      values.forEach(value -> {
-        createMultiPartUploadConnection.setRequestProperty(key, value);
-      });
-    });
-
-    int createMultiPartUploadConnectionResponseCode = createMultiPartUploadConnection.getResponseCode();
-    assertEquals(200, createMultiPartUploadConnectionResponseCode,
-        "CreateMultipartUploadPresignRequest should return 200 OK");
 
     String uploadId;
-    try (InputStream is = createMultiPartUploadConnection.getInputStream()) {
-      String responseXml = IOUtils.toString(is, StandardCharsets.UTF_8);
-      int startIdx = responseXml.indexOf("<UploadId>") + "<UploadId>".length();
-      int endIdx = responseXml.indexOf("</UploadId>");
-      uploadId = responseXml.substring(startIdx, endIdx);
+    HttpURLConnection createMultiPartUploadConnection = null;
+    try {
+      createMultiPartUploadConnection =
+          (HttpURLConnection) createMultipartUploadPresignedUrl.openConnection();
+      createMultiPartUploadConnection.setDoOutput(true);
+      createMultiPartUploadConnection.setRequestMethod("POST");
+      for (Map.Entry<String, List<String>> entry : presignCreateMultipartUpload.signedHeaders().entrySet()) {
+        String key = entry.getKey();
+        for (String value : entry.getValue()) {
+          createMultiPartUploadConnection.setRequestProperty(key, value);
+        }
+      }
+
+      int createMultiPartUploadConnectionResponseCode = createMultiPartUploadConnection.getResponseCode();
+      assertEquals(200, createMultiPartUploadConnectionResponseCode,
+          "CreateMultipartUploadPresignRequest should return 200 OK");
+
+      try (InputStream is = createMultiPartUploadConnection.getInputStream()) {
+        String responseXml = IOUtils.toString(is, StandardCharsets.UTF_8);
+        int startIdx = responseXml.indexOf("<UploadId>") + "<UploadId>".length();
+        int endIdx = responseXml.indexOf("</UploadId>");
+        uploadId = responseXml.substring(startIdx, endIdx);
+      }
+    } finally {
+      if(createMultiPartUploadConnection != null) {
+        createMultiPartUploadConnection.disconnect();
+      }
     }
+
+
 
     // Upload parts using presigned URL
     List<CompletedPart> completedParts = new ArrayList<>();
@@ -795,11 +806,12 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
         // Use HttpURLConnection to upload the part
         URL presignedUrl = presignedRequest.url();
-        HttpURLConnection connection = (HttpURLConnection) presignedUrl.openConnection();
-        connection.setDoOutput(true);
-        connection.setRequestMethod("PUT");
-
+        HttpURLConnection connection = null;
         try {
+          connection = (HttpURLConnection) presignedUrl.openConnection();
+          connection.setDoOutput(true);
+          connection.setRequestMethod("PUT");
+
           try (OutputStream os = connection.getOutputStream()) {
             byte[] bytes = new byte[bb.remaining()];
             bb.get(bytes);
@@ -818,7 +830,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
               .build();
           completedParts.add(part);
         } finally {
-          connection.disconnect();
+          if (connection != null) {
+            connection.disconnect();
+          }
         }
 
         bb.clear();
@@ -844,38 +858,46 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         presigner.presignCompleteMultipartUpload(completeMultipartUploadPresignRequest);
 
     URL presignedCompleteMultipartUploadUrl = presignedCompleteMultipartUploadRequest.url();
-    HttpURLConnection completeMultipartUploadConnection =
-        (HttpURLConnection) presignedCompleteMultipartUploadUrl.openConnection();
-    completeMultipartUploadConnection.setDoOutput(true);
-    completeMultipartUploadConnection.setRequestMethod("POST");
+    HttpURLConnection completeMultipartUploadConnection = null;
+    try {
 
-    // copy headers
-    presignedCompleteMultipartUploadRequest.signedHeaders().forEach((key, values) -> {
-      values.forEach(value -> {
-        completeMultipartUploadConnection.setRequestProperty(key, value);
-      });
-    });
+      completeMultipartUploadConnection = (HttpURLConnection) presignedCompleteMultipartUploadUrl.openConnection();
+      completeMultipartUploadConnection.setDoOutput(true);
+      completeMultipartUploadConnection.setRequestMethod("POST");
 
-    String xmlPayload = buildCompleteMultipartUploadXml(completedParts);
-    byte[] payloadBytes = xmlPayload.getBytes(StandardCharsets.UTF_8);
-    try (OutputStream os = completeMultipartUploadConnection.getOutputStream()) {
-      os.write(payloadBytes);
-      os.flush();
+      // copy headers
+      for (Map.Entry<String, List<String>> entry : presignedCompleteMultipartUploadRequest.signedHeaders().entrySet()) {
+        String key = entry.getKey();
+        for (String value : entry.getValue()) {
+          completeMultipartUploadConnection.setRequestProperty(key, value);
+        }
+      }
+
+      String xmlPayload = buildCompleteMultipartUploadXml(completedParts);
+      byte[] payloadBytes = xmlPayload.getBytes(StandardCharsets.UTF_8);
+      try (OutputStream os = completeMultipartUploadConnection.getOutputStream()) {
+        os.write(payloadBytes);
+        os.flush();
+      }
+
+      int completeMultipartUploadConnectionResponseCode = completeMultipartUploadConnection.getResponseCode();
+      assertEquals(200, completeMultipartUploadConnectionResponseCode,
+          "CompleteMultipartUploadPresignRequest should return 200 OK");
+
+      // Verify upload result
+      HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
+      assertTrue(headObjectResponse.hasMetadata());
+      assertEquals(userMetadata, headObjectResponse.metadata());
+
+      // Verify content
+      String actualContent = downloadKey(bucketName, keyName);
+      String originalContent = new String(Files.readAllBytes(multipartUploadFile.toPath()), StandardCharsets.UTF_8);
+      assertEquals(originalContent, actualContent, "Uploaded file content should match original file content");
+    } finally {
+      if (completeMultipartUploadConnection != null) {
+        completeMultipartUploadConnection.disconnect();
+      }
     }
-
-    int completeMultipartUploadConnectionResponseCode = completeMultipartUploadConnection.getResponseCode();
-    assertEquals(200, completeMultipartUploadConnectionResponseCode,
-        "CompleteMultipartUploadPresignRequest should return 200 OK");
-
-    // Verify upload result
-    HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
-    assertTrue(headObjectResponse.hasMetadata());
-    assertEquals(userMetadata, headObjectResponse.metadata());
-
-    // Verify content
-    String actualContent = downloadKey(bucketName, keyName);
-    String originalContent = new String(Files.readAllBytes(multipartUploadFile.toPath()), StandardCharsets.UTF_8);
-    assertEquals(originalContent, actualContent, "Uploaded file content should match original file content");
   }
 
   private void mpuUseSdkHttpClient(PresignedCreateMultipartUploadRequest presignCreateMultipartUpload,
