@@ -41,11 +41,11 @@ This proposal introduces a comprehensive **Storage Capacity Distribution Dashboa
 
 Detailed breakdown of storage usage across components:
 
-- **Global Used Space**
-- **Global Namespace Space**
-- **Open Keys and Open Files**: Data held in open keys and files
-- **Committed Keys**: Space used by committed key-value pairs
-- **Component-wise Distribution**: Metrics segregated by OM, SCM, and DataNodes
+- **Global Used Space**: Represents the actual physical storage consumed on the DataNodes.
+- **Global Namespace Space**: Logical size of the namespace, calculated as the sum of pendingDirectorySize + pendingKeySize + totalOpenKeySize + totalCommittedSize, multiplied by the replication factor.
+- **Open Keys and Open Files**: Space occupied by data in open keys and files that are not yet finalized.
+- **Committed Keys**: Space utilized by fully committed key–value pairs.
+- **Component-wise Distribution**: Breakdown of metrics across OM, SCM, and DataNodes.
 
 ## 2. Deletion Progress Monitoring
 
@@ -84,7 +84,7 @@ Leverage the existing Recon service to build the dashboard with centralized and 
 - **Current State**: DNs expose storage metrics in their reports
 - **Enhancement**:
   - Add `pending deletion byte counters` in container metadata
-  - Include these in DN’s storage reports
+  - Calculate total pending per DN from these container metadata and publish metrics.
 - **Responsibilities**:
   - Report actual and pending deletion usage per container
 
@@ -117,11 +117,11 @@ Leverage the existing Recon service to build the dashboard with centralized and 
   - Add a new dashboard aggregating:
     - Logical metrics from OM
     - Deletion progress from SCM
-    - Container-level reports from DNs
+    - Container-level metadata from DNs
 - **Data Sources**:
   - OM DB (via Insight Sync)
   - SCM Client API
-  - DN storage reports
+  - DN BlockDeletingService metrics.
 
 ---
 
