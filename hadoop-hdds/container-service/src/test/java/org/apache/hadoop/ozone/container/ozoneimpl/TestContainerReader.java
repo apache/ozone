@@ -718,8 +718,7 @@ public class TestContainerReader {
     KeyValueContainerData containerData = container.getContainerData();
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
     ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
-    ContainerProtos.ContainerChecksumInfo checksumInfo =
-        checksumManager.writeContainerDataTree(containerData, treeWriter);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.updateTree(containerData, treeWriter);
     long dataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
 
     // Verify no checksum in RocksDB initially
