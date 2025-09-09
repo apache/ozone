@@ -77,7 +77,6 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -131,15 +130,11 @@ class TestObjectPut {
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
 
-    SignatureInfo signatureInfo = mock(SignatureInfo.class);
-    when(signatureInfo.isSignPayload()).thenReturn(true);
-
     // Create PutObject and setClient to OzoneClientStub
     objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(clientStub)
         .setConfig(config)
         .setHeaders(headers)
-        .setSignatureInfo(signatureInfo)
         .build();
 
     objectEndpoint = spy(objectEndpoint);

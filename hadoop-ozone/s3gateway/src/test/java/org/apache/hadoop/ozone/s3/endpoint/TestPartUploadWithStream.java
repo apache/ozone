@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -63,8 +62,6 @@ public class TestPartUploadWithStream {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
 
-    SignatureInfo signatureInfo = mock(SignatureInfo.class);
-    when(signatureInfo.isSignPayload()).thenReturn(true);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
@@ -74,7 +71,6 @@ public class TestPartUploadWithStream {
         .setHeaders(headers)
         .setClient(client)
         .setConfig(conf)
-        .setSignatureInfo(signatureInfo)
         .build();
 
     rest.init();

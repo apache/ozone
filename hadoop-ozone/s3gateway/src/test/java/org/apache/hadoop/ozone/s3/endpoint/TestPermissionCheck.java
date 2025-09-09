@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -269,15 +268,12 @@ public class TestPermissionCheck {
   public void testPutKey() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
     when(volume.getBucket("bucketName")).thenReturn(bucket);
-    SignatureInfo signatureInfo = mock(SignatureInfo.class);
-    when(signatureInfo.isSignPayload()).thenReturn(true);
     doThrow(exception).when(clientProtocol).createKey(
             anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
         .setConfig(conf)
-        .setSignatureInfo(signatureInfo)
         .build();
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(

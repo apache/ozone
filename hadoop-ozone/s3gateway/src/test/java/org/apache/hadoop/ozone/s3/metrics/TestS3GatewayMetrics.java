@@ -55,11 +55,9 @@ import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 /**
  * Tests for {@link S3GatewayMetrics}.
@@ -93,12 +91,8 @@ public class TestS3GatewayMetrics {
         .setClient(clientStub)
         .build();
 
-    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
-    Mockito.when(signatureInfo.isSignPayload()).thenReturn(true);
-
     keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(clientStub)
-        .setSignatureInfo(signatureInfo)
         .build();
 
     headers = mock(HttpHeaders.class);

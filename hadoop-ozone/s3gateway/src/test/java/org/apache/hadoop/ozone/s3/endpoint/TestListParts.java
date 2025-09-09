@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -58,13 +57,10 @@ public class TestListParts {
         .thenReturn("mockSignature");
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
-    SignatureInfo signatureInfo = mock(SignatureInfo.class);
-    when(signatureInfo.isSignPayload()).thenReturn(true);
 
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(client)
-        .setSignatureInfo(signatureInfo)
         .build();
 
     Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,

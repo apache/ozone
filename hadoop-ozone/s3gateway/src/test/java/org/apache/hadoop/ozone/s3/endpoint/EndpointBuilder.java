@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.util.function.Supplier;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
@@ -44,6 +47,8 @@ public class EndpointBuilder<T extends EndpointBase> {
     this.constructor = constructor;
     this.ozoneConfig = new OzoneConfiguration();
     this.identifier = new RequestIdentifier();
+    this.signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
   }
 
   public EndpointBuilder<T> setBase(T base) {

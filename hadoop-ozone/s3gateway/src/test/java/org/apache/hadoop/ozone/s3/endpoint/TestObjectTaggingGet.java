@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -66,14 +65,10 @@ public class TestObjectTaggingGet {
     Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
 
-    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
-    Mockito.when(signatureInfo.isSignPayload()).thenReturn(true);
-
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setConfig(config)
         .setHeaders(headers)
-        .setSignatureInfo(signatureInfo)
         .build();
 
     ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));

@@ -126,13 +126,12 @@ public class TestMultipartUploadWithCopy {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
 
-    SignatureInfo signatureInfo = mock(SignatureInfo.class);
-    when(signatureInfo.isSignPayload()).thenReturn(true);
-
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
     REST.setOzoneConfiguration(new OzoneConfiguration());
     REST.setRequestIdentifier(new RequestIdentifier());
+    SignatureInfo signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
     REST.setSignatureInfo(signatureInfo);
   }
 

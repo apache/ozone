@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -87,13 +86,9 @@ public class TestObjectGet {
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
 
-    SignatureInfo signatureInfo = mock(SignatureInfo.class);
-    when(signatureInfo.isSignPayload()).thenReturn(true);
-
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
-        .setSignatureInfo(signatureInfo)
         .build();
 
     ByteArrayInputStream body = new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
