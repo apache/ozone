@@ -164,6 +164,8 @@
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
     <maven.compiler.createMissingPackageInfoClass>false</maven.compiler.createMissingPackageInfoClass>
+    <maven.compiler.source>${javac.version}</maven.compiler.source>
+    <maven.compiler.target>${javac.version}</maven.compiler.target>
     <maven.core.version>3.9.10</maven.core.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <metainf-services.version>1.11</metainf-services.version>
@@ -2674,39 +2676,32 @@
     </profile>
     <!-- Profiles for specific JDK versions -->
     <profile>
-      <id>java8</id>
+      <id>java9-or-later</id>
       <activation>
-        <jdk>[,8]</jdk>
+        <jdk>[9,]</jdk>
       </activation>
       <properties>
-        <maven.compiler.source>${javac.version}</maven.compiler.source>
-        <maven.compiler.target>${javac.version}</maven.compiler.target>
+        <!-- supported since Java 9 -->
+        <maven.compiler.release>${javac.version}</maven.compiler.release>
       </properties>
     </profile>
+    <!-- Profiles for specific aspectj versions -->
     <profile>
-      <id>java11-20</id>
+      <id>aspectj-java11-20</id>
       <activation>
         <jdk>[11,20]</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java11.version}</aspectj.version>
-        <!-- supported since Java 9 -->
-        <maven.compiler.release>${javac.version}</maven.compiler.release>
-        <maven.compiler.source>${javac.version}</maven.compiler.source>
-        <maven.compiler.target>${javac.version}</maven.compiler.target>
       </properties>
     </profile>
     <profile>
-      <id>java21-or-later</id>
+      <id>aspectj-java21-or-later</id>
       <activation>
         <jdk>[21,]</jdk>
       </activation>
       <properties>
         <aspectj.version>${aspectj.java21.version}</aspectj.version>
-        <!-- supported since Java 9 -->
-        <maven.compiler.release>${javac.version}</maven.compiler.release>
-        <maven.compiler.source>${javac.version}</maven.compiler.source>
-        <maven.compiler.target>${javac.version}</maven.compiler.target>
       </properties>
     </profile>
     <profile>
