@@ -542,7 +542,11 @@ public final class OzoneManagerRatisServer {
     }
     //cache hit
     try {
-      return getOMResponse(cacheEntry.getReplyFuture().get());
+      RaftClientReply reply = cacheEntry.getReplyFuture().get();
+      if (!reply.isSuccess()) {
+        return null;
+      }
+      return getOMResponse(reply);
     } catch (ExecutionException ex) {
       throw new ServiceException(ex.getMessage(), ex);
     } catch (InterruptedException ex) {
