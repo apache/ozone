@@ -624,7 +624,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       PutObjectRequest objectRequest = PutObjectRequest.builder()
           .bucket(bucketName)
           .key(keyName)
-          .contentType("text/plain")
           .build();
 
       PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
