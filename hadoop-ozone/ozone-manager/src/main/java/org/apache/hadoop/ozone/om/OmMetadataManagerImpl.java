@@ -28,8 +28,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_O
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
@@ -58,7 +56,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -71,7 +68,6 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -239,7 +235,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @param name - Checkpoint directory name.
    * @throws IOException
    */
-  private OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
+  protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
       throws IOException {
     lock = new OmReadOnlyLock();
     omEpoch = 0;
@@ -258,8 +254,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   // metadata constructor for snapshots
-  OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName,
-      boolean isSnapshotInCache, int maxOpenFiles) throws IOException {
+  OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName, int maxOpenFiles) throws IOException {
     try {
       lock = new OmReadOnlyLock();
       omEpoch = 0;
@@ -267,22 +262,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
       File metaDir = new File(snapshotDir);
       String dbName = OM_DB_NAME + snapshotDirName;
-      Duration maxPollDuration =
-          Duration.ofMillis(conf.getTimeDuration(
-              OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT,
-              OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT,
-              TimeUnit.MILLISECONDS));
-      // The check is only to prevent every snapshot read to perform a disk IO
-      // and check if a checkpoint dir exists. If entry is present in cache,
-      // it is most likely DB entries will get flushed in this wait time.
-      if (isSnapshotInCache) {
-        File checkpoint =
-            Paths.get(metaDir.toPath().toString(), dbName).toFile();
-        RDBCheckpointUtils.waitForCheckpointDirectoryExist(checkpoint,
-            maxPollDuration);
-        // Check if the snapshot directory exists.
-        checkSnapshotDirExist(checkpoint);
-      }
+      checkSnapshotDirExist(Paths.get(metaDir.toPath().toString(), dbName).toFile());
       final boolean enableRocksDBMetrics = conf.getBoolean(
           OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED,
           OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED_DEFAULT);

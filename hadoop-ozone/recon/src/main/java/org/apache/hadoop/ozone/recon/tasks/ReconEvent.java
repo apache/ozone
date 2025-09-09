@@ -15,28 +15,33 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.segmentparser;
-
-import java.util.concurrent.Callable;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import picocli.CommandLine;
+package org.apache.hadoop.ozone.recon.tasks;
 
 /**
- * Command line utility to parse and dump any generic ratis segment file.
+ * Common interface for all Recon events that can be processed by the event buffer.
+ * This allows the event buffer to handle both OM update events and custom control events.
  */
-@CommandLine.Command(
-    name = "generic",
-    description = "dump generic ratis segment file",
-    mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class)
-public class GenericRatisLogParser extends BaseLogParser
-    implements Callable<Void> {
-  @CommandLine.ParentCommand
-  private RatisLogParser logParser;
+public interface ReconEvent {
+  
+  /**
+   * Get the type of event for processing logic.
+   * @return the event type
+   */
+  EventType getEventType();
+  
+  /**
+   * Get the number of events contained in this event (for metrics).
+   * For OMUpdateEventBatch, this returns the number of OM events.
+   * For control events, this typically returns 1.
+   * @return the event count
+   */
+  int getEventCount();
 
-  @Override
-  public Void call() throws Exception {
-    parseRatisLogs(null);
-    return null;
+  /**
+   * Enum representing the types of events that can be processed by the event buffer.
+   */
+  enum EventType {
+    OM_UPDATE_BATCH,
+    TASK_REINITIALIZATION
   }
 }

@@ -36,7 +36,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.4</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.33.0</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.33.4</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.81</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -59,7 +59,7 @@
     <commons-net.version>3.11.1</commons-net.version>
     <commons-text.version>1.13.1</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
-    <compile-testing.version>0.21.0</compile-testing.version>
+    <compile-testing.version>0.22.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
     <cyclonedx.version>2.9.1</cyclonedx.version>
@@ -117,6 +117,7 @@
     <jaxb-api.version>2.3.3</jaxb-api.version>
     <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
     <jcip-annotations.version>1.0-1</jcip-annotations.version>
+    <jdeb.version>1.14</jdeb.version>
     <jersey.version>1.19.4</jersey.version>
     <jersey2.version>2.47</jersey2.version>
     <jetty.version>9.4.58.v20250814</jetty.version>
@@ -1385,6 +1386,11 @@
         <version>${bouncycastle.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>properties-maven-plugin</artifactId>
+        <version>${properties.maven.plugin.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-client</artifactId>
         <version>${jetty.version}</version>
@@ -1654,6 +1660,11 @@
         <groupId>org.springframework</groupId>
         <artifactId>spring-tx</artifactId>
         <version>${spring.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.vafer</groupId>
+        <artifactId>jdeb</artifactId>
+        <version>${jdeb.version}</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>

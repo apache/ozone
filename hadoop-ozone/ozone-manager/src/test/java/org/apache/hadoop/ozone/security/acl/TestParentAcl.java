@@ -74,11 +74,6 @@ import org.junit.jupiter.api.io.TempDir;
  * Test parent acl requirements when accessing children with native authorizer.
  */
 public class TestParentAcl {
-  private static OzoneConfiguration ozConfig;
-  private static KeyManager keyManager;
-  private static VolumeManager volumeManager;
-  private static BucketManager bucketManager;
-  private static PrefixManager prefixManager;
   private static OMMetadataManager metadataManager;
   private static OzoneNativeAuthorizer nativeAuthorizer;
   private static UserGroupInformation adminUgi;
@@ -89,7 +84,7 @@ public class TestParentAcl {
 
   @BeforeAll
   static void setup() throws Exception {
-    ozConfig = new OzoneConfiguration();
+    OzoneConfiguration ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     ozConfig.set(OZONE_METADATA_DIRS, testDir.toString());
@@ -98,10 +93,10 @@ public class TestParentAcl {
     OmTestManagers omTestManagers =
         new OmTestManagers(ozConfig);
     metadataManager = omTestManagers.getMetadataManager();
-    volumeManager = omTestManagers.getVolumeManager();
-    bucketManager = omTestManagers.getBucketManager();
-    prefixManager = omTestManagers.getPrefixManager();
-    keyManager = omTestManagers.getKeyManager();
+    VolumeManager volumeManager = omTestManagers.getVolumeManager();
+    BucketManager bucketManager = omTestManagers.getBucketManager();
+    PrefixManager prefixManager = omTestManagers.getPrefixManager();
+    KeyManager keyManager = omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager,
