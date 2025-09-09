@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
@@ -103,13 +102,6 @@ public class ReconNamespaceSummaryManagerImpl
   public void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException {
     this.namespaceDbStore.commitBatchOperation(rdbBatchOperation);
-  }
-
-  @Override
-  public void rebuildNSSummaryTree(OMMetadataManager omMetadataManager) {
-    // This method is called by the unified ReconUtils.triggerNSSummaryRebuild
-    // It should only handle the actual rebuild logic without state management
-    nsSummaryTask.reprocess(omMetadataManager);
   }
 
   public Table getNSSummaryTable() {
