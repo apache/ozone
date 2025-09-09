@@ -116,6 +116,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.MethodOrderer;
@@ -1194,25 +1195,47 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     userMetadata.put("key1", "value1");
     userMetadata.put("key2", "value2");
 
-    List<Tag> tags = Arrays.asList(
-        new Tag("tag1", "value1"),
-        new Tag("tag2", "value2")
-    );
-
     s3Client.createBucket(bucketName);
 
     File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
     createFile(multipartUploadFile, (int) (10 * MB));
 
     // Create multipart upload
-    InitiateMultipartUploadRequest initRequest = new InitiateMultipartUploadRequest(bucketName, keyName);
-    ObjectMetadata objectMetadata = new ObjectMetadata();
-    objectMetadata.setUserMetadata(userMetadata);
-    initRequest.setObjectMetadata(objectMetadata);
-    initRequest.setTagging(new ObjectTagging(tags));
+    GeneratePresignedUrlRequest initMPUPresignUrlRequest = new GeneratePresignedUrlRequest(bucketName, keyName)
+        .withMethod(HttpMethod.POST)
+        .withExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60));
+    initMPUPresignUrlRequest.putCustomRequestHeader("x-amz-meta-key1", "value1");
+    initMPUPresignUrlRequest.putCustomRequestHeader("x-amz-meta-key2", "value2");
+    initMPUPresignUrlRequest.putCustomRequestHeader(S3Consts.TAG_HEADER, "tag1=value1,tg2=value2");
 
-    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
-    String uploadId = initResponse.getUploadId();
+
+    URL iniMPUPresignUrl = s3Client.generatePresignedUrl(initMPUPresignUrlRequest);
+
+    String uploadId;
+    HttpURLConnection initMPUConnection = null;
+    try {
+
+      initMPUConnection = (HttpURLConnection) iniMPUPresignUrl.openConnection();
+
+      initMPUConnection.setRequestMethod("POST");
+      initMPUConnection.setDoOutput(true);
+      initMPUConnection.setRequestProperty("x-amz-meta-key1", "value1");
+      initMPUConnection.setRequestProperty("x-amz-meta-key2", "value2");
+      initMPUConnection.setRequestProperty(S3Consts.TAG_HEADER, "tag1=value1;tag2=value2");
+      initMPUConnection.connect();
+      int initMPUConnectionResponseCode = initMPUConnection.getResponseCode();
+      assertEquals(200, initMPUConnectionResponseCode);
+      try (InputStream is = initMPUConnection.getInputStream()) {
+        String responseXml = org.apache.commons.io.IOUtils.toString(is, StandardCharsets.UTF_8);
+        int startIdx = responseXml.indexOf("<UploadId>") + "<UploadId>".length();
+        int endIdx = responseXml.indexOf("</UploadId>");
+        uploadId = responseXml.substring(startIdx, endIdx);
+      }
+    } finally {
+      if(initMPUConnection != null) {
+        initMPUConnection.disconnect();
+      }
+    }
 
     // Upload parts using presigned URL
     List<PartETag> completedParts = new ArrayList<>();
@@ -1238,12 +1261,13 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
 
         // Upload part using HttpURLConnection
-        HttpURLConnection connection = (HttpURLConnection) presignedUrl.openConnection();
-        connection.setDoOutput(true);
-        connection.setRequestMethod("PUT");
-        connection.setRequestProperty("Content-Length", String.valueOf(byteBuffer.remaining()));
-
+        HttpURLConnection connection = null;
         try {
+          connection = (HttpURLConnection) presignedUrl.openConnection();
+          connection.setDoOutput(true);
+          connection.setRequestMethod("PUT");
+          connection.setRequestProperty("Content-Length", String.valueOf(byteBuffer.remaining()));
+
           try (OutputStream os = connection.getOutputStream()) {
             byte[] bytes = new byte[byteBuffer.remaining()];
             byteBuffer.get(bytes);
@@ -1259,7 +1283,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           PartETag partETag = new PartETag(partNumber, etag);
           completedParts.add(partETag);
         } finally {
-          connection.disconnect();
+          if(connection != null) {
+            connection.disconnect();
+          }
         }
 
         byteBuffer.clear();
@@ -1268,12 +1294,40 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       }
     }
 
-    // Complete multipart upload
-    CompleteMultipartUploadRequest compRequest =
-        new CompleteMultipartUploadRequest(bucketName, keyName, uploadId, completedParts);
-    CompleteMultipartUploadResult compResponse = s3Client.completeMultipartUpload(compRequest);
-    assertEquals(bucketName, compResponse.getBucketName());
-    assertEquals(keyName, compResponse.getKey());
+    // Complete multipart upload using presigned URL
+    GeneratePresignedUrlRequest completeMPURequest = new GeneratePresignedUrlRequest(bucketName, keyName)
+        .withMethod(HttpMethod.POST)
+        .withExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60));
+    completeMPURequest.addRequestParameter("uploadId", uploadId);
+    URL completeMPUPresignedUrl = s3Client.generatePresignedUrl(completeMPURequest);
+
+    HttpURLConnection completeMPUConnection = null;
+    try {
+      completeMPUConnection = (HttpURLConnection) completeMPUPresignedUrl.openConnection();
+      completeMPUConnection.setRequestMethod("POST");
+      completeMPUConnection.setDoOutput(true);
+
+      // Generate completion XML payload
+      StringBuilder completionXml = new StringBuilder("<CompleteMultipartUpload>\n");
+      for (PartETag part : completedParts) {
+        completionXml.append(String.format("  <Part>\n    <PartNumber>%d</PartNumber>\n    <ETag>%s</ETag>\n  </Part>\n",
+            part.getPartNumber(), part.getETag()));
+      }
+      completionXml.append("</CompleteMultipartUpload>");
+
+      byte[] completionPayloadBytes = completionXml.toString().getBytes(StandardCharsets.UTF_8);
+      try (OutputStream os = completeMPUConnection.getOutputStream()) {
+        os.write(completionPayloadBytes);
+        os.flush();
+      }
+
+      int completeMPUResponseCode = completeMPUConnection.getResponseCode();
+      assertEquals(200, completeMPUResponseCode, "Complete multipart upload should return 200 OK");
+    } finally {
+      if (completeMPUConnection != null) {
+        completeMPUConnection.disconnect();
+      }
+    }
 
     // Verify upload result
     ObjectMetadata objectMeta = s3Client.getObjectMetadata(bucketName, keyName);
