@@ -1302,7 +1302,8 @@ class TestKeyLifecycleService extends OzoneTestBase {
         assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
       }
       GenericTestUtils.waitFor(() ->
-          log.getOutput().contains("LimitedSizeList has reached maximum size " + maxListSize), WAIT_CHECK_INTERVAL, 5000);
+          log.getOutput().contains("LimitedSizeList has reached maximum size " + maxListSize),
+          WAIT_CHECK_INTERVAL, 5000);
       GenericTestUtils.setLogLevel(KeyLifecycleService.getLog(), Level.INFO);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
