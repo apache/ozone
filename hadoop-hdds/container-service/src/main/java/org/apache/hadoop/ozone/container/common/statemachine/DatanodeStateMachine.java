@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Comm
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CreatePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DiskBalancerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconcileContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
@@ -244,7 +245,7 @@ public class DatanodeStateMachine implements Closeable {
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
-    commandDispatcher = CommandDispatcher.newBuilder()
+    CommandDispatcher.Builder dispatcherBuilder = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler(
             dnConf.getContainerCloseThreads(),
             dnConf.getCommandQueueLimit(), threadNamePrefix))
@@ -260,15 +261,26 @@ public class DatanodeStateMachine implements Closeable {
             pipelineCommandExecutorService))
         .addHandler(new CreatePipelineCommandHandler(conf,
             pipelineCommandExecutorService))
-        .addHandler(new SetNodeOperationalStateCommandHandler(conf,
-            supervisor::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
-        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient))
+        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient));
+
+    if (container.getDiskBalancerService() != null) {
+      dispatcherBuilder.addHandler(new SetNodeOperationalStateCommandHandler(
+          conf, supervisor::nodeStateUpdated,
+          container.getDiskBalancerService()::nodeStateUpdated));
+      dispatcherBuilder.addHandler(new DiskBalancerCommandHandler());
+    } else {
+      dispatcherBuilder.addHandler(new SetNodeOperationalStateCommandHandler(
+          conf, supervisor::nodeStateUpdated, null));
+    }
+
+    dispatcherBuilder
         .setConnectionManager(connectionManager)
         .setContainer(container)
-        .setContext(context)
-        .build();
+        .setContext(context);
+
+    commandDispatcher = dispatcherBuilder.build();
 
     reportManager = ReportManager.newBuilder(conf)
         .setStateContext(context)

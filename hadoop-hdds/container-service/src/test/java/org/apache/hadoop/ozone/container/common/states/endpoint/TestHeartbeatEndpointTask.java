@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 import com.google.protobuf.Proto2Utils;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -49,6 +50,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
@@ -57,9 +59,13 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService.DiskBalancerOperationalState;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -70,6 +76,21 @@ public class TestHeartbeatEndpointTask {
 
   private static final InetSocketAddress TEST_SCM_ENDPOINT =
       new InetSocketAddress("test-scm-1", 9861);
+
+  private DatanodeStateMachine datanodeStateMachine;
+  private OzoneContainer container;
+
+  @BeforeEach
+  public void setup() {
+    datanodeStateMachine = mock(DatanodeStateMachine.class);
+    container = mock(OzoneContainer.class);
+    when(container.getDiskBalancerInfo()).thenReturn(new DiskBalancerInfo(
+        DiskBalancerOperationalState.RUNNING, 10, 20, 30, true));
+    when(datanodeStateMachine.getContainer()).thenReturn(container);
+    PipelineReportsProto pipelineReportsProto = mock(PipelineReportsProto.class);
+    when(pipelineReportsProto.getPipelineReportList()).thenReturn(Collections.emptyList());
+    when(container.getPipelineReport()).thenReturn(pipelineReportsProto);
+  }
 
   @Test
   public void handlesReconstructContainerCommand() throws Exception {
@@ -97,8 +118,6 @@ public class TestHeartbeatEndpointTask {
                 .build());
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine =
-        mock(DatanodeStateMachine.class);
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -134,7 +153,6 @@ public class TestHeartbeatEndpointTask {
                 .build());
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -166,7 +184,7 @@ public class TestHeartbeatEndpointTask {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        mock(DatanodeStateMachine.class), "");
+        datanodeStateMachine, "");
     context.setTermOfLeaderSCM(1);
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
@@ -186,7 +204,7 @@ public class TestHeartbeatEndpointTask {
   public void testheartbeatWithNodeReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        mock(DatanodeStateMachine.class), "");
+        datanodeStateMachine, "");
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         mock(
@@ -218,7 +236,7 @@ public class TestHeartbeatEndpointTask {
   public void testheartbeatWithContainerReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        mock(DatanodeStateMachine.class), "");
+        datanodeStateMachine, "");
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         mock(
@@ -250,7 +268,7 @@ public class TestHeartbeatEndpointTask {
   public void testheartbeatWithCommandStatusReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        mock(DatanodeStateMachine.class), "");
+        datanodeStateMachine, "");
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         mock(
@@ -283,7 +301,7 @@ public class TestHeartbeatEndpointTask {
   public void testheartbeatWithContainerActions() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        mock(DatanodeStateMachine.class), "");
+        datanodeStateMachine, "");
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         mock(
@@ -314,8 +332,6 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithAllReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine =
-        mock(DatanodeStateMachine.class);
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -364,6 +380,7 @@ public class TestHeartbeatEndpointTask {
       assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
           queueCount.getCount(i));
     }
+    assertTrue(heartbeat.hasDiskBalancerReport());
   }
 
   /**
