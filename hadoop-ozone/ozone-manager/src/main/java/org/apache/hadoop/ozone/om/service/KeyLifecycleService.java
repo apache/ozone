@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVIC
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -291,17 +292,17 @@ public class KeyLifecycleService extends BackgroundService {
         }
 
         if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
-          LOG.info("No expired keys/dirs found for bucket {}", bucketKey);
+          LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
           onSuccess(bucketKey);
           return result;
         }
 
-        LOG.info("{} expired keys and {} expired dirs found for bucket {}",
+        LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
             expiredKeyList.size(), expiredDirList.size(), bucketKey);
 
         // If trash is enabled, move files to trash, instead of send delete requests.
         // OBS bucket doesn't support trash.
-        if (bucket.getBucketLayout() == BucketLayout.OBJECT_STORE) {
+        if (bucket.getBucketLayout() == OBJECT_STORE) {
           sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
               expiredKeyList, false);
         } else if (ozoneTrash != null) {
@@ -366,9 +367,8 @@ public class KeyLifecycleService extends BackgroundService {
               directoryPath.toString().equals(rule.getEffectivePrefix() + OM_KEY_PREFIX))
               && rule.match(lastDir, directoryPath.toString())) {
             if (expiredDirList.isFull()) {
-              // if expiredDirList is full, send delete request for pending deletion directories
-              sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
-                  expiredDirList, true);
+              // if expiredDirList is full, send delete/rename request for expired directories
+              handleAndClearFullList(bucket, expiredDirList, true);
             }
             expiredDirList.add(directoryPath.toString(), 0, lastDir.getUpdateID());
           }
@@ -390,9 +390,8 @@ public class KeyLifecycleService extends BackgroundService {
             prefix += dirInfo.getObjectID();
             if (dirInfo.getName().equals(rule.getEffectivePrefix()) && rule.match(dirInfo, dirInfo.getName())) {
               if (expiredDirList.isFull()) {
-                // if expiredDirList is full, send delete request for pending deletion directories
-                sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
-                    expiredDirList, true);
+                // if expiredDirList is full, send delete/rename request for expired directories
+                handleAndClearFullList(bucket, expiredDirList, true);
               }
               expiredDirList.add(dirInfo.getName(), 0, dirInfo.getUpdateID());
             }
@@ -423,9 +422,8 @@ public class KeyLifecycleService extends BackgroundService {
               if (rule.match(key)) {
                 // mark key as expired, check next key
                 if (expiredKeyList.isFull()) {
-                  // if expiredKeyList is full, send delete request for pending deletion keys
-                  sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
-                      expiredKeyList, false);
+                  // if expiredKeyList is full, send delete/rename request for expired keys
+                  handleAndClearFullList(bucket, expiredKeyList, false);
                 }
                 expiredKeyList.add(key.getKeyName(), key.getReplicatedSize(), key.getUpdateID());
                 break;
@@ -451,9 +449,8 @@ public class KeyLifecycleService extends BackgroundService {
               if (rule.match(dir, dir.getPath())) {
                 // mark directory as expired, check next directory
                 if (expiredDirList.isFull()) {
-                  // if expiredDirList is full, send delete request for pending deletion directories
-                  sendDeleteKeysRequestAndClearList(volume.getVolume(), bucket.getBucketName(),
-                      expiredDirList, true);
+                  // if expiredDirList is full, send delete/rename request for expired directories
+                  handleAndClearFullList(bucket, expiredDirList, true);
                 }
                 expiredDirList.add(dir.getPath(), 0, dir.getUpdateID());
                 break;
@@ -481,8 +478,8 @@ public class KeyLifecycleService extends BackgroundService {
           if (rule.match(key, keyPath)) {
             // mark key as expired, check next key
             if (keyList.isFull()) {
-              // if keyList is full, send delete request for pending deletion keys
-              sendDeleteKeysRequestAndClearList(volumeName, bucketName, keyList, false);
+              // if keyList is full, send delete/rename request for expired keys
+              handleAndClearFullList(bucket, keyList, false);
             }
             keyList.add(keyPath, key.getReplicatedSize(), key.getUpdateID());
           }
@@ -511,8 +508,8 @@ public class KeyLifecycleService extends BackgroundService {
           if (rule.match(dir, dirPath)) {
             // mark dir as expired, check next key
             if (dirList.isFull()) {
-              // if dirList is full, send delete request for pending deletion directories
-              sendDeleteKeysRequestAndClearList(volumeName, bucketName, dirList, true);
+              // if dirList is full, send delete/rename request for expired directories
+              handleAndClearFullList(bucket, dirList, true);
             }
             dirList.add(dirPath, 0, dir.getUpdateID());
           }
@@ -553,8 +550,8 @@ public class KeyLifecycleService extends BackgroundService {
             if (rule.match(key)) {
               // mark key as expired, check next key
               if (expiredKeyList.isFull()) {
-                // if expiredKeyList is full, send delete request for pending deletion keys
-                sendDeleteKeysRequestAndClearList(volumeName, bucketName, expiredKeyList, false);
+                // if expiredKeyList is full, send delete/rename request for expired keys
+                handleAndClearFullList(bucketInfo, expiredKeyList, false);
               }
               expiredKeyList.add(key.getKeyName(), key.getReplicatedSize(), key.getUpdateID());
               break;
@@ -633,6 +630,14 @@ public class KeyLifecycleService extends BackgroundService {
       LOG.info("Spend {} ms on bucket {} to iterate {} keys and {} dirs, deleted {} keys with {} bytes, " +
           "and {} dirs, renamed {} keys with {} bytes to trash", timeSpent, bucketName, numKeyIterated, numDirIterated,
           numKeyDeleted, sizeKeyDeleted, numDirDeleted, numKeyRenamed, sizeKeyRenamed);
+    }
+
+    private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList, boolean dir) {
+      if (bucket.getBucketLayout() != OBJECT_STORE && ozoneTrash != null) {
+        moveKeysToTrash(bucket, keysList);
+      } else {
+        sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), keysList, dir);
+      }
     }
 
     private void sendDeleteKeysRequestAndClearList(String volume, String bucket,
@@ -737,8 +742,9 @@ public class KeyLifecycleService extends BackgroundService {
       String volumeName = bucket.getVolumeName();
       String bucketName = bucket.getBucketName();
       String trashCurrent;
+      UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bucket.getOwner());
       try {
-        trashCurrent = checkAndCreateTrashDirectoryIfNeeded(bucket);
+        trashCurrent = checkAndCreateTrashDirectoryIfNeeded(bucket, ugi);
       } catch (IOException e) {
         keysList.clear();
         return;
@@ -771,29 +777,36 @@ public class KeyLifecycleService extends BackgroundService {
         try {
           // perform preExecute as ratis submit do no perform preExecute
           OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
-          omRequest = omClientRequest.preExecute(ozoneManager);
-          final OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(
-              getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
-          if (response != null) {
-            if (!response.getSuccess()) {
+          OzoneManagerProtocolProtos.OMResponse omResponse =
+              ugi.doAs(new PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>() {
+                @Override
+                public OzoneManagerProtocolProtos.OMResponse run() throws Exception {
+                  OMRequest request = omClientRequest.preExecute(ozoneManager);
+                  return OzoneManagerRatisUtils.submitRequest(getOzoneManager(),
+                      request, clientId, callId.getAndIncrement());
+                }
+              });
+          if (omResponse != null) {
+            if (!omResponse.getSuccess()) {
               // log the failure and continue the iterating
               LOG.error("RenameKey request failed with source key: {}, dest key: {}", keyName, targetKeyName);
               continue;
             }
           }
-          LOG.info("RenameKey request succeed with source key: {}, dest key: {}", keyName, targetKeyName);
+          LOG.debug("RenameKey request succeed with source key: {}, dest key: {}", keyName, targetKeyName);
           numKeyRenamed += 1;
           sizeKeyRenamed += keysList.getReplicatedSize(i);
           metrics.incrNumKeyRenamed(1);
           metrics.incrSizeKeyRenamed(keysList.getReplicatedSize(i));
-        } catch (ServiceException | IOException e) {
+        } catch (InterruptedException | IOException e) {
           LOG.error("Failed to send RenameKeysRequest", e);
         }
       }
       keysList.clear();
     }
 
-    private String checkAndCreateTrashDirectoryIfNeeded(OmBucketInfo bucket) throws IOException {
+    private String checkAndCreateTrashDirectoryIfNeeded(OmBucketInfo bucket, UserGroupInformation ugi)
+        throws IOException {
       String userTrashRoot = TRASH_PREFIX + OM_KEY_PREFIX + bucket.getOwner();
       String userTrashCurrent = userTrashRoot + OM_KEY_PREFIX + CURRENT;
       try {
@@ -819,7 +832,6 @@ public class KeyLifecycleService extends BackgroundService {
           try {
             // perform preExecute as ratis submit do no perform preExecute
             final OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
-            UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bucket.getOwner());
             OzoneManagerProtocolProtos.OMResponse omResponse =
                 ugi.doAs(new PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>() {
                   @Override
@@ -836,7 +848,7 @@ public class KeyLifecycleService extends BackgroundService {
                     omResponse.getMessage(), userTrashCurrent);
                 throw new IOException("Failed to create trash directory " + userTrashCurrent);
               }
-              LOG.error("Create trash current directory: {}", userTrashCurrent);
+              LOG.debug("Created trash current directory: {}", userTrashCurrent);
               return userTrashCurrent;
             }
           } catch (InterruptedException | IOException e1) {

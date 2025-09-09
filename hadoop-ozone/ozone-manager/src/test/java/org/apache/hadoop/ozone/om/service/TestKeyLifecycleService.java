@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVIC
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -1052,7 +1053,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyLifecycleService.getInjector(0).resume();
 
       GenericTestUtils.waitFor(
-          () -> log.getOutput().contains(KEY_COUNT + " expired keys and 0 expired dirs found"),
+          () -> log.getOutput().contains(KEY_COUNT + " expired keys and 0 expired dirs found and remained"),
           WAIT_CHECK_INTERVAL, 10000);
 
       OmKeyArgs key = keyList.get(ThreadLocalRandom.current().nextInt(keyList.size()));
@@ -1241,17 +1242,29 @@ class TestKeyLifecycleService extends OzoneTestBase {
       deleteLifecyclePolicy(volumeName, bucketName);
     }
 
+    public Stream<Arguments> parameters6() {
+      return Stream.of(
+          arguments("FILE_SYSTEM_OPTIMIZED", true),
+          arguments("FILE_SYSTEM_OPTIMIZED", false),
+          arguments("LEGACY", true),
+          arguments("LEGACY", false),
+          arguments("OBJECT_STORE", true),
+          arguments("OBJECT_STORE", false));
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"FILE_SYSTEM_OPTIMIZED", "OBJECT_STORE"})
-    void testListMaxSize(BucketLayout bucketLayout) throws IOException,
+    @MethodSource("parameters6")
+    void testListMaxSize(BucketLayout bucketLayout, boolean enableTrash) throws IOException,
         TimeoutException, InterruptedException {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       String prefix = "key";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(bucketLayout);
-      final int keyCount = 500;
-      keyLifecycleService.setListMaxSize(100);
+      long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
+      final int keyCount = 100;
+      final int maxListSize = 20;
+      keyLifecycleService.setListMaxSize(maxListSize);
       // create keys
       List<OmKeyArgs> keyList =
           createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, prefix, null);
@@ -1260,6 +1273,15 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertEquals(keyCount, keyList.size());
       GenericTestUtils.waitFor(() -> getKeyCount(bucketLayout) - initialKeyCount == keyCount,
           WAIT_CHECK_INTERVAL, 1000);
+
+      if (enableTrash) {
+        final float trashInterval = 0.5f; // 30 seconds, 0.5 * (60 * 1000) ms
+        conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+        FileSystem fs = SecurityUtil.doAsLoginUser(
+            (PrivilegedExceptionAction<FileSystem>)
+                () -> new TrashOzoneFileSystem(om));
+        keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+      }
 
       GenericTestUtils.setLogLevel(KeyLifecycleService.getLog(), Level.DEBUG);
       GenericTestUtils.LogCapturer log =
@@ -1270,11 +1292,17 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, prefix, null, date.toString(), true);
 
+      if (enableTrash && bucketLayout != OBJECT_STORE) {
+        GenericTestUtils.waitFor(() ->
+            (metrics.getNumKeyRenamed().value() - initialRenamedKeyCount) == keyCount, WAIT_CHECK_INTERVAL, 5000);
+        assertEquals(0, getDeletedKeyCount() - initialDeletedKeyCount);
+      } else {
+        GenericTestUtils.waitFor(() ->
+            (getDeletedKeyCount() - initialDeletedKeyCount) == keyCount, WAIT_CHECK_INTERVAL, 5000);
+        assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
+      }
       GenericTestUtils.waitFor(() ->
-          (getDeletedKeyCount() - initialDeletedKeyCount) == keyCount, WAIT_CHECK_INTERVAL, 5000);
-      assertEquals(0, getKeyCount(bucketLayout) - initialKeyCount);
-      GenericTestUtils.waitFor(() ->
-          log.getOutput().contains("LimitedSizeList has reached maximum size " + 100), WAIT_CHECK_INTERVAL, 5000);
+          log.getOutput().contains("LimitedSizeList has reached maximum size " + maxListSize), WAIT_CHECK_INTERVAL, 5000);
       GenericTestUtils.setLogLevel(KeyLifecycleService.getLog(), Level.INFO);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
@@ -1378,7 +1406,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       createLifecyclePolicy(volumeName, bucketName, bucketLayout, "", null, date.toString(), true);
 
       GenericTestUtils.waitFor(
-          () -> log.getOutput().contains("No expired keys/dirs found for bucket"), WAIT_CHECK_INTERVAL, 5000);
+          () -> log.getOutput().contains("No expired keys/dirs found/remained for bucket"), WAIT_CHECK_INTERVAL, 5000);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
   }
