@@ -1184,7 +1184,7 @@ public class TestBlockDeletingService {
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
-  private void assertDeletionsInChecksumFile(ContainerData data, int numBlocks) {
+  private void assertDeletionsInChecksumFile(ContainerData data, int expectedNumBlocks) {
     ContainerProtos.ContainerChecksumInfo checksumInfo = null;
     try {
       checksumInfo = readChecksumFile(data);
@@ -1193,16 +1193,9 @@ public class TestBlockDeletingService {
     }
     assertNotNull(checksumInfo);
 
-    List<ContainerProtos.BlockMerkleTree> deletedBlocks = checksumInfo.getDeletedBlocksList();
-    assertEquals(numBlocks, deletedBlocks.size());
-    // Create a sorted copy of the list to check the order written to the file.
-    List<ContainerProtos.BlockMerkleTree> sortedDeletedBlocks = checksumInfo.getDeletedBlocksList().stream()
-        .sorted(Comparator.comparingLong(ContainerProtos.BlockMerkleTree::getBlockID))
-        .collect(Collectors.toList());
-    assertNotSame(sortedDeletedBlocks, deletedBlocks);
-    assertEquals(sortedDeletedBlocks, deletedBlocks);
-
-    // Each block in the list should be unique.
-    assertEquals(new HashSet<>(deletedBlocks).size(), deletedBlocks.size());
+    long numDeletedBlocks = checksumInfo.getContainerMerkleTree().getBlockMerkleTreeList().stream()
+        .filter(ContainerProtos.BlockMerkleTree::getDeleted)
+        .count();
+    assertEquals(expectedNumBlocks, numDeletedBlocks);
   }
 }
