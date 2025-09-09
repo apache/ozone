@@ -251,6 +251,7 @@ public class SstFileSetReader {
       advance();
     }
 
+    @Override
     public void close() {
       iterator.close();
     }
