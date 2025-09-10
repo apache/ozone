@@ -36,7 +36,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -67,7 +66,6 @@ public class TestDownloadAndImportReplicator {
   private MutableVolumeSet volumeSet;
   private SimpleContainerDownloader downloader;
   private DownloadAndImportReplicator replicator;
-  private long containerMaxSize;
 
   @BeforeEach
   void setup() throws IOException {
@@ -83,9 +81,6 @@ public class TestDownloadAndImportReplicator {
     downloader = mock(SimpleContainerDownloader.class);
     replicator = new DownloadAndImportReplicator(conf, containerSet, importer,
         downloader);
-    containerMaxSize = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
   /**
