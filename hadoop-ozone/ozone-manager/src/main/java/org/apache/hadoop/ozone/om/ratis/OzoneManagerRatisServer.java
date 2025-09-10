@@ -538,7 +538,7 @@ public final class OzoneManagerRatisServer {
     //cache hit
     try {
       RaftClientReply reply = cacheEntry.getReplyFuture().get();
-      if(!reply.isSuccess()) {
+      if (!reply.isSuccess()) {
         return null;
       }
       return getOMResponse(reply);
