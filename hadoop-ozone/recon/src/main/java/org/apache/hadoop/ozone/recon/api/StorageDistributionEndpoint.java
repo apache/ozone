@@ -179,14 +179,14 @@ public class StorageDistributionEndpoint {
     try {
       scmSummary = scmClient.getDeletedBlockSummary();
     } catch (IOException e) {
-      log.warn("Failed to get deleted block summary from SCM", e);
+      log.error("Failed to get deleted block summary from SCM", e);
     }
 
     long totalPendingAtDnSide = 0L;
     try {
       totalPendingAtDnSide = blockDeletionMetricsMap.values().stream().reduce(0L, Long::sum);
     } catch (Exception e) {
-      log.warn("Error calculating pending deletion metrics", e);
+      log.error("Error calculating pending deletion metrics", e);
     }
 
     DeletionPendingBytesByStage deletionPendingBytesByStage =
@@ -287,7 +287,7 @@ public class StorageDistributionEndpoint {
                 "TotalPendingBlockBytes");
         blockDeletionMetricsMap.put(nodeId, dnPending);
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        blockDeletionMetricsMap.put(nodeId, -1L);
       }
     });
   }
@@ -311,7 +311,10 @@ public class StorageDistributionEndpoint {
       long remaining = nodeStat.getRemaining() != null ? nodeStat.getRemaining().get() : 0L;
       long committed = nodeStat.getCommitted() != null ? nodeStat.getCommitted().get() : 0L;
       long pendingDeletion = blockDeletionMetricsMap.getOrDefault(datanode, 0L);
-
+      if (pendingDeletion < 0) {
+        log.warn("Block deletion metrics unavailable for datanode: {}", datanode);
+        pendingDeletion = 0L;
+      }
       return new DatanodeStorageReport(capacity, used, remaining, committed, pendingDeletion);
     } catch (Exception e) {
       log.error("Error getting storage report for datanode: {}", datanode, e);
