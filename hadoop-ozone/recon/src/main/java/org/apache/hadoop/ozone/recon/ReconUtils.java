@@ -900,7 +900,7 @@ public class ReconUtils {
       try {
         conn.disconnect();
       } catch (Exception ignored) {
-        // no-op
+        log.error("Error closing connection to datanode: {}", datanode, ignored);
       }
     }
   }
@@ -917,7 +917,7 @@ public class ReconUtils {
         err = readStream(conn.getErrorStream());
       }
     } catch (IOException ignored) {
-      // ignore read errors on error stream
+      log.error("Error reading response body from URL: {}", conn.getURL(), ignored);
     }
     log.warn("HTTP {} from {}. Error body: {}", code, conn.getURL(), err);
     return "";
@@ -937,7 +937,7 @@ public class ReconUtils {
 
   private static long parseMetrics(String jsonResponse, String serviceName, String keyName) {
     if (jsonResponse == null || jsonResponse.isEmpty()) {
-      return 0L;
+      return -1L;
     }
     try {
       JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
