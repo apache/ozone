@@ -1181,12 +1181,11 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
       int responseCode = connection.getResponseCode();
       assertEquals(200, responseCode, "PutObject presigned URL should return 200 OK");
-      String result;
+      String actualContent;
       S3Object s3Object = s3Client.getObject(bucketName, keyName);
       try (S3ObjectInputStream inputStream = s3Object.getObjectContent()) {
-        result = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+        actualContent = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
       }
-      String actualContent = result;
       assertEquals(expectedContent, actualContent, "Downloaded content should match uploaded content");
     } finally {
       if (connection != null) {
@@ -1238,9 +1237,8 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       initMPUConnection = (HttpURLConnection) iniMPUPresignUrl.openConnection();
       initMPUConnection.setRequestMethod("POST");
       initMPUConnection.setDoOutput(true);
-      initMPUConnection.setRequestProperty("x-amz-meta-key1", "value1");
-      initMPUConnection.setRequestProperty("x-amz-meta-key2", "value2");
-      initMPUConnection.setRequestProperty(S3Consts.TAG_HEADER, "tag1=value1;tag2=value2");
+      initMPUPresignUrlRequest.getCustomRequestHeaders().forEach(initMPUConnection::setRequestProperty);
+
       initMPUConnection.connect();
       int initMPUConnectionResponseCode = initMPUConnection.getResponseCode();
       assertEquals(200, initMPUConnectionResponseCode);
@@ -1286,9 +1284,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           connection.setRequestProperty("Content-Length", String.valueOf(byteBuffer.remaining()));
 
           try (OutputStream os = connection.getOutputStream()) {
-            byte[] bytes = new byte[byteBuffer.remaining()];
-            byteBuffer.get(bytes);
-            os.write(bytes);
+            os.write(byteBuffer.array(), 0, byteBuffer.remaining());
             os.flush();
           }
 
@@ -1337,8 +1333,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
       byte[] completionPayloadBytes = completionXml.toString().getBytes(StandardCharsets.UTF_8);
       try (OutputStream os = completeMPUConnection.getOutputStream()) {
-        os.write(completionPayloadBytes);
-        os.flush();
+        IOUtils.write(completionPayloadBytes, os);
       }
 
       int completeMPUResponseCode = completeMPUConnection.getResponseCode();

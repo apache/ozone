@@ -657,8 +657,8 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
         int responseCode = connection.getResponseCode();
         assertEquals(200, responseCode, "PutObject presigned URL should return 200 OK");
-        //verify the object was uploaded
 
+        //verify the object was uploaded
         ResponseInputStream<GetObjectResponse> object1 = s3Client.getObject(b1 -> b1.bucket(bucketName).key(keyName));
         actualContent = IoUtils.toUtf8String(object1);
         assertEquals(expectedContent, actualContent);
@@ -814,9 +814,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
           connection.setRequestMethod("PUT");
 
           try (OutputStream os = connection.getOutputStream()) {
-            byte[] bytes = new byte[bb.remaining()];
-            bb.get(bytes);
-            os.write(bytes);
+            os.write(bb.array(), 0, bb.remaining());
             os.flush();
           }
 
@@ -876,7 +874,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       String xmlPayload = buildCompleteMultipartUploadXml(completedParts);
       byte[] payloadBytes = xmlPayload.getBytes(StandardCharsets.UTF_8);
       try (OutputStream os = completeMultipartUploadConnection.getOutputStream()) {
-        os.write(payloadBytes);
+        IOUtils.write(payloadBytes, os);
         os.flush();
       }
 

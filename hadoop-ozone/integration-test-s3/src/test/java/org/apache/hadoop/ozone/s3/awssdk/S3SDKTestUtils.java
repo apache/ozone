@@ -32,6 +32,8 @@ import org.apache.ozone.test.InputSubstream;
  */
 public final class S3SDKTestUtils {
 
+  public static final Pattern UPLOAD_ID_PATTERN = Pattern.compile("<UploadId>(.+?)</UploadId>");
+
   private S3SDKTestUtils() {
   }
 
@@ -86,8 +88,7 @@ public final class S3SDKTestUtils {
    * @return The UploadId, or null if not found.
    */
   public static String extractUploadId(String xml) {
-    Pattern pattern = Pattern.compile("<UploadId>(.+?)</UploadId>");
-    Matcher matcher = pattern.matcher(xml);
+    Matcher matcher = UPLOAD_ID_PATTERN.matcher(xml);
     if (matcher.find()) {
       return matcher.group(1);
     }
