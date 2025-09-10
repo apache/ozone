@@ -149,15 +149,33 @@ public final class ContainerMerkleTreeTestUtils {
     return buildTestTree(conf, 5);
   }
 
+
   public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numBlocks) {
+    return buildTestTree(conf, numBlocks, 0);
+  }
+
+  public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numLiveBlocks,
+      int numDeletedBlocks) {
     ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
+
     byte byteValue = 1;
-    for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
+    for (int i = 0; i < numLiveBlocks; i++) {
+      // Use even block ID's for live blocks.
+      int blockID = (i + 1) * 2;
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
-        tree.addChunks(blockIndex, true,
+        tree.addChunks(blockID, true,
             buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
       }
     }
+
+    for (int i = 0; i < numDeletedBlocks; i++) {
+      // Use odd block ID's for live blocks.
+      int blockID = (i * 2) + 1;
+      for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
+        tree.setDeletedBlock(blockID, byteValue++);
+      }
+    }
+
     return tree;
   }
 
@@ -337,22 +355,6 @@ public final class ContainerMerkleTreeTestUtils {
     OzoneContainer ozoneContainer = hddsDatanode.getDatanodeStateMachine().getContainer();
     Container<?> container = ozoneContainer.getController().getContainer(containerID);
     return getContainerChecksumFile(container.getContainerData()).exists();
-  }
-
-  public static void writeContainerDataTreeProto(ContainerData data, ContainerProtos.ContainerMerkleTree tree)
-      throws IOException {
-    ContainerProtos.ContainerChecksumInfo checksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
-        .setContainerID(data.getContainerID())
-        .setContainerMerkleTree(tree).build();
-    File checksumFile = getContainerChecksumFile(data);
-
-    try (OutputStream outputStream = Files.newOutputStream(checksumFile.toPath())) {
-      checksumInfo.writeTo(outputStream);
-    } catch (IOException ex) {
-      throw new IOException("Error occurred when writing container merkle tree for containerID "
-          + data.getContainerID(), ex);
-    }
-    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
   }
 
   /**

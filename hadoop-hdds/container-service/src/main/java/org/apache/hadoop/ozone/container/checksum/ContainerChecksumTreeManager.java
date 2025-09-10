@@ -340,6 +340,8 @@ public class ContainerChecksumTreeManager {
   /**
    * Called by block deletion to update the merkle tree persisted to disk.
    * The sets of live and deleted blocks are merged into one tree.
+   * If a block with the same ID already exists in the tree, it is overwritten as deleted with the checksum computed
+   * from the chunk checksums in the BlockData.
    */
   public void addDeletedBlocks(ContainerData data, Collection<BlockData> blocks) throws IOException {
     write(data, existingTree -> {
