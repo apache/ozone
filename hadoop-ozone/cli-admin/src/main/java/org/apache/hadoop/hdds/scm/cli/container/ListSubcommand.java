@@ -118,7 +118,6 @@ public class ListSubcommand extends ScmSubcommand {
 
     // Use SequenceWriter to output JSON array format for all cases
     SequenceWriter sequenceWriter = JsonUtils.getStdoutSequenceWriter();
-    sequenceWriter.init(true); // Initialize as a JSON array
 
     if (!all) {
       // Regular listing with count limit
