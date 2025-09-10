@@ -49,20 +49,16 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 public class TestECContainerSafeModeRule {
   private ContainerManager containerManager;
-  private ConfigurationSource conf;
-  private EventQueue eventQueue;
-  private SCMSafeModeManager safeModeManager;
-  private SafeModeMetrics metrics;
 
   private ECContainerSafeModeRule rule;
 
   @BeforeEach
   public void setup() {
     containerManager = mock(ContainerManager.class);
-    conf = mock(ConfigurationSource.class);
-    eventQueue = mock(EventQueue.class);
-    safeModeManager = mock(SCMSafeModeManager.class);
-    metrics = mock(SafeModeMetrics.class);
+    ConfigurationSource conf = mock(ConfigurationSource.class);
+    EventQueue eventQueue = mock(EventQueue.class);
+    SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
+    SafeModeMetrics metrics = mock(SafeModeMetrics.class);
 
     when(safeModeManager.getSafeModeMetrics()).thenReturn(metrics);
 

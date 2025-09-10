@@ -60,7 +60,6 @@ public class TestS3GatewayAuditLog {
   }
 
   private String bucketName = OzoneConsts.BUCKET;
-  private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
   private RootEndpoint rootEndpoint;
   private ObjectEndpoint keyEndpoint;
@@ -71,7 +70,7 @@ public class TestS3GatewayAuditLog {
   @BeforeEach
   public void setup() throws Exception {
     parametersMap.clear();
-    clientStub = new OzoneClientStub();
+    OzoneClient clientStub = new OzoneClientStub();
     clientStub.getObjectStore().createS3Bucket(bucketName);
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
     requestIdentifier = new RequestIdentifier();

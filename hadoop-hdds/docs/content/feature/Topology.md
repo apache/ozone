@@ -31,14 +31,17 @@ Apache Ozone uses topology information (e.g., rack placement) to optimize data a
 
 ## Applicability to Container Types
 
-Ozone's topology-aware placement strategies vary by container replication type and state:
+Ozone's topology-aware strategies apply differently depending on the operation:
 
-* **RATIS Replicated Containers:** Ozone uses RAFT replication for Open containers (write), and an async replication for closed, immutable containers (cold data). Topology awareness placement is implemented for both open and closed RATIS containers, ensuring rack diversity and fault tolerance during both write and re-replication operations. See the [page about Containers](concept/Containers.md) for more information related to Open vs Closed containers.
+*   **Write Path (Open Containers):** When a client writes data, topology awareness is used during **pipeline creation** to ensure the set of datanodes forming the pipeline are on different racks. This provides fault tolerance for the initial write.
+*   **Re-replication Path (Closed Containers):** When a replica of a **closed** container is needed (due to node failure, decommissioning, or balancing), a topology-aware policy is used to select the best datanode for the new replica.
+
+See the [page about Containers](concept/Containers.md) for more information related to Open vs Closed containers.
 
 
 ## Configuring Topology Hierarchy
 
-Ozone determines DataNode network locations (e.g., racks) using Hadoop's rack awareness, configured via `net.topology.node.switch.mapping.impl` in `ozone-site.xml`. This key specifies a `org.apache.hadoop.net.CachedDNSToSwitchMapping` implementation. \[1]
+Ozone determines DataNode network locations (e.g., racks) using Hadoop's rack awareness, configured via `net.topology.node.switch.mapping.impl` in `ozone-site.xml`. This key specifies a `org.apache.hadoop.net.CachedDNSToSwitchMapping` implementation. [1]
 
 Two primary methods exist:
 
@@ -46,7 +49,7 @@ Two primary methods exist:
 
 Maps IPs/hostnames to racks using a predefined file.
 
-* **Configuration:** Set `net.topology.node.switch.mapping.impl` to `org.apache.hadoop.net.TableMapping` and `net.topology.table.file.name` to the mapping file's path. \[1]
+*   **Configuration:** Set `net.topology.node.switch.mapping.impl` to `org.apache.hadoop.net.TableMapping` and `net.topology.table.file.name` to the mapping file's path. [1]
     ```xml
     <property>
       <name>net.topology.node.switch.mapping.impl</name>
@@ -57,7 +60,7 @@ Maps IPs/hostnames to racks using a predefined file.
       <value>/etc/ozone/topology.map</value>
     </property>
     ```
-* **File Format:** A two-column text file (IP/hostname, rack path per line). Unlisted nodes go to `/default-rack`. \[1]
+*   **File Format:** A two-column text file (IP/hostname, rack path per line). Unlisted nodes go to `/default-rack`. [1]
   Example `topology.map`:
     ```
     192.168.1.100 /rack1
@@ -70,7 +73,7 @@ Maps IPs/hostnames to racks using a predefined file.
 
 Uses an external script to resolve rack locations for IPs.
 
-* **Configuration:** Set `net.topology.node.switch.mapping.impl` to `org.apache.hadoop.net.ScriptBasedMapping` and `net.topology.script.file.name` to the script's path. \[1]
+*   **Configuration:** Set `net.topology.node.switch.mapping.impl` to `org.apache.hadoop.net.ScriptBasedMapping` and `net.topology.script.file.name` to the script's path. [1]
     ```xml
     <property>
       <name>net.topology.node.switch.mapping.impl</name>
@@ -81,7 +84,7 @@ Uses an external script to resolve rack locations for IPs.
       <value>/etc/ozone/determine_rack.sh</value>
     </property>
     ```
-* **Script:** Admin-provided, executable script. Ozone passes IPs (up to `net.topology.script.number.args`, default 100) as arguments; script outputs rack paths (one per line).
+*   **Script:** Admin-provided, executable script. Ozone passes IPs (up to `net.topology.script.number.args`, default 100) as arguments; script outputs rack paths (one per line).
   Example `determine_rack.sh`:
     ```bash
     #!/bin/bash
@@ -104,78 +107,59 @@ Uses an external script to resolve rack locations for IPs.
 
 **Topology Mapping Best Practices:**
 
-* **Accuracy:** Mappings must be accurate and current.
-* **Static Mapping:** Simpler for small, stable clusters; requires manual updates.
-* **Dynamic Mapping:** Flexible for large/dynamic clusters. Script performance, correctness, and reliability are vital; ensure it's idempotent and handles batch lookups efficiently.
+*   **Accuracy:** Mappings must be accurate and current.
+*   **Static Mapping:** Simpler for small, stable clusters; requires manual updates.
+*   **Dynamic Mapping:** Flexible for large/dynamic clusters. Script performance, correctness, and reliability are vital; ensure it's idempotent and handles batch lookups efficiently.
 
-## Pipeline Choosing Policies
+## Placement and Selection Policies
 
-Ozone supports several policies for selecting a pipeline when placing containers. The policy for Ratis containers is configured by the property `hdds.scm.pipeline.choose.policy.impl` for SCM. The policy for EC (Erasure Coded) containers is configured by the property `hdds.scm.ec.pipeline.choose.policy.impl`. For both, the default value is `org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy`.
+Ozone uses three distinct types of policies to manage how and where data is written.
 
-These policies help optimize for different goals such as load balancing, health, or simplicity:
+### 1. Pipeline Creation Policy
 
-- **RandomPipelineChoosePolicy** (Default): Selects a pipeline at random from the available list, without considering utilization or health. This policy is simple and does not optimize for any particular metric.
+This policy selects a set of datanodes to form a new pipeline. Its purpose is to ensure new pipelines are internally fault-tolerant by spreading their nodes across racks, while also balancing the number of pipelines across the datanodes. This is the primary mechanism for topology awareness on the write path for open containers.
 
-- **CapacityPipelineChoosePolicy**: Picks two random pipelines and selects the one with lower utilization, favoring pipelines with more available capacity and helping to balance the load across the cluster.
+The policy is configured by the `ozone.scm.pipeline.placement.impl` property in `ozone-site.xml`.
 
-- **RoundRobinPipelineChoosePolicy**: Selects pipelines in a round-robin order. This policy is mainly used for debugging and testing, ensuring even distribution but not considering health or capacity.
+*   **`PipelinePlacementPolicy` (Default)**
+    *   **Function:** This is the default and only supported policy for pipeline creation. It chooses datanodes based on load balancing (pipeline count per node) and network topology. It filters out nodes that are too heavily engaged in other pipelines and then selects nodes to ensure rack diversity. This policy is recommended for most production environments.
+    *   **Use Cases:** General purpose pipeline creation in a rack-aware cluster.
 
-- **HealthyPipelineChoosePolicy**: Randomly selects pipelines but only returns a healthy one. If no healthy pipeline is found, it returns the last tried pipeline as a fallback.
+### 2. Pipeline Selection (Load Balancing) Policy
 
-These policies can be configured to suit different deployment needs and workloads.
+After a pool of healthy, open, and rack-aware pipelines has been created, this policy is used to **select one** of them to handle a client's write request. Its purpose is **load balancing**, not topology awareness, as the topology has already been handled during pipeline creation.
 
-## Container Placement Policies for Replicated (RATIS) Containers
+The policy is configured by `hdds.scm.pipeline.choose.policy.impl` in `ozone-site.xml`.
 
-SCM uses a pluggable policy to place additional replicas of *closed* RATIS-replicated containers. This is configured using the `ozone.scm.container.placement.impl` property in `ozone-site.xml`. Available policies are found in the `org.apache.hadoop.hdds.scm.container.placement.algorithms` package \[1, 3\].
+*   **`RandomPipelineChoosePolicy` (Default):** Selects a pipeline at random from the available list. This policy is simple and distributes load without considering other metrics.
+*   **`CapacityPipelineChoosePolicy`:** Picks two random pipelines and selects the one with lower utilization, favoring pipelines with more available capacity.
+*   **`RoundRobinPipelineChoosePolicy`:** Selects pipelines in a round-robin order. This is mainly for debugging and testing.
+*   **`HealthyPipelineChoosePolicy`:** Randomly selects pipelines but only returns a healthy one.
 
-These policies are applied when SCM needs to re-replicate containers, such as during container balancing.
+Note: When configuring these values, include the full class name prefix: for example, org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy
 
-### 1. `SCMContainerPlacementRackAware` (Default)
+### 3. Closed Container Replication Policy
 
-* **Function:** Distributes replicas across racks for fault tolerance (e.g., for 3 replicas, aims for at least two racks). Similar to HDFS placement. \[1]
-* **Use Cases:** Production clusters needing rack-level fault tolerance.
-* **Configuration:**
-    ```xml
-    <property>
-      <name>ozone.scm.container.placement.impl</name>
-      <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware</value>
-    </property>
-    ```
-* **Best Practices:** Requires accurate topology mapping.
-* **Limitations:** Designed for single-layer rack topologies (e.g., `/rack/node`). Not recommended for multi-layer hierarchies (e.g., `/dc/row/rack/node`) as it may not interpret deeper levels correctly. \[1]
+This is configured using the `ozone.scm.container.placement.impl` property in `ozone-site.xml`. The available policies are:
 
-### 2. `SCMContainerPlacementRandom`
+*   **`SCMContainerPlacementRackAware` (Default)**
+    *   **Function:** Distributes the datanodes of a pipeline across racks for fault tolerance (e.g., for a 3-node pipeline, it aims for at least two racks). Similar to HDFS placement. [1]
+    *   **Use Cases:** Production clusters needing rack-level fault tolerance.
+    *   **Limitations:** Designed for single-layer rack topologies (e.g., `/rack/node`). Not recommended for multi-layer hierarchies (e.g., `/dc/row/rack/node`) as it may not interpret deeper levels correctly. [1]
 
-* **Function:** Randomly selects healthy, available DataNodes meeting basic criteria (space, no existing replica), ignoring rack topology. \[1, 4\]
-* **Use Cases:** Small/dev/test clusters, or if rack fault tolerance for closed replicas isn't critical.
-* **Configuration:**
-    ```xml
-    <property>
-      <name>ozone.scm.container.placement.impl</name>
-      <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom</value>
-    </property>
-    ```
-* **Best Practices:** Not for production needing rack failure resilience.
+*   **`SCMContainerPlacementRandom`**
+    *   **Function:** Randomly selects healthy, available DataNodes, ignoring rack topology. [3]
+    *   **Use Cases:** Small/dev/test clusters where rack fault tolerance is not critical.
 
-### 3. `SCMContainerPlacementCapacity`
+*   **`SCMContainerPlacementCapacity`**
+    *   **Function:** Selects DataNodes by available capacity (favors lower disk utilization) to balance disk usage across the cluster. [4]
+    *   **Use Cases:** Heterogeneous storage clusters or where even disk utilization is key.
 
-* **Function:** Selects DataNodes by available capacity (favors lower disk utilization) to balance disk usage. \[5, 6\]
-* **Use Cases:** Heterogeneous storage clusters or where even disk utilization is key.
-* **Configuration:**
-    ```xml
-    <property>
-      <name>ozone.scm.container.placement.impl</name>
-      <value>org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity</value>
-    </property>
-    ```
-* **Best Practices:** Prevents uneven node filling.
-* **Interaction:** This container placement policy selects datanodes by randomly picking two nodes from a pool of healthy, available nodes and then choosing the one with lower utilization (more free space). This approach aims to distribute containers more evenly across the cluster over time, favoring less utilized nodes without overwhelming newly added nodes.
-
-
+Note: When configuring these values, include the full class name prefix: for example, org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity
 
 ## Optimizing Read Paths
 
-Enable by setting `ozone.network.topology.aware.read` to `true` in `ozone-site.xml`. \[1]
+Enable by setting `ozone.network.topology.aware.read` to `true` in `ozone-site.xml`. [1]
 ```xml
 <property>
   <name>ozone.network.topology.aware.read</name>
@@ -186,11 +170,11 @@ This directs clients (replicated data) to read from topologically closest DataNo
 
 ## Summary of Best Practices
 
-* **Accurate Topology:** Maintain an accurate, up-to-date topology map (static or dynamic script); this is foundational.
-* **Replicated (RATIS) Containers:** For production rack fault tolerance, use `SCMContainerPlacementRackAware` (mindful of its single-layer topology limitation) or `SCMContainerPlacementCapacity` (verify rack interaction) over `SCMContainerPlacementRandom`.
-
-* **Read Operations:** Enable `ozone.network.topology.aware.read` with accurate topology.
-* **Monitor & Validate:** Regularly monitor placement and balance; use tools like Recon to verify topology awareness.
+*   **Accurate Topology:** Maintain an accurate, up-to-date topology map (static or dynamic script); this is foundational.
+*   **Pipeline Creation:** For production environments, use the default `PipelinePlacementPolicy` for `ozone.scm.pipeline.placement.impl` to ensure both rack fault tolerance and pipeline load balancing.
+*   **Pipeline Selection:** The default `RandomPipelineChoosePolicy` for `hdds.scm.pipeline.choose.policy.impl` is suitable for general load balancing.
+*   **Read Operations:** Enable `ozone.network.topology.aware.read` with accurate topology.
+*   **Monitor & Validate:** Regularly monitor placement and balance; use tools like Recon to verify topology awareness.
 
 ## References
 

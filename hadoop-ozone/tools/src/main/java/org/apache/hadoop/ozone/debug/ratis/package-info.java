@@ -15,27 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.segmentparser;
-
-import org.apache.hadoop.hdds.cli.DebugSubcommand;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.kohsuke.MetaInfServices;
-import picocli.CommandLine;
-
 /**
- * Parse Ratis Log CLI implementation.
+ * Ratis debug related commands.
  */
-@CommandLine.Command(
-    name = "ratislogparser",
-    description = "Shell of printing Ratis Log in understandable text",
-    subcommands = {
-        DatanodeRatisLogParser.class,
-        GenericRatisLogParser.class,
-        OMRatisLogParser.class,
-        SCMRatisLogParser.class
-    },
-    versionProvider = HddsVersionProvider.class,
-    mixinStandardHelpOptions = true)
-@MetaInfServices(DebugSubcommand.class)
-public class RatisLogParser implements DebugSubcommand {
-}
+package org.apache.hadoop.ozone.debug.ratis;
