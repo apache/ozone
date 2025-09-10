@@ -112,21 +112,41 @@ public final class DBConfigFromFile {
    * @return DBOptions, Options to be used for opening/creating the DB.
    */
   public static ManagedDBOptions readDBOptionsFromFile(Path dbPath) throws RocksDBException {
+    Path generatedDBPath = generateDBPath(dbPath);
+    if (!generatedDBPath.toFile().exists()) {
+      LOG.warn("Error trying to read generated rocksDB file: {}, file does not exists.", generatedDBPath);
+      return null;
+    }
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
     try {
-      return readFromFile(dbPath, descriptors);
+      //TODO: Add Documentation on how to support RocksDB Mem Env.
+      ManagedDBOptions options = new ManagedDBOptions();
+      try (ManagedConfigOptions configOptions = new ManagedConfigOptions()) {
+        OptionsUtil.loadOptionsFromFile(configOptions, generatedDBPath.toString(), options, descriptors);
+      } catch (RocksDBException rdEx) {
+        options.close();
+        throw new RocksDBException("There was an error opening rocksDB Options file: " + rdEx.getMessage());
+      }
+      return options;
     } finally {
       //readDBOptions will be freed once the store using it is closed, but the descriptors need to be closed.
       closeDescriptors(descriptors);
     }
   }
 
-  public static ManagedColumnFamilyOptions readCFOptionsFromFile(Path dbPath, String cfName) throws RocksDBException {
+  public static ManagedColumnFamilyOptions readCFOptionsFromFile(Path optionsPath, String cfName)
+      throws RocksDBException {
+    Path generatedDBPath = generateDBPath(optionsPath);
+    if (!generatedDBPath.toFile().exists()) {
+      LOG.warn("Error trying to read column family options from file: {}, file does not exists.", generatedDBPath);
+      return null;
+    }
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
     String defaultColumnFamilyString = StringUtils.toEncodedString(DEFAULT_COLUMN_FAMILY, StandardCharsets.UTF_8);
     String validatedCfName = StringUtils.isEmpty(cfName) ? defaultColumnFamilyString : cfName;
     ManagedColumnFamilyOptions resultCfOptions = null;
-    try (ManagedDBOptions ignored = readFromFile(dbPath, descriptors)) {
+    try (ManagedConfigOptions ignored = new ManagedConfigOptions(); ManagedDBOptions options = new ManagedDBOptions()) {
+      OptionsUtil.loadOptionsFromFile(ignored, generatedDBPath.toString(), options, descriptors);
       ColumnFamilyDescriptor descriptor = descriptors.stream()
           .filter(desc -> StringUtils.toEncodedString(desc.getName(), StandardCharsets.UTF_8).equals(validatedCfName))
           .findAny().orElse(null);
@@ -137,26 +157,6 @@ public final class DBConfigFromFile {
       closeDescriptors(descriptors);
     }
     return resultCfOptions;
-  }
-
-  private static ManagedDBOptions readFromFile(Path dbPath, List<ColumnFamilyDescriptor> descriptors)
-      throws RocksDBException {
-    Preconditions.checkNotNull(dbPath);
-
-    //TODO: Add Documentation on how to support RocksDB Mem Env.
-    Path generatedDBPath = generateDBPath(dbPath);
-    if (!generatedDBPath.toFile().exists()) {
-      LOG.warn("Error trying to read generated rocksDB file: {}, file does not exists.", generatedDBPath);
-      return null;
-    }
-    ManagedDBOptions options = new ManagedDBOptions();
-    try (ManagedConfigOptions configOptions = new ManagedConfigOptions()) {
-      OptionsUtil.loadOptionsFromFile(configOptions, generatedDBPath.toString(), options, descriptors);
-    } catch (RocksDBException rdEx) {
-      options.close();
-      throw new RocksDBException("There was an error opening rocksDB Options file: " + rdEx.getMessage());
-    }
-    return options;
   }
 
   private static void closeDescriptors(List<ColumnFamilyDescriptor> descriptors) {
@@ -173,6 +173,7 @@ public final class DBConfigFromFile {
    * @throws RocksDBException
    */
   private static Path generateDBPath(Path path) {
+    Preconditions.checkNotNull(path);
     if (path.toFile().exists()) {
       LOG.debug("RocksDB path found: {}, opening db from it.", path);
       return path;
