@@ -96,9 +96,13 @@ Checkpoint V2 Endpoint Compatibility
     Log    Testing v2 checkpoint endpoint: CLIENT=${CLIENT_VERSION}, CLUSTER=${CLUSTER_VERSION}
     
     IF    '${CLUSTER_VERSION}' < '${CHECKPOINT_V2_VERSION}'
-        # Old cluster doesn't have v2 endpoint - should fail
-        Download Checkpoint V2    1
-        Log    v2 endpoint correctly failed on old cluster ${CLUSTER_VERSION}
+        # Old cluster doesn't have v2 endpoint - should fail with any non-zero exit code
+        ${result} =    Run Keyword And Return Status    Download Checkpoint V2    0
+        IF    not ${result}
+            Log    v2 endpoint correctly failed on old cluster ${CLUSTER_VERSION} (expected failure)
+        ELSE
+            Fail    v2 endpoint unexpectedly succeeded on old cluster ${CLUSTER_VERSION}
+        END
     ELSE
         # New cluster has v2 endpoint - should succeed
         Download Checkpoint V2    0
