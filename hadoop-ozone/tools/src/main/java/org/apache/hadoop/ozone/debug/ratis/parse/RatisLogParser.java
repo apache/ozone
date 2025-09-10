@@ -15,44 +15,62 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.segmentparser;
+package org.apache.hadoop.ozone.debug.ratis.parse;
 
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisRequest;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import picocli.CommandLine;
 
 /**
- * Command line utility to parse and dump a datanode ratis segment file.
+ * Parse Ratis Log CLI implementation.
  */
 @CommandLine.Command(
-    name = "datanode",
-    description = "dump datanode segment file",
-    mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class)
-public class DatanodeRatisLogParser extends BaseLogParser
-    implements Callable<Void> {
-  @CommandLine.ParentCommand
-  private RatisLogParser logParser;
+    name = "parse",
+    description = "Shell for printing Ratis Log in understandable text",
+    versionProvider = HddsVersionProvider.class,
+    mixinStandardHelpOptions = true)
+public class RatisLogParser extends BaseLogParser implements Callable<Void> {
+  @CommandLine.Option(names = {"--role"},
+      defaultValue = "generic",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS,
+      description = "Component role for parsing. Values: om, scm, datanode")
+  private String role;
 
   private static final RaftGroupId DUMMY_PIPELINE_ID =
       RaftGroupId.valueOf(ByteString.copyFromUtf8("ADummyRatisGroup"));
 
   public static String smToContainerLogString(
       StateMachineLogEntryProto logEntryProto) {
-    return ContainerStateMachine.
-        smProtoToString(DUMMY_PIPELINE_ID, null, logEntryProto);
+    return ContainerStateMachine.smProtoToString(DUMMY_PIPELINE_ID, null, logEntryProto);
   }
 
   @Override
   public Void call() throws Exception {
-    System.out.println("Dumping Datanode Ratis Log");
-    System.out.println("Using Dummy PipelineID:" + DUMMY_PIPELINE_ID + "\n\n");
-
-    parseRatisLogs(DatanodeRatisLogParser::smToContainerLogString);
+    switch (role.toLowerCase()) {
+    case "om":
+      System.out.println("Dumping OM Ratis Log");
+      parseRatisLogs(OMRatisHelper::smProtoToString);
+      break;
+    case "scm":
+      System.out.println("Dumping SCM Ratis Log");
+      parseRatisLogs(SCMRatisRequest::smProtoToString);
+      break;
+    case "datanode":
+      System.out.println("Dumping Datanode Ratis Log");
+      System.out.println("Using Dummy PipelineID:" + DUMMY_PIPELINE_ID + "\n\n");
+      parseRatisLogs(RatisLogParser::smToContainerLogString);
+      break;
+    default:
+      System.out.println("Dumping Generic Ratis Log");
+      parseRatisLogs(null);
+      break;
+    }
     return null;
   }
 }

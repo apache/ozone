@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.debug.segmentparser;
+package org.apache.hadoop.ozone.debug.ratis.parse;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -43,8 +43,8 @@ public abstract class BaseLogParser {
       ParseRatisLog prl = builder.build();
       prl.dumpSegmentFile();
     } catch (Exception e) {
-      System.out.println(DatanodeRatisLogParser.class.getSimpleName()
-          + "failed with exception  " + e.toString());
+      System.out.println(RatisLogParser.class.getSimpleName()
+          + "failed with exception  " + e);
     }
   }
 

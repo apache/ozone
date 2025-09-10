@@ -205,9 +205,14 @@ public class NSSummaryTask implements ReconOmTask {
       LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
       return buildTaskResult(false);
     }
-    
+
     if (!REBUILD_STATE.compareAndSet(currentState, RebuildState.RUNNING)) {
-      LOG.info("Failed to acquire rebuild lock, another thread may have started rebuild.");
+      // Check if another thread successfully started the rebuild
+      if (REBUILD_STATE.get() == RebuildState.RUNNING) {
+        LOG.info("Rebuild already in progress by another thread, returning success");
+        return buildTaskResult(true);
+      }
+      LOG.info("Failed to acquire rebuild lock, unknown state");
       return buildTaskResult(false);
     }
 
@@ -250,7 +255,7 @@ public class NSSummaryTask implements ReconOmTask {
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat("Recon-NSSummaryTask-%d")
         .build();
-    ExecutorService executorService = Executors.newFixedThreadPool(2,
+    ExecutorService executorService = Executors.newFixedThreadPool(3,
         threadFactory);
     boolean success = false;
     try {
@@ -263,14 +268,31 @@ public class NSSummaryTask implements ReconOmTask {
         }
       }
       success = true;
-      
-    } catch (InterruptedException | ExecutionException ex) {
-      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
+
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      LOG.error("NSSummaryTask was interrupted.", ex);
       REBUILD_STATE.set(RebuildState.FAILED);
       return buildTaskResult(false);
-      
+    } catch (ExecutionException ex) {
+      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex.getCause());
+      REBUILD_STATE.set(RebuildState.FAILED);
+      return buildTaskResult(false);
     } finally {
       executorService.shutdown();
+      // Deterministic resource cleanup with timeout
+      try {
+        // get() ensures the work is done. awaitTermination ensures the workers are also verifiably gone.
+        // It turns an asynchronous shutdown into a synchronous, deterministic one
+        if (!executorService.awaitTermination(5, TimeUnit.MINUTES)) {
+          LOG.warn("Executor service for NSSummaryTask did not terminate in the specified time.");
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException ex) {
+        LOG.error("NSSummaryTask executor service termination was interrupted.", ex);
+        executorService.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
 
       long endTime = System.nanoTime();
       // Convert to milliseconds

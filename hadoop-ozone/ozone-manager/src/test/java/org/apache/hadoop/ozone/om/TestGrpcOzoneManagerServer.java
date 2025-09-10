@@ -27,17 +27,14 @@ import org.junit.jupiter.api.Test;
  * Tests for GrpcOzoneManagerServer.
  */
 public class TestGrpcOzoneManagerServer {
-  private OzoneManager ozoneManager;
-  private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
-  private GrpcOzoneManagerServer server;
 
   @Test
   public void testStartStop() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    ozoneManager = mock(OzoneManager.class);
-    omServerProtocol = ozoneManager.getOmServerProtocol();
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OzoneManagerProtocolServerSideTranslatorPB omServerProtocol = ozoneManager.getOmServerProtocol();
 
-    server = new GrpcOzoneManagerServer(conf,
+    GrpcOzoneManagerServer server = new GrpcOzoneManagerServer(conf,
         omServerProtocol,
         ozoneManager.getDelegationTokenMgr(),
         ozoneManager.getCertificateClient(),
