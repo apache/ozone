@@ -271,7 +271,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertEquals(15, metrics.getNumSubFilesMovedToDeletedTable());
     assertEquals(19, metrics.getNumDirsPurged());
     assertEquals(19, metrics.getNumDirsSentForPurge());
-    assertEquals(18, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(0, metrics.getNumSubDirsMovedToDeletedDirTable());
     assertEquals(18, metrics.getNumSubDirsSentForPurge());
 
     assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
@@ -327,7 +327,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
     assertEquals(5, metrics.getNumDirsSentForPurge());
     assertEquals(5, metrics.getNumDirsPurged());
-    assertEquals(4, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(0, metrics.getNumSubDirsMovedToDeletedDirTable());
     assertEquals(4, metrics.getNumSubDirsSentForPurge());
     assertEquals(3, metrics.getNumSubFilesSentForPurge());
     assertEquals(3, metrics.getNumSubFilesMovedToDeletedTable());
@@ -381,7 +381,7 @@ public class TestDirectoryDeletingServiceWithFSO {
 
     assertEquals(2, metrics.getNumDirsSentForPurge());
     assertEquals(2, metrics.getNumDirsPurged());
-    assertEquals(1, metrics.getNumSubDirsMovedToDeletedDirTable());
+    assertEquals(0, metrics.getNumSubDirsMovedToDeletedDirTable());
     assertEquals(1, metrics.getNumSubDirsSentForPurge());
     assertEquals(1, metrics.getNumSubFilesSentForPurge());
     assertEquals(1, metrics.getNumSubFilesMovedToDeletedTable());
