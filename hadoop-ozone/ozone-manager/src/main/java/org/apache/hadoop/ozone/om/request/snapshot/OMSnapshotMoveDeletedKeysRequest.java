@@ -26,7 +26,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
-import org.apache.hadoop.ozone.audit.OMDeletionAction;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
  */
 public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
-  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMDELETIONLOGGER);
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
   private static final String AUDIT_PARAM_FROM_SNAPSHOT_ID = "fromSnapshotId";
   private static final String AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY = "fromSnapshotTableKey";
   private static final String AUDIT_PARAM_NEXT_SNAPSHOT_ID = "nextSnapshotId";
@@ -86,6 +86,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
+    Map<String, String> auditParams = new LinkedHashMap<>();
     try {
       // Check the snapshot exists.
       SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, fromSnapshot.getTableKey());
@@ -103,7 +104,6 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
           omResponse.build(), fromSnapshot, nextSnapshot,
           nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);
 
-      Map<String, String> auditParams = new LinkedHashMap<>();
       auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_ID, fromSnapshot.getSnapshotId().toString());
       auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY, fromSnapshot.getTableKey());
       if (nextSnapshot != null) {
@@ -127,20 +127,19 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       if (!reclaimKeysList.isEmpty()) {
         auditParams.put(AUDIT_PARAM_RECLAIM_KEYS_LIST, reclaimKeysList.toString());
       }
-      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMDeletionAction.SNAPSHOT_MOVE_DEL_KEYS,
+      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_MOVE_DEL_KEYS,
           auditParams));
 
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
           createErrorOMResponse(omResponse, ex));
-      Map<String, String> auditParams = new LinkedHashMap<>();
       auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_ID, fromSnapshot.getSnapshotId().toString());
       auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY, fromSnapshot.getTableKey());
       if (nextSnapshot != null) {
         auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_ID, nextSnapshot.getSnapshotId().toString());
         auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_TABLE_KEY, nextSnapshot.getTableKey());
       }
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMDeletionAction.SNAPSHOT_MOVE_DEL_KEYS,
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_DEL_KEYS,
           auditParams, ex));
     }
 

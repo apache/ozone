@@ -24,16 +24,12 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAP
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
-import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.audit.OMDeletionAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -65,13 +61,6 @@ import org.slf4j.LoggerFactory;
 public class OMSnapshotDeleteRequest extends OMClientRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMSnapshotDeleteRequest.class);
-
-  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMDELETIONLOGGER);
-  private static final String AUDIT_PARAM_SNAPSHOT_ID = "snapshotId";
-  private static final String AUDIT_PARAM_SNAPSHOT_TABLE_KEY = "snapshotTableKey";
-  private static final String AUDIT_PARAM_VOLUME_NAME = "volumeName";
-  private static final String AUDIT_PARAM_BUCKET_NAME = "bucketName";
-  private static final String AUDIT_PARAM_SNAPSHOT_NAME = "snapshotName";
 
   public OMSnapshotDeleteRequest(OMRequest omRequest) {
     super(omRequest);
@@ -239,28 +228,10 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       omMetrics.incNumSnapshotDeleted();
       LOG.info("Deleted snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
-      
-      Map<String, String> auditParams = new LinkedHashMap<>();
-      auditParams.put(AUDIT_PARAM_VOLUME_NAME, volumeName);
-      auditParams.put(AUDIT_PARAM_BUCKET_NAME, bucketName);
-      auditParams.put(AUDIT_PARAM_SNAPSHOT_NAME, snapshotName);
-      auditParams.put(AUDIT_PARAM_SNAPSHOT_TABLE_KEY, snapshotInfo.getTableKey());
-      auditParams.put(AUDIT_PARAM_SNAPSHOT_ID, snapshotInfo.getSnapshotId().toString());
-      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMDeletionAction.SNAPSHOT_DELETION, auditParams));
     } else {
       omMetrics.incNumSnapshotDeleteFails();
       LOG.error("Failed to delete snapshot '{}' under path '{}'",
           snapshotName, snapshotPath);
-      
-      Map<String, String> auditParams = new LinkedHashMap<>();
-      auditParams.put(AUDIT_PARAM_VOLUME_NAME, volumeName);
-      auditParams.put(AUDIT_PARAM_BUCKET_NAME, bucketName);
-      auditParams.put(AUDIT_PARAM_SNAPSHOT_NAME, snapshotName);
-      if (snapshotInfo.getSnapshotId() != null) {
-        auditParams.put(AUDIT_PARAM_SNAPSHOT_ID, snapshotInfo.getSnapshotId().toString());
-      }
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMDeletionAction.SNAPSHOT_DELETION, auditParams,
-          exception));
     }
     return omClientResponse;
   }

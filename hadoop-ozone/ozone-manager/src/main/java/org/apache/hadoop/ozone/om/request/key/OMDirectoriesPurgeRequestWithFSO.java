@@ -19,16 +19,13 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePreviousSnapshotId;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -39,7 +36,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
-import org.apache.hadoop.ozone.audit.OMDeletionAction;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -61,7 +58,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  * Handles purging of keys from OM DB.
  */
 public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
-  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMDELETIONLOGGER);
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
   private static final String AUDIT_PARAM_DIRS_DELETED = "directoriesDeleted";
   private static final String AUDIT_PARAM_SUBDIRS_MOVED = "subdirectoriesMoved";
   private static final String AUDIT_PARAM_SUBFILES_MOVED = "subFilesMoved";
@@ -72,15 +69,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
   public OMDirectoriesPurgeRequestWithFSO(OMRequest omRequest) {
     super(omRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
-  }
-
-  /**
-   * Construct the full path for a key/directory for audit logging.
-   */
-  private String constructFullPath(OmKeyInfo keyInfo) {
-    return OM_KEY_PREFIX + keyInfo.getVolumeName() + 
-           OM_KEY_PREFIX + keyInfo.getBucketName() + 
-           OM_KEY_PREFIX + keyInfo.getKeyName();
   }
 
   @Override
@@ -103,9 +91,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         getOmRequest());
     final SnapshotInfo fromSnapshotInfo;
 
-    List<String> subDirNames = new ArrayList<>();
-    List<String> subFileNames = new ArrayList<>();
-    List<String> deletedDirNames = new ArrayList<>();
+    Set<String> subDirNames = new HashSet<>();
+    Set<String> subFileNames = new HashSet<>();
+    Set<String> deletedDirNames = new HashSet<>();
 
     try {
       fromSnapshotInfo = fromSnapshot != null ? SnapshotUtils.getSnapshotInfo(ozoneManager,
@@ -124,7 +112,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OMDirectoriesPurge. ", e);
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMDeletionAction.DIRECTORY_DELETION, null, e));
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, e));
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     try {
@@ -133,7 +121,13 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
-          subDirNames.add(constructFullPath(keyInfo));
+          
+          String pathKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
+              path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
+          String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+              keyInfo.getObjectID(), pathKey);
+          
+          subDirNames.add(deleteKey);
 
           String volumeName = keyInfo.getVolumeName();
           String bucketName = keyInfo.getBucketName();
@@ -144,7 +138,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
             lockSet.add(volBucketPair);
           }
           omMetrics.decNumKeys();
-          numSubDirMoved++;
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
@@ -163,7 +156,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getDeletedSubFilesList()) {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
-          subFileNames.add(constructFullPath(keyInfo));
+
+          String pathKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
+              path.getBucketId(), keyInfo.getParentObjectID(), keyInfo.getFileName());
+          String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+              keyInfo.getObjectID(), pathKey);
+          subFileNames.add(deleteKey);
 
           String volumeName = keyInfo.getVolumeName();
           String bucketName = keyInfo.getBucketName();
@@ -210,6 +208,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           numDirsDeleted++;
         }
       }
+      
+      // Remove deletedDirNames from subDirNames to avoid duplication
+      subDirNames.removeAll(deletedDirNames);
+      numSubDirMoved = subDirNames.size();
       deletingServiceMetrics.incrNumSubDirectoriesMoved(numSubDirMoved);
       deletingServiceMetrics.incrNumSubFilesMoved(numSubFilesMoved);
       deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
@@ -228,12 +230,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       auditParams.put(AUDIT_PARAM_DIRS_DELETED_LIST, String.join(",", deletedDirNames));
       auditParams.put(AUDIT_PARAM_SUBDIRS_MOVED_LIST, String.join(",", subDirNames));
       auditParams.put(AUDIT_PARAM_SUBFILES_MOVED_LIST, String.join(",", subFileNames));
-      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMDeletionAction.DIRECTORY_DELETION, auditParams));
+      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.DIRECTORY_DELETION, auditParams));
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen
       // as this is created and send within OM
       // only case of upgrade where compatibility is broken can have
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMDeletionAction.DIRECTORY_DELETION, null, ex));
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, ex));
       throw new IllegalStateException(ex);
     } finally {
       lockSet.stream().forEach(e -> omMetadataManager.getLock()

@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
-import org.apache.hadoop.ozone.audit.OMDeletionAction;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -58,7 +58,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyPurgeRequest.class);
 
-  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMDELETIONLOGGER);
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
   private static final String AUDIT_PARAM_KEYS_DELETED = "keysDeleted";
   private static final String AUDIT_PARAM_RENAMED_KEYS_PURGED = "renamedKeysPurged";
   private static final String AUDIT_PARAMS_DELETED_KEYS_LIST = "deletedKeysList";
@@ -99,7 +99,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OmKeyPurge. ", e);
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMDeletionAction.KEY_DELETION, null, e));
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
     }
 
@@ -119,33 +119,34 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
       OMException oe = new OMException("None of the keys can be purged be purged since a new snapshot was created " +
           "for all the buckets, making this request invalid", OMException.ResultCodes.KEY_DELETION_ERROR);
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMDeletionAction.KEY_DELETION, null, oe));
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, oe));
     }
 
-    Map<String, String> auditParams = new LinkedHashMap<>();
     // Setting transaction info for snapshot, this is to prevent duplicate purge requests to OM from background
     // services.
     try {
+      Map<String, String> auditParams = new LinkedHashMap<>();
       if (fromSnapshotInfo != null) {
         fromSnapshotInfo.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), fromSnapshotInfo));
         auditParams.put(AUDIT_PARAM_SNAPSHOT_ID, fromSnapshotInfo.getSnapshotId().toString());
       }
+      auditParams.put(AUDIT_PARAM_KEYS_DELETED, String.valueOf(numKeysDeleted));
+      auditParams.put(AUDIT_PARAM_RENAMED_KEYS_PURGED, String.valueOf(renamedKeysToBePurged.size()));
+      if (!keysToBePurgedList.isEmpty()) {
+        auditParams.put(AUDIT_PARAMS_DELETED_KEYS_LIST, String.join(",", keysToBePurgedList));
+      }
+      if (!renamedKeysToBePurged.isEmpty()) {
+        auditParams.put(AUDIT_PARAMS_RENAMED_KEYS_LIST, String.join(",", renamedKeysToBePurged));
+      }
+      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.KEY_DELETION, auditParams));
     } catch (IOException e) {
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
     }
 
-    auditParams.put(AUDIT_PARAM_KEYS_DELETED, String.valueOf(numKeysDeleted));
-    auditParams.put(AUDIT_PARAM_RENAMED_KEYS_PURGED, String.valueOf(renamedKeysToBePurged.size()));
-    if (!keysToBePurgedList.isEmpty()) {
-      auditParams.put(AUDIT_PARAMS_DELETED_KEYS_LIST, String.join(",", keysToBePurgedList));
-    }
-    if (!renamedKeysToBePurged.isEmpty()) {
-      auditParams.put(AUDIT_PARAMS_RENAMED_KEYS_LIST, String.join(",", renamedKeysToBePurged));
-    }
-    AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForFailure(OMDeletionAction.KEY_DELETION, auditParams, null));
     return new OMKeyPurgeResponse(omResponse.build(),
         keysToBePurgedList, renamedKeysToBePurged, fromSnapshotInfo, keysToUpdateList);
   }
