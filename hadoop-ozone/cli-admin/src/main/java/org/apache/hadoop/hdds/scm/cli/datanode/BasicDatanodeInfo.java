@@ -37,17 +37,23 @@ public class BasicDatanodeInfo {
   private final DatanodeDetails dn;
   private final HddsProtos.NodeOperationalState opState;
   private final HddsProtos.NodeState healthState;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Integer totalVolumeCount = null;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Integer healthyVolumeCount = null;
   
   public BasicDatanodeInfo(DatanodeDetails dnDetails, HddsProtos.NodeOperationalState opState,
-      HddsProtos.NodeState healthState) {
+      HddsProtos.NodeState healthState, List<Integer> volumeCounts) {
     this.dn = dnDetails;
     this.opState = opState;
     this.healthState = healthState;
+    this.totalVolumeCount = volumeCounts.get(0);
+    this.healthyVolumeCount = volumeCounts.get(1);
   }
 
   public BasicDatanodeInfo(DatanodeDetails dnDetails, HddsProtos.NodeOperationalState opState,
-      HddsProtos.NodeState healthState, long used, long capacity, double percentUsed) {
-    this(dnDetails, opState, healthState);
+      HddsProtos.NodeState healthState, long used, long capacity, double percentUsed, List<Integer> volumeCounts) {
+    this(dnDetails, opState, healthState, volumeCounts);
     this.used = used;
     this.capacity = capacity;
     this.percentUsed = percentUsed;
@@ -156,6 +162,16 @@ public class BasicDatanodeInfo {
   @JsonProperty(index = 105)
   public Double getPercentUsed() {
     return percentUsed;
+  }
+
+  @JsonProperty(index = 110)
+  public Integer getTotalVolumeCount() {
+    return totalVolumeCount;
+  }
+
+  @JsonProperty(index = 115)
+  public Integer getHealthyVolumeCount() {
+    return healthyVolumeCount;
   }
 
   @JsonIgnore
