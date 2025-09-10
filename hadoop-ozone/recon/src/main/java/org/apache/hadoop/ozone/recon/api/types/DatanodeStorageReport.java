@@ -21,14 +21,16 @@ package org.apache.hadoop.ozone.recon.api.types;
  * Metadata object that contains storage report of a Datanode.
  */
 public class DatanodeStorageReport {
+  private String dataNodeId;
   private long capacity;
   private long used;
   private long remaining;
   private long committed;
   private long pendingDeletion;
 
-  public DatanodeStorageReport(long capacity, long used, long remaining,
+  public DatanodeStorageReport(String dataNodeId, long capacity, long used, long remaining,
                                long committed, long pendingDeletion) {
+    this.dataNodeId = dataNodeId;
     this.capacity = capacity;
     this.used = used;
     this.remaining = remaining;
@@ -54,5 +56,9 @@ public class DatanodeStorageReport {
 
   public long getPendingDeletion() {
     return pendingDeletion;
+  }
+
+  public String getDataNodeId() {
+    return dataNodeId;
   }
 }

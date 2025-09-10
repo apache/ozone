@@ -50,13 +50,17 @@ public class UsedSpaceBreakDown {
   @JsonProperty("committedBytes")
   private long committedBytes;
 
+  @JsonProperty("containerPreAllocated")
+  private long containerPreAllocated;
+
   @JsonProperty("deletionPendingBytes")
   private DeletionPendingBytesByStage deletionPendingBytesByStage;
 
-  public UsedSpaceBreakDown(long openKeysBytes, long committedBytes,
+  public UsedSpaceBreakDown(long openKeysBytes, long committedBytes, long containerPreAllocated,
       DeletionPendingBytesByStage deletionPendingBytesByStage) {
     this.openKeysBytes = openKeysBytes;
     this.committedBytes = committedBytes;
+    this.containerPreAllocated = containerPreAllocated;
     this.deletionPendingBytesByStage = deletionPendingBytesByStage;
   }
 
@@ -66,6 +70,10 @@ public class UsedSpaceBreakDown {
 
   public long getCommittedBytes() {
     return committedBytes;
+  }
+
+  public long getContainerPreAllocated() {
+    return containerPreAllocated;
   }
 
   public DeletionPendingBytesByStage getDeletionPendingBytesByStage() {

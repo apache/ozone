@@ -201,6 +201,9 @@ public class StorageDistributionEndpoint {
     Long totalOpenKeySize = namespaceMetrics.get("totalOpenKeySize");
     Long totalCommittedSize = namespaceMetrics.get("totalCommittedSize");
     Long totalKeys = namespaceMetrics.get("totalKeys");
+    Long totalContainerPreAllocated = nodeStorageReports.stream()
+        .map(report -> report.getCommitted())
+        .reduce(0L, Long::sum);
 
     return StorageCapacityDistributionResponse.newBuilder()
             .setDataNodeUsage(nodeStorageReports)
@@ -211,6 +214,7 @@ public class StorageDistributionEndpoint {
             .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
                     totalOpenKeySize != null ? totalOpenKeySize : 0L,
                     totalCommittedSize != null ? totalCommittedSize : 0L,
+                    totalContainerPreAllocated != null ? totalContainerPreAllocated : 0L,
                     deletionPendingBytesByStage))
             .build();
   }
@@ -315,7 +319,7 @@ public class StorageDistributionEndpoint {
         log.warn("Block deletion metrics unavailable for datanode: {}", datanode);
         pendingDeletion = 0L;
       }
-      return new DatanodeStorageReport(capacity, used, remaining, committed, pendingDeletion);
+      return new DatanodeStorageReport(datanode.getUuidString(), capacity, used, remaining, committed, pendingDeletion);
     } catch (Exception e) {
       log.error("Error getting storage report for datanode: {}", datanode, e);
       return null; // Return null on any error
