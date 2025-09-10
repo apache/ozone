@@ -57,6 +57,7 @@ public abstract class OmSnapshotLocalData {
   // Whether the snapshot needs compaction
   private boolean needsCompaction;
 
+  // Previous snapshotId based on which the snapshot local data is built.
   private UUID previousSnapshotId;
 
   // Map of version to VersionMeta, using linkedHashMap since the order of the map needs to be deterministic for
