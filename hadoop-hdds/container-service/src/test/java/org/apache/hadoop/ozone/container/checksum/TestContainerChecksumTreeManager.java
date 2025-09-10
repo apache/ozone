@@ -568,6 +568,32 @@ class TestContainerChecksumTreeManager {
         ContainerChecksumTreeManager.getContainerChecksumFile(container).getAbsolutePath());
   }
 
+  @Test
+  public void testHasDataChecksum() {
+    assertFalse(ContainerChecksumTreeManager.hasDataChecksum(null));
+
+    ContainerProtos.ContainerChecksumInfo empty = ContainerProtos.ContainerChecksumInfo.newBuilder().build();
+    assertFalse(ContainerChecksumTreeManager.hasDataChecksum(empty));
+
+    ContainerProtos.ContainerChecksumInfo treeNoChecksum = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerMerkleTree(buildTestTree(config).addDeletedBlocks(Collections.emptyList(), false))
+        .build();
+    assertFalse(ContainerChecksumTreeManager.hasDataChecksum(treeNoChecksum));
+
+    ContainerProtos.ContainerMerkleTree zeroChecksumTree = ContainerProtos.ContainerMerkleTree.newBuilder()
+        .setDataChecksum(0)
+        .build();
+    ContainerProtos.ContainerChecksumInfo treeWithZeroChecksum = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerMerkleTree(zeroChecksumTree)
+        .build();
+    assertTrue(ContainerChecksumTreeManager.hasDataChecksum(treeWithZeroChecksum));
+
+    ContainerProtos.ContainerChecksumInfo treeWithDataChecksum = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerMerkleTree(buildTestTree(config).toProto())
+        .build();
+    assertTrue(ContainerChecksumTreeManager.hasDataChecksum(treeWithDataChecksum));
+  }
+
   private List<Long> getDeletedBlockIDs(ContainerProtos.ContainerChecksumInfo checksumInfo) {
     return checksumInfo.getDeletedBlocksList().stream()
         .map(ContainerProtos.BlockMerkleTree::getBlockID)
