@@ -186,4 +186,21 @@ public class ContainerImporter {
   public long getRequiredReplicationSpace(long actualContainerSize) {
     return HddsServerUtil.requiredReplicationSpace(actualContainerSize);
   }
+
+  /**
+   * Get space to reserve for replication. If replicateSize is provided,
+   * calculate required space based on that, otherwise return default
+   * replication space.
+   *
+   * @param replicateSize the size of the container to replicate in bytes
+   *                      (can be null)
+   * @return space to reserve for replication
+   */
+  public long getSpaceToReserve(Long replicateSize) {
+    if (replicateSize != null) {
+      return getRequiredReplicationSpace(replicateSize);
+    } else {
+      return getDefaultReplicationSpace();
+    }
+  }
 }

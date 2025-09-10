@@ -86,12 +86,6 @@ public class TestDownloadAndImportReplicator {
     containerMaxSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-
-    // Mock the space reservation logic to be independent of the
-    // importer's implementation details.
-    when(importer.getRequiredReplicationSpace(anyLong()))
-        .thenAnswer(invocation -> 2 * (long) invocation.getArgument(0));
-    when(importer.getDefaultReplicationSpace()).thenReturn(2 * containerMaxSize);
   }
 
   /**

@@ -90,12 +90,6 @@ public class TestSendContainerRequestHandler {
     containerMaxSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-
-    // Mock the space reservation logic to be independent of the
-    // importer's implementation details.
-    when(importer.getRequiredReplicationSpace(anyLong()))
-        .thenAnswer(invocation -> 2 * (long) invocation.getArgument(0));
-    when(importer.getDefaultReplicationSpace()).thenReturn(2 * containerMaxSize);
   }
 
   /**
@@ -214,7 +208,7 @@ public class TestSendContainerRequestHandler {
    * overallocated containers and default containers.
    */
   @Test
-  public void testOverallocatedReservesMoreSpace() {
+  public void testOverAllocatedReservesMoreSpace() {
     long containerId1 = 1;
     long containerId2 = 2;
     long overallocatedSize = 10L * 1024L * 1024L * 1024L; // 10GB

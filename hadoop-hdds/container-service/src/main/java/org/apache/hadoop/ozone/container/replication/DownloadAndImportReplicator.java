@@ -44,6 +44,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   private final ContainerDownloader downloader;
   private final ContainerImporter containerImporter;
   private final ContainerSet containerSet;
+  private Long spaceToReserve;
 
   public DownloadAndImportReplicator(
       ConfigurationSource conf, ContainerSet containerSet,
@@ -73,14 +74,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     HddsVolume targetVolume = null;
     
     // Use replicate size from command if available, otherwise use default
-    long spaceToReserve = 0;
-    Long replicateSize = task.getReplicateSize();
-    if (replicateSize != null) {
-      spaceToReserve = containerImporter.getRequiredReplicationSpace(replicateSize);
-    } else {
-      // Fallback to default (backward compatibility)
-      spaceToReserve = containerImporter.getDefaultReplicationSpace();
-    }
+    spaceToReserve = containerImporter.getSpaceToReserve(task.getReplicateSize());
 
     try {
       targetVolume = containerImporter.chooseNextVolume(spaceToReserve);
@@ -109,7 +103,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       LOG.error("Container {} replication was unsuccessful.", containerID, e);
       task.setStatus(Status.FAILED);
     } finally {
-      if (targetVolume != null) {
+      if (targetVolume != null && spaceToReserve > 0) {
         targetVolume.incCommittedBytes(-spaceToReserve);
       }
     }

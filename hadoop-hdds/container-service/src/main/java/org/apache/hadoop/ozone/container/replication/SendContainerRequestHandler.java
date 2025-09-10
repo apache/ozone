@@ -87,11 +87,8 @@ class SendContainerRequestHandler
         containerId = req.getContainerID();
         
         // Use replicate size if available, otherwise fall back to default
-        if (req.hasReplicateSize()) {
-          spaceToReserve = importer.getRequiredReplicationSpace(req.getReplicateSize());
-        } else {
-          spaceToReserve = importer.getDefaultReplicationSpace();
-        }
+        spaceToReserve = importer.getSpaceToReserve(
+            req.hasReplicateSize() ? req.getReplicateSize() : null);
 
         volume = importer.chooseNextVolume(spaceToReserve);
 
