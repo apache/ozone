@@ -21,7 +21,7 @@ import filesize from 'filesize';
 import { Card, Row, Col, Table, Tag } from 'antd';
 
 import EChart from '@/v2/components/eChart/eChart';
-import OverviewCardWrapper from '@/v2/components/overviewCard/overviewCardWrapper';
+import OverviewCardWrapper from '@/v2/components/cards/overviewCardWrapper';
 
 import { StorageReport } from '@/v2/types/overview.types';
 
