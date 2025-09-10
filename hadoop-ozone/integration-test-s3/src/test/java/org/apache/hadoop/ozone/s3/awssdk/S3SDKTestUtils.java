@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.security.MessageDigest;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.ozone.test.InputSubstream;
 
@@ -75,5 +77,20 @@ public final class S3SDKTestUtils {
 
     file.getFD().sync();
     file.close();
+  }
+
+  /**
+   * Extract the UploadId from XML string.
+   *
+   * @param xml The XML string.
+   * @return The UploadId, or null if not found.
+   */
+  public static String extractUploadId(String xml) {
+    Pattern pattern = Pattern.compile("<UploadId>(.+?)</UploadId>");
+    Matcher matcher = pattern.matcher(xml);
+    if (matcher.find()) {
+      return matcher.group(1);
+    }
+    return null;
   }
 }

@@ -452,7 +452,7 @@ public abstract class EndpointBase implements Auditor {
       Map<String, String> auditMap) {
     auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
     auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
-
+    
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)
         .withParams(auditMap);
@@ -507,7 +507,6 @@ public abstract class EndpointBase implements Auditor {
     this.signatureInfo = signatureInfo;
   }
 
-  @VisibleForTesting
   public OzoneClient getClient() {
     return client;
   }

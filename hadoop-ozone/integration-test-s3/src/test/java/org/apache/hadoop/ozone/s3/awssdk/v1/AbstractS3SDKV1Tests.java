@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.awssdk.v1;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.calculateDigest;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -71,7 +72,6 @@ import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.TransferManagerBuilder;
 import com.amazonaws.services.s3.transfer.Upload;
 import com.amazonaws.services.s3.transfer.model.UploadResult;
-import com.amazonaws.util.IOUtils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -81,6 +81,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -98,6 +99,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -115,6 +117,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
+import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -1177,8 +1180,13 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       }
 
       int responseCode = connection.getResponseCode();
-      assertEquals(200, responseCode, "PUtObject presigned URL should return 200 OK");
-      String actualContent = downloadKey(bucketName, keyName);
+      assertEquals(200, responseCode, "PutObject presigned URL should return 200 OK");
+      String result;
+      S3Object s3Object = s3Client.getObject(bucketName, keyName);
+      try (S3ObjectInputStream inputStream = s3Object.getObjectContent()) {
+        result = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+      }
+      String actualContent = result;
       assertEquals(expectedContent, actualContent, "Downloaded content should match uploaded content");
     } finally {
       if (connection != null) {
@@ -1187,6 +1195,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     }
   }
 
+  @SuppressWarnings("checkstyle:MethodLength")
   @Test
   public void testPresignedUrlMultipartUpload(@TempDir Path tempDir) throws Exception {
     final String bucketName = getBucketName();
@@ -1194,29 +1203,39 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     final Map<String, String> userMetadata = new HashMap<>();
     userMetadata.put("key1", "value1");
     userMetadata.put("key2", "value2");
+    final Map<String, String> tags = new HashMap<>();
+    tags.put("tag1", "value1");
+    tags.put("tag2", "value2");
 
     s3Client.createBucket(bucketName);
 
     File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
     createFile(multipartUploadFile, (int) (10 * MB));
 
-    // Create multipart upload
+    // create MPU using presigned URL
     GeneratePresignedUrlRequest initMPUPresignUrlRequest = new GeneratePresignedUrlRequest(bucketName, keyName)
         .withMethod(HttpMethod.POST)
         .withExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60));
-    initMPUPresignUrlRequest.putCustomRequestHeader("x-amz-meta-key1", "value1");
-    initMPUPresignUrlRequest.putCustomRequestHeader("x-amz-meta-key2", "value2");
-    initMPUPresignUrlRequest.putCustomRequestHeader(S3Consts.TAG_HEADER, "tag1=value1,tg2=value2");
 
+    userMetadata.forEach((k, v) -> {
+      initMPUPresignUrlRequest.putCustomRequestHeader(CUSTOM_METADATA_HEADER_PREFIX + k, v);
+    });
+
+    StringBuilder tagValueBuilder = new StringBuilder();
+    for (Map.Entry<String, String> entry : tags.entrySet()) {
+      if (tagValueBuilder.length() > 0) {
+        tagValueBuilder.append('&');
+      }
+      tagValueBuilder.append(entry.getKey()).append('=').append(URLEncoder.encode(entry.getValue(), "UTF-8"));
+    }
+    initMPUPresignUrlRequest.putCustomRequestHeader(S3Consts.TAG_HEADER, tagValueBuilder.toString());
 
     URL iniMPUPresignUrl = s3Client.generatePresignedUrl(initMPUPresignUrlRequest);
 
     String uploadId;
     HttpURLConnection initMPUConnection = null;
     try {
-
       initMPUConnection = (HttpURLConnection) iniMPUPresignUrl.openConnection();
-
       initMPUConnection.setRequestMethod("POST");
       initMPUConnection.setDoOutput(true);
       initMPUConnection.setRequestProperty("x-amz-meta-key1", "value1");
@@ -1226,18 +1245,16 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       int initMPUConnectionResponseCode = initMPUConnection.getResponseCode();
       assertEquals(200, initMPUConnectionResponseCode);
       try (InputStream is = initMPUConnection.getInputStream()) {
-        String responseXml = org.apache.commons.io.IOUtils.toString(is, StandardCharsets.UTF_8);
-        int startIdx = responseXml.indexOf("<UploadId>") + "<UploadId>".length();
-        int endIdx = responseXml.indexOf("</UploadId>");
-        uploadId = responseXml.substring(startIdx, endIdx);
+        String responseXml = IOUtils.toString(is, StandardCharsets.UTF_8);
+        uploadId = S3SDKTestUtils.extractUploadId(responseXml);
       }
     } finally {
-      if(initMPUConnection != null) {
+      if (initMPUConnection != null) {
         initMPUConnection.disconnect();
       }
     }
 
-    // Upload parts using presigned URL
+    // upload parts using presigned URL
     List<PartETag> completedParts = new ArrayList<>();
     ByteBuffer byteBuffer = ByteBuffer.allocate((int) (5 * MB));
     long filePosition = 0;
@@ -1250,7 +1267,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
         long bytesRead = file.getChannel().read(byteBuffer);
         byteBuffer.flip();
 
-        // Generate presigned URL for each part
+        // generate presigned URL for each part
         GeneratePresignedUrlRequest generatePresignedUrlRequest =
             new GeneratePresignedUrlRequest(bucketName, keyName)
                 .withMethod(HttpMethod.PUT)
@@ -1260,7 +1277,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
 
         URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
 
-        // Upload part using HttpURLConnection
+        // upload each part using presigned URL
         HttpURLConnection connection = null;
         try {
           connection = (HttpURLConnection) presignedUrl.openConnection();
@@ -1283,7 +1300,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           PartETag partETag = new PartETag(partNumber, etag);
           completedParts.add(partETag);
         } finally {
-          if(connection != null) {
+          if (connection != null) {
             connection.disconnect();
           }
         }
@@ -1308,10 +1325,13 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       completeMPUConnection.setDoOutput(true);
 
       // Generate completion XML payload
-      StringBuilder completionXml = new StringBuilder("<CompleteMultipartUpload>\n");
+      StringBuilder completionXml = new StringBuilder();
+      completionXml.append("<CompleteMultipartUpload>\n");
       for (PartETag part : completedParts) {
-        completionXml.append(String.format("  <Part>\n    <PartNumber>%d</PartNumber>\n    <ETag>%s</ETag>\n  </Part>\n",
-            part.getPartNumber(), part.getETag()));
+        completionXml.append("  <Part>\n");
+        completionXml.append("    <PartNumber>").append(part.getPartNumber()).append("</PartNumber>\n");
+        completionXml.append("    <ETag>").append(part.getETag()).append("</ETag>\n");
+        completionXml.append("  </Part>\n");
       }
       completionXml.append("</CompleteMultipartUpload>");
 
@@ -1334,16 +1354,14 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     assertEquals(userMetadata, objectMeta.getUserMetadata());
 
     // Verify content
-    String actualContent = downloadKey(bucketName, keyName);
+    S3Object s3Object = s3Client.getObject(bucketName, keyName);
+    assertEquals(tags.size(), s3Object.getTaggingCount());
+    String actualContent;
+    try (S3ObjectInputStream inputStream = s3Object.getObjectContent()) {
+      actualContent = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+    }
     String expectedContent = new String(Files.readAllBytes(multipartUploadFile.toPath()), StandardCharsets.UTF_8);
     assertEquals(expectedContent, actualContent, "Downloaded content should match uploaded content");
-  }
-
-  private String downloadKey(String bucketName, String keyName) throws IOException {
-    S3Object s3Object = s3Client.getObject(bucketName, keyName);
-    try (S3ObjectInputStream inputStream = s3Object.getObjectContent()) {
-      return new String(IOUtils.toByteArray(inputStream), StandardCharsets.UTF_8);
-    }
   }
 
   /**
