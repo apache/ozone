@@ -149,7 +149,6 @@ public final class ContainerMerkleTreeTestUtils {
     return buildTestTree(conf, 5);
   }
 
-
   public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numBlocks) {
     return buildTestTree(conf, numBlocks, 0);
   }
@@ -169,7 +168,7 @@ public final class ContainerMerkleTreeTestUtils {
     }
 
     for (int i = 0; i < numDeletedBlocks; i++) {
-      // Use odd block ID's for live blocks.
+      // Use odd block ID's for deleted blocks.
       int blockID = (i * 2) + 1;
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
         tree.setDeletedBlock(blockID, byteValue++);
