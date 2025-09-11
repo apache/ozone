@@ -954,9 +954,9 @@ public class TestKeyValueContainer {
       // Check sst files
       DatanodeStore dnStore = DatanodeStoreCache.getInstance().getDB(
           hddsVolume.getDbParentDir() + "/" + OzoneConsts.CONTAINER_DB_NAME,
-          CONF).getStore();
+              CONF).getStore();
       List<LiveFileMetaData> fileMetaDataList1 =
-          ((RDBStore) (dnStore.getStore())).getDb().getLiveFilesMetaData();
+          ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
       // When using Table.loadFromFile() in loadKVContainerData(),
       // there were as many SST files generated as the number of imported containers
       // After moving away from using Table.loadFromFile(), no SST files are generated unless the db is force flushed
