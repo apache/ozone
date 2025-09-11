@@ -68,9 +68,9 @@ public class ContainerMerkleTreeWriter {
         setDeletedBlock(blockID, blockTree.getDataChecksum());
       } else {
         addBlock(blockID);
-      }
-      for (ContainerProtos.ChunkMerkleTree chunkTree: blockTree.getChunkMerkleTreeList()) {
-        addChunks(blockID, new ChunkMerkleTreeWriter(chunkTree));
+        for (ContainerProtos.ChunkMerkleTree chunkTree: blockTree.getChunkMerkleTreeList()) {
+          addChunks(blockID, new ChunkMerkleTreeWriter(chunkTree));
+        }
       }
     }
   }
@@ -162,6 +162,15 @@ public class ContainerMerkleTreeWriter {
     return toProtoBuilder().build();
   }
 
+  /**
+   * Adds deleted blocks to this merkle tree. The blocks' checksums are computed from the checksums in the BlockData.
+   * If a block with the same ID already exists in the tree, it is overwritten as deleted with the checksum computed
+   * from the chunk checksums in the BlockData.
+   *
+   * The top level container data checksum is only computed in the returned tree proto if computeChecksum is true.
+   * If it is false, the resulting tree proto will have data checksums for each block, but an empty/unset data checksum
+   * for the container at the root of the tree.
+   */
   public ContainerProtos.ContainerMerkleTree addDeletedBlocks(Collection<BlockData> blocks, boolean computeChecksum) {
     for (BlockData block: blocks) {
       long blockID = block.getLocalID();

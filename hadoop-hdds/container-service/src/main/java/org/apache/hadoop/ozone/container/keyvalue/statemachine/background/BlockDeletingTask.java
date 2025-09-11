@@ -204,7 +204,6 @@ public class BlockDeletingTask implements BackgroundTask {
           .getHandler(container.getContainerType()));
 
       long releasedBytes = 0;
-      ContainerMerkleTreeWriter treeWriter = new ContainerMerkleTreeWriter();
       for (Table.KeyValue<String, BlockData> entry : toDeleteBlocks) {
         String blockName = entry.getKey();
         BlockData blockData = entry.getValue();

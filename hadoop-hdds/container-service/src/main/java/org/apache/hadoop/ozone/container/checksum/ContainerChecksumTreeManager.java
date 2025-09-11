@@ -297,6 +297,11 @@ public class ContainerChecksumTreeManager {
     return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION);
   }
 
+  /**
+   * Returns true if the {@link ContainerProtos.ContainerChecksumInfo} provided is not null, and its merkle tree has a
+   * data checksum field present. Returns false otherwise, indicating a scan of the data in this container has not yet
+   * been done.
+   */
   public static boolean hasDataChecksum(ContainerProtos.ContainerChecksumInfo checksumInfo) {
     return checksumInfo != null &&
         checksumInfo.hasContainerMerkleTree() &&
@@ -338,10 +343,14 @@ public class ContainerChecksumTreeManager {
   }
 
   /**
-   * Called by block deletion to update the merkle tree persisted to disk.
-   * The sets of live and deleted blocks are merged into one tree.
+   * Called by block deletion to update the merkle tree persisted to disk with more deleted blocks.
    * If a block with the same ID already exists in the tree, it is overwritten as deleted with the checksum computed
    * from the chunk checksums in the BlockData.
+   *
+   * The top level container data checksum is only updated if the existing tree on disk already has this value present.
+   * This lets the block deleting service add blocks to the tree before the scanner has reached the container, and that
+   * list of deleted blocks will not be mistaken for the list of all blocks seen in the container.
+   * See {@link #hasDataChecksum(ContainerProtos.ContainerChecksumInfo)}.
    */
   public void addDeletedBlocks(ContainerData data, Collection<BlockData> blocks) throws IOException {
     write(data, existingTree -> {
