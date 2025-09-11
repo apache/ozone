@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -84,6 +85,9 @@ public class TestPartUpload {
     REST.setHeaders(headers);
     REST.setClient(client);
     REST.setOzoneConfiguration(new OzoneConfiguration());
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    REST.setSignatureInfo(signatureInfo);
   }
 
 
@@ -166,6 +170,9 @@ public class TestPartUpload {
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setClient(client);
     objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    objectEndpoint.setSignatureInfo(signatureInfo);
     String keyName = UUID.randomUUID().toString();
 
     String chunkedContent = "0a;chunk-signature=signature\r\n"
@@ -230,6 +237,9 @@ public class TestPartUpload {
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setClient(clientStub);
     objectEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    objectEndpoint.setSignatureInfo(signatureInfo);
 
     Response response = objectEndpoint.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
         OzoneConsts.KEY);

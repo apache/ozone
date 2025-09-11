@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -112,6 +113,9 @@ public class TestS3GatewayMetrics {
     Mockito.when(context.getUriInfo().getQueryParameters())
         .thenReturn(new MultivaluedHashMap<>());
     keyEndpoint.setContext(context);
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    keyEndpoint.setSignatureInfo(signatureInfo);
   }
 
   /**

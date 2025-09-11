@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -260,6 +261,9 @@ public class TestPermissionCheck {
     objectEndpoint.setClient(client);
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setOzoneConfiguration(conf);
+    SignatureInfo signatureInfo = Mockito.mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    objectEndpoint.setSignatureInfo(signatureInfo);
 
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
         "bucketName", "keyPath", 1024, 0, null,
