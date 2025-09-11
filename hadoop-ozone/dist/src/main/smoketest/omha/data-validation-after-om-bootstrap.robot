@@ -29,6 +29,7 @@ ${SNAP_2}
 ${KEY_PREFIX}
 ${KEY_1}
 ${KEY_2}
+${IS_FOLLOWER}  true
 
 *** Keywords ***
 Number of checkpoints equals 2
@@ -42,8 +43,15 @@ Check current leader is different than OM
 
 Transfer leadership to OM
     [arguments]         ${new_leader}
-    ${result} =         Execute                 ozone admin om transfer --service-id=omservice -n ${new_leader}
-                        Should Contain          ${result}               Transfer leadership successfully
+    ${status}    ${result} =    Run Keyword And Ignore Error
+    ...                   Execute    ozone admin om transfer --service-id=omservice -n ${new_leader}
+
+    Run Keyword If      '${IS_FOLLOWER}' == 'true'
+    ...                       Should Be Equal As Strings    ${status}    PASS
+    ...                       AND    Should Contain    ${result}    Transfer leadership successfully
+    ...            ELSE
+    ...                       Should Be Equal As Strings    ${status}    FAIL
+    ...                       AND    Should Contain    ${result}    not in Follower role
 
 Check snapshots on OM
     [arguments]         ${volume}               ${bucket}           ${snap_1}       ${snap_2}

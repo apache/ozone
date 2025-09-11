@@ -74,17 +74,15 @@ public class TestOzoneContainer {
   private String clusterId = UUID.randomUUID().toString();
   private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
-  private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private final DatanodeDetails datanodeDetails = createDatanodeDetails();
   private HashMap<String, Long> commitSpaceMap; //RootDir -> committed space
 
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
 
   private void initTest(ContainerTestVersionInfo versionInfo) throws Exception {
     this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     setup();
@@ -133,7 +131,7 @@ public class TestOzoneContainer {
 
       HddsVolume myVolume;
 
-      keyValueContainerData = new KeyValueContainerData(i,
+      KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
           layout,
           maxCap, UUID.randomUUID().toString(),
           datanodeDetails.getUuidString());
@@ -238,7 +236,7 @@ public class TestOzoneContainer {
       // eat up 10 bytes more, now available space is less than 1 container
       volume.incCommittedBytes(10);
     }
-    keyValueContainerData = new KeyValueContainerData(99,
+    KeyValueContainerData keyValueContainerData = new KeyValueContainerData(99,
         layout, containerSize,
         UUID.randomUUID().toString(), datanodeDetails.getUuidString());
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);

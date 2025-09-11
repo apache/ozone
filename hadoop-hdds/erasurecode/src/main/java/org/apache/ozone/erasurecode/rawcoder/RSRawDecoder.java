@@ -51,6 +51,8 @@ public class RSRawDecoder extends RawErasureDecoder {
   private int[] cachedErasedIndexes;
   private int[] validIndexes;
   private int numErasedDataUnits;
+
+  @SuppressWarnings("PMD.SingularField")
   private boolean[] erasureFlags;
 
   public RSRawDecoder(ECReplicationConfig ecReplicationConfig) {

@@ -66,12 +66,13 @@ import org.slf4j.event.Level;
 @Flaky("HDDS-5631")
 public class TestSCMInstallSnapshotWithHA {
 
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final String SCM_SERVICE_ID = "scm-service-test1";
+  private static final int NUM_OF_OMS = 1;
+  private static final int NUM_OF_SCMS = 3;
+
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String omServiceId;
-  private String scmServiceId;
-  private int numOfOMs = 1;
-  private int numOfSCMs = 3;
 
   private static final long SNAPSHOT_THRESHOLD = 5;
   private static final int LOG_PURGE_GAP = 5;
@@ -84,8 +85,6 @@ public class TestSCMInstallSnapshotWithHA {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    omServiceId = "om-service-test1";
-    scmServiceId = "scm-service-test1";
 
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_ENABLED, true);
     conf.setInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP, LOG_PURGE_GAP);
@@ -93,10 +92,10 @@ public class TestSCMInstallSnapshotWithHA {
             SNAPSHOT_THRESHOLD);
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId(omServiceId)
-        .setSCMServiceId(scmServiceId)
-        .setNumOfOzoneManagers(numOfOMs)
-        .setNumOfStorageContainerManagers(numOfSCMs)
+        .setOMServiceId(OM_SERVICE_ID)
+        .setSCMServiceId(SCM_SERVICE_ID)
+        .setNumOfOzoneManagers(NUM_OF_OMS)
+        .setNumOfStorageContainerManagers(NUM_OF_SCMS)
         .setNumOfActiveSCMs(2)
         .build();
     cluster.waitForClusterToBeReady();

@@ -261,7 +261,7 @@ public class NSSummaryTaskDbEventHandler {
     try {
       updateNSSummariesToDB(nsSummaryMap, objectIdsToBeDeleted);
     } catch (IOException e) {
-      LOG.error("Unable to write Namespace Summary data in Recon DB.", e);
+      LOG.error("Unable to write Namespace Summary data in Recon DB. batchSize={}", nsSummaryMap.size(), e);
       return false;
     } finally {
       nsSummaryMap.clear();

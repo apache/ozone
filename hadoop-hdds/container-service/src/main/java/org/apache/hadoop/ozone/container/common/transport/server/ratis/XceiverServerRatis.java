@@ -77,8 +77,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -132,6 +130,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int serverPort;
   private int adminPort;
   private int clientPort;
+
+  // TODO: https://issues.apache.org/jira/browse/HDDS-13558
+  @SuppressWarnings("PMD.SingularField")
   private int dataStreamPort;
   private final RaftServer server;
   private final String name;
@@ -775,18 +776,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()));
   }
 
-  private long calculatePipelineBytesWritten(HddsProtos.PipelineID pipelineID) {
-    long bytesWritten = 0;
-    for (Container<?> container : containerController.getContainers()) {
-      ContainerData containerData = container.getContainerData();
-      if (containerData.getOriginPipelineId()
-          .compareTo(pipelineID.getId()) == 0) {
-        bytesWritten += containerData.getStatistics().getWriteBytes();
-      }
-    }
-    return bytesWritten;
-  }
-
   @Override
   public List<PipelineReport> getPipelineReport() {
     try {
@@ -800,7 +789,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         reports.add(PipelineReport.newBuilder()
             .setPipelineID(pipelineID)
             .setIsLeader(isLeader)
-            .setBytesWritten(calculatePipelineBytesWritten(pipelineID))
             .build());
       }
       return reports;

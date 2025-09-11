@@ -15,7 +15,33 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.recon.tasks;
+
 /**
- * Command line utility for dump ratis log files.
+ * Common interface for all Recon events that can be processed by the event buffer.
+ * This allows the event buffer to handle both OM update events and custom control events.
  */
-package org.apache.hadoop.ozone.debug.segmentparser;
+public interface ReconEvent {
+  
+  /**
+   * Get the type of event for processing logic.
+   * @return the event type
+   */
+  EventType getEventType();
+  
+  /**
+   * Get the number of events contained in this event (for metrics).
+   * For OMUpdateEventBatch, this returns the number of OM events.
+   * For control events, this typically returns 1.
+   * @return the event count
+   */
+  int getEventCount();
+
+  /**
+   * Enum representing the types of events that can be processed by the event buffer.
+   */
+  enum EventType {
+    OM_UPDATE_BATCH,
+    TASK_REINITIALIZATION
+  }
+}

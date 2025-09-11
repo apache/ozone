@@ -15,14 +15,23 @@
  * limitations under the License.
  */
 
-/**
- * Interface definitions borrowed from Hadoop 3.3.6.
- * FIXME: Hack: This is copied from Hadoop 3.3.6. Remove this interface once
- * we drop Hadoop 3.1, 3.2 support.
- */
-@InterfaceAudience.Private
-@InterfaceStability.Evolving
-package org.apache.hadoop.fs;
+package org.apache.hadoop.ozone.debug.ratis;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
+import org.apache.hadoop.ozone.debug.ratis.parse.RatisLogParser;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
+
+/**
+ * Ratis debug related commands.
+ */
+@CommandLine.Command(
+    name = "ratis",
+    description = "Debug commands related to Ratis.",
+    subcommands = {
+        RatisLogParser.class
+    }
+)
+@MetaInfServices(DebugSubcommand.class)
+public class RatisDebug implements DebugSubcommand {
+}
