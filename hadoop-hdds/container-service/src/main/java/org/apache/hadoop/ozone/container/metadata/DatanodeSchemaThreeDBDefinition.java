@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
@@ -36,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
+import org.rocksdb.RocksDBException;
 
 /**
  * This class defines the RocksDB structure for datanode following schema
@@ -196,9 +198,16 @@ public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinitio
       DBColumnFamilyDefinition<?, ?> definition) {
     // Use prefix seek to mitigating seek overhead.
     // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
-    ManagedColumnFamilyOptions cfOptions =
-        (ManagedColumnFamilyOptions) dbProfile.getColumnFamilyOptions(config, pathToOptions, definition.getName())
-            .useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
+    ManagedColumnFamilyOptions cfOptions = null;
+    try {
+      cfOptions = DBConfigFromFile.readCFOptionsFromFile(pathToOptions, definition.getName());
+    } catch (RocksDBException e) {
+      LOG.error("Error while reading column family options from file: {}", pathToOptions);
+    }
+    if (cfOptions == null) {
+      cfOptions = dbProfile.getColumnFamilyOptions(config);
+    }
+    cfOptions.useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
     definition.setCfOptions(cfOptions);
   }
 }

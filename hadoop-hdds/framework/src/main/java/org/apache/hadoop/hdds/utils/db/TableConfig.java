@@ -23,6 +23,7 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.RocksDBException;
 
 /**
  * Class that maintains Table Configuration.
@@ -48,8 +49,16 @@ public class TableConfig implements AutoCloseable {
   }
 
   static TableConfig newTableConfig(Path dbPath, String name) {
-    return new TableConfig(name,
-        DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions(dbPath, name));
+    ManagedColumnFamilyOptions cfOptions = null;
+    try {
+      cfOptions = DBConfigFromFile.readCFOptionsFromFile(dbPath, name);
+    } catch (RocksDBException ignored) {
+
+    }
+    if (cfOptions == null) {
+      cfOptions = DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions();
+    }
+    return new TableConfig(name, cfOptions);
   }
 
   /**

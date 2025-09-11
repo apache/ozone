@@ -776,17 +776,17 @@ public class TestKeyValueContainer {
       // ColumnFamilyOptions should be same across configurations
       OzoneConfiguration config = new OzoneConfiguration();
       ColumnFamilyOptions columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(config, dbPath, DEFAULT_CF_NAME);
+          .getColumnFamilyOptions(config);
       ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(config, dbPath, DEFAULT_CF_NAME);
+          .getColumnFamilyOptions(config);
       assertEquals(columnFamilyOptions1, columnFamilyOptions2);
 
       // ColumnFamilyOptions should be same when queried multiple times
       // for a particulat configuration
       columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(config, dbPath, DEFAULT_CF_NAME);
+          .getColumnFamilyOptions(config);
       columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(config, dbPath, DEFAULT_CF_NAME);
+          .getColumnFamilyOptions(config);
       assertEquals(columnFamilyOptions1, columnFamilyOptions2);
     }
 
@@ -794,10 +794,10 @@ public class TestKeyValueContainer {
     DatanodeDBProfile diskProfile = new DatanodeDBProfile.Disk();
     DatanodeDBProfile ssdProfile = new DatanodeDBProfile.SSD();
     assertNotEquals(
-        diskProfile.getColumnFamilyOptions(new OzoneConfiguration(), dbPath, DEFAULT_CF_NAME),
-        ssdProfile.getColumnFamilyOptions(new OzoneConfiguration(), dbPath, DEFAULT_CF_NAME));
-    assertNotEquals(diskProfile.getColumnFamilyOptions(conf, dbPath, DEFAULT_CF_NAME),
-        ssdProfile.getColumnFamilyOptions(conf, dbPath, DEFAULT_CF_NAME));
+        diskProfile.getColumnFamilyOptions(new OzoneConfiguration()),
+        ssdProfile.getColumnFamilyOptions(new OzoneConfiguration()));
+    assertNotEquals(diskProfile.getColumnFamilyOptions(conf),
+        ssdProfile.getColumnFamilyOptions(conf));
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -839,12 +839,12 @@ public class TestKeyValueContainer {
     // DBOtions should be different, except SCHEMA-V3
     if (isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
       assertEquals(
-          outProfile1.getDBOptions(null).compactionReadaheadSize(),
-          outProfile2.getDBOptions(null).compactionReadaheadSize());
+          outProfile1.getDBOptions().compactionReadaheadSize(),
+          outProfile2.getDBOptions().compactionReadaheadSize());
     } else {
       assertNotEquals(
-          outProfile1.getDBOptions(null).compactionReadaheadSize(),
-          outProfile2.getDBOptions(null).compactionReadaheadSize());
+          outProfile1.getDBOptions().compactionReadaheadSize(),
+          outProfile2.getDBOptions().compactionReadaheadSize());
     }
   }
 
