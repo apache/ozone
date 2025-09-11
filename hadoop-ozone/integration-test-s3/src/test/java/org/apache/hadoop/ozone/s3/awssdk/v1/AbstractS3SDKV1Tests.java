@@ -1378,6 +1378,40 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     return initMPUPresignUrlRequest;
   }
 
+  @Test
+  public void testPresignedUrlDelete() throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+
+    s3Client.createBucket(bucketName);
+    try (InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
+      s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+    }
+
+    // Set the presigned URL to expire after one hour.
+    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+
+    // Generate the presigned URL for DELETE
+    GeneratePresignedUrlRequest generatePresignedUrlRequest =
+        new GeneratePresignedUrlRequest(bucketName, keyName)
+            .withMethod(HttpMethod.DELETE)
+            .withExpiration(expiration);
+    URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+    // Execute the DELETE request using HttpUrlConnection
+    URL presignedUrl = new URL(url.toExternalForm());
+    HttpURLConnection connection = (HttpURLConnection) presignedUrl.openConnection();
+    connection.setRequestMethod("DELETE");
+    int responseCode = connection.getResponseCode();
+
+    // Verify the response code is 204 (No Content)
+    assertEquals(HttpURLConnection.HTTP_NO_CONTENT, responseCode);
+
+    // Verify the object is deleted
+    assertFalse(s3Client.doesObjectExist(bucketName, keyName));
+  }
+
   /**
    * Tests the functionality to create a snapshot of an Ozone bucket and then read files
    * from the snapshot directory using the S3 SDK.
