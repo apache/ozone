@@ -217,13 +217,12 @@ public class ContainerMerkleTreeWriter {
     private final SortedMap<Long, ChunkMerkleTreeWriter> offset2Chunk;
     private final long blockID;
     private boolean deleted;
-    private long dataChecksum;
+    private Long dataChecksum;
 
     BlockMerkleTreeWriter(long blockID) {
       this.blockID = blockID;
       this.offset2Chunk = new TreeMap<>();
       this.deleted = false;
-      this.dataChecksum = 0;
     }
 
     public void markDeleted(long deletedDataChecksum) {
@@ -247,12 +246,6 @@ public class ContainerMerkleTreeWriter {
       }
     }
 
-    public void addChunks(Collection<ChunkMerkleTreeWriter> chunks) {
-      for (ChunkMerkleTreeWriter chunk: chunks) {
-        offset2Chunk.put(chunk.getOffset(), chunk);
-      }
-    }
-
     public boolean isDeleted() {
       return deleted;
     }
@@ -265,7 +258,7 @@ public class ContainerMerkleTreeWriter {
      */
     public ContainerProtos.BlockMerkleTree toProto() {
       ContainerProtos.BlockMerkleTree.Builder blockTreeBuilder = ContainerProtos.BlockMerkleTree.newBuilder();
-      if (offset2Chunk.isEmpty()) {
+      if (dataChecksum != null) {
         blockTreeBuilder.setDataChecksum(dataChecksum);
       } else {
         setDataChecksumFromChunks(blockTreeBuilder);

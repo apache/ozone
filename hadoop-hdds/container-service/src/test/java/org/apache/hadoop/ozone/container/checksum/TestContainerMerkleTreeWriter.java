@@ -466,9 +466,6 @@ class TestContainerMerkleTreeWriter {
     // Verify container has 2 blocks
     assertEquals(2, result.getBlockMerkleTreeCount());
 
-    assertTrue(result.hasDataChecksum());
-    assertNotEquals(0, result.getDataChecksum());
-
     // Verify both blocks are marked as deleted with no chunks
     ContainerProtos.BlockMerkleTree block1 = result.getBlockMerkleTreeList().stream()
         .filter(b -> b.getBlockID() == blockID1)
@@ -492,9 +489,10 @@ class TestContainerMerkleTreeWriter {
       assertTrue(block2.hasDataChecksum());
       assertNotEquals(0, block2.getDataChecksum());
     } else {
+      // Top level tree checksum should not be populated, but individual blocks will have checksums.
       assertFalse(result.hasDataChecksum());
-      assertFalse(block1.hasDataChecksum());
-      assertFalse(block2.hasDataChecksum());
+      assertTrue(block1.hasDataChecksum());
+      assertTrue(block2.hasDataChecksum());
     }
   }
 
@@ -706,8 +704,8 @@ class TestContainerMerkleTreeWriter {
    */
   @Test
   public void testUpdateMergesTrees() {
-    final long existingLiveBlockID = 6L;
-    final long existingDeletedBlockID = 5L;
+    final long existingLiveBlockID = 5L;
+    final long existingDeletedBlockID = 6L;
     final long existingDeletedChecksum = 555L;
     final long ourLiveBlockID = 7L;
     final long ourDeletedBlockID = 8L;
@@ -734,8 +732,8 @@ class TestContainerMerkleTreeWriter {
 
     // Expect union: our live block + existing deleted block, but not the existing live block
     ContainerProtos.ContainerMerkleTree expected = buildExpectedContainerTree(
-        buildExpectedBlockTree(ourLiveBlockID, buildExpectedChunkTree(ourLiveChunk)),
         buildExpectedDeletedBlockTree(existingDeletedBlockID, existingDeletedChecksum),
+        buildExpectedBlockTree(ourLiveBlockID, buildExpectedChunkTree(ourLiveChunk)),
         buildExpectedDeletedBlockTree(ourDeletedBlockID, ourDeletedChecksum));
     assertTreesSortedAndMatch(expected, result);
   }

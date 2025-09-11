@@ -197,6 +197,25 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   /**
+   * Writes a ContainerMerkleTree proto directly into a container without using a ContainerMerkleTreeWriter.
+   */
+  public static void updateTreeProto(ContainerData data, ContainerProtos.ContainerMerkleTree tree)
+      throws IOException {
+    ContainerProtos.ContainerChecksumInfo checksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerID(data.getContainerID())
+        .setContainerMerkleTree(tree).build();
+    File checksumFile = getContainerChecksumFile(data);
+
+    try (OutputStream outputStream = Files.newOutputStream(checksumFile.toPath())) {
+      checksumInfo.writeTo(outputStream);
+    } catch (IOException ex) {
+      throw new IOException("Error occurred when writing container merkle tree for containerID "
+          + data.getContainerID(), ex);
+    }
+    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
+  }
+
+  /**
    * Introduces missing blocks by removing blocks sequentially from the tree.
    */
   private static void introduceMissingBlocks(ContainerProtos.ContainerMerkleTree.Builder treeBuilder,
