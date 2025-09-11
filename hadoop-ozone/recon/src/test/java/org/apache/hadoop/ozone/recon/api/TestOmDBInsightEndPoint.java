@@ -347,17 +347,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
    */
   @AfterEach
   public void tearDown() throws Exception {
-
-    if (ozoneStorageContainerManager != null) {
-      ozoneStorageContainerManager.stop();
-    }
-
     if (reconOMMetadataManager != null) {
       reconOMMetadataManager.stop();
-    }
-
-    if (omMetadataManager != null) {
-      omMetadataManager.stop();
     }
   }
 

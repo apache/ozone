@@ -33,7 +33,6 @@ public enum ReconLayoutFeature {
   TASK_STATUS_STATISTICS(1, "Recon Task Status Statistics Tracking Introduced"),
   UNHEALTHY_CONTAINER_REPLICA_MISMATCH(2, "Adding replica mismatch state to the unhealthy container table"),
   REPLICATED_SIZE_OF_FILES(3, "Adds replicatedSizeOfFiles to NSSummary"),
-
   // HDDS-13432: Materialize NSSummary totals and rebuild tree on upgrade
   NSSUMMARY_AGGREGATED_TOTALS(4, "Aggregated totals for NSSummary and auto-rebuild on upgrade");
 
