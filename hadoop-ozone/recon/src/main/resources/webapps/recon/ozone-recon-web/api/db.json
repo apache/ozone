@@ -6866,5 +6866,63 @@
     "selectedRowKeys": [
       "b5907812-a5f2-11ea-bb37-0242ac130011"
     ]
+  },
+  "utilization": {
+    "globalStorage": {
+        "totalUsedSpace": 1632526336,
+        "totalFreeSpace": 596013527040,
+        "totalCapacity": 746331226935
+    },
+    "globalNamespace": {
+        "totalUsedSpace": 0,
+        "totalKeys": 0
+    },
+    "usedSpaceBreakdown": {
+      "openKeysBytes": 10000,
+      "committedBytes": 250100,
+      "containerPreAllocated": 1073725932,
+      "deletionPendingBytes": {
+        "total": 3765706484,
+        "byStage": {
+            "DN": {
+                "pendingBytes": 3758096384
+            },
+            "SCM": {
+                "pendingBytes": 3145600
+            },
+            "OM": {
+                "pendingKeyBytes": 1254500,
+                "pendingBytes": 4464500,
+                "pendingDirectoryBytes": 3210000
+            }
+        }
+      }
+    },
+    "dataNodeUsage": [
+      {
+        "uuid": "1477a674-b86c-43b9-ae84-1586c5720125",
+        "capacity": 1080992018248,
+        "used": 4398612,
+        "remaining": 1019728228844,
+        "committed": 1073725932,
+        "pendingDeletion": 1013125932
+      },
+      {
+        "uuid": "c040c145-b44f-42a8-a3a3-b18171c8c01c",
+        "capacity": 1080992018248,
+        "used": 4382720,
+        "remaining": 1019728248832,
+        "committed": 0,
+        "pendingDeletion": 11025932
+      },
+      {
+        "uuid": "1d076fc9-ece2-43e7-9fca-bb1e8646a56d",
+        "capacity": 1080992018248,
+        "used": 4382720,
+        "remaining": 1019728248832,
+        "committed": 1023725932,
+        "pendingDeletion": 21125932
+      }
+    ]
   }
 }

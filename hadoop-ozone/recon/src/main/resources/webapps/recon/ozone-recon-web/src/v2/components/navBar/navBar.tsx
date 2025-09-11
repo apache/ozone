@@ -138,6 +138,12 @@ const NavBar: React.FC<NavBarProps> = ({
       <Link to='/DiskUsage' />
     </Menu.Item>
   ), (
+    <Menu.Item key='/Capacity'
+      icon={<PieChartOutlined />}>
+      <span>Cluster Capacity</span>
+      <Link to='/Capacity' />
+    </Menu.Item>
+  ),(
     isHeatmapEnabled &&
     <Menu.Item key='/Heatmap'
       icon={<LayoutOutlined />}>
