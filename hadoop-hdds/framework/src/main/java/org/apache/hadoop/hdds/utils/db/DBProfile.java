@@ -44,34 +44,41 @@ public enum DBProfile {
     }
 
     @Override
-    public ManagedDBOptions getDBOptions() {
-      ManagedDBOptions dbOptions = new ManagedDBOptions();
-      dbOptions
-          .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
-          .setMaxBackgroundCompactions(4)
-          .setMaxBackgroundFlushes(2)
-          .setBytesPerSync(toLong(StorageUnit.MB.toBytes(1.00)))
-          .setCreateIfMissing(true)
-          .setCreateMissingColumnFamilies(true);
-      return dbOptions;
-    }
-
-    @Override
     public ManagedColumnFamilyOptions getColumnFamilyOptions() {
+      // Write Buffer Size -- set to 128 MB
+      final long writeBufferSize = toLong(StorageUnit.MB.toBytes(128));
+
       ManagedColumnFamilyOptions managedColumnFamilyOptions =
           new ManagedColumnFamilyOptions();
+
       managedColumnFamilyOptions.setLevelCompactionDynamicLevelBytes(true)
-          .setWriteBufferSize(toLong(StorageUnit.MB.toBytes(128)))
-          .setTableFormatConfig(createDefaultBlockBasedTableConfig());
+          .setWriteBufferSize(writeBufferSize)
+          .setTableFormatConfig(getBlockBasedTableConfig());
+
       return managedColumnFamilyOptions;
     }
 
     @Override
-    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
-      return createDefaultBlockBasedTableConfig();
+    public ManagedDBOptions getDBOptions() {
+      final int maxBackgroundCompactions = 4;
+      final int maxBackgroundFlushes = 2;
+      final long bytesPerSync = toLong(StorageUnit.MB.toBytes(1.00));
+      final boolean createIfMissing = true;
+      final boolean createMissingColumnFamilies = true;
+      ManagedDBOptions dbOptions = new ManagedDBOptions();
+      dbOptions
+          .setIncreaseParallelism(Runtime.getRuntime().availableProcessors())
+          .setMaxBackgroundCompactions(maxBackgroundCompactions)
+          .setMaxBackgroundFlushes(maxBackgroundFlushes)
+          .setBytesPerSync(bytesPerSync)
+          .setCreateIfMissing(createIfMissing)
+          .setCreateMissingColumnFamilies(createMissingColumnFamilies);
+      return dbOptions;
     }
 
-    private ManagedBlockBasedTableConfig createDefaultBlockBasedTableConfig() {
+    @Override
+    public ManagedBlockBasedTableConfig getBlockBasedTableConfig() {
+      // Set BlockCacheSize to 256 MB. This should not be an issue for HADOOP.
       final long blockCacheSize = toLong(StorageUnit.MB.toBytes(256.00));
 
       // Set the Default block size to 16KB
@@ -120,7 +127,8 @@ public enum DBProfile {
 
     @Override
     public ManagedDBOptions getDBOptions() {
-      return SSD.getDBOptions();
+      ManagedDBOptions dbOptions = SSD.getDBOptions();
+      return dbOptions;
     }
 
     @Override

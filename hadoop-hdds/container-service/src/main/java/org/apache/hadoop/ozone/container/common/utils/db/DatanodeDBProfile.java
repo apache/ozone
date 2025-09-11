@@ -46,7 +46,8 @@ public abstract class DatanodeDBProfile {
    * Returns ColumnFamilyOptions to be used for rocksDB column families in
    * datanodes.
    */
-  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions(ConfigurationSource config);
+  public abstract ManagedColumnFamilyOptions getColumnFamilyOptions(
+      ConfigurationSource config);
 
   /**
    * Returns DatanodeDBProfile for corresponding storage type.
@@ -77,7 +78,8 @@ public abstract class DatanodeDBProfile {
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions(ConfigurationSource config) {
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(
+        ConfigurationSource config) {
       return SSD_STORAGE_BASED_PROFILE.getColumnFamilyOptions(config);
     }
   }
@@ -95,7 +97,8 @@ public abstract class DatanodeDBProfile {
     }
 
     @Override
-    public ManagedColumnFamilyOptions getColumnFamilyOptions(ConfigurationSource config) {
+    public ManagedColumnFamilyOptions getColumnFamilyOptions(
+        ConfigurationSource config) {
       return DISK_STORAGE_BASED_PROFILE.getColumnFamilyOptions(config);
     }
   }
@@ -116,15 +119,16 @@ public abstract class DatanodeDBProfile {
       return baseProfile.getDBOptions();
     }
 
-    private ManagedColumnFamilyOptions getColumnFamilyOptions(ConfigurationSource config) {
-      final MemoizedSupplier<ManagedColumnFamilyOptions> supplier = MemoizedSupplier.valueOf(() ->
-          createColumnFamilyOptions(config)
-      );
+    private ManagedColumnFamilyOptions getColumnFamilyOptions(
+        ConfigurationSource config) {
+      final MemoizedSupplier<ManagedColumnFamilyOptions> supplier =
+          MemoizedSupplier.valueOf(() -> createColumnFamilyOptions(config));
       cfOpts.compareAndSet(null, supplier);
       return cfOpts.get().get();
     }
 
-    private ManagedColumnFamilyOptions createColumnFamilyOptions(ConfigurationSource config) {
+    private ManagedColumnFamilyOptions createColumnFamilyOptions(
+        ConfigurationSource config) {
       ManagedColumnFamilyOptions options =
           baseProfile.getColumnFamilyOptions();
       options.setReused(true);
@@ -132,9 +136,13 @@ public abstract class DatanodeDBProfile {
           getBlockBasedTableConfig(config));
     }
 
-    private ManagedBlockBasedTableConfig getBlockBasedTableConfig(ConfigurationSource config) {
+    private ManagedBlockBasedTableConfig getBlockBasedTableConfig(
+        ConfigurationSource config) {
       ManagedBlockBasedTableConfig blockBasedTableConfig =
           baseProfile.getBlockBasedTableConfig();
+      if (config == null) {
+        return blockBasedTableConfig;
+      }
 
       long cacheSize = (long) config
           .getStorageSize(HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
@@ -144,6 +152,5 @@ public abstract class DatanodeDBProfile {
           new ManagedLRUCache(cacheSize));
       return blockBasedTableConfig;
     }
-
   }
 }

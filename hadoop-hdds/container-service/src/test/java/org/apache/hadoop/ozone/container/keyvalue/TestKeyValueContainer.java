@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
@@ -650,7 +649,7 @@ public class TestKeyValueContainer {
     assertFalse(keyValueContainer.getContainerFile().exists(),
         "Container File still exists");
 
-    if (isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       assertTrue(keyValueContainer.getContainerDBFile().exists());
     } else {
       assertFalse(keyValueContainer.getContainerDBFile().exists(),
@@ -769,19 +768,18 @@ public class TestKeyValueContainer {
     for (Supplier<DatanodeDBProfile> dbProfileSupplier : new Supplier[] {
         DatanodeDBProfile.Disk::new, DatanodeDBProfile.SSD::new }) {
       // ColumnFamilyOptions should be same across configurations
-      OzoneConfiguration config = new OzoneConfiguration();
       ColumnFamilyOptions columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(config);
+          .getColumnFamilyOptions(new OzoneConfiguration());
       ColumnFamilyOptions columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(config);
+          .getColumnFamilyOptions(new OzoneConfiguration());
       assertEquals(columnFamilyOptions1, columnFamilyOptions2);
 
       // ColumnFamilyOptions should be same when queried multiple times
       // for a particulat configuration
       columnFamilyOptions1 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(config);
+          .getColumnFamilyOptions(conf);
       columnFamilyOptions2 = dbProfileSupplier.get()
-          .getColumnFamilyOptions(config);
+          .getColumnFamilyOptions(conf);
       assertEquals(columnFamilyOptions1, columnFamilyOptions2);
     }
 
@@ -832,7 +830,7 @@ public class TestKeyValueContainer {
     }
 
     // DBOtions should be different, except SCHEMA-V3
-    if (isSameSchemaVersion(schemaVersion, SCHEMA_V3)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       assertEquals(
           outProfile1.getDBOptions().compactionReadaheadSize(),
           outProfile2.getDBOptions().compactionReadaheadSize());
@@ -876,7 +874,7 @@ public class TestKeyValueContainer {
   void testAutoCompactionSmallSstFile(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    assumeTrue(isSameSchemaVersion(schemaVersion, SCHEMA_V3));
+    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // Create a new HDDS volume
     String volumeDirPath =
         Files.createDirectory(folder.toPath().resolve("volumeDir")).toFile()
@@ -955,7 +953,7 @@ public class TestKeyValueContainer {
 
       // Check sst files
       DatanodeStore dnStore = DatanodeStoreCache.getInstance().getDB(
-          hddsVolume.getDbParentDir() + "/" + CONTAINER_DB_NAME,
+          hddsVolume.getDbParentDir() + "/" + OzoneConsts.CONTAINER_DB_NAME,
           CONF).getStore();
       List<LiveFileMetaData> fileMetaDataList1 =
           ((RDBStore) (dnStore.getStore())).getDb().getLiveFilesMetaData();
