@@ -243,7 +243,7 @@ public class SstFileSetReader {
     private final ClosableIterator<T> iterator;
     private T currentKey;
 
-    HeapEntryWithFileIdx(ClosableIterator<T> iterator, int fileIndex) {
+    HeapEntryWithFileIdx(ClosableIterator<T> iterator) {
       this.iterator = iterator;
       advance();
     }
@@ -322,10 +322,9 @@ public class SstFileSetReader {
 
     private void initMinHeap(Collection<String> files) {
       try {
-        int fileIndex = 0;
         for (String file : files) {
           ClosableIterator<T> iterator = getKeyIteratorForFile(file);
-          HeapEntryWithFileIdx<T> entry = new HeapEntryWithFileIdx<>(iterator, fileIndex++);
+          HeapEntryWithFileIdx<T> entry = new HeapEntryWithFileIdx<>(iterator);
 
           if (entry.getCurrentKey() != null) {
             minHeap.offer(entry);
