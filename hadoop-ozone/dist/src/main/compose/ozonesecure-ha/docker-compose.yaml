@@ -159,6 +159,25 @@ services:
     networks:
       ozone_net:
         ipv4_address: 172.25.0.113
+  om4:
+    hostname: om4
+    <<: *common-config
+    ports:
+      - 9886:9874
+      - 9896:9872
+      #- 18003:18003
+    environment:
+      WAITFOR: scm3.org:9894
+      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      OZONE_OPTS:
+    command: ["/opt/hadoop/bin/ozone","om"]
+    extra_hosts:
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.114
   httpfs:
     hostname: httpfs
     <<: *common-config

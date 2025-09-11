@@ -204,11 +204,11 @@ public final class OMRequestTestUtils {
    * @throws Exception
    */
   @SuppressWarnings("parameterNumber")
-  public static void addKeyToTable(boolean openKeyTable, String volumeName,
+  public static OmKeyInfo addKeyToTable(boolean openKeyTable, String volumeName,
       String bucketName, String keyName, long clientID,
       ReplicationConfig replicationConfig,
       OMMetadataManager omMetadataManager) throws Exception {
-    addKeyToTable(openKeyTable, false, volumeName, bucketName, keyName,
+    return addKeyToTable(openKeyTable, false, volumeName, bucketName, keyName,
         clientID, replicationConfig, 0L, omMetadataManager);
   }
 
@@ -265,7 +265,7 @@ public final class OMRequestTestUtils {
    * @throws Exception
    */
   @SuppressWarnings("parameternumber")
-  public static void addKeyToTable(boolean openKeyTable, boolean addToCache,
+  public static OmKeyInfo addKeyToTable(boolean openKeyTable, boolean addToCache,
       String volumeName, String bucketName, String keyName, long clientID,
       ReplicationConfig replicationConfig, long trxnLogIndex,
       OMMetadataManager omMetadataManager) throws Exception {
@@ -275,6 +275,8 @@ public final class OMRequestTestUtils {
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
         omMetadataManager);
+
+    return omKeyInfo;
   }
 
   /**
@@ -480,7 +482,7 @@ public final class OMRequestTestUtils {
    * @param omMetadataManager
    */
   @SuppressWarnings("parameterNumber")
-  public static void addKeyToTableCache(String volumeName,
+  public static OmKeyInfo addKeyToTableCache(String volumeName,
       String bucketName,
       String keyName,
       ReplicationConfig replicationConfig,
@@ -492,6 +494,8 @@ public final class OMRequestTestUtils {
     omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
         new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName)), CacheValue.get(1L, omKeyInfo));
+
+    return omKeyInfo;
   }
 
   /**

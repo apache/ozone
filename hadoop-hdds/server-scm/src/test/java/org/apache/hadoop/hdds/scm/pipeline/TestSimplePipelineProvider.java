@@ -47,7 +47,6 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestSimplePipelineProvider {
 
-  private NodeManager nodeManager;
   private PipelineProvider provider;
   private PipelineStateManager stateManager;
   @TempDir
@@ -56,7 +55,7 @@ public class TestSimplePipelineProvider {
 
   @BeforeEach
   public void init() throws Exception {
-    nodeManager = new MockNodeManager(true, 10);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
