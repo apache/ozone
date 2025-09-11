@@ -81,7 +81,6 @@ public class TestBlockDeletionService {
   private static StorageContainerLocationProtocol scmClient;
   private static OzoneBucket bucket;
   private static SCMPerformanceMetrics metrics;
-  private static InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> scmFinalizationExecutor;
 
   public static Stream<Arguments> replicationConfigProvider() {
     return Stream.of(
@@ -100,7 +99,8 @@ public class TestBlockDeletionService {
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500, TimeUnit.MILLISECONDS);
     conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HBASE_SUPPORT.layoutVersion());
 
-    scmFinalizationExecutor = new InjectedUpgradeFinalizationExecutor<>();
+    InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
+        scmFinalizationExecutor = new InjectedUpgradeFinalizationExecutor<>();
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setUpgradeFinalizationExecutor(scmFinalizationExecutor);
 

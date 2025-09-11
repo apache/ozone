@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -31,7 +29,6 @@ import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -43,9 +40,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -59,7 +53,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.recon.api.OMDBInsightEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
@@ -71,9 +64,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,18 +81,17 @@ public class TestReconInsightsForDeletedDirectories {
   private static FileSystem fs;
   private static OzoneClient client;
   private static ReconService recon;
-  private static OzoneConfiguration conf;
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1000000);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     recon = new ReconService(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
+        .setNumDatanodes(3)
         .addService(recon)
         .build();
     cluster.waitForClusterToBeReady();
@@ -120,19 +110,8 @@ public class TestReconInsightsForDeletedDirectories {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
-  }
 
-  /**
-   * Provides a list of replication configurations (RATIS and EC)
-   * to be used for parameterized tests.
-   *
-   * @return List of replication configurations as Arguments.
-   */
-  static List<Arguments> replicationConfigs() {
-    return Arrays.asList(
-        Arguments.of(ReplicationConfig.fromTypeAndFactor(RATIS, THREE)),
-        Arguments.of(new ECReplicationConfig("RS-3-2-1024k"))
-    );
+    fs = FileSystem.get(conf);
   }
 
   @AfterAll
@@ -141,6 +120,7 @@ public class TestReconInsightsForDeletedDirectories {
     if (cluster != null) {
       cluster.shutdown();
     }
+    IOUtils.closeQuietly(fs);
   }
 
   @AfterEach
@@ -152,8 +132,7 @@ public class TestReconInsightsForDeletedDirectories {
         fs.delete(fileStatus.getPath(), true);
       }
     });
-
-    IOUtils.closeQuietly(fs);
+    cleanupTables();
   }
 
   /**
@@ -165,16 +144,9 @@ public class TestReconInsightsForDeletedDirectories {
    *      ├── ...
    *      └── file10
    */
-  @ParameterizedTest
-  @MethodSource("replicationConfigs")
-  public void testGetDeletedDirectoryInfo(ReplicationConfig replicationConfig)
+  @Test
+  public void testGetDeletedDirectoryInfo()
       throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        new DefaultReplicationConfig(replicationConfig));
-    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
-        bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    fs = FileSystem.get(conf);
 
     // Create a directory structure with 10 files in dir1.
     Path dir1 = new Path("/dir1");
@@ -220,7 +192,7 @@ public class TestReconInsightsForDeletedDirectories {
     // Retrieve the object ID of dir1 from directory table.
     Long directoryObjectId = null;
     try (Table.KeyValueIterator<?, OmDirectoryInfo> iterator
-            = reconDirTable.iterator()) {
+             = reconDirTable.iterator()) {
       if (iterator.hasNext()) {
         directoryObjectId = iterator.next().getValue().getObjectID();
       }
@@ -238,7 +210,6 @@ public class TestReconInsightsForDeletedDirectories {
       // Assert that the directory dir1 has 10 sub-files and size of 1000 bytes.
       assertEquals(10, summary.getNumOfFiles());
       assertEquals(10, summary.getSizeOfFiles());
-      assertEquals(QuotaUtil.getReplicatedSize(10, replicationConfig), summary.getReplicatedSizeOfFiles());
     }
 
     // Delete the entire directory dir1.
@@ -266,10 +237,6 @@ public class TestReconInsightsForDeletedDirectories {
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 10.
     assertEquals(10, entity.getUnreplicatedDataSize());
-    assertEquals(QuotaUtil.getReplicatedSize(10, replicationConfig), entity.getReplicatedDataSize());
-
-    // Cleanup the tables.
-    cleanupTables();
   }
 
 
@@ -284,16 +251,9 @@ public class TestReconInsightsForDeletedDirectories {
    *      │   │   └── file3
    *
    */
-  @ParameterizedTest
-  @MethodSource("replicationConfigs")
-  public void testGetDeletedDirectoryInfoForNestedDirectories(ReplicationConfig replicationConfig)
+  @Test
+  public void testGetDeletedDirectoryInfoForNestedDirectories()
       throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        new DefaultReplicationConfig(replicationConfig));
-    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
-        bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    fs = FileSystem.get(conf);
 
     // Create a directory structure with 10 files and 3 nested directories.
     Path path = new Path("/dir1/dir2/dir3");
@@ -363,10 +323,6 @@ public class TestReconInsightsForDeletedDirectories {
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 3.
     assertEquals(3, entity.getUnreplicatedDataSize());
-    assertEquals(QuotaUtil.getReplicatedSize(3, replicationConfig), entity.getReplicatedDataSize());
-
-    // Cleanup the tables.
-    cleanupTables();
   }
 
   /**
@@ -390,18 +346,9 @@ public class TestReconInsightsForDeletedDirectories {
    *        ├── ...
    *        └── file10
    */
-  @ParameterizedTest
-  @MethodSource("replicationConfigs")
-  public void testGetDeletedDirectoryInfoWithMultipleSubdirectories(ReplicationConfig replicationConfig)
+  @Test
+  public void testGetDeletedDirectoryInfoWithMultipleSubdirectories()
       throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        new DefaultReplicationConfig(replicationConfig));
-    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
-        bucket.getVolumeName());
-    // Set the fs.defaultFS and start the filesystem
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    fs = FileSystem.get(conf);
-
     int numSubdirectories = 10;
     int filesPerSubdirectory = 10;
 
@@ -435,10 +382,6 @@ public class TestReconInsightsForDeletedDirectories {
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 100.
     assertEquals(100, entity.getUnreplicatedDataSize());
-    assertEquals(QuotaUtil.getReplicatedSize(100, replicationConfig), entity.getReplicatedDataSize());
-
-    // Cleanup the tables.
-    cleanupTables();
   }
 
   private void createLargeDirectory(Path dir, int numSubdirs,
@@ -532,22 +475,22 @@ public class TestReconInsightsForDeletedDirectories {
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
-    
+
     // Wait for async processing to complete using a latch approach
     waitForAsyncProcessingToComplete();
   }
-  
+
   private void waitForAsyncProcessingToComplete() {
     try {
       // Create a latch to wait for async processing
       CountDownLatch latch = new CountDownLatch(1);
-      
+
       // Use a separate thread to check completion and countdown the latch
       Thread checkThread = new Thread(() -> {
         try {
           // Wait a bit for async processing to start
           Thread.sleep(100);
-          
+
           // Check for completion by monitoring buffer state
           int maxRetries = 50; // 5 seconds total
           for (int i = 0; i < maxRetries; i++) {
@@ -563,14 +506,14 @@ public class TestReconInsightsForDeletedDirectories {
           latch.countDown();
         }
       });
-      
+
       checkThread.start();
-      
+
       // Wait for the latch with timeout
       if (!latch.await(10, TimeUnit.SECONDS)) {
         LOG.warn("Timed out waiting for async processing to complete");
       }
-      
+
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       LOG.warn("Interrupted while waiting for async processing");

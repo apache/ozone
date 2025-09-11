@@ -45,13 +45,12 @@ import org.junit.jupiter.api.Test;
  */
 public class TestScmBlockLocationProtocolClientSideTranslatorPB {
 
-  private SCMBlockLocationFailoverProxyProvider mockProxyProvider;
   private ScmBlockLocationProtocolPB mockRpcProxy;
   private ScmBlockLocationProtocolClientSideTranslatorPB translator;
 
   @BeforeEach
   public void setUp() {
-    mockProxyProvider = mock(SCMBlockLocationFailoverProxyProvider.class);
+    SCMBlockLocationFailoverProxyProvider mockProxyProvider = mock(SCMBlockLocationFailoverProxyProvider.class);
     mockRpcProxy = mock(ScmBlockLocationProtocolPB.class);
     when(mockProxyProvider.getInterface()).thenReturn(ScmBlockLocationProtocolPB.class);
     when(mockProxyProvider.getProxy()).thenReturn(new FailoverProxyProvider.ProxyInfo<>(mockRpcProxy, null));

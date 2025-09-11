@@ -68,9 +68,7 @@ public class TestReplicatedSizeOfFilesUpgradeAction {
     try (MockedStatic<ReconGuiceServletContextListener> mockStaticContext =
              mockStatic(ReconGuiceServletContextListener.class)) {
       mockStaticContext.when(ReconGuiceServletContextListener::getStaticInjector).thenReturn(mockInjector);
-      when(mockInjector.getInstance(ReconNamespaceSummaryManager.class)).thenReturn(mockNsSummaryManager);
-      when(mockInjector.getInstance(ReconOMMetadataManager.class)).thenReturn(mockOmMetadataManager);
-
+      when(mockInjector.getInstance(ReconTaskController.class)).thenReturn(mocReconTaskController);
       upgradeAction.execute(mockDataSource);
 
       // Verify that rebuildNSSummaryTree was called exactly once.
@@ -83,8 +81,7 @@ public class TestReplicatedSizeOfFilesUpgradeAction {
     try (MockedStatic<ReconGuiceServletContextListener> mockStaticContext =
              mockStatic(ReconGuiceServletContextListener.class)) {
       mockStaticContext.when(ReconGuiceServletContextListener::getStaticInjector).thenReturn(mockInjector);
-      when(mockInjector.getInstance(ReconNamespaceSummaryManager.class)).thenReturn(mockNsSummaryManager);
-      when(mockInjector.getInstance(ReconOMMetadataManager.class)).thenReturn(mockOmMetadataManager);
+      when(mockInjector.getInstance(ReconTaskController.class)).thenReturn(mocReconTaskController);
 
       // Simulate a failure during the rebuild process
       doThrow(new RuntimeException("Simulated rebuild error")).when(mocReconTaskController)

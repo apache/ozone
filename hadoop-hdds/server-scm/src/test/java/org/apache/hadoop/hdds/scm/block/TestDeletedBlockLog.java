@@ -106,7 +106,6 @@ public class TestDeletedBlockLog {
   @TempDir
   private File testDir;
   private ContainerManager containerManager;
-  private BlockManager blockManager;
   private Table<ContainerID, ContainerInfo> containerTable;
   private StorageContainerManager scm;
   private List<DatanodeDetails> dnList;
@@ -133,7 +132,7 @@ public class TestDeletedBlockLog {
     containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
         new SCMHADBTransactionBufferStub(scm.getScmMetadataStore().getStore());
-    blockManager = mock(BlockManager.class);
+    BlockManager blockManager = mock(BlockManager.class);
     when(blockManager.getDeletedBlockLog()).thenReturn(deletedBlockLog);
     metrics = ScmBlockDeletingServiceMetrics.create(blockManager);
     deletedBlockLog = new DeletedBlockLogImpl(conf,
