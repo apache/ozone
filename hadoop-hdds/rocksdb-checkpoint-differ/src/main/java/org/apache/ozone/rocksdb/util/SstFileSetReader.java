@@ -242,12 +242,9 @@ public class SstFileSetReader {
       implements Comparable<HeapEntryWithFileIdx<T>>, Closeable {
     private final ClosableIterator<T> iterator;
     private T currentKey;
-    // To ensure stable ordering for identical keys
-    private final int fileIndex;
 
     HeapEntryWithFileIdx(ClosableIterator<T> iterator, int fileIndex) {
       this.iterator = iterator;
-      this.fileIndex = fileIndex;
       advance();
     }
 
@@ -281,13 +278,7 @@ public class SstFileSetReader {
       if (other.currentKey == null) {
         return -1;
       }
-
-      int result = this.currentKey.compareTo(other.currentKey);
-      if (result == 0) {
-        // For identical keys, prefer the one from the file with the higher index
-        return Integer.compare(other.fileIndex, this.fileIndex);
-      }
-      return result;
+      return this.currentKey.compareTo(other.currentKey);
     }
 
     @Override
@@ -305,7 +296,7 @@ public class SstFileSetReader {
 
     @Override
     public int hashCode() {
-      return Objects.hash(iterator, currentKey, fileIndex);
+      return Objects.hash(iterator, currentKey);
     }
   }
 
