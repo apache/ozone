@@ -42,7 +42,8 @@ public enum HDDSLayoutFeature implements LayoutFeature {
                                      "to DatanodeDetails."),
   HBASE_SUPPORT(8, "Datanode RocksDB Schema Version 3 has an extra table " +
           "for the last chunk of blocks to support HBase.)"),
-  DATA_DISTRIBUTION(9, "Enhanced block deletion function for data distribution feature.");
+  WITNESSED_CONTAINER_DB_PROTO_VALUE(9, "ContainerID table schema to use value type as proto"),
+  DATA_DISTRIBUTION(10, "Enhanced block deletion function for data distribution feature.");
 
   //////////////////////////////  //////////////////////////////
 

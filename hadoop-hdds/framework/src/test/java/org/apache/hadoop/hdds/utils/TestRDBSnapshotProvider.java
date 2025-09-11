@@ -72,7 +72,6 @@ public class TestRDBSnapshotProvider {
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
 
   private RDBStore rdbStore = null;
-  private ManagedDBOptions options = null;
   private Set<TableConfig> configSet;
   private RDBSnapshotProvider rdbSnapshotProvider;
   private File testDir;
@@ -85,7 +84,7 @@ public class TestRDBSnapshotProvider {
   public void init(@TempDir File tempDir) throws Exception {
     CodecBuffer.enableLeakDetection();
 
-    options = getNewDBOptions();
+    ManagedDBOptions options = getNewDBOptions();
     configSet = new HashSet<>();
     for (String name : families) {
       TableConfig newConfig = new TableConfig(name,
@@ -116,9 +115,11 @@ public class TestRDBSnapshotProvider {
                 concat(String.valueOf(a.length())))
             .collect(Collectors.toList()));
         try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
-          writeDBCheckpointToStream(dbCheckpoint, outputStream,
-              new HashSet<>(HAUtils.getExistingSstFiles(
-                  rdbSnapshotProvider.getCandidateDir())));
+          Set<String> existingSstFiles = HAUtils.getExistingFiles(rdbSnapshotProvider.getCandidateDir())
+              .stream()
+              .filter(fName -> fName.endsWith(".sst") && !fName.equals(".sst"))
+              .collect(Collectors.toSet());
+          writeDBCheckpointToStream(dbCheckpoint, outputStream, existingSstFiles);
         }
       }
     };
@@ -141,7 +142,7 @@ public class TestRDBSnapshotProvider {
     assertTrue(candidateDir.exists());
 
     DBCheckpoint checkpoint;
-    int before = HAUtils.getExistingSstFiles(
+    int before = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertEquals(0, before);
 
@@ -149,12 +150,12 @@ public class TestRDBSnapshotProvider {
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
     File checkpointDir = checkpoint.getCheckpointLocation().toFile();
     assertEquals(candidateDir, checkpointDir);
-    int first = HAUtils.getExistingSstFiles(
+    int first = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
 
     // Get second snapshot
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
-    int second = HAUtils.getExistingSstFiles(
+    int second = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertThat(second).withFailMessage("The second snapshot should have more SST files")
         .isGreaterThan(first);
@@ -164,7 +165,7 @@ public class TestRDBSnapshotProvider {
 
     // Get third snapshot
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
-    int third = HAUtils.getExistingSstFiles(
+    int third = HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
     assertThat(third).withFailMessage("The third snapshot should have more SST files")
         .isGreaterThan(second);
@@ -173,7 +174,7 @@ public class TestRDBSnapshotProvider {
 
     // Test cleanup candidateDB
     rdbSnapshotProvider.init();
-    assertEquals(0, HAUtils.getExistingSstFiles(
+    assertEquals(0, HAUtils.getExistingFiles(
         rdbSnapshotProvider.getCandidateDir()).size());
   }
 

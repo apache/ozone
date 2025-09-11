@@ -207,14 +207,19 @@ public final class ContainerTestUtils {
     return new KeyValueContainer(kvData, new OzoneConfiguration());
   }
 
+  public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
+      String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics) {
+    return getKeyValueHandler(config, datanodeId, contSet, volSet, metrics, new ContainerChecksumTreeManager(config));
+  }
+
   /**
    * Constructs an instance of KeyValueHandler that can be used for testing.
    * This instance can be used for tests that do not need an ICR sender or {@link ContainerChecksumTreeManager}.
    */
   public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
-      String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics) {
-    return new KeyValueHandler(config, datanodeId, contSet, volSet, metrics, c -> { },
-        new ContainerChecksumTreeManager(config));
+      String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
+      ContainerChecksumTreeManager checksumTreeManager) {
+    return new KeyValueHandler(config, datanodeId, contSet, volSet, metrics, c -> { }, checksumTreeManager);
   }
 
   /**
@@ -225,6 +230,12 @@ public final class ContainerTestUtils {
   public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
       String datanodeId, ContainerSet contSet, VolumeSet volSet) {
     return getKeyValueHandler(config, datanodeId, contSet, volSet, ContainerMetrics.create(config));
+  }
+
+  public static KeyValueHandler getKeyValueHandler(ConfigurationSource config,
+      String datanodeId, ContainerSet contSet, VolumeSet volSet, ContainerChecksumTreeManager checksumTreeManager) {
+    return getKeyValueHandler(config, datanodeId, contSet, volSet, ContainerMetrics.create(config),
+        checksumTreeManager);
   }
 
   public static HddsDispatcher getHddsDispatcher(OzoneConfiguration conf,

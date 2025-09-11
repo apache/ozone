@@ -40,4 +40,11 @@ public class ReconGuiceServletContextListener
   static void setInjector(Injector inj) {
     injector = inj;
   }
+
+  /**
+   * Expose injector for internal upgrade actions that run outside Jersey.
+   */
+  public static Injector getGlobalInjector() {
+    return injector;
+  }
 }

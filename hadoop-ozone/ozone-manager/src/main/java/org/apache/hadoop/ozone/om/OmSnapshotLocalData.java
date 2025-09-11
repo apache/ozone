@@ -17,16 +17,22 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import static java.util.Collections.unmodifiableList;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.ozone.compaction.log.SstFileInfo;
+import org.rocksdb.LiveFileMetaData;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -35,7 +41,8 @@ import org.yaml.snakeyaml.Yaml;
  */
 public abstract class OmSnapshotLocalData {
 
-  // Version of the snapshot local data. A valid version shall be greater than 0.
+  // Version of the snapshot local data. 0 indicates uncompacted snapshot.
+  // compacted snapshots will have version > 0.
   private int version;
 
   // Checksum of the YAML representation
@@ -44,18 +51,18 @@ public abstract class OmSnapshotLocalData {
   // Whether SST is filtered
   private boolean isSSTFiltered;
 
-  // Map of Table to uncompacted SST file list on snapshot create
-  private Map<String, List<String>> uncompactedSSTFileList;
-
   // Time of last compaction, in epoch milliseconds
   private long lastCompactionTime;
 
   // Whether the snapshot needs compaction
   private boolean needsCompaction;
 
-  // Map of version to compacted SST file list
-  // Map<version, Map<Table, sstFileList>>
-  private Map<Integer, Map<String, List<String>>> compactedSSTFileList;
+  // Previous snapshotId based on which the snapshot local data is built.
+  private UUID previousSnapshotId;
+
+  // Map of version to VersionMeta, using linkedHashMap since the order of the map needs to be deterministic for
+  // checksum computation.
+  private final LinkedHashMap<Integer, VersionMeta> versionSstFileInfos;
 
   public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
   private static final String DUMMY_CHECKSUM = new String(new byte[64], CHARSET_ENCODING);
@@ -63,13 +70,15 @@ public abstract class OmSnapshotLocalData {
   /**
    * Creates a OmSnapshotLocalData object with default values.
    */
-  public OmSnapshotLocalData() {
+  public OmSnapshotLocalData(List<LiveFileMetaData> uncompactedSSTFileList, UUID previousSnapshotId) {
     this.isSSTFiltered = false;
-    this.uncompactedSSTFileList = new HashMap<>();
     this.lastCompactionTime = 0L;
     this.needsCompaction = false;
-    this.compactedSSTFileList = new HashMap<>();
+    this.versionSstFileInfos = new LinkedHashMap<>();
+    versionSstFileInfos.put(0,
+        new VersionMeta(0, uncompactedSSTFileList.stream().map(SstFileInfo::new).collect(Collectors.toList())));
     this.version = 0;
+    this.previousSnapshotId = previousSnapshotId;
     setChecksumTo0ByteArray();
   }
 
@@ -84,31 +93,11 @@ public abstract class OmSnapshotLocalData {
     this.needsCompaction = source.needsCompaction;
     this.checksum = source.checksum;
     this.version = source.version;
-
-    // Deep copy for uncompactedSSTFileList
-    this.uncompactedSSTFileList = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry :
-        source.uncompactedSSTFileList.entrySet()) {
-      this.uncompactedSSTFileList.put(
-          entry.getKey(),
-          Lists.newArrayList(entry.getValue()));
-    }
+    this.previousSnapshotId = source.previousSnapshotId;
 
     // Deep copy for compactedSSTFileList
-    this.compactedSSTFileList = new HashMap<>();
-    for (Map.Entry<Integer, Map<String, List<String>>> versionEntry :
-        source.compactedSSTFileList.entrySet()) {
-      Map<String, List<String>> tableMap = new HashMap<>();
-
-      for (Map.Entry<String, List<String>> tableEntry :
-          versionEntry.getValue().entrySet()) {
-        tableMap.put(
-            tableEntry.getKey(),
-            Lists.newArrayList(tableEntry.getValue()));
-      }
-
-      this.compactedSSTFileList.put(versionEntry.getKey(), tableMap);
-    }
+    this.versionSstFileInfos = new LinkedHashMap<>();
+    setVersionSstFileInfos(source.versionSstFileInfos);
   }
 
   /**
@@ -125,34 +114,6 @@ public abstract class OmSnapshotLocalData {
    */
   public void setSstFiltered(boolean sstFiltered) {
     this.isSSTFiltered = sstFiltered;
-  }
-
-  /**
-   * Returns the uncompacted SST file list.
-   * @return Map of Table to uncompacted SST file list
-   */
-  public Map<String, List<String>> getUncompactedSSTFileList() {
-    return Collections.unmodifiableMap(this.uncompactedSSTFileList);
-  }
-
-  /**
-   * Sets the uncompacted SST file list.
-   * @param uncompactedSSTFileList Map of Table to uncompacted SST file list
-   */
-  public void setUncompactedSSTFileList(
-      Map<String, List<String>> uncompactedSSTFileList) {
-    this.uncompactedSSTFileList.clear();
-    this.uncompactedSSTFileList.putAll(uncompactedSSTFileList);
-  }
-
-  /**
-   * Adds an entry to the uncompacted SST file list.
-   * @param table Table name
-   * @param sstFile SST file name
-   */
-  public void addUncompactedSSTFile(String table, String sstFile) {
-    this.uncompactedSSTFileList.computeIfAbsent(table, k -> Lists.newArrayList())
-        .add(sstFile);
   }
 
   /**
@@ -191,30 +152,34 @@ public abstract class OmSnapshotLocalData {
    * Returns the compacted SST file list.
    * @return Map of version to compacted SST file list
    */
-  public Map<Integer, Map<String, List<String>>> getCompactedSSTFileList() {
-    return Collections.unmodifiableMap(this.compactedSSTFileList);
+  public Map<Integer, VersionMeta> getVersionSstFileInfos() {
+    return Collections.unmodifiableMap(this.versionSstFileInfos);
   }
 
   /**
    * Sets the compacted SST file list.
-   * @param compactedSSTFileList Map of version to compacted SST file list
+   * @param versionSstFileInfos Map of version to compacted SST file list
    */
-  public void setCompactedSSTFileList(
-      Map<Integer, Map<String, List<String>>> compactedSSTFileList) {
-    this.compactedSSTFileList.clear();
-    this.compactedSSTFileList.putAll(compactedSSTFileList);
+  public void setVersionSstFileInfos(Map<Integer, VersionMeta> versionSstFileInfos) {
+    this.versionSstFileInfos.clear();
+    this.versionSstFileInfos.putAll(versionSstFileInfos);
+  }
+
+  public UUID getPreviousSnapshotId() {
+    return previousSnapshotId;
+  }
+
+  public void setPreviousSnapshotId(UUID previousSnapshotId) {
+    this.previousSnapshotId = previousSnapshotId;
   }
 
   /**
    * Adds an entry to the compacted SST file list.
-   * @param ver Version number (TODO: to be clarified)
-   * @param table Table name
-   * @param sstFile SST file name
+   * @param sstFiles SST file name
    */
-  public void addCompactedSSTFile(Integer ver, String table, String sstFile) {
-    this.compactedSSTFileList.computeIfAbsent(ver, k -> Maps.newHashMap())
-        .computeIfAbsent(table, k -> Lists.newArrayList())
-        .add(sstFile);
+  public void addVersionSSTFileInfos(List<SstFileInfo> sstFiles, int previousSnapshotVersion) {
+    version++;
+    this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles));
   }
 
   /**
@@ -284,5 +249,60 @@ public abstract class OmSnapshotLocalData {
    */
   public void setVersion(int version) {
     this.version = version;
+  }
+
+  /**
+   * Represents metadata for a specific version in a snapshot.
+   * This class maintains the version of the previous snapshot and a list of SST (Sorted String Table) files
+   * associated with the current version. It provides methods for accessing this data and supports a
+   * copy mechanism for deep cloning.
+   *
+   * Instances of this class are immutable. The list of SST files is stored as an unmodifiable list to
+   * maintain immutability.
+   */
+  public static class VersionMeta implements CopyObject<VersionMeta> {
+    private final int previousSnapshotVersion;
+    private final List<SstFileInfo> sstFiles;
+
+    public VersionMeta(int previousSnapshotVersion, List<SstFileInfo> sstFiles) {
+      this.previousSnapshotVersion = previousSnapshotVersion;
+      this.sstFiles = unmodifiableList(sstFiles);
+    }
+
+    public int getPreviousSnapshotVersion() {
+      return previousSnapshotVersion;
+    }
+
+    public List<SstFileInfo> getSstFiles() {
+      return sstFiles;
+    }
+
+    @Override
+    public VersionMeta copyObject() {
+      return new VersionMeta(previousSnapshotVersion,
+          sstFiles.stream().map(SstFileInfo::copyObject).collect(Collectors.toList()));
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(previousSnapshotVersion, sstFiles);
+    }
+
+    @Override
+    public final boolean equals(Object o) {
+      if (!(o instanceof VersionMeta)) {
+        return false;
+      }
+      VersionMeta that = (VersionMeta) o;
+      return previousSnapshotVersion == that.previousSnapshotVersion && sstFiles.equals(that.sstFiles);
+    }
+
+    @Override
+    public String toString() {
+      return "VersionMeta{" +
+          "previousSnapshotVersion=" + previousSnapshotVersion +
+          ", sstFiles=" + sstFiles +
+          '}';
+    }
   }
 }

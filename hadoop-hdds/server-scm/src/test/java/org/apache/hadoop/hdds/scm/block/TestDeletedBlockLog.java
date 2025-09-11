@@ -898,6 +898,41 @@ public class TestDeletedBlockLog {
     assertEquals(2, blocks.size());
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {30, 45})
+  public void testGetTransactionsWithMaxBlocksPerDatanode(int maxAllowedBlockNum) throws IOException {
+    int deleteBlocksFactorPerDatanode = 1;
+    deletedBlockLog.setDeleteBlocksFactorPerDatanode(deleteBlocksFactorPerDatanode);
+    mockContainerHealthResult(true);
+    int txNum = 10;
+    DatanodeDetails dnId1 = dnList.get(0), dnId2 = dnList.get(1);
+
+    // Creates {TXNum} TX in the log.
+    Map<Long, List<DeletedBlock>> deletedBlocks = generateData(txNum);
+    addTransactions(deletedBlocks, true);
+    List<Long> containerIds = new ArrayList<>(deletedBlocks.keySet());
+    for (int i = 0; i < containerIds.size(); i++) {
+      DatanodeDetails assignedDn = (i % 2 == 0) ? dnId1 : dnId2;
+      mockStandAloneContainerInfo(containerIds.get(i), assignedDn);
+    }
+
+    int blocksPerDataNode = maxAllowedBlockNum / (dnList.size() / deleteBlocksFactorPerDatanode);
+    DatanodeDeletedBlockTransactions transactions =
+        deletedBlockLog.getTransactions(maxAllowedBlockNum, new HashSet<>(dnList));
+
+    Map<DatanodeID, Integer> datanodeBlockCountMap =  transactions.getDatanodeTransactionMap()
+        .entrySet()
+        .stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue()
+                .stream()
+                .mapToInt(tx -> tx.getLocalIDList().size())
+                .sum()
+        ));
+    // Transactions should have blocksPerDataNode for both DNs
+    assertEquals(datanodeBlockCountMap.get(dnId1.getID()), blocksPerDataNode);
+    assertEquals(datanodeBlockCountMap.get(dnId2.getID()), blocksPerDataNode);
+  }
+
   @Test
   public void testDeletedBlockTransactionsOfDeletedContainer() throws IOException {
     int txNum = 10;
