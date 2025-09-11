@@ -361,6 +361,9 @@ public class SstFileSetReader {
         HeapEntryWithFileIdx<T> entry = minHeap.poll();
         if (entry.advance()) {
           minHeap.offer(entry);
+        } else {
+          // Iterator is exhausted, close it to prevent resource leak
+          entry.close();
         }
       }
 
@@ -376,4 +379,3 @@ public class SstFileSetReader {
   }
 
 }
-
