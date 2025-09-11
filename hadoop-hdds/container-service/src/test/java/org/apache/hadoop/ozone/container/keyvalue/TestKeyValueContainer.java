@@ -44,7 +44,6 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import java.io.File;
 import java.io.IOException;
@@ -52,7 +51,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -66,7 +64,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -128,7 +125,6 @@ public class TestKeyValueContainer {
   // This preserves the column family options in the container options
   // cache for testContainersShareColumnFamilyOptions.
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
-  private static final String DEFAULT_CF_NAME = StringUtils.bytes2String((DEFAULT_COLUMN_FAMILY));
 
   private void setVersionInfo(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
@@ -770,7 +766,6 @@ public class TestKeyValueContainer {
     ConfigurationSource conf = new OzoneConfiguration();
 
     // Make sure ColumnFamilyOptions are same for a particular db profile
-    Path dbPath = Paths.get(CONTAINER_DB_NAME);
     for (Supplier<DatanodeDBProfile> dbProfileSupplier : new Supplier[] {
         DatanodeDBProfile.Disk::new, DatanodeDBProfile.SSD::new }) {
       // ColumnFamilyOptions should be same across configurations
