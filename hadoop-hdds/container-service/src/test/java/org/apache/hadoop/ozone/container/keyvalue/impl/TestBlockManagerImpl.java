@@ -66,15 +66,10 @@ public class TestBlockManagerImpl {
   private Path folder;
   private OzoneConfiguration config;
   private String scmId = UUID.randomUUID().toString();
-  private VolumeSet volumeSet;
-  private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
-  private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private BlockData blockData;
   private BlockData blockData1;
   private BlockManagerImpl blockManager;
-  private BlockID blockID;
-  private BlockID blockID1;
 
   private ContainerLayoutVersion layout;
   private String schemaVersion;
@@ -97,13 +92,13 @@ public class TestBlockManagerImpl {
     StorageVolumeUtil.checkVolume(hddsVolume, scmId, scmId, config,
         null, null);
 
-    volumeSet = mock(MutableVolumeSet.class);
+    VolumeSet volumeSet = mock(MutableVolumeSet.class);
 
-    volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
+    RoundRobinVolumeChoosingPolicy volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
-    keyValueContainerData = new KeyValueContainerData(1L,
+    KeyValueContainerData keyValueContainerData = new KeyValueContainerData(1L,
         layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
@@ -114,7 +109,7 @@ public class TestBlockManagerImpl {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
     // Creating BlockData
-    blockID = new BlockID(1L, 1L);
+    BlockID blockID = new BlockID(1L, 1L);
     blockData = new BlockData(blockID);
     blockData.addMetadata(OzoneConsts.VOLUME, OzoneConsts.OZONE);
     blockData.addMetadata(OzoneConsts.OWNER,
@@ -126,13 +121,13 @@ public class TestBlockManagerImpl {
     blockData.setChunks(chunkList);
 
     // Creating BlockData
-    blockID1 = new BlockID(1L, 2L);
-    blockData1 = new BlockData(blockID1);
+    blockID = new BlockID(1L, 2L);
+    blockData1 = new BlockData(blockID);
     blockData1.addMetadata(OzoneConsts.VOLUME, OzoneConsts.OZONE);
     blockData1.addMetadata(OzoneConsts.OWNER,
         OzoneConsts.OZONE_SIMPLE_HDFS_USER);
     List<ContainerProtos.ChunkInfo> chunkList1 = new ArrayList<>();
-    ChunkInfo info1 = new ChunkInfo(String.format("%d.data.%d", blockID1
+    ChunkInfo info1 = new ChunkInfo(String.format("%d.data.%d", blockID
         .getLocalID(), 0), 0, 1024);
     chunkList1.add(info1.getProtoBufMessage());
     blockData1.setChunks(chunkList1);
@@ -278,7 +273,7 @@ public class TestBlockManagerImpl {
     assertEquals(1, listBlockData.size());
 
     for (long i = 2; i <= 10; i++) {
-      blockID = new BlockID(1L, i);
+      BlockID blockID = new BlockID(1L, i);
       blockData = new BlockData(blockID);
       blockData.addMetadata(OzoneConsts.VOLUME, OzoneConsts.OZONE);
       blockData.addMetadata(OzoneConsts.OWNER,
@@ -300,10 +295,10 @@ public class TestBlockManagerImpl {
   private BlockData createBlockData(long containerID, long blockNo,
       int chunkID, long offset, long len, long bcsID)
       throws IOException {
-    blockID1 = new BlockID(containerID, blockNo);
-    blockData = new BlockData(blockID1);
+    BlockID blockID = new BlockID(containerID, blockNo);
+    blockData = new BlockData(blockID);
     List<ContainerProtos.ChunkInfo> chunkList1 = new ArrayList<>();
-    ChunkInfo info1 = new ChunkInfo(String.format("%d_chunk_%d", blockID1
+    ChunkInfo info1 = new ChunkInfo(String.format("%d_chunk_%d", blockID
         .getLocalID(), chunkID), offset, len);
     chunkList1.add(info1.getProtoBufMessage());
     blockData.setChunks(chunkList1);
@@ -316,14 +311,14 @@ public class TestBlockManagerImpl {
   private BlockData createBlockDataWithOneFullChunk(long containerID,
       long blockNo, int chunkID, long offset, long len, long bcsID)
       throws IOException {
-    blockID1 = new BlockID(containerID, blockNo);
-    blockData = new BlockData(blockID1);
+    BlockID blockID = new BlockID(containerID, blockNo);
+    blockData = new BlockData(blockID);
     List<ContainerProtos.ChunkInfo> chunkList1 = new ArrayList<>();
-    ChunkInfo info1 = new ChunkInfo(String.format("%d_chunk_%d", blockID1
+    ChunkInfo info1 = new ChunkInfo(String.format("%d_chunk_%d", blockID
         .getLocalID(), 1), 0, 4 * 1024 * 1024);
     info1.addMetadata(FULL_CHUNK, "");
 
-    ChunkInfo info2 = new ChunkInfo(String.format("%d_chunk_%d", blockID1
+    ChunkInfo info2 = new ChunkInfo(String.format("%d_chunk_%d", blockID
         .getLocalID(), chunkID), offset, len);
     chunkList1.add(info1.getProtoBufMessage());
     chunkList1.add(info2.getProtoBufMessage());
@@ -336,13 +331,13 @@ public class TestBlockManagerImpl {
 
   private BlockData createBlockDataWithThreeFullChunks(long containerID,
       long blockNo, long bcsID) throws IOException {
-    blockID1 = new BlockID(containerID, blockNo);
-    blockData = new BlockData(blockID1);
+    BlockID blockID = new BlockID(containerID, blockNo);
+    blockData = new BlockData(blockID);
     List<ContainerProtos.ChunkInfo> chunkList1 = new ArrayList<>();
     long chunkLimit = 4 * 1024 * 1024;
     for (int i = 1; i < 4; i++) {
       ChunkInfo info1 = new ChunkInfo(
-          String.format("%d_chunk_%d", blockID1.getLocalID(), i),
+          String.format("%d_chunk_%d", blockID.getLocalID(), i),
           chunkLimit * i, chunkLimit);
       info1.addMetadata(FULL_CHUNK, "");
       chunkList1.add(info1.getProtoBufMessage());
