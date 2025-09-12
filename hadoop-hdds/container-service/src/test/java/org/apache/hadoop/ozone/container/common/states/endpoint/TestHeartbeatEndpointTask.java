@@ -357,6 +357,8 @@ public class TestHeartbeatEndpointTask {
                         .getDatanodeDetails().getUuid())
                 .build());
 
+    DiskBalancerInfo mockInfo = container.getDiskBalancerInfo();
+
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     context.addEndpoint(TEST_SCM_ENDPOINT);
@@ -365,6 +367,7 @@ public class TestHeartbeatEndpointTask {
     context.addIncrementalReport(
         CommandStatusReportsProto.getDefaultInstance());
     context.addContainerAction(getContainerAction());
+    context.refreshFullReport(mockInfo.toDiskBalancerReportProto());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
     assertTrue(heartbeat.hasDatanodeDetails());
