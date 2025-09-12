@@ -217,7 +217,7 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
           loading: false
         }
       });
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     });
   }
 

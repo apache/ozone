@@ -204,7 +204,7 @@ const Heatmap: React.FC<{}> = () => {
     request.then(response => {
       setIsHeatmapEnabled(!response?.data?.includes('HEATMAP'));
     }).catch(error => {
-      showDataFetchError((error as Error).toString());
+      showDataFetchError(error);
     });
   }
 

@@ -17,7 +17,6 @@
 */
 
 import React from 'react';
-import { AxiosError } from 'axios';
 import {
   Dropdown,
   Menu,
@@ -96,7 +95,7 @@ const OpenKeysTable: React.FC<OpenKeysTableProps> = ({
       setLoading(false);
     }).catch(error => {
       setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     });
   }
 

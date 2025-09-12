@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import { AxiosError } from 'axios';
 import Table, {
   ColumnsType,
   TablePaginationConfig
@@ -112,7 +111,7 @@ const DeletedContainerKeysTable: React.FC<DeletedContainerKeysTableProps> = ({
       setLoading(false);
     }).catch(error => {
       setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     });
   }
 

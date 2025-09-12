@@ -24,6 +24,7 @@ import React, {
 import moment from 'moment';
 import { ValueType } from 'react-select';
 
+
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import Search from '@/v2/components/search/search';
 import MultiSelect, { Option } from '@/v2/components/select/multiSelect';
@@ -85,7 +86,7 @@ const Pipelines: React.FC<{}> = () => {
       setLoading(false);
     }).catch(error => {
       setLoading(false);
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     })
   }
 

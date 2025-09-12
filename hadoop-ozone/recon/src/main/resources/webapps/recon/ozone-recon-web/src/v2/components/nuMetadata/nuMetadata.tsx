@@ -18,7 +18,7 @@
 
 import React, {useRef, useState} from 'react';
 import moment from 'moment';
-import axios, {AxiosError} from 'axios';
+import axios from 'axios';
 import {Table} from 'antd';
 
 import {AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper} from '@/utils/axiosRequestHelper';
@@ -290,7 +290,7 @@ const NUMetadata: React.FC<MetadataProps> = ({
             }])
             setState(data);
           }).catch(error => {
-            showDataFetchError(error.toString());
+            showDataFetchError(error);
           });
           return;
         }
@@ -347,7 +347,7 @@ const NUMetadata: React.FC<MetadataProps> = ({
       }
       setState(data);
     })).catch(error => {
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     });
   }
 

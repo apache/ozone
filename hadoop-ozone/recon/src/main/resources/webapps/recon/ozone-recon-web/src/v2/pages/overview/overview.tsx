@@ -229,7 +229,7 @@ const Overview: React.FC<{}> = () => {
         ...state,
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   }
 
@@ -255,12 +255,12 @@ const Overview: React.FC<{}> = () => {
         loading: false,
         omStatus: omStatus
       });
-    }).catch((error: Error) => {
+    }).catch((error) => {
       setState({
         ...state,
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 

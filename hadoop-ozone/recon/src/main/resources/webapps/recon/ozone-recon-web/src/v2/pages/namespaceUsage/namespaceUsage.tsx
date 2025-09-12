@@ -17,7 +17,6 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { AxiosError } from 'axios';
 import { Alert, Button, Tooltip } from 'antd';
 import { InfoCircleFilled, ReloadOutlined, } from '@ant-design/icons';
 import { ValueType } from 'react-select';
@@ -84,7 +83,7 @@ const NamespaceUsage: React.FC<{}> = () => {
       setLoading(false);
     }).catch(error => {
       setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     });
   }
 

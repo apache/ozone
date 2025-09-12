@@ -22,7 +22,6 @@ import React, {
   useState
 } from 'react';
 import moment from 'moment';
-import { AxiosError } from 'axios';
 import {
   Button,
   Modal
@@ -131,7 +130,7 @@ const Datanodes: React.FC<{}> = () => {
     request.then(() => {
       loadData();
     }).catch((error) => {
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     }).finally(() => {
       setLoading(false);
       setSelectedRows([]);
@@ -150,7 +149,7 @@ const Datanodes: React.FC<{}> = () => {
       );
     } catch (error) {
       decommissionUuids = [];
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     }
 
     try {
@@ -189,7 +188,7 @@ const Datanodes: React.FC<{}> = () => {
       });
     } catch (error) {
       setLoading(false);
-      showDataFetchError((error as AxiosError).toString())
+      showDataFetchError(error)
     }
   }
 
