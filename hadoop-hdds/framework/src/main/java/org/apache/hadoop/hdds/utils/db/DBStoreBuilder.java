@@ -252,11 +252,6 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public DBStoreBuilder setCfOptions(String cfName, ManagedColumnFamilyOptions options) {
-    cfOptions.put(cfName, options);
-    return this;
-  }
-
   public DBStoreBuilder setPath(Path path) {
     Preconditions.checkNotNull(path);
     dbPath = path;
@@ -345,7 +340,7 @@ public final class DBStoreBuilder {
    * @param defaultCFAutoCompaction
    */
   public DBStoreBuilder disableDefaultCFAutoCompaction(boolean defaultCFAutoCompaction) {
-    ManagedColumnFamilyOptions defaultCFOptions = getCfOptionsFromFile(DEFAULT_COLUMN_FAMILY_NAME);
+    ManagedColumnFamilyOptions defaultCFOptions = getFromFileOrDefault(DEFAULT_COLUMN_FAMILY_NAME);
     defaultCFOptions.setDisableAutoCompactions(defaultCFAutoCompaction);
     setCfOptions(defaultCFOptions);
     return this;
@@ -368,7 +363,8 @@ public final class DBStoreBuilder {
       return rocksDBOption;
     }
     try {
-      rocksDBOption = DBConfigFromFile.readDBOptionsFromFile(optionsPath);
+      Path configuredPath = optionsPath != null ? optionsPath : dbPath;
+      rocksDBOption = DBConfigFromFile.readDBOptionsFromFile(configuredPath);
     } catch (RocksDBException e) {
       LOG.error("Error trying to use dbOptions from file: {}", optionsPath);
     }

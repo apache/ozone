@@ -173,7 +173,6 @@ public final class DBConfigFromFile {
    * @throws RocksDBException
    */
   private static Path generateDBPath(Path path) {
-    Preconditions.checkNotNull(path);
     if (path.toFile().exists()) {
       LOG.debug("RocksDB path found: {}, opening db from it.", path);
       return path;
@@ -188,7 +187,7 @@ public final class DBConfigFromFile {
         return fallbackPath;
       }
     }
-    LOG.error("No RocksDB path found");
+    LOG.info("No RocksDB path found");
     return Paths.get("");
   }
 
