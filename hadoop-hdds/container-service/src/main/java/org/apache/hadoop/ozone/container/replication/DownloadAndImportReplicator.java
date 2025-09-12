@@ -44,6 +44,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
   private final ContainerDownloader downloader;
   private final ContainerImporter containerImporter;
   private final ContainerSet containerSet;
+  private Long spaceToReserve;
 
   public DownloadAndImportReplicator(
       ConfigurationSource conf, ContainerSet containerSet,
@@ -71,9 +72,13 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     LOG.info("Starting replication of container {} from {} using {}",
         containerID, sourceDatanodes, compression);
     HddsVolume targetVolume = null;
+    
+    // Use replicate size from command if available, otherwise use default
+    spaceToReserve = containerImporter.getSpaceToReserve(task.getReplicateSize());
 
     try {
-      targetVolume = containerImporter.chooseNextVolume();
+      targetVolume = containerImporter.chooseNextVolume(spaceToReserve);
+
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.
       Path tarFilePath =
@@ -83,6 +88,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         task.setStatus(Status.FAILED);
         return;
       }
+
       long bytes = Files.size(tarFilePath);
       LOG.info("Container {} is downloaded with size {}, starting to import.",
               containerID, bytes);
@@ -97,8 +103,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       LOG.error("Container {} replication was unsuccessful.", containerID, e);
       task.setStatus(Status.FAILED);
     } finally {
-      if (targetVolume != null) {
-        targetVolume.incCommittedBytes(-containerImporter.getDefaultReplicationSpace());
+      if (targetVolume != null && spaceToReserve > 0) {
+        targetVolume.incCommittedBytes(-spaceToReserve);
       }
     }
   }
