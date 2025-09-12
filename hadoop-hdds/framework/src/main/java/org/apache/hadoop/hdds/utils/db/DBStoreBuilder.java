@@ -69,9 +69,6 @@ public final class DBStoreBuilder {
 
   // The DBOptions specified by the caller.
   private ManagedDBOptions rocksDBOption;
-  // The column family options that will be used for any column families
-  // added by name only (without specifying options).
-  private ManagedColumnFamilyOptions defaultCfOptions;
   // Initialize the Statistics instance if ROCKSDB_STATISTICS enabled
   private ManagedStatistics statistics;
 
@@ -250,9 +247,13 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public DBStoreBuilder setDefaultCFOptions(
-      ManagedColumnFamilyOptions options) {
-    defaultCfOptions = options;
+  public DBStoreBuilder setCfOptions(ManagedColumnFamilyOptions options) {
+    cfOptions.put(DEFAULT_COLUMN_FAMILY_NAME, options);
+    return this;
+  }
+
+  public DBStoreBuilder setCfOptions(String cfName, ManagedColumnFamilyOptions options) {
+    cfOptions.put(cfName, options);
     return this;
   }
 
@@ -294,7 +295,6 @@ public final class DBStoreBuilder {
    */
   public DBStoreBuilder setProfile(DBProfile prof) {
     setDBOptions(prof.getDBOptions());
-    setDefaultCFOptions(prof.getColumnFamilyOptions());
     return this;
   }
 
@@ -347,7 +347,7 @@ public final class DBStoreBuilder {
   public DBStoreBuilder disableDefaultCFAutoCompaction(boolean defaultCFAutoCompaction) {
     ManagedColumnFamilyOptions defaultCFOptions = getCfOptionsFromFile(DEFAULT_COLUMN_FAMILY_NAME);
     defaultCFOptions.setDisableAutoCompactions(defaultCFAutoCompaction);
-    setDefaultCFOptions(defaultCFOptions);
+    setCfOptions(defaultCFOptions);
     return this;
   }
 

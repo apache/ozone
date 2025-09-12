@@ -78,7 +78,7 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
       options.setKeepLogFileNum(dc.getRocksdbLogMaxFileNum());
       this.store = initDBStore(DBStoreBuilder.newBuilder(config, dbDef, null, null)
           .setDBOptions(options)
-          .setDefaultCFOptions(cfOptions)
+          .setCfOptions(cfOptions)
           .setOpenReadOnly(openReadOnly), options, config);
     }
   }
