@@ -304,6 +304,14 @@ message RemoveScmResponseProto {
     optional string scmId = 2;
 }
 
+message VolumeInfoProto {
+    optional DatanodeIDProto dataNodeId = 1;
+    optional string hostName = 2;
+    optional string volumeName = 3;
+    optional bool failed = 4;
+    optional int64 capacity = 5;
+}
+
 enum ReplicationType {
     RATIS = 1;
     STAND_ALONE = 2;
