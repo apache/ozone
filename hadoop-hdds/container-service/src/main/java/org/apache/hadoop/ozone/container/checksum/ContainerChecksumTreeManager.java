@@ -180,18 +180,21 @@ public class ContainerChecksumTreeManager {
 
     if (thisBlockDeleted) {
       // Our block has been deleted.
-      if (peerBlockDeleted && compareDataChecksums(thisBlockMerkleTree, peerBlockMerkleTree) < 0) {
+      if (peerBlockDeleted && thisBlockMerkleTree.getDataChecksum() < peerBlockMerkleTree.getDataChecksum()) {
         // If the peer's block is also deleted, use the largest checksum value as the winner so that the values converge
         // since there is no data corresponding to this block.
         report.addDeletedBlock(peerBlockMerkleTree);
       }
       // Else, either the peer has not deleted the block or they have a lower checksum for their deleted block.
-      // The peer needs to update their block.
+      // In these cases the peer needs to update their block.
+      // If the peer's block is deleted and its checksum matches ours, no update is required.
     } else {
       if (peerBlockDeleted) {
         // Our block has not yet been deleted, but peer's block has been.
         // Mark our block as deleted to bring it in sync with the peer.
         // Our block deleting service will eventually catch up.
+        // Our container scanner will not update this deleted block in the merkle tree further even if it is still on
+        // disk so that we remain in sync with the peer.
         // TODO HDDS-11765 Add support for deleting blocks from our replica when a peer has already deleted the block.
         report.addDeletedBlock(peerBlockMerkleTree);
       } else {
@@ -199,33 +202,6 @@ public class ContainerChecksumTreeManager {
         compareChunkMerkleTrees(thisBlockMerkleTree, peerBlockMerkleTree, report);
       }
     }
-  }
-
-  /**
-   * Compares the data checksums of two block merkle trees lexicographically as big-endian binary strings.
-   */
-  private static int compareDataChecksums(ContainerProtos.BlockMerkleTree tree1,
-      ContainerProtos.BlockMerkleTree tree2) {
-    long checksum1 = tree1.getDataChecksum();
-    long checksum2 = tree2.getDataChecksum();
-
-    if (checksum1 == checksum2) {
-      return 0;
-    }
-
-    final int lowest8bitMask = 0xFF;
-    final int lsbIndex = Long.BYTES - 1;
-    for (int i = lsbIndex; i >= 0; i--) {
-      byte byte1 = (byte) ((checksum1 >>> (i * Byte.SIZE)) & lowest8bitMask);
-      byte byte2 = (byte) ((checksum2 >>> (i * Byte.SIZE)) & lowest8bitMask);
-
-      int cmp = UnsignedBytes.compare(byte1, byte2);
-      if (cmp != 0) {
-        return cmp;
-      }
-    }
-
-    return 0;
   }
 
   private void compareChunkMerkleTrees(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
