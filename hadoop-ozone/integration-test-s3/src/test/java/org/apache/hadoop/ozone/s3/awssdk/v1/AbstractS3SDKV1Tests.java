@@ -77,7 +77,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -122,8 +121,11 @@ import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.OzoneTestBase;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -1059,196 +1061,159 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     assertEquals("QuotaExceeded", ase.getErrorCode());
   }
 
-  @Test
-  public void testPresignedUrlGet() throws IOException {
-    final String bucketName = getBucketName();
-    final String keyName = getKeyName();
-    final String content = "bar";
-    s3Client.createBucket(bucketName);
-
-    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-
-    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
-
+  @Nested
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  class PresignedUrlTests {
+    private static final String BUCKET_NAME = "presigned-url-bucket";
+    private static final String CONTENT = "bar";
     // Set the presigned URL to expire after one hour.
-    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+    private final Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
 
-    // Generate the presigned URL
-    GeneratePresignedUrlRequest generatePresignedUrlRequest =
-        new GeneratePresignedUrlRequest(bucketName, keyName)
-            .withMethod(HttpMethod.GET)
-            .withExpiration(expiration);
-    generatePresignedUrlRequest.addRequestParameter("x-custom-parameter", "custom-value");
-    URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
-
-    // Download the object using HttpUrlConnection (since v1.1)
-    // Capture the response body to a byte array.
-    URL presignedUrl = new URL(url.toExternalForm());
-    HttpURLConnection connection = (HttpURLConnection) presignedUrl.openConnection();
-    connection.setRequestMethod("GET");
-    // Download the result of executing the request.
-    try (InputStream s3is = connection.getInputStream();
-         ByteArrayOutputStream bos = new ByteArrayOutputStream(
-             content.getBytes(StandardCharsets.UTF_8).length)) {
-      IOUtils.copy(s3is, bos);
-      assertEquals(content, bos.toString("UTF-8"));
+    @BeforeAll
+    public void setup() {
+      s3Client.createBucket(BUCKET_NAME);
     }
-  }
 
-  @Test
-  public void testPresignedUrlHead() throws IOException {
-    final String bucketName = getBucketName();
-    final String keyName = getKeyName();
-    final String content = "bar";
-    s3Client.createBucket(bucketName);
+    @Test
+    public void testPresignedUrlGet() throws IOException {
+      final String keyName = getKeyName();
 
-    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
-    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+      InputStream is = new ByteArrayInputStream(CONTENT.getBytes(StandardCharsets.UTF_8));
 
-    // Set the presigned URL to expire after one hour.
-    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+      s3Client.putObject(BUCKET_NAME, keyName, is, new ObjectMetadata());
 
-    // Test HeadObject presigned URL
-    GeneratePresignedUrlRequest generatePresignedUrlRequest =
-        new GeneratePresignedUrlRequest(bucketName, keyName)
-            .withMethod(HttpMethod.HEAD)
-            .withExpiration(expiration);
-    URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+      // Generate the presigned URL
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.GET).withExpiration(expiration);
+      generatePresignedUrlRequest.addRequestParameter("x-custom-parameter", "custom-value");
+      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
 
-    URL presignedUrl = new URL(url.toExternalForm());
-    HttpURLConnection connection = null;
-    try {
-      connection = (HttpURLConnection) presignedUrl.openConnection();
-      connection.setRequestMethod("HEAD");
-
-      int responseCode = connection.getResponseCode();
-      assertEquals(200, responseCode, "HeadObject presigned URL should return 200 OK");
-    } finally {
-      if (connection != null) {
-        connection.disconnect();
+      // Download the object using HttpUrlConnection (since v1.1)
+      // Capture the response body to a byte array.
+      HttpURLConnection connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "GET", null, null);
+      // Download the result of executing the request.
+      try (InputStream s3is = connection.getInputStream();
+           ByteArrayOutputStream bos = new ByteArrayOutputStream(CONTENT.getBytes(StandardCharsets.UTF_8).length)) {
+        IOUtils.copy(s3is, bos);
+        assertEquals(CONTENT, bos.toString("UTF-8"));
       }
     }
 
-    // Test HeadBucket presigned URL
-    GeneratePresignedUrlRequest generateBucketPresignedUrlRequest =
-        new GeneratePresignedUrlRequest(bucketName, null)
-            .withMethod(HttpMethod.HEAD)
-            .withExpiration(expiration);
-    URL bucketUrl = s3Client.generatePresignedUrl(generateBucketPresignedUrlRequest);
+    @Test
+    public void testPresignedUrlHead() throws IOException {
+      final String keyName = getKeyName();
 
-    URL presignedBucketUrl = new URL(bucketUrl.toExternalForm());
-    HttpURLConnection bucketConnection = null;
-    try {
-      bucketConnection = (HttpURLConnection) presignedBucketUrl.openConnection();
-      bucketConnection.setRequestMethod("HEAD");
+      InputStream is = new ByteArrayInputStream(CONTENT.getBytes(StandardCharsets.UTF_8));
+      s3Client.putObject(BUCKET_NAME, keyName, is, new ObjectMetadata());
 
-      int bucketResponseCode = bucketConnection.getResponseCode();
-      assertEquals(200, bucketResponseCode, "HeadBucket presigned URL should return 200 OK");
-    } finally {
-      if (bucketConnection != null) {
-        bucketConnection.disconnect();
+      // Test HeadObject presigned URL
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.HEAD).withExpiration(expiration);
+      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "HEAD", null, null);
+        int responseCode = connection.getResponseCode();
+        assertEquals(200, responseCode, "HeadObject presigned URL should return 200 OK");
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+
+      // Test HeadBucket presigned URL
+      GeneratePresignedUrlRequest generateBucketPresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, null).withMethod(HttpMethod.HEAD).withExpiration(expiration);
+      URL presignedBucketUrl = s3Client.generatePresignedUrl(generateBucketPresignedUrlRequest);
+
+      HttpURLConnection bucketConnection = null;
+      try {
+        bucketConnection = S3SDKTestUtils.openHttpURLConnection(presignedBucketUrl, "HEAD", null, null);
+        int bucketResponseCode = bucketConnection.getResponseCode();
+        assertEquals(200, bucketResponseCode, "HeadBucket presigned URL should return 200 OK");
+      } finally {
+        if (bucketConnection != null) {
+          bucketConnection.disconnect();
+        }
       }
     }
-  }
 
-  @Test
-  public void testPresignedUrlPutObject() throws Exception {
-    final String bucketName = getBucketName();
-    final String keyName = getKeyName();
-    final String expectedContent = "bar";
-    s3Client.createBucket(bucketName);
+    @Test
+    public void testPresignedUrlPutObject() throws Exception {
+      final String keyName = getKeyName();
 
-    // Set the presigned URL to expire after one hour.
-    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+      // Test PutObjectRequest presigned URL
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.PUT).withExpiration(expiration);
+      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
 
-    // Test PutObjectRequest presigned URL
-    GeneratePresignedUrlRequest generatePresignedUrlRequest =
-        new GeneratePresignedUrlRequest(bucketName, keyName)
-            .withMethod(HttpMethod.PUT)
-            .withExpiration(expiration);
-    URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
-
-    HttpURLConnection connection = null;
-    try {
-      connection = (HttpURLConnection) presignedUrl.openConnection();
-      connection.setRequestMethod("PUT");
-      connection.setDoOutput(true);
-      try (OutputStream os = connection.getOutputStream()) {
-        os.write(expectedContent.getBytes(StandardCharsets.UTF_8));
-        os.flush();
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT",
+            null, CONTENT.getBytes(StandardCharsets.UTF_8));
+        int responseCode = connection.getResponseCode();
+        assertEquals(200, responseCode, "PutObject presigned URL should return 200 OK");
+        String actualContent;
+        S3Object s3Object = s3Client.getObject(BUCKET_NAME, keyName);
+        try (S3ObjectInputStream inputStream = s3Object.getObjectContent()) {
+          actualContent = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+        }
+        assertEquals(CONTENT, actualContent, "Downloaded content should match uploaded content");
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
       }
+    }
 
-      int responseCode = connection.getResponseCode();
-      assertEquals(200, responseCode, "PutObject presigned URL should return 200 OK");
+    @Test
+    public void testPresignedUrlMultipartUpload(@TempDir Path tempDir) throws Exception {
+      final String keyName = getKeyName();
+      final Map<String, String> userMetadata = new HashMap<>();
+      userMetadata.put("key1", "value1");
+      userMetadata.put("key2", "value2");
+      final Map<String, String> tags = new HashMap<>();
+      tags.put("tag1", "value1");
+      tags.put("tag2", "value2");
+
+      File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
+      createFile(multipartUploadFile, (int) (10 * MB));
+
+      // create MPU using presigned URL
+      GeneratePresignedUrlRequest initMPUPresignedUrlRequest =
+          createInitMPUPresignedUrlRequest(keyName, userMetadata, tags);
+
+
+      String uploadId = initMultipartUpload(initMPUPresignedUrlRequest);
+
+      // upload parts using presigned URL
+      List<PartETag> completedParts = uploadParts(multipartUploadFile, keyName, uploadId);
+
+      // Complete multipart upload using presigned URL
+      completeMPU(keyName, uploadId, completedParts);
+
+      // Verify upload result
+      ObjectMetadata objectMeta = s3Client.getObjectMetadata(BUCKET_NAME, keyName);
+      assertEquals(userMetadata, objectMeta.getUserMetadata());
+
+      // Verify content
+      S3Object s3Object = s3Client.getObject(BUCKET_NAME, keyName);
+      assertEquals(tags.size(), s3Object.getTaggingCount());
       String actualContent;
-      S3Object s3Object = s3Client.getObject(bucketName, keyName);
       try (S3ObjectInputStream inputStream = s3Object.getObjectContent()) {
         actualContent = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
       }
+      String expectedContent = new String(Files.readAllBytes(multipartUploadFile.toPath()), StandardCharsets.UTF_8);
       assertEquals(expectedContent, actualContent, "Downloaded content should match uploaded content");
-    } finally {
-      if (connection != null) {
-        connection.disconnect();
-      }
     }
-  }
 
-  @Test
-  public void testPresignedUrlMultipartUpload(@TempDir Path tempDir) throws Exception {
-    final String bucketName = getBucketName();
-    final String keyName = getKeyName();
-    final Map<String, String> userMetadata = new HashMap<>();
-    userMetadata.put("key1", "value1");
-    userMetadata.put("key2", "value2");
-    final Map<String, String> tags = new HashMap<>();
-    tags.put("tag1", "value1");
-    tags.put("tag2", "value2");
+    private void completeMPU(String keyName, String uploadId, List<PartETag> completedParts) throws IOException {
+      GeneratePresignedUrlRequest request =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.POST).withExpiration(expiration);
+      request.addRequestParameter("uploadId", uploadId);
 
-    s3Client.createBucket(bucketName);
-
-    File multipartUploadFile = Files.createFile(tempDir.resolve("multipartupload.txt")).toFile();
-    createFile(multipartUploadFile, (int) (10 * MB));
-
-    // create MPU using presigned URL
-    GeneratePresignedUrlRequest initMPUPresignedUrlRequest =
-        createInitMPUPresignedUrlRequest(bucketName, keyName, userMetadata, tags);
-
-
-    String uploadId = initMultipartUpload(initMPUPresignedUrlRequest);
-
-    // upload parts using presigned URL
-    List<PartETag> completedParts = uploadParts(multipartUploadFile, bucketName, keyName, uploadId);
-
-    // Complete multipart upload using presigned URL
-    completeMPU(bucketName, keyName, uploadId, completedParts);
-
-    // Verify upload result
-    ObjectMetadata objectMeta = s3Client.getObjectMetadata(bucketName, keyName);
-    assertEquals(userMetadata, objectMeta.getUserMetadata());
-
-    // Verify content
-    S3Object s3Object = s3Client.getObject(bucketName, keyName);
-    assertEquals(tags.size(), s3Object.getTaggingCount());
-    String actualContent;
-    try (S3ObjectInputStream inputStream = s3Object.getObjectContent()) {
-      actualContent = IOUtils.toString(inputStream, StandardCharsets.UTF_8);
-    }
-    String expectedContent = new String(Files.readAllBytes(multipartUploadFile.toPath()), StandardCharsets.UTF_8);
-    assertEquals(expectedContent, actualContent, "Downloaded content should match uploaded content");
-  }
-
-  private static void completeMPU(String bucketName, String keyName, String uploadId, List<PartETag> completedParts)
-      throws IOException {
-    GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(bucketName, keyName)
-        .withMethod(HttpMethod.POST)
-        .withExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60));
-    request.addRequestParameter("uploadId", uploadId);
-
-    HttpURLConnection httpConnection = null;
-    try {
-      httpConnection = (HttpURLConnection) s3Client.generatePresignedUrl(request).openConnection();
-      httpConnection.setRequestMethod("POST");
-      httpConnection.setDoOutput(true);
+      URL presignedUrl = s3Client.generatePresignedUrl(request);
 
       // Generate completion XML payload
       StringBuilder completionXml = new StringBuilder();
@@ -1262,154 +1227,144 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       completionXml.append("</CompleteMultipartUpload>");
 
       byte[] completionPayloadBytes = completionXml.toString().getBytes(StandardCharsets.UTF_8);
-      try (OutputStream os = httpConnection.getOutputStream()) {
-        IOUtils.write(completionPayloadBytes, os);
-      }
 
-      int responseCode = httpConnection.getResponseCode();
-      assertEquals(200, responseCode, "Complete multipart upload should return 200 OK");
-    } finally {
-      if (httpConnection != null) {
-        httpConnection.disconnect();
+      HttpURLConnection httpConnection = null;
+      try {
+        httpConnection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "POST", null, completionPayloadBytes);
+        int responseCode = httpConnection.getResponseCode();
+        assertEquals(200, responseCode, "Complete multipart upload should return 200 OK");
+      } finally {
+        if (httpConnection != null) {
+          httpConnection.disconnect();
+        }
       }
     }
-  }
 
-  private static List<PartETag> uploadParts(File multipartUploadFile, String bucketName, String keyName,
-                                             String uploadId) throws IOException {
-    List<PartETag> completedParts = new ArrayList<>();
-    ByteBuffer byteBuffer = ByteBuffer.allocate((int) (5 * MB));
-    long filePosition = 0;
-    long fileLength = multipartUploadFile.length();
-    int partNumber = 1;
+    private List<PartETag> uploadParts(File multipartUploadFile, String keyName, String uploadId) throws IOException {
+      List<PartETag> completedParts = new ArrayList<>();
+      ByteBuffer byteBuffer = ByteBuffer.allocate((int) (5 * MB));
+      long filePosition = 0;
+      long fileLength = multipartUploadFile.length();
+      int partNumber = 1;
 
-    try (RandomAccessFile file = new RandomAccessFile(multipartUploadFile, "r")) {
-      while (filePosition < fileLength) {
-        file.seek(filePosition);
-        long bytesRead = file.getChannel().read(byteBuffer);
-        byteBuffer.flip();
+      try (RandomAccessFile file = new RandomAccessFile(multipartUploadFile, "r")) {
+        while (filePosition < fileLength) {
+          file.seek(filePosition);
+          long bytesRead = file.getChannel().read(byteBuffer);
+          byteBuffer.flip();
 
-        // generate presigned URL for each part
-        GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(bucketName, keyName)
-            .withMethod(HttpMethod.PUT)
-            .withExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60));
-        request.addRequestParameter("partNumber", String.valueOf(partNumber));
-        request.addRequestParameter("uploadId", uploadId);
+          // generate presigned URL for each part
+          GeneratePresignedUrlRequest request =
+              new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.PUT)
+                  .withExpiration(expiration);
+          request.addRequestParameter("partNumber", String.valueOf(partNumber));
+          request.addRequestParameter("uploadId", uploadId);
 
-        URL presignedUrl = s3Client.generatePresignedUrl(request);
+          URL presignedUrl = s3Client.generatePresignedUrl(request);
 
-        // upload each part using presigned URL
-        HttpURLConnection connection = null;
-        try {
-          connection = (HttpURLConnection) presignedUrl.openConnection();
-          connection.setDoOutput(true);
-          connection.setRequestMethod("PUT");
-          connection.setRequestProperty("Content-Length", String.valueOf(byteBuffer.remaining()));
+          // upload each part using presigned URL
+          HttpURLConnection connection = null;
+          try {
+            Map<String, List<String>> headers = new HashMap<>();
+            List<String> header = Collections.singletonList(String.valueOf(byteBuffer.remaining()));
+            headers.put("Content-Length", header);
+            byte[] body = new byte[byteBuffer.remaining()];
+            byteBuffer.get(body);
 
-          try (OutputStream os = connection.getOutputStream()) {
-            os.write(byteBuffer.array(), 0, byteBuffer.remaining());
-            os.flush();
+            connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT", headers, body);
+            int responseCode = connection.getResponseCode();
+            assertEquals(200, responseCode, String.format("Upload part %d should return 200 OK", partNumber));
+
+            String etag = connection.getHeaderField("ETag");
+            PartETag partETag = new PartETag(partNumber, etag);
+            completedParts.add(partETag);
+          } finally {
+            if (connection != null) {
+              connection.disconnect();
+            }
           }
 
-          int responseCode = connection.getResponseCode();
-          assertEquals(200, responseCode, String.format("Upload part %d should return 200 OK", partNumber));
+          byteBuffer.clear();
+          filePosition += bytesRead;
+          partNumber++;
+        }
+      }
+      return completedParts;
+    }
 
-          String etag = connection.getHeaderField("ETag");
-          PartETag partETag = new PartETag(partNumber, etag);
-          completedParts.add(partETag);
-        } finally {
-          if (connection != null) {
-            connection.disconnect();
+    private String initMultipartUpload(GeneratePresignedUrlRequest request) throws IOException {
+      URL presignedUrl = s3Client.generatePresignedUrl(request);
+      String uploadId;
+      HttpURLConnection httpConnection = null;
+      try {
+        Map<String, String> customRequestHeaders = request.getCustomRequestHeaders();
+        Map<String, List<String>> headers = new HashMap<>();
+        if (customRequestHeaders != null) {
+          for (Map.Entry<String, String> entry : customRequestHeaders.entrySet()) {
+            headers.put(entry.getKey(), Collections.singletonList(entry.getValue()));
           }
         }
+        httpConnection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "POST", headers, null);
+        int initMPUConnectionResponseCode = httpConnection.getResponseCode();
+        assertEquals(200, initMPUConnectionResponseCode);
 
-        byteBuffer.clear();
-        filePosition += bytesRead;
-        partNumber++;
+        try (InputStream is = httpConnection.getInputStream()) {
+          String responseXml = IOUtils.toString(is, StandardCharsets.UTF_8);
+          uploadId = S3SDKTestUtils.extractUploadId(responseXml);
+        }
+      } finally {
+        if (httpConnection != null) {
+          httpConnection.disconnect();
+        }
       }
-    }
-    return completedParts;
-  }
-
-  private String initMultipartUpload(GeneratePresignedUrlRequest request) throws IOException {
-    URL presignedUrl = s3Client.generatePresignedUrl(request);
-    String uploadId;
-    HttpURLConnection httpConnection = null;
-    try {
-      httpConnection = (HttpURLConnection) presignedUrl.openConnection();
-      httpConnection.setRequestMethod("POST");
-      httpConnection.setDoOutput(true);
-      request.getCustomRequestHeaders().forEach(httpConnection::setRequestProperty);
-
-      httpConnection.connect();
-      int initMPUConnectionResponseCode = httpConnection.getResponseCode();
-      assertEquals(200, initMPUConnectionResponseCode);
-      try (InputStream is = httpConnection.getInputStream()) {
-        String responseXml = IOUtils.toString(is, StandardCharsets.UTF_8);
-        uploadId = S3SDKTestUtils.extractUploadId(responseXml);
-      }
-    } finally {
-      if (httpConnection != null) {
-        httpConnection.disconnect();
-      }
-    }
-    return uploadId;
-  }
-
-  private GeneratePresignedUrlRequest createInitMPUPresignedUrlRequest(String bucketName, String keyName,
-                                                                       Map<String, String> userMetadata,
-                                                                       Map<String, String> tags) throws Exception {
-    GeneratePresignedUrlRequest initMPUPresignUrlRequest = new GeneratePresignedUrlRequest(bucketName, keyName)
-        .withMethod(HttpMethod.POST)
-        .withExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60));
-
-    userMetadata.forEach((k, v) -> {
-      initMPUPresignUrlRequest.putCustomRequestHeader(CUSTOM_METADATA_HEADER_PREFIX + k, v);
-    });
-
-    StringBuilder tagValueBuilder = new StringBuilder();
-    for (Map.Entry<String, String> entry : tags.entrySet()) {
-      if (tagValueBuilder.length() > 0) {
-        tagValueBuilder.append('&');
-      }
-      tagValueBuilder.append(entry.getKey()).append('=').append(URLEncoder.encode(entry.getValue(), "UTF-8"));
-    }
-    initMPUPresignUrlRequest.putCustomRequestHeader(S3Consts.TAG_HEADER, tagValueBuilder.toString());
-    return initMPUPresignUrlRequest;
-  }
-
-  @Test
-  public void testPresignedUrlDelete() throws IOException {
-    final String bucketName = getBucketName();
-    final String keyName = getKeyName();
-    final String content = "bar";
-
-    s3Client.createBucket(bucketName);
-    try (InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8))) {
-      s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+      return uploadId;
     }
 
-    // Set the presigned URL to expire after one hour.
-    Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
+    private GeneratePresignedUrlRequest createInitMPUPresignedUrlRequest(String keyName,
+                                                                         Map<String, String> userMetadata,
+                                                                         Map<String, String> tags) throws Exception {
+      GeneratePresignedUrlRequest initMPUPresignUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.POST).withExpiration(expiration);
 
-    // Generate the presigned URL for DELETE
-    GeneratePresignedUrlRequest generatePresignedUrlRequest =
-        new GeneratePresignedUrlRequest(bucketName, keyName)
-            .withMethod(HttpMethod.DELETE)
-            .withExpiration(expiration);
-    URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+      userMetadata.forEach((k, v) -> {
+        initMPUPresignUrlRequest.putCustomRequestHeader(CUSTOM_METADATA_HEADER_PREFIX + k, v);
+      });
 
-    // Execute the DELETE request using HttpUrlConnection
-    URL presignedUrl = new URL(url.toExternalForm());
-    HttpURLConnection connection = (HttpURLConnection) presignedUrl.openConnection();
-    connection.setRequestMethod("DELETE");
-    int responseCode = connection.getResponseCode();
+      StringBuilder tagValueBuilder = new StringBuilder();
+      for (Map.Entry<String, String> entry : tags.entrySet()) {
+        if (tagValueBuilder.length() > 0) {
+          tagValueBuilder.append('&');
+        }
+        tagValueBuilder.append(entry.getKey()).append('=').append(URLEncoder.encode(entry.getValue(), "UTF-8"));
+      }
+      initMPUPresignUrlRequest.putCustomRequestHeader(S3Consts.TAG_HEADER, tagValueBuilder.toString());
+      return initMPUPresignUrlRequest;
+    }
 
-    // Verify the response code is 204 (No Content)
-    assertEquals(HttpURLConnection.HTTP_NO_CONTENT, responseCode);
+    @Test
+    public void testPresignedUrlDelete() throws IOException {
+      final String keyName = getKeyName();
 
-    // Verify the object is deleted
-    assertFalse(s3Client.doesObjectExist(bucketName, keyName));
+      try (InputStream is = new ByteArrayInputStream(CONTENT.getBytes(StandardCharsets.UTF_8))) {
+        s3Client.putObject(BUCKET_NAME, keyName, is, new ObjectMetadata());
+      }
+
+      // Generate the presigned URL for DELETE
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.DELETE)
+              .withExpiration(expiration);
+      URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+      // Execute the DELETE request using HttpUrlConnection
+      HttpURLConnection connection = S3SDKTestUtils.openHttpURLConnection(url, "DELETE", null, null);
+      int responseCode = connection.getResponseCode();
+
+      // Verify the response code is 204 (No Content)
+      assertEquals(HttpURLConnection.HTTP_NO_CONTENT, responseCode);
+
+      // Verify the object is deleted
+      assertFalse(s3Client.doesObjectExist(BUCKET_NAME, keyName));
+    }
   }
 
   /**
