@@ -419,6 +419,9 @@ public final class HddsConfigKeys {
       "hdds.datanode.kerberos.keytab.file";
   public static final String HDDS_METRICS_PERCENTILES_INTERVALS_KEY =
       "hdds.metrics.percentiles.intervals";
+  public static final String HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED =
+      "hdds.datanode.container.startup.cache.enabled";
+  public static final boolean HDDS_DATANODE_CONTAINER_STARTUP_CACHE_ENABLED_DEFAULT = false;
 
   /** Do not instantiate. */
   private HddsConfigKeys() {
