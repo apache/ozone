@@ -2674,17 +2674,6 @@
         </plugins>
       </build>
     </profile>
-    <!-- Profiles for specific JDK versions -->
-    <profile>
-      <id>java9-or-later</id>
-      <activation>
-        <jdk>[9,]</jdk>
-      </activation>
-      <properties>
-        <!-- supported since Java 9 -->
-        <maven.compiler.release>${javac.version}</maven.compiler.release>
-      </properties>
-    </profile>
     <!-- Profiles for specific aspectj versions -->
     <profile>
       <id>aspectj-java11-20</id>
