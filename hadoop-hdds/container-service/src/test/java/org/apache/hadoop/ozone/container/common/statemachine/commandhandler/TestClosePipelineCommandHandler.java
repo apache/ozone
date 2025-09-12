@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.eq;
@@ -31,6 +34,10 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -130,6 +137,50 @@ public class TestClosePipelineCommandHandler {
 
     verify(raftClientGroupManager, times(0))
         .remove(any(), anyBoolean(), anyBoolean());
+  }
+
+  @Test
+  void testPendingPipelineClose() throws IOException, InterruptedException {
+    final List<DatanodeDetails> datanodes = getDatanodes();
+    final DatanodeDetails currentDatanode = datanodes.get(0);
+    final PipelineID pipelineID = PipelineID.randomId();
+    final UUID pipelineUUID = pipelineID.getId();
+    final SCMCommand<ClosePipelineCommandProto> command1 = new ClosePipelineCommand(pipelineID);
+    final SCMCommand<ClosePipelineCommandProto> command2 = new ClosePipelineCommand(pipelineID);
+    StateContext stateContext = ContainerTestUtils.getMockContext(currentDatanode, conf);
+
+    final boolean shouldDeleteRatisLogDirectory = true;
+    XceiverServerRatis writeChannel = mock(XceiverServerRatis.class);
+    when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
+    when(writeChannel.getShouldDeleteRatisLogDirectory()).thenReturn(shouldDeleteRatisLogDirectory);
+    when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(true);
+    Collection<RaftPeer> raftPeers = datanodes.stream()
+        .map(RatisHelper::toRaftPeer)
+        .collect(Collectors.toList());
+    when(writeChannel.getServer()).thenReturn(mock(RaftServer.class));
+    when(writeChannel.getServer().getId()).thenReturn(RatisHelper.toRaftPeerId(currentDatanode));
+    when(writeChannel.getRaftPeersInPipeline(pipelineID)).thenReturn(raftPeers);
+
+    lenient().doAnswer(invocation -> {
+      Thread.sleep(200);
+      return null;
+    }).when(writeChannel).removeGroup(pipelineID.getProtobuf());
+
+    ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
+
+    final ClosePipelineCommandHandler commandHandler =
+        new ClosePipelineCommandHandler((leader, tls) -> raftClient, singleThreadExecutor);
+    assertFalse(commandHandler.isPipelineInProgress(pipelineUUID));
+    commandHandler.handle(command1, ozoneContainer, stateContext, connectionManager);
+    Thread.sleep(50);
+    commandHandler.handle(command2, ozoneContainer, stateContext, connectionManager);
+
+    singleThreadExecutor.shutdown();
+    assertTrue(singleThreadExecutor.awaitTermination(10, TimeUnit.SECONDS));
+    
+    // Only one command should have been processed due to duplicate prevention
+    assertEquals(1, commandHandler.getInvocationCount());
+    assertFalse(commandHandler.isPipelineInProgress(pipelineUUID));
   }
 
   private List<DatanodeDetails> getDatanodes() {
