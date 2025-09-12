@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import com.google.common.base.Strings;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -91,9 +90,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
       HddsProtos.Node node = scmClient.queryNode(UUID.fromString(exclusiveNodeOptions.getNodeId()));
       Integer totalVolumeCount = node.hasTotalVolumeCount() ? node.getTotalVolumeCount() : null;
       Integer healthyVolumeCount = node.hasHealthyVolumeCount() ? node.getHealthyVolumeCount() : null;
-      BasicDatanodeInfo singleNodeInfo = new BasicDatanodeInfo(DatanodeDetails.getFromProtoBuf(node.getNodeID()),
-          node.getNodeOperationalStates(0), node.getNodeStates(0), 
-          Arrays.asList(totalVolumeCount, healthyVolumeCount));
+      BasicDatanodeInfo singleNodeInfo = new BasicDatanodeInfo.Builder(
+          DatanodeDetails.getFromProtoBuf(node.getNodeID()), node.getNodeOperationalStates(0),
+          node.getNodeStates(0)).withVolumeCounts(totalVolumeCount, healthyVolumeCount).build();
       if (json) {
         List<BasicDatanodeInfo> dtoList = Collections.singletonList(singleNodeInfo);
         System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(dtoList));
@@ -157,14 +156,11 @@ public class ListInfoSubcommand extends ScmSubcommand {
               double percentUsed = (capacity > 0) ? (used * 100.0) / capacity : 0.0;
               Integer totalVolumeCount = node.hasTotalVolumeCount() ? node.getTotalVolumeCount() : null;
               Integer healthyVolumeCount = node.hasHealthyVolumeCount() ? node.getHealthyVolumeCount() : null;
-              return new BasicDatanodeInfo(
+              return new BasicDatanodeInfo.Builder(
                   DatanodeDetails.getFromProtoBuf(node.getNodeID()),
-                  node.getNodeOperationalStates(0),
-                  node.getNodeStates(0),
-                  used,
-                  capacity,
-                  percentUsed,
-                  Arrays.asList(totalVolumeCount, healthyVolumeCount));
+                  node.getNodeOperationalStates(0), node.getNodeStates(0))
+                  .withUsageInfo(used, capacity, percentUsed)
+                  .withVolumeCounts(totalVolumeCount, healthyVolumeCount).build();
             } catch (Exception e) {
               String reason = "Could not process info for an unknown datanode";
               if (p != null && p.getNode() != null && !Strings.isNullOrEmpty(p.getNode().getUuid())) {
@@ -184,10 +180,9 @@ public class ListInfoSubcommand extends ScmSubcommand {
     return nodes.stream().map(p -> {
       Integer totalVolumeCount = p.hasTotalVolumeCount() ? p.getTotalVolumeCount() : null;
       Integer healthyVolumeCount = p.hasHealthyVolumeCount() ? p.getHealthyVolumeCount() : null;
-      return new BasicDatanodeInfo(
-          DatanodeDetails.getFromProtoBuf(p.getNodeID()),
-          p.getNodeOperationalStates(0), p.getNodeStates(0), 
-          Arrays.asList(totalVolumeCount, healthyVolumeCount)); })
+      return new BasicDatanodeInfo.Builder(
+          DatanodeDetails.getFromProtoBuf(p.getNodeID()), p.getNodeOperationalStates(0), p.getNodeStates(0))
+          .withVolumeCounts(totalVolumeCount, healthyVolumeCount).build(); })
         .sorted(Comparator.comparing(BasicDatanodeInfo::getHealthState))
         .collect(Collectors.toList());
   }
