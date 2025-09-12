@@ -20,6 +20,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import moment from 'moment';
 import { ValueType } from 'react-select';
 import { useLocation } from 'react-router-dom';
+import { AxiosError } from 'axios';
 
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import AclPanel from '@/v2/components/aclDrawer/aclDrawer';
@@ -207,7 +208,7 @@ const Buckets: React.FC<{}> = () => {
       });
     }).catch(error => {
       setLoading(false);
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   }
 

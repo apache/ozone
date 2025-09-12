@@ -101,7 +101,7 @@ const DecommissionSummary: React.FC<DecommisioningSummaryProps> = ({
         loading: false,
         summaryData: {}
       });
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
       content = (
         <Result
           status='error'

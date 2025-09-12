@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import { AxiosError } from 'axios';
 import { ValueType } from 'react-select';
 import { Tabs, Tooltip } from 'antd';
 import { TablePaginationConfig } from 'antd/es/table';
@@ -87,7 +86,7 @@ const OMDBInsights: React.FC<{}> = () => {
         ));
         setLoading(false);
       }).catch(error => {
-        showDataFetchError((error as AxiosError).toString());
+        showDataFetchError(error);
       });
     }
   }

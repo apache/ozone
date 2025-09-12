@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import { AxiosError } from 'axios';
 import Table, {
   ColumnsType,
   TablePaginationConfig
@@ -101,7 +100,7 @@ const DeletePendingDirTable: React.FC<DeletePendingDirTableProps> = ({
       setLoading(false);
     }).catch(error => {
       setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     });
   }
 

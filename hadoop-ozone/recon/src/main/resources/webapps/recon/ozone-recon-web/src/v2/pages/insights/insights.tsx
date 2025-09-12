@@ -17,10 +17,7 @@
  */
 
 import React, { useState } from 'react';
-import axios, {
-  CanceledError,
-  AxiosError
-} from 'axios';
+import axios, { CanceledError } from 'axios';
 import { Row, Col, Card, Result } from 'antd';
 
 import { showDataFetchError } from '@/utils/common';
@@ -136,7 +133,7 @@ const Insights: React.FC<{}> = () => {
       setLoading(false);
     })).catch(error => {
       setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     })
   }
 

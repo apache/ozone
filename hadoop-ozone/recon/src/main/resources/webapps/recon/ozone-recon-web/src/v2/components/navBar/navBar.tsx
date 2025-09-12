@@ -66,8 +66,8 @@ const NavBar: React.FC<NavBarProps> = ({
       const response: AxiosResponse<string[]> = await request;
       const heatmapDisabled = response?.data?.includes('HEATMAP')
       setIsHeatmapEnabled(!heatmapDisabled);
-    } catch (error: unknown) {
-      showDataFetchError((error as Error).toString())
+    } catch (error) {
+      showDataFetchError(error)
     }
   }
 
