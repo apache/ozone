@@ -19,9 +19,6 @@ package org.apache.hadoop.ozone.container.common.transport.server;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
 import java.net.BindException;
 import java.util.Collections;
@@ -30,6 +27,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -222,7 +221,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .importAndCreateSpan(
             "XceiverServerGrpc." + request.getCmdType().name(),
             request.getTraceID());
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignore = span.makeCurrent()) {
       ContainerProtos.ContainerCommandResponseProto response =
           storageContainer.dispatch(request, null);
       if (response.getResult() != ContainerProtos.Result.SUCCESS) {
@@ -230,7 +229,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
             response.getResult());
       }
     } finally {
-      span.finish();
+      span.end();
     }
   }
 

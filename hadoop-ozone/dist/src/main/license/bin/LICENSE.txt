@@ -325,10 +325,6 @@ Apache License 2.0
    io.grpc:grpc-protobuf-lite
    io.grpc:grpc-stub
    io.grpc:grpc-util
-   io.jaegertracing:jaeger-client
-   io.jaegertracing:jaeger-core
-   io.jaegertracing:jaeger-thrift
-   io.jaegertracing:jaeger-tracerresolver
    io.netty:netty-buffer
    io.netty:netty-codec
    io.netty:netty-codec-http
@@ -347,10 +343,12 @@ Apache License 2.0
    io.netty:netty-transport-native-unix-common
    io.opencensus:opencensus-api
    io.opencensus:opencensus-contrib-grpc-metrics
-   io.opentracing.contrib:opentracing-tracerresolver
-   io.opentracing:opentracing-api
-   io.opentracing:opentracing-noop
-   io.opentracing:opentracing-util
+   io.opentelemetry:opentelemetry-api
+   io.opentelemetry:opentelemetry-context
+   io.opentelemetry:opentelemetry-exporter-otlp
+   io.opentelemetry:opentelemetry-sdk
+   io.opentelemetry:opentelemetry-sdk-common
+   io.opentelemetry:opentelemetry-sdk-trace
    io.perfmark:perfmark-api
    io.prometheus:simpleclient
    io.prometheus:simpleclient_common

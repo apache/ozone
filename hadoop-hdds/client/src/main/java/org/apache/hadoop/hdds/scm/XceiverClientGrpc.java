@@ -21,9 +21,6 @@ import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.ArrayList;
@@ -536,10 +533,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       ContainerCommandRequestProto request)
       throws IOException, ExecutionException, InterruptedException {
 
-    Span span = GlobalTracer.get()
-        .buildSpan("XceiverClientGrpc." + request.getCmdType().name()).start();
-
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
+    try (AutoCloseable ignored = TracingUtil.createActivatedSpan("XceiverClientGrpc." + request.getCmdType().name())) {
 
       ContainerCommandRequestProto.Builder builder =
           ContainerCommandRequestProto.newBuilder(request)
@@ -553,9 +547,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         asyncReply.getResponse().get();
       }
       return asyncReply;
-
-    } finally {
-      span.finish();
+    } catch (Exception e) {
+      throw new IOException(e);
     }
   }
 

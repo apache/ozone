@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.server;
 
 import com.google.protobuf.ServiceException;
-import io.opentracing.Span;
 import java.util.function.UnaryOperator;
+import io.opentelemetry.api.trace.Span;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -98,7 +98,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       return response;
 
     } finally {
-      span.finish();
+      span.end();
     }
   }
 

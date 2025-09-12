@@ -20,9 +20,8 @@ package org.apache.hadoop.hdds.scm.storage;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
 
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -155,17 +154,17 @@ public final class ContainerProtocolCalls  {
       try {
         return op.apply(d);
       } catch (IOException e) {
-        Span span = GlobalTracer.get().activeSpan();
+        Span span = TracingUtil.getActiveSpan();
         if (e instanceof StorageContainerException) {
           StorageContainerException sce = (StorageContainerException)e;
           // Block token expired. There's no point retrying other DN.
           // Throw the exception to request a new block token right away.
           if (sce.getResult() == BLOCK_TOKEN_VERIFICATION_FAILED) {
-            span.log("block token verification failed at DN " + d);
+            span.addEvent("block token verification failed at DN " + d);
             throw e;
           }
         }
-        span.log("failed to connect to DN " + d);
+        span.addEvent("failed to connect to DN " + d);
         excluded.add(d);
         if (excluded.size() < pipeline.size()) {
           LOG.warn(toErrorMessage.apply(d)
@@ -372,30 +371,28 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-    Span span = GlobalTracer.get()
-        .buildSpan("readChunk").start();
-    try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
-      span.setTag("offset", chunk.getOffset())
-          .setTag("length", chunk.getLen())
-          .setTag("block", blockID.toString());
-      return tryEachDatanode(xceiverClient.getPipeline(),
-          d -> readChunk(xceiverClient, chunk, blockID,
-              validators, builder, d),
-          d -> toErrorMessage(chunk, blockID, d));
-    } finally {
-      span.finish();
-    }
+      try (AutoCloseable ignored = TracingUtil.createActivatedSpan("readChunk")) {
+        Span span = TracingUtil.getActiveSpan();
+        span.setAttribute("offset", chunk.getOffset())
+            .setAttribute("length", chunk.getLen())
+            .setAttribute("block", blockID.toString());
+        return tryEachDatanode(xceiverClient.getPipeline(),
+            d -> readChunk(xceiverClient, chunk, blockID,
+                validators, builder, d),
+            d -> toErrorMessage(chunk, blockID, d));
+      } catch (Exception e) {
+        throw new IOException(e);
+      }
   }
 
-  private static ContainerProtos.ReadChunkResponseProto readChunk(
+    private static ContainerProtos.ReadChunkResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
       List<Validator> validators,
       ContainerCommandRequestProto.Builder builder,
       DatanodeDetails d) throws IOException {
-    ContainerCommandRequestProto.Builder requestBuilder = builder
+      ContainerCommandRequestProto.Builder requestBuilder = builder
         .setDatanodeUuid(d.getUuidString());
-    Span span = GlobalTracer.get().activeSpan();
-    String traceId = TracingUtil.exportSpan(span);
+    String traceId = TracingUtil.exportCurrentSpan();
     if (traceId != null) {
       requestBuilder = requestBuilder.setTraceID(traceId);
     }
