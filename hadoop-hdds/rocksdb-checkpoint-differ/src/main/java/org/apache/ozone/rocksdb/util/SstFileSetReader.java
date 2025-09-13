@@ -238,12 +238,12 @@ public class SstFileSetReader {
   /**
    * A wrapper class that holds an iterator and its current value for heap operations.
    */
-  private static class HeapEntryWithFileIdx<T extends Comparable<T>>
-      implements Comparable<HeapEntryWithFileIdx<T>>, Closeable {
+  private static class HeapEntry<T extends Comparable<T>>
+      implements Comparable<HeapEntry<T>>, Closeable {
     private final ClosableIterator<T> iterator;
     private T currentKey;
 
-    HeapEntryWithFileIdx(ClosableIterator<T> iterator) {
+    HeapEntry(ClosableIterator<T> iterator) {
       this.iterator = iterator;
       advance();
     }
@@ -268,7 +268,7 @@ public class SstFileSetReader {
     }
 
     @Override
-    public int compareTo(@Nonnull HeapEntryWithFileIdx<T> other) {
+    public int compareTo(@Nonnull HeapEntry<T> other) {
       if (this.currentKey == null && other.currentKey == null) {
         return 0;
       }
@@ -290,7 +290,7 @@ public class SstFileSetReader {
         return false;
       }
 
-      HeapEntryWithFileIdx<T> other = (HeapEntryWithFileIdx<T>) obj;
+      HeapEntry<T> other = (HeapEntry<T>) obj;
       return compareTo(other) == 0;
     }
 
@@ -308,7 +308,7 @@ public class SstFileSetReader {
    * @param <T>
    */
   private abstract static class MultipleSstFileIterator<T extends Comparable<T>> implements ClosableIterator<T> {
-    private final PriorityQueue<HeapEntryWithFileIdx<T>> minHeap;
+    private final PriorityQueue<HeapEntry<T>> minHeap;
 
     private MultipleSstFileIterator(Collection<String> sstFiles) {
       this.minHeap = new PriorityQueue<>();
@@ -324,7 +324,7 @@ public class SstFileSetReader {
       try {
         for (String file : files) {
           ClosableIterator<T> iterator = getKeyIteratorForFile(file);
-          HeapEntryWithFileIdx<T> entry = new HeapEntryWithFileIdx<>(iterator);
+          HeapEntry<T> entry = new HeapEntry<>(iterator);
 
           if (entry.getCurrentKey() != null) {
             minHeap.offer(entry);
@@ -353,12 +353,12 @@ public class SstFileSetReader {
 
       assert minHeap.peek() != null;
       // Get current key from heap
-      T currentKey = minHeap.peek().getCurrentKey();
+      HeapEntry<T> currentKey = minHeap.peek();
 
       // Advance all entries with the same key (from different files)
       // and keep the one with the highest file index
-      while (!minHeap.isEmpty() && Objects.equals(minHeap.peek().getCurrentKey(), currentKey)) {
-        HeapEntryWithFileIdx<T> entry = minHeap.poll();
+      while (!minHeap.isEmpty() && Objects.equals(minHeap.peek(), currentKey)) {
+        HeapEntry<T> entry = minHeap.poll();
         if (entry.advance()) {
           minHeap.offer(entry);
         } else {
@@ -367,7 +367,7 @@ public class SstFileSetReader {
         }
       }
 
-      return currentKey;
+      return currentKey.getCurrentKey();
     }
 
     @Override
