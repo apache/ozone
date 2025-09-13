@@ -42,10 +42,8 @@ import static org.apache.hadoop.ozone.recon.api.handlers.EntityHandler.parseRequ
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -264,7 +262,7 @@ public class OMDBInsightEndpoint {
     Map<String, OmKeyInfo> matchedKeys = new LinkedHashMap<>();
     // Convert the search prefix to an object path for FSO buckets
     String startPrefixObjectPath = ReconUtils.convertToObjectPathForOpenKeySearch(
-            startPrefix, omMetadataManager, reconNamespaceSummaryManager, reconSCM);
+        startPrefix, omMetadataManager, reconNamespaceSummaryManager, reconSCM);
     String[] names = parseRequestPath(startPrefixObjectPath);
     Table<String, OmKeyInfo> openFileTable =
         omMetadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
@@ -709,23 +707,11 @@ public class OMDBInsightEndpoint {
    */
   protected Pair<Long, Long> fetchSizeForDeletedDirectory(long objectId)
       throws IOException {
-    long totalSize = 0;
-    long totalReplicatedSize = 0;
-    Deque<Long> stack = new ArrayDeque();
-    stack.push(objectId);
-
-    while (!stack.isEmpty()) {
-      long currentId = stack.pop();
-      NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(currentId);
-      if (nsSummary != null) {
-        totalSize += nsSummary.getSizeOfFiles();
-        totalReplicatedSize += nsSummary.getReplicatedSizeOfFiles();
-        for (long childId : nsSummary.getChildDir()) {
-          stack.push(childId);
-        }
-      }
+    NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
+    if (nsSummary != null) {
+      return Pair.of(nsSummary.getSizeOfFiles(), nsSummary.getReplicatedSizeOfFiles());
     }
-    return Pair.of(totalSize, totalReplicatedSize);
+    return Pair.of(0L, 0L);
   }
 
   /** This method retrieves set of directories pending for deletion.
@@ -1373,7 +1359,7 @@ public class OMDBInsightEndpoint {
 
     if (!StringUtils.isEmpty(paramInfo.getReplicationType())
         && !entry.getValue().getReplicationConfig().getReplicationType().name().equals(
-            paramInfo.getReplicationType())) {
+        paramInfo.getReplicationType())) {
       return false;
     }
 

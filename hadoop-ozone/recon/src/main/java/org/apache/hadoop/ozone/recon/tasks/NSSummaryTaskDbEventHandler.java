@@ -110,7 +110,7 @@ public class NSSummaryTaskDbEventHandler {
     nsSummaryMap.put(parentObjectId, nsSummary);
 
     // Propagate upwards to all parents in the parent chain
-    propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), 1, nsSummaryMap);
+    propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), keyInfo.getReplicatedSize(),  1, nsSummaryMap);
   }
 
   protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
@@ -130,6 +130,7 @@ public class NSSummaryTaskDbEventHandler {
     // Check if this directory already has content (files/subdirs) that need propagation
     boolean directoryAlreadyExists = (curNSSummary != null);
     long existingSizeOfFiles = directoryAlreadyExists ? curNSSummary.getSizeOfFiles() : 0;
+    long existingReplicatedSizeOfFiles = directoryAlreadyExists ? curNSSummary.getReplicatedSizeOfFiles() : 0;
     int existingNumOfFiles = directoryAlreadyExists ? curNSSummary.getNumOfFiles() : 0;
 
     if (curNSSummary == null) {
@@ -159,7 +160,8 @@ public class NSSummaryTaskDbEventHandler {
 
     // If the directory already existed with content, propagate its totals upward
     if (directoryAlreadyExists && (existingSizeOfFiles > 0 || existingNumOfFiles > 0)) {
-      propagateSizeUpwards(parentObjectId, existingSizeOfFiles, existingNumOfFiles, nsSummaryMap);
+      propagateSizeUpwards(parentObjectId, existingSizeOfFiles,
+          existingReplicatedSizeOfFiles, existingNumOfFiles, nsSummaryMap);
     }
   }
 
@@ -192,7 +194,7 @@ public class NSSummaryTaskDbEventHandler {
     nsSummaryMap.put(parentObjectId, nsSummary);
 
     // Propagate upwards to all parents in the parent chain
-    propagateSizeUpwards(parentObjectId, -keyInfo.getDataSize(), -1, nsSummaryMap);
+    propagateSizeUpwards(parentObjectId, -keyInfo.getDataSize(), -keyInfo.getReplicatedSize(), -1, nsSummaryMap);
   }
 
   protected void handleDeleteDirEvent(OmDirectoryInfo directoryInfo,
@@ -224,10 +226,12 @@ public class NSSummaryTaskDbEventHandler {
       // Decrement parent's totals by the deleted directory's totals
       parentNsSummary.setNumOfFiles(parentNsSummary.getNumOfFiles() - deletedDirSummary.getNumOfFiles());
       parentNsSummary.setSizeOfFiles(parentNsSummary.getSizeOfFiles() - deletedDirSummary.getSizeOfFiles());
+      parentNsSummary.setReplicatedSizeOfFiles(
+          parentNsSummary.getReplicatedSizeOfFiles() - deletedDirSummary.getReplicatedSizeOfFiles());
       
       // Propagate the decrements upwards to all ancestors
-      propagateSizeUpwards(parentObjectId, -deletedDirSummary.getSizeOfFiles(), 
-                          -deletedDirSummary.getNumOfFiles(), nsSummaryMap);
+      propagateSizeUpwards(parentObjectId, -deletedDirSummary.getSizeOfFiles(),
+          -deletedDirSummary.getReplicatedSizeOfFiles(), -deletedDirSummary.getNumOfFiles(), nsSummaryMap);
       
       // Set the deleted directory's parentId to 0 (unlink it)
       deletedDirSummary.setParentId(0);
@@ -276,7 +280,7 @@ public class NSSummaryTaskDbEventHandler {
    * This ensures that when files are added/deleted, all ancestor directories
    * reflect the total changes in their sizeOfFiles and numOfFiles fields.
    */
-  protected void propagateSizeUpwards(long objectId, long sizeChange,
+  protected void propagateSizeUpwards(long objectId, long sizeChange, long replicatedSizeChange,
                                        int countChange, Map<Long, NSSummary> nsSummaryMap) 
                                        throws IOException {
     // Get the current directory's NSSummary
@@ -299,11 +303,12 @@ public class NSSummaryTaskDbEventHandler {
       if (parentSummary != null) {
         // Update parent's totals
         parentSummary.setSizeOfFiles(parentSummary.getSizeOfFiles() + sizeChange);
+        parentSummary.setReplicatedSizeOfFiles(parentSummary.getReplicatedSizeOfFiles() + replicatedSizeChange);
         parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + countChange);
         nsSummaryMap.put(parentId, parentSummary);
         
         // Recursively propagate to grandparents
-        propagateSizeUpwards(parentId, sizeChange, countChange, nsSummaryMap);
+        propagateSizeUpwards(parentId, sizeChange, replicatedSizeChange, countChange, nsSummaryMap);
       }
     }
   }
