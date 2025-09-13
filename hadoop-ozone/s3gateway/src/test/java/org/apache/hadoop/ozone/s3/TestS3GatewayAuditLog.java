@@ -123,9 +123,9 @@ public class TestS3GatewayAuditLog {
     bucketEndpoint.head(bucketName);
 
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_BUCKET {bucket=[bucket], x-amz-request-id=" + 
-        requestIdentifier.getRequestId() + ", x-amz-id-2=" + 
-        requestIdentifier.getAmzId() + "} | ret=SUCCESS";
+        "op=HEAD_BUCKET {\"bucket\":\"[bucket]\",\"x-amz-request-id\":\"" +
+        requestIdentifier.getRequestId() + "\",\"x-amz-id-2\":\"" +
+        requestIdentifier.getAmzId() + "\"} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -134,9 +134,9 @@ public class TestS3GatewayAuditLog {
 
     rootEndpoint.get().getEntity();
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=LIST_S3_BUCKETS {x-amz-request-id=" + 
-        requestIdentifier.getRequestId() + ", x-amz-id-2=" + 
-        requestIdentifier.getAmzId() + "} | ret=SUCCESS";
+        "op=LIST_S3_BUCKETS {\"x-amz-request-id\":\"" +
+        requestIdentifier.getRequestId() + "\",\"x-amz-id-2\":\"" +
+        requestIdentifier.getAmzId() + "\"} | ret=SUCCESS";
     verifyLog(expected);
   }
 
@@ -155,9 +155,9 @@ public class TestS3GatewayAuditLog {
 
     keyEndpoint.head(bucketName, "key1");
     String expected = "INFO  | S3GAudit | ? | user=null | ip=null | " +
-        "op=HEAD_KEY {bucket=[bucket], path=[key1], x-amz-request-id=" + 
-        requestIdentifier.getRequestId() + ", x-amz-id-2=" + 
-        requestIdentifier.getAmzId() + "} | ret=SUCCESS";
+        "op=HEAD_KEY {\"bucket\":\"[bucket]\",\"path\":\"[key1]\",\"x-amz-request-id\":\"" +
+        requestIdentifier.getRequestId() + "\",\"x-amz-id-2\":\"" +
+        requestIdentifier.getAmzId() + "\"} | ret=SUCCESS";
     verifyLog(expected);
   }
 
