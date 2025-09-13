@@ -80,6 +80,11 @@ public final class CommandDispatcher {
     return handlerMap.get(Type.deleteBlocksCommand);
   }
 
+  @VisibleForTesting
+  public ClosePipelineCommandHandler getClosePipelineCommandHandler() {
+    return (ClosePipelineCommandHandler) handlerMap.get(Type.closePipelineCommand);
+  }
+
   /**
    * Dispatch the command to the correct handler.
    *
