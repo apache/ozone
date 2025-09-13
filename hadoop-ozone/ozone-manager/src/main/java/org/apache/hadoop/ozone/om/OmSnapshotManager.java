@@ -517,8 +517,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
     OmSnapshotManager omSnapshotManager =
         ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
-    // Create the snapshot local property file.
-    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager, omMetadataManager, snapshotInfo, store);
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshotSupplier =
+             omSnapshotManager.getSnapshot(snapshotInfo.getSnapshotId())) {
+      // Create the snapshot local property file.
+      OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager,
+          (RDBStore) omSnapshotSupplier.get().getMetadataManager().getStore(), snapshotInfo);
+    }
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
     // Snapshot create is processed as a single transaction and
@@ -632,16 +636,13 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   /**
    * Creates and writes snapshot local properties to a YAML file with uncompacted SST file list.
-   * @param omMetadataManager the metadata manager
-   * @param snapshotInfo The metadata of snapshot to be created
-   * @param store The store used to get uncompacted SST file list from.
+   * @param snapshotStore snapshot metadata manager.
    */
-  public static void createNewOmSnapshotLocalDataFile(OmSnapshotManager snapshotManager,
-      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo, RDBStore store)
-      throws IOException {
-    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(omMetadataManager, snapshotInfo));
+  public static void createNewOmSnapshotLocalDataFile(OmSnapshotManager snapshotManager, RDBStore snapshotStore,
+      SnapshotInfo snapshotInfo) throws IOException {
+    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(snapshotStore.getDbLocation().toPath()));
     Files.deleteIfExists(snapshotLocalDataPath);
-    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(store),
+    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(snapshotStore),
         snapshotInfo.getPathPreviousSnapshotId());
     snapshotLocalDataYaml.writeToYaml(snapshotManager, snapshotLocalDataPath.toFile());
   }
