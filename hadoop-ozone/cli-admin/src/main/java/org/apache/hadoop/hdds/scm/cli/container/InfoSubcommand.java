@@ -65,28 +65,21 @@ public class InfoSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
+    // validate all container IDs and fail fast
+    List<Long> containerIDs = containerList.getValidatedIDs();
+
     boolean first = true;
-    multiContainer = containerList.size() > 1;
+    multiContainer = containerIDs.size() > 1;
 
     printHeader();
-    // TODO HDDS-13592: Use ContainerIDParameters#getValidatedIDs to automatically handle type conversion and fail fast.
-    for (String id : containerList) {
-      printOutput(scmClient, id, first);
+    for (Long containerID : containerIDs) {
+      if (!first) {
+        printBreak();
+      }
+      printDetails(scmClient, containerID, first);
       first = false;
     }
     printFooter();
-  }
-
-  private void printOutput(ScmClient scmClient, String id, boolean first)
-      throws IOException {
-    long containerID;
-    try {
-      containerID = Long.parseLong(id);
-    } catch (NumberFormatException e) {
-      printError("Invalid container ID: " + id);
-      return;
-    }
-    printDetails(scmClient, containerID, first);
   }
 
   private void printHeader() {
@@ -131,9 +124,6 @@ public class InfoSubcommand extends ScmSubcommand {
       printError("Unable to retrieve the replica details: " + e.getMessage());
     }
 
-    if (!first) {
-      printBreak();
-    }
     if (json) {
       if (!container.getPipeline().isEmpty()) {
         ContainerWithPipelineAndReplicas wrapper =

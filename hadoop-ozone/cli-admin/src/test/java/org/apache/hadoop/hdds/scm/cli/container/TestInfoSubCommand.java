@@ -119,14 +119,22 @@ public class TestInfoSubCommand {
     when(scmClient.getContainerReplicas(anyLong())).thenReturn(getReplicas(true));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("1", "123", "456", "invalid", "789");
+    c.parseArgs("1", "123", "456", "789");
     cmd.execute(scmClient);
     validateMultiOutput();
   }
 
   @Test
+  public void testMultipleInvalidContainerIdFails() throws Exception {
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("1", "invalid", "-2", "0.5");
+    validateInvalidContainerIDOutput();
+  }
+
+  @Test
   public void testContainersCanBeReadFromStdin() throws IOException {
-    String input = "1\n123\n456\ninvalid\n789\n";
+    String input = "1\n123\n456\n789\n";
     ByteArrayInputStream inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
     System.setIn(inContent);
     cmd = new InfoSubcommand();
@@ -137,23 +145,38 @@ public class TestInfoSubCommand {
     validateMultiOutput();
   }
 
+  @Test
+  public void testInvalidContainerIdFromStdinFails() throws Exception {
+    String input = "1\ninvalid\n-2\n0.5\n";
+    ByteArrayInputStream inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
+    System.setIn(inContent);
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-");
+    validateInvalidContainerIDOutput();
+  }
+
   private void validateMultiOutput() throws UnsupportedEncodingException {
     // Ensure we have a log line for each containerID
     List<String> replica = Arrays.stream(outContent.toString(DEFAULT_ENCODING).split("\n"))
         .filter(m -> m.matches("(?s)^Container id: (1|123|456|789).*"))
         .collect(Collectors.toList());
     assertEquals(4, replica.size());
+  }
 
-    Pattern p = Pattern.compile(
-        "^Invalid\\scontainer\\sID:\\sinvalid.*", Pattern.MULTILINE);
-    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
+  private void validateInvalidContainerIDOutput() throws Exception {
+    CommandLine.ParameterException ex = assertThrows(
+        CommandLine.ParameterException.class, () -> cmd.execute(scmClient));
+
+    assertThat(ex.getMessage())
+        .isEqualTo("Container IDs must be positive integers. Invalid container IDs: invalid -2 0.5");
+    assertThat(outContent.toString(DEFAULT_ENCODING)).isEmpty();
   }
 
   @Test
   public void testContainersCanBeReadFromStdinJson()
       throws IOException {
-    String input = "1\n123\n456\ninvalid\n789\n";
+    String input = "1\n123\n456\n789\n";
     ByteArrayInputStream inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
     System.setIn(inContent);
     cmd = new InfoSubcommand();
@@ -165,11 +188,22 @@ public class TestInfoSubCommand {
   }
 
   @Test
+  public void testInvalidContainerIdFromStdinJsonFails() throws Exception {
+    String input = "1\ninvalid\n-2\n0.5\n";
+    ByteArrayInputStream inContent = new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING));
+    System.setIn(inContent);
+    cmd = new InfoSubcommand();
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-", "--json");
+    validateInvalidContainerIDOutput();
+  }
+
+  @Test
   public void testMultipleContainersCanBePassedJson() throws Exception {
     when(scmClient.getContainerReplicas(anyLong())).thenReturn(getReplicas(true));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
-    c.parseArgs("1", "123", "456", "invalid", "789", "--json");
+    c.parseArgs("1", "123", "456", "789", "--json");
     cmd.execute(scmClient);
 
     validateJsonMultiOutput();
@@ -181,11 +215,6 @@ public class TestInfoSubCommand {
         .filter(m -> m.matches("(?s)^.*\"containerInfo\".*"))
         .collect(Collectors.toList());
     assertEquals(4, replica.size());
-
-    Pattern p = Pattern.compile(
-        "^Invalid\\scontainer\\sID:\\sinvalid.*", Pattern.MULTILINE);
-    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
-    assertTrue(m.find());
   }
 
   private void testReplicaIncludedInOutput(boolean includeIndex)
