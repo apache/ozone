@@ -282,6 +282,7 @@ public class SstFileSetReader {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public boolean equals(Object obj) {
       if (this == obj) {
         return true;
@@ -296,7 +297,7 @@ public class SstFileSetReader {
 
     @Override
     public int hashCode() {
-      return Objects.hash(iterator, currentKey);
+      return Objects.hash(currentKey);
     }
   }
 
@@ -356,7 +357,6 @@ public class SstFileSetReader {
       HeapEntry<T> currentKey = minHeap.peek();
 
       // Advance all entries with the same key (from different files)
-      // and keep the one with the highest file index
       while (!minHeap.isEmpty() && Objects.equals(minHeap.peek(), currentKey)) {
         HeapEntry<T> entry = minHeap.poll();
         if (entry.advance()) {

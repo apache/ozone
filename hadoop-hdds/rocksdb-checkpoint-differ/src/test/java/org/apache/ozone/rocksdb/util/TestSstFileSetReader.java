@@ -121,7 +121,6 @@ class TestSstFileSetReader {
    * @param numberOfFiles Number of SST files to create
    * @return Pair containing the complete sorted key map and list of SST file paths
    * @throws RocksDBException if there's an error during SST file creation
-   * @throws IOException if there's an I/O error during file operations
    */
   private Pair<SortedMap<String, Integer>, List<String>> createDummyData(int numberOfFiles) throws RocksDBException {
     List<String> files = new ArrayList<>();
