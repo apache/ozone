@@ -346,10 +346,10 @@ public class SstFileSetReader {
 
       assert minHeap.peek() != null;
       // Get current key from heap
-      HeapEntry<T> currentKey = minHeap.peek();
+      T currentKey = minHeap.peek().getCurrentKey();
 
       // Advance all entries with the same key (from different files)
-      while (!minHeap.isEmpty() && Objects.equals(minHeap.peek(), currentKey)) {
+      while (!minHeap.isEmpty() && Objects.equals(minHeap.peek().getCurrentKey(), currentKey)) {
         HeapEntry<T> entry = minHeap.poll();
         if (entry.advance()) {
           minHeap.offer(entry);
@@ -359,7 +359,7 @@ public class SstFileSetReader {
         }
       }
 
-      return currentKey.getCurrentKey();
+      return currentKey;
     }
 
     @Override
