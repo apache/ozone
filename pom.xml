@@ -124,7 +124,7 @@
     <jetty.version>9.4.58.v20250814</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.5</jline.version>
+    <jline.version>3.30.6</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
