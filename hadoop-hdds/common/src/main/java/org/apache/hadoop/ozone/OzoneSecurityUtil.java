@@ -109,7 +109,9 @@ public final class OzoneSecurityUtil {
 
           String hostAddress = addr.getHostAddress();
           if (!INVALID_IPS.contains(hostAddress)
-              && ipValidator.isValid(hostAddress)) {
+              // scoped IPv6 address is valid according to Commons Validator 1.7+, but Bouncy Castle does not accept it
+              // https://issues.apache.org/jira/browse/VALIDATOR-445
+              && ipValidator.isValidInet4Address(hostAddress)) {
             LOG.info("Adding ip:{},host:{}", hostAddress, addr.getHostName());
             hostIps.add(addr);
           } else {
