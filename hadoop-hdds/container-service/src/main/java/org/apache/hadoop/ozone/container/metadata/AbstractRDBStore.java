@@ -57,8 +57,8 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
     // The same config instance is used on each datanode, so we can share the
     // corresponding column family options, providing a single shared cache
     // for all containers on a datanode.
-    this.dbDef = dbDef;
     cfOptions = getCfOptions(config);
+    this.dbDef = dbDef;
 
     if (this.store == null) {
       ManagedDBOptions options = readDbOptionsFromFile(config);
@@ -78,7 +78,7 @@ public abstract class AbstractRDBStore<DEF extends DBDefinition> implements DBSt
       options.setKeepLogFileNum(dc.getRocksdbLogMaxFileNum());
       this.store = initDBStore(DBStoreBuilder.newBuilder(config, dbDef, null, null)
           .setDBOptions(options)
-          .setCfOptions(cfOptions)
+          .setDefaultCFOptions(cfOptions)
           .setOpenReadOnly(openReadOnly), options, config);
     }
   }
