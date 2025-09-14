@@ -484,6 +484,12 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     @Test
     public void testPresignedUrlGet() throws Exception {
       final String keyName = getKeyName();
+
+      s3Client.putObject(b -> b
+              .bucket(BUCKET_NAME)
+              .key(keyName),
+          RequestBody.fromString(CONTENT));
+
       GetObjectRequest objectRequest = GetObjectRequest.builder().bucket(BUCKET_NAME).key(keyName).build();
 
       GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
