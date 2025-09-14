@@ -86,8 +86,8 @@ public class TestReconInsightsForDeletedDirectories {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestReconInsightsForDeletedDirectories.class);
 
+  private FileSystem fs;
   private static MiniOzoneCluster cluster;
-  private static FileSystem fs;
   private static OzoneClient client;
   private static ReconService recon;
   private static OzoneConfiguration conf;
@@ -130,7 +130,6 @@ public class TestReconInsightsForDeletedDirectories {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @AfterEach
