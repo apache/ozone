@@ -121,6 +121,14 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         throw new OMException("Key not found " + fromKeyName, KEY_NOT_FOUND);
       }
 
+      if (renameKeyRequest.hasUpdateID()) {
+        if (fromKeyFileStatus.getKeyInfo().getUpdateID() != renameKeyRequest.getUpdateID()) {
+          throw new OMException("UpdateID does not match. Key: " + fromKeyName +
+              ", Expected UpdateID: " + fromKeyFileStatus.getKeyInfo().getUpdateID() +
+              ", Given UpdateID: " + renameKeyRequest.getUpdateID(), OMException.ResultCodes.UPDATE_ID_NOT_MATCH);
+        }
+      }
+
       if (fromKeyFileStatus.getKeyInfo().isHsync()) {
         throw new OMException("Open file cannot be renamed since it is " +
             "hsync'ed: volumeName=" + volumeName + ", bucketName=" +
