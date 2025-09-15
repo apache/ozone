@@ -146,7 +146,6 @@ import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
 import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.jooq.Record3;
 import org.junit.jupiter.api.BeforeEach;
