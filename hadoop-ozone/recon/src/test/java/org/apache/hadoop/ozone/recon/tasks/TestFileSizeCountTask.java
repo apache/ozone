@@ -504,9 +504,8 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testTruncateTableExceptionPropagation() throws IOException {
-    // Mock DSLContext and FileCountBySizeDao
+    // Mock DSLContext
     DSLContext mockDslContext = mock(DSLContext.class);
-    FileCountBySizeDao mockDao = mock(FileCountBySizeDao.class);
 
     // Mock schema definition and ensure it returns our mocked DSLContext
     UtilizationSchemaDefinition mockSchema = mock(UtilizationSchemaDefinition.class);

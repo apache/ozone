@@ -302,8 +302,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
-    Configuration sqlConfiguration =
-        reconTestInjector.getInstance(Configuration.class);
     utilizationEndpoint = new UtilizationEndpoint(
         fileCountBySizeDao,
         containerCountBySizeDao,
