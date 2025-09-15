@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Row, Col, Button } from 'antd';
 import { Link } from 'react-router-dom';
 import moment from 'moment';
@@ -118,42 +118,58 @@ const Overview: React.FC<{}> = () => {
   const clusterState = useApiData<ClusterStateResponse>(
     '/api/v1/clusterState',
     DEFAULT_CLUSTER_STATE,
-    { retryAttempts: 2, onError: (error) => showDataFetchError(error) }
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
   );
 
   const taskStatus = useApiData<TaskStatus[]>(
     '/api/v1/task/status',
     DEFAULT_TASK_STATUS,
-    { retryAttempts: 2, onError: (error) => showDataFetchError(error) }
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
   );
 
   const openKeysSummary = useApiData<KeysSummary & { totalOpenKeys: number}>(
     '/api/v1/keys/open/summary',
     DEFAULT_OPEN_KEYS_SUMMARY,
-    { retryAttempts: 2, onError: (error) => showDataFetchError(error) }
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
   );
 
   const deletePendingKeysSummary = useApiData<KeysSummary & { totalDeletedKeys: number}>(
     '/api/v1/keys/deletePending/summary',
     DEFAULT_DELETE_PENDING_KEYS_SUMMARY,
-    { retryAttempts: 2, onError: (error) => showDataFetchError(error) }
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
   );
 
   const omDBDeltaObject = taskStatus.data?.find((item: TaskStatus) => item.taskName === 'OmDeltaRequest');
   const omDBFullObject = taskStatus.data?.find((item: TaskStatus) => item.taskName === 'OmSnapshotRequest');
 
-  const loadOverviewPageData = useCallback(() => {
+  const loadOverviewPageData = () => {
     clusterState.refetch();
     taskStatus.refetch();
     openKeysSummary.refetch();
     deletePendingKeysSummary.refetch();
     setState(prev => ({ ...prev, lastRefreshed: Number(moment()) }));
-  }, []);
+  };
   
   const autoReload = useAutoReload(loadOverviewPageData);
 
   // OM DB Sync function
-  const syncOmData = useCallback(() => {
+  const syncOmData = () => {
     const { request, controller } = AxiosGetHelper(
       '/api/v1/triggerdbsync/om',
       cancelOMDBSyncSignal.current,
@@ -167,13 +183,10 @@ const Overview: React.FC<{}> = () => {
     }).catch((error: Error) => {
       showDataFetchError(error.toString());
     });
-  }, []);
+  };
 
   useEffect(() => {
-    autoReload.startPolling();
-    
     return () => {
-      autoReload.stopPolling();
       cancelRequests([cancelOMDBSyncSignal.current!]);
     };
   }, []);
