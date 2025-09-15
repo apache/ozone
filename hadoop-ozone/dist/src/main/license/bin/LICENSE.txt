@@ -299,9 +299,7 @@ Apache License 2.0
    com.jolbox:bonecp
    com.lmax:disruptor
    com.nimbusds:nimbus-jose-jwt
-   com.squareup.okhttp3:okhttp
    com.squareup.okhttp3:okhttp-jvm
-   com.squareup.okio:okio
    com.squareup.okio:okio-jvm
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
@@ -424,7 +422,6 @@ Apache License 2.0
    org.apache.ratis:ratis-shell
    org.apache.ratis:ratis-thirdparty-misc
    org.apache.ratis:ratis-tools
-   org.apache.thrift:libthrift
    org.apache.zookeeper:zookeeper
    org.apache.zookeeper:zookeeper-jute
    org.eclipse.jetty:jetty-client
@@ -441,9 +438,6 @@ Apache License 2.0
    org.jboss.weld.servlet:weld-servlet-shaded
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib
-   org.jetbrains.kotlin:kotlin-stdlib-common
-   org.jetbrains.kotlin:kotlin-stdlib-jdk7
-   org.jetbrains.kotlin:kotlin-stdlib-jdk8
    org.jheaps:jheaps
    org.jooq:jooq
    org.jooq:jooq-codegen
