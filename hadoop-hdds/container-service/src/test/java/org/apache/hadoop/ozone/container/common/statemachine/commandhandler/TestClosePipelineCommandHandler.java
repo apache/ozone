@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -35,6 +36,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -161,8 +163,12 @@ public class TestClosePipelineCommandHandler {
     when(writeChannel.getServer().getId()).thenReturn(RatisHelper.toRaftPeerId(currentDatanode));
     when(writeChannel.getRaftPeersInPipeline(pipelineID)).thenReturn(raftPeers);
 
-    lenient().doAnswer(invocation -> {
-      Thread.sleep(200);
+    CountDownLatch firstCommandStarted = new CountDownLatch(1);
+    CountDownLatch secondCommandSubmitted = new CountDownLatch(1);
+
+    doAnswer(invocation -> {
+      firstCommandStarted.countDown();
+      secondCommandSubmitted.await();
       return null;
     }).when(writeChannel).removeGroup(pipelineID.getProtobuf());
 
@@ -172,8 +178,9 @@ public class TestClosePipelineCommandHandler {
         new ClosePipelineCommandHandler((leader, tls) -> raftClient, singleThreadExecutor);
     assertFalse(commandHandler.isPipelineInProgress(pipelineUUID));
     commandHandler.handle(command1, ozoneContainer, stateContext, connectionManager);
-    Thread.sleep(50);
+    assertTrue(firstCommandStarted.await(5, TimeUnit.SECONDS));
     commandHandler.handle(command2, ozoneContainer, stateContext, connectionManager);
+    secondCommandSubmitted.countDown();
 
     singleThreadExecutor.shutdown();
     assertTrue(singleThreadExecutor.awaitTermination(10, TimeUnit.SECONDS));
