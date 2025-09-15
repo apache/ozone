@@ -292,12 +292,12 @@ public class SstFileSetReader {
       }
 
       HeapEntry<T> other = (HeapEntry<T>) obj;
-      return compareTo(other) == 0;
+      return this.compareTo(other) == 0;
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(currentKey);
+      return currentKey.hashCode();
     }
   }
 
