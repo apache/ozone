@@ -116,7 +116,7 @@ public final class S3SDKTestUtils {
     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
     connection.setRequestMethod(httpMethod);
     if (headers != null) {
-      headers.forEach((key, values) -> values.forEach(value -> connection.setRequestProperty(key, value)));
+      headers.forEach((key, values) -> values.forEach(value -> connection.addRequestProperty(key, value)));
     }
 
     if (body != null) {

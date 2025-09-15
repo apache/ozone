@@ -507,6 +507,8 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
            ByteArrayOutputStream bos = new ByteArrayOutputStream(CONTENT.getBytes(StandardCharsets.UTF_8).length)) {
         IoUtils.copy(s3is, bos);
         assertEquals(CONTENT, bos.toString("UTF-8"));
+      } finally {
+        connection.disconnect();
       }
 
       // Use the AWS SDK for Java SdkHttpClient class to do the download
@@ -945,70 +947,49 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
     @Test
     public void testPresignedUrlDelete() throws Exception {
-      final String bucketName = getBucketName();
       final String keyName = getKeyName();
-      final String content = "bar";
-      s3Client.createBucket(b -> b.bucket(bucketName));
 
-      s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+      s3Client.putObject(b -> b.bucket(BUCKET_NAME).key(keyName), RequestBody.fromString(CONTENT));
 
-      try (S3Presigner presigner = S3Presigner.builder()
-          // TODO: Find a way to retrieve the path style configuration from S3Client instead
-          .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-          .endpointOverride(s3Client.serviceClientConfiguration().endpointOverride().get())
-          .region(s3Client.serviceClientConfiguration().region())
-          .credentialsProvider(s3Client.serviceClientConfiguration().credentialsProvider()).build()) {
+      DeleteObjectRequest objectRequest = DeleteObjectRequest.builder().bucket(BUCKET_NAME).key(keyName).build();
 
-        DeleteObjectRequest objectRequest = DeleteObjectRequest.builder().bucket(bucketName).key(keyName).build();
+      DeleteObjectPresignRequest presignRequest =
+          DeleteObjectPresignRequest.builder().signatureDuration(Duration.ofMinutes(10))
+              .deleteObjectRequest(objectRequest).build();
 
-        DeleteObjectPresignRequest presignRequest =
-            DeleteObjectPresignRequest.builder().signatureDuration(Duration.ofMinutes(10))
-                .deleteObjectRequest(objectRequest).build();
+      PresignedDeleteObjectRequest presignedRequest = presigner.presignDeleteObject(presignRequest);
 
-        PresignedDeleteObjectRequest presignedRequest = presigner.presignDeleteObject(presignRequest);
+      // use http url connection
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedRequest.url(), "DELETE", null, null);
+        int responseCode = connection.getResponseCode();
+        assertEquals(204, responseCode, "DeleteObject presigned URL should return 204 No Content");
 
-        // use http url connection
-        HttpURLConnection connection = null;
-        try {
-          connection = (HttpURLConnection) presignedRequest.url().openConnection();
-          connection.setRequestMethod("DELETE");
-
-          int responseCode = connection.getResponseCode();
-          assertEquals(204, responseCode, "DeleteObject presigned URL should return 204 No Content");
-
-          //verify the object was deleted
-          assertThrows(NoSuchKeyException.class, () -> s3Client.getObject(b -> b.bucket(bucketName).key(keyName)));
-        } finally {
-          if (connection != null) {
-            connection.disconnect();
-          }
+        //verify the object was deleted
+        assertThrows(NoSuchKeyException.class, () -> s3Client.getObject(b -> b.bucket(BUCKET_NAME).key(keyName)));
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
         }
       }
 
       // use SdkHttpClient
-      s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+      s3Client.putObject(b -> b.bucket(BUCKET_NAME).key(keyName), RequestBody.fromString(CONTENT));
 
-      try (SdkHttpClient sdkHttpClient = ApacheHttpClient.create()) {
-        DeleteObjectRequest objectRequest = DeleteObjectRequest.builder().bucket(bucketName).key(keyName).build();
+      SdkHttpRequest request = SdkHttpRequest.builder()
+          .method(SdkHttpMethod.DELETE)
+          .uri(presignedRequest.url().toURI())
+          .build();
 
-        DeleteObjectPresignRequest presignRequest =
-            DeleteObjectPresignRequest.builder().signatureDuration(Duration.ofMinutes(10))
-                .deleteObjectRequest(objectRequest).build();
+      HttpExecuteRequest executeRequest = HttpExecuteRequest.builder().request(request).build();
 
-        PresignedDeleteObjectRequest presignedRequest = presigner.presignDeleteObject(presignRequest);
+      HttpExecuteResponse response = sdkHttpClient.prepareRequest(executeRequest).call();
+      assertEquals(204, response.httpResponse().statusCode(),
+          "DeleteObject presigned URL should return 204 No Content via SdkHttpClient");
 
-        SdkHttpRequest request =
-            SdkHttpRequest.builder().method(SdkHttpMethod.DELETE).uri(presignedRequest.url().toURI()).build();
-
-        HttpExecuteRequest executeRequest = HttpExecuteRequest.builder().request(request).build();
-
-        HttpExecuteResponse response = sdkHttpClient.prepareRequest(executeRequest).call();
-        assertEquals(204, response.httpResponse().statusCode(),
-            "DeleteObject presigned URL should return 204 No Content via SdkHttpClient");
-
-        //verify the object was deleted
-        assertThrows(NoSuchKeyException.class, () -> s3Client.getObject(b -> b.bucket(bucketName).key(keyName)));
-      }
+      //verify the object was deleted
+      assertThrows(NoSuchKeyException.class, () -> s3Client.getObject(b -> b.bucket(BUCKET_NAME).key(keyName)));
     }
   }
 

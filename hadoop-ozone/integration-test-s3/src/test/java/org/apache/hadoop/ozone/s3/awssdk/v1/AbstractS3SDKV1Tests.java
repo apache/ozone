@@ -1356,11 +1356,17 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
       URL url = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
 
       // Execute the DELETE request using HttpUrlConnection
-      HttpURLConnection connection = S3SDKTestUtils.openHttpURLConnection(url, "DELETE", null, null);
-      int responseCode = connection.getResponseCode();
-
-      // Verify the response code is 204 (No Content)
-      assertEquals(HttpURLConnection.HTTP_NO_CONTENT, responseCode);
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(url, "DELETE", null, null);
+        int responseCode = connection.getResponseCode();
+        // Verify the response code is 204 (No Content)
+        assertEquals(HttpURLConnection.HTTP_NO_CONTENT, responseCode);
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
 
       // Verify the object is deleted
       assertFalse(s3Client.doesObjectExist(BUCKET_NAME, keyName));
