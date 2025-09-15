@@ -91,7 +91,7 @@ Checkpoint V1 Endpoint Compatibility
     Download Checkpoint V1    0
 
 Checkpoint V2 Endpoint Compatibility
-    [Documentation]    Test v2 endpoint endpoint (/dbCheckpointv2) - should only work with new cluster
+    [Documentation]    Test v2 checkpoint endpoint (/v2/dbCheckpoint) - should only work with new cluster
     
     Log    Testing v2 checkpoint endpoint: CLIENT=${CLIENT_VERSION}, CLUSTER=${CLUSTER_VERSION}
     
