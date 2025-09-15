@@ -128,6 +128,8 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
@@ -306,12 +308,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         fileCountBySizeDao,
         containerCountBySizeDao,
         utilizationSchemaDefinition);
+    ReconFileMetadataManager reconFileMetadataManager = reconTestInjector.getInstance(ReconFileMetadataManager.class);
+    ReconGlobalStatsManager reconGlobalStatsManager = reconTestInjector.getInstance(ReconGlobalStatsManager.class);
+    OzoneConfiguration configuration = reconTestInjector.getInstance(OzoneConfiguration.class);
     fileSizeCountTaskFSO =
-        new FileSizeCountTaskFSO(fileCountBySizeDao, utilizationSchemaDefinition);
+        new FileSizeCountTaskFSO(reconFileMetadataManager, configuration);
     fileSizeCountTaskOBS =
-        new FileSizeCountTaskOBS(fileCountBySizeDao, utilizationSchemaDefinition);
+        new FileSizeCountTaskOBS(reconFileMetadataManager, configuration);
     omTableInsightTask =
-        new OmTableInsightTask(globalStatsDao, sqlConfiguration,
+        new OmTableInsightTask(reconGlobalStatsManager,
             reconOMMetadataManager);
     ContainerHealthSchemaManager containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);

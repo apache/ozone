@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
@@ -68,12 +70,14 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   }
 
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws IOException {
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition = getSchemaDefinition(UtilizationSchemaDefinition.class);
+    ReconFileMetadataManager reconFileMetadataManager = getInjector().getInstance(ReconFileMetadataManager.class);
+    OzoneConfiguration configuration = getInjector().getInstance(OzoneConfiguration.class);
     // Create separate task instances.
-    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(fileCountBySizeDao, utilizationSchemaDefinition);
-    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(fileCountBySizeDao, utilizationSchemaDefinition);
+    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(reconFileMetadataManager, configuration);
+    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(reconFileMetadataManager, configuration);
     dslContext = utilizationSchemaDefinition.getDSLContext();
     // Truncate table before each test.
     dslContext.truncate(FILE_COUNT_BY_SIZE);
@@ -499,7 +503,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testTruncateTableExceptionPropagation() {
+  public void testTruncateTableExceptionPropagation() throws IOException {
     // Mock DSLContext and FileCountBySizeDao
     DSLContext mockDslContext = mock(DSLContext.class);
     FileCountBySizeDao mockDao = mock(FileCountBySizeDao.class);
@@ -513,8 +517,10 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .thenThrow(new RuntimeException("Simulated DB failure"));
 
     // Create instances of FileSizeCountTaskOBS and FileSizeCountTaskFSO using mocks
-    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(mockDao, mockSchema);
-    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(mockDao, mockSchema);
+    ReconFileMetadataManager mockReconFileMetadataManager = mock(ReconFileMetadataManager.class);
+    OzoneConfiguration mockConfiguration = mock(OzoneConfiguration.class);
+    fileSizeCountTaskOBS = new FileSizeCountTaskOBS(mockReconFileMetadataManager, mockConfiguration);
+    fileSizeCountTaskFSO = new FileSizeCountTaskFSO(mockReconFileMetadataManager, mockConfiguration);
 
     // Mock OMMetadataManager
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
