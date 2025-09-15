@@ -300,6 +300,7 @@ Apache License 2.0
    com.lmax:disruptor
    com.nimbusds:nimbus-jose-jwt
    com.squareup.okhttp3:okhttp
+   com.squareup.okhttp3:okhttp-jvm
    com.squareup.okio:okio
    com.squareup.okio:okio-jvm
    commons-beanutils:commons-beanutils
@@ -344,10 +345,17 @@ Apache License 2.0
    io.opencensus:opencensus-api
    io.opencensus:opencensus-contrib-grpc-metrics
    io.opentelemetry:opentelemetry-api
+   io.opentelemetry:opentelemetry-common
    io.opentelemetry:opentelemetry-context
+   io.opentelemetry:opentelemetry-exporter-common
+   io.opentelemetry:opentelemetry-exporter-otlp-common
    io.opentelemetry:opentelemetry-exporter-otlp
+   io.opentelemetry:opentelemetry-exporter-sender-okhttp
    io.opentelemetry:opentelemetry-sdk
    io.opentelemetry:opentelemetry-sdk-common
+   io.opentelemetry:opentelemetry-sdk-common-extension-autoconfigure-spi
+   io.opentelemetry:opentelemetry-sdk-logs
+   io.opentelemetry:opentelemetry-sdk-metrics
    io.opentelemetry:opentelemetry-sdk-trace
    io.perfmark:perfmark-api
    io.prometheus:simpleclient

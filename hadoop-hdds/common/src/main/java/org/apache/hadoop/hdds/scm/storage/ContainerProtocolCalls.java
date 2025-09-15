@@ -21,7 +21,6 @@ import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED;
 
 import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.StatusCode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -371,26 +370,26 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-      try (AutoCloseable ignored = TracingUtil.createActivatedSpan("readChunk")) {
-        Span span = TracingUtil.getActiveSpan();
-        span.setAttribute("offset", chunk.getOffset())
-            .setAttribute("length", chunk.getLen())
-            .setAttribute("block", blockID.toString());
-        return tryEachDatanode(xceiverClient.getPipeline(),
-            d -> readChunk(xceiverClient, chunk, blockID,
-                validators, builder, d),
-            d -> toErrorMessage(chunk, blockID, d));
-      } catch (Exception e) {
-        throw new IOException(e);
-      }
+    try (AutoCloseable ignored = TracingUtil.createActivatedSpan("readChunk")) {
+      Span span = TracingUtil.getActiveSpan();
+      span.setAttribute("offset", chunk.getOffset())
+          .setAttribute("length", chunk.getLen())
+          .setAttribute("block", blockID.toString());
+      return tryEachDatanode(xceiverClient.getPipeline(),
+          d -> readChunk(xceiverClient, chunk, blockID,
+              validators, builder, d),
+          d -> toErrorMessage(chunk, blockID, d));
+    } catch (Exception e) {
+      throw new IOException(e);
+    }
   }
 
-    private static ContainerProtos.ReadChunkResponseProto readChunk(
+  private static ContainerProtos.ReadChunkResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, DatanodeBlockID blockID,
       List<Validator> validators,
       ContainerCommandRequestProto.Builder builder,
       DatanodeDetails d) throws IOException {
-      ContainerCommandRequestProto.Builder requestBuilder = builder
+    ContainerCommandRequestProto.Builder requestBuilder = builder
         .setDatanodeUuid(d.getUuidString());
     String traceId = TracingUtil.exportCurrentSpan();
     if (traceId != null) {

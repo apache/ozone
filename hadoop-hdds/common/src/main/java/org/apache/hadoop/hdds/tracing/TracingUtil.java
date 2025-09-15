@@ -29,12 +29,12 @@ import io.opentelemetry.context.Scope;
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
-import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.sdk.trace.samplers.Sampler;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Map;
-import io.opentelemetry.sdk.trace.samplers.Sampler;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.ratis.util.function.CheckedRunnable;
@@ -51,8 +51,7 @@ public final class TracingUtil {
   private static final double OTEL_TRACES_SAMPLER_RATIO_DEFAULT = 1.0;
 
   private static volatile boolean isInit = false;
-  private static OpenTelemetry openTelemetry = OpenTelemetry.noop();
-  private static Tracer tracer = openTelemetry.getTracer("noop");;
+  private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
 
   private TracingUtil() {
   }
@@ -92,7 +91,7 @@ public final class TracingUtil {
         .setResource(resource)
         .setSampler(Sampler.traceIdRatioBased(samplerRatio))
         .build();
-    openTelemetry = OpenTelemetrySdk.builder()
+    OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
         .setTracerProvider(tracerProvider)
         .build();
     tracer = openTelemetry.getTracer(serviceName);
@@ -113,7 +112,7 @@ public final class TracingUtil {
     StringBuilder builder = new StringBuilder();
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     propagator.inject(Context.current(), builder,
-        (carrier, key, value) -> carrier.append(key).append("=").append(value).append(";"));
+        (carrier, key, value) -> carrier.append(key).append('=').append(value).append(';'));
     return builder.toString();
   }
 
