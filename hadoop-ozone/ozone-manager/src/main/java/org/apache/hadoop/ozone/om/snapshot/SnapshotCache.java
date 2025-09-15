@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.utils.Scheduler;
@@ -48,6 +49,7 @@ import org.slf4j.LoggerFactory;
 public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
   static final Logger LOG = LoggerFactory.getLogger(SnapshotCache.class);
+  private static final long CACHE_WARNING_THROTTLE_INTERVAL_MS = 60_000L;
 
   // Snapshot cache internal hash map.
   // Key:   SnapshotId
@@ -68,6 +70,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   private final boolean compactNonSnapshotDiffTables;
 
   private final OMMetrics omMetrics;
+
+  private static AtomicLong lastLogTimeForCacheSizeWarning = new AtomicLong(System.currentTimeMillis());
 
   private boolean shouldCompactTable(String tableName) {
     return !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(tableName);
@@ -188,8 +192,12 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   public UncheckedAutoCloseableSupplier<OmSnapshot> get(UUID key) throws IOException {
     // Warn if actual cache size exceeds the soft limit already.
     if (size() > cacheSizeLimit) {
-      LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
-          size(), cacheSizeLimit);
+      long now = System.currentTimeMillis();
+      if (now - lastLogTimeForCacheSizeWarning.get() > CACHE_WARNING_THROTTLE_INTERVAL_MS) {  // once per minute
+        LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
+            size(), cacheSizeLimit);
+        lastLogTimeForCacheSizeWarning.set(now);
+      }
     }
     OMLockDetails lockDetails = lock.acquireReadLock(SNAPSHOT_DB_LOCK, key.toString());
     if (!lockDetails.isLockAcquired()) {
