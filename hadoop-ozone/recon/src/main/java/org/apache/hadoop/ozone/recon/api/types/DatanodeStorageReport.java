@@ -27,15 +27,17 @@ public class DatanodeStorageReport {
   private long remaining;
   private long committed;
   private long pendingDeletion;
+  private long minimumFreeSpace;
 
   public DatanodeStorageReport(String dataNodeId, long capacity, long used, long remaining,
-                               long committed, long pendingDeletion) {
+                               long committed, long pendingDeletion, long minimumFreeSpace) {
     this.dataNodeId = dataNodeId;
     this.capacity = capacity;
     this.used = used;
     this.remaining = remaining;
     this.committed = committed;
     this.pendingDeletion = pendingDeletion;
+    this.minimumFreeSpace = minimumFreeSpace;
   }
 
   public long getCapacity() {
@@ -60,5 +62,9 @@ public class DatanodeStorageReport {
 
   public String getDataNodeId() {
     return dataNodeId;
+  }
+
+  public long getMinimumFreeSpace() {
+    return minimumFreeSpace;
   }
 }

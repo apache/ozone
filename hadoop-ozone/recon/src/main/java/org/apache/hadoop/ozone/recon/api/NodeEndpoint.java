@@ -177,7 +177,9 @@ public class NodeEndpoint {
     long used = nodeStat.getScmUsed().get();
     long remaining = nodeStat.getRemaining().get();
     long committed = nodeStat.getCommitted().get();
-    return new DatanodeStorageReport(datanode.getUuidString(), capacity, used, remaining, committed, 0);
+    long minFreeSpace = nodeStat.getFreeSpaceToSpare().get();
+    return new DatanodeStorageReport(datanode.getUuidString(),
+        capacity, used, remaining, committed, 0, minFreeSpace);
   }
 
   /**

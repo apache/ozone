@@ -315,11 +315,13 @@ public class StorageDistributionEndpoint {
       long remaining = nodeStat.getRemaining() != null ? nodeStat.getRemaining().get() : 0L;
       long committed = nodeStat.getCommitted() != null ? nodeStat.getCommitted().get() : 0L;
       long pendingDeletion = blockDeletionMetricsMap.getOrDefault(datanode, 0L);
+      long minFreeSpace  = nodeStat.getFreeSpaceToSpare() != null ? nodeStat.getFreeSpaceToSpare().get() : 0L;
       if (pendingDeletion < 0) {
         log.warn("Block deletion metrics unavailable for datanode: {}", datanode);
         pendingDeletion = 0L;
       }
-      return new DatanodeStorageReport(datanode.getUuidString(), capacity, used, remaining, committed, pendingDeletion);
+      return new DatanodeStorageReport(datanode.getUuidString(),
+          capacity, used, remaining, committed, pendingDeletion, minFreeSpace);
     } catch (Exception e) {
       log.error("Error getting storage report for datanode: {}", datanode, e);
       return null; // Return null on any error
