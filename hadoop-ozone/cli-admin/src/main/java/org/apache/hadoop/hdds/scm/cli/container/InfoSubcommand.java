@@ -76,7 +76,7 @@ public class InfoSubcommand extends ScmSubcommand {
       if (!first) {
         printBreak();
       }
-      printDetails(scmClient, containerID, first);
+      printDetails(scmClient, containerID);
       first = false;
     }
     printFooter();
@@ -106,8 +106,7 @@ public class InfoSubcommand extends ScmSubcommand {
     }
   }
 
-  private void printDetails(ScmClient scmClient, long containerID,
-      boolean first) throws IOException {
+  private void printDetails(ScmClient scmClient, long containerID) throws IOException {
     final ContainerWithPipeline container;
     try {
       container = scmClient.getContainerWithPipeline(containerID);
