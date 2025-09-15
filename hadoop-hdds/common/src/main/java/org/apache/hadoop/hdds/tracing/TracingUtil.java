@@ -39,11 +39,14 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class to collect all the tracing helper methods.
  */
 public final class TracingUtil {
+  private static final Logger LOG = LoggerFactory.getLogger(TracingUtil.class);
   private static final String NULL_SPAN_AS_STRING = "";
   private static final String OTEL_EXPORTER_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT";
   private static final String OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT = "http://localhost:4317";
@@ -65,6 +68,16 @@ public final class TracingUtil {
       return;
     }
 
+    try {
+      initialize(serviceName);
+      isInit = true;
+      LOG.info("Initialized tracing service: {}", serviceName);
+    } catch (Exception e) {
+      LOG.error("Failed to initialize tracing", e);
+    }
+  }
+
+  private static void initialize(String serviceName) {
     String otelEndPoint = System.getenv(OTEL_EXPORTER_OTLP_ENDPOINT);
     if (otelEndPoint == null || otelEndPoint.isEmpty()) {
       otelEndPoint = OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT;
@@ -73,7 +86,7 @@ public final class TracingUtil {
     double samplerRatio = OTEL_TRACES_SAMPLER_RATIO_DEFAULT;
     try {
       String sampleStrRatio = System.getenv(OTEL_TRACES_SAMPLER_ARG);
-      if (sampleStrRatio == null || sampleStrRatio.isEmpty()) {
+      if (sampleStrRatio != null && !sampleStrRatio.isEmpty()) {
         samplerRatio = Double.parseDouble(System.getenv(OTEL_TRACES_SAMPLER_ARG));
       }
     } catch (NumberFormatException ex) {
@@ -95,7 +108,6 @@ public final class TracingUtil {
         .setTracerProvider(tracerProvider)
         .build();
     tracer = openTelemetry.getTracer(serviceName);
-    isInit = true;
   }
 
   /**
