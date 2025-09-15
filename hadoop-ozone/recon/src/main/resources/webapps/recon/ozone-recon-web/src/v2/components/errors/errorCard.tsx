@@ -30,7 +30,7 @@ type ErrorCardProps = {
 const cardHeadStyle: React.CSSProperties = { fontSize: '14px' };
 const compactCardBodyStyle: React.CSSProperties = {
   padding: '24px',
-  justifyTracks: 'space-between'
+  justifyContent: 'space-between'
 }
 const cardBodyStyle: React.CSSProperties = {
   padding: '80px'

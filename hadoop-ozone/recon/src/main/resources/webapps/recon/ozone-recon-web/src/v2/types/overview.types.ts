@@ -34,7 +34,7 @@ export type ClusterStateResponse = {
 }
 
 export type TaskStatus = {
-  taskName: string;
+  taskName: 'OmDeltaRequest' | 'OmSnapshotRequest' | string;
   lastUpdatedTimestamp: number;
   lastUpdatedSeqNumber: number;
 }

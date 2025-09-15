@@ -26,6 +26,7 @@ export function useAutoReload(
   const intervalRef = useRef<number>(0);
   const [isPolling, setIsPolling] = useState<boolean>(false);
   const refreshFunctionRef = useRef(refreshFunction);
+  const lastPollCallRef = useRef<number>(0); // This is used to store the last time poll was called
 
   // Update the ref when the function changes
   refreshFunctionRef.current = refreshFunction;
@@ -41,7 +42,17 @@ export function useAutoReload(
   const startPolling = () => {
     stopPolling();
     const poll = () => {
-      refreshFunctionRef.current();
+      /**
+       * Prevent any extra polling calls within 100ms of the last call,
+       * This is done in case at any place multiple API calls are made, for example
+       * the useEffect on mount in this component will call the startPolling() function.
+       * If this startPolling() function is called elsewhere in a different component then
+       * race condition can occur where this gets called in succession multiple times.
+       */
+      if (Date.now() - lastPollCallRef.current > 100) {
+        refreshFunctionRef.current();
+        lastPollCallRef.current = Date.now();
+      }
       intervalRef.current = window.setTimeout(poll, interval);
     };
     poll();

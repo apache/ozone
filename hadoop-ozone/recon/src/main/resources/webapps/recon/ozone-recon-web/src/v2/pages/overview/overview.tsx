@@ -18,9 +18,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Row, Col, Button } from 'antd';
+import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import moment from 'moment';
+import filesize from 'filesize';
 
+import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
 import OverviewSummaryCard from '@/v2/components/overviewCard/overviewSummaryCard';
 import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
@@ -29,40 +32,10 @@ import { showDataFetchError } from '@/utils/common';
 import { cancelRequests } from '@/utils/axiosRequestHelper';
 import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
-import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
+import * as CONSTANTS from '@/v2/constants/overview.constants';
 import { ClusterStateResponse, KeysSummary, OverviewState, TaskStatus } from '@/v2/types/overview.types';
+
 import './overview.less';
-import filesize from 'filesize';
-import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
-
-const DEFAULT_CLUSTER_STATE: ClusterStateResponse = {
-  missingContainers: 0,
-  totalDatanodes: 0,
-  healthyDatanodes: 0,
-  pipelines: 0,
-  storageReport: { capacity: 0, used: 0, remaining: 0, committed: 0 },
-  containers: 0,
-  volumes: 0,
-  buckets: 0,
-  keys: 0,
-  openContainers: 0,
-  deletedContainers: 0,
-  keysPendingDeletion: 0,
-  scmServiceId: 'N/A',
-  omServiceId: 'N/A'
-};
-
-const DEFAULT_TASK_STATUS: TaskStatus[] = [];
-const DEFAULT_OPEN_KEYS_SUMMARY: KeysSummary & {totalOpenKeys: number} = {
-  totalUnreplicatedDataSize: 0,
-  totalReplicatedDataSize: 0,
-  totalOpenKeys: 0
-};
-const DEFAULT_DELETE_PENDING_KEYS_SUMMARY: KeysSummary & {totalDeletedKeys: number} = {
-  totalUnreplicatedDataSize: 0,
-  totalReplicatedDataSize: 0,
-  totalDeletedKeys: 0
-};
 
 // ------------- Helper Functions -------------- //
 const size = filesize.partial({ round: 1 });
@@ -117,7 +90,7 @@ const Overview: React.FC<{}> = () => {
   // Individual API calls using custom hook (no auto-refresh)
   const clusterState = useApiData<ClusterStateResponse>(
     '/api/v1/clusterState',
-    DEFAULT_CLUSTER_STATE,
+    CONSTANTS.DEFAULT_CLUSTER_STATE,
     {
       retryAttempts: 2,
       initialFetch: false,
@@ -127,7 +100,7 @@ const Overview: React.FC<{}> = () => {
 
   const taskStatus = useApiData<TaskStatus[]>(
     '/api/v1/task/status',
-    DEFAULT_TASK_STATUS,
+    CONSTANTS.DEFAULT_TASK_STATUS,
     {
       retryAttempts: 2,
       initialFetch: false,
@@ -137,7 +110,7 @@ const Overview: React.FC<{}> = () => {
 
   const openKeysSummary = useApiData<KeysSummary & { totalOpenKeys: number}>(
     '/api/v1/keys/open/summary',
-    DEFAULT_OPEN_KEYS_SUMMARY,
+    CONSTANTS.DEFAULT_OPEN_KEYS_SUMMARY,
     {
       retryAttempts: 2,
       initialFetch: false,
@@ -147,7 +120,7 @@ const Overview: React.FC<{}> = () => {
 
   const deletePendingKeysSummary = useApiData<KeysSummary & { totalDeletedKeys: number}>(
     '/api/v1/keys/deletePending/summary',
-    DEFAULT_DELETE_PENDING_KEYS_SUMMARY,
+    CONSTANTS.DEFAULT_DELETE_PENDING_KEYS_SUMMARY,
     {
       retryAttempts: 2,
       initialFetch: false,

@@ -112,9 +112,10 @@ export function useApiData<T>(
         return;
       }
 
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'An unexpected error occurred';
+      const errorMessage = error.response?.data?.message ||
+                          error.response?.statusText ||
+                          error.message ||
+                          `Request failed with status: ${error.response?.status || 'unknown'}`;
 
       // Clear any existing retry timeout
       if (retryTimeoutRef.current) {
