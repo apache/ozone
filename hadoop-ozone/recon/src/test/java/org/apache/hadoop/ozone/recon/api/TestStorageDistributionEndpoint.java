@@ -78,8 +78,6 @@ class StorageDistributionEndpointTest {
   private static final long OPEN_KEYS_SIZE = 150L;
   private static final long COMMITTED_SIZE = 300L;
   private static final long OM_PENDING_TOTAL = 50L;
-  private static final long OM_PENDING_DIR = 25L;
-  private static final long OM_PENDING_KEY = 25L;
   private static final long SCM_PENDING = 75L;
 
   @Test

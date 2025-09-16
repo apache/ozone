@@ -33,13 +33,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import jakarta.annotation.Nonnull;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.text.ParseException;
@@ -930,36 +927,6 @@ public class ReconUtils {
       log.error("Error getting metrics from datanode: {}", datanode.getIpAddress(), e);
     }
     return 0;
-  }
-
-  private static String getResponseData(HttpURLConnection conn) throws IOException {
-    int code = conn.getResponseCode();
-    // 2xx: read normal body
-    if (code >= 200 && code < 300) {
-      return readStream(conn.getInputStream());
-    }
-    String err = null;
-    try {
-      if (conn.getErrorStream() != null) {
-        err = readStream(conn.getErrorStream());
-      }
-    } catch (IOException ignored) {
-      log.error("Error reading response body from URL: {}", conn.getURL(), ignored);
-    }
-    log.warn("HTTP {} from {}. Error body: {}", code, conn.getURL(), err);
-    return "";
-  }
-
-  /** Small utility to read an entire stream as a UTF-8 String. */
-  private static String readStream(java.io.InputStream in) throws IOException {
-    StringBuilder sb = new StringBuilder();
-    try (BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-      String line;
-      while ((line = br.readLine()) != null) {
-        sb.append(line).append('\n');
-      }
-    }
-    return sb.toString();
   }
 
   private static long parseMetrics(String jsonResponse, String serviceName, String keyName) {
