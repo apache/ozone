@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test;
 public abstract class AbstractContractSetTimesTest extends
     AbstractFSContractTestBase {
 
-  private Path testPath;
   private Path target;
 
   @BeforeEach
@@ -40,7 +39,7 @@ public abstract class AbstractContractSetTimesTest extends
     skipIfUnsupported(SUPPORTS_SETTIMES);
 
     //delete the test directory
-    testPath = path("test");
+    Path testPath = path("test");
     target = new Path(testPath, "target");
   }
 
