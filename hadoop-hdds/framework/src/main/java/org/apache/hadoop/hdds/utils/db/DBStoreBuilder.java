@@ -213,13 +213,12 @@ public final class DBStoreBuilder {
         rocksDBOption = getDefaultDBOptions(tableConfigs);
       }
       setDBOptionsProps(rocksDBOption);
-      ManagedWriteOptions writeOptions = new ManagedWriteOptions();
-      writeOptions.setSync(rocksDBConfiguration.getSyncOption());
-
       File dbFile = getDBFile();
       if (!dbFile.getParentFile().exists()) {
         throw new RocksDatabaseException("The DB destination directory should exist.");
       }
+      ManagedWriteOptions writeOptions = new ManagedWriteOptions();
+      writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           openReadOnly, dbJmxBeanNameName, enableCompactionDag,
