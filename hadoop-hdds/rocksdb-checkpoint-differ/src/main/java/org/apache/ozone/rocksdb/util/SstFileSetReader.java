@@ -24,6 +24,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.PriorityQueue;
@@ -269,16 +270,7 @@ public class SstFileSetReader {
 
     @Override
     public int compareTo(@Nonnull HeapEntry<T> other) {
-      if (this.currentKey == null && other.currentKey == null) {
-        return 0;
-      }
-      if (this.currentKey == null) {
-        return 1;
-      }
-      if (other.currentKey == null) {
-        return -1;
-      }
-      return this.currentKey.compareTo(other.currentKey);
+      return Comparator.comparing(HeapEntry<T>::getCurrentKey).compare(this, other);
     }
 
     @Override
