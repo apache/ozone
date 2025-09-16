@@ -28,7 +28,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.utils.Scheduler;
@@ -39,6 +38,8 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.ratis.util.BatchLogger;
+import org.apache.ratis.util.TimeDuration;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,7 +72,14 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
   private final OMMetrics omMetrics;
 
-  private static AtomicLong lastLogTimeForCacheSizeWarning = new AtomicLong(System.currentTimeMillis());
+  private enum BatchLogKey implements BatchLogger.Key {
+    SNAPSHOT_CACHE_SIZE_EXCEEDED;
+
+    @Override
+    public TimeDuration getBatchDuration() {
+      return TimeDuration.valueOf(CACHE_WARNING_THROTTLE_INTERVAL_MS, TimeUnit.MILLISECONDS);
+    }
+  }
 
   private boolean shouldCompactTable(String tableName) {
     return !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(tableName);
@@ -192,12 +200,12 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   public UncheckedAutoCloseableSupplier<OmSnapshot> get(UUID key) throws IOException {
     // Warn if actual cache size exceeds the soft limit already.
     if (size() > cacheSizeLimit) {
-      long now = System.currentTimeMillis();
-      if (now - lastLogTimeForCacheSizeWarning.get() > CACHE_WARNING_THROTTLE_INTERVAL_MS) {  // once per minute
-        LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
-            size(), cacheSizeLimit);
-        lastLogTimeForCacheSizeWarning.set(now);
-      }
+      BatchLogger.print(
+          BatchLogKey.SNAPSHOT_CACHE_SIZE_EXCEEDED, // The unique key for this log type
+          "CacheSizeWarning", // A specific name for this log message
+          suffix -> LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).{}",
+              size(), cacheSizeLimit, suffix)
+      );
     }
     OMLockDetails lockDetails = lock.acquireReadLock(SNAPSHOT_DB_LOCK, key.toString());
     if (!lockDetails.isLockAcquired()) {
