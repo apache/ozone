@@ -59,6 +59,8 @@ public class OzoneFSInputStream extends FSInputStream
         statistics.incrementBytesRead(1);
       }
       return byteRead;
+    } catch (IOException e) {
+      throw e;
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -74,6 +76,8 @@ public class OzoneFSInputStream extends FSInputStream
         statistics.incrementBytesRead(bytesRead);
       }
       return bytesRead;
+    } catch (IOException e) {
+      throw e;
     } catch (Exception e) {
       throw new IOException(e);
     }

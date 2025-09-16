@@ -547,6 +547,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         asyncReply.getResponse().get();
       }
       return asyncReply;
+    } catch (IOException e) {
+      throw e;
     } catch (Exception e) {
       throw new IOException(e);
     }

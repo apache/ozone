@@ -379,6 +379,8 @@ public final class ContainerProtocolCalls  {
           d -> readChunk(xceiverClient, chunk, blockID,
               validators, builder, d),
           d -> toErrorMessage(chunk, blockID, d));
+    } catch (IOException e) {
+      throw e;
     } catch (Exception e) {
       throw new IOException(e);
     }
