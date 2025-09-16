@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.recon.api.ClusterStateEndpoint;
 import org.apache.hadoop.ozone.recon.api.MetricsProxyEndpoint;
 import org.apache.hadoop.ozone.recon.api.NodeEndpoint;
 import org.apache.hadoop.ozone.recon.api.PipelineEndpoint;
-import org.apache.hadoop.ozone.recon.api.StorageDistributionEndpoint;
 import org.apache.hadoop.ozone.recon.api.TaskStatusService;
 import org.apache.hadoop.ozone.recon.api.UtilizationEndpoint;
 import org.apache.hadoop.security.UserGroupInformation;
