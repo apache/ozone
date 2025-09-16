@@ -256,6 +256,9 @@ public final class TracingUtil {
     return Span.current();
   }
 
+  /**
+   * AutoCloseable interface for tracing span but no exception is thrown in close.
+   */
   public interface TraceCloseable extends AutoCloseable {
     @Override
     void close();
