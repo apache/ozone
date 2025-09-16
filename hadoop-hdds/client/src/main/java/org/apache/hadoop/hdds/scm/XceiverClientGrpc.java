@@ -533,7 +533,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       ContainerCommandRequestProto request)
       throws IOException, ExecutionException, InterruptedException {
 
-    try (AutoCloseable ignored = TracingUtil.createActivatedSpan("XceiverClientGrpc." + request.getCmdType().name())) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(
+        "XceiverClientGrpc." + request.getCmdType().name())) {
 
       ContainerCommandRequestProto.Builder builder =
           ContainerCommandRequestProto.newBuilder(request)
@@ -547,10 +548,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         asyncReply.getResponse().get();
       }
       return asyncReply;
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException(e);
     }
   }
 

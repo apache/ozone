@@ -370,7 +370,7 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-    try (AutoCloseable ignored = TracingUtil.createActivatedSpan("readChunk")) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("readChunk")) {
       Span span = TracingUtil.getActiveSpan();
       span.setAttribute("offset", chunk.getOffset())
           .setAttribute("length", chunk.getLen())
@@ -379,10 +379,6 @@ public final class ContainerProtocolCalls  {
           d -> readChunk(xceiverClient, chunk, blockID,
               validators, builder, d),
           d -> toErrorMessage(chunk, blockID, d));
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException(e);
     }
   }
 

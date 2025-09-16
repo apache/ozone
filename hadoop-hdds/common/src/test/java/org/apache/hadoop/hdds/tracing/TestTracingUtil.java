@@ -45,7 +45,7 @@ public class TestTracingUtil {
   @Test
   public void testInitTracing() {
     TracingUtil.initTracing("testInitTracing", tracingEnabled());
-    try (AutoCloseable ignored = TracingUtil.createActivatedSpan("initTracing")) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("initTracing")) {
       exportCurrentSpan();
     } catch (Exception e) {
       fail("Should not get exception");

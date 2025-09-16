@@ -211,7 +211,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
    * @param taskId unique ID of the task
    */
   private void tryNextTask(TaskProvider provider, long taskId) {
-    try (AutoCloseable ignored = TracingUtil.createActivatedSpan(spanName)) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(spanName)) {
       provider.executeNextTask(taskId);
       successCounter.incrementAndGet();
     } catch (Exception e) {

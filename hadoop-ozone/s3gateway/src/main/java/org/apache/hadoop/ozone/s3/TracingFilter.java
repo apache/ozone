@@ -46,7 +46,7 @@ public class TracingFilter implements ContainerRequestFilter,
   public void filter(ContainerRequestContext requestContext) {
     finishAndCloseActiveSpan();
 
-    AutoCloseable activatedSpan =
+    TracingUtil.TraceCloseable activatedSpan =
         TracingUtil.createActivatedSpan(resourceInfo.getResourceClass().getSimpleName() + "." +
             resourceInfo.getResourceMethod().getName());
     requestContext.setProperty(TRACING_SPAN_CLOSABLE, activatedSpan);
@@ -55,7 +55,8 @@ public class TracingFilter implements ContainerRequestFilter,
   @Override
   public void filter(ContainerRequestContext requestContext,
       ContainerResponseContext responseContext) {
-    final AutoCloseable spanClosable = (AutoCloseable) requestContext.getProperty(TRACING_SPAN_CLOSABLE);
+    final TracingUtil.TraceCloseable spanClosable
+        = (TracingUtil.TraceCloseable) requestContext.getProperty(TRACING_SPAN_CLOSABLE);
     // HDDS-7064: Operation performed while writing StreamingOutput response
     // should only be closed once the StreamingOutput callback has completely
     // written the data to the destination
@@ -73,7 +74,7 @@ public class TracingFilter implements ContainerRequestFilter,
     }
   }
 
-  private static void finishAndClose(AutoCloseable spanClosable) {
+  private static void finishAndClose(TracingUtil.TraceCloseable spanClosable) {
     try {
       spanClosable.close();
     } catch (Exception e) {

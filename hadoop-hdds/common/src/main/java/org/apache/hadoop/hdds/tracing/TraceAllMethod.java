@@ -64,7 +64,7 @@ public class TraceAllMethod<T> implements InvocationHandler {
         method.getName());
     }
 
-    try (AutoCloseable ignored = TracingUtil.createActivatedSpan(name + "." + method.getName())) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(name + "." + method.getName())) {
       try {
         return delegateMethod.invoke(delegate, args);
       } catch (Exception ex) {

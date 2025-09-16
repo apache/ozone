@@ -53,22 +53,18 @@ public class OzoneFSInputStream extends FSInputStream
 
   @Override
   public int read() throws IOException {
-    try (AutoCloseable ignored = TracingUtil.createActivatedSpan("OzoneFSInputStream.read")) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("OzoneFSInputStream.read")) {
       int byteRead = inputStream.read();
       if (statistics != null && byteRead >= 0) {
         statistics.incrementBytesRead(1);
       }
       return byteRead;
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException(e);
     }
   }
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
-    try (AutoCloseable ignored = TracingUtil.createActivatedSpan("OzoneFSInputStream.read")) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("OzoneFSInputStream.read")) {
       TracingUtil.getActiveSpan().setAttribute("offset", off)
           .setAttribute("length", len);
       int bytesRead = inputStream.read(b, off, len);
@@ -76,10 +72,6 @@ public class OzoneFSInputStream extends FSInputStream
         statistics.incrementBytesRead(bytesRead);
       }
       return bytesRead;
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException(e);
     }
   }
 

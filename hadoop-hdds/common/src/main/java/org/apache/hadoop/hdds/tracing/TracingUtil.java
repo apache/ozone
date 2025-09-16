@@ -243,7 +243,7 @@ public final class TracingUtil {
    * This is a simplified way to use span as there is no way to add any tag
    * in case of Exceptions.
    */
-  public static AutoCloseable createActivatedSpan(String spanName) {
+  public static TraceCloseable createActivatedSpan(String spanName) {
     Span span = tracer.spanBuilder(spanName).setNoParent().startSpan();
     Scope scope = span.makeCurrent();
     return () -> {
@@ -254,6 +254,11 @@ public final class TracingUtil {
 
   public static Span getActiveSpan() {
     return Span.current();
+  }
+
+  public interface TraceCloseable extends AutoCloseable {
+    @Override
+    void close();
   }
 
   /**
