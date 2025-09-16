@@ -45,7 +45,6 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
         implements Callable<Void> {
 
   private Timer timer;
-  private OzoneConfiguration configuration;
   private OzoneManagerProtocolClientSideTranslatorPB[] clients;
   private byte[] payloadReqBytes = new byte[0];
   private int payloadRespSize;
@@ -81,7 +80,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
     Preconditions.checkArgument(payloadRespSizeKB >= 0,
             "OM echo response payload size should be positive value or zero.");
 
-    configuration = createOzoneConfiguration();
+    OzoneConfiguration configuration = createOzoneConfiguration();
     clients = new OzoneManagerProtocolClientSideTranslatorPB[clientsCount];
     for (int i = 0; i < clientsCount; i++) {
       clients[i] = createOmClient(configuration, null);

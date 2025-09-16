@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOU
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -48,6 +50,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -99,7 +102,6 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
-import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -383,11 +385,49 @@ public class TestKeyValueHandler {
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
         keyValueHandler.handleCloseContainer(closeContainerRequest, container);
-    assertTrue(ContainerChecksumTreeManager.checksumFileExist(container));
+    // Checksum will not be generated for an invalid container.
+    assertFalse(ContainerChecksumTreeManager.getContainerChecksumFile(kvData).exists());
 
     assertEquals(ContainerProtos.Result.INVALID_CONTAINER_STATE,
         response.getResult(),
         "Close container should return Invalid container error");
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testCloseRecoveringContainerTriggersScan(ContainerLayoutVersion layoutVersion) {
+    final KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
+        DATANODE_UUID, mockContainerSet, mock(MutableVolumeSet.class),  mock(ContainerMetrics.class),
+        c -> { }, new ContainerChecksumTreeManager(conf));
+
+    conf = new OzoneConfiguration();
+    KeyValueContainerData kvData = new KeyValueContainerData(DUMMY_CONTAINER_ID,
+        layoutVersion,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+    kvData.setMetadataPath(tempDir.toString());
+    kvData.setDbFile(dbFile.toFile());
+    KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    ContainerCommandRequestProto createContainerRequest =
+        createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID);
+    keyValueHandler.handleCreateContainer(createContainerRequest, container);
+
+    // Make the container state as invalid.
+    kvData.setState(State.RECOVERING);
+
+    // Create Close container request
+    ContainerCommandRequestProto closeContainerRequest =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.CloseContainer)
+            .setContainerID(DUMMY_CONTAINER_ID)
+            .setDatanodeUuid(DATANODE_UUID)
+            .setCloseContainer(ContainerProtos.CloseContainerRequestProto
+                .getDefaultInstance())
+            .build();
+    dispatcher.dispatch(closeContainerRequest, null);
+
+    keyValueHandler.handleCloseContainer(closeContainerRequest, container);
+
+    verify(mockContainerSet, atLeastOnce()).scanContainer(DUMMY_CONTAINER_ID, "EC Reconstruction");
   }
 
   @Test
@@ -679,17 +719,18 @@ public class TestKeyValueHandler {
 
     // Initially, container should have no checksum information.
     assertEquals(0, containerData.getDataChecksum());
-    assertFalse(checksumManager.read(containerData).isPresent());
+    assertFalse(checksumManager.read(containerData).hasContainerMerkleTree());
+    assertFalse(ContainerChecksumTreeManager.getContainerChecksumFile(containerData).exists());
     assertEquals(0, icrCount.get());
 
     // Update container with checksum information.
     keyValueHandler.updateContainerChecksum(container, treeWriter);
     // Check ICR sent. The ICR sender verifies that the expected checksum is present in the report.
     assertEquals(1, icrCount.get());
-    // Check checksum in memory.
-    assertEquals(updatedDataChecksum, containerData.getDataChecksum());
+    // Check all data checksums are updated correctly.
+    verifyAllDataChecksumsMatch(containerData, conf);
     // Check disk content.
-    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData).get();
+    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.read(containerData);
     assertTreesSortedAndMatch(treeWriter.toProto(), checksumInfo.getContainerMerkleTree());
   }
 
