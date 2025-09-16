@@ -103,6 +103,7 @@ import software.amazon.awssdk.services.s3.model.CreateMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CreateMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.DeleteBucketRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
@@ -119,6 +120,7 @@ import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.ListPartsRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -134,11 +136,13 @@ import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.CompleteMultipartUploadPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.CreateMultipartUploadPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.DeleteObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.HeadBucketPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.HeadObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedCompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedCreateMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedDeleteObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedHeadBucketRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedHeadObjectRequest;
@@ -1075,6 +1079,89 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     }
     xml.append("</CompleteMultipartUpload>");
     return xml.toString();
+  }
+
+  @Test
+  public void testPresignedUrlDelete() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName),
+        RequestBody.fromString(content));
+
+    try (S3Presigner presigner = createS3Presigner()) {
+
+      DeleteObjectRequest objectRequest = DeleteObjectRequest.builder()
+          .bucket(bucketName)
+          .key(keyName)
+          .build();
+
+      DeleteObjectPresignRequest presignRequest = DeleteObjectPresignRequest.builder()
+          .signatureDuration(Duration.ofMinutes(10))
+          .deleteObjectRequest(objectRequest)
+          .build();
+
+      PresignedDeleteObjectRequest presignedRequest = presigner.presignDeleteObject(presignRequest);
+
+      // use http url connection
+      HttpURLConnection connection = null;
+      try {
+        connection = (HttpURLConnection) presignedRequest.url().openConnection();
+        connection.setRequestMethod("DELETE");
+
+        int responseCode = connection.getResponseCode();
+        assertEquals(204, responseCode, "DeleteObject presigned URL should return 204 No Content");
+
+        //verify the object was deleted
+        assertThrows(NoSuchKeyException.class, () -> s3Client.getObject(b -> b.bucket(bucketName).key(keyName)));
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+    }
+
+    // use SdkHttpClient
+    s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName),
+        RequestBody.fromString(content));
+
+    try (S3Presigner presigner = createS3Presigner();
+         SdkHttpClient sdkHttpClient = ApacheHttpClient.create()) {
+
+      DeleteObjectRequest objectRequest = DeleteObjectRequest.builder()
+          .bucket(bucketName)
+          .key(keyName)
+          .build();
+
+      DeleteObjectPresignRequest presignRequest = DeleteObjectPresignRequest.builder()
+          .signatureDuration(Duration.ofMinutes(10))
+          .deleteObjectRequest(objectRequest)
+          .build();
+
+      PresignedDeleteObjectRequest presignedRequest = presigner.presignDeleteObject(presignRequest);
+
+      SdkHttpRequest request = SdkHttpRequest.builder()
+          .method(SdkHttpMethod.DELETE)
+          .uri(presignedRequest.url().toURI())
+          .build();
+
+      HttpExecuteRequest executeRequest = HttpExecuteRequest.builder()
+          .request(request)
+          .build();
+
+      HttpExecuteResponse response = sdkHttpClient.prepareRequest(executeRequest).call();
+      assertEquals(204, response.httpResponse().statusCode(),
+          "DeleteObject presigned URL should return 204 No Content via SdkHttpClient");
+
+      //verify the object was deleted
+      assertThrows(NoSuchKeyException.class, () -> s3Client.getObject(b -> b.bucket(bucketName).key(keyName)));
+    }
   }
 
   private S3Presigner createS3Presigner() {
