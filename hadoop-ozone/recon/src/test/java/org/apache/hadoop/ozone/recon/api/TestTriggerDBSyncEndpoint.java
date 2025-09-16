@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.test.GenericTestUtils.PortAllocator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -83,7 +84,7 @@ public class TestTriggerDBSyncEndpoint {
     configuration.set(OZONE_RECON_DB_DIR,
         Files.createDirectory(temporaryFolder.resolve("ReconDb"))
             .toFile().getAbsolutePath());
-    configuration.set(OZONE_OM_ADDRESS_KEY, "localhost:9862");
+    configuration.set(OZONE_OM_ADDRESS_KEY, "localhost:" + PortAllocator.getFreePort());
     CommonUtils commonUtils = new CommonUtils();
     OzoneManagerProtocol ozoneManagerProtocol
         = mock(OzoneManagerProtocol.class);

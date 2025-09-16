@@ -17,6 +17,11 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_PORT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.mockito.Mockito.mock;
 
@@ -36,6 +41,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ozone.test.GenericTestUtils.PortAllocator;
 
 /**
  * Test utility for creating a dummy OM, the associated
@@ -103,6 +109,13 @@ public final class OmTestManagers {
     }
     scmBlockClient = blockClient != null ? blockClient :
         new ScmBlockLocationTestingClient(null, null, 0);
+
+    // Configure dynamic ports for OM to avoid conflicts in parallel testing
+    conf.set(OZONE_OM_ADDRESS_KEY, "127.0.0.1:" + PortAllocator.getFreePort());
+    conf.set(OZONE_OM_HTTP_ADDRESS_KEY, "127.0.0.1:" + PortAllocator.getFreePort());
+    conf.set(OZONE_OM_HTTPS_ADDRESS_KEY, "127.0.0.1:" + PortAllocator.getFreePort());
+    conf.setInt(OZONE_OM_RATIS_PORT_KEY, PortAllocator.getFreePort());
+    conf.setInt(OZONE_OM_GRPC_PORT_KEY, PortAllocator.getFreePort());
 
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     DefaultMetricsSystem.setMiniClusterMode(true);

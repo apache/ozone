@@ -33,8 +33,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,6 +48,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
+import org.apache.ozone.test.GenericTestUtils;
 
 /**
  * Creates datanodes with similar configuration (same number of volumes, same layout version, etc.).
@@ -123,14 +122,15 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
   }
 
   private void configureDatanodePorts(ConfigurationTarget conf) {
-    conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, anyHostWithFreePort());
-    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, anyHostWithFreePort());
-    conf.setInt(HDDS_CONTAINER_IPC_PORT, getFreePort());
-    conf.setInt(HDDS_CONTAINER_RATIS_IPC_PORT, getFreePort());
-    conf.setInt(HDDS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());
-    conf.setInt(HDDS_CONTAINER_RATIS_SERVER_PORT, getFreePort());
-    conf.setInt(HDDS_CONTAINER_RATIS_DATASTREAM_PORT, getFreePort());
-    conf.setFromObject(new ReplicationServer.ReplicationConfig().setPort(getFreePort()));
+    // Use the improved thread-safe port allocation directly
+    conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, GenericTestUtils.PortAllocator.anyHostWithFreePort());
+    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, GenericTestUtils.PortAllocator.anyHostWithFreePort());
+    conf.setInt(HDDS_CONTAINER_IPC_PORT, GenericTestUtils.PortAllocator.getFreePort());
+    conf.setInt(HDDS_CONTAINER_RATIS_IPC_PORT, GenericTestUtils.PortAllocator.getFreePort());
+    conf.setInt(HDDS_CONTAINER_RATIS_ADMIN_PORT, GenericTestUtils.PortAllocator.getFreePort());
+    conf.setInt(HDDS_CONTAINER_RATIS_SERVER_PORT, GenericTestUtils.PortAllocator.getFreePort());
+    conf.setInt(HDDS_CONTAINER_RATIS_DATASTREAM_PORT, GenericTestUtils.PortAllocator.getFreePort());
+    conf.setFromObject(new ReplicationServer.ReplicationConfig().setPort(GenericTestUtils.PortAllocator.getFreePort()));
   }
 
   public static Builder newBuilder() {

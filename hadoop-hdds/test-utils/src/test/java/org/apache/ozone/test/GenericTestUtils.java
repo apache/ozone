@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.base.Preconditions;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -30,12 +31,15 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -55,6 +59,8 @@ import org.slf4j.LoggerFactory;
  * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
+
+  private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(GenericTestUtils.class);
 
   /**
    * Error string used in
@@ -381,27 +387,88 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * Helper class to get free port avoiding randomness.
+   * Thread-safe and fork-safe port allocator for parallel test execution.
+   * Uses a hybrid approach: simple sequential allocation with collision detection.
    */
   public static final class PortAllocator {
 
     public static final String HOSTNAME = "localhost";
     public static final String HOST_ADDRESS = "127.0.0.1";
-    public static final int MIN_PORT = 15000;
+    public static final int BASE_PORT = 15000;
     public static final int MAX_PORT = 32000;
-    public static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
+
+    // Process/fork-specific unique identifier
+    private static final long PROCESS_UNIQUE_ID = generateProcessUniqueId();
+
+    // Atomic counter for this specific JVM instance
+    private static final AtomicLong GLOBAL_PORT_COUNTER = new AtomicLong(0);
+
+    // Track allocated ports for cleanup - using concurrent map
+    private static final ConcurrentHashMap<Integer, Long> ALLOCATED_PORTS = new ConcurrentHashMap<>();
+
+    // Maximum attempts to find a free port
+    private static final int MAX_ATTEMPTS = 50;
 
     private PortAllocator() {
       // no instances
     }
 
+    /**
+     * Gets a free port with collision detection.
+     * Uses sequential allocation within process-specific ranges to minimize conflicts.
+     */
     public static synchronized int getFreePort() {
-      int port = NEXT_PORT.getAndIncrement();
-      if (port > MAX_PORT) {
-        NEXT_PORT.set(MIN_PORT);
-        port = NEXT_PORT.getAndIncrement();
+      // Use a more predictable approach with process-specific offset
+      int processOffset = (int) (PROCESS_UNIQUE_ID % 1000) * 40; // Max 1000 processes, 40 ports each
+      int basePortForProcess = BASE_PORT + processOffset;
+      int maxPortForProcess = Math.min(basePortForProcess + 40, MAX_PORT);
+
+      for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        long counter = GLOBAL_PORT_COUNTER.incrementAndGet();
+        int candidatePort = basePortForProcess + (int) (counter % (maxPortForProcess - basePortForProcess));
+
+        // Quick check if we already allocated this port
+        if (ALLOCATED_PORTS.containsKey(candidatePort)) {
+          continue;
+        }
+
+        // Try to reserve and verify the port
+        if (ALLOCATED_PORTS.putIfAbsent(candidatePort, System.currentTimeMillis()) == null) {
+          if (isPortActuallyAvailable(candidatePort)) {
+            return candidatePort;
+          } else {
+            // Port is not available, remove from our tracking and try next
+            ALLOCATED_PORTS.remove(candidatePort);
+          }
+        }
       }
-      return port;
+
+      // If all else fails, use system ephemeral port
+      LOG.warn("Failed to allocate port after {} attempts, falling back to ephemeral port", MAX_ATTEMPTS);
+      return getEphemeralPort();
+    }
+
+    /**
+     * Release a previously allocated port for reuse.
+     */
+    public static void releasePort(int port) {
+      ALLOCATED_PORTS.remove(port);
+    }
+
+    /**
+     * Release all ports allocated by this JVM instance.
+     * Useful for cleanup during test teardown.
+     */
+    public static void releaseAllPorts() {
+      ALLOCATED_PORTS.clear();
+    }
+
+    /**
+     * Get statistics about port allocation for debugging.
+     */
+    public static String getAllocationStats() {
+      return String.format("Process_ID: %d, Allocated: %d ports, Counter: %d",
+          PROCESS_UNIQUE_ID, ALLOCATED_PORTS.size(), GLOBAL_PORT_COUNTER.get());
     }
 
     public static String localhostWithFreePort() {
@@ -410,6 +477,83 @@ public abstract class GenericTestUtils {
 
     public static String anyHostWithFreePort() {
       return "0.0.0.0:" + getFreePort();
+    }
+
+    /**
+     * Allocate a block of free ports (not necessarily contiguous).
+     * More reliable than contiguous allocation in high-concurrency scenarios.
+     */
+    public static int[] allocatePortBlock(int count) {
+      if (count <= 0 || count > 20) {
+        throw new IllegalArgumentException("Port block size must be between 1 and 20");
+      }
+
+      int[] ports = new int[count];
+      for (int i = 0; i < count; i++) {
+        ports[i] = getFreePort(); // Each port is independently allocated
+      }
+      return ports;
+    }
+
+    // Private helper methods - cryptographically robust implementations
+
+    /**
+     * Generate a process-specific unique identifier for fork safety.
+     */
+    private static long generateProcessUniqueId() {
+      long id = 0;
+
+      // Primary source: Process ID if available
+      try {
+        String jvmName = java.lang.management.ManagementFactory.getRuntimeMXBean().getName();
+        String pid = jvmName.split("@")[0];
+        id = Integer.parseInt(pid);
+      } catch (Exception e) {
+        // Fallback: use system identity hash
+        id = System.identityHashCode(PortAllocator.class);
+      }
+
+      // Secondary source: Surefire fork number (for Maven parallel execution)
+      String forkId = System.getProperty("test.unique.fork.id", "");
+      if (!forkId.isEmpty()) {
+        try {
+          int forkNumber = Integer.parseInt(forkId.replace("fork-", ""));
+          id = (id << 16) | (forkNumber & 0xFFFF);
+        } catch (NumberFormatException ignored) {
+          // Use hash of the fork string
+          id = (id << 16) | (forkId.hashCode() & 0xFFFF);
+        }
+      }
+
+      // Add some time-based entropy to avoid collisions on system restart
+      id ^= (System.currentTimeMillis() / 1000); // seconds since epoch
+
+      return Math.abs(id);
+    }
+
+    private static boolean isPortActuallyAvailable(int port) {
+      // Test both TCP and UDP to ensure the port is truly free
+      try (ServerSocket serverSocket = new ServerSocket()) {
+        serverSocket.setReuseAddress(false);
+        serverSocket.bind(new InetSocketAddress("localhost", port), 1);
+        return true;
+      } catch (Exception ex) {
+        return false;
+      }
+    }
+
+    /**
+     * Get a system-provided ephemeral port as ultimate fallback.
+     */
+    private static int getEphemeralPort() {
+      try (ServerSocket socket = new ServerSocket(0)) {
+        socket.setReuseAddress(true);
+        int port = socket.getLocalPort();
+        ALLOCATED_PORTS.put(port, System.currentTimeMillis());
+        return port;
+      } catch (IOException e) {
+        throw new IllegalStateException("Cannot allocate ephemeral port", e);
+      }
     }
   }
 

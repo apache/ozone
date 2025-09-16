@@ -45,9 +45,16 @@ class TestBaseHttpServer {
   private static final String BIND_HOST_HTTP_KEY = "bind-host.http";
   private static final String BIND_HOST_HTTPS_KEY = "bind-host.https";
   private static final String BIND_HOST_DEFAULT = "0.0.0.0";
-  private static final int BIND_PORT_HTTP_DEFAULT = PortAllocator.getFreePort();
-  private static final int BIND_PORT_HTTPS_DEFAULT = PortAllocator.getFreePort();
   private static final String ENABLED_KEY = "enabled";
+
+  // Use dynamic port allocation to avoid conflicts in parallel tests
+  private static int getHttpPort() {
+    return PortAllocator.getFreePort();
+  }
+
+  private static int getHttpsPort() {
+    return PortAllocator.getFreePort();
+  }
 
   private String hostname;
 
@@ -200,12 +207,12 @@ class TestBaseHttpServer {
 
     @Override
     protected int getHttpBindPortDefault() {
-      return BIND_PORT_HTTP_DEFAULT;
+      return getHttpPort();
     }
 
     @Override
     protected int getHttpsBindPortDefault() {
-      return BIND_PORT_HTTPS_DEFAULT;
+      return getHttpsPort();
     }
 
     @Override

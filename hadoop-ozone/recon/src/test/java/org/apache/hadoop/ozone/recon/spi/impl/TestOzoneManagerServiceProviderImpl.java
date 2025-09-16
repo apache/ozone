@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
+import org.apache.ozone.test.GenericTestUtils.PortAllocator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,7 +103,7 @@ public class TestOzoneManagerServiceProviderImpl {
         dirReconSnapDB.getAbsolutePath());
     configuration.set(OZONE_RECON_DB_DIR,
         dirReconDB.getAbsolutePath());
-    configuration.set("ozone.om.address", "localhost:9862");
+    configuration.set("ozone.om.address", "localhost:" + PortAllocator.getFreePort());
     ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdates());
     commonUtils = new CommonUtils();
     reconContext = new ReconContext(configuration, new ReconUtils());
