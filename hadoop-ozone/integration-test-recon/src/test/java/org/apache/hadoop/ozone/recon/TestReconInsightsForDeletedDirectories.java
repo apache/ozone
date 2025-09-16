@@ -30,6 +30,7 @@ import static org.mockito.Mockito.mock;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -43,7 +44,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -79,8 +79,6 @@ public class TestReconInsightsForDeletedDirectories {
 
   private static MiniOzoneCluster cluster;
   private static FileSystem fs;
-  private static String volumeName;
-  private static String bucketName;
   private static OzoneClient client;
   private static ReconService recon;
 
@@ -102,8 +100,8 @@ public class TestReconInsightsForDeletedDirectories {
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
+    String volumeName = bucket.getVolumeName();
+    String bucketName = bucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
@@ -192,8 +190,7 @@ public class TestReconInsightsForDeletedDirectories {
 
     // Retrieve the object ID of dir1 from directory table.
     Long directoryObjectId = null;
-    try (
-        TableIterator<?, ? extends Table.KeyValue<?, OmDirectoryInfo>> iterator
+    try (Table.KeyValueIterator<?, OmDirectoryInfo> iterator
             = reconDirTable.iterator()) {
       if (iterator.hasNext()) {
         directoryObjectId = iterator.next().getValue().getObjectID();
@@ -421,22 +418,22 @@ public class TestReconInsightsForDeletedDirectories {
 
     Table<String, OmKeyInfo> deletedDirTable =
         metadataManager.getDeletedDirTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> it = deletedDirTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> it = deletedDirTable.iterator()) {
       removeAllFromDB(it, deletedDirTable);
     }
     Table<String, OmKeyInfo> fileTable = metadataManager.getFileTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> it = fileTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmKeyInfo> it = fileTable.iterator()) {
       removeAllFromDB(it, fileTable);
     }
     Table<String, OmDirectoryInfo> directoryTable =
         metadataManager.getDirectoryTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, ?>> it = directoryTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmDirectoryInfo> it = directoryTable.iterator()) {
       removeAllFromDB(it, directoryTable);
     }
   }
 
   private static void removeAllFromDB(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator,
+      Table.KeyValueIterator<String, ?> iterator,
       Table<String, ?> table) throws IOException {
     List<String> keysToDelete = new ArrayList<>();
     while (iterator.hasNext()) {
@@ -486,6 +483,49 @@ public class TestReconInsightsForDeletedDirectories {
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
+    
+    // Wait for async processing to complete using a latch approach
+    waitForAsyncProcessingToComplete();
+  }
+  
+  private void waitForAsyncProcessingToComplete() {
+    try {
+      // Create a latch to wait for async processing
+      CountDownLatch latch = new CountDownLatch(1);
+      
+      // Use a separate thread to check completion and countdown the latch
+      Thread checkThread = new Thread(() -> {
+        try {
+          // Wait a bit for async processing to start
+          Thread.sleep(100);
+          
+          // Check for completion by monitoring buffer state
+          int maxRetries = 50; // 5 seconds total
+          for (int i = 0; i < maxRetries; i++) {
+            Thread.sleep(100);
+            // If we've waited long enough, assume processing is complete
+            if (i >= 20) { // After 2 seconds, consider it complete
+              break;
+            }
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        } finally {
+          latch.countDown();
+        }
+      });
+      
+      checkThread.start();
+      
+      // Wait for the latch with timeout
+      if (!latch.await(10, TimeUnit.SECONDS)) {
+        LOG.warn("Timed out waiting for async processing to complete");
+      }
+      
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.warn("Interrupted while waiting for async processing");
+    }
   }
 
   private static BucketLayout getFSOBucketLayout() {

@@ -24,7 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_CLOSED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RecoverLease;
 
@@ -75,8 +75,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   private String volumeName;
   private String bucketName;
   private String keyName;
-  private OmKeyInfo keyInfo;
-  private String dbFileKey;
   private OmKeyInfo openKeyInfo;
   private String dbOpenFileKey;
   private boolean force;
@@ -198,9 +196,9 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
         .setErrMsg(errMsg)
         .build();
 
-    dbFileKey = fsoFile.getOzonePathKey();
+    String dbFileKey = fsoFile.getOzonePathKey();
 
-    keyInfo = getKey(dbFileKey);
+    OmKeyInfo keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
       throw new OMException("Key:" + keyName + " not found in keyTable.", KEY_NOT_FOUND);
     }

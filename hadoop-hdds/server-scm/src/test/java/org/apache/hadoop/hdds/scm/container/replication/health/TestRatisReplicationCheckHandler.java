@@ -84,7 +84,6 @@ public class TestRatisReplicationCheckHandler {
   private ReplicationQueue repQueue;
   private ContainerCheckRequest.Builder requestBuilder;
   private ReplicationManagerReport report;
-  private ReplicationManager replicationManager;
   private int maintenanceRedundancy = 2;
 
   @BeforeEach
@@ -96,7 +95,7 @@ public class TestRatisReplicationCheckHandler {
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(2, 2, 3));
 
-    replicationManager = mock(ReplicationManager.class);
+    ReplicationManager replicationManager = mock(ReplicationManager.class);
     when(replicationManager.getNodeStatus(any()))
         .thenReturn(NodeStatus.inServiceHealthy());
     healthCheck = new RatisReplicationCheckHandler(containerPlacementPolicy,

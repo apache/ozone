@@ -94,24 +94,18 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestBlockManager {
   private StorageContainerManager scm;
-  private ContainerManager mapping;
   private MockNodeManager nodeManager;
   private PipelineManagerImpl pipelineManager;
   private BlockManagerImpl blockManager;
-  private SCMHAManager scmHAManager;
-  private SequenceIdGenerator sequenceIdGen;
   private static final long DEFAULT_BLOCK_SIZE = 128 * MB;
   private EventQueue eventQueue;
-  private SCMContext scmContext;
-  private SCMServiceManager serviceManager;
   private int numContainerPerOwnerInPipeline;
-  private OzoneConfiguration conf;
   private SCMMetadataStore scmMetadataStore;
   private ReplicationConfig replicationConfig;
 
   @BeforeEach
   void setUp(@TempDir File tempDir) throws Exception {
-    conf = SCMTestUtils.getConf(tempDir);
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     numContainerPerOwnerInPipeline = conf.getInt(
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
@@ -124,16 +118,16 @@ public class TestBlockManager {
     // Override the default Node Manager and SCMHAManager
     // in SCM with the Mock one.
     nodeManager = new MockNodeManager(true, 10);
-    scmHAManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmHAManager = SCMHAManagerStub.getInstance(true);
 
     eventQueue = new EventQueue();
-    scmContext = SCMContext.emptyContext();
-    serviceManager = new SCMServiceManager();
+    SCMContext scmContext = SCMContext.emptyContext();
+    SCMServiceManager serviceManager = new SCMServiceManager();
 
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
 
-    sequenceIdGen = new SequenceIdGenerator(
+    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
         conf, scmHAManager, scmMetadataStore.getSequenceIdTable());
 
     pipelineManager =
@@ -175,7 +169,7 @@ public class TestBlockManager {
     configurator.getLeaseManager().start();
 
     // Initialize these fields so that the tests can pass.
-    mapping = scm.getContainerManager();
+    ContainerManager mapping = scm.getContainerManager();
     blockManager = (BlockManagerImpl) scm.getScmBlockManager();
     DatanodeCommandHandler handler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
@@ -186,7 +180,7 @@ public class TestBlockManager {
     replicationConfig = RatisReplicationConfig
         .getInstance(ReplicationFactor.THREE);
 
-    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.of(false, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
   }
 
   @AfterEach
@@ -385,7 +379,6 @@ public class TestBlockManager {
         numContainerPerOwnerInPipeline;
     int numMetaDataVolumes = 2;
     nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
-    nodeManager.setNumMetaDataVolumes(numMetaDataVolumes);
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
@@ -450,8 +443,7 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockFailureInSafeMode() {
-    scm.getScmContext().updateSafeModeStatus(
-        SCMSafeModeManager.SafeModeStatus.of(true, true));
+    scm.getScmContext().updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     // Test1: In safe mode expect an SCMException.
     Throwable t = assertThrows(IOException.class, () ->
         blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,

@@ -97,6 +97,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -182,7 +183,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto3;
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
-  private ContainerCountBySizeDao containerCountBySizeDao;
   private DSLContext dslContext;
   private static final String HOST1 = "host1.datanode";
   private static final String HOST2 = "host2.datanode";
@@ -197,10 +197,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ReconUtils reconUtilsMock;
   private StorageContainerLocationProtocol mockScmClient;
 
-  private ContainerHealthSchemaManager containerHealthSchemaManager;
   private CommonUtils commonUtils;
-  private PipelineManager pipelineManager;
-  private ReconPipelineManager reconPipelineManager;
   private List<HddsProtos.Node> nodes = getNodeDetails(2);
   private Map<String, List<ContainerID>> containerOnDecom = getContainersOnDecomNodes();
   private ArrayList<String> metrics = getMetrics();
@@ -299,7 +296,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     volumeEndpoint = reconTestInjector.getInstance(VolumeEndpoint.class);
     bucketEndpoint = reconTestInjector.getInstance(BucketEndpoint.class);
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
-    containerCountBySizeDao = reconScm.getContainerCountBySizeDao();
+    ContainerCountBySizeDao containerCountBySizeDao = reconScm.getContainerCountBySizeDao();
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
@@ -316,7 +313,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     omTableInsightTask =
         new OmTableInsightTask(globalStatsDao, sqlConfiguration,
             reconOMMetadataManager);
-    containerHealthSchemaManager =
+    ContainerHealthSchemaManager containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     clusterStateEndpoint =
         new ClusterStateEndpoint(reconScm, globalStatsDao,
@@ -327,8 +324,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     metricsProxyEndpoint =
         new MetricsProxyEndpoint(metricsServiceProviderFactory);
     dslContext = getDslContext();
-    pipelineManager = reconScm.getPipelineManager();
-    reconPipelineManager = (ReconPipelineManager) pipelineManager;
+    PipelineManager pipelineManager = reconScm.getPipelineManager();
+    ReconPipelineManager reconPipelineManager = (ReconPipelineManager) pipelineManager;
     reconPipelineManager.addPipeline(pipeline);
   }
 
@@ -833,10 +830,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         .TypedTableIterator.class);
     TypedTable.TypedTableIterator mockKeyIterFso = mock(TypedTable
         .TypedTableIterator.class);
-    TypedTable.TypedKeyValue mockKeyValueLegacy = mock(
-        TypedTable.TypedKeyValue.class);
-    TypedTable.TypedKeyValue mockKeyValueFso = mock(
-        TypedTable.TypedKeyValue.class);
+    final Table.KeyValue mockKeyValueLegacy = mock(Table.KeyValue.class);
+    final Table.KeyValue mockKeyValueFso = mock(Table.KeyValue.class);
 
     when(keyTableLegacy.iterator()).thenReturn(mockKeyIterLegacy);
     when(keyTableFso.iterator()).thenReturn(mockKeyIterFso);

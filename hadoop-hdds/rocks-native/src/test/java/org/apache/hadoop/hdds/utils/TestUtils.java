@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyLowerString;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -31,18 +34,6 @@ import java.util.stream.Collectors;
 public final class TestUtils {
 
   private TestUtils() {
-  }
-
-  public static String getLexicographicallyLowerString(String val) {
-    char[] charVal = val.toCharArray();
-    charVal[charVal.length - 1] -= 1;
-    return String.valueOf(charVal);
-  }
-
-  public static String getLexicographicallyHigherString(String val) {
-    char[] charVal = val.toCharArray();
-    charVal[charVal.length - 1] += 1;
-    return String.valueOf(charVal);
   }
 
   public static List<Optional<String>> getTestingBounds(

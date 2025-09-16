@@ -28,7 +28,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 import com.google.common.base.Preconditions;
@@ -40,6 +40,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -64,7 +65,6 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -176,80 +176,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         resolvedArgs.getBucketName(), keyArgs.getKeyName(),
         aclType, clientId);
     return resolvedArgs;
-  }
-
-  /**
-   * Define the parameters carried when verifying the Key.
-   */
-  public static class ValidateKeyArgs {
-    private String snapshotReservedWord;
-    private String keyName;
-    private boolean validateSnapshotReserved;
-    private boolean validateKeyName;
-
-    ValidateKeyArgs(String snapshotReservedWord, String keyName,
-        boolean validateSnapshotReserved, boolean validateKeyName) {
-      this.snapshotReservedWord = snapshotReservedWord;
-      this.keyName = keyName;
-      this.validateSnapshotReserved = validateSnapshotReserved;
-      this.validateKeyName = validateKeyName;
-    }
-
-    public String getSnapshotReservedWord() {
-      return snapshotReservedWord;
-    }
-
-    public String getKeyName() {
-      return keyName;
-    }
-
-    public boolean isValidateSnapshotReserved() {
-      return validateSnapshotReserved;
-    }
-
-    public boolean isValidateKeyName() {
-      return validateKeyName;
-    }
-
-    /**
-     * Tools for building {@link ValidateKeyArgs}.
-     */
-    public static class Builder {
-      private String snapshotReservedWord;
-      private String keyName;
-      private boolean validateSnapshotReserved;
-      private boolean validateKeyName;
-
-      public Builder setSnapshotReservedWord(String snapshotReservedWord) {
-        this.snapshotReservedWord = snapshotReservedWord;
-        this.validateSnapshotReserved = true;
-        return this;
-      }
-
-      public Builder setKeyName(String keyName) {
-        this.keyName = keyName;
-        this.validateKeyName = true;
-        return this;
-      }
-
-      public ValidateKeyArgs build() {
-        return new ValidateKeyArgs(snapshotReservedWord, keyName,
-            validateSnapshotReserved, validateKeyName);
-      }
-    }
-  }
-
-  protected void validateKey(OzoneManager ozoneManager, ValidateKeyArgs validateKeyArgs)
-      throws OMException {
-    if (validateKeyArgs.isValidateSnapshotReserved()) {
-      OmUtils.verifyKeyNameWithSnapshotReservedWord(validateKeyArgs.getSnapshotReservedWord());
-    }
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-        .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-            OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (validateKeyArgs.isValidateKeyName() && checkKeyNameEnabled) {
-      OmUtils.validateKeyName(validateKeyArgs.getKeyName());
-    }
   }
 
   /**
@@ -1247,6 +1173,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
     uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
     pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
     return pseudoKeyInfo;
+  }
+
+  protected static Map<String, RepeatedOmKeyInfo> addKeyInfoToDeleteMap(OzoneManager om,
+      long trxnLogIndex, String ozoneKey, OmKeyInfo keyInfo, Map<String, RepeatedOmKeyInfo> deleteMap) {
+    if (keyInfo == null) {
+      return deleteMap;
+    }
+    final long pseudoObjId = om.getObjectIdFromTxId(trxnLogIndex);
+    final String delKeyName = om.getMetadataManager().getOzoneDeletePathKey(pseudoObjId, ozoneKey);
+    if (deleteMap == null) {
+      deleteMap = new HashMap<>();
+    }
+    deleteMap.computeIfAbsent(delKeyName, key -> new RepeatedOmKeyInfo())
+        .addOmKeyInfo(keyInfo);
+    return deleteMap;
   }
 
   /**

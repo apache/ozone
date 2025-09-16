@@ -74,17 +74,15 @@ public class TestOzoneContainer {
   private String clusterId = UUID.randomUUID().toString();
   private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
-  private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private final DatanodeDetails datanodeDetails = createDatanodeDetails();
   private HashMap<String, Long> commitSpaceMap; //RootDir -> committed space
 
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
 
   private void initTest(ContainerTestVersionInfo versionInfo) throws Exception {
     this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     setup();
@@ -99,6 +97,7 @@ public class TestOzoneContainer {
         clusterId, conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, clusterId, clusterId, conf);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
+    volumeSet.startAllVolume();
   }
 
   @AfterEach
@@ -132,7 +131,7 @@ public class TestOzoneContainer {
 
       HddsVolume myVolume;
 
-      keyValueContainerData = new KeyValueContainerData(i,
+      KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
           layout,
           maxCap, UUID.randomUUID().toString(),
           datanodeDetails.getUuidString());
@@ -142,7 +141,7 @@ public class TestOzoneContainer {
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
       myVolume = keyValueContainer.getContainerData().getVolume();
 
-      freeBytes = addBlocks(keyValueContainer, 2, 3);
+      freeBytes = addBlocks(keyValueContainer, 2, 3, 65536);
 
       // update our expectation of volume committed space in the map
       volCommitBytes = commitSpaceMap.get(getVolumeKey(myVolume)).longValue();
@@ -158,6 +157,8 @@ public class TestOzoneContainer {
     ContainerSet containerset = ozoneContainer.getContainerSet();
     assertEquals(numTestContainers, containerset.containerCount());
     verifyCommittedSpace(ozoneContainer);
+    // container usage here, nrOfContainer * blocks * chunksPerBlock * datalen
+    assertEquals(10 * 2 * 3 * 65536, ozoneContainer.gatherContainerUsages(volumes.get(0)));
     Set<Long> missingContainers = new HashSet<>();
     for (int i = 0; i < numTestContainers; i++) {
       if (i % 2 == 0) {
@@ -235,7 +236,7 @@ public class TestOzoneContainer {
       // eat up 10 bytes more, now available space is less than 1 container
       volume.incCommittedBytes(10);
     }
-    keyValueContainerData = new KeyValueContainerData(99,
+    KeyValueContainerData keyValueContainerData = new KeyValueContainerData(99,
         layout, containerSize,
         UUID.randomUUID().toString(), datanodeDetails.getUuidString());
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
@@ -262,10 +263,9 @@ public class TestOzoneContainer {
   }
 
   private long addBlocks(KeyValueContainer container,
-      int blocks, int chunksPerBlock) throws Exception {
+      int blocks, int chunksPerBlock, int datalen) throws Exception {
     String strBlock = "block";
     String strChunk = "-chunkFile";
-    int datalen = 65536;
     long usedBytes = 0;
 
     long freeBytes = container.getContainerData().getMaxSize();

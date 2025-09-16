@@ -92,6 +92,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacem
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
+import org.apache.hadoop.hdds.scm.container.reconciliation.ReconcileContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.container.replication.DatanodeCommandCountUpdatedHandler;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -285,7 +286,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
-  private PlacementPolicy ecContainerPlacementPolicy;
   private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
@@ -403,6 +403,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READONLY_ADMINISTRATORS,
                 this::reconfOzoneReadOnlyAdmins);
 
+    reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
+
     initializeSystemManagers(conf, configurator);
 
     if (isSecretKeyEnable(securityConfig)) {
@@ -499,6 +501,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     ReplicationManagerEventHandler replicationManagerEventHandler =
         new ReplicationManagerEventHandler(replicationManager, scmContext);
 
+    ReconcileContainerEventHandler reconcileContainerEventHandler =
+        new ReconcileContainerEventHandler(containerManager, scmContext);
+
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
@@ -572,6 +577,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
+    eventQueue.addHandler(SCMEvents.RECONCILE_CONTAINER, reconcileContainerEventHandler);
 
     scmNodeManager.registerSendCommandNotify(
         SCMCommandProto.Type.deleteBlocksCommand,
@@ -703,8 +709,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmContext = new SCMContext.Builder()
           .setLeader(false)
           .setTerm(0)
-          .setIsInSafeMode(true)
-          .setIsPreCheckComplete(false)
+          .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.INITIAL)
           .setSCM(this)
           .setThreadNamePrefix(threadNamePrefix)
           .setFinalizationCheckpoint(finalizationManager.getCheckpoint())
@@ -734,7 +739,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
 
-    ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
+    PlacementPolicy ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
         conf, scmNodeManager, clusterMap, true, placementMetrics);
 
     placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
@@ -759,8 +764,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     finalizationManager.buildUpgradeContext(scmNodeManager, pipelineManager,
         scmContext);
 
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(systemClock);
+        new ContainerReplicaPendingOps(systemClock, rmConf);
 
     long containerReplicaOpScrubberIntervalMs = conf.getTimeDuration(
         ScmConfigKeys
@@ -813,6 +820,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       replicationManager = configurator.getReplicationManager();
     }  else {
       replicationManager = new ReplicationManager(
+          rmConf,
           conf,
           containerManager,
           containerPlacementPolicy,
@@ -822,7 +830,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmNodeManager,
           systemClock,
           containerReplicaPendingOps);
-      reconfigurationHandler.register(replicationManager.getConfig());
+      reconfigurationHandler.register(rmConf);
     }
     serviceManager.register(replicationManager);
     // RM gets notified of expired pending delete from containerReplicaPendingOps by subscribing to it
@@ -1705,7 +1713,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMHAMetrics.unRegister();
     }
 
-    IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
 
     if (ms != null) {
@@ -1931,11 +1938,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public boolean isInSafeMode() {
     return scmSafeModeManager.getInSafeMode();
-  }
-
-  @Override
-  public boolean isSafeModeExitForceful() {
-    return scmSafeModeManager.isForceExitSafeMode();
   }
 
   /**

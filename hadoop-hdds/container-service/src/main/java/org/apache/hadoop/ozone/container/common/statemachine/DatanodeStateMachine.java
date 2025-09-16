@@ -26,7 +26,9 @@ import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -48,6 +50,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
@@ -58,6 +61,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Crea
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconcileContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
@@ -94,7 +98,8 @@ public class DatanodeStateMachine implements Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeStateMachine.class);
   private final ExecutorService executorService;
-  private final ExecutorService pipelineCommandExecutorService;
+  private final ExecutorService closePipelineCommandExecutorService;
+  private final ExecutorService createPipelineCommandExecutorService;
   private final ConfigurationSource conf;
   private final SCMConnectionManager connectionManager;
   private final ECReconstructionCoordinator ecReconstructionCoordinator;
@@ -230,11 +235,28 @@ public class DatanodeStateMachine implements Closeable {
         new ReconstructECContainersCommandHandler(conf, supervisor,
             ecReconstructionCoordinator);
 
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat(threadNamePrefix + "PipelineCommandHandlerThread-%d")
+    // TODO HDDS-11218 combine the clients used for reconstruction and reconciliation so they share the same cache of
+    //  datanode clients.
+    DNContainerOperationClient dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
+
+    // Create separate bounded executors for pipeline command handlers
+    ThreadFactory closePipelineThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "ClosePipelineCommandHandlerThread-%d")
         .build();
-    pipelineCommandExecutorService = Executors
-        .newSingleThreadExecutor(threadFactory);
+    closePipelineCommandExecutorService = new ThreadPoolExecutor(
+        1, 1,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(dnConf.getCommandQueueLimit()),
+        closePipelineThreadFactory);
+
+    ThreadFactory createPipelineThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "CreatePipelineCommandHandlerThread-%d")
+        .build();
+    createPipelineCommandExecutorService = new ThreadPoolExecutor(
+        1, 1,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(dnConf.getCommandQueueLimit()),
+        createPipelineThreadFactory);
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
@@ -251,13 +273,14 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getContainerDeleteThreads(), clock,
             dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(new ClosePipelineCommandHandler(conf,
-            pipelineCommandExecutorService))
+            closePipelineCommandExecutorService))
         .addHandler(new CreatePipelineCommandHandler(conf,
-            pipelineCommandExecutorService))
+            createPipelineCommandExecutorService))
         .addHandler(new SetNodeOperationalStateCommandHandler(conf,
             supervisor::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
+        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -429,7 +452,8 @@ public class DatanodeStateMachine implements Closeable {
     replicationSupervisorMetrics.unRegister();
     ecReconstructionMetrics.unRegister();
     executorServiceShutdownGraceful(executorService);
-    executorServiceShutdownGraceful(pipelineCommandExecutorService);
+    executorServiceShutdownGraceful(closePipelineCommandExecutorService);
+    executorServiceShutdownGraceful(createPipelineCommandExecutorService);
 
     if (connectionManager != null) {
       connectionManager.close();

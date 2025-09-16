@@ -130,6 +130,7 @@ import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -729,10 +730,10 @@ public class SnapshotDiffManager implements AutoCloseable {
     // If executor cannot take any more job, remove the job form DB and return
     // the Rejected Job status with wait time.
     try {
+      updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
       snapDiffExecutor.execute(() -> generateSnapshotDiffReport(jobKey, jobId,
           volumeName, bucketName, fromSnapshotName, toSnapshotName,
           forceFullDiff, disableNativeDiff));
-      updateJobStatus(jobKey, QUEUED, IN_PROGRESS);
       return new SnapshotDiffResponse(
           new SnapshotDiffReportOzone(snapshotRoot.toString(), volumeName,
               bucketName, fromSnapshotName, toSnapshotName, new ArrayList<>(),
@@ -837,8 +838,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     // job by RocksDBCheckpointDiffer#pruneOlderSnapshotsWithCompactionHistory.
     Path path = Paths.get(sstBackupDirForSnapDiffJobs + "/" + jobId);
 
-    ReferenceCounted<OmSnapshot> rcFromSnapshot = null;
-    ReferenceCounted<OmSnapshot> rcToSnapshot = null;
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcFromSnapshot = null;
+    UncheckedAutoCloseableSupplier<OmSnapshot> rcToSnapshot = null;
 
     try {
       if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
@@ -969,7 +970,7 @@ public class SnapshotDiffManager implements AutoCloseable {
               oldParentIdPathMap.get().putAll(new FSODirectoryPathResolver(
                   tablePrefix, bucketId,
                   fromSnapshot.getMetadataManager().getDirectoryTable())
-                  .getAbsolutePathForObjectIDs(oldParentIds));
+                  .getAbsolutePathForObjectIDs(oldParentIds, true));
               newParentIdPathMap.get().putAll(new FSODirectoryPathResolver(
                   tablePrefix, bucketId,
                   toSnapshot.getMetadataManager().getDirectoryTable())
@@ -1377,10 +1378,12 @@ public class SnapshotDiffManager implements AutoCloseable {
             }
           } else if (newKeyName == null) { // Key Deleted.
             String key = resolveBucketRelativePath(isFSOBucket,
-                oldParentIdPathMap, oldKeyName, false);
-            DiffReportEntry entry =
-                SnapshotDiffReportOzone.getDiffReportEntry(DELETE, key);
-            deleteDiffs.add(codecRegistry.asRawData(entry));
+                oldParentIdPathMap, oldKeyName, true);
+            if (key != null) {
+              DiffReportEntry entry =
+                  SnapshotDiffReportOzone.getDiffReportEntry(DELETE, key);
+              deleteDiffs.add(codecRegistry.asRawData(entry));
+            }
           } else if (isDirectoryObject &&
               Arrays.equals(oldKeyName, newKeyName)) {
             String key = resolveBucketRelativePath(isFSOBucket,
@@ -1394,10 +1397,18 @@ public class SnapshotDiffManager implements AutoCloseable {
             String keyPrefix = getTablePrefix(tablePrefix,
                 (isDirectoryObject ? fsDirTable : fsTable).getName());
             String oldKey = resolveBucketRelativePath(isFSOBucket,
-                oldParentIdPathMap, oldKeyName, false);
+                oldParentIdPathMap, oldKeyName, true);
             String newKey = resolveBucketRelativePath(isFSOBucket,
                 newParentIdPathMap, newKeyName, true);
-            if (newKey == null) {
+            if (oldKey == null && newKey == null) {
+              // When both are unresolved then it means both keys are deleted. So no change for these objects.
+              continue;
+            } else if (oldKey == null) {
+              // This should never happen where oldKey path is unresolved and new snapshot is resolved.
+              throw new IllegalStateException(String.format("Old and new key resolved paths both are not null when " +
+                      "oldKey is null for oldKey : %s newKey: %s", codecRegistry.asObject(oldKeyName, String.class),
+                  codecRegistry.asObject(newKeyName, String.class)));
+            } else if (newKey == null) {
               deleteDiffs.add(codecRegistry.asRawData(SnapshotDiffReportOzone
                   .getDiffReportEntry(DELETE, oldKey)));
             } else {
@@ -1421,7 +1432,6 @@ public class SnapshotDiffManager implements AutoCloseable {
               }
             }
           }
-
           counter++;
         }
       }

@@ -103,6 +103,7 @@ public class TestSCMSafeModeManager {
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         false);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
+    config.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 1);
     scmMetadataStore = new SCMMetadataStoreImpl(config);
   }
 
@@ -413,7 +414,6 @@ public class TestSCMSafeModeManager {
               .PipelineReport.newBuilder()
               .setPipelineID(pipelineID)
               .setIsLeader(true)
-              .setBytesWritten(0)
               .build());
       StorageContainerDatanodeProtocolProtos
               .PipelineReportsProto.Builder pipelineReportsProto =

@@ -62,6 +62,8 @@ public final class OMConfigKeys {
       "ozone.om.node.id";
   public static final String OZONE_OM_DECOMMISSIONED_NODES_KEY =
       "ozone.om.decommissioned.nodes";
+  public static final String OZONE_OM_LISTENER_NODES_KEY =
+      "ozone.om.listener.nodes";
 
   public static final String OZONE_OM_FEATURES_DISABLED =
       "ozone.om.features.disabled";
@@ -106,7 +108,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
-  public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
+  public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 50000;
   public static final String OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.key.deleting.limit.per.task";
   public static final int OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT
@@ -183,7 +185,7 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_SEGMENT_SIZE_KEY
       = "ozone.om.ratis.segment.size";
   public static final String OZONE_OM_RATIS_SEGMENT_SIZE_DEFAULT
-      = "4MB";
+      = "64MB";
   public static final String OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
       = "ozone.om.ratis.segment.preallocated.size";
   public static final String OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT
@@ -199,6 +201,15 @@ public final class OMConfigKeys {
       "ozone.om.ratis.log.appender.queue.byte-limit";
   public static final String
       OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT = "32MB";
+
+  // OM Ratis Pending Write configurations
+  public static final String OZONE_OM_RATIS_PENDING_WRITE_ELEMENT_LIMIT =
+      "ozone.om.ratis.server.pending.write.element-limit";
+  public static final int OZONE_OM_RATIS_PENDING_WRITE_NUM_LIMIT_DEFAULT = 4096;
+
+  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT = "ozone.om.ratis.server.pending.write.byte-limit";
+  public static final String OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT_DEFAULT = "64MB";
+
   public static final String OZONE_OM_RATIS_LOG_PURGE_GAP =
       "ozone.om.ratis.log.purge.gap";
   public static final int OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT = 1000000;
@@ -323,11 +334,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SECURITY_ADMIN_PROTOCOL_ACL =
       "ozone.om.security.admin.protocol.acl";
 
-  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
-          "ozone.om.keyname.character.check.enabled";
-  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
-          false;
-
   @Deprecated
   public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =
       OmConfig.Keys.ENABLE_FILESYSTEM_PATHS;
@@ -387,19 +393,32 @@ public final class OMConfigKeys {
    */
   public static final String OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED = "ozone.snapshot.deep.cleaning.enabled";
   public static final boolean OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED_DEFAULT = false;
+  /**
+   * DirectoryDeepCleaning snapshots have been moved from SnapshotDirectoryCleaningService to DirectoryDeletingService.
+   * Configs related to SnapshotDirectoryCleaningService are deprecated as this won't be used anywhere.
+   */
+  @Deprecated
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL =
       "ozone.snapshot.directory.service.interval";
+  @Deprecated
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT
       = "24h";
+  @Deprecated
   public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT =
       "ozone.snapshot.directory.service.timeout";
+  @Deprecated
   public static final String
       OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT = "300s";
 
   public static final String OZONE_THREAD_NUMBER_DIR_DELETION =
       "ozone.thread.number.dir.deletion";
 
+  public static final String OZONE_THREAD_NUMBER_KEY_DELETION =
+      "ozone.thread.number.key.deletion";
+
   public static final int OZONE_THREAD_NUMBER_DIR_DELETION_DEFAULT = 10;
+
+  public static final int OZONE_THREAD_NUMBER_KEY_DELETION_DEFAULT = 10;
 
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";
@@ -622,7 +641,7 @@ public final class OMConfigKeys {
   /**
    * Configuration properties for Compaction Service.
    */
-  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.compaction.service.enabled";
+  public static final String OZONE_OM_COMPACTION_SERVICE_ENABLED = "ozone.om.compaction.service.enabled";
   public static final boolean OZONE_OM_COMPACTION_SERVICE_ENABLED_DEFAULT = false;
   public static final String OZONE_OM_COMPACTION_SERVICE_RUN_INTERVAL =
       "ozone.om.compaction.service.run.interval";
@@ -636,6 +655,13 @@ public final class OMConfigKeys {
       = "ozone.om.compaction.service.columnfamilies";
   public static final String OZONE_OM_COMPACTION_SERVICE_COLUMNFAMILIES_DEFAULT =
       "keyTable,fileTable,directoryTable,deletedTable,deletedDirectoryTable,multipartInfoTable";
+
+  /**
+   * Configuration to enable/disable non-snapshot diff table compaction when snapshots are evicted from cache.
+   */
+  public static final String OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES = 
+      "ozone.om.snapshot.compact.non.snapshot.diff.tables";
+  public static final boolean OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT = false;
 
   /**
    * Never constructed.

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
@@ -57,12 +56,12 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -212,9 +211,9 @@ public class TestOMSnapshotDAG {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     RocksDBCheckpointDiffer differ = rdbStore.getRocksDBCheckpointDiffer();
-    ReferenceCounted<OmSnapshot> snapDB1 = ozoneManager.getOmSnapshotManager()
+    UncheckedAutoCloseableSupplier<OmSnapshot> snapDB1 = ozoneManager.getOmSnapshotManager()
         .getActiveSnapshot(volumeName, bucketName, "snap1");
-    ReferenceCounted<OmSnapshot> snapDB2 = ozoneManager.getOmSnapshotManager()
+    UncheckedAutoCloseableSupplier<OmSnapshot> snapDB2 = ozoneManager.getOmSnapshotManager()
         .getActiveSnapshot(volumeName, bucketName, "snap2");
     DifferSnapshotInfo snap1 = getDifferSnapshotInfo(omMetadataManager,
         volumeName, bucketName, "snap1",
@@ -240,7 +239,7 @@ public class TestOMSnapshotDAG {
 
     resp = store.createSnapshot(volumeName, bucketName, "snap3");
     LOG.debug("Snapshot created: {}", resp);
-    ReferenceCounted<OmSnapshot> snapDB3 = ozoneManager.getOmSnapshotManager()
+    UncheckedAutoCloseableSupplier<OmSnapshot> snapDB3 = ozoneManager.getOmSnapshotManager()
         .getActiveSnapshot(volumeName, bucketName, "snap3");
     DifferSnapshotInfo snap3 = getDifferSnapshotInfo(omMetadataManager,
         volumeName, bucketName, "snap3",
@@ -318,7 +317,7 @@ public class TestOMSnapshotDAG {
     assertEquals(1000L, randomKeyGenerator.getSuccessfulValidationCount());
 
     String omMetadataDir =
-        cluster.getOzoneManager().getConfiguration().get(OZONE_METADATA_DIRS);
+        cluster.getOzoneManager().getConfiguration().get(OMConfigKeys.OZONE_OM_DB_DIRS);
     // Verify that no compaction log entry has been written
     Path logPath = Paths.get(omMetadataDir, OM_SNAPSHOT_DIFF_DIR,
         DB_COMPACTION_LOG_DIR);

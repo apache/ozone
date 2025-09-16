@@ -11,7 +11,6 @@ share/ozone/lib/asm.jar
 share/ozone/lib/asm-tree.jar
 share/ozone/lib/asm-util.jar
 share/ozone/lib/aspectjrt.jar
-share/ozone/lib/aspectjweaver.jar
 share/ozone/lib/aws-java-sdk-core.jar
 share/ozone/lib/aws-java-sdk-kms.jar
 share/ozone/lib/aws-java-sdk-logs.jar
@@ -21,11 +20,11 @@ share/ozone/lib/bcprov-jdk18on.jar
 share/ozone/lib/bcutil-jdk18on.jar
 share/ozone/lib/bonecp.RELEASE.jar
 share/ozone/lib/cdi-api.jar
-share/ozone/lib/checker-qual.jar
 share/ozone/lib/commons-beanutils.jar
 share/ozone/lib/commons-cli.jar
 share/ozone/lib/commons-codec.jar
 share/ozone/lib/commons-collections.jar
+share/ozone/lib/commons-collections4.jar
 share/ozone/lib/commons-compress.jar
 share/ozone/lib/commons-configuration2.jar
 share/ozone/lib/commons-daemon.jar
@@ -34,6 +33,7 @@ share/ozone/lib/commons-io.jar
 share/ozone/lib/commons-lang3.jar
 share/ozone/lib/commons-lang.jar
 share/ozone/lib/commons-net.jar
+share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
 share/ozone/lib/commons-validator.jar
 share/ozone/lib/commons-fileupload.jar
@@ -66,7 +66,6 @@ share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
 share/ozone/lib/hadoop-shaded-guava.jar
 share/ozone/lib/hadoop-shaded-protobuf_3_25.jar
-share/ozone/lib/hdds-annotation-processing.jar
 share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
@@ -126,7 +125,6 @@ share/ozone/lib/jersey-client.jar
 share/ozone/lib/jersey-client.jar
 share/ozone/lib/jersey-common.jar
 share/ozone/lib/jersey-container-servlet-core.jar
-share/ozone/lib/jersey-container-servlet.jar
 share/ozone/lib/jersey-core.jar
 share/ozone/lib/jersey-entity-filtering.jar
 share/ozone/lib/jersey-hk2.jar
@@ -166,6 +164,7 @@ share/ozone/lib/jooq-meta.jar
 share/ozone/lib/jsch.jar
 share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
+share/ozone/lib/jspecify.jar
 share/ozone/lib/jsr311-api.jar
 share/ozone/lib/kerb-core.jar
 share/ozone/lib/kerb-crypto.jar
@@ -182,7 +181,6 @@ share/ozone/lib/libthrift.jar
 share/ozone/lib/listenablefuture-empty-to-avoid-conflict-with-guava.jar
 share/ozone/lib/log4j-api.jar
 share/ozone/lib/log4j-core.jar
-share/ozone/lib/metainf-services.jar
 share/ozone/lib/metrics-core.jar
 share/ozone/lib/netty-buffer.Final.jar
 share/ozone/lib/netty-codec.Final.jar
@@ -243,7 +241,6 @@ share/ozone/lib/picocli.jar
 share/ozone/lib/picocli-shell-jline3.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java.jar
-share/ozone/lib/protobuf-java-util.jar
 share/ozone/lib/proto-google-common-protos.jar
 share/ozone/lib/ranger-intg.jar
 share/ozone/lib/ranger-plugin-classloader.jar

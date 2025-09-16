@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.base.Preconditions;
@@ -83,8 +83,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     String keyPath = keyArgs.getKeyName();
 
     OmUtils.verifyKeyNameWithSnapshotReservedWordForDeletion(keyPath);
-    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-        keyPath, getBucketLayout());
+    keyPath = normalizeKeyPath(ozoneManager.getEnableFileSystemPaths(), keyPath, getBucketLayout());
 
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);

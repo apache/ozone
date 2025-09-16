@@ -48,10 +48,6 @@
     </dependency>
     <dependency>
       <groupId>com.google.inject.extensions</groupId>
-      <artifactId>guice-assistedinject</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.inject.extensions</groupId>
       <artifactId>guice-servlet</artifactId>
     </dependency>
     <dependency>
@@ -63,20 +59,12 @@
       <artifactId>bonecp</artifactId>
     </dependency>
     <dependency>
-      <groupId>commons-collections</groupId>
-      <artifactId>commons-collections</artifactId>
-    </dependency>
-    <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
     </dependency>
     <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>jakarta.activation</groupId>
-      <artifactId>jakarta.activation-api</artifactId>
     </dependency>
     <dependency>
       <groupId>jakarta.annotation</groupId>
@@ -95,12 +83,24 @@
       <artifactId>jakarta.xml.bind-api</artifactId>
     </dependency>
     <dependency>
+      <!--
+      1. for compiling generated sources with Java 11+
+      2. at runtime for jersey-common
+      -->
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
+    </dependency>
+    <dependency>
       <groupId>javax.inject</groupId>
       <artifactId>javax.inject</artifactId>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -208,24 +208,12 @@
       <artifactId>jetty-servlet</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-util</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.glassfish.hk2</groupId>
       <artifactId>guice-bridge</artifactId>
     </dependency>
     <dependency>
       <groupId>org.glassfish.hk2</groupId>
       <artifactId>hk2-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.hk2.external</groupId>
-      <artifactId>jakarta.inject</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.jersey.containers</groupId>
-      <artifactId>jersey-container-servlet</artifactId>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
@@ -240,32 +228,8 @@
       <artifactId>jersey-server</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.glassfish.jersey.inject</groupId>
-      <artifactId>jersey-hk2</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.jersey.media</groupId>
-      <artifactId>jersey-media-jaxb</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.jersey.media</groupId>
-      <artifactId>jersey-media-json-jackson</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.javassist</groupId>
-      <artifactId>javassist</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.jooq</groupId>
       <artifactId>jooq</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jooq</groupId>
-      <artifactId>jooq-codegen</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.jooq</groupId>
-      <artifactId>jooq-meta</artifactId>
     </dependency>
     <dependency>
       <groupId>org.reflections</groupId>
@@ -282,6 +246,7 @@
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-core</artifactId>
+      <!-- <scope>test</scope> but transitive via spring-jdbc -->
     </dependency>
     <dependency>
       <groupId>org.springframework</groupId>
@@ -294,6 +259,31 @@
     <dependency>
       <groupId>org.xerial</groupId>
       <artifactId>sqlite-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.google.inject.extensions</groupId>
+      <artifactId>guice-assistedinject</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.hk2.external</groupId>
+      <artifactId>jakarta.inject</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.inject</groupId>
+      <artifactId>jersey-hk2</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.media</groupId>
+      <artifactId>jersey-media-jaxb</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.media</groupId>
+      <artifactId>jersey-media-json-jackson</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <!-- Test dependencies -->
@@ -334,6 +324,15 @@
           <annotationProcessors>
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
           </annotationProcessors>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <configuration>
+          <ignoredUnusedDeclaredDependencies>
+            <ignoredUnusedDeclaredDependency>javax.annotation:javax.annotation-api:jar</ignoredUnusedDeclaredDependency>
+          </ignoredUnusedDeclaredDependencies>
         </configuration>
       </plugin>
       <plugin>
@@ -416,42 +415,41 @@
           <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
           <installDirectory>target</installDirectory>
           <workingDirectory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web</workingDirectory>
+          <nodeVersion>v${nodejs.version}</nodeVersion>
+          <pnpmVersion>${pnpm.version}</pnpmVersion>
         </configuration>
         <executions>
           <execution>
             <id>Install node and npm locally to the project</id>
             <goals>
-              <goal>install-node-and-npm</goal>
+              <goal>install-node-and-pnpm</goal>
             </goals>
-            <configuration>
-              <nodeVersion>v${nodejs.version}</nodeVersion>
-            </configuration>
           </execution>
           <execution>
             <id>set pnpm@${pnpm.version} store path</id>
             <goals>
-              <goal>npx</goal>
+              <goal>pnpm</goal>
             </goals>
             <configuration>
-              <arguments>pnpm@${pnpm.version} config set store-dir ~/.pnpm-store</arguments>
+              <arguments>config set store-dir ~/.pnpm-store</arguments>
             </configuration>
           </execution>
           <execution>
             <id>install frontend dependencies</id>
             <goals>
-              <goal>npx</goal>
+              <goal>pnpm</goal>
             </goals>
             <configuration>
-              <arguments>pnpm@${pnpm.version} install --frozen-lockfile</arguments>
+              <arguments>install --frozen-lockfile</arguments>
             </configuration>
           </execution>
           <execution>
             <id>Build frontend</id>
             <goals>
-              <goal>npx</goal>
+              <goal>pnpm</goal>
             </goals>
             <configuration>
-              <arguments>pnpm@${pnpm.version} run build</arguments>
+              <arguments>run build</arguments>
             </configuration>
           </execution>
         </executions>

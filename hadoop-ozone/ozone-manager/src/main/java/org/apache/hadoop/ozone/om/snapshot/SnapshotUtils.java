@@ -93,6 +93,11 @@ public final class SnapshotUtils {
                                              SnapshotChainManager chainManager,
                                              UUID snapshotId) throws IOException {
     String tableKey = chainManager.getTableKey(snapshotId);
+    if (tableKey == null) {
+      LOG.error("Snapshot not found with UUID '{}'", snapshotId);
+      throw new OMException("Snapshot not found with UUID '" + snapshotId + "'",
+          FILE_NOT_FOUND);
+    }
     return SnapshotUtils.getSnapshotInfo(ozoneManager, tableKey);
   }
 
@@ -286,19 +291,17 @@ public final class SnapshotUtils {
     return snapshotChainManager.getLatestPathSnapshotId(snapshotPath);
   }
 
-  // Validates the previous path snapshotId for given a snapshotInfo. In case snapshotInfo is
-  // null, the snapshotInfo would be considered as AOS and previous snapshot becomes the latest snapshot in the global
-  // snapshot chain. Would throw OMException if validation fails otherwise function would pass.
-  public static void validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
+  public static boolean validatePreviousSnapshotId(SnapshotInfo snapshotInfo,
                                                 SnapshotChainManager snapshotChainManager,
                                                 UUID expectedPreviousSnapshotId) throws IOException {
     UUID previousSnapshotId = snapshotInfo == null ? snapshotChainManager.getLatestGlobalSnapshotId() :
         SnapshotUtils.getPreviousSnapshotId(snapshotInfo, snapshotChainManager);
     if (!Objects.equals(expectedPreviousSnapshotId, previousSnapshotId)) {
-      throw new OMException("Snapshot validation failed. Expected previous snapshotId : " +
-          expectedPreviousSnapshotId + " but was " + previousSnapshotId,
-          OMException.ResultCodes.INVALID_REQUEST);
+      LOG.warn("Snapshot validation failed. Expected previous snapshotId : " +
+          expectedPreviousSnapshotId + " but was " + previousSnapshotId);
+      return false;
     }
+    return true;
   }
 
   /**
@@ -320,7 +323,7 @@ public final class SnapshotUtils {
     // at the time of snapshot and key deletion as blocks can be appended.
     // If the objectId is same then the key is same.
     if (prevKeyInfo.isHsync() && deletedKeyInfo.isHsync()) {
-      return true;
+      return prevKeyInfo.getObjectID() == deletedKeyInfo.getObjectID();
     }
 
     if (prevKeyInfo.getKeyLocationVersions().size() !=

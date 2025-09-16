@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
@@ -31,12 +31,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -88,11 +87,11 @@ public class OMFileCreateRequest extends OMKeyRequest {
     Preconditions.checkNotNull(createFileRequest);
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
-    ValidateKeyArgs validateArgs = new ValidateKeyArgs.Builder()
-        .setSnapshotReservedWord(keyArgs.getKeyName())
-        .setKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
-            OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX)).build();
-    validateKey(ozoneManager, validateArgs);
+
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
+    if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {
+      OmUtils.validateKeyName(keyArgs.getKeyName());
+    }
 
     UserInfo userInfo = getUserInfo();
     if (keyArgs.getKeyName().isEmpty()) {

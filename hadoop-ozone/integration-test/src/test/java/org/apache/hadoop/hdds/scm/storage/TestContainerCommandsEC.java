@@ -163,7 +163,6 @@ public class TestContainerCommandsEC {
   private static CertificateClient certClient;
 
   private static OzoneBucket classBucket;
-  private static OzoneVolume classVolume;
   private static ReplicationConfig repConfig;
 
   @BeforeAll
@@ -1016,7 +1015,7 @@ public class TestContainerCommandsEC {
     final String volumeName = UUID.randomUUID().toString();
     final String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    classVolume = store.getVolume(volumeName);
+    OzoneVolume classVolume = store.getVolume(volumeName);
     classVolume.createBucket(bucketName);
     classBucket = classVolume.getBucket(bucketName);
     repConfig =

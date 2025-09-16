@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
@@ -88,8 +89,9 @@ public abstract class EndpointBase implements Auditor {
 
   @Inject
   private OzoneClient client;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   @Inject
-  private SignatureInfo signatureInfo;
+  protected SignatureInfo signatureInfo;
   @Inject
   private RequestIdentifier requestIdentifier;
 
@@ -98,7 +100,7 @@ public abstract class EndpointBase implements Auditor {
   private ContainerRequestContext context;
 
   private Set<String> excludeMetadataFields =
-      new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
+      new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG, STORAGE_CONFIG_HEADER));
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
@@ -296,8 +298,8 @@ public abstract class EndpointBase implements Auditor {
 
     Set<String> customMetadataKeys = requestHeaders.keySet().stream()
             .filter(k -> {
-              if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
-                      !excludeMetadataFields.contains(
+              if (k.toLowerCase().startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
+                  !excludeMetadataFields.contains(
                         k.substring(
                           CUSTOM_METADATA_HEADER_PREFIX.length()))) {
                 return true;
@@ -498,6 +500,11 @@ public abstract class EndpointBase implements Auditor {
   @VisibleForTesting
   public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
     this.requestIdentifier = requestIdentifier;
+  }
+
+  @VisibleForTesting
+  public void setSignatureInfo(SignatureInfo signatureInfo) {
+    this.signatureInfo = signatureInfo;
   }
 
   public OzoneClient getClient() {

@@ -621,7 +621,7 @@ public final class OzoneConfigKeys {
 
   public static final String FS_TRASH_CLASSNAME = "fs.trash.classname";
   public static final String FS_TRASH_CLASSNAME_DEFAULT =
-      "org.apache.hadoop.ozone.om.TrashPolicyOzone";
+      "org.apache.hadoop.fs.ozone.OzoneTrashPolicy";
 
   public static final String
       OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED =
@@ -637,7 +637,7 @@ public final class OzoneConfigKeys {
 
   public static final long
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
-      TimeUnit.HOURS.toMillis(1);
+      TimeUnit.MINUTES.toMillis(10);
 
   public static final String
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE =

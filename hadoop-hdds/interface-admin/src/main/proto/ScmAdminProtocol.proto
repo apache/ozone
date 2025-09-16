@@ -85,6 +85,7 @@ message ScmContainerLocationRequest {
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
+  optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
 }
 
 message ScmContainerLocationResponse {
@@ -141,6 +142,7 @@ message ScmContainerLocationResponse {
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
   optional GetMetricsResponseProto getMetricsResponse = 47;
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
+  optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
 
   enum Status {
     OK = 1;
@@ -196,6 +198,7 @@ enum Type {
   GetContainersOnDecomNode = 42;
   GetMetrics = 43;
   GetContainerBalancerStatusInfo = 44;
+  ReconcileContainer = 45;
 }
 
 /**
@@ -203,10 +206,11 @@ enum Type {
 */
 message ContainerRequestProto {
   // Ozone only support replication of either 1 or 3.
-  required ReplicationFactor replicationFactor = 2;
+  optional ReplicationFactor replicationFactor = 2;
   required ReplicationType  replicationType = 3;
   required string owner = 4;
   optional string traceID = 5;
+  optional ECReplicationConfig ecReplicationConfig = 6;
 }
 
 /**
@@ -672,6 +676,13 @@ message GetMetricsRequestProto {
 
 message GetMetricsResponseProto {
   optional string metricsJson = 1;
+}
+
+message ReconcileContainerRequestProto {
+  required int64 containerID = 1;
+}
+
+message ReconcileContainerResponseProto {
 }
 
 /**
