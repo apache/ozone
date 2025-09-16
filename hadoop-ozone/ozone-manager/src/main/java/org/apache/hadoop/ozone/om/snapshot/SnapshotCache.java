@@ -38,6 +38,8 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.ratis.util.BatchLogger;
+import org.apache.ratis.util.TimeDuration;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +50,7 @@ import org.slf4j.LoggerFactory;
 public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
   static final Logger LOG = LoggerFactory.getLogger(SnapshotCache.class);
+  private static final long CACHE_WARNING_THROTTLE_INTERVAL_MS = 60_000L;
 
   // Snapshot cache internal hash map.
   // Key:   SnapshotId
@@ -68,6 +71,15 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   private final boolean compactNonSnapshotDiffTables;
 
   private final OMMetrics omMetrics;
+
+  private enum BatchLogKey implements BatchLogger.Key {
+    SNAPSHOT_CACHE_SIZE_EXCEEDED;
+
+    @Override
+    public TimeDuration getBatchDuration() {
+      return TimeDuration.valueOf(CACHE_WARNING_THROTTLE_INTERVAL_MS, TimeUnit.MILLISECONDS);
+    }
+  }
 
   private boolean shouldCompactTable(String tableName) {
     return !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(tableName);
@@ -188,8 +200,12 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   public UncheckedAutoCloseableSupplier<OmSnapshot> get(UUID key) throws IOException {
     // Warn if actual cache size exceeds the soft limit already.
     if (size() > cacheSizeLimit) {
-      LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
-          size(), cacheSizeLimit);
+      BatchLogger.print(
+          BatchLogKey.SNAPSHOT_CACHE_SIZE_EXCEEDED, // The unique key for this log type
+          "CacheSizeWarning", // A specific name for this log message
+          suffix -> LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).{}",
+              size(), cacheSizeLimit, suffix)
+      );
     }
     OMLockDetails lockDetails = lock.acquireReadLock(SNAPSHOT_DB_LOCK, key.toString());
     if (!lockDetails.isLockAcquired()) {
