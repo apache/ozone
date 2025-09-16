@@ -26,7 +26,8 @@ public enum OMSystemAction implements AuditAction {
   DIRECTORY_DELETION,
   KEY_DELETION,
   SNAPSHOT_MOVE_DEL_KEYS,
-  SNAPSHOT_PURGE;
+  SNAPSHOT_PURGE,
+  SNAPSHOT_SET_PROPERTY;
 
   @Override
   public String getAction() {
