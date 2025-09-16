@@ -81,7 +81,6 @@ public class TestAdminFilter {
     Set<Class<?>> nonAdminEndpoints = new HashSet<>();
     nonAdminEndpoints.add(UtilizationEndpoint.class);
     nonAdminEndpoints.add(ClusterStateEndpoint.class);
-    nonAdminEndpoints.add(StorageDistributionEndpoint.class);
     nonAdminEndpoints.add(MetricsProxyEndpoint.class);
     nonAdminEndpoints.add(NodeEndpoint.class);
     nonAdminEndpoints.add(PipelineEndpoint.class);
