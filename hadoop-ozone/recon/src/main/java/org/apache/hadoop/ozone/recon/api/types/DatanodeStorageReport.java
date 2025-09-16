@@ -17,11 +17,15 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Metadata object that contains storage report of a Datanode.
  */
-public class DatanodeStorageReport {
-  private String dataNodeId;
+public final class DatanodeStorageReport {
+  private String hostName;
   private long capacity;
   private long used;
   private long remaining;
@@ -29,15 +33,14 @@ public class DatanodeStorageReport {
   private long pendingDeletion;
   private long minimumFreeSpace;
 
-  public DatanodeStorageReport(String dataNodeId, long capacity, long used, long remaining,
-                               long committed, long pendingDeletion, long minimumFreeSpace) {
-    this.dataNodeId = dataNodeId;
-    this.capacity = capacity;
-    this.used = used;
-    this.remaining = remaining;
-    this.committed = committed;
-    this.pendingDeletion = pendingDeletion;
-    this.minimumFreeSpace = minimumFreeSpace;
+  private DatanodeStorageReport(Builder builder) {
+    this.hostName = builder.hostName;
+    this.capacity = builder.capacity;
+    this.used = builder.used;
+    this.remaining = builder.remaining;
+    this.committed = builder.committed;
+    this.pendingDeletion = builder.pendingDeletion;
+    this.minimumFreeSpace = builder.minimumFreeSpace;
   }
 
   public long getCapacity() {
@@ -60,11 +63,98 @@ public class DatanodeStorageReport {
     return pendingDeletion;
   }
 
-  public String getDataNodeId() {
-    return dataNodeId;
+  public String getHostName() {
+    return hostName;
   }
 
   public long getMinimumFreeSpace() {
     return minimumFreeSpace;
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  /**
+   * Builder class for DataNodeStorage Report.
+   */
+  public static final class Builder {
+    private String hostName = "";
+    private long capacity = 0;
+    private long used = 0;
+    private long remaining = 0;
+    private long committed = 0;
+    private long pendingDeletion = 0;
+    private long minimumFreeSpace = 0;
+
+    private static final Logger LOG =
+        LoggerFactory.getLogger(Builder.class);
+
+    private Builder() {
+    }
+
+    public Builder setHostName(String hostName) {
+      this.hostName = hostName;
+      return this;
+    }
+
+    public Builder setCapacity(long capacity) {
+      this.capacity = capacity;
+      return this;
+    }
+
+    public Builder setUsed(long used) {
+      this.used = used;
+      return this;
+    }
+
+    public Builder setRemaining(long remaining) {
+      this.remaining = remaining;
+      return this;
+    }
+
+    public Builder setCommitted(long committed) {
+      this.committed = committed;
+      return this;
+    }
+
+    public Builder setPendingDeletion(long pendingDeletion) {
+      this.pendingDeletion = pendingDeletion;
+      return this;
+    }
+
+    public Builder setMinimumFreeSpace(long minimumFreeSpace) {
+      this.minimumFreeSpace = minimumFreeSpace;
+      return this;
+    }
+
+    public void validate() {
+      Objects.requireNonNull(hostName, "hostName cannot be null");
+
+      if (capacity < 0) {
+        throw new IllegalArgumentException("capacity cannot be negative");
+      }
+      if (used < 0) {
+        throw new IllegalArgumentException("used cannot be negative");
+      }
+      if (remaining < 0) {
+        throw new IllegalArgumentException("remaining cannot be negative");
+      }
+      if (committed < 0) {
+        throw new IllegalArgumentException("committed cannot be negative");
+      }
+      if (pendingDeletion < 0) {
+        throw new IllegalArgumentException("pendingDeletion cannot be negative");
+      }
+      // Logical consistency checks
+      if (used + remaining > capacity) {
+        LOG.warn("Inconsistent storage report for {}: used({}) + remaining({}) > capacity({})",
+            hostName, used, remaining, capacity);
+      }
+    }
+
+    public DatanodeStorageReport build() {
+      return new DatanodeStorageReport(this);
+    }
   }
 }

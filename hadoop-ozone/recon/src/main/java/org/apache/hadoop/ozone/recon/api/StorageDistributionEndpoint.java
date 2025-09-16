@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -66,13 +67,14 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/storageDistribution")
 @Produces("application/json")
+@AdminOnly
 public class StorageDistributionEndpoint {
   private final ReconNodeManager nodeManager;
   private final OMDBInsightEndpoint omdbInsightEndpoint;
   private final NSSummaryEndpoint nsSummaryEndpoint;
   private final StorageContainerLocationProtocol scmClient;
   private static Logger log = LoggerFactory.getLogger(StorageDistributionEndpoint.class);
-  private Map<DatanodeDetails, Long> blockDeletionMetricsMap = new HashMap<>();
+  private Map<DatanodeDetails, Long> blockDeletionMetricsMap = new ConcurrentHashMap<>();
   private GlobalStatsDao globalStatsDao;
 
   @Inject
@@ -283,7 +285,7 @@ public class StorageDistributionEndpoint {
   }
 
   private void initializeBlockDeletionMetricsMap() {
-    nodeManager.getNodeStats().keySet().forEach(nodeId -> {
+    nodeManager.getNodeStats().keySet().parallelStream().forEach(nodeId -> {
       try {
         long dnPending = ReconUtils.getMetricsFromDatanode(nodeId,
                 "HddsDatanode",
@@ -320,8 +322,16 @@ public class StorageDistributionEndpoint {
         log.warn("Block deletion metrics unavailable for datanode: {}", datanode);
         pendingDeletion = 0L;
       }
-      return new DatanodeStorageReport(datanode.getUuidString(),
-          capacity, used, remaining, committed, pendingDeletion, minFreeSpace);
+      DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+          .setCapacity(capacity)
+          .setUsed(used)
+          .setRemaining(remaining)
+          .setCommitted(committed)
+          .setPendingDeletion(pendingDeletion)
+          .setMinimumFreeSpace(minFreeSpace)
+          .setHostName(datanode.getHostName())
+          .build();
+      return storageReport;
     } catch (Exception e) {
       log.error("Error getting storage report for datanode: {}", datanode, e);
       return null; // Return null on any error

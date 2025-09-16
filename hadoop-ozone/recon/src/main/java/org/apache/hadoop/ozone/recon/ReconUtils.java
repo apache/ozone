@@ -50,14 +50,15 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-import javax.net.ssl.HttpsURLConnection;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -89,6 +90,14 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.Time;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.util.EntityUtils;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -103,6 +112,13 @@ public class ReconUtils {
 
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
+  
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static CloseableHttpClient httpClient;
+  private static final int MAX_CONNECTIONS_PER_ROUTE = 20;
+  private static final int MAX_TOTAL_CONNECTIONS = 100;
+  private static final int CONNECTION_TIMEOUT_MS = 5000;
+  private static final int SOCKET_TIMEOUT_MS = 10000;
 
   public ReconUtils() {
   }
@@ -115,6 +131,39 @@ public class ReconUtils {
    */
   public static org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState getNSSummaryRebuildState() {
     return org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.getRebuildState();
+  }
+  static {
+    initializeHttpClient();
+  }
+
+  private static void initializeHttpClient() {
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    connectionManager.setMaxTotal(MAX_TOTAL_CONNECTIONS);
+    connectionManager.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
+    connectionManager.setValidateAfterInactivity(30000); // 30 seconds
+
+    RequestConfig requestConfig = RequestConfig.custom()
+        .setConnectionRequestTimeout(CONNECTION_TIMEOUT_MS)
+        .setConnectTimeout(CONNECTION_TIMEOUT_MS)
+        .setSocketTimeout(SOCKET_TIMEOUT_MS)
+        .build();
+
+    httpClient = HttpClientBuilder.create()
+        .setConnectionManager(connectionManager)
+        .setDefaultRequestConfig(requestConfig)
+        .setConnectionTimeToLive(60, TimeUnit.SECONDS)
+        .evictIdleConnections(30, TimeUnit.SECONDS)
+        .build();
+
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        if (httpClient != null) {
+          httpClient.close();
+        }
+      } catch (IOException e) {
+        log.warn("Error closing HTTP client", e);
+      }
+    }));
   }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
@@ -860,29 +909,6 @@ public class ReconUtils {
     return pathBuilder.toString();
   }
 
-  private static HttpURLConnection makeHttpGetCall(String urlString) throws IOException {
-    Objects.requireNonNull(urlString, "urlString");
-    URL url = new URL(urlString);
-    final HttpURLConnection conn = openURLConnection(url);
-    conn.setRequestMethod("GET");
-    conn.setConnectTimeout(HTTP_TIMEOUT_MS);
-    conn.setReadTimeout(HTTP_TIMEOUT_MS);
-    conn.setRequestProperty("Accept", "application/json");
-    return conn;
-  }
-
-  private static HttpURLConnection openURLConnection(URL url) throws IOException {
-    final String protocol = url.getProtocol().toLowerCase(Locale.ROOT);
-    switch (protocol) {
-    case "https":
-      return (HttpsURLConnection) url.openConnection();
-    case "http":
-      return (HttpURLConnection) url.openConnection();
-    default:
-      throw new IOException("Unsupported protocol: " + protocol + " for URL: " + url);
-    }
-  }
-
   public static long getMetricsFromDatanode(DatanodeDetails datanode, String service, String name, String keyName)
       throws IOException {
     // Construct metrics URL for DataNode JMX endpoint
@@ -891,18 +917,19 @@ public class ReconUtils {
         datanode.getPort(DatanodeDetails.Port.Name.HTTP).getValue(),
         service,
         name);
-
-    HttpURLConnection conn = makeHttpGetCall(metricsUrl);
-    try {
-      String jsonResponse = getResponseData(conn);
-      return parseMetrics(jsonResponse, name, keyName);
-    } finally {
-      try {
-        conn.disconnect();
-      } catch (Exception ignored) {
-        log.error("Error closing connection to datanode: {}", datanode, ignored);
+    HttpGet request = new HttpGet(metricsUrl);
+    try (CloseableHttpResponse response = httpClient.execute(request)) {
+      if (response.getStatusLine().getStatusCode() != 200) {
+        throw new IOException("HTTP request failed with status: " +
+            response.getStatusLine().getStatusCode());
       }
+
+      String jsonResponse = EntityUtils.toString(response.getEntity());
+      return parseMetrics(jsonResponse, name, keyName);
+    } catch (IOException e) {
+      log.error("Error getting metrics from datanode: {}", datanode.getIpAddress(), e);
     }
+    return 0;
   }
 
   private static String getResponseData(HttpURLConnection conn) throws IOException {

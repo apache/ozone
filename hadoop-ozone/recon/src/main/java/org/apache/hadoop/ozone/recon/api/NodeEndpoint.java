@@ -173,13 +173,14 @@ public class NodeEndpoint {
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     SCMNodeStat nodeStat =
         nodeManager.getNodeStat(datanode).get();
-    long capacity = nodeStat.getCapacity().get();
-    long used = nodeStat.getScmUsed().get();
-    long remaining = nodeStat.getRemaining().get();
-    long committed = nodeStat.getCommitted().get();
-    long minFreeSpace = nodeStat.getFreeSpaceToSpare().get();
-    return new DatanodeStorageReport(datanode.getUuidString(),
-        capacity, used, remaining, committed, 0, minFreeSpace);
+    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+        .setCapacity(nodeStat.getCapacity().get())
+        .setUsed(nodeStat.getScmUsed().get())
+        .setRemaining(nodeStat.getRemaining().get())
+        .setCommitted(nodeStat.getCommitted().get())
+        .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get())
+        .build();
+    return storageReport;
   }
 
   /**
