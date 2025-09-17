@@ -176,7 +176,7 @@ public class TestClosePipelineCommandHandler {
 
     final ClosePipelineCommandHandler commandHandler =
         new ClosePipelineCommandHandler((leader, tls) -> raftClient, singleThreadExecutor);
-    assertFalse(commandHandler.isPipelineInProgress(pipelineUUID));
+    assertFalse(commandHandler.isPipelineCloseInProgress(pipelineUUID));
     commandHandler.handle(command1, ozoneContainer, stateContext, connectionManager);
     assertTrue(firstCommandStarted.await(5, TimeUnit.SECONDS));
     commandHandler.handle(command2, ozoneContainer, stateContext, connectionManager);
@@ -187,7 +187,7 @@ public class TestClosePipelineCommandHandler {
     
     // Only one command should have been processed due to duplicate prevention
     assertEquals(1, commandHandler.getInvocationCount());
-    assertFalse(commandHandler.isPipelineInProgress(pipelineUUID));
+    assertFalse(commandHandler.isPipelineCloseInProgress(pipelineUUID));
   }
 
   private List<DatanodeDetails> getDatanodes() {

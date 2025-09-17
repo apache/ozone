@@ -91,11 +91,11 @@ public class ClosePipelineCommandHandler implements CommandHandler {
   }
 
   /**
-   * Returns true if pipeline is in progress, else false.
+   * Returns true if pipeline close is in progress, else false.
    *
    * @return boolean
    */
-  public boolean isPipelineInProgress(UUID pipelineID) {
+  public boolean isPipelineCloseInProgress(UUID pipelineID) {
     return pipelinesInProgress.contains(pipelineID);
   }
 

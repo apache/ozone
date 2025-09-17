@@ -741,7 +741,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     triggerPipelineClose(groupId, b.toString(), ClosePipelineInfo.Reason.PIPELINE_FAILED);
   }
 
-  private void triggerPipelineClose(RaftGroupId groupId, String detail,
+  @VisibleForTesting
+  public void triggerPipelineClose(RaftGroupId groupId, String detail,
       ClosePipelineInfo.Reason reasonCode) {
     PipelineID pipelineID = PipelineID.valueOf(groupId.getUuid());
 

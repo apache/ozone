@@ -812,7 +812,7 @@ public class StateContext {
   public boolean isPipelineCloseInProgress(UUID pipelineID) {
     ClosePipelineCommandHandler handler = parentDatanodeStateMachine.getCommandDispatcher()
         .getClosePipelineCommandHandler();
-    return handler.isPipelineInProgress(pipelineID);
+    return handler.isPipelineCloseInProgress(pipelineID);
   }
 
   /**
