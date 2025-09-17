@@ -256,7 +256,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
                                     int maxKeys,
                                     String dbOpenKeyPrefix,
                                     boolean hasContToken,
-                                    String dbContTokenPrefix)
+                                    String dbContTokenPrefix,
+                                    boolean showCount)
       throws IOException;
 
   /**

@@ -1636,6 +1636,7 @@ message ListOpenFilesRequest {
   optional string path = 1;
   optional uint32 count = 2;
   optional string token = 3;
+  optional bool showCount = 4;
 }
 
 message ListOpenFilesResponse {

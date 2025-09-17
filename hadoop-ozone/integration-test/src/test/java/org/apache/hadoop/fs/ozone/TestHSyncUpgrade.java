@@ -184,7 +184,7 @@ public class TestHSyncUpgrade {
       final OzoneManagerProtocol omClient = client.getObjectStore()
           .getClientProxy().getOzoneManagerClient();
       OMException omException  = assertThrows(OMException.class,
-          () -> omClient.listOpenFiles("", 100, ""));
+          () -> omClient.listOpenFiles("", 100, "", false));
       assertFinalizationException(omException);
 
       omException = assertThrows(OMException.class,

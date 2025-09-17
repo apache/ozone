@@ -906,7 +906,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                            int maxKeys,
                                            String dbOpenKeyPrefix,
                                            boolean hasContToken,
-                                           String dbContTokenPrefix)
+                                           String dbContTokenPrefix,
+                                           boolean showCount)
       throws IOException {
 
     List<OpenKeySession> openKeySessionList = new ArrayList<>();
@@ -958,7 +959,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return new ListOpenFilesResult(
-        getTotalOpenKeyCount(),
+        showCount ? getTotalOpenKeyCount() : 0,
         hasMore,
         retContToken,
         openKeySessionList);
@@ -1330,9 +1331,28 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public long getTotalOpenKeyCount() throws IOException {
-    // Get an estimated key count of OpenKeyTable + OpenFileTable
-    return openKeyTable.getEstimatedKeyCount()
-        + openFileTable.getEstimatedKeyCount();
+    long count = 0;
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+             keyValueTableIterator = openKeyTable.iterator()) {
+      while (keyValueTableIterator.hasNext()) {
+        count += 1;
+        keyValueTableIterator.next();
+      }
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
+
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+             keyValueTableIterator = openFileTable.iterator()) {
+      while (keyValueTableIterator.hasNext()) {
+        count += 1;
+        keyValueTableIterator.next();
+      }
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
+    return count;
+
   }
 
   @Override
