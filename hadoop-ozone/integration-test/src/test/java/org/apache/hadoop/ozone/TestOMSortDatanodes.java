@@ -62,7 +62,6 @@ public class TestOMSortDatanodes {
   private static StorageContainerManager scm;
   private static NodeManager nodeManager;
   private static KeyManagerImpl keyManager;
-  private static StorageContainerLocationProtocol mockScmContainerClient;
   private static OzoneManager om;
   private static final int NODE_COUNT = 10;
   private static final Map<String, String> EDGE_NODES = ImmutableMap.of(
@@ -100,8 +99,7 @@ public class TestOMSortDatanodes {
     scm.exitSafeMode();
     nodeManager = scm.getScmNodeManager();
     datanodes.forEach(dn -> nodeManager.register(dn, null, null));
-    mockScmContainerClient =
-        mock(StorageContainerLocationProtocol.class);
+    StorageContainerLocationProtocol mockScmContainerClient = mock(StorageContainerLocationProtocol.class);
     OmTestManagers omTestManagers
         = new OmTestManagers(config, scm.getBlockProtocolServer(),
         mockScmContainerClient);

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.container;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.ItemsFromStdin;
 import picocli.CommandLine;
@@ -25,10 +26,42 @@ import picocli.CommandLine;
 @CommandLine.Command
 public class ContainerIDParameters extends ItemsFromStdin {
 
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   @CommandLine.Parameters(description = "Container IDs" + FORMAT_DESCRIPTION,
       arity = "1..*",
       paramLabel = "<container ID>")
   public void setContainerIDs(List<String> arguments) {
     setItems(arguments);
+  }
+
+  public List<Long> getValidatedIDs() {
+    List<Long> containerIDs = new ArrayList<>(size());
+    List<String> invalidIDs = new ArrayList<>();
+
+    for (String input: this) {
+      boolean idValid = true;
+      try {
+        long id = Long.parseLong(input);
+        if (id <= 0) {
+          idValid = false;
+        } else {
+          containerIDs.add(id);
+        }
+      } catch (NumberFormatException e) {
+        idValid = false;
+      }
+
+      if (!idValid) {
+        invalidIDs.add(input);
+      }
+    }
+
+    if (!invalidIDs.isEmpty()) {
+      throw new CommandLine.ParameterException(spec.commandLine(),
+          "Container IDs must be positive integers. Invalid container IDs: " + String.join(" ", invalidIDs));
+    }
+    return containerIDs;
   }
 }

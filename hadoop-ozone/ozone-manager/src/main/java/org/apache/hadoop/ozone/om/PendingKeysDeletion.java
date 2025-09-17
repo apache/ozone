@@ -37,11 +37,14 @@ public class PendingKeysDeletion {
 
   private final Map<String, RepeatedOmKeyInfo> keysToModify;
   private final List<PurgedKey> purgedKeys;
+  private int notReclaimableKeyCount;
 
   public PendingKeysDeletion(List<PurgedKey> purgedKeys,
-       Map<String, RepeatedOmKeyInfo> keysToModify) {
+      Map<String, RepeatedOmKeyInfo> keysToModify,
+      int notReclaimableKeyCount) {
     this.keysToModify = keysToModify;
     this.purgedKeys = purgedKeys;
+    this.notReclaimableKeyCount = notReclaimableKeyCount;
   }
 
   public Map<String, RepeatedOmKeyInfo> getKeysToModify() {
@@ -104,5 +107,9 @@ public class PendingKeysDeletion {
           ", isCommittedKey=" + isCommittedKey +
           '}';
     }
+  }
+
+  public int getNotReclaimableKeyCount() {
+    return notReclaimableKeyCount;
   }
 }

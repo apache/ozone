@@ -40,13 +40,16 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -87,9 +90,6 @@ import org.mockito.stubbing.Answer;
 public class TestDeleteBlocksCommandHandler {
   @TempDir
   private Path folder;
-  private OzoneConfiguration conf;
-  private ContainerLayoutVersion layout;
-  private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
   private DeleteBlocksCommandHandler handler;
   private String schemaVersion;
@@ -98,17 +98,16 @@ public class TestDeleteBlocksCommandHandler {
 
   private void prepareTest(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     setup();
   }
 
   private void setup() throws Exception {
-    conf = new OzoneConfiguration();
-    layout = ContainerLayoutVersion.FILE_PER_BLOCK;
-    ozoneContainer = mock(OzoneContainer.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     containerSet = newContainerSet();
     volume1 = mock(HddsVolume.class);
     when(volume1.getStorageID()).thenReturn("uuid-1");
@@ -269,6 +268,28 @@ public class TestDeleteBlocksCommandHandler {
 
     assertEquals(0,
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
+  }
+
+  @Test
+  public void testDeleteBlocksCommandHandlerExceptionShouldNotInterrupt() throws Exception {
+    setup();
+    // future task will throw first execution exception, and next one will succeed
+    doAnswer((Answer<List<Future<DeleteBlockTransactionExecutionResult>>>) invocationOnMock -> {
+      List<Future<DeleteBlockTransactionExecutionResult>> result = new ArrayList<>();
+      CompletableFuture<DeleteBlockTransactionExecutionResult> future =
+          new CompletableFuture<>();
+      future.completeExceptionally(new ExecutionException("Simulated Exception", new IOException()));
+      result.add(future);
+      future = new CompletableFuture<>();
+      future.complete(new DeleteBlockTransactionExecutionResult(null, false));
+      result.add(future);
+      return result;
+    }).when(handler).submitTasks(any());
+
+    // last task as success should be returned as result, ignoring the first failed task
+    List<DeleteBlockTransactionResult> deleteBlockTransactionResults =
+        handler.executeCmdWithRetry(Collections.emptyList());
+    assertEquals(1, deleteBlockTransactionResults.size());
   }
 
   @ContainerTestVersionInfo.ContainerTest

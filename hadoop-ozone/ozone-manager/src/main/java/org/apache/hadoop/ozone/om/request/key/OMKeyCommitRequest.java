@@ -357,16 +357,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // which will be deleted as RepeatedOmKeyInfo
       final OmKeyInfo pseudoKeyInfo = isHSync ? null
           : wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
-      if (pseudoKeyInfo != null) {
-        long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
-        String delKeyName = omMetadataManager.getOzoneDeletePathKey(
-            pseudoObjId, dbOzoneKey);
-        if (null == oldKeyVersionsToDeleteMap) {
-          oldKeyVersionsToDeleteMap = new HashMap<>();
-        }
-        oldKeyVersionsToDeleteMap.computeIfAbsent(delKeyName,
-            key -> new RepeatedOmKeyInfo()).addOmKeyInfo(pseudoKeyInfo);
-      }
+      oldKeyVersionsToDeleteMap = addKeyInfoToDeleteMap(ozoneManager, trxnLogIndex, dbOzoneKey,
+          pseudoKeyInfo, oldKeyVersionsToDeleteMap);
 
       // Add to cache of open key table and key table.
       if (!isHSync) {

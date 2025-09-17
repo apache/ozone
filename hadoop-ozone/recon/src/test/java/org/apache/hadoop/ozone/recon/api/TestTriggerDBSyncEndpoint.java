@@ -73,7 +73,6 @@ public class TestTriggerDBSyncEndpoint {
   @TempDir
   private Path temporaryFolder;
   private ReconTestInjector reconTestInjector;
-  private CommonUtils commonUtils;
 
   @BeforeEach
   public void setUp() throws IOException, AuthenticationException {
@@ -85,7 +84,7 @@ public class TestTriggerDBSyncEndpoint {
         Files.createDirectory(temporaryFolder.resolve("ReconDb"))
             .toFile().getAbsolutePath());
     configuration.set(OZONE_OM_ADDRESS_KEY, "localhost:9862");
-    commonUtils = new CommonUtils();
+    CommonUtils commonUtils = new CommonUtils();
     OzoneManagerProtocol ozoneManagerProtocol
         = mock(OzoneManagerProtocol.class);
     when(ozoneManagerProtocol.getDBUpdates(any(OzoneManagerProtocolProtos

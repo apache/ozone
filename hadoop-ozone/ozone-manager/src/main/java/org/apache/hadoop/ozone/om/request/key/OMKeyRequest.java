@@ -40,6 +40,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -1189,6 +1190,21 @@ public abstract class OMKeyRequest extends OMClientRequest {
     uncommittedGroups.add(new OmKeyLocationInfoGroup(0, uncommitted));
     pseudoKeyInfo.setKeyLocationVersions(uncommittedGroups);
     return pseudoKeyInfo;
+  }
+
+  protected static Map<String, RepeatedOmKeyInfo> addKeyInfoToDeleteMap(OzoneManager om,
+      long trxnLogIndex, String ozoneKey, OmKeyInfo keyInfo, Map<String, RepeatedOmKeyInfo> deleteMap) {
+    if (keyInfo == null) {
+      return deleteMap;
+    }
+    final long pseudoObjId = om.getObjectIdFromTxId(trxnLogIndex);
+    final String delKeyName = om.getMetadataManager().getOzoneDeletePathKey(pseudoObjId, ozoneKey);
+    if (deleteMap == null) {
+      deleteMap = new HashMap<>();
+    }
+    deleteMap.computeIfAbsent(delKeyName, key -> new RepeatedOmKeyInfo())
+        .addOmKeyInfo(keyInfo);
+    return deleteMap;
   }
 
   /**

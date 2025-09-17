@@ -17,13 +17,26 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
+import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmOption;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -38,6 +51,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Shell;
+import org.apache.hadoop.ozone.shell.ShellReplicationOptions;
+import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import picocli.CommandLine;
 
 /**
@@ -46,10 +61,14 @@ import picocli.CommandLine;
 
 @CommandLine.Command(
     name = "verify",
-    description = "Run checks to verify data across replicas. By default prints only the keys with failed checks.")
+    description = "Run checks to verify data across replicas. By default prints only the keys with failed checks. " +
+        "Optionally you can filter keys by replication type (RATIS, EC) and factor.")
 public class ReplicasVerify extends Handler {
   @CommandLine.Mixin
   private ScmOption scmOption;
+
+  @CommandLine.Mixin
+  private ShellReplicationOptions replication;
 
   @CommandLine.Parameters(arity = "1",
       description = Shell.OZONE_URI_DESCRIPTION)
@@ -72,22 +91,80 @@ public class ReplicasVerify extends Handler {
 
   private List<ReplicaVerifier> replicaVerifiers;
 
+  private static final String DURATION_FORMAT = "HH:mm:ss,SSS";
+  private long startTime;
+  private long endTime;
+  private String verificationScope;
+  private final List<String> verificationTypes = new ArrayList<>();
+  private final AtomicInteger volumesProcessed = new AtomicInteger(0);
+  private final AtomicInteger bucketsProcessed = new AtomicInteger(0);
+  private final AtomicInteger keysProcessed = new AtomicInteger(0);
+  private final AtomicInteger keysPassed = new AtomicInteger(0);
+  private final AtomicInteger keysFailed = new AtomicInteger(0);
+  private final Map<String, AtomicInteger> failuresByType = new ConcurrentHashMap<>();
+  private volatile Throwable exception;
+
+  private void addVerifier(boolean condition, Supplier<ReplicaVerifier> verifierSupplier) {
+    if (condition) {
+      ReplicaVerifier verifier = verifierSupplier.get();
+      replicaVerifiers.add(verifier);
+      String verifierType = verifier.getType();
+      verificationTypes.add(verifierType);
+      failuresByType.put(verifierType, new AtomicInteger(0));
+    }
+  }
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException {
+    startTime = System.nanoTime();
+
+    if (!address.getKeyName().isEmpty()) {
+      verificationScope = "Key";
+    } else if (!address.getBucketName().isEmpty()) {
+      verificationScope = "Bucket";
+    } else if (!address.getVolumeName().isEmpty()) {
+      verificationScope = "Volume";
+    } else {
+      verificationScope = "All Volumes";
+    }
+
     replicaVerifiers = new ArrayList<>();
 
-    if (verification.doExecuteChecksums) {
-      replicaVerifiers.add(new ChecksumVerifier(getConf()));
-    }
+    addVerifier(verification.doExecuteChecksums, () -> {
+      try {
+        return new ChecksumVerifier(getConf());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
 
-    if (verification.doExecuteBlockExistence) {
-      replicaVerifiers.add(new BlockExistenceVerifier(getConf()));
-    }
-    if (verification.doExecuteReplicaState) {
-      replicaVerifiers.add(new ContainerStateVerifier(getConf(), containerCacheSize));
-    }
+    addVerifier(verification.doExecuteBlockExistence, () -> {
+      try {
+        return new BlockExistenceVerifier(getConf());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
 
-    findCandidateKeys(client, address);
+    addVerifier(verification.doExecuteReplicaState, () -> {
+      try {
+        return new ContainerStateVerifier(getConf(), containerCacheSize);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    // Add shutdown hook to ensure summary is printed even if interrupted
+    addShutdownHook();
+
+    try {
+      findCandidateKeys(client, address);
+    } catch (Exception e) {
+      exception = e;
+      throw e;
+    } finally {
+      endTime = System.nanoTime();
+    }
   }
 
   @Override
@@ -126,6 +203,7 @@ public class ReplicasVerify extends Handler {
 
   void checkVolume(OzoneClient ozoneClient, OzoneVolume volume, ArrayNode keysArray, AtomicBoolean allKeysPassed)
       throws IOException {
+    volumesProcessed.incrementAndGet();
     for (Iterator<? extends OzoneBucket> it = volume.listBuckets(null); it.hasNext();) {
       OzoneBucket bucket = it.next();
       checkBucket(ozoneClient, bucket, keysArray, allKeysPassed);
@@ -134,6 +212,7 @@ public class ReplicasVerify extends Handler {
 
   void checkBucket(OzoneClient ozoneClient, OzoneBucket bucket, ArrayNode keysArray, AtomicBoolean allKeysPassed)
       throws IOException {
+    bucketsProcessed.incrementAndGet();
     for (Iterator<? extends OzoneKey> it = bucket.listKeys(null); it.hasNext();) {
       OzoneKey key = it.next();
       // TODO: Remove this check once HDDS-12094 is fixed
@@ -145,8 +224,14 @@ public class ReplicasVerify extends Handler {
 
   void processKey(OzoneClient ozoneClient, String volumeName, String bucketName, String keyName,
       ArrayNode keysArray, AtomicBoolean allKeysPassed) throws IOException {
+    keysProcessed.incrementAndGet();
     OmKeyInfo keyInfo = ozoneClient.getProxy().getKeyInfo(
         volumeName, bucketName, keyName, false);
+
+    // Check if key should be processed based on replication config
+    if (!shouldProcessKeyByReplicationType(keyInfo)) {
+      return;
+    }
 
     ObjectNode keyNode = JsonUtils.createObjectNode(null);
     keyNode.put("volumeName", volumeName);
@@ -155,6 +240,7 @@ public class ReplicasVerify extends Handler {
 
     ArrayNode blocksArray = keyNode.putArray("blocks");
     boolean keyPass = true;
+    Set<String> failedVerificationTypes = new HashSet<>();
 
     for (OmKeyLocationInfo keyLocation : keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly()) {
       long containerID = keyLocation.getContainerID();
@@ -193,6 +279,7 @@ public class ReplicasVerify extends Handler {
 
           if (!result.passed()) {
             replicaPass = false;
+            failedVerificationTypes.add(verifier.getType());
           }
         }
 
@@ -207,13 +294,108 @@ public class ReplicasVerify extends Handler {
     }
 
     keyNode.put("pass", keyPass);
-    if (!keyPass) {
+    if (keyPass) {
+      keysPassed.incrementAndGet();
+    } else {
+      keysFailed.incrementAndGet();
       allKeysPassed.set(false);
+      failedVerificationTypes.forEach(failedType -> failuresByType
+          .computeIfAbsent(failedType, k -> new AtomicInteger(0))
+          .incrementAndGet()
+      );
     }
 
     if (!keyPass || allResults) {
       keysArray.add(keyNode);
     }
+  }
+
+  /**
+   * Adds ShutdownHook to print summary statistics.
+   */
+  private void addShutdownHook() {
+    ShutdownHookManager.get().addShutdownHook(() -> {
+      if (endTime == 0) {
+        endTime = System.nanoTime();
+      }
+      printSummary(System.err);
+    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+  }
+
+  /**
+   * Prints summary of replica verification run.
+   *
+   * @param out PrintStream
+   */
+  void printSummary(PrintStream out) {
+    if (endTime == 0) {
+      endTime = System.nanoTime();
+    }
+
+    long execTimeNanos = endTime - startTime;
+    String execTime = DurationFormatUtils.formatDuration(TimeUnit.NANOSECONDS.toMillis(execTimeNanos), DURATION_FORMAT);
+
+    long totalKeysProcessed = keysProcessed.get();
+    long totalKeysPassed = keysPassed.get();
+    long totalKeysFailed = keysFailed.get();
+
+    out.println();
+    out.println("***************************************************");
+    out.println("REPLICA VERIFICATION SUMMARY");
+    out.println("***************************************************");
+    out.println("Status: " + (exception != null ? "Failed" :
+        (totalKeysFailed == 0 ? "Success" : "Completed with failures")));
+    out.println("Verification Scope: " + verificationScope);
+    out.println("Verification Types: " + String.join(", ", verificationTypes));
+    out.println("URI: " + uri);
+    out.println();
+    out.println("Number of Volumes processed: " + volumesProcessed.get());
+    out.println("Number of Buckets processed: " + bucketsProcessed.get());
+    out.println("Number of Keys processed: " + totalKeysProcessed);
+    out.println();
+    out.println("Keys passed verification: " + totalKeysPassed);
+    out.println("Keys failed verification: " + totalKeysFailed);
+
+    if (!failuresByType.isEmpty() && totalKeysFailed > 0) {
+      out.println();
+      for (String verificationType : verificationTypes) {
+        long typeFailures = failuresByType.get(verificationType).get();
+        if (typeFailures > 0) {
+          out.println("Keys failed " + verificationType + " verification: " + typeFailures);
+        }
+      }
+      out.println("Note: A key may fail multiple verification types, so total may exceed overall failures.");
+    }
+
+    out.println();
+    out.println("Total Execution time: " + execTime);
+
+    if (exception != null) {
+      out.println();
+      out.println("Exception: " + exception.getClass().getSimpleName() + ": " + exception.getMessage());
+    }
+
+    out.println("***************************************************");
+  }
+
+  /**
+   * Check if the key should be processed based on replication config.
+   * @param keyInfo the key to check
+   * @return true if the key should be processed, false if it should be skipped
+   */
+  private boolean shouldProcessKeyByReplicationType(OmKeyInfo keyInfo) {
+    Optional<ReplicationConfig> filterConfig = replication.fromParams(getConf());
+    if (!filterConfig.isPresent()) {
+      // No filter specified, include all keys
+      return true;
+    }
+
+    ReplicationConfig keyReplicationConfig = keyInfo.getReplicationConfig();
+    ReplicationConfig filter = filterConfig.get();
+
+    // Process key only if both replication type and factor match
+    return keyReplicationConfig.getReplicationType().equals(filter.getReplicationType())
+        && keyReplicationConfig.getReplication().equals(filter.getReplication());
   }
 
   static class Verification {
@@ -229,9 +411,10 @@ public class ReplicasVerify extends Handler {
     private boolean doExecuteBlockExistence;
 
     @CommandLine.Option(names = "--container-state",
-        description = "Check the container and replica states. " +
-            "Containers in [DELETING, DELETED] states, or " +
-            "it's replicas in [DELETED, UNHEALTHY, INVALID] states fail the check.",
+        description = "Check the container and replica states." +
+            " Containers must be in [OPEN, CLOSING, QUASI_CLOSED, CLOSED] states," +
+            " and it's replicas must be in [OPEN, CLOSING, QUASI_CLOSED, CLOSED] states" +
+            " to pass the check. Any other states will fail the verification.",
         defaultValue = "false")
     private boolean doExecuteReplicaState;
 
