@@ -264,7 +264,7 @@ public class TestPipelineClose {
 
   @Test
   @SuppressWarnings("unchecked")
-  void testDuplicatePipelineClosePrevention() throws Exception {
+  void testPipelineCloseTriggersSkippedWhenAlreadyInProgress() throws Exception {
     DatanodeStateMachine datanodeStateMachine = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine();
     XceiverServerRatis xceiverRatis = (XceiverServerRatis) datanodeStateMachine.getContainer().getWriteChannel();
 
@@ -280,19 +280,23 @@ public class TestPipelineClose {
     Field pipelinesInProgressField = handler.getClass().getDeclaredField("pipelinesInProgress");
     pipelinesInProgressField.setAccessible(true);
     Set<UUID> pipelinesInProgress = (Set<UUID>) pipelinesInProgressField.get(handler);
-    pipelinesInProgress.add(pipelineID.getId());
 
-    String detail = "test duplicate trigger ";
-    int numOfDuplicateTriggers = 10;
-    for (int i = 1; i <= numOfDuplicateTriggers; i++) {
-      xceiverRatis.triggerPipelineClose(groupId, detail + i, ClosePipelineInfo.Reason.PIPELINE_FAILED);
+    try {
+      pipelinesInProgress.add(pipelineID.getId());
+
+      String detail = "test duplicate trigger ";
+      int numOfDuplicateTriggers = 10;
+      for (int i = 1; i <= numOfDuplicateTriggers; i++) {
+        xceiverRatis.triggerPipelineClose(groupId, detail + i, ClosePipelineInfo.Reason.PIPELINE_FAILED);
+      }
+
+      String xceiverLogs = xceiverLogCapturer.getOutput();
+      int skippedCount = StringUtils.countMatches(xceiverLogs.toLowerCase(), "skipped triggering pipeline close");
+      assertEquals(numOfDuplicateTriggers, skippedCount);
+    } finally {
+      pipelinesInProgress.remove(pipelineID.getId());
+      xceiverLogCapturer.stopCapturing();
     }
-
-    String xceiverLogs = xceiverLogCapturer.getOutput();
-    int skippedCount = StringUtils.countMatches(xceiverLogs.toLowerCase(), "skipped triggering pipeline close");
-    assertEquals(numOfDuplicateTriggers, skippedCount);
-     
-    xceiverLogCapturer.stopCapturing();
   }
 
   private boolean verifyCloseForPipeline(Pipeline pipeline,
