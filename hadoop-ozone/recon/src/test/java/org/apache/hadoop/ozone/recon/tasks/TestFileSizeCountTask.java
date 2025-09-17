@@ -65,7 +65,6 @@ public class TestFileSizeCountTask {
   @TempDir
   private static Path temporaryFolder;
   private static ReconFileMetadataManager reconFileMetadataManager;
-  private static ReconTestInjector reconTestInjector;
   private FileSizeCountTaskOBS fileSizeCountTaskOBS;
   private FileSizeCountTaskFSO fileSizeCountTaskFSO;
 
@@ -75,7 +74,7 @@ public class TestFileSizeCountTask {
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
-    reconTestInjector =
+    ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
