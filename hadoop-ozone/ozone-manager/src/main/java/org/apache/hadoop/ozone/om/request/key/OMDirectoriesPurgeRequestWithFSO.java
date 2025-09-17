@@ -39,8 +39,11 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -54,6 +57,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 
 /**
  * Handles purging of keys from OM DB.
@@ -116,7 +120,10 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, e));
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
-    try {
+    OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
+
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> supplier =
+             fromSnapshotInfo == null ? null : omSnapshotManager.getSnapshot(fromSnapshotInfo.getSnapshotId())) {
       int numSubDirMoved = 0, numSubFilesMoved = 0, numDirsDeleted = 0;
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
         for (OzoneManagerProtocolProtos.KeyInfo key :
@@ -207,7 +214,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         if (path.hasDeletedDir()) {
           deletedDirNames.add(path.getDeletedDir());
           // Using deletedDirInfo since there is no reverse mapping for volumeId and bucketId.
-          deletedDirInfo = omMetadataManager.getDeletedDirTable().get(path.getDeletedDir());
+          OMMetadataManager metadataManager = fromSnapshotInfo == null ? ozoneManager.getMetadataManager()
+              : supplier.get().getMetadataManager();
+          OmKeyInfo deletedDirInfo = metadataManager.getDeletedDirTable().get(path.getDeletedDir());
           if (deletedDirInfo != null) {
             OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
                 deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName());
