@@ -437,6 +437,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-multitenancy-ranger</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-recon</artifactId>
       <scope>test</scope>
     </dependency>

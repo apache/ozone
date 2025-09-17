@@ -1236,6 +1236,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-multitenancy-ranger</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-recon</artifactId>
         <version>${ozone.version}</version>
       </dependency>
