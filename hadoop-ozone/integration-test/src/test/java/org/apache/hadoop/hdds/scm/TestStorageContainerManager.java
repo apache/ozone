@@ -303,7 +303,7 @@ public class TestStorageContainerManager {
       try {
         cluster.getStorageContainerManager().getScmHAManager()
             .asSCMHADBTransactionBuffer().flush();
-        return delLog.getFailedTransactions(-1, 0).isEmpty();
+        return delLog.getNumOfValidTransactions() == 0;
       } catch (IOException e) {
         return false;
       }
@@ -333,7 +333,6 @@ public class TestStorageContainerManager {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     // Reset container provision size, otherwise only one container
     // is created by default.
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 10 * KEY_COUNT);
@@ -405,7 +404,6 @@ public class TestStorageContainerManager {
     int numKeys = 15;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
@@ -660,7 +658,6 @@ public class TestStorageContainerManager {
     int numKeys = 15;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,

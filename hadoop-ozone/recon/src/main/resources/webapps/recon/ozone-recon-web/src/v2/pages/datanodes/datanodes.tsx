@@ -44,7 +44,7 @@ import {
   cancelRequests
 } from '@/utils/axiosRequestHelper';
 
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 import {
   Datanode,
   DatanodeDecomissionInfo,
