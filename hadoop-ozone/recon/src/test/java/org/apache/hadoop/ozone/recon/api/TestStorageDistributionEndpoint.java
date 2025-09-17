@@ -67,9 +67,7 @@ class StorageDistributionEndpointTest {
   private GlobalStatsDao globalStatsDao;
   private OzoneStorageContainerManager mockReconScm;
   private DatanodeInfo datanodeDetails;
-  private SCMNodeStat mockNodeStat;
   private SCMNodeStat globalStats;
-  private DUResponse mockDuResponse;
 
   private static final long NODE_CAPACITY = 5000L;
   private static final long NODE_USED = 2000L;
@@ -206,6 +204,8 @@ class StorageDistributionEndpointTest {
   }
 
   private void setupMockDependencies() throws IOException {
+    DUResponse mockDuResponse = mock(DUResponse.class);
+    SCMNodeStat mockNodeStat = mock(SCMNodeStat.class);
     mockNodeManager = mock(ReconNodeManager.class);
     mockOmdbInsightEndpoint = mock(OMDBInsightEndpoint.class);
     mockNsSummaryEndpoint = mock(NSSummaryEndpoint.class);
@@ -213,7 +213,6 @@ class StorageDistributionEndpointTest {
     mockReconScm = mock(OzoneStorageContainerManager.class);
     when(mockReconScm.getScmNodeManager()).thenReturn(mockNodeManager);
     datanodeDetails = mock(DatanodeInfo.class);
-    mockNodeStat = mock(SCMNodeStat.class);
     globalStatsDao = mock(GlobalStatsDao.class);
     when(globalStatsDao.findById(any())).thenReturn(new GlobalStats("test", 0L, new Timestamp(10000L)));
     when(mockNodeManager.getAllNodes()).thenReturn(Collections.singletonList(datanodeDetails));
@@ -242,8 +241,6 @@ class StorageDistributionEndpointTest {
       ((Map<String, Long>) invocation.getArgument(0)).putAll(openKeySummary);
       return null;
     }).when(mockOmdbInsightEndpoint).createKeysSummaryForOpenKey(anyMap());
-
-    mockDuResponse = mock(DUResponse.class);
     when(mockDuResponse.getSizeWithReplica()).thenReturn(COMMITTED_SIZE);
     when(mockNsSummaryEndpoint.getDiskUsage(eq("/"), eq(false), eq(true), eq(false)))
         .thenReturn(Response.ok(mockDuResponse).build());
