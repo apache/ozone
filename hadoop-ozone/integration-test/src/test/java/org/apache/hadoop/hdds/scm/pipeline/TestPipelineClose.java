@@ -265,6 +265,12 @@ public class TestPipelineClose {
   @Test
   @SuppressWarnings("unchecked")
   void testPipelineCloseTriggersSkippedWhenAlreadyInProgress() throws Exception {
+    ContainerInfo allocateContainer = containerManager
+        .allocateContainer(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE), "newTestOwner");
+    ContainerWithPipeline containerWithPipeline = new ContainerWithPipeline(allocateContainer,
+        pipelineManager.getPipeline(allocateContainer.getPipelineID()));
+    
     DatanodeStateMachine datanodeStateMachine = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine();
     XceiverServerRatis xceiverRatis = (XceiverServerRatis) datanodeStateMachine.getContainer().getWriteChannel();
 
@@ -272,7 +278,7 @@ public class TestPipelineClose {
     GenericTestUtils.LogCapturer xceiverLogCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverServerRatis.class);
 
-    RaftGroupId groupId = RaftGroupId.valueOf(ratisContainer.getPipeline().getId().getId());
+    RaftGroupId groupId = RaftGroupId.valueOf(containerWithPipeline.getPipeline().getId().getId());
     PipelineID pipelineID = PipelineID.valueOf(groupId.getUuid());
 
     ClosePipelineCommandHandler handler = datanodeStateMachine.getCommandDispatcher().getClosePipelineCommandHandler();
@@ -296,6 +302,9 @@ public class TestPipelineClose {
     } finally {
       pipelinesInProgress.remove(pipelineID.getId());
       xceiverLogCapturer.stopCapturing();
+
+      pipelineManager.closePipeline(containerWithPipeline.getPipeline().getId());
+      pipelineManager.deletePipeline(containerWithPipeline.getPipeline().getId());
     }
   }
 
