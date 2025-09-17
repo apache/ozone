@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
@@ -606,5 +607,10 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public void reconcileContainer(long id) throws IOException {
     storageContainerLocationClient.reconcileContainer(id);
+  }
+
+  @Override
+  public StorageContainerLocationProtocolProtos.GetVolumeInfosResponseProto getVolumeInfos() throws IOException {
+    return storageContainerLocationClient.getVolumeInfos();
   }
 }
