@@ -91,6 +91,15 @@ public class ClosePipelineCommandHandler implements CommandHandler {
   }
 
   /**
+   * Returns true if pipeline close is in progress, else false.
+   *
+   * @return boolean
+   */
+  public boolean isPipelineCloseInProgress(UUID pipelineID) {
+    return pipelinesInProgress.contains(pipelineID);
+  }
+
+  /**
    * Handles a given SCM command.
    *
    * @param command           - SCM Command
