@@ -82,6 +82,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @TempDir
   private Path temporaryFolder;
   private static GlobalStatsDao globalStatsDao;
+  private static ReconGlobalStatsManager reconGlobalStatsManager;
   private static OmTableInsightTask omTableInsightTask;
   private static DSLContext dslContext;
   private boolean isSetupDone = false;
@@ -142,7 +143,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager = reconTestInjector.getInstance(
         ReconNamespaceSummaryManagerImpl.class);
 
-    ReconGlobalStatsManager reconGlobalStatsManager = reconTestInjector.getInstance(ReconGlobalStatsManager.class);
+    reconGlobalStatsManager = reconTestInjector.getInstance(ReconGlobalStatsManager.class);
     omTableInsightTask = new OmTableInsightTask(
         reconGlobalStatsManager, reconOMMetadataManager);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
@@ -644,18 +645,33 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   private long getCountForTable(String tableName) {
-    String key = OmTableInsightTask.getTableCountKeyFromTable(tableName);
-    return globalStatsDao.findById(key).getValue();
+    try {
+      String key = OmTableInsightTask.getTableCountKeyFromTable(tableName);
+      GlobalStatsValue value = reconGlobalStatsManager.getGlobalStatsValue(key);
+      return value != null ? value.getValue() : 0L;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get count for table " + tableName, e);
+    }
   }
 
   private long getUnReplicatedSizeForTable(String tableName) {
-    String key = OmTableInsightTask.getUnReplicatedSizeKeyFromTable(tableName);
-    return globalStatsDao.findById(key).getValue();
+    try {
+      String key = OmTableInsightTask.getUnReplicatedSizeKeyFromTable(tableName);
+      GlobalStatsValue value = reconGlobalStatsManager.getGlobalStatsValue(key);
+      return value != null ? value.getValue() : 0L;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get unreplicated size for table " + tableName, e);
+    }
   }
 
   private long getReplicatedSizeForTable(String tableName) {
-    String key = OmTableInsightTask.getReplicatedSizeKeyFromTable(tableName);
-    return globalStatsDao.findById(key).getValue();
+    try {
+      String key = OmTableInsightTask.getReplicatedSizeKeyFromTable(tableName);
+      GlobalStatsValue value = reconGlobalStatsManager.getGlobalStatsValue(key);
+      return value != null ? value.getValue() : 0L;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get replicated size for table " + tableName, e);
+    }
   }
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
