@@ -177,14 +177,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private DatanodeDetails datanodeDetails2;
   private DatanodeDetails datanodeDetails3;
   private ReconFileMetadataManager reconFileMetadataManager;
-  private ReconGlobalStatsManager reconGlobalStatsManager;
   private DatanodeDetails datanodeDetails4;
   private long containerId = 1L;
   private ContainerReportsProto containerReportsProto;
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
   private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto3;
   private Pipeline pipeline;
-  private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
   private static final String HOST1 = "host1.datanode";
   private static final String HOST2 = "host2.datanode";
@@ -297,13 +295,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
     volumeEndpoint = reconTestInjector.getInstance(VolumeEndpoint.class);
     bucketEndpoint = reconTestInjector.getInstance(BucketEndpoint.class);
-    fileCountBySizeDao = getDao(FileCountBySizeDao.class);
+    FileCountBySizeDao fileCountBySizeDao = getDao(FileCountBySizeDao.class);
     ContainerCountBySizeDao containerCountBySizeDao = reconScm.getContainerCountBySizeDao();
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
     reconFileMetadataManager = reconTestInjector.getInstance(ReconFileMetadataManager.class);
-    reconGlobalStatsManager = reconTestInjector.getInstance(ReconGlobalStatsManager.class);
+    ReconGlobalStatsManager reconGlobalStatsManager = reconTestInjector.getInstance(ReconGlobalStatsManager.class);
     utilizationEndpoint = new UtilizationEndpoint(
         fileCountBySizeDao,
         containerCountBySizeDao,

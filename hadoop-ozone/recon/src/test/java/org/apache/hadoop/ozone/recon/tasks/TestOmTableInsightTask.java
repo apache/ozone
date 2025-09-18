@@ -65,7 +65,6 @@ import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,7 +80,6 @@ import org.mockito.MockitoAnnotations;
 public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @TempDir
   private Path temporaryFolder;
-  private static GlobalStatsDao globalStatsDao;
   private static ReconGlobalStatsManager reconGlobalStatsManager;
   private static OmTableInsightTask omTableInsightTask;
   private static DSLContext dslContext;
@@ -132,7 +130,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
-    globalStatsDao = getDao(GlobalStatsDao.class);
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
