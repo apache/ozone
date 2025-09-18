@@ -131,7 +131,6 @@ const NUMetadata: React.FC<MetadataProps> = ({
     `/api/v1/namespace/summary?path=${path}`,
     {} as SummaryResponse,
     {
-      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -140,7 +139,6 @@ const NUMetadata: React.FC<MetadataProps> = ({
     `/api/v1/namespace/quota?path=${path}`,
     {},
     {
-      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -369,17 +367,6 @@ const NUMetadata: React.FC<MetadataProps> = ({
     }
   }, [summaryAPI.loading, quotaAPI.loading, summaryAPI.data, quotaAPI.data, 
       summaryAPI.lastUpdated, quotaAPI.lastUpdated, processMetadata]);
-
-  const loadData = useCallback(() => {
-    // Trigger both API calls together
-    summaryAPI.refetch();
-    quotaAPI.refetch();
-  }, [summaryAPI, quotaAPI]);
-
-  // Load data when path changes
-  useEffect(() => {
-    loadData();
-  }, [path, loadData]);
 
   return (
     <Table

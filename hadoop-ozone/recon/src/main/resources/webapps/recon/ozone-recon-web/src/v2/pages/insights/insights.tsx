@@ -72,11 +72,6 @@ const Insights: React.FC<{}> = () => {
 
   const loading = fileCountAPI.loading || containerCountAPI.loading;
 
-  const loadData = () => {
-    fileCountAPI.refetch();
-    containerCountAPI.refetch();
-  };
-
   // Process the API responses when they're available
   useEffect(() => {
     if (!fileCountAPI.loading && !containerCountAPI.loading && 
@@ -140,11 +135,7 @@ const Insights: React.FC<{}> = () => {
     containerCountAPI.data,
     fileCountAPI.error,
     containerCountAPI.error
-  ]);
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  ]);  
 
   return (
     <>
