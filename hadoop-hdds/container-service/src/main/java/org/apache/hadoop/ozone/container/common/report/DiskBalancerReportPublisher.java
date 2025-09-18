@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 
 /**
  * Publishes DiskBalancer report which will be sent to SCM as part of heartbeat.
@@ -77,21 +76,12 @@ public class DiskBalancerReportPublisher extends
 
     DiskBalancerReportProto currentReport = info.toDiskBalancerReportProto();
 
-    // Always publish if DiskBalancer state is running or paused by node state
-    if (info.getOperationalState() == DiskBalancerService.DiskBalancerOperationalState.RUNNING
-        || info.getOperationalState() == DiskBalancerService.DiskBalancerOperationalState.PAUSED_BY_NODE_STATE) {
-      lastPublishedReport = currentReport;
-      return currentReport;
+    // Publish a report only if it has changed since the last time.
+    if (currentReport.equals(lastPublishedReport)) {
+      return null;
     }
 
-    // DiskBalancer is in stopped state.
-    // Publish if there is a change in the report since last publish
-    if (!currentReport.equals(lastPublishedReport)) {
-      lastPublishedReport = currentReport;
-      return currentReport;
-    }
-    // the balancer is stopped and lastPublishedReport
-    // is unchanged, so don't send any report.
-    return null;
+    lastPublishedReport = currentReport;
+    return currentReport;
   }
 }
