@@ -22,6 +22,8 @@ cd "$DIR/../../.." || exit 1
 export MAVEN_OPTS="\
 -Dmaven.wagon.http.pool=false \
 -Dmaven.wagon.http.retryHandler.class=standard \
--Dmaven.wagon.http.retryHandler.count=3"
+-Dmaven.wagon.http.retryHandler.count=3 \
+-DreportOutputDirectory=target \
+-DdestDir=javadoc"
 
 mvn javadoc:aggregate
