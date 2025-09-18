@@ -104,4 +104,10 @@ public class ReconFileMetadataManagerImpl implements ReconFileMetadataManager {
       throws IOException {
     fileMetadataDbStore.commitBatchOperation(rdbBatchOperation);
   }
+
+  @Override
+  public void clearFileCountTable() throws IOException {
+    ReconDBProvider.truncateTable(fileCountTable);
+    LOG.info("Successfully cleared file count table");
+  }
 }

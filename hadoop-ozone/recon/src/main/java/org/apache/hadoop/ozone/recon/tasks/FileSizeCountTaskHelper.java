@@ -74,6 +74,29 @@ public abstract class FileSizeCountTaskHelper {
   }
 
   /**
+   * Truncates the file count table if needed during reprocess.
+   * Uses a flag to ensure the table is truncated only once across all tasks.
+   */
+  public static void truncateFileCountTableIfNeeded(ReconFileMetadataManager reconFileMetadataManager,
+                                                    String taskName) {
+    synchronized (ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED) {
+      if (ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.compareAndSet(false, true)) {
+        try {
+          reconFileMetadataManager.clearFileCountTable();
+          LOG.info("Successfully truncated file count table for reprocess by task: {}", taskName);
+        } catch (Exception e) {
+          LOG.error("Failed to truncate file count table for task: {}", taskName, e);
+          // Reset flag on failure so another task can try
+          ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
+          throw new RuntimeException("Failed to truncate file count table", e);
+        }
+      } else {
+        LOG.debug("File count table already truncated by another task, skipping for task: {}", taskName);
+      }
+    }
+  }
+
+  /**
    * Executes the reprocess method using RocksDB for the given task.
    */
   public static ReconOmTask.TaskResult reprocess(OMMetadataManager omMetadataManager,
@@ -83,6 +106,9 @@ public abstract class FileSizeCountTaskHelper {
     LOG.info("Starting RocksDB Reprocess for {}", taskName);
     Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     long startTime = Time.monotonicNow();
+    
+    // Ensure the file count table is truncated only once during reprocess
+    truncateFileCountTableIfNeeded(reconFileMetadataManager, taskName);
     
     boolean status = reprocessBucketLayout(
         bucketLayout, omMetadataManager, fileSizeCountMap, reconFileMetadataManager, taskName);

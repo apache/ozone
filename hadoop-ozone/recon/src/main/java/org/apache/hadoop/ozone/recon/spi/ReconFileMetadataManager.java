@@ -88,4 +88,10 @@ public interface ReconFileMetadataManager {
    */
   void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException;
+
+  /**
+   * Clear all file size count data from the table.
+   * This method is used during reprocess operations.
+   */
+  void clearFileCountTable() throws IOException;
 }
