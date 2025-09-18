@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OperationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
@@ -320,6 +321,17 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String startKey, int maxKeys) throws IOException;
 
   /**
+   * Returns a list of operation info objects.
+   *
+   * @param startKey the start key determines where to start listing
+   * from, this key is excluded from the result.
+   * @param maxKeys the maximum number of results to return.
+   * @return a list of {@link OperationInfo}
+   * @throws IOException
+   */
+  List<OperationInfo> listOperationInfo(String startKey, int maxResults) throws IOException;
+
+  /**
    * Get total open key count (estimated, due to the nature of RocksDB impl)
    * of both OpenKeyTable and OpenFileTable.
    */
@@ -466,6 +478,8 @@ public interface OMMetadataManager extends DBStoreHAManager {
   Table<String, String> getSnapshotRenamedTable();
 
   Table<String, CompactionLogEntry> getCompactionLogTable();
+
+  Table<String, OperationInfo> getOperationInfoTable();
 
   /**
    * Gets the OM Meta table.
