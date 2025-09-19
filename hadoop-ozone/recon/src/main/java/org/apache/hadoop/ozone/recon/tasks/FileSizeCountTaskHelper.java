@@ -226,15 +226,30 @@ public abstract class FileSizeCountTaskHelper {
   /**
    * Writes the accumulated file size counts to RocksDB using ReconFileMetadataManager.
    */
+  /**
+   * Checks if the file count table is empty by trying to get the first entry.
+   * This mimics the SQL Derby behavior of isFileCountBySizeTableEmpty().
+   */
+  private static boolean isFileCountTableEmpty(ReconFileMetadataManager reconFileMetadataManager) {
+    try (TableIterator<FileSizeCountKey, ? extends Table.KeyValue<FileSizeCountKey, Long>> iterator = 
+         reconFileMetadataManager.getFileCountTable().iterator()) {
+      return !iterator.hasNext();
+    } catch (Exception e) {
+      LOG.warn("Error checking if file count table is empty, assuming not empty", e);
+      return false;
+    }
+  }
+
   public static void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap,
                                      ReconFileMetadataManager reconFileMetadataManager) {
     if (fileSizeCountMap.isEmpty()) {
       return;
     }
-    boolean isTableTruncated = ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.get();
     
-    LOG.debug("writeCountsToDB: processing {} entries, isTableTruncated={}", 
-        fileSizeCountMap.size(), isTableTruncated);
+    boolean isTableEmpty = isFileCountTableEmpty(reconFileMetadataManager);
+    
+    LOG.debug("writeCountsToDB: processing {} entries, isTableEmpty={}", 
+        fileSizeCountMap.size(), isTableEmpty);
 
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       for (Map.Entry<FileSizeCountKey, Long> entry : fileSizeCountMap.entrySet()) {
@@ -243,8 +258,15 @@ public abstract class FileSizeCountTaskHelper {
         
         LOG.debug("Processing key: {}, deltaCount: {}", key, deltaCount);
         
-        if (!isTableTruncated) {
-          // For incremental updates, read existing value and update
+        if (isTableEmpty) {
+          // Direct insert when table is empty (like SQL Derby reprocess behavior)
+          LOG.debug("Direct insert (table empty): key={}, deltaCount={}", key, deltaCount);
+          if (deltaCount > 0L) {
+            reconFileMetadataManager.batchStoreFileSizeCount(rdbBatchOperation, key, deltaCount);
+            LOG.debug("Storing key={} with deltaCount={}", key, deltaCount);
+          }
+        } else {
+          // Incremental update when table has data (like SQL Derby incremental behavior)
           Long existingCount = reconFileMetadataManager.getFileSizeCount(key);
           Long newCount = (existingCount != null ? existingCount : 0L) + deltaCount;
           
@@ -258,18 +280,6 @@ public abstract class FileSizeCountTaskHelper {
             // Delete key if count becomes 0 or negative
             reconFileMetadataManager.batchDeleteFileSizeCount(rdbBatchOperation, key);
             LOG.debug("Deleting key={} as newCount={} <= 0", key, newCount);
-          }
-        } else {
-          // Direct insert after truncation - but we still need to check if key exists from previous task
-          Long existingCount = reconFileMetadataManager.getFileSizeCount(key);
-          Long newCount = (existingCount != null ? existingCount : 0L) + deltaCount;
-          
-          LOG.debug("Direct insert after truncation: key={}, existingCount={}, deltaCount={}, newCount={}", 
-              key, existingCount, deltaCount, newCount);
-          
-          if (newCount > 0L) {
-            reconFileMetadataManager.batchStoreFileSizeCount(rdbBatchOperation, key, newCount);
-            LOG.debug("Storing key={} with newCount={}", key, newCount);
           }
         }
       }
