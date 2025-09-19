@@ -420,6 +420,7 @@ message ReplicateContainerCommandProto {
   optional int32 replicaIndex = 4;
   optional DatanodeDetailsProto target = 5;
   optional ReplicationCommandPriority priority = 6 [default = NORMAL];
+  optional int64 replicateSize = 7;
 }
 
 /**
