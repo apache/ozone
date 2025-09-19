@@ -86,7 +86,7 @@ message ScmContainerLocationRequest {
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
-  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 50;
+  optional DatanodeDiskBalancerInfoRequestProto datanodeDiskBalancerInfoRequest = 50;
   optional DatanodeDiskBalancerOpRequestProto datanodeDiskBalancerOpRequest = 51;
 }
 

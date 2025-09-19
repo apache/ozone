@@ -120,14 +120,17 @@ used time or if the container iterator for that is invalidated on full utilisati
 
 ## Feature Flag
 
-The Disk Balancer feature is introduced with a feature flag. By default, this feature is disabled to prevent it from 
-running until it has undergone thorough testing.
+The Disk Balancer feature is introduced with a feature flag. By default, this feature is disabled.
 
 The feature can be enabled by setting the following property to `true` in the `ozone-site.xml` configuration file:
 `hdds.datanode.disk.balancer.enabled = false`
 
 Developers who wish to test or use the Disk Balancer must explicitly enable it. Once the feature is 
 considered stable, the default value may be changed to `true` in a future release.
+
+**Note:** This command is hidden from the main help message (`ozone admin datanode --help`). This is because the feature
+is currently considered experimental and is disabled by default. The command is, however, fully functional for those who
+wish to enable and use the feature.
 
 ## DiskBalancer Metrics
 
