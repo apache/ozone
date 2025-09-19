@@ -120,6 +120,12 @@ public abstract class FileSizeCountTaskHelper {
     
     long endTime = Time.monotonicNow();
     LOG.info("{} completed RocksDB Reprocess in {} ms.", taskName, (endTime - startTime));
+    
+    // Reset the truncated flag after successful reprocess completion
+    // This allows subsequent incremental updates to work properly
+    ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
+    LOG.info("Reset FILE_SIZE_COUNT_TABLE_TRUNCATED flag to false after reprocess completion");
+    
     return buildTaskResult(taskName, true);
   }
 
@@ -228,30 +234,46 @@ public abstract class FileSizeCountTaskHelper {
       return;
     }
     boolean isTableTruncated = ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.get();
+    
+    LOG.debug("writeCountsToDB: processing {} entries, isTableTruncated={}", 
+        fileSizeCountMap.size(), isTableTruncated);
 
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
       for (Map.Entry<FileSizeCountKey, Long> entry : fileSizeCountMap.entrySet()) {
         FileSizeCountKey key = entry.getKey();
         Long deltaCount = entry.getValue();
         
+        LOG.debug("Processing key: {}, deltaCount: {}", key, deltaCount);
+        
         if (!isTableTruncated) {
-          // Read-modify-write pattern for incremental updates
+          // For incremental updates, read existing value and update
           Long existingCount = reconFileMetadataManager.getFileSizeCount(key);
           Long newCount = (existingCount != null ? existingCount : 0L) + deltaCount;
+          
+          LOG.debug("Incremental update: key={}, existingCount={}, deltaCount={}, newCount={}", 
+              key, existingCount, deltaCount, newCount);
+          
           if (newCount > 0L) {
             reconFileMetadataManager.batchStoreFileSizeCount(rdbBatchOperation, key, newCount);
+            LOG.debug("Storing key={} with newCount={}", key, newCount);
           } else if (existingCount != null) {
+            // Delete key if count becomes 0 or negative
             reconFileMetadataManager.batchDeleteFileSizeCount(rdbBatchOperation, key);
+            LOG.debug("Deleting key={} as newCount={} <= 0", key, newCount);
           }
         } else {
           // Direct insert after truncation
+          LOG.debug("Direct insert after truncation: key={}, deltaCount={}", key, deltaCount);
           if (deltaCount > 0L) {
             reconFileMetadataManager.batchStoreFileSizeCount(rdbBatchOperation, key, deltaCount);
+            LOG.debug("Storing key={} with deltaCount={}", key, deltaCount);
           }
         }
       }
       
+      LOG.debug("Committing batch operation with {} operations", fileSizeCountMap.size());
       reconFileMetadataManager.commitBatchOperation(rdbBatchOperation);
+      LOG.debug("Batch operation committed successfully");
     } catch (Exception e) {
       LOG.error("Error writing file size counts to RocksDB", e);
       throw new RuntimeException("Failed to write to RocksDB", e);

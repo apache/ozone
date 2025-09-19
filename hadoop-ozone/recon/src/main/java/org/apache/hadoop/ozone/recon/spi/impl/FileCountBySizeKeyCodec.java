@@ -51,7 +51,7 @@ public final class FileCountBySizeKeyCodec implements Codec<FileSizeCountKey> {
   public byte[] toPersistedFormat(FileSizeCountKey key) {
     Preconditions.checkNotNull(key, "Null object can't be converted to byte array.");
     
-    // Serialize: volume + delimiter + bucket + delimiter + fileSize
+    // Serialize: volume + delimiter + bucket + delimiter + fileSize (8 bytes)
     byte[] volumeBytes = key.getVolume().getBytes(UTF_8);
     byte[] bucketBytes = key.getBucket().getBytes(UTF_8);
     byte[] fileSizeBytes = Longs.toByteArray(key.getFileSizeUpperBound());
@@ -67,20 +67,22 @@ public final class FileCountBySizeKeyCodec implements Codec<FileSizeCountKey> {
 
   @Override
   public FileSizeCountKey fromPersistedFormat(byte[] rawData) {
-    String rawString = new String(rawData, UTF_8);
-    
-    // Find delimiter positions
-    int firstDelimiter = rawString.indexOf(KEY_DELIMITER);
-    int secondDelimiter = rawString.indexOf(KEY_DELIMITER, firstDelimiter + 1);
-    
-    // Extract volume and bucket
-    String volume = rawString.substring(0, firstDelimiter);
-    String bucket = rawString.substring(firstDelimiter + 1, secondDelimiter);
-    
-    // Extract file size from the remaining bytes after the second delimiter
-    byte[] fileSizeBytes = ArrayUtils.subarray(rawData, 
-        secondDelimiter + KEY_DELIMITER.length(), rawData.length);
+    // Last 8 bytes is the file size (long)
+    byte[] fileSizeBytes = ArrayUtils.subarray(rawData,
+        rawData.length - Long.BYTES,
+        rawData.length);
     long fileSize = Longs.fromByteArray(fileSizeBytes);
+    
+    // Everything before the last 8 bytes contains volume + delimiter + bucket + delimiter
+    byte[] volumeBucketBytes = ArrayUtils.subarray(rawData, 0, rawData.length - Long.BYTES);
+    String volumeBucketString = new String(volumeBucketBytes, UTF_8);
+    
+    // Find the first delimiter to separate volume from bucket
+    int firstDelimiter = volumeBucketString.indexOf(KEY_DELIMITER);
+    int secondDelimiter = volumeBucketString.indexOf(KEY_DELIMITER, firstDelimiter + 1);
+    
+    String volume = volumeBucketString.substring(0, firstDelimiter);
+    String bucket = volumeBucketString.substring(firstDelimiter + 1, secondDelimiter);
     
     return new FileSizeCountKey(volume, bucket, fileSize);
   }
