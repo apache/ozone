@@ -2011,6 +2011,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.s3g.sts.http.enabled</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The boolean which enables the Ozone S3Gateway STS endpoint.
+    </description>
+  </property>
+  <property>
     <name>ozone.s3g.metrics.percentiles.intervals.seconds</name>
     <value>60</value>
     <tag>S3GATEWAY, PERFORMANCE</tag>

@@ -15,39 +15,49 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3secret;
+package org.apache.hadoop.ozone.s3web.s3sts;
 
-import static org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys.OZONE_S3G_SECRET_HTTP_ENABLED_KEY;
+import static org.apache.hadoop.ozone.s3web.s3sts.S3STSConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY;
 
 import java.io.IOException;
 import javax.inject.Inject;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
- * Filter that disables all endpoints annotated with {@link S3SecretEnabled}.
+ * Filter that disables all endpoints annotated with {@link S3STSEnabled}.
  * Condition is based on the value of the configuration key
- * ozone.s3g.secret.http.enabled.
+ * ozone.s3g.s3sts.http.enabled.
  */
-@S3SecretEnabled
+@S3STSEnabled
 @Provider
-public class S3SecretEnabledEndpointRequestFilter
-    implements ContainerRequestFilter {
-
+public class S3STSEnabledEndpointRequestFilter implements ContainerRequestFilter {
   @Inject
   private OzoneConfiguration ozoneConfiguration;
 
   @Override
-  public void filter(ContainerRequestContext requestContext)
-      throws IOException {
-    boolean isSecretEnabled = ozoneConfiguration.getBoolean(
-        OZONE_S3G_SECRET_HTTP_ENABLED_KEY, false);
-    if (!isSecretEnabled) {
+  public void filter(ContainerRequestContext requestContext) throws IOException {
+    boolean isSTSEnabled = ozoneConfiguration.getBoolean(
+        OZONE_S3G_STS_HTTP_ENABLED_KEY, false);
+    if (!isSTSEnabled) {
+      String errorMessage = "S3 STS endpoint is disabled.";
+      String errorCode = "AccessDenied";
+      String xmlError = "<ErrorResponse xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\">" +
+          "<Error>" +
+          "<Type>Sender</Type>" +
+          "<Code>" + errorCode + "</Code>" +
+          "<Message>" + errorMessage + "</Message>" +
+          "</Error>" +
+          "<RequestId>" + requestContext.getHeaderString("x-amz-request-id") + "</RequestId>" +
+          "</ErrorResponse>";
+
       requestContext.abortWith(Response.status(Response.Status.BAD_REQUEST)
-          .entity("S3 Secret endpoint is disabled.")
+          .entity(xmlError)
+          .type(MediaType.APPLICATION_XML_TYPE)
           .build());
     }
   }
