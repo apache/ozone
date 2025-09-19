@@ -93,6 +93,7 @@ import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.RetryCache;
+import org.apache.ratis.server.RaftServerConfigKeys.Read;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.util.LifeCycle;
@@ -124,6 +125,7 @@ public final class OzoneManagerRatisServer {
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private final Read.Option readOption;
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -170,6 +172,8 @@ public final class OzoneManagerRatisServer {
           raftGroupIdStr, raftPeersStr.substring(2));
     }
     this.omStateMachine = getStateMachine(conf);
+
+    this.readOption = RaftServerConfigKeys.Read.option(serverProperties);
 
     Parameters parameters = createServerTlsParameters(secConfig, certClient);
     this.server = RaftServer.newBuilder()
@@ -647,6 +651,10 @@ public final class OzoneManagerRatisServer {
     return serverDivision.get();
   }
 
+  public boolean isLinearizableRead() {
+    return readOption == Read.Option.LINEARIZABLE;
+  }
+
   /**
    * Initializes and returns OzoneManager StateMachine.
    */
@@ -720,6 +728,10 @@ public final class OzoneManagerRatisServer {
     setRaftSnapshotProperties(properties, conf);
 
     setRaftCloseThreshold(properties, conf);
+
+    RaftServerConfigKeys.Read.setOption(properties,
+        conf.getEnum(OMConfigKeys.OZONE_OM_RATIS_SERVER_READ_OPTION,
+            OMConfigKeys.OZONE_OM_RATIS_SERVER_READ_OPTION_DEFAULT));
 
     getOMHAConfigs(conf).forEach(properties::set);
     return properties;
