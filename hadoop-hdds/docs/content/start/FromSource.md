@@ -110,7 +110,7 @@ cp $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${
 
 cd ..
 # Compile grpc
-# Pre-req: Manually install gradle (www.gradle.org) and a jvm compatible with installed gradle version
+# Pre-req: Manually install Gradle (version 7.0 or higher) and a compatible JVM (JDK 8 or higher) as required by gRPC Java v1.71.0. See https://github.com/grpc/grpc-java/blob/v1.71.0/README.md for details.
 git clone https://github.com/grpc/grpc-java.git
 cd grpc-java
 git checkout v1.71.0
