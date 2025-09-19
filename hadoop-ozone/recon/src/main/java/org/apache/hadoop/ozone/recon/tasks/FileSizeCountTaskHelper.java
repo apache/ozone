@@ -39,6 +39,9 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class FileSizeCountTaskHelper {
   protected static final Logger LOG = LoggerFactory.getLogger(FileSizeCountTaskHelper.class);
+  
+  // Static lock object for table truncation synchronization
+  private static final Object TRUNCATE_LOCK = new Object();
 
   /**
    * Increments the count for a given key on a PUT event.
@@ -72,9 +75,6 @@ public abstract class FileSizeCountTaskHelper {
         omKeyInfo.getBucketName(),
         ReconUtils.getFileSizeUpperBound(omKeyInfo.getDataSize()));
   }
-
-  // Static lock object for table truncation synchronization
-  private static final Object TRUNCATE_LOCK = new Object();
 
   /**
    * Truncates the file count table if needed during reprocess.
