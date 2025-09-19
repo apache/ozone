@@ -231,6 +231,7 @@ share/ozone/lib/ozone-insight.jar
 share/ozone/lib/ozone-interface-client.jar
 share/ozone/lib/ozone-interface-storage.jar
 share/ozone/lib/ozone-manager.jar
+share/ozone/lib/ozone-multitenancy-ranger.jar
 share/ozone/lib/ozone-reconcodegen.jar
 share/ozone/lib/ozone-recon.jar
 share/ozone/lib/ozone-s3-secret-store.jar

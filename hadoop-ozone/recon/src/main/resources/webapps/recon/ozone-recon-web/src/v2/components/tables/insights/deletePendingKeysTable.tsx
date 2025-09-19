@@ -29,7 +29,7 @@ import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import ExpandedPendingKeysTable from '@/v2/components/tables/insights/expandedPendingKeysTable';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import {
