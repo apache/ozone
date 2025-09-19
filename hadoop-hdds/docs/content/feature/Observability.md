@@ -109,8 +109,7 @@ Tracing is turned off by default, but can be turned on with `hdds.tracing.enable
 </property>
 ```
 
-Below are the configuration to be done to provide collector endpoint and sampling strategy. These are environment variables to be set for each Ozone component (OM, SCM, datanode)
-and Ozone Client to enable traces such as shell.
+Below are the configuration steps for setting the collector endpoint and sampling strategy. Set these environment variables to be set for each Ozone component (OM, SCM, datanode) and for the Ozone client to enable tracing.
 
 ```
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
