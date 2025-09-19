@@ -115,10 +115,10 @@ git clone https://github.com/grpc/grpc-java.git
 cd grpc-java
 git checkout v1.71.0
 PARENTDIR=$(cd .. && pwd)
-PROTOBUF_ROOT="$PARENTDIR/protobuf-${PROTOBUF_VERSION}"
-PATH="${PROTOBUF_ROOT}/src:$PATH"
-CPPFLAGS="-I${PROTOBUF_ROOT}/src"
-LDFLAGS="-L${PROTOBUF_ROOT}/src/.libs"
+export PROTOBUF_ROOT="$PARENTDIR/protobuf-${PROTOBUF_VERSION}"
+export PATH="${PROTOBUF_ROOT}/src:$PATH"
+export CPPFLAGS="-I${PROTOBUF_ROOT}/src"
+export LDFLAGS="-L${PROTOBUF_ROOT}/src/.libs"
 ./gradlew :grpc-compiler:java_pluginExecutable -PskipAndroid=true
 PLUGIN="protoc-gen-grpc-java-1.71.0-osx-aarch_64.exe"
 cp compiler/build/exe/java_plugin/protoc-gen-grpc-java $PLUGIN
