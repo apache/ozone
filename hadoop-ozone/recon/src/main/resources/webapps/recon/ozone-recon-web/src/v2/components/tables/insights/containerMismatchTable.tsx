@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import { AxiosError } from 'axios';
 import {
   Dropdown,
   Menu,
@@ -164,7 +163,7 @@ const ContainerMismatchTable: React.FC<ContainerMismatchTableProps> = ({
       setLoading(false);
     }).catch(error => {
       setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     })
   }
 
