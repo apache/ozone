@@ -191,7 +191,7 @@ This directs clients (replicated data) to read from topologically closest DataNo
 *   **Accurate Topology:** Maintain an accurate, up-to-date topology map (static or dynamic script); this is foundational.
 *   **Pipeline Creation:** For production environments, use the default `PipelinePlacementPolicy` for `ozone.scm.pipeline.placement.impl` to ensure both rack fault tolerance and pipeline load balancing.
 *   **Pipeline Selection:** The default `RandomPipelineChoosePolicy` for `hdds.scm.pipeline.choose.policy.impl` is suitable for general load balancing.
-*   **Replicated (RATIS) Containers:** For production rack fault tolerance, use `SCMContainerPlacementRackAware` (mindful of its single-layer topology limitation) or `SCMContainerPlacementCapacity` (verify rack interaction) over `SCMContainerPlacementRandom`.
+*   **Replicated (RATIS) Containers:** For production, use `SCMContainerPlacementRackAware` (mindful of its single-layer topology limitation) or `SCMContainerPlacementCapacity` (balanced disk usage) over `SCMContainerPlacementRandom`.
 *   **Erasure Coded (EC) Containers:** For production rack fault tolerance, use `SCMContainerPlacementRackScatter`.
 *   **Read Operations:** Enable `ozone.network.topology.aware.read` with accurate topology.
 *   **Monitor & Validate:** Regularly monitor placement and balance; use tools like Recon to verify topology awareness.
