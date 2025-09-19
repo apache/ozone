@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -69,6 +70,14 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
+  }
+
+  @Override
+  public ReconOmTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    ReconGlobalStatsManager stagedGlobalStatsManager =
+        reconGlobalStatsManager.getStagedReconGlobalStatsManager(stagedReconDbStore);
+    return new OmTableInsightTask(stagedGlobalStatsManager, stagedOmMetadataManager);
   }
 
   /**
@@ -158,6 +167,11 @@ public class OmTableInsightTask implements ReconOmTask {
   @Override
   public TaskResult process(OMUpdateEventBatch events,
                             Map<String, Integer> subTaskSeekPosMap) {
+    // Initialize tables if not already initialized
+    if (tables == null || tables.isEmpty()) {
+      init();
+    }
+
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
 
     String tableName;

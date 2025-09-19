@@ -141,7 +141,6 @@ import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
-import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
 import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
@@ -295,7 +294,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
     volumeEndpoint = reconTestInjector.getInstance(VolumeEndpoint.class);
     bucketEndpoint = reconTestInjector.getInstance(BucketEndpoint.class);
-    FileCountBySizeDao fileCountBySizeDao = getDao(FileCountBySizeDao.class);
     ContainerCountBySizeDao containerCountBySizeDao = reconScm.getContainerCountBySizeDao();
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
@@ -303,7 +301,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     reconFileMetadataManager = reconTestInjector.getInstance(ReconFileMetadataManager.class);
     ReconGlobalStatsManager reconGlobalStatsManager = reconTestInjector.getInstance(ReconGlobalStatsManager.class);
     utilizationEndpoint = new UtilizationEndpoint(
-        fileCountBySizeDao,
         containerCountBySizeDao,
         utilizationSchemaDefinition,
         reconFileMetadataManager);

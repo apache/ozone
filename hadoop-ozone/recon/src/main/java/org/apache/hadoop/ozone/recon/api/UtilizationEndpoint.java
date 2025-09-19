@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountKey;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
-import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
 import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
 import org.jooq.DSLContext;
@@ -56,7 +55,6 @@ import org.slf4j.LoggerFactory;
 @Produces(MediaType.APPLICATION_JSON)
 public class UtilizationEndpoint {
 
-  private FileCountBySizeDao fileCountBySizeDao;
   private UtilizationSchemaDefinition utilizationSchemaDefinition;
   private ContainerCountBySizeDao containerCountBySizeDao;
   private ReconFileMetadataManager reconFileMetadataManager;
@@ -64,12 +62,10 @@ public class UtilizationEndpoint {
       .getLogger(UtilizationEndpoint.class);
 
   @Inject
-  public UtilizationEndpoint(FileCountBySizeDao fileCountBySizeDao,
-                             ContainerCountBySizeDao containerCountBySizeDao,
+  public UtilizationEndpoint(ContainerCountBySizeDao containerCountBySizeDao,
                              UtilizationSchemaDefinition utilizationSchemaDefinition,
                              ReconFileMetadataManager reconFileMetadataManager) {
     this.utilizationSchemaDefinition = utilizationSchemaDefinition;
-    this.fileCountBySizeDao = fileCountBySizeDao;
     this.containerCountBySizeDao = containerCountBySizeDao;
     this.reconFileMetadataManager = reconFileMetadataManager;
   }
