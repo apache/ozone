@@ -312,12 +312,10 @@ public class TestRocksDBCheckpointDiffer {
   private File metadataDirDir;
   private File compactionLogDir;
   private File sstBackUpDir;
-  private ConfigurationSource config;
   private ExecutorService executorService = Executors.newCachedThreadPool();
   private RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
   private ManagedRocksDB activeRocksDB;
 
-  private ManagedDBOptions dbOptions;
   private ColumnFamilyHandle keyTableCFHandle;
   private ColumnFamilyHandle directoryTableCFHandle;
   private ColumnFamilyHandle fileTableCFHandle;
@@ -354,7 +352,7 @@ public class TestRocksDBCheckpointDiffer {
     sstBackUpDir = new File(METADATA_DIR_NAME, SST_BACK_UP_DIR_NAME);
     createDir(sstBackUpDir, METADATA_DIR_NAME + "/" + SST_BACK_UP_DIR_NAME);
 
-    config = mock(ConfigurationSource.class);
+    ConfigurationSource config = mock(ConfigurationSource.class);
 
     when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
@@ -387,7 +385,7 @@ public class TestRocksDBCheckpointDiffer {
     cfOpts.optimizeUniversalStyleCompaction();
     List<ColumnFamilyDescriptor> cfDescriptors = getCFDescriptorList(cfOpts);
     List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
-    dbOptions = new ManagedDBOptions();
+    ManagedDBOptions dbOptions = new ManagedDBOptions();
     dbOptions.setCreateIfMissing(true);
     dbOptions.setCreateMissingColumnFamilies(true);
 
@@ -1935,6 +1933,12 @@ public class TestRocksDBCheckpointDiffer {
    */
   @Test
   public void testPruneSSTFileValues() throws Exception {
+    SSTFilePruningMetrics sstFilePruningMetrics = rocksDBCheckpointDiffer.getPruningMetrics();
+    assertEquals(0L, sstFilePruningMetrics.getPruneQueueSize());
+    assertEquals(0L, sstFilePruningMetrics.getFilesPrunedTotal());
+    assertEquals(0L, sstFilePruningMetrics.getFilesPrunedLast());
+    assertEquals(0L, sstFilePruningMetrics.getCompactionsProcessed());
+    assertEquals(0L, sstFilePruningMetrics.getFilesRemovedTotal());
 
     List<Pair<byte[], Integer>> keys = new ArrayList<Pair<byte[], Integer>>();
     keys.add(Pair.of("key1".getBytes(UTF_8), Integer.valueOf(1)));
@@ -1962,8 +1966,9 @@ public class TestRocksDBCheckpointDiffer {
     );
     byte[] compactionLogEntryKey = rocksDBCheckpointDiffer.addToCompactionLogTable(compactionLogEntry);
     rocksDBCheckpointDiffer.loadAllCompactionLogs();
+    assertEquals(1L, sstFilePruningMetrics.getPruneQueueSize());
 
-    // Pruning should not fail a source SST file has been removed by a another pruner.
+    // Pruning should not fail a source SST file has been removed by another pruner.
     Files.delete(sstBackUpDir.toPath().resolve(inputFile73 + SST_FILE_EXTENSION));
     // Run the SST file pruner.
     ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
@@ -2011,6 +2016,12 @@ public class TestRocksDBCheckpointDiffer {
 
     // Verify 000073.sst pruning has been skipped
     assertFalse(fileInfo73.isPruned());
+
+    assertEquals(0L, sstFilePruningMetrics.getPruneQueueSize());
+    assertEquals(1L, sstFilePruningMetrics.getFilesPrunedTotal());
+    assertEquals(1L, sstFilePruningMetrics.getFilesPrunedLast());
+    assertEquals(1L, sstFilePruningMetrics.getCompactionsProcessed());
+    assertEquals(1L, sstFilePruningMetrics.getFilesRemovedTotal());
   }
 
   private void createSSTFileWithKeys(String filePath, List<Pair<byte[], Integer>> keys)

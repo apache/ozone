@@ -129,7 +129,6 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private OzoneConfiguration conf;
   private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
@@ -340,7 +339,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
 
   @BeforeEach
   public void setUp() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     // By setting this config our Legacy buckets will behave like OBS buckets.
     conf.set(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, "false");
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(

@@ -69,15 +69,14 @@ import org.junit.jupiter.api.Test;
  * Tests Exception handling by Ozone Client by set flush delay.
  */
 public class TestFailureHandlingByClientFlushDelay {
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 4 * CHUNK_SIZE;
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private OzoneClient client;
   private ObjectStore objectStore;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private String volumeName;
   private String bucketName;
   private String keyString;
@@ -90,11 +89,7 @@ public class TestFailureHandlingByClientFlushDelay {
    * @throws IOException
    */
   private void init() throws Exception {
-    conf = new OzoneConfiguration();
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 4 * chunkSize;
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
 
     RatisClientConfig ratisClientConfig =
@@ -130,10 +125,10 @@ public class TestFailureHandlingByClientFlushDelay {
         "/rack1");
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -170,9 +165,9 @@ public class TestFailureHandlingByClientFlushDelay {
     startCluster();
     String keyName = UUID.randomUUID().toString();
     OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, blockSize);
+        createKey(keyName, ReplicationType.RATIS, BLOCK_SIZE);
     String data = ContainerTestHelper
-        .getFixedLengthString(keyString,  chunkSize);
+        .getFixedLengthString(keyString, CHUNK_SIZE);
 
     // get the name of a valid container
     KeyOutputStream keyOutputStream =

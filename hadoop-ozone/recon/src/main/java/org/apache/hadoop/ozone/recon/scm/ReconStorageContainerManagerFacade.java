@@ -94,6 +94,7 @@ import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -159,17 +160,12 @@ public class ReconStorageContainerManagerFacade
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
-  private NetworkTopology clusterMap;
   private StorageContainerServiceProvider scmServiceProvider;
   private Set<ReconScmTask> reconScmTasks = new HashSet<>();
-  private SCMContainerPlacementMetrics placementMetrics;
-  private PlacementPolicy containerPlacementPolicy;
-  private HDDSLayoutVersionManager scmLayoutVersionManager;
   private ReconSafeModeManager safeModeManager;
   private ReconSafeModeMgrTask reconSafeModeMgrTask;
   private ContainerSizeCountTask containerSizeCountTask;
   private ContainerCountBySizeDao containerCountBySizeDao;
-  private ScheduledExecutorService scheduler;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
@@ -195,7 +191,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.setSilent(true);
     this.reconContext = reconContext;
     this.scmContext = new SCMContext.Builder()
-        .setIsPreCheckComplete(true)
+        .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.OUT_OF_SAFE_MODE)
         .setSCM(this)
         .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
@@ -217,10 +213,10 @@ public class ReconStorageContainerManagerFacade
         scmClientFailOverMaxRetryCount);
 
     this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
-    this.clusterMap = new NetworkTopologyImpl(conf);
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, ReconSCMDBDefinition.get());
 
-    this.scmLayoutVersionManager =
+    HDDSLayoutVersionManager scmLayoutVersionManager =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     this.scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMDBTransactionBufferImpl());
@@ -230,11 +226,10 @@ public class ReconStorageContainerManagerFacade
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             ReconSCMDBDefinition.NODES.getTable(dbStore),
-            this.scmLayoutVersionManager, reconContext);
-    placementMetrics = SCMContainerPlacementMetrics.create();
-    this.containerPlacementPolicy =
-        ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
-            clusterMap, true, placementMetrics);
+            scmLayoutVersionManager, reconContext);
+    SCMContainerPlacementMetrics placementMetrics = SCMContainerPlacementMetrics.create();
+    PlacementPolicy containerPlacementPolicy = ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
+        clusterMap, true, placementMetrics);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager = ReconPipelineManager.newReconPipelineManager(
@@ -244,7 +239,8 @@ public class ReconStorageContainerManagerFacade
         scmhaManager,
         scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
-        Clock.system(ZoneId.systemDefault()));
+        Clock.system(ZoneId.systemDefault()),
+        conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class));
     this.containerManager = new ReconContainerManager(conf,
         dbStore,
         ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
@@ -388,9 +384,9 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
-    scheduler = Executors.newScheduledThreadPool(1,
+    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix +
-                "SyncSCMContainerInfo-%d")
+                                                     "SyncSCMContainerInfo-%d")
             .build());
     boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,
@@ -435,6 +431,7 @@ public class ReconStorageContainerManagerFacade
     if (!this.safeModeManager.getInSafeMode()) {
       this.reconScmTasks.forEach(ReconScmTask::start);
     }
+    LOG.info("Successfully started Recon Storage Container Manager.");
   }
 
   /**
@@ -509,6 +506,8 @@ public class ReconStorageContainerManagerFacade
       }
     } catch (IOException e) {
       LOG.error("Exception encountered while getting SCM DB.");
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.INTERNAL_ERROR);
     } finally {
       isSyncDataFromSCMRunning.compareAndSet(true, false);
     }

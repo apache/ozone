@@ -26,7 +26,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Optional;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -236,8 +235,8 @@ public final class KeyValueContainerUtil {
     File dbFile = KeyValueContainerLocationUtil.getContainerDBFile(
         kvContainerData);
     if (!dbFile.exists()) {
-      LOG.error("Container DB file is missing for ContainerID {}. " +
-          "Skipping loading of this container.", containerID);
+      LOG.error("Container DB file is missing at {} for ContainerID {}. " +
+          "Skipping loading of this container.", dbFile, containerID);
       // Don't further process this container, as it is missing db file.
       throw new IOException("Container DB file is missing for containerID "
           + containerID);
@@ -260,10 +259,10 @@ public final class KeyValueContainerUtil {
     DatanodeStore store = null;
     try {
       try {
-        boolean readOnly = ContainerInspectorUtil.isReadOnly(
-            ContainerProtos.ContainerType.KeyValueContainer);
-        store = BlockUtils.getUncachedDatanodeStore(
-            kvContainerData, config, readOnly);
+        // Open RocksDB in write mode, as it is required for container checksum updates and inspector repair operations.
+        // The method KeyValueContainerMetadataInspector.buildErrorAndRepair will determine if write access to the DB
+        // is permitted based on the mode.
+        store = BlockUtils.getUncachedDatanodeStore(kvContainerData, config, false);
       } catch (IOException e) {
         // If an exception is thrown, then it may indicate the RocksDB is
         // already open in the container cache. As this code is only executed at
@@ -283,29 +282,30 @@ public final class KeyValueContainerUtil {
       } else if (store != null) {
         // We only stop the store if cacheDB is null, as otherwise we would
         // close the rocksDB handle in the cache and the next reader would fail
-        try {
-          store.stop();
-        } catch (IOException e) {
-          throw e;
-        } catch (Exception e) {
-          throw new RuntimeException("Unexpected exception closing the " +
-              "RocksDB when loading containers", e);
-        }
+        store.stop();
       }
     }
   }
 
-  private static void populateContainerDataChecksum(KeyValueContainerData kvContainerData) {
+  private static void loadAndSetContainerDataChecksum(KeyValueContainerData kvContainerData,
+                                                      Table<String, Long> metadataTable) {
     if (kvContainerData.isOpen()) {
       return;
     }
 
     try {
-      Optional<ContainerChecksumInfo> optionalContainerChecksumInfo = ContainerChecksumTreeManager
-          .readChecksumInfo(kvContainerData);
-      if (optionalContainerChecksumInfo.isPresent()) {
-        ContainerChecksumInfo containerChecksumInfo = optionalContainerChecksumInfo.get();
-        kvContainerData.setDataChecksum(containerChecksumInfo.getContainerMerkleTree().getDataChecksum());
+      Long containerDataChecksum = metadataTable.get(kvContainerData.getContainerDataChecksumKey());
+      if (containerDataChecksum != null && kvContainerData.needsDataChecksum()) {
+        kvContainerData.setDataChecksum(containerDataChecksum);
+        return;
+      }
+
+      ContainerChecksumInfo containerChecksumInfo = ContainerChecksumTreeManager.readChecksumInfo(kvContainerData);
+      if (containerChecksumInfo != null && containerChecksumInfo.hasContainerMerkleTree()
+          && kvContainerData.needsDataChecksum()) {
+        containerDataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+        kvContainerData.setDataChecksum(containerDataChecksum);
+        metadataTable.put(kvContainerData.getContainerDataChecksumKey(), containerDataChecksum);
       }
     } catch (IOException ex) {
       LOG.warn("Failed to read checksum info for container {}", kvContainerData.getContainerID(), ex);
@@ -382,6 +382,8 @@ public final class KeyValueContainerUtil {
       kvContainerData.markAsEmpty();
     }
 
+    loadAndSetContainerDataChecksum(kvContainerData, metadataTable);
+
     // Run advanced container inspection/repair operations if specified on
     // startup. If this method is called but not as a part of startup,
     // The inspectors will be unloaded and this will be a no-op.
@@ -389,7 +391,6 @@ public final class KeyValueContainerUtil {
 
     // Load finalizeBlockLocalIds for container in memory.
     populateContainerFinalizeBlock(kvContainerData, store);
-    populateContainerDataChecksum(kvContainerData);
   }
 
   /**

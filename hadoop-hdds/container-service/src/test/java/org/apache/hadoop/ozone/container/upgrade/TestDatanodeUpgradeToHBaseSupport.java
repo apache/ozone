@@ -49,7 +49,6 @@ public class TestDatanodeUpgradeToHBaseSupport {
   private Path tempFolder;
 
   private DatanodeStateMachine dsm;
-  private ContainerDispatcher dispatcher;
   private OzoneConfiguration conf;
   private static final String CLUSTER_ID = "clusterID";
 
@@ -91,7 +90,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
-    dispatcher = dsm.getContainer().getDispatcher();
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
 
@@ -126,7 +125,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
-    dispatcher = dsm.getContainer().getDispatcher();
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(
         Collections.singletonList(dsm.getDatanodeDetails()));
 

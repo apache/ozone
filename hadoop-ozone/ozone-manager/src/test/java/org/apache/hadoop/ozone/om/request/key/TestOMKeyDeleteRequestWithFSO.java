@@ -21,8 +21,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -31,9 +33,12 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
 import org.junit.jupiter.api.Test;
@@ -226,5 +231,32 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     // Recursive access check is only enabled for directories, hence should be
     // false for file1.
     assertFalse(pathViewer.isCheckRecursiveAccess());
+  }
+
+  @Test
+  public void testDeleteDirectoryWithColonInFSOBucket() throws Exception {
+    when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    String dirName = "foo:dir/";
+    String dirKeyPath = addKeyToDirTable(volumeName, bucketName, dirName);
+
+    long parentObjectID = 0L;
+    long dirObjectID = 12345L;
+    OmDirectoryInfo omDirectoryInfo = OMRequestTestUtils.createOmDirectoryInfo(dirName, dirObjectID, parentObjectID);
+    omMetadataManager.getDirectoryTable().put(dirKeyPath, omDirectoryInfo);
+
+    OmDirectoryInfo storedDirInfo = omMetadataManager.getDirectoryTable().get(dirKeyPath);
+    assertNotNull(storedDirInfo);
+    assertEquals(dirName, storedDirInfo.getName());
+    assertEquals(dirObjectID, storedDirInfo.getObjectID());
+    assertEquals(parentObjectID, storedDirInfo.getParentObjectID());
+
+    OMRequest deleteRequest = doPreExecute(createDeleteKeyRequest(dirName));
+    OMKeyDeleteRequest omKeyDeleteRequest = getOmKeyDeleteRequest(deleteRequest);
+    OMClientResponse response = omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getDirectoryTable().get(dirName));
   }
 }

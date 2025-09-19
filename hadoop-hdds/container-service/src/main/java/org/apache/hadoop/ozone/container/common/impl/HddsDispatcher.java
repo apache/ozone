@@ -71,7 +71,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
@@ -340,8 +339,22 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
     // Small performance optimization. We check if the operation is of type
     // write before trying to send CloseContainerAction.
+    boolean isVolumeFullForWrite = false;
     if (!HddsUtils.isReadOnly(msg)) {
-      sendCloseContainerActionIfNeeded(container);
+      try {
+        if (container != null && container.getContainerState() == State.OPEN) {
+          ContainerUtils.assertSpaceAvailability(containerID, container.getContainerData().getVolume(), 0);
+        }
+      } catch (StorageContainerException e) {
+        LOG.warn(e.getMessage());
+        isVolumeFullForWrite = true;
+        if (cmdType == Type.WriteChunk || cmdType == Type.PutBlock || cmdType == Type.PutSmallFile) {
+          audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, e);
+          return ContainerUtils.logAndReturnError(LOG, e, msg);
+        }
+      } finally {
+        sendCloseContainerActionIfNeeded(container, isVolumeFullForWrite);
+      }
     }
     Handler handler = getHandler(containerType);
     if (handler == null) {
@@ -393,12 +406,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
                 || containerState == State.RECOVERING);
         // mark and persist the container state to be unhealthy
         try {
-          // TODO HDDS-7096 + HDDS-8781: Use on demand scanning for the open
-          //  container instead.
           ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.WRITE_FAILURE,
               new File(container.getContainerData().getContainerPath()),
               new StorageContainerException(result));
           handler.markContainerUnhealthy(container, DataScanResult.fromErrors(Collections.singletonList(error)));
+          // For unhealthy containers, trigger an async on-demand scan to build container merkle tree,
+          // as the metadata-based tree may not be reliable due to potential data corruption.
+          containerSet.scanContainerWithoutGap(containerID, "Unhealthy container scan");
           LOG.info("Marked Container UNHEALTHY, ContainerID: {}", containerID);
         } catch (IOException ioe) {
           // just log the error here in case marking the container fails,
@@ -409,7 +423,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // in any case, the in memory state of the container should be unhealthy
         Preconditions.checkArgument(
             container.getContainerData().getState() == State.UNHEALTHY);
-        sendCloseContainerActionIfNeeded(container);
+        sendCloseContainerActionIfNeeded(container, isVolumeFullForWrite);
       }
       if (cmdType == Type.CreateContainer
           && result == Result.SUCCESS && dispatcherContext != null) {
@@ -425,7 +439,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // Create a specific exception that signals for on demand scanning
         // and move this general scan to where it is more appropriate.
         // Add integration tests to test the full functionality.
-        containerSet.scanContainer(containerID);
+        containerSet.scanContainer(containerID, result.name());
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
       }
@@ -582,12 +596,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   /**
    * If the container usage reaches the close threshold or the container is
    * marked unhealthy we send Close ContainerAction to SCM.
-   * @param container current state of container
+   *
+   * @param container    current state of container
+   * @param isVolumeFull volume full flag for open containers
    */
-  private void sendCloseContainerActionIfNeeded(Container container) {
+  private void sendCloseContainerActionIfNeeded(Container container, boolean isVolumeFull) {
     // We have to find a more efficient way to close a container.
-    boolean isOpen = container != null && container.getContainerState() == State.OPEN;
-    boolean isVolumeFull = isOpen && isVolumeFullExcludingCommittedSpace(container);
     boolean isSpaceFull = isVolumeFull || isContainerFull(container);
     boolean shouldClose = isSpaceFull || isContainerUnhealthy(container);
     if (shouldClose) {
@@ -599,11 +613,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           .setContainerID(containerData.getContainerID())
           .setAction(ContainerAction.Action.CLOSE).setReason(reason).build();
       context.addContainerActionIfAbsent(action);
-      if (isVolumeFull) {
-        HddsVolume volume = containerData.getVolume();
-        LOG.warn("Volume [{}] is full. containerID: {}. Volume usage: [{}].", volume, containerData.getContainerID(),
-            volume.getCurrentUsage());
-      }
       AtomicBoolean immediateCloseActionSent = containerData.getImmediateCloseActionSent();
       // if an immediate heartbeat has not been triggered already, trigger it now
       if (immediateCloseActionSent.compareAndSet(false, true)) {
@@ -629,10 +638,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     } else {
       return false;
     }
-  }
-
-  private boolean isVolumeFullExcludingCommittedSpace(Container container) {
-    return container.getContainerData().getVolume().isVolumeFull();
   }
 
   private boolean isContainerUnhealthy(Container container) {
