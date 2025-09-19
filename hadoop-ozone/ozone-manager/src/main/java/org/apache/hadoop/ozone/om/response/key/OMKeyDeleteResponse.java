@@ -75,7 +75,7 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     Table<String, OmKeyInfo> keyTable =
         omMetadataManager.getKeyTable(getBucketLayout());
     addDeletionToBatch(omMetadataManager, batchOperation, keyTable, ozoneKey,
-        omKeyInfo);
+        omKeyInfo, true);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,

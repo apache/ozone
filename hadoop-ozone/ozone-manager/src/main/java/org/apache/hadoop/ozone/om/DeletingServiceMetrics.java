@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -108,6 +109,11 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong snapKeysIteratedLast;
   @Metric("Snapshot: No. of not reclaimable keys the last run")
   private MutableGaugeLong snapKeysNotReclaimableLast;
+
+  @Metric("Last Purge Key termIndex on Active Object Store")
+  private MutableGaugeLong lastAOSPurgeTermId;
+  @Metric("Last Purge Key transactionId on Active Object Store")
+  private MutableGaugeLong lastAOSPurgeTransactionId;
 
   private DeletingServiceMetrics() {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
@@ -285,6 +291,18 @@ public final class DeletingServiceMetrics {
 
   public long getSnapKeysNotReclaimableLast() {
     return snapKeysNotReclaimableLast.value();
+  }
+
+  public synchronized TransactionInfo getLastAOSTransactionId() {
+    return TransactionInfo.valueOf(lastAOSPurgeTermId.value(), lastAOSPurgeTransactionId.value());
+  }
+
+  public synchronized void setLastAOSTransactionId(TransactionInfo transactionInfo) {
+    TransactionInfo previousTransactionInfo = getLastAOSTransactionId();
+    if (transactionInfo.compareTo(previousTransactionInfo) > 0) {
+      this.lastAOSPurgeTermId.set(transactionInfo.getTerm());
+      this.lastAOSPurgeTransactionId.set(transactionInfo.getTransactionIndex());
+    }
   }
 
   @VisibleForTesting

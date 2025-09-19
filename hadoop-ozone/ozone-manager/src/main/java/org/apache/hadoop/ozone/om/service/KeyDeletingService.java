@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -48,7 +49,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PendingKeysDeletion;
+import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -131,7 +132,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return deletedKeyCount;
   }
 
-  Pair<Pair<Integer, Long>, Boolean> processKeyDeletes(List<BlockGroup> keyBlocksList,
+  Pair<Pair<Integer, Long>, Boolean> processKeyDeletes(List<PurgedKey> keyBlocksList,
       Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
       String snapTableKey, UUID expectedPreviousSnapshotId, Map<String, Long> keyBlockReplicatedSize)
       throws IOException, InterruptedException {
@@ -149,13 +150,13 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           keyBlocksList.size(), logSize, keyBlocksList.subList(0, logSize));
     }
     List<DeleteBlockGroupResult> blockDeletionResults =
-        scmClient.deleteKeyBlocks(keyBlocksList);
+        scmClient.deleteKeyBlocks(keyBlocksList.stream().map(PurgedKey::getBlockGroup).collect(Collectors.toList()));
     LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
         keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
       long purgeStartTime = Time.monotonicNow();
-      purgeResult = submitPurgeKeysRequest(blockDeletionResults, keysToModify, renameEntries, snapTableKey,
-          expectedPreviousSnapshotId, ratisByteLimit, keyBlockReplicatedSize);
+      purgeResult = submitPurgeKeysRequest(blockDeletionResults, keyBlocksList, keysToModify, renameEntries,
+          snapTableKey, expectedPreviousSnapshotId, ratisByteLimit, keyBlockReplicatedSize);
       int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
           OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
       LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
@@ -174,6 +175,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   @SuppressWarnings("checkstyle:MethodLength")
   private Pair<Pair<Integer, Long>, Boolean> submitPurgeKeysRequest(
       List<DeleteBlockGroupResult> results,
+      List<PurgedKey> purgedKeys,
       Map<String, RepeatedOmKeyInfo> keysToModify,
       List<String> renameEntriesToBeDeleted,
       String snapTableKey,
@@ -181,7 +183,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       int ratisLimit,
       Map<String, Long> keyBlockReplicatedSize) throws InterruptedException {
 
-    List<String> purgeKeys = new ArrayList<>();
+    Set<String> completePurgedKeys = new HashSet<>();
 
     // Put all keys to be purged in a list
     int deletedCount = 0;
@@ -194,17 +196,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       String deletedKey = result.getObjectKey();
       if (result.isSuccess()) {
         // Add key to PurgeKeys list.
-        if (keysToModify != null && !keysToModify.containsKey(deletedKey)) {
-          // Parse Volume and BucketName
-          purgeKeys.add(deletedKey);
+        if (keysToModify == null || !keysToModify.containsKey(deletedKey)) {
+          completePurgedKeys.add(deletedKey);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Key {} set to be purged from OM DB", deletedKey);
+          }
+        } else {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Key {} set to be updated in OM DB, Other versions " +
                 "of the key that are reclaimable are reclaimed.", deletedKey);
-          }
-        } else if (keysToModify == null) {
-          purgeKeys.add(deletedKey);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Key {} set to be purged from OM DB", deletedKey);
           }
         }
         if (keyBlockReplicatedSize != null) {
@@ -212,17 +212,80 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         }
         deletedCount++;
       } else {
-        // If the block deletion failed, then the deleted keys should also not be modified.
+        // If the block deletion failed, then the deleted keys should also not be modified and
+        // any other version of the key should also not be purged.
         failedDeletedKeys.add(deletedKey);
         purgeSuccess = false;
+        if (LOG.isDebugEnabled()) {
+          LOG.error("Failed Block Delete corresponding to Key {} with block result : {}.", deletedKey,
+              result.getBlockResultList());
+        } else {
+          LOG.error("Failed Block Delete corresponding to Key {}.", deletedKey);
+        }
       }
     }
+    // Filter out the key even if one version of the key purge has failed. This is to prevent orphan blocks, and
+    // this needs to be retried.
+    completePurgedKeys = completePurgedKeys.stream()
+        .filter(i -> !failedDeletedKeys.contains(i)).collect(Collectors.toSet());
+    // Filter out any keys that have failed and sort the purge keys based on volume and bucket.
+    purgedKeys = purgedKeys.stream()
+        .filter(purgedKey -> !failedDeletedKeys.contains(purgedKey.getBlockGroup().getGroupID()))
+        .sorted(Comparator.comparing(PurgedKey::getVolume).thenComparing(PurgedKey::getBucket))
+        .collect(Collectors.toList());
 
     // Step 2: Prepare keysToUpdateList
+    PurgeKeysRequest.Builder purgeKeysRequest = PurgeKeysRequest.newBuilder();
+    if (snapTableKey != null) {
+      purgeKeysRequest.setSnapshotTableKey(snapTableKey);
+    }
+
+    NullableUUID.Builder expectedPreviousSnapshotNullableUUID = NullableUUID.newBuilder();
+    if (expectedPreviousSnapshotId != null) {
+      expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+    }
+    purgeKeysRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
+
+    String volume = null, bucket = null;
+    OzoneManagerProtocolProtos.DeletedKeys.Builder bucketDeleteKeys = null;
+    long purgedBytes = 0;
+    long purgedNamespace = 0;
+    // Iterate keys sorted based on volume and bucket.
+    for (PurgedKey purgedKey : purgedKeys) {
+      if (!purgedKey.getVolume().equals(volume) || !purgedKey.getBucket().equals(bucket)) {
+        if (bucketDeleteKeys != null) {
+          purgeKeysRequest.addDeletedKeys(bucketDeleteKeys
+              .setPurgedBytes(purgedBytes).setPurgedNamespace(purgedNamespace).build());
+        }
+        volume = purgedKey.getVolume();
+        bucket = purgedKey.getBucket();
+        purgedBytes = 0;
+        purgedNamespace = 0;
+        bucketDeleteKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder()
+            .setVolumeName(volume).setBucketName(bucket);
+      }
+      String deletedKey = purgedKey.getBlockGroup().getGroupID();
+      // Add to purge keys only if there are no other version of key that needs to be retained.
+      if (completePurgedKeys.contains(deletedKey)) {
+        bucketDeleteKeys.addKeys(deletedKey);
+      }
+      if (purgedKey.isCommittedKey()) {
+        purgedBytes += purgedKey.getPurgedBytes();
+        purgedNamespace++;
+      }
+    }
+    if (bucketDeleteKeys != null) {
+      purgeKeysRequest.addDeletedKeys(bucketDeleteKeys
+          .setPurgedBytes(purgedBytes).setPurgedNamespace(purgedNamespace).build());
+    }
+
+    // Adding rename entries to be purged.
+    if (renameEntriesToBeDeleted != null) {
+      purgeKeysRequest.addAllRenamedKeys(renameEntriesToBeDeleted);
+    }
     List<OzoneManagerProtocolProtos.SnapshotMoveKeyInfos> keysToUpdateList = new ArrayList<>();
     if (keysToModify != null) {
-      for (Map.Entry<String, RepeatedOmKeyInfo> keyToModify :
-          keysToModify.entrySet()) {
+      for (Map.Entry<String, RepeatedOmKeyInfo> keyToModify : keysToModify.entrySet()) {
         if (failedDeletedKeys.contains(keyToModify.getKey())) {
           continue;
         }
@@ -473,7 +536,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null
               ? keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum)
               : keyManager.getPendingDeletionKeys(volume, bucket, null, reclaimableKeyFilter, remainNum);
-          List<BlockGroup> keyBlocksList = pendingKeysDeletion.getKeyBlocksList();
+          List<PurgedKey> keyBlocksList = pendingKeysDeletion.getPurgedKeys();
           //submit purge requests if there are renamed entries to be purged or keys to be purged.
           if (!renamedTableEntries.isEmpty() || keyBlocksList != null && !keyBlocksList.isEmpty()) {
             // Validating if the previous snapshot is still the same before purging the blocks.
@@ -565,6 +628,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   " iteration.", snapInfo);
               return EmptyTaskResult.newResult();
             }
+          } else if (!isPreviousPurgeTransactionFlushed()) {
+            return EmptyTaskResult.newResult();
           }
           try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapInfo == null ? null :
               omSnapshotManager.getActiveSnapshot(snapInfo.getVolumeName(), snapInfo.getBucketName(),
