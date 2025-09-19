@@ -1875,12 +1875,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public ListOpenFilesResult listOpenFiles(String path,
                                            int maxKeys,
-                                           String contToken)
+                                           String contToken,
+                                           boolean showCount)
       throws IOException {
     ListOpenFilesRequest req = ListOpenFilesRequest.newBuilder()
         .setPath(path)
         .setCount(maxKeys)
         .setToken(contToken)
+        .setShowCount(showCount)
         .build();
 
     OMRequest omRequest = createOMRequest(Type.ListOpenFiles)

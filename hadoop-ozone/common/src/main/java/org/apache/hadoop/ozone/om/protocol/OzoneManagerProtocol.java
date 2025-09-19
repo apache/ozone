@@ -436,7 +436,7 @@ public interface OzoneManagerProtocol
    * @return ListOpenFilesResult
    * @throws IOException
    */
-  ListOpenFilesResult listOpenFiles(String path, int maxKeys, String contToken)
+  ListOpenFilesResult listOpenFiles(String path, int maxKeys, String contToken, boolean showCount)
       throws IOException;
 
   /**
