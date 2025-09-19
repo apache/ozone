@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
@@ -85,6 +86,9 @@ public class TestFileSizeCountTask {
 
   @BeforeEach
   public void setUp() throws IOException {
+    // Reset the truncated flag to ensure clean state for each test
+    ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
+    
     OzoneConfiguration configuration = new OzoneConfiguration();
     // Create separate task instances.
     fileSizeCountTaskOBS = new FileSizeCountTaskOBS(reconFileMetadataManager, configuration);
