@@ -73,13 +73,16 @@ public abstract class FileSizeCountTaskHelper {
         ReconUtils.getFileSizeUpperBound(omKeyInfo.getDataSize()));
   }
 
+  // Static lock object for table truncation synchronization
+  private static final Object TRUNCATE_LOCK = new Object();
+
   /**
    * Truncates the file count table if needed during reprocess.
    * Uses a flag to ensure the table is truncated only once across all tasks.
    */
   public static void truncateFileCountTableIfNeeded(ReconFileMetadataManager reconFileMetadataManager,
                                                     String taskName) {
-    synchronized (ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED) {
+    synchronized (TRUNCATE_LOCK) {
       if (ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.compareAndSet(false, true)) {
         try {
           reconFileMetadataManager.clearFileCountTable();
