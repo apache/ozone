@@ -82,7 +82,6 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerStatusInfo
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.common.helpers.DeletedBlocksTransactionInfoWrapper;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.EligibilityResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -960,47 +959,17 @@ public class SCMClientProtocolServer implements
             SCMAction.TRANSFER_LEADERSHIP, auditMap));
   }
 
+  @Deprecated
   @Override
   public List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
       long startTxId) throws IOException {
-    List<DeletedBlocksTransactionInfo> result;
-    Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("count", String.valueOf(count));
-    auditMap.put("startTxId", String.valueOf(startTxId));
-
-    try {
-      result = scm.getScmBlockManager().getDeletedBlockLog()
-          .getFailedTransactions(count, startTxId).stream()
-          .map(DeletedBlocksTransactionInfoWrapper::fromTxn)
-          .collect(Collectors.toList());
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap));
-      return result;
-    } catch (IOException ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(
-              SCMAction.GET_FAILED_DELETED_BLOCKS_TRANSACTION, auditMap, ex)
-      );
-      throw ex;
-    }
+    return Collections.emptyList();
   }
 
+  @Deprecated
   @Override
   public int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException {
-    final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("txIDs", txIDs.toString());
-    try {
-      getScm().checkAdminAccess(getRemoteUser(), false);
-      int count = scm.getScmBlockManager().getDeletedBlockLog().
-          resetCount(txIDs);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap));
-      return count;
-    } catch (Exception ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.RESET_DELETED_BLOCK_RETRY_COUNT, auditMap, ex));
-      throw ex;
-    }
+    return 0;
   }
 
   /**
