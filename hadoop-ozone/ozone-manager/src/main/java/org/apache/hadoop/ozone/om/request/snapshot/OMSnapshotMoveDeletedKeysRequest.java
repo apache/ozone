@@ -50,10 +50,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
 public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
   private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
-  private static final String AUDIT_PARAM_FROM_SNAPSHOT_ID = "fromSnapshotId";
   private static final String AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY = "fromSnapshotTableKey";
-  private static final String AUDIT_PARAM_NEXT_SNAPSHOT_ID = "nextSnapshotId";
-  private static final String AUDIT_PARAM_NEXT_SNAPSHOT_TABLE_KEY = "nextSnapshotTableKey";
+  private static final String AUDIT_PARAM_TO_SNAPSHOT_TABLE_KEY_OR_AOS = "toSnapshotTableKeyOrAOS";
   private static final String AUDIT_PARAM_KEYS_MOVED = "keysMoved";
   private static final String AUDIT_PARAM_RENAMED_KEYS_MOVED = "renamedKeysMoved";
   private static final String AUDIT_PARAM_DIRS_MOVED = "dirsMoved";
@@ -62,6 +60,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
   private static final String AUDIT_PARAM_RENAMED_KEYS_LIST = "renamedKeysList";
   private static final String AUDIT_PARAM_DIRS_MOVED_LIST = "dirsMovedList";
   private static final String AUDIT_PARAM_RECLAIM_KEYS_LIST = "reclaimKeysList";
+  private static final String AOS = "AOS";
 
   public OMSnapshotMoveDeletedKeysRequest(OMRequest omRequest) {
     super(omRequest);
@@ -104,11 +103,11 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
           omResponse.build(), fromSnapshot, nextSnapshot,
           nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);
 
-      auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_ID, fromSnapshot.getSnapshotId().toString());
       auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY, fromSnapshot.getTableKey());
       if (nextSnapshot != null) {
-        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_ID, nextSnapshot.getSnapshotId().toString());
-        auditParams.put(AUDIT_PARAM_NEXT_SNAPSHOT_TABLE_KEY, nextSnapshot.getTableKey());
+        auditParams.put(AUDIT_PARAM_TO_SNAPSHOT_TABLE_KEY_OR_AOS, nextSnapshot.getTableKey());
+      } else {
+        auditParams.put(AUDIT_PARAM_TO_SNAPSHOT_TABLE_KEY_OR_AOS, AOS);
       }
       auditParams.put(AUDIT_PARAM_KEYS_MOVED, String.valueOf(nextDBKeysList.size()));
       auditParams.put(AUDIT_PARAM_RENAMED_KEYS_MOVED, String.valueOf(renamedKeysList.size()));
