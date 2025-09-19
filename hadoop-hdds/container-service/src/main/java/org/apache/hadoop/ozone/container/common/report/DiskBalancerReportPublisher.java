@@ -24,18 +24,28 @@ import com.google.common.base.Preconditions;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
 
 /**
  * Publishes DiskBalancer report which will be sent to SCM as part of heartbeat.
+ * Report is only published is lastPublishedReport is different from currentReport,
+ * when balancer is in stopped state.
+ * But when balancer is running or paused by node state, report is actively sent to SCM.
  * DiskBalancer Report consist of the following information:
  *   - isBalancerRunning
  *   - balancedBytes
  *   - DiskBalancerConfiguration
+ *   - successCount
+ *   - failureCount
+ *   - bytesToMove
  */
 public class DiskBalancerReportPublisher extends
     ReportPublisher<DiskBalancerReportProto> {
 
   private Long diskBalancerReportInterval = null;
+
+  // Cache the last published report to detect changes when balancer is stopped
+  private DiskBalancerReportProto lastPublishedReport = null;
 
   @Override
   protected long getReportFrequency() {
@@ -59,6 +69,19 @@ public class DiskBalancerReportPublisher extends
 
   @Override
   protected DiskBalancerReportProto getReport() {
-    return getContext().getParent().getContainer().getDiskBalancerReport();
+    DiskBalancerInfo info = getContext().getParent().getContainer().getDiskBalancerInfo();
+    if (info == null) {
+      return null;
+    }
+
+    DiskBalancerReportProto currentReport = info.toDiskBalancerReportProto();
+
+    // Publish a report only if it has changed since the last time.
+    if (currentReport.equals(lastPublishedReport)) {
+      return null;
+    }
+
+    lastPublishedReport = currentReport;
+    return currentReport;
   }
 }

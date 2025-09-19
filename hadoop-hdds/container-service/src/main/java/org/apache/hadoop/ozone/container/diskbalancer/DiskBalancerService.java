@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -356,21 +355,6 @@ public class DiskBalancerService extends BackgroundService {
 
   public void setVersion(DiskBalancerVersion version) {
     this.version = version;
-  }
-
-  public DiskBalancerReportProto getDiskBalancerReportProto() {
-    DiskBalancerReportProto.Builder builder =
-        DiskBalancerReportProto.newBuilder();
-    return builder.setIsRunning(this.operationalState == DiskBalancerOperationalState.RUNNING)
-        .setBalancedBytes(totalBalancedBytes.get())
-        .setDiskBalancerConf(
-            HddsProtos.DiskBalancerConfigurationProto.newBuilder()
-                .setThreshold(threshold)
-                .setDiskBandwidthInMB(bandwidthInMB)
-                .setParallelThread(parallelThread)
-                .setStopAfterDiskEven(stopAfterDiskEven)
-                .build())
-        .build();
   }
 
   @Override

@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -180,6 +181,7 @@ public class TestReportPublisher {
     DatanodeStateMachine dummyStateMachine =
         mock(DatanodeStateMachine.class);
     OzoneContainer dummyContainer = mock(OzoneContainer.class);
+    DiskBalancerInfo dummyInfo = mock(DiskBalancerInfo.class);
 
     DiskBalancerReportProto.Builder builder = DiskBalancerReportProto.newBuilder();
     builder.setIsRunning(true);
@@ -191,7 +193,8 @@ public class TestReportPublisher {
     ReportPublisher publisher = new DiskBalancerReportPublisher();
     when(dummyContext.getParent()).thenReturn(dummyStateMachine);
     when(dummyStateMachine.getContainer()).thenReturn(dummyContainer);
-    when(dummyContainer.getDiskBalancerReport()).thenReturn(dummyReport);
+    when(dummyContainer.getDiskBalancerInfo()).thenReturn(dummyInfo);
+    when(dummyInfo.toDiskBalancerReportProto()).thenReturn(dummyReport);
     publisher.setConf(config);
 
     ScheduledExecutorService executorService = HadoopExecutors

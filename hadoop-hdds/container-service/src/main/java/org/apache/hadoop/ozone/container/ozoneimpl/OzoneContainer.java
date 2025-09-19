@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -717,13 +716,6 @@ public class OzoneContainer {
 
   public WitnessedContainerMetadataStore getWitnessedContainerMetadataStore() {
     return witnessedContainerMetadataStore;
-  }
-
-  public DiskBalancerReportProto getDiskBalancerReport() {
-    if (diskBalancerService == null) {
-      return null;
-    }
-    return diskBalancerService.getDiskBalancerReportProto();
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
