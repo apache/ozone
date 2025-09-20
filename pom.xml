@@ -2504,6 +2504,16 @@
                 </goals>
                 <phase>package</phase>
               </execution>
+              <execution>
+                <id>aggregate</id>
+                <goals>
+                  <goal>aggregate</goal>
+                </goals>
+                <phase>package</phase>
+                <configuration>
+                  <outputDirectory>${project.build.directory}/javadoc</outputDirectory>
+                </configuration>
+              </execution>
             </executions>
           </plugin>
           <plugin>
