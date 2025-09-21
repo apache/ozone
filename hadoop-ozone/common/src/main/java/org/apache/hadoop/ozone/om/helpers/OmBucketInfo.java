@@ -98,6 +98,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   private final long quotaInNamespace;
   // Total size of data trapped which is pending to be deleted either because of data trapped in snapshots or
   // background key deleting service is yet to run.
+  // This also indicates the size exclusively held by all snapshots of this bucket.
+  // i.e. when all snapshots of this bucket are deleted and purged, this much space would be released.
   private long snapshotUsedBytes;
   private long snapshotUsedNamespace;
 
@@ -801,7 +803,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         ", usedBytes=" + usedBytes +
         ", usedNamespace=" + usedNamespace +
         ", snapshotUsedBytes=" + snapshotUsedBytes +
-        ", snapshotUsedBytes=" + snapshotUsedNamespace +
+        ", snapshotUsedNamespace=" + snapshotUsedNamespace +
         ", quotaInBytes=" + quotaInBytes +
         ", quotaInNamespace=" + quotaInNamespace +
         ", bucketLayout=" + bucketLayout +

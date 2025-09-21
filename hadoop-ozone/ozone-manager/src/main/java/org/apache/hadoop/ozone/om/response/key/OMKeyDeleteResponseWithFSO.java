@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import static org.apache.hadoop.hdds.utils.db.DBDefinition.LOG;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
@@ -101,7 +100,6 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
               omKeyInfo.getKeyName());
       deletedKey = omMetadataManager.getOzoneDeletePathKey(
           omKeyInfo.getObjectID(), deletedKey);
-      LOG.info("Delete key : {} ", ozoneDbKey);
       addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
           ozoneDbKey, deletedKey, omKeyInfo, true);
     }

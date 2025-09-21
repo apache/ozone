@@ -115,7 +115,6 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    System.out.println(ozoneKey + " " + ozoneKey.length());
     assertFalse(omMetadataManager.getKeyTable(getBucketLayout()).isExist(ozoneKey));
     
     String deletedKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
