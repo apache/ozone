@@ -19,11 +19,4 @@ set -e
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-export MAVEN_OPTS="\
--Dmaven.wagon.http.pool=false \
--Dmaven.wagon.http.retryHandler.class=standard \
--Dmaven.wagon.http.retryHandler.count=3 \
--DreportOutputDirectory=target \
--DdestDir=javadoc"
-
-mvn javadoc:aggregate
+mvn javadoc:aggregate -DreportOutputDirectory=target/javadoc
