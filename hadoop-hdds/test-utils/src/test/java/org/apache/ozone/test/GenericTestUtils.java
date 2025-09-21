@@ -47,6 +47,7 @@ import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
@@ -77,6 +78,17 @@ public abstract class GenericTestUtils {
    */
   public static Instant getTestStartTime() {
     return Instant.ofEpochMilli(System.currentTimeMillis());
+  }
+
+  public static <E extends Exception> void waitFor(CheckedSupplier<Boolean, E> check, int checkEveryMillis,
+      int waitForMillis) throws InterruptedException, TimeoutException {
+    waitFor((BooleanSupplier) () -> {
+      try {
+        return check.get();
+      } catch (Exception e) {
+        return false;
+      }
+    }, checkEveryMillis, waitForMillis);
   }
 
   /**
