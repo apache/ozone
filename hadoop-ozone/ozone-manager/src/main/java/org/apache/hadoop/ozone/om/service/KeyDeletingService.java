@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -324,7 +325,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       boolean allDone = purgeKeyIndex == purgedKeyList.size() && updateIndex == keysToUpdateList.size() &&
           (renameEntriesToBeDeleted == null || renameIndex == renameEntriesToBeDeleted.size());
 
-      if (currSize >= ratisLimit || (allDone && hasPendingItems(requestBuilder))) {
+      if (currSize >= ratisLimit || (allDone && (hasPendingItems(requestBuilder) || bucketDeleteKeys != null))) {
         if (bucketDeleteKeys != null) {
           requestBuilder.addDeletedKeys(bucketDeleteKeys.setPurgedBytes(purgedBytes)
               .setPurgedNamespace(purgedNamespace).build());
@@ -539,7 +540,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 pendingKeysDeletion.getNotReclaimableKeyCount()
             );
             if (successStatus) {
-              deletedKeyCount.addAndGet(purgeResult.getKey().getKey());
+              LOG.info("Purged {} keys from the deletedTable of {}. Purged key : {}",
+                  deletedKeyCount.addAndGet(purgeResult.getKey().getKey()),
+                  Optional.ofNullable(currentSnapshotInfo).map(SnapshotInfo::getSnapshotId).orElse(null),
+                  purgedKeys.keySet().stream().sorted().collect(Collectors.joining(",")));
             }
           }
 

@@ -50,6 +50,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -141,8 +142,6 @@ class TestKeyDeletingService extends OzoneTestBase {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyDeletingService.class);
   private static final AtomicInteger OBJECT_COUNTER = new AtomicInteger();
-  private static final long DATA_SIZE = 1000L;
-
   private OzoneConfiguration conf;
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
@@ -687,13 +686,13 @@ class TestKeyDeletingService extends OzoneTestBase {
       final String testVolumeName = getTestName();
       final String testBucketName = uniqueObjectName("bucket");
       final String keyName = uniqueObjectName("key");
-
+      Map<Integer, Long> keySizeMap = new HashMap<>();
       // Create Volume and Buckets
       createVolumeAndBucket(testVolumeName, testBucketName, false);
 
       // Create 3 keys
       for (int i = 1; i <= 3; i++) {
-        createAndCommitKey(testVolumeName, testBucketName, keyName + i, 3);
+        keySizeMap.put(i, createAndCommitKey(testVolumeName, testBucketName, keyName + i, 3).getDataSize());
       }
       assertTableRowCount(keyTable, initialKeyCount + 3, metadataManager);
 
@@ -705,7 +704,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Create 2 keys
       for (int i = 4; i <= 5; i++) {
-        createAndCommitKey(testVolumeName, testBucketName, keyName + i, 3);
+        keySizeMap.put(i, createAndCommitKey(testVolumeName, testBucketName, keyName + i, 3).getDataSize());
       }
       // Delete a key, rename 2 keys. We will be using this to test
       // how we handle renamed key for exclusive size calculation.
@@ -723,7 +722,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Create 2 keys
       for (int i = 6; i <= 7; i++) {
-        createAndCommitKey(testVolumeName, testBucketName, keyName + i, 3);
+        keySizeMap.put(i, createAndCommitKey(testVolumeName, testBucketName, keyName + i, 3).getDataSize());
       }
 
       deleteKey(testVolumeName, testBucketName, "renamedKey1");
@@ -758,13 +757,11 @@ class TestKeyDeletingService extends OzoneTestBase {
       keyDeletingService.resume();
 
       Map<String, Long> expectedSize = new ImmutableMap.Builder<String, Long>()
-          .put(snap1, 1000L)
-          .put(snap2, 1000L)
-          .put(snap3, 2000L)
+          .put(snap1, keySizeMap.get(3))
+          .put(snap2, keySizeMap.get(4))
+          .put(snap3, keySizeMap.get(6) + keySizeMap.get(7))
           .put(snap4, 0L)
           .build();
-      System.out.println(expectedSize);
-
       // Let KeyDeletingService to run for some iterations
       GenericTestUtils.waitFor(
           () -> (getRunCount() > prevKdsRunCount + 20),
@@ -780,7 +777,6 @@ class TestKeyDeletingService extends OzoneTestBase {
 
           Long expected = expectedSize.getOrDefault(snapshotName, snapshotInfo.getExclusiveSize());
           assertNotNull(expected);
-          System.out.println(snapshotName);
           assertEquals(expected, snapshotInfo.getExclusiveSize());
           // Since for the test we are using RATIS/THREE
           assertEquals(expected * 3, snapshotInfo.getExclusiveReplicatedSize());
@@ -993,9 +989,11 @@ class TestKeyDeletingService extends OzoneTestBase {
       writeClient.createSnapshot(volumeName, bucketName, snap2);
 
       // Create and delete 5 more keys.
+      long dataSize = 0L;
       for (int i = 16; i <= 20; i++) {
         OmKeyArgs args = createAndCommitKey(volumeName, bucketName, uniqueObjectName("key"), 1);
         createdKeys.add(args);
+        dataSize = args.getDataSize();
       }
       for (int i = 15; i < 20; i++) {
         writeClient.deleteKey(createdKeys.get(i));
@@ -1023,17 +1021,17 @@ class TestKeyDeletingService extends OzoneTestBase {
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 10, 100, 10000);
       // Verify last run AOS deletion metrics.
       assertEquals(5, metrics.getAosKeysReclaimedLast());
-      assertEquals(5 * DATA_SIZE * 3, metrics.getAosReclaimedSizeLast());
+      assertEquals(5 * dataSize * 3, metrics.getAosReclaimedSizeLast());
       assertEquals(5, metrics.getAosKeysIteratedLast());
       assertEquals(0, metrics.getAosKeysNotReclaimableLast());
       // Verify last run Snapshot deletion metrics.
       assertEquals(5, metrics.getSnapKeysReclaimedLast());
-      assertEquals(5 * DATA_SIZE * 3, metrics.getSnapReclaimedSizeLast());
+      assertEquals(5 * dataSize * 3, metrics.getSnapReclaimedSizeLast());
       assertEquals(15, metrics.getSnapKeysIteratedLast());
       assertEquals(10, metrics.getSnapKeysNotReclaimableLast());
       // Verify 24h deletion metrics.
       assertEquals(10, metrics.getKeysReclaimedInInterval());
-      assertEquals(10 * DATA_SIZE * 3, metrics.getReclaimedSizeInInterval());
+      assertEquals(10 * dataSize * 3, metrics.getReclaimedSizeInInterval());
 
       // Delete snap1. Which also sets the snap2 to be deep cleaned.
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
@@ -1061,12 +1059,12 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertEquals(0, metrics.getAosKeysNotReclaimableLast());
       // Verify last run Snapshot deletion metrics.
       assertEquals(10, metrics.getSnapKeysReclaimedLast());
-      assertEquals(10 * DATA_SIZE * 3, metrics.getSnapReclaimedSizeLast());
+      assertEquals(10 * dataSize * 3, metrics.getSnapReclaimedSizeLast());
       assertEquals(10, metrics.getSnapKeysIteratedLast());
       assertEquals(0, metrics.getSnapKeysNotReclaimableLast());
       // Verify 24h deletion metrics.
       assertEquals(20, metrics.getKeysReclaimedInInterval());
-      assertEquals(20 * DATA_SIZE * 3, metrics.getReclaimedSizeInInterval());
+      assertEquals(20 * dataSize * 3, metrics.getReclaimedSizeInInterval());
     }
   }
 
@@ -1402,6 +1400,6 @@ class TestKeyDeletingService extends OzoneTestBase {
   }
 
   private static String uniqueObjectName(String prefix) {
-    return prefix + OBJECT_COUNTER.getAndIncrement();
+    return prefix + String.format("%010d", OBJECT_COUNTER.getAndIncrement());
   }
 }
