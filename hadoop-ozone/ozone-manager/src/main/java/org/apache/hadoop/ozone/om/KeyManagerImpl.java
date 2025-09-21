@@ -80,7 +80,7 @@ import static org.apache.hadoop.util.Time.monotonicNow;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -743,7 +743,7 @@ public class KeyManagerImpl implements KeyManager {
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
       int count) throws IOException {
-    List<PurgedKey> purgedKeys = Lists.newArrayList();
+    Map<String, PurgedKey> purgedKeys = Maps.newHashMap();
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
     int notReclaimableKeyCount = 0;
 
@@ -763,7 +763,7 @@ public class KeyManagerImpl implements KeyManager {
         RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
         if (kv != null) {
-          List<PurgedKey> reclaimableKeys = Lists.newArrayList();
+          Map<String, PurgedKey> reclaimableKeys = Maps.newHashMap();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
@@ -775,8 +775,8 @@ public class KeyManagerImpl implements KeyManager {
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
                   .addAllBlockIDs(blockIDS).build();
-              reclaimableKeys.add(new PurgedKey(info.getVolumeName(), info.getBucketName(), keyBlocks,
-                  OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
+              reclaimableKeys.put(keyBlocks.getGroupID(), new PurgedKey(info.getVolumeName(), info.getBucketName(),
+                  keyBlocks, OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);
@@ -790,7 +790,7 @@ public class KeyManagerImpl implements KeyManager {
               notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList().size()) {
             keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
           }
-          purgedKeys.addAll(reclaimableKeys);
+          purgedKeys.putAll(reclaimableKeys);
           notReclaimableKeyCount += notReclaimableKeyInfoList.size();
         }
       }

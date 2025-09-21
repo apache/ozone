@@ -442,7 +442,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 1, metadataManager);
       doAnswer(i -> {
         PendingKeysDeletion pendingKeysDeletion = (PendingKeysDeletion) i.callRealMethod();
-        for (PurgedKey purgedKey : pendingKeysDeletion.getPurgedKeys()) {
+        for (PurgedKey purgedKey : pendingKeysDeletion.getPurgedKeys().values()) {
           Assertions.assertNotEquals(deletePathKey[0], purgedKey.getBlockGroup().getGroupID());
         }
         return pendingKeysDeletion;
@@ -831,7 +831,8 @@ class TestKeyDeletingService extends OzoneTestBase {
             });
         BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1")
             .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build();
-        List<PurgedKey> blockGroups = Collections.singletonList(new PurgedKey("vol", "buck", blockGroup, 30, true));
+        Map<String, PurgedKey> blockGroups = Collections.singletonMap(blockGroup.getGroupID(), new PurgedKey("vol",
+            "buck", blockGroup, 30, true));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
         OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
             .setBucketName("buck")
@@ -845,7 +846,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             .build();
         Map<String, RepeatedOmKeyInfo> keysToModify = Collections.singletonMap("key1",
             new RepeatedOmKeyInfo(Collections.singletonList(omKeyInfo)));
-        keyDeletingService.processKeyDeletes(blockGroups, keysToModify, renameEntriesToBeDeleted, null, null, null);
+        keyDeletingService.processKeyDeletes(blockGroups, keysToModify, renameEntriesToBeDeleted, null, null);
         assertTrue(purgeRequest.get().getPurgeKeysRequest().getKeysToUpdateList().isEmpty());
         assertEquals(renameEntriesToBeDeleted, purgeRequest.get().getPurgeKeysRequest().getRenamedKeysList());
       }
@@ -1389,7 +1390,7 @@ class TestKeyDeletingService extends OzoneTestBase {
   private long countBlocksPendingDeletion() {
     try {
       return keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE)
-          .getPurgedKeys()
+          .getPurgedKeys().values()
           .stream()
           .map(PurgedKey::getBlockGroup)
           .map(BlockGroup::getBlockIDList)
