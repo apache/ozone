@@ -19,7 +19,6 @@ package org.apache.hadoop.fs.ozone;
 
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 
-import com.google.common.base.Strings;
 import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
 import java.io.InputStream;
@@ -62,7 +61,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   public RootedOzoneFileSystem() {
     this.storageStatistics = new OzoneFSStorageStatistics();
     String force = System.getProperty(FORCE_LEASE_RECOVERY_ENV);
-    forceRecovery = Strings.isNullOrEmpty(force) ? false : Boolean.parseBoolean(force);
+    forceRecovery = Boolean.parseBoolean(force);
   }
 
   @Override
