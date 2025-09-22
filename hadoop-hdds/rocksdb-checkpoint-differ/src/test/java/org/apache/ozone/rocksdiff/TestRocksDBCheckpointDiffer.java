@@ -144,18 +144,6 @@ public class TestRocksDBCheckpointDiffer {
       Arrays.asList("000059", "000055", "000056", "000060", "000057", "000058")
   );
 
-  private static final List<List<CompactionNode>> COMPACTION_NODES_BY_LEVEL =
-      SST_FILES_BY_LEVEL.stream()
-          .map(sstFiles ->
-              sstFiles.stream()
-                  .map(
-                      sstFile -> new CompactionNode(sstFile,
-                          1000L,
-                          null, null, null
-                      ))
-                  .collect(Collectors.toList()))
-          .collect(Collectors.toList());
-
   private final List<CompactionLogEntry> compactionLogEntryList = Arrays.asList(
       new CompactionLogEntry(101, System.currentTimeMillis(),
           Arrays.asList(

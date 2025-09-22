@@ -116,7 +116,7 @@ public class TestCompactionDag {
   private File metadataDirDir;
   private File compactionLogDir;
   private File sstBackUpDir;
-  private ConfigurationSource config;
+  
   private final ExecutorService executorService =
       Executors.newCachedThreadPool();
   private RocksDBCheckpointDiffer rocksDBCheckpointDiffer;
@@ -144,7 +144,7 @@ public class TestCompactionDag {
     createDir(sstBackUpDir,
         METADATA_DIR_NAME + "/" + SST_BACK_UP_DIR_NAME);
 
-    config = mock(ConfigurationSource.class);
+    ConfigurationSource config = mock(ConfigurationSource.class);
 
     when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
