@@ -517,11 +517,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
     OmSnapshotManager omSnapshotManager =
         ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
-    try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshotSupplier =
-             omSnapshotManager.getSnapshot(snapshotInfo.getSnapshotId())) {
+    OzoneConfiguration configuration = omSnapshotManager.ozoneManager.getConfiguration();
+    try (OmMetadataManagerImpl checkpointMetadataManager =
+             OmMetadataManagerImpl.createCheckpointMetadataManager(configuration, dbCheckpoint)) {
       // Create the snapshot local property file.
       OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager,
-          (RDBStore) omSnapshotSupplier.get().getMetadataManager().getStore(), snapshotInfo);
+          (RDBStore) checkpointMetadataManager.getStore(), snapshotInfo);
     }
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
@@ -536,11 +537,11 @@ public final class OmSnapshotManager implements AutoCloseable {
     deleteKeysFromSnapRenamedTableInSnapshotScope(omMetadataManager,
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
 
-    if (dbCheckpoint != null && snapshotDirExist) {
+    if (snapshotDirExist) {
       LOG.info("Checkpoint: {} for snapshot {} already exists.",
           dbCheckpoint.getCheckpointLocation(), snapshotInfo.getTableKey());
       return dbCheckpoint;
-    } else if (dbCheckpoint != null) {
+    } else {
       LOG.info("Created checkpoint: {} for snapshot {}",
           dbCheckpoint.getCheckpointLocation(),
           snapshotInfo.getTableKey());

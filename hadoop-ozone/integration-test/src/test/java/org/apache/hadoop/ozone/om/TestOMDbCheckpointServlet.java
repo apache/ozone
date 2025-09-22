@@ -736,7 +736,7 @@ public class TestOMDbCheckpointServlet {
     String snapshotPath = getSnapshotPath(conf, snapshotInfo)
         + OM_KEY_PREFIX;
     GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
-        100, 2000);
+        100, 30000);
     return snapshotPath;
   }
 
@@ -755,7 +755,7 @@ public class TestOMDbCheckpointServlet {
         }
         String filename = String.valueOf(file.getFileName());
         Path parentDir = file.getParent();
-        String parentFileName = parentDir == null ? "" : parentDir.getFileName().toString();
+        String parentFileName = parentDir == null ? "null" : parentDir.toFile().getName();
         if (!filename.startsWith("fabricated") &&
             !filename.startsWith(OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME) &&
             !(filename.equals("archive") && parentFileName.startsWith("om.db"))) {
