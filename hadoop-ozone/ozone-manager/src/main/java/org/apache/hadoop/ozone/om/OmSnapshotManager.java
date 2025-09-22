@@ -636,7 +636,9 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   /**
    * Creates and writes snapshot local properties to a YAML file with uncompacted SST file list.
+   * @param snapshotManager snapshot manager instance.
    * @param snapshotStore snapshot metadata manager.
+   * @param snapshotInfo snapshot info instance corresponding to snapshot.
    */
   public static void createNewOmSnapshotLocalDataFile(OmSnapshotManager snapshotManager, RDBStore snapshotStore,
       SnapshotInfo snapshotInfo) throws IOException {

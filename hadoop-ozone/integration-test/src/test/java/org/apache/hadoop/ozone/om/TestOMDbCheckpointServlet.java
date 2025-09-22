@@ -754,9 +754,11 @@ public class TestOMDbCheckpointServlet {
           getFiles(file, truncateLength, fileSet);
         }
         String filename = String.valueOf(file.getFileName());
+        Path parentDir = file.getParent();
+        String parentFileName = parentDir == null ? "" : parentDir.getFileName().toString();
         if (!filename.startsWith("fabricated") &&
             !filename.startsWith(OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME) &&
-            !(filename.equals("archive") && file.getParent().getFileName().toString().startsWith("om.db"))) {
+            !(filename.equals("archive") && parentFileName.startsWith("om.db"))) {
           fileSet.add(truncateFileName(truncateLength, file));
         }
       }
