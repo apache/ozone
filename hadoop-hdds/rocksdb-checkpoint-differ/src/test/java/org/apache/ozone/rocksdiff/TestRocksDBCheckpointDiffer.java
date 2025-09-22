@@ -133,17 +133,6 @@ public class TestRocksDBCheckpointDiffer {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestRocksDBCheckpointDiffer.class);
 
-  private static final List<List<String>> SST_FILES_BY_LEVEL = Arrays.asList(
-      Arrays.asList("000015", "000013", "000011", "000009"),
-      Arrays.asList("000018", "000016", "000017", "000026", "000024", "000022",
-          "000020"),
-      Arrays.asList("000027", "000030", "000028", "000029", "000031", "000039",
-          "000037", "000035", "000033"),
-      Arrays.asList("000040", "000044", "000042", "000043", "000045", "000041",
-          "000046", "000054", "000052", "000050", "000048"),
-      Arrays.asList("000059", "000055", "000056", "000060", "000057", "000058")
-  );
-
   private final List<CompactionLogEntry> compactionLogEntryList = Arrays.asList(
       new CompactionLogEntry(101, System.currentTimeMillis(),
           Arrays.asList(
