@@ -23,9 +23,7 @@ import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.ScheduledReporter;
 import com.codahale.metrics.Slf4jReporter;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.StatusCode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
@@ -49,6 +47,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.TimeDurationUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -212,16 +211,14 @@ public class BaseFreonGenerator implements FreonSubcommand {
    * @param taskId unique ID of the task
    */
   private void tryNextTask(TaskProvider provider, long taskId) {
-    Span span = GlobalTracer.get().buildSpan(spanName).start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(spanName)) {
       provider.executeNextTask(taskId);
       successCounter.incrementAndGet();
     } catch (Exception e) {
-      span.setTag("failure", true);
+      TracingUtil.getActiveSpan().addEvent("failure with exception: " + e.getMessage());
+      TracingUtil.getActiveSpan().setStatus(StatusCode.ERROR);
       failureCounter.incrementAndGet();
       LOG.error("Error on executing task {}", taskId, e);
-    } finally {
-      span.finish();
     }
   }
 
