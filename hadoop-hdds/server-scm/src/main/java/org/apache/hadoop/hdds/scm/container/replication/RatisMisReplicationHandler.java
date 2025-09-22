@@ -73,7 +73,6 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
       } else {
         ReplicateContainerCommand cmd = ReplicateContainerCommand
             .fromSources(containerID, sources);
-        cmd.setReplicateSize(containerInfo.getUsedBytes());
         replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
       }
       commandsSent++;

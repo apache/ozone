@@ -101,10 +101,6 @@ public class ReplicationTask extends AbstractReplicationTask {
     return cmd.getSourceDatanodes();
   }
 
-  public Long getReplicateSize() {
-    return cmd.getReplicateSize();
-  }
-
   @Override
   protected Object getCommandForDebug() {
     return debugString;

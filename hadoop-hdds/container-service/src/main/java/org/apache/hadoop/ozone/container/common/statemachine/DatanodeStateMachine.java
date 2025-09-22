@@ -206,7 +206,7 @@ public class DatanodeStateMachine implements Closeable {
         new SimpleContainerDownloader(conf, certClient));
     ContainerReplicator pushReplicator = new PushReplicator(conf,
         new OnDemandContainerReplicationSource(container.getController()),
-        new GrpcContainerUploader(conf, certClient)
+        new GrpcContainerUploader(conf, certClient, container.getController())
     );
 
     pullReplicatorWithMetrics = new MeasuredReplicator(pullReplicator, "pull");

@@ -27,6 +27,5 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
  */
 public interface ContainerUploader {
   OutputStream startUpload(long containerId, DatanodeDetails target,
-      CompletableFuture<Void> callback, CopyContainerCompression compression,
-      Long replicateSize) throws IOException;
+      CompletableFuture<Void> callback, CopyContainerCompression compression) throws IOException;
 }

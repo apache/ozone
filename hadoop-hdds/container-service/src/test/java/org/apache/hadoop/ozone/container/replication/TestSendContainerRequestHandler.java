@@ -95,7 +95,7 @@ public class TestSendContainerRequestHandler {
   /**
    * Provides stream of different container sizes for tests.
    */
-  public static Stream<Arguments> replicateSizeProvider() {
+  public static Stream<Arguments> sizeProvider() {
     return Stream.of(
         Arguments.of("Null replicate size (fallback to default)", null),
         Arguments.of("Zero Size", 0L),
@@ -127,18 +127,18 @@ public class TestSendContainerRequestHandler {
   }
 
   @ParameterizedTest(name = "for {0}")
-  @MethodSource("replicateSizeProvider")
-  public void testSpaceReservedAndReleasedWhenRequestCompleted(String testName, Long replicateSize) throws Exception {
+  @MethodSource("sizeProvider")
+  public void testSpaceReservedAndReleasedWhenRequestCompleted(String testName, Long size) throws Exception {
     long containerId = 1;
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
-    long expectedReservedSpace = replicateSize != null ?
-        importer.getRequiredReplicationSpace(replicateSize) :
+    long expectedReservedSpace = size != null ?
+        importer.getRequiredReplicationSpace(size) :
         importer.getDefaultReplicationSpace();
 
     // Create and execute the first request to reserve space
     sendContainerRequestHandler.onNext(
-        createRequest(containerId, ByteString.EMPTY, 0, replicateSize));
+        createRequest(containerId, ByteString.EMPTY, 0, size));
 
     // Verify commit space is reserved
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes + expectedReservedSpace);
@@ -151,19 +151,19 @@ public class TestSendContainerRequestHandler {
   }
 
   @ParameterizedTest(name = "for {0}")
-  @MethodSource("replicateSizeProvider")
-  public void testSpaceReservedAndReleasedWhenOnNextFails(String testName, Long replicateSize) throws Exception {
+  @MethodSource("sizeProvider")
+  public void testSpaceReservedAndReleasedWhenOnNextFails(String testName, Long size) throws Exception {
     long containerId = 1;
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
-    long expectedReservedSpace = replicateSize != null ?
-        importer.getRequiredReplicationSpace(replicateSize) :
+    long expectedReservedSpace = size != null ?
+        importer.getRequiredReplicationSpace(size) :
         importer.getDefaultReplicationSpace();
 
     ByteString data = ByteString.copyFromUtf8("test");
     // Execute first request to reserve space
     sendContainerRequestHandler.onNext(
-        createRequest(containerId, data, 0, replicateSize));
+        createRequest(containerId, data, 0, size));
 
     // Verify commit space is reserved
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes + expectedReservedSpace);
@@ -172,25 +172,25 @@ public class TestSendContainerRequestHandler {
     when(importer.isAllowedContainerImport(containerId)).thenReturn(false);
     
     sendContainerRequestHandler.onNext(createRequest(containerId, data, 0,
-        replicateSize));
+        size));
 
     // Verify commit space is released
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes);
   }
 
   @ParameterizedTest(name = "for {0}")
-  @MethodSource("replicateSizeProvider")
-  public void testSpaceReservedAndReleasedWhenOnCompletedFails(String testName, Long replicateSize) throws Exception {
+  @MethodSource("sizeProvider")
+  public void testSpaceReservedAndReleasedWhenOnCompletedFails(String testName, Long size) throws Exception {
     long containerId = 1;
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
-    long expectedReservedSpace = replicateSize != null ?
-        importer.getRequiredReplicationSpace(replicateSize) :
+    long expectedReservedSpace = size != null ?
+        importer.getRequiredReplicationSpace(size) :
         importer.getDefaultReplicationSpace();
 
     // Execute request
     sendContainerRequestHandler.onNext(createRequest(containerId,
-        ByteString.copyFromUtf8("test"), 0, replicateSize));
+        ByteString.copyFromUtf8("test"), 0, size));
 
     // Verify commit space is reserved
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes + expectedReservedSpace);
@@ -221,7 +221,7 @@ public class TestSendContainerRequestHandler {
     long overallocatedReservation = volume.getCommittedBytes() - initialCommittedBytes;
     handler1.onCompleted(); // Release space
 
-    // Test default container (null replicateSize)
+    // Test default container (null size)
     SendContainerRequestHandler handler2 = new SendContainerRequestHandler(importer, responseObserver, null);
     handler2.onNext(createRequest(containerId2, ByteString.EMPTY, 0, null));
 
@@ -237,7 +237,7 @@ public class TestSendContainerRequestHandler {
   }
 
   private ContainerProtos.SendContainerRequest createRequest(
-      long containerId, ByteString data, int offset, Long replicateSize) {
+      long containerId, ByteString data, int offset, Long size) {
     ContainerProtos.SendContainerRequest.Builder builder =
         ContainerProtos.SendContainerRequest.newBuilder()
             .setContainerID(containerId)
@@ -245,8 +245,8 @@ public class TestSendContainerRequestHandler {
             .setOffset(offset)
             .setCompression(NO_COMPRESSION.toProto());
 
-    if (replicateSize != null) {
-      builder.setReplicateSize(replicateSize);
+    if (size != null) {
+      builder.setSize(size);
     }
     return builder.build();
   }

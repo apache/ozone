@@ -33,9 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.ToLongFunction;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -53,8 +51,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Tests ozone containers replication.
@@ -91,32 +88,9 @@ class TestContainerReplication {
     IOUtils.closeQuietly(clientFactory, cluster);
   }
 
-  /**
-   * Creates a Cartesian product of all compression types and replicate sizes.
-   */
-  public static Stream<Arguments> compressionAndReplicateSize() {
-    List<Arguments> replicateSizes = Stream.of(
-        Arguments.of("Null replicate size (fallback to default)", null),
-        Arguments.of("Zero Size", 0L),
-        Arguments.of("Normal 2GB", 2L * 1024L * 1024L * 1024L),
-        Arguments.of("Overallocated 20GB", 20L * 1024L * 1024L * 1024L)
-    ).collect(Collectors.toList());
-
-    // Create a Cartesian product of all compression types and the sizes
-    return Stream.of(CopyContainerCompression.values())
-        .flatMap(compression ->
-            replicateSizes.stream().map(sizeArgs -> {
-              Object[] args = sizeArgs.get();
-              // Arguments are: compression, testName, replicateSize
-              return Arguments.of(compression, args[0], args[1]);
-            })
-        );
-  }
-
-  @ParameterizedTest(name = "{1} with {0} compression")
-  @MethodSource("compressionAndReplicateSize")
-  void testPushWithReplicateSize(CopyContainerCompression compression, String testName, Long replicateSize)
-      throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void testPush(CopyContainerCompression compression) throws Exception {
     final int index = compression.ordinal();
     DatanodeDetails source = cluster.getHddsDatanodes().get(index)
         .getDatanodeDetails();
@@ -124,16 +98,14 @@ class TestContainerReplication {
     DatanodeDetails target = selectOtherNode(source);
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(containerID, target);
-    cmd.setReplicateSize(replicateSize);
 
     queueAndWaitForCompletion(cmd, source,
         ReplicationSupervisor::getReplicationSuccessCount);
   }
 
-  @ParameterizedTest(name = "{1} with {0} compression")
-  @MethodSource("compressionAndReplicateSize")
-  void testPullWithReplicateSize(CopyContainerCompression compression, String testName, Long replicateSize)
-      throws Exception {
+  @ParameterizedTest
+  @EnumSource
+  void testPull(CopyContainerCompression compression) throws Exception {
     final int index = compression.ordinal();
     DatanodeDetails target = cluster.getHddsDatanodes().get(index)
         .getDatanodeDetails();
@@ -142,7 +114,6 @@ class TestContainerReplication {
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.fromSources(containerID,
             ImmutableList.of(source));
-    cmd.setReplicateSize(replicateSize);
 
     queueAndWaitForCompletion(cmd, target,
         ReplicationSupervisor::getReplicationSuccessCount);

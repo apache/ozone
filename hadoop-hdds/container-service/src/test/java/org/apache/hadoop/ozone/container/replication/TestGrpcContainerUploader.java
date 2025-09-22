@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Test;
@@ -116,8 +117,8 @@ class TestGrpcContainerUploader {
 
   private static GrpcContainerUploader createSubject(
       GrpcReplicationClient client) {
-
-    return new GrpcContainerUploader(new InMemoryConfiguration(), null) {
+    return new GrpcContainerUploader(new InMemoryConfiguration(), null,
+        mock(ContainerController.class)) {
       @Override
       protected GrpcReplicationClient createReplicationClient(
           DatanodeDetails target, CopyContainerCompression compression) {
@@ -129,7 +130,7 @@ class TestGrpcContainerUploader {
   private static OutputStream startUpload(GrpcContainerUploader subject,
       CompletableFuture<Void> callback) throws IOException {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
-    return subject.startUpload(1, target, callback, NO_COMPRESSION, null);
+    return subject.startUpload(1, target, callback, NO_COMPRESSION);
   }
 
   /**

@@ -193,7 +193,7 @@ class TestGrpcReplicationService {
     ContainerReplicationSource source =
         new OnDemandContainerReplicationSource(containerController);
 
-    GrpcContainerUploader uploader = new GrpcContainerUploader(conf, null);
+    GrpcContainerUploader uploader = new GrpcContainerUploader(conf, null, containerController);
 
     PushReplicator pushReplicator = new PushReplicator(conf, source, uploader);
 
