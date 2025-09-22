@@ -39,7 +39,7 @@ import Search from '@/v2/components/search/search';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import { showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import {

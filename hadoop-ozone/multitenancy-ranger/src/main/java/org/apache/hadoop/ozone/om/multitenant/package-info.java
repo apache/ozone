@@ -15,24 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.admin.scm;
-
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import picocli.CommandLine;
-
 /**
- * Subcommand to group container related operations.
+ * Ozone Multi tenancy implementation with Apache Ranger.
  */
-@CommandLine.Command(
-    name = "deletedBlocksTxn",
-    description = "SCM deleted blocks transaction specific operations",
-    mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class,
-    subcommands = {
-        GetFailedDeletedBlocksTxnSubcommand.class,
-        ResetDeletedBlockRetryCountSubcommand.class,
-    })
-public class DeletedBlocksTxnCommands {
-
-}
-
+package org.apache.hadoop.ozone.om.multitenant;

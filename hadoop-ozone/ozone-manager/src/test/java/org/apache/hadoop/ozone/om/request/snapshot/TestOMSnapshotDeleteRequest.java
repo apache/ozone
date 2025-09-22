@@ -152,7 +152,7 @@ public class TestOMSnapshotDeleteRequest extends TestSnapshotRequestAndResponse 
 
     // add key to cache
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(getVolumeName(), getBucketName(),
-        snapshotName, null, Time.now());
+        snapshotName, UUID.randomUUID(), Time.now());
     assertEquals(SNAPSHOT_ACTIVE, snapshotInfo.getSnapshotStatus());
     getOmMetadataManager().getSnapshotInfoTable().addCacheEntry(
         new CacheKey<>(key),
