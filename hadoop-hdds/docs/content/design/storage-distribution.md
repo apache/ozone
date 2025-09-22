@@ -1,6 +1,6 @@
 ---
 title: Storage Capacity Distribution Dashboard
-summary: Proposal for introducing a comprehensive storage distribution dashboard in Recon for enhanced cluster monitoring and debugging capabilities.
+summary: Proposal for introducing a comprehensive storage distribution dashboard in Recon.
 date: 2025-08-05
 jira: HDDS-13177
 status: Under Review
@@ -44,7 +44,7 @@ Detailed breakdown of storage usage across components:
 - **Global Used Space**: Represents the actual physical storage consumed on the DataNodes.
 - **Global Namespace Space**: Logical size of the namespace, calculated as the sum of pendingDirectorySize + pendingKeySize + totalOpenKeySize + totalCommittedSize, multiplied by the replication factor.
 - **Open Keys and Open Files**: Space occupied by data in open keys and files that are not yet finalized.
-- **Committed Keys**: Space utilized by fully committed key–value pairs.
+- **Committed Keys**: Space used by fully committed key–value pairs.
 - **Component-wise Distribution**: Breakdown of metrics across OM, SCM, and DataNodes.
 
 ## 2. Deletion Progress Monitoring
@@ -68,17 +68,14 @@ Summarized cluster statistics:
 
 ## Approach 1: Recon-based Implementation
 
-Leverage the existing Recon service to build the dashboard with centralized and efficient data collection.
-Recon currently maintains synchronization with the OM database and constructs the NSSummary tree, providing established calculation logic for metrics such as openKeysBytes and committedBytes. 
-Additionally, Recon already possesses a comprehensive physical and logical capacity to break down information through its OM DB insights component.
-These existing capabilities can be effectively leveraged to minimize development effort and ensure consistency. 
-While certain enhancements to OM are required regardless of the chosen implementation approach—whether CLI-based or Prometheus-driven—the foundational data processing infrastructure is already in place.
-The modifications outlined for OM, SCM, and DataNode components remain mandatory across all proposed approaches to ensure complete and accurate storage distribution reporting.
+Leverage the existing Recon service to build the dashboard with centralized and efficient data collection.  
+Recon currently maintains synchronization with the OM database and constructs the NSSummary tree, providing established calculation logic for metrics such as openKeysBytes and committedBytes.  
+Additionally, Recon already possesses a comprehensive physical and logical capacity breakdown through its OM DB insights component.
 
 ### Benefits
 
-- **Unified Data Source**: All metrics aggregated centrally in Recon. 
-- **Performance Optimization**: Incremental sync reduces a load
+- **Unified Data Source**: All metrics aggregated centrally in Recon
+- **Performance Optimization**: Incremental sync reduces the load
 - **Reduced Overhead**: Avoids redundant calculations across services
 - **Code Reusability**: Built on top of existing Recon infrastructure and endpoints
 
@@ -89,13 +86,13 @@ The modifications outlined for OM, SCM, and DataNode components remain mandatory
 - **Current State**: DNs expose storage metrics in their reports
 - **Enhancement**:
   - Add `pending deletion byte counters` in container metadata
-  - Calculate total pending per DN from these container metadata and publish metrics.
+  - Calculate total pending per DN from container metadata and publish metrics
 - **Responsibilities**:
   - Report actual and pending deletion usage per container
 
 #### **Storage Container Manager (SCM)**
 
-- **Current Gap**: No block size tracking in a block deletion process
+- **Current Gap**: No block size tracking in the block deletion process
 - **Enhancement**:
   - Track block sizes when OM issues a deletion request
   - Send a deletion command to DN along with block size and replication factor
@@ -125,51 +122,59 @@ The modifications outlined for OM, SCM, and DataNode components remain mandatory
 - **Data Sources**:
   - OM DB (via Insight Sync)
   - SCM Client API
-  - DN BlockDeletingService metrics.
+  - DN BlockDeletingService metrics
 
 ---
-## Approach 2: Prometheus + Grafana Implementation (Not Recommended)
+## Approach 2: CLI-based (Not Proceeding)
 
-### Overview
-
-This approach would involve publishing storage distribution metrics directly from individual components (OM, SCM, DataNodes) to Prometheus, with visualization handled entirely through Grafana dashboards.
-
-### Why This Approach Is Not Recommended
-
-#### **1. Customer Adoption and User Experience**
-- **Current Reality**: Customers are already actively using Recon for storage analysis and monitoring
-- **Existing Feedback**: Users have specifically identified gaps in Recon's current calculations and requested improvements within the existing interface
-- **User Workflow Disruption**: Introducing a completely separate monitoring stack would fragment the user experience
-- **Training and Adoption Overhead**: Teams would need to learn new tools and workflows, creating adoption barriers
-
-#### **2. Incomplete Current State**
-The primary driver for this enhancement is that **customers have identified that Recon's existing calculations are incomplete or incorrect**. Key issues include:
-- Inconsistent storage usage calculations across different views
-- Missing pending deletion visibility at granular levels
-- Lack of real-time correlation between logical and physical storage metrics
-- Incomplete breakdown of storage distribution across cluster components
-
-Moving to Prometheus/Grafana would not address these calculation issues. It would simply relocate them to a different platform while requiring significant additional implementation effort.
-
-#### **3. Recon's Existing Infrastructure Advantages**
-- **Data Access**: Recon already has optimized access to OM DB, SCM metadata, and DN reports
-- **Calculation Engine**: Existing framework for cross-component metric aggregation and correlation
-- **Web Interface**: Established a UI framework for complex data visualization and drill-down capabilities
-- **User Base**: Active user community familiar with Recon's interface and capabilities
-
-## Approach 3: CLI-based (Not Proceeding)
-
-A CLI-based approach was evaluated to compute detailed usage and pending deletion breakdown by analyzing offline OM and SCM database checkpoints and querying DataNodes. 
+A CLI-based approach was evaluated to compute detailed usage and pending deletion breakdown by analyzing offline OM and SCM database checkpoints and querying DataNodes.
 While it offers precise, up-to-date results and independence from Recon, it introduces significant operational overhead.
 
-This approach requires generating and processing large metadata snapshots, which can take hours in large-scale clusters. 
+This approach requires generating and processing large metadata snapshots, which can take hours in large-scale clusters.
 Given its complexity, dependency on manual execution, and high resource consumption, we have chosen not to proceed with the CLI-based solution and instead focus on enhancing Recon for better usability and integration.
+
+## Metrics Exposure and Time-Series Tracking
+
+While Recon provides a point-in-time view of pending deletions and storage distribution, it is equally important to track these metrics over time to understand trends and validate reclamation progress.  
+To enable this, components should expose metrics that can be scraped by Prometheus and visualized in Grafana.
+
+### Component-wise Metrics
+
+- **Ozone Manager (OM)**
+  - Recon has already methods that are available to calculate the following information.
+    - open key used space
+    - committed key used space 
+    - containerPreAllocated space
+    - pending deletion 
+  - In every OM db syncing, we can update these metrics values.
+
+- **Storage Container Manager (SCM)**
+  - Block sizes associated with deletion requests and its caching in scm. 
+  - This can be accessed by Recon using scmClient and can be exposed as metrics.
+  - This can also be updated along with OM db syncing so that we will get proper time series data.
+
+- **DataNodes (DN)**
+  - Pending deletion bytes per node. This can be exposed as metrics in BlockDeletingService of DataNode
+  - Pending deletion count per node. This can be exposed as metrics in BlockDeletingService of DataNode
+
+### Dashboard
+
+- **Recon UI** → Point-in-time snapshot for immediate debugging
+- **Grafana** → Time-series visualization of trends such as:
+  - Pending deletion backlog reduction
+  - Growth of open key space
+  - Utilization vs reclamation rates over time
+
+By combining both, operators gain:
+- **Real-time visibility** (via Recon)
+- **Historical context** (via Grafana)
 
 ---
 
 # Summary
 
-The proposed dashboard improves visibility into cluster storage dynamics, providing deeper insights for effective debugging and informed decision-making. 
-Recon is the ideal place to host this feature, given its established role as the central storage overview in Ozone.
+The proposed dashboard improves visibility into cluster storage dynamics, providing deeper insights for effective debugging and informed decision-making.  
+Recon is the ideal place to host the point-in-time overview, while exposing metrics enables Prometheus and Grafana to track long-term trends.  
+Together, these complementary approaches give operators a unified and powerful view of both current cluster state and historical storage patterns.
 
 ---
