@@ -73,7 +73,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     HddsVolume targetVolume = null;
 
     try {
-      targetVolume = containerImporter.chooseNextVolume(containerImporter.getDefaultReplicationSpace());
+      targetVolume = containerImporter.chooseNextVolume(
+          containerImporter.getDefaultReplicationSpace());
 
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.
@@ -84,7 +85,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         task.setStatus(Status.FAILED);
         return;
       }
-
       long bytes = Files.size(tarFilePath);
       LOG.info("Container {} is downloaded with size {}, starting to import.",
               containerID, bytes);

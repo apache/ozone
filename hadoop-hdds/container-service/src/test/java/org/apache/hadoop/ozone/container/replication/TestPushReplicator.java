@@ -129,7 +129,8 @@ class TestPushReplicator {
   private ContainerReplicator createSubject(
       long containerID, DatanodeDetails target, OutputStream outputStream,
       Consumer<CompletableFuture<Void>> completion,
-      CopyContainerCompression compression) throws IOException {
+      CopyContainerCompression compression
+  ) throws IOException {
     ContainerReplicationSource source = mock(ContainerReplicationSource.class);
     ContainerUploader uploader = mock(ContainerUploader.class);
     ArgumentCaptor<CompletableFuture<Void>> futureArgument =
@@ -139,7 +140,8 @@ class TestPushReplicator {
 
     when(
         uploader.startUpload(eq(containerID), eq(target),
-        futureArgument.capture(), compressionArgument.capture()))
+            futureArgument.capture(), compressionArgument.capture()
+        ))
         .thenReturn(outputStream);
 
     doAnswer(invocation -> {

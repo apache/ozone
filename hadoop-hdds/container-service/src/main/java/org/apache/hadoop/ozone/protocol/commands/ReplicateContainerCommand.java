@@ -105,7 +105,6 @@ public final class ReplicateContainerCommand
       builder.setTarget(targetDatanode.getProtoBufMessage());
     }
     builder.setPriority(priority);
-    
     return builder.build();
   }
 
@@ -132,7 +131,6 @@ public final class ReplicateContainerCommand
     if (protoMessage.hasPriority()) {
       cmd.setPriority(protoMessage.getPriority());
     }
-    
     return cmd;
   }
 

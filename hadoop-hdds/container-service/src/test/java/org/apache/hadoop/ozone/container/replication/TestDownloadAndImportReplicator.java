@@ -104,13 +104,13 @@ public class TestDownloadAndImportReplicator {
 
     // Wait such that first container import reserve space
     GenericTestUtils.waitFor(() ->
-            volume.getCommittedBytes() > initialCommittedBytes,
+        volume.getCommittedBytes() > initialCommittedBytes,
         1000, 50000);
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes + 2 * containerMaxSize);
     semaphore.release();
 
     GenericTestUtils.waitFor(() ->
-            volume.getCommittedBytes() == initialCommittedBytes,
+        volume.getCommittedBytes() == initialCommittedBytes,
         1000, 50000);
 
     // Verify commit space is released
