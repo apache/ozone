@@ -725,7 +725,7 @@ public class TestOmMetadataManager {
 
     // Without pagination
     ListOpenFilesResult res = omMetadataManager.listOpenFiles(
-        bucketLayout, 100, dbPrefix, false, dbPrefix, true);
+        bucketLayout, 100, dbPrefix, false, dbPrefix);
 
     assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
     assertFalse(res.hasMore());
@@ -743,7 +743,7 @@ public class TestOmMetadataManager {
     int pageSize = 2;
     int numExpectedKeys = pageSize;
     res = omMetadataManager.listOpenFiles(
-        bucketLayout, pageSize, dbPrefix, false, dbPrefix, true);
+        bucketLayout, pageSize, dbPrefix, false, dbPrefix);
     // total open key count should still be 3
     assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
     // hasMore should have been set
@@ -759,7 +759,7 @@ public class TestOmMetadataManager {
 
     // Get the second page
     res = omMetadataManager.listOpenFiles(
-        bucketLayout, pageSize, dbPrefix, true, res.getContinuationToken(), true);
+        bucketLayout, pageSize, dbPrefix, true, res.getContinuationToken());
     numExpectedKeys = numOpenKeys - pageSize;
     // total open key count should still be 3
     assertEquals(numOpenKeys, res.getTotalOpenKeyCount());

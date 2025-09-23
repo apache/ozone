@@ -3371,8 +3371,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public ListOpenFilesResult listOpenFiles(String path,
                                            int maxKeys,
-                                           String contToken,
-                                           boolean showCount)
+                                           String contToken)
       throws IOException {
 
     metrics.incNumListOpenFiles();
@@ -3457,7 +3456,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // arg processing done. call inner impl (table iteration)
     return metadataManager.listOpenFiles(
         bucketLayout, maxKeys, dbOpenKeyPrefix,
-        !StringUtils.isEmpty(contToken), dbContTokenPrefix, showCount);
+        !StringUtils.isEmpty(contToken), dbContTokenPrefix);
   }
 
   @Override

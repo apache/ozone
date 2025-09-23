@@ -921,7 +921,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ListOpenFilesResponse.Builder resp = ListOpenFilesResponse.newBuilder();
 
     ListOpenFilesResult res =
-        impl.listOpenFiles(req.getPath(), limitListSizeInt(req.getCount()), req.getToken(), req.getShowCount());
+        impl.listOpenFiles(req.getPath(), limitListSizeInt(req.getCount()), req.getToken());
     // TODO: Is there a clean way to avoid ser-de for responses:
     //  OM does: ListOpenFilesResult -> ListOpenFilesResponse
     //  Client : ListOpenFilesResponse -> ListOpenFilesResult

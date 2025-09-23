@@ -256,8 +256,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
                                     int maxKeys,
                                     String dbOpenKeyPrefix,
                                     boolean hasContToken,
-                                    String dbContTokenPrefix,
-                                    boolean showCount)
+                                    String dbContTokenPrefix)
       throws IOException;
 
   /**
@@ -319,12 +318,6 @@ public interface OMMetadataManager extends DBStoreHAManager {
    */
   List<OmVolumeArgs> listVolumes(String userName, String prefix,
       String startKey, int maxKeys) throws IOException;
-
-  /**
-   * Get total open key count (estimated, due to the nature of RocksDB impl)
-   * of both OpenKeyTable and OpenFileTable.
-   */
-  long getTotalOpenKeyCount() throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is

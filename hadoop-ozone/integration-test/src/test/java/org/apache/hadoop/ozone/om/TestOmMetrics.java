@@ -965,7 +965,7 @@ public class TestOmMetrics {
     }
 
     try {
-      writeClient.listOpenFiles("", 100, "", true);
+      writeClient.listOpenFiles("", 100, "");
     } catch (IOException ignored) {
     }
   }

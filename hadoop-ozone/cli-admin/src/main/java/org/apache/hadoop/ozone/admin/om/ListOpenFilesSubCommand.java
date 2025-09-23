@@ -104,13 +104,6 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   )
   private String startItem;
 
-  @CommandLine.Option(
-      names = {"--show-count"},
-      description = "Whether to show the real count of total open keys.",
-      defaultValue = "false"
-  )
-  private boolean showCount;
-
   @Override
   public Void call() throws Exception {
 
@@ -130,7 +123,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     }
 
     ListOpenFilesResult res =
-        ozoneManagerClient.listOpenFiles(pathPrefix, limit, startItem, showCount);
+        ozoneManagerClient.listOpenFiles(pathPrefix, limit, startItem);
 
     if (!showDeleted) {
       res.getOpenKeys().removeIf(o -> o.getKeyInfo().getMetadata().containsKey(OzoneConsts.DELETED_HSYNC_KEY));
@@ -218,12 +211,8 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
    */
   private String getMessageString(ListOpenFilesResult res, List<OpenKeySession> openFileList) {
     StringBuilder sb = new StringBuilder();
-    if (showCount) {
-      sb.append(res.getTotalOpenKeyCount())
+    sb.append(res.getTotalOpenKeyCount())
           .append(" total open files. Showing ");
-    } else {
-      sb.append("Showing ");
-    }
     sb.append(openFileList.size())
         .append(" open files (limit ")
         .append(limit)

@@ -906,8 +906,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                            int maxKeys,
                                            String dbOpenKeyPrefix,
                                            boolean hasContToken,
-                                           String dbContTokenPrefix,
-                                           boolean showCount)
+                                           String dbContTokenPrefix)
       throws IOException {
 
     List<OpenKeySession> openKeySessionList = new ArrayList<>();
@@ -959,7 +958,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return new ListOpenFilesResult(
-        showCount ? getTotalOpenKeyCount() : 0,
+        getTotalOpenKeyCount(bucketLayout, dbOpenKeyPrefix),
         hasMore,
         retContToken,
         openKeySessionList);
@@ -1329,21 +1328,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return getMultipartInfoTable().isExist(multipartInfoDbKey);
   }
 
-  @Override
-  public long getTotalOpenKeyCount() throws IOException {
+  private long getTotalOpenKeyCount(BucketLayout bucketLayout, String prefix) throws IOException {
     long count = 0;
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             keyValueTableIterator = openKeyTable.iterator()) {
-      while (keyValueTableIterator.hasNext()) {
-        count += 1;
-        keyValueTableIterator.next();
-      }
-    } catch (UncheckedIOException e) {
-      throw e.getCause();
-    }
-
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             keyValueTableIterator = openFileTable.iterator()) {
+    try (TableIterator<String, String>
+             keyValueTableIterator = getOpenKeyTable(bucketLayout).keyIterator(prefix)) {
       while (keyValueTableIterator.hasNext()) {
         count += 1;
         keyValueTableIterator.next();
@@ -1352,7 +1340,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       throw e.getCause();
     }
     return count;
-
   }
 
   @Override
