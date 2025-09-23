@@ -758,6 +758,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     uploadIds.add(uploadId3);
 
     ListMultipartUploadsRequest listMultipartUploadsRequest = new ListMultipartUploadsRequest(bucketName);
+    listMultipartUploadsRequest.setMaxUploads(5000);
 
     MultipartUploadListing result = s3Client.listMultipartUploads(listMultipartUploadsRequest);
 
