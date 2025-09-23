@@ -517,7 +517,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
     OmSnapshotManager omSnapshotManager =
         ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
-    OzoneConfiguration configuration = omSnapshotManager.ozoneManager.getConfiguration();
+    OzoneConfiguration configuration = ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getConfiguration();
     try (OmMetadataManagerImpl checkpointMetadataManager =
              OmMetadataManagerImpl.createCheckpointMetadataManager(configuration, dbCheckpoint)) {
       // Create the snapshot local property file.
