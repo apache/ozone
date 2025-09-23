@@ -868,7 +868,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       if (responseProto == null) {
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.SUCCESS, null);
       } else {
-        containerSet.scanContainer(containerID);
+        containerSet.scanContainer(containerID, "ReadBlock failed " + responseProto.getResult());
         audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE,
             new Exception(responseProto.getMessage()));
         streamObserver.onNext(responseProto);
