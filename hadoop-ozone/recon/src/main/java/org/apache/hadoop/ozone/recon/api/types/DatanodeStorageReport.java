@@ -35,7 +35,7 @@ public final class DatanodeStorageReport {
   private long minimumFreeSpace;
 
   private DatanodeStorageReport(Builder builder) {
-    this.datanodeUuid = builder.hostName;
+    this.datanodeUuid = builder.datanodeUuid;
     this.hostName = builder.hostName;
     this.capacity = builder.capacity;
     this.used = builder.used;
