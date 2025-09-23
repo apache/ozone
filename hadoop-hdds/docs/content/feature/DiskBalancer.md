@@ -41,8 +41,17 @@ A disk is considered a candidate for balancing if its
 
 ![Data spread across disks](diskBalancer.png)
 
+## Feature Flag
+
+The Disk Balancer feature is introduced with a feature flag. By default, this feature is disabled.
+
+The feature can be **enabled** by setting the following property to `true` in the `ozone-site.xml` configuration file:
+`hdds.datanode.disk.balancer.enabled = false`
+
 ## Command Line Usage
 The DiskBalancer is managed through the `ozone admin datanode diskbalancer` command.
+
+**注意：**此命令在主帮助消息（“ozone admin datanode --help”）中隐藏。这是因为该功能目前处于实验阶段，默认禁用。不过，对于希望启用和使用该功能的用户来说，该命令功能齐全。
 
 ### **Start DiskBalancer**
 To start diskBalancer on all Datanodes with default configurations :
@@ -65,14 +74,14 @@ ozone admin datanode diskbalancer update [options]
 ```
 **Options include:**
 
-| Options                               | Description                                                                                           |                                                                                                                                                             
-|---------------------------------------|-------------------------------------------------------------------------------------------------------|
-| `-t, --threshold`                     | Percentage deviation from average utilization of the disks after which a datanode will be rebalanced. |
-| `-b, --bandwithInMB`                  | Maximum bandwidth for DiskBalancer per second.                                                        |
-| `-p, --parallelThread`                | Max parallelThread for DiskBalancer.                                                                  |
-| `-s, --stop-after-disk-even`          | Stop DiskBalancer automatically after disk utilization is even.                                       |
-| `-a, --all`                           | Run commands on all datanodes.                                                                        |
-| `-d, --datanodes`                     | Run commands on specific datanodes                                                                    |
+| Options                      | Description                                                                                           |                                                                                                                                                             
+|------------------------------|-------------------------------------------------------------------------------------------------------|
+| `-t, --threshold`            | Percentage deviation from average utilization of the disks after which a datanode will be rebalanced. |
+| `-b, --bandwith-in-mb`       | Maximum bandwidth for DiskBalancer per second.                                                        |
+| `-p, --parallel-thread`      | Max parallelThread for DiskBalancer.                                                                  |
+| `-s, --stop-after-disk-even` | Stop DiskBalancer automatically after disk utilization is even.                                       |
+| `-a, --all`                  | Run commands on all datanodes.                                                                        |
+| `-d, --datanodes`            | Run commands on specific datanodes                                                                    |
 
 ### **Stop DiskBalancer**
 To stop DiskBalancer on all Datanodes:

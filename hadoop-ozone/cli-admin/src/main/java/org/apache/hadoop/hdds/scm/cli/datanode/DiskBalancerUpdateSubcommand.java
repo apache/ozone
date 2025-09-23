@@ -44,11 +44,11 @@ public class DiskBalancerUpdateSubcommand extends ScmSubcommand {
           "example, '10' for 10%%).")
   private Double threshold;
 
-  @Option(names = {"-b", "--bandwidthInMB"},
+  @Option(names = {"-b", "--bandwidth-in-mb"},
       description = "Maximum bandwidth for DiskBalancer per second.")
   private Long bandwidthInMB;
 
-  @Option(names = {"-p", "--parallelThread"},
+  @Option(names = {"-p", "--parallel-thread"},
       description = "Max parallelThread for DiskBalancer.")
   private Integer parallelThread;
 
