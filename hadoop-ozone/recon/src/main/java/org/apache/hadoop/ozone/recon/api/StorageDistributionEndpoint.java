@@ -329,6 +329,7 @@ public class StorageDistributionEndpoint {
           .setCommitted(committed)
           .setPendingDeletion(pendingDeletion)
           .setMinimumFreeSpace(minFreeSpace)
+          .setDatanodeUuid(datanode.getUuidString())
           .setHostName(datanode.getHostName())
           .build();
       return storageReport;

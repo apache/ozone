@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
  * Metadata object that contains storage report of a Datanode.
  */
 public final class DatanodeStorageReport {
+  private String datanodeUuid;
   private String hostName;
   private long capacity;
   private long used;
@@ -34,6 +35,7 @@ public final class DatanodeStorageReport {
   private long minimumFreeSpace;
 
   private DatanodeStorageReport(Builder builder) {
+    this.datanodeUuid = builder.hostName;
     this.hostName = builder.hostName;
     this.capacity = builder.capacity;
     this.used = builder.used;
@@ -41,6 +43,14 @@ public final class DatanodeStorageReport {
     this.committed = builder.committed;
     this.pendingDeletion = builder.pendingDeletion;
     this.minimumFreeSpace = builder.minimumFreeSpace;
+  }
+
+  public String getDatanodeUuid() {
+    return datanodeUuid;
+  }
+
+  public String getHostName() {
+    return hostName;
   }
 
   public long getCapacity() {
@@ -63,10 +73,6 @@ public final class DatanodeStorageReport {
     return pendingDeletion;
   }
 
-  public String getHostName() {
-    return hostName;
-  }
-
   public long getMinimumFreeSpace() {
     return minimumFreeSpace;
   }
@@ -79,6 +85,7 @@ public final class DatanodeStorageReport {
    * Builder class for DataNodeStorage Report.
    */
   public static final class Builder {
+    private String datanodeUuid = "";
     private String hostName = "";
     private long capacity = 0;
     private long used = 0;
@@ -91,6 +98,11 @@ public final class DatanodeStorageReport {
         LoggerFactory.getLogger(Builder.class);
 
     private Builder() {
+    }
+
+    public Builder setDatanodeUuid(String datanodeUuid) {
+      this.datanodeUuid = datanodeUuid;
+      return this;
     }
 
     public Builder setHostName(String hostName) {
