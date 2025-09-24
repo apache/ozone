@@ -49,6 +49,8 @@ spec:
           ports:
             - containerPort: 16686
               name: web
+            - containerPort: 4317
+              name: otlp-grpc
           env:
             - name: COLLECTOR_ZIPKIN_HTTP_PORT
               value: "9411"

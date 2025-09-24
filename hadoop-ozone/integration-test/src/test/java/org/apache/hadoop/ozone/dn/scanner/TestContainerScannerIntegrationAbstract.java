@@ -220,4 +220,13 @@ public abstract class TestContainerScannerIntegrationAbstract {
     return TestHelper.createKey(
         keyName, RATIS, ONE, 0, store, volumeName, bucketName);
   }
+
+  protected OzoneConfiguration getConf() {
+    return cluster.getConf();
+  }
+
+  protected HddsDatanodeService getDatanode() {
+    assertEquals(1, cluster.getHddsDatanodes().size());
+    return cluster.getHddsDatanodes().get(0);
+  }
 }

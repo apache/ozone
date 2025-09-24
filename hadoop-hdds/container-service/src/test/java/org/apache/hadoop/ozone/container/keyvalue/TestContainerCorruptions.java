@@ -17,8 +17,9 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.corruptFile;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.truncateFile;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,16 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.ozone.test.GenericTestUtils;
@@ -171,33 +168,6 @@ public enum TestContainerCorruptions {
     return includeSet;
   }
 
-  /**
-   * Overwrite the file with random bytes.
-   */
-  private static void corruptFile(File file) {
-    try {
-      final int length = (int) file.length();
-
-      Path path = file.toPath();
-      final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
-
-      // Corrupt the last byte and middle bytes of the block. The scanner should log this as two errors.
-      final byte[] corruptedBytes = Arrays.copyOf(original, length);
-      corruptedBytes[length - 1] = (byte) (original[length - 1] << 1);
-      corruptedBytes[length / 2] = (byte) (original[length / 2] << 1);
-
-      Files.write(path, corruptedBytes,
-          StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
-
-      assertThat(IOUtils.readFully(Files.newInputStream(path), length))
-          .isEqualTo(corruptedBytes)
-          .isNotEqualTo(original);
-    } catch (IOException ex) {
-      // Fail the test.
-      throw new UncheckedIOException(ex);
-    }
-  }
-
   public static File getBlock(Container<?> container, long blockID) {
     File blockFile;
     File chunksDir = new File(container.getContainerData().getContainerPath(),
@@ -214,20 +184,5 @@ public enum TestContainerCorruptions {
     }
     assertTrue(blockFile.exists());
     return blockFile;
-  }
-
-  /**
-   * Truncate the file to 0 bytes in length.
-   */
-  private static void truncateFile(File file) {
-    try {
-      Files.write(file.toPath(), new byte[0],
-          StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
-
-      assertEquals(0, file.length());
-    } catch (IOException ex) {
-      // Fail the test.
-      throw new UncheckedIOException(ex);
-    }
   }
 }
