@@ -27,10 +27,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -83,6 +85,7 @@ public class DiskBalancerService extends BackgroundService {
       LoggerFactory.getLogger(DiskBalancerService.class);
 
   public static final String DISK_BALANCER_DIR = "diskBalancer";
+  private static long replicaDeletionDelayMills = 30 * 60 * 1000L; // 30 minutes
 
   private OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
@@ -102,6 +105,7 @@ public class DiskBalancerService extends BackgroundService {
   private AtomicLong nextAvailableTime = new AtomicLong(Time.monotonicNow());
 
   private Set<ContainerID> inProgressContainers;
+  private ConcurrentSkipListMap<Long, Container> pendingDeletionContainers = new ConcurrentSkipListMap();
   private static FaultInjector injector;
 
   /**
@@ -363,12 +367,14 @@ public class DiskBalancerService extends BackgroundService {
 
     if (this.operationalState == DiskBalancerOperationalState.STOPPED ||
         this.operationalState == DiskBalancerOperationalState.PAUSED_BY_NODE_STATE) {
+      cleanupPendingDeletionContainers();
       return queue;
     }
     metrics.incrRunningLoopCount();
 
     if (shouldDelay()) {
       metrics.incrIdleLoopExceedsBandwidthCount();
+      cleanupPendingDeletionContainers();
       return queue;
     }
 
@@ -401,7 +407,7 @@ public class DiskBalancerService extends BackgroundService {
       }
     }
 
-    if (queue.isEmpty()) {
+    if (queue.isEmpty() && inProgressContainers.isEmpty()) {
       bytesToMove = 0;
       if (stopAfterDiskEven) {
         LOG.info("Disk balancer is stopped due to disk even as" +
@@ -415,6 +421,7 @@ public class DiskBalancerService extends BackgroundService {
         }
       }
       metrics.incrIdleLoopNoAvailableVolumePairCount();
+      cleanupPendingDeletionContainers();
     } else {
       bytesToMove = calculateBytesToMove(volumeSet);
     }
@@ -580,20 +587,15 @@ public class DiskBalancerService extends BackgroundService {
           container.readUnlock();
         }
         if (moveSucceeded) {
-          // Remove the old container from the KeyValueContainerUtil.
-          try {
-            KeyValueContainerUtil.removeContainer(
-                (KeyValueContainerData) container.getContainerData(), conf);
-            container.delete();
-            container.getContainerData().getVolume().decrementUsedSpace(containerSize);
-          } catch (IOException ex) {
-            LOG.warn("Failed to move or delete old container {} after it's marked as DELETED. " +
-                    "It will be handled by background scanners.", containerId, ex);
-          }
+          // Add current old container to pendingDeletionContainers.
+          pendingDeletionContainers.put(System.currentTimeMillis() + replicaDeletionDelayMills, container);
           ContainerLogger.logMoveSuccess(containerId, sourceVolume,
               destVolume, containerSize, Time.monotonicNow() - startTime);
         }
         postCall(moveSucceeded, startTime);
+
+        // pick one expired container from pendingDeletionContainers to delete
+        tryCleanupOnePendingDeletionContainer();
       }
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
@@ -615,6 +617,51 @@ public class DiskBalancerService extends BackgroundService {
       } else {
         metrics.incrFailureCount(1);
         metrics.getMoveFailureTime().add(endTime - startTime);
+      }
+    }
+  }
+
+  private void deleteContainer(Container container) {
+    try {
+      KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+      KeyValueContainerUtil.removeContainer(containerData, conf);
+      container.delete();
+      container.getContainerData().getVolume().decrementUsedSpace(containerData.getBytesUsed());
+      LOG.info("Deleted expired container {} after delay {} ms.",
+          containerData.getContainerID(), replicaDeletionDelayMills);
+    } catch (IOException ex) {
+      LOG.warn("Failed to delete old container {} after it's marked as DELETED. " +
+          "It will be handled by background scanners.", container.getContainerData().getContainerID(), ex);
+    }
+  }
+
+  private void cleanupPendingDeletionContainers() {
+    // delete all pending deletion containers before stop the service
+    // we still need to honor the expiry time of deletion
+    Iterator<Map.Entry<Long, Container>> iterator = pendingDeletionContainers.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<Long, Container> entry = iterator.next();
+      if (entry.getKey() <= System.currentTimeMillis()) {
+        iterator.remove();
+        deleteContainer(entry.getValue());
+      } else {
+        // Since the map is sorted by key (timestamp), we can break early.
+        break;
+      }
+    }
+  }
+
+  private void tryCleanupOnePendingDeletionContainer() {
+    if (!pendingDeletionContainers.isEmpty()) {
+      Map.Entry<Long, Container> entry = pendingDeletionContainers.pollFirstEntry();
+      if (entry != null) {
+        if (entry.getKey() <= System.currentTimeMillis()) {
+          // entry container is expired
+          deleteContainer(entry.getValue());
+        } else {
+          // put back the container
+          pendingDeletionContainers.put(entry.getKey(), entry.getValue());
+        }
       }
     }
   }
@@ -747,5 +794,10 @@ public class DiskBalancerService extends BackgroundService {
   @VisibleForTesting
   public static void setInjector(FaultInjector instance) {
     injector = instance;
+  }
+
+  @VisibleForTesting
+  public static void setReplicaDeletionDelayMills(long durationMills) {
+    replicaDeletionDelayMills = durationMills;
   }
 }
