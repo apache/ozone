@@ -177,7 +177,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             // Get all entries from deletedKeyTable.
             List<Table.KeyValue<String, List<OmKeyInfo>>> deletedKeyEntries =
                 snapshotKeyManager.getDeletedKeyEntries(snapInfo.getVolumeName(), snapInfo.getBucketName(),
-                    null, (kv) -> true, remaining, ratisByteLimit);
+                    null, (kv) -> true, remaining);
             moveCount += deletedKeyEntries.size();
             // Get all entries from deletedDirTable.
             List<Table.KeyValue<String, OmKeyInfo>> deletedDirEntries = snapshotKeyManager.getDeletedDirEntries(
@@ -186,7 +186,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
             // Get all entries from snapshotRenamedTable.
             List<Table.KeyValue<String, String>> renameEntries =
                 snapshotKeyManager.getRenamesKeyEntries(snapInfo.getVolumeName(), snapInfo.getBucketName(), null,
-                    (kv) -> true, remaining - moveCount, ratisByteLimit);
+                    (kv) -> true, remaining - moveCount);
             moveCount += renameEntries.size();
             if (moveCount > 0) {
               List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(deletedKeyEntries.size());

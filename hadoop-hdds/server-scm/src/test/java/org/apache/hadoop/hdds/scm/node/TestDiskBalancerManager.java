@@ -45,7 +45,6 @@ public class TestDiskBalancerManager {
 
   private DiskBalancerManager diskBalancerManager;
   private NodeManager nodeManager;
-  private OzoneConfiguration conf;
   private DiskBalancerReportHandler diskBalancerReportHandler;
   private Random random;
   @TempDir
@@ -53,7 +52,7 @@ public class TestDiskBalancerManager {
 
   @BeforeEach
   public void setup() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY, true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     nodeManager = new MockNodeManager(true, 3);

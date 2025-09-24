@@ -83,7 +83,6 @@ public class TestDiskBalancerService {
   private String datanodeUuid;
   private OzoneConfiguration conf = new OzoneConfiguration();
 
-  private String schemaVersion;
   private MutableVolumeSet volumeSet;
 
   @BeforeEach
@@ -319,7 +318,7 @@ public class TestDiskBalancerService {
   }
 
   private void setLayoutAndSchemaForTest(ContainerTestVersionInfo versionInfo) {
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 }

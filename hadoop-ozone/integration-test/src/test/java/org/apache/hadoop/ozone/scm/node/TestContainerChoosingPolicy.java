@@ -88,7 +88,6 @@ public class TestContainerChoosingPolicy {
   private OzoneContainer ozoneContainer;
   private ContainerChoosingPolicy containerChoosingPolicy;
   private ExecutorService executor;
-  private ContainerController containerController;
 
   // Simulate containers currently being balanced (in progress)
   private Set<ContainerID> inProgressContainerIDs = ConcurrentHashMap.newKeySet();
@@ -99,7 +98,7 @@ public class TestContainerChoosingPolicy {
     createVolumes();
     createContainers();
     ozoneContainer = mock(OzoneContainer.class);
-    containerController = new ContainerController(containerSet, null);
+    ContainerController containerController = new ContainerController(containerSet, null);
     when(ozoneContainer.getController()).thenReturn(containerController);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     containerChoosingPolicy = new DefaultContainerChoosingPolicy();

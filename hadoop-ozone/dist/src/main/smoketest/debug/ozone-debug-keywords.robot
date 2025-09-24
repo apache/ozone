@@ -36,7 +36,8 @@ Execute replicas verify container state debug tool
 
 Parse replicas verify JSON output
     [Arguments]    ${output}
-    ${json} =      Evaluate    json.loads('''${output}''')    json
+    ${json_split} =  Evaluate  '''${output}'''.split('***')[0].strip()
+    ${json} =      Evaluate  json.loads('''${json_split}''')  json
     [Return]       ${json}
 
 Check to Verify Replicas
@@ -65,3 +66,18 @@ Check Replica Passed
     Should Be True    ${check['completed']}
     Should Be True    ${check['pass']}
     Should Be Empty   ${check['failures']}
+
+Execute replicas verify with replication filter
+    [Arguments]    ${replication_type}    ${replication_factor}    ${verification_type}
+    ${output}      Execute          ozone debug replicas verify --${verification_type} --type ${replication_type} --replication ${replication_factor} o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} --all-results
+    [Return]       ${output}
+
+Get key names from output
+    [Arguments]    ${json}
+    ${keys} =      Get From Dictionary    ${json}    keys
+    ${key_names} =    Create List
+    FOR    ${key}    IN    @{keys}
+        ${key_name} =    Get From Dictionary    ${key}    name
+        Append To List    ${key_names}    ${key_name}
+    END
+    [Return]       ${key_names}

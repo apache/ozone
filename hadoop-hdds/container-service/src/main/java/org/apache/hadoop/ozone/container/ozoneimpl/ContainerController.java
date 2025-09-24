@@ -226,8 +226,14 @@ public class ContainerController {
   public void exportContainer(final ContainerType type,
       final long containerId, final OutputStream outputStream,
       final TarContainerPacker packer) throws IOException {
-    handlers.get(type).exportContainer(
-        containerSet.getContainer(containerId), outputStream, packer);
+    try {
+      handlers.get(type).exportContainer(
+          containerSet.getContainer(containerId), outputStream, packer);
+    } catch (IOException e) {
+      // If export fails, then trigger a scan for the container
+      containerSet.scanContainer(containerId, "Export failed");
+      throw e;
+    }
   }
 
   /**

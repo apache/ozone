@@ -108,7 +108,6 @@ public class TestDiskBalancerTask {
 
   private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
-  private ContainerController controller;
   private MutableVolumeSet volumeSet;
   private HddsVolume sourceVolume;
   private HddsVolume destVolume;
@@ -118,7 +117,6 @@ public class TestDiskBalancerTask {
   private static final long CONTAINER_SIZE = 1024L * 1024L; // 1 MB
 
   private final TestFaultInjector kvFaultInjector = new TestFaultInjector();
-  private String schemaVersion;
 
   /**
    * A FaultInjector that can be configured to throw an exception on a
@@ -233,7 +231,7 @@ public class TestDiskBalancerTask {
 
     Map<ContainerProtos.ContainerType, Handler> handlers = new HashMap<>();
     handlers.put(ContainerProtos.ContainerType.KeyValueContainer, keyValueHandler);
-    controller = new ContainerController(containerSet, handlers);
+    ContainerController controller = new ContainerController(containerSet, handlers);
     ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getVolumeSet()).thenReturn(volumeSet);
@@ -601,7 +599,7 @@ public class TestDiskBalancerTask {
   }
 
   private void setLayoutAndSchemaForTest(ContainerTestVersionInfo versionInfo) {
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 }

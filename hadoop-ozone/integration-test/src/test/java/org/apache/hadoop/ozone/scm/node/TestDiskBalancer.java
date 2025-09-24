@@ -62,12 +62,11 @@ public class TestDiskBalancer {
 
   private static ScmClient storageClient;
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration ozoneConf;
   private static DiskBalancerManager diskBalancerManager;
 
   @BeforeAll
   public static void setup() throws Exception {
-    ozoneConf = new OzoneConfiguration();
+    OzoneConfiguration ozoneConf = new OzoneConfiguration();
     ozoneConf.setBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY, true);
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);

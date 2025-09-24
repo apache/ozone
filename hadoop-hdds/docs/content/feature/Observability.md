@@ -97,8 +97,8 @@ Repeat the same for [Object Metrics](https://raw.githubusercontent.com/apache/oz
 ## Distributed tracing
 
 Distributed tracing can help to understand performance bottleneck with visualizing end-to-end performance.
-
-Ozone uses [jaeger](https://jaegertracing.io) tracing library to collect traces which can send tracing data to any compatible backend (Zipkin, ...).
+Ozone makes use of [OpenTelemetry](https://opentelemetry.io/) API for tracing and uses otlp with Grpc format for sending traces.
+[jaeger](https://jaegertracing.io) tracing library as collector can collect traces from Ozone over default port 4317 (as default).
 
 Tracing is turned off by default, but can be turned on with `hdds.tracing.enabled` from `ozone-site.xml`
 
@@ -109,17 +109,14 @@ Tracing is turned off by default, but can be turned on with `hdds.tracing.enable
 </property>
 ```
 
-Jaeger client can be configured with environment variables as documented [here](https://github.com/jaegertracing/jaeger-client-java/blob/master/jaeger-core/README.md):
+Below are the configuration steps for setting the collector endpoint and sampling strategy. Set these environment variables to be set for each Ozone component (OM, SCM, datanode) and for the Ozone client to enable tracing.
 
-For example:
-
-```shell
-JAEGER_SAMPLER_PARAM=0.01
-JAEGER_SAMPLER_TYPE=probabilistic
-JAEGER_AGENT_HOST=jaeger
+```
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+OTEL_TRACES_SAMPLER_ARG=0.01
 ```
 
-This configuration will record 1% of the requests to limit the performance overhead. For more information about jaeger sampling [check the documentation](https://www.jaegertracing.io/docs/1.18/sampling/#client-sampling-configuration)
+This configuration will record 1% of the requests to limit the performance overhead.
 
 ## ozone insight
 

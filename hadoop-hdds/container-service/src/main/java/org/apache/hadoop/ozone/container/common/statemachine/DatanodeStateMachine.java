@@ -26,7 +26,9 @@ import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -98,7 +100,8 @@ public class DatanodeStateMachine implements Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeStateMachine.class);
   private final ExecutorService executorService;
-  private final ExecutorService pipelineCommandExecutorService;
+  private final ExecutorService closePipelineCommandExecutorService;
+  private final ExecutorService createPipelineCommandExecutorService;
   private final ConfigurationSource conf;
   private final SCMConnectionManager connectionManager;
   private final ECReconstructionCoordinator ecReconstructionCoordinator;
@@ -144,7 +147,7 @@ public class DatanodeStateMachine implements Closeable {
    * @param certClient - Datanode Certificate client, required if security is
    *                     enabled
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:methodlength"})
   public DatanodeStateMachine(HddsDatanodeService hddsDatanodeService,
                               DatanodeDetails datanodeDetails,
                               ConfigurationSource conf,
@@ -238,11 +241,24 @@ public class DatanodeStateMachine implements Closeable {
     //  datanode clients.
     DNContainerOperationClient dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
 
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat(threadNamePrefix + "PipelineCommandHandlerThread-%d")
+    // Create separate bounded executors for pipeline command handlers
+    ThreadFactory closePipelineThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "ClosePipelineCommandHandlerThread-%d")
         .build();
-    pipelineCommandExecutorService = Executors
-        .newSingleThreadExecutor(threadFactory);
+    closePipelineCommandExecutorService = new ThreadPoolExecutor(
+        1, 1,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(dnConf.getCommandQueueLimit()),
+        closePipelineThreadFactory);
+
+    ThreadFactory createPipelineThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "CreatePipelineCommandHandlerThread-%d")
+        .build();
+    createPipelineCommandExecutorService = new ThreadPoolExecutor(
+        1, 1,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(dnConf.getCommandQueueLimit()),
+        createPipelineThreadFactory);
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
@@ -259,9 +275,9 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getContainerDeleteThreads(), clock,
             dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(new ClosePipelineCommandHandler(conf,
-            pipelineCommandExecutorService))
+            closePipelineCommandExecutorService))
         .addHandler(new CreatePipelineCommandHandler(conf,
-            pipelineCommandExecutorService))
+            createPipelineCommandExecutorService))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
         .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient));
@@ -450,7 +466,8 @@ public class DatanodeStateMachine implements Closeable {
     replicationSupervisorMetrics.unRegister();
     ecReconstructionMetrics.unRegister();
     executorServiceShutdownGraceful(executorService);
-    executorServiceShutdownGraceful(pipelineCommandExecutorService);
+    executorServiceShutdownGraceful(closePipelineCommandExecutorService);
+    executorServiceShutdownGraceful(createPipelineCommandExecutorService);
 
     if (connectionManager != null) {
       connectionManager.close();

@@ -402,12 +402,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
                 || containerState == State.RECOVERING);
         // mark and persist the container state to be unhealthy
         try {
-          // TODO HDDS-7096 + HDDS-8781: Use on demand scanning for the open
-          //  container instead.
           ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.WRITE_FAILURE,
               new File(container.getContainerData().getContainerPath()),
               new StorageContainerException(result));
           handler.markContainerUnhealthy(container, DataScanResult.fromErrors(Collections.singletonList(error)));
+          // For unhealthy containers, trigger an async on-demand scan to build container merkle tree,
+          // as the metadata-based tree may not be reliable due to potential data corruption.
+          containerSet.scanContainerWithoutGap(containerID, "Unhealthy container scan");
           LOG.info("Marked Container UNHEALTHY, ContainerID: {}", containerID);
         } catch (IOException ioe) {
           // just log the error here in case marking the container fails,

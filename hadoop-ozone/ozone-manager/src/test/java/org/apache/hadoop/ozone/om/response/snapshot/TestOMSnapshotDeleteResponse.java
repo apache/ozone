@@ -21,6 +21,8 @@ import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNA
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -31,7 +33,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotResponse;
@@ -39,10 +43,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * This class tests OMSnapshotDeleteResponse.
@@ -62,7 +68,25 @@ public class TestOMSnapshotDeleteResponse {
     String fsPath = folder.toAbsolutePath().toString();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    OmSnapshotLocalDataYaml.YamlFactory yamlFactory = new OmSnapshotLocalDataYaml.YamlFactory();
+    Yaml yaml = yamlFactory.create();
+    UncheckedAutoCloseableSupplier<Yaml> yamlSupplier = new UncheckedAutoCloseableSupplier<Yaml>() {
+      @Override
+      public Yaml get() {
+        return yaml;
+      }
+
+      @Override
+      public void close() {
+
+      }
+    };
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+    when(omSnapshotManager.getSnapshotLocalYaml()).thenReturn(yamlSupplier);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 

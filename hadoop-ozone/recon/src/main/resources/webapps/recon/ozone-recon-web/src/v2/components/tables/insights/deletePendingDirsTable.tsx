@@ -29,7 +29,7 @@ import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { byteToSize, showDataFetchError } from '@/utils/common';
 import { getFormattedTime } from '@/v2/utils/momentUtils';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
 
 import { DeletedDirInfo } from '@/v2/types/insights.types';

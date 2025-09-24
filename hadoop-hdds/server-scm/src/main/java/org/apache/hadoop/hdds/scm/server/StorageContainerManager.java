@@ -289,7 +289,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
-  private PlacementPolicy ecContainerPlacementPolicy;
   private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private MetricsSystem ms;
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
@@ -750,7 +749,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
 
-    ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
+    PlacementPolicy ecContainerPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
         conf, scmNodeManager, clusterMap, true, placementMetrics);
 
     placementPolicyValidateProxy = new PlacementPolicyValidateProxy(

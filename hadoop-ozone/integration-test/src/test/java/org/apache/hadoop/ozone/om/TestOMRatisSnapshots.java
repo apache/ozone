@@ -106,12 +106,12 @@ public class TestOMRatisSnapshots {
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
   private static final int SNAPSHOTS_TO_CREATE = 100;
+  private static final String OM_SERVICE_ID = "om-service-test1";
+  private static final int NUM_OF_OMS = 3;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
-  private String omServiceId;
-  private int numOfOMs = 3;
   private OzoneBucket ozoneBucket;
   private String volumeName;
   private String bucketName;
@@ -134,7 +134,6 @@ public class TestOMRatisSnapshots {
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
     conf = new OzoneConfiguration();
-    omServiceId = "om-service-test1";
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16,
         StorageUnit.KB);
@@ -158,11 +157,11 @@ public class TestOMRatisSnapshots {
 
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId("om-service-test1")
-        .setNumOfOzoneManagers(numOfOMs)
+        .setNumOfOzoneManagers(NUM_OF_OMS)
         .setNumOfActiveOMs(2)
         .build();
     cluster.waitForClusterToBeReady();
-    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+    client = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, conf);
     objectStore = client.getObjectStore();
 
     volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);

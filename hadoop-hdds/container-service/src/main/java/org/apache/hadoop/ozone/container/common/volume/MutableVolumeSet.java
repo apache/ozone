@@ -86,6 +86,7 @@ public class MutableVolumeSet implements VolumeSet {
   private final StorageVolumeFactory volumeFactory;
   private final StorageVolume.VolumeType volumeType;
   private int maxVolumeFailuresTolerated;
+  private final VolumeHealthMetrics volumeHealthMetrics;
 
   public MutableVolumeSet(String dnUuid, ConfigurationSource conf,
       StateContext context, StorageVolume.VolumeType volumeType,
@@ -125,7 +126,14 @@ public class MutableVolumeSet implements VolumeSet {
       maxVolumeFailuresTolerated = dnConf.getFailedDataVolumesTolerated();
     }
 
-    initializeVolumeSet();
+    // Ensure metrics are unregistered if the volume set initialization fails.
+    this.volumeHealthMetrics = VolumeHealthMetrics.create(volumeType);
+    try {
+      initializeVolumeSet();
+    } catch (Exception e) {
+      volumeHealthMetrics.unregister();
+      throw e;
+    }
   }
 
   public void setFailedVolumeListener(CheckedRunnable<IOException> runnable) {
@@ -176,7 +184,9 @@ public class MutableVolumeSet implements VolumeSet {
         }
         volumeMap.put(volume.getStorageDir().getPath(), volume);
         volumeStateMap.get(volume.getStorageType()).add(volume);
+        volumeHealthMetrics.incrementHealthyVolumes();
       } catch (IOException e) {
+        volumeHealthMetrics.incrementFailedVolumes();
         if (volume != null) {
           volume.shutdown();
         }
@@ -339,6 +349,7 @@ public class MutableVolumeSet implements VolumeSet {
       } else {
         if (failedVolumeMap.containsKey(volumeRoot)) {
           failedVolumeMap.remove(volumeRoot);
+          volumeHealthMetrics.decrementFailedVolumes();
         }
 
         StorageVolume volume =
@@ -349,6 +360,7 @@ public class MutableVolumeSet implements VolumeSet {
         LOG.info("Added Volume : {} to VolumeSet",
             volume.getStorageDir().getPath());
         success = true;
+        volumeHealthMetrics.incrementHealthyVolumes();
       }
     } catch (IOException ex) {
       LOG.error("Failed to add volume " + volumeRoot + " to VolumeSet", ex);
@@ -370,7 +382,8 @@ public class MutableVolumeSet implements VolumeSet {
         volumeMap.remove(volumeRoot);
         volumeStateMap.get(volume.getStorageType()).remove(volume);
         failedVolumeMap.put(volumeRoot, volume);
-
+        volumeHealthMetrics.decrementHealthyVolumes();
+        volumeHealthMetrics.incrementFailedVolumes();
         LOG.info("Moving Volume : {} to failed Volumes", volumeRoot);
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
         LOG.info("Volume : {} is not active", volumeRoot);
@@ -392,10 +405,11 @@ public class MutableVolumeSet implements VolumeSet {
 
         volumeMap.remove(volumeRoot);
         volumeStateMap.get(volume.getStorageType()).remove(volume);
-
+        volumeHealthMetrics.decrementHealthyVolumes();
         LOG.info("Removed Volume : {} from VolumeSet", volumeRoot);
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
         failedVolumeMap.remove(volumeRoot);
+        volumeHealthMetrics.decrementFailedVolumes();
         LOG.info("Removed Volume : {} from failed VolumeSet", volumeRoot);
       } else {
         LOG.warn("Volume : {} does not exist in VolumeSet", volumeRoot);
@@ -417,6 +431,10 @@ public class MutableVolumeSet implements VolumeSet {
       }
     }
     volumeMap.clear();
+
+    if (volumeHealthMetrics != null) {
+      volumeHealthMetrics.unregister();
+    }
   }
 
   @Override
@@ -483,6 +501,11 @@ public class MutableVolumeSet implements VolumeSet {
 
   public StorageVolume.VolumeType getVolumeType() {
     return volumeType;
+  }
+
+  @VisibleForTesting
+  public VolumeHealthMetrics getVolumeHealthMetrics() {
+    return volumeHealthMetrics;
   }
 
   public double getIdealUsage() {

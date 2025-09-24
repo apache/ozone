@@ -786,13 +786,13 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.block.deletion.max.retry</name>
-    <value>4096</value>
+    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
+    <value>8</value>
     <tag>OZONE, SCM</tag>
     <description>
-      SCM wraps up many blocks in a deletion transaction and sends that to data
-      node for physical deletion periodically. This property determines how many
-      times SCM is going to retry sending a deletion operation to the data node.
+      Factor with which number of delete blocks sent to each datanode in every interval.
+      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
+      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
     </description>
   </property>
   <property>
@@ -1552,7 +1552,7 @@
   </property>
 
   <property>
-    <name>ozone.compaction.service.enabled</name>
+    <name>ozone.om.compaction.service.enabled</name>
     <value>false</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
@@ -2360,7 +2360,6 @@
     <tag>OZONE, OM, MANAGEMENT</tag>
     <description>
       The maximum number of filesystem snapshot allowed in an Ozone Manager.
-      This limit is set to 65000 because the ext4 filesystem limits the number of hard links per file to 65,000.
     </description>
   </property>
 
@@ -3515,6 +3514,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.om.event.buffer.capacity</name>
+    <value>20000</value>
+    <tag>OZONE, RECON, OM, PERFORMANCE</tag>
+    <description>
+      Maximum capacity of the event buffer used by Recon to queue OM delta updates
+      during task reinitialization. When tasks are being reprocessed on staging DB,
+      this buffer holds incoming delta updates to prevent blocking the OM sync process.
+      If the buffer overflows, task reinitialization will be triggered.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>
@@ -4418,7 +4428,7 @@
 
   <property>
     <name>ozone.om.snapshot.compaction.dag.prune.daemon.run.interval</name>
-    <value>3600s</value>
+    <value>10m</value>
     <tag>OZONE, OM</tag>
     <description>
       Interval at which compaction DAG pruning daemon thread is running to remove older snapshots with compaction

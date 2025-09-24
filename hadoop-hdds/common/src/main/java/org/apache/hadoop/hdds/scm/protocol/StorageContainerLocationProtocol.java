@@ -348,6 +348,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return a list of failed deleted block transactions.
    * @throws IOException
    */
+  @Deprecated
   List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
       long startTxId) throws IOException;
 
@@ -358,6 +359,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return num of successful reset
    * @throws IOException
    */
+  @Deprecated
   int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
 
   /**

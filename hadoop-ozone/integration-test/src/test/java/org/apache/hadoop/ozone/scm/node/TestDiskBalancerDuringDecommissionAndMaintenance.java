@@ -66,13 +66,12 @@ import org.junit.jupiter.api.Timeout;
 public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
   private static DiskBalancerManager diskBalancerManager;
   private static ScmClient scmClient;
 
   @BeforeAll
   public static void setup() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY, true);
     conf.setStrings(HddsConfigKeys.HDDS_DISK_BALANCER_REPORT_INTERVAL, "2s");
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,

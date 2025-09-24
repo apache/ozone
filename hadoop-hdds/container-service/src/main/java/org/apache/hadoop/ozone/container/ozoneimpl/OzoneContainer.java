@@ -295,6 +295,7 @@ public class OzoneContainer {
 
     Duration recoveringContainerScrubbingSvcInterval =
         dnConf.getRecoveringContainerScrubInterval();
+
     long recoveringContainerScrubbingServiceTimeout = config
         .getTimeDuration(OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT,
             OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT_DEFAULT,
@@ -491,6 +492,11 @@ public class OzoneContainer {
   @VisibleForTesting
   public void resumeContainerScrub() {
     backgroundScanners.forEach(AbstractBackgroundContainerScanner::unpause);
+  }
+
+  @VisibleForTesting
+  public OnDemandContainerScanner getOnDemandScanner() {
+    return onDemandScanner;
   }
 
   /**
