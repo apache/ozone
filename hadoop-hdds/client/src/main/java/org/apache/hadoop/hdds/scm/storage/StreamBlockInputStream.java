@@ -103,8 +103,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     setPipeline(pipeline);
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
-    this.validators = ContainerProtocolCalls.toValidatorList(
-        (request, response) -> validateBlock(response));
+    this.validators = ContainerProtocolCalls.toValidatorList(this::validateBlock);
     this.verifyChecksum = config.isChecksumVerify();
     this.refreshFunction = refreshFunction;
     this.retryPolicy =
@@ -617,6 +616,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   }
 
   private void validateBlock(
+      ContainerProtos.ContainerCommandRequestProto request,
       ContainerProtos.ContainerCommandResponseProto response
   ) throws IOException {
 
@@ -640,16 +640,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
             buffersLen));
       }
 
-
       if (verifyChecksum) {
         ChecksumData checksumData = ChecksumData.getFromProtoBuf(
             chunkInfo.getChecksumData());
-        int startIndex = (int) readChunk.getChunkData().getOffset() / checksumData.getBytesPerChecksum();
-
+        int startIndex = (int) (readChunk.getChunkData().getOffset() - readChunk.getChunkData().getChunkOffsetInBlock())
+            / checksumData.getBytesPerChecksum();
         // ChecksumData stores checksum for each 'numBytesPerChecksum'
         // number of bytes in a list. Compute the index of the first
         // checksum to match with the read data
-
         Checksum.verifyChecksum(byteStrings, checksumData, startIndex);
       }
     }

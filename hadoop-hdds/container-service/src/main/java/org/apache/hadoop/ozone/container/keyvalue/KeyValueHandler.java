@@ -2079,6 +2079,9 @@ public class KeyValueHandler extends Handler {
 
       long len =  readBlock.getLen();
       long adjustedChunkOffset, adjustedChunkLen;
+      // the first chunk length is the largest one. Either the block is less than the chunk size and there is only
+      // a single chunk, or the block is larger and the chunks are all fixed size (eg 4MB) until the final chunk.
+      long blockChunkSize = chunkInfos.get(0).getLen();
       do {
         ContainerProtos.ChunkInfo chunk = chunkInfos.get(chunkIndex);
         if (readBlock.getVerifyChecksum()) {
@@ -2093,10 +2096,12 @@ public class KeyValueHandler extends Handler {
               chunk.getLen() + chunk.getOffset() - chunkOffset, len);
         }
 
-        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(
-            ContainerProtos.ChunkInfo.newBuilder(chunk)
-                .setOffset(adjustedChunkOffset)
-                .setLen(adjustedChunkLen).build());
+        ContainerProtos.ChunkInfo chunkInfoProto = ContainerProtos.ChunkInfo.newBuilder(chunk)
+            .setOffset(adjustedChunkOffset)
+            .setLen(adjustedChunkLen)
+            .setChunkOffsetInBlock(blockChunkSize * chunkIndex).build();
+        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
+
         BlockUtils.verifyReplicaIdx(kvContainer, blockID);
         BlockUtils.verifyBCSId(kvContainer, blockID);
         data = getChunkManager().readChunk(
@@ -2106,7 +2111,7 @@ public class KeyValueHandler extends Handler {
         streamObserver.onNext(
             getReadBlockResponse(request,
                 blockData.getProtoBufMessage().getBlockID(),
-                chunkInfo.getProtoBufMessage(),
+                chunkInfoProto,
                 data, byteBufferToByteString));
         len -= adjustedChunkLen + adjustedChunkOffset - chunkOffset;
         chunkOffset = 0;

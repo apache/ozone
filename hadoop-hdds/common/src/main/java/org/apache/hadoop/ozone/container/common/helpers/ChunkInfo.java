@@ -37,6 +37,7 @@ public class ChunkInfo {
   private ChecksumData checksumData;
   private final Map<String, String> metadata;
   private ByteString stripeChecksum;
+  private long chunkOffsetInBlock;
 
   // For older clients reading chunks in V0 version (all read data should
   // reside in one buffer). This variable should be set to true for older
@@ -97,6 +98,10 @@ public class ChunkInfo {
       chunkInfo.setStripeChecksum(info.getStripeChecksum());
     }
 
+    if (info.hasChunkOffsetInBlock()) {
+      chunkInfo.setChunkOffsetInBlock(info.getChunkOffsetInBlock());
+    }
+
     return chunkInfo;
   }
 
@@ -119,6 +124,7 @@ public class ChunkInfo {
     } else {
       builder.setChecksumData(this.checksumData.getProtoBufMessage());
     }
+    builder.setChunkOffsetInBlock(this.chunkOffsetInBlock);
 
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
       ContainerProtos.KeyValue.Builder keyValBuilder =
@@ -183,12 +189,21 @@ public class ChunkInfo {
     return metadata.get(key);
   }
 
+  public void setChunkOffsetInBlock(long chunkOffsetInBlock) {
+    this.chunkOffsetInBlock = chunkOffsetInBlock;
+  }
+
+  public long getChunkOffsetInBlock() {
+    return chunkOffsetInBlock;
+  }
+
   @Override
   public String toString() {
     return "ChunkInfo{" +
         "chunkName='" + chunkName +
         ", offset=" + offset +
         ", len=" + len +
+        ", chunkOffsetInBlock=" + chunkOffsetInBlock +
         '}';
   }
 
