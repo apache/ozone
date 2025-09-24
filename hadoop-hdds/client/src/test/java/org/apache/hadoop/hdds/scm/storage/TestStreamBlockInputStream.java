@@ -57,7 +57,6 @@ public class TestStreamBlockInputStream {
   private List<ChunkInfo> chunks;
   private Map<String, byte[]> chunkDataMap;
   private Checksum checksum;
-  private Function<BlockID, BlockLocationInfo> refreshFunction;
   private BlockID blockID;
   private static final String CHUNK_NAME = "chunk-";
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -66,7 +65,7 @@ public class TestStreamBlockInputStream {
   public void setup() throws Exception {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setStreamReadBlock(true);
-    refreshFunction = mock(Function.class);
+    Function<BlockID, BlockLocationInfo> refreshFunction = mock(Function.class);
     blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
     createChunkList(5);
