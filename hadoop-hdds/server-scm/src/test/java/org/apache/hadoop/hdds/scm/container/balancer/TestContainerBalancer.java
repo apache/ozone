@@ -129,6 +129,8 @@ public class TestContainerBalancer {
 
   @Test
   public void testStartBalancerStop() throws Exception {
+    //stop should not throw an exception as it is idempotent
+    assertDoesNotThrow(() -> containerBalancer.stopBalancer());
     startBalancer(balancerConfiguration);
     assertThrows(IllegalContainerBalancerStateException.class,
         () -> containerBalancer.startBalancer(balancerConfiguration),
@@ -144,8 +146,7 @@ public class TestContainerBalancer {
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
 
     // If the balancer is already stopped, the stop command should do nothing
-    // and return successfully with exit code 0 as stopBalancer is idempotent
-    assertDoesNotThrow(() -> containerBalancer.stopBalancer());
+    // and return successfully as stopBalancer is idempotent
     assertDoesNotThrow(() -> containerBalancer.stopBalancer());
   }
 

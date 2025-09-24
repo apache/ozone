@@ -189,6 +189,7 @@ public class TestContainerBalancerOperations {
   public void testStopBalancerIdempotent() throws IOException {
     boolean running = containerBalancerClient.getContainerBalancerStatus();
     assertFalse(running);
+    assertDoesNotThrow(() -> containerBalancerClient.stopContainerBalancer());
 
     Optional<Double> threshold = Optional.of(0.1);
     Optional<Integer> iterations = Optional.of(10000);
@@ -216,8 +217,7 @@ public class TestContainerBalancerOperations {
     running = containerBalancerClient.getContainerBalancerStatus();
     assertFalse(running);
 
-    // Calling stop balancer multiple times should not throw an exception
-    assertDoesNotThrow(() -> containerBalancerClient.stopContainerBalancer());
+    // Calling stop balancer again should not throw an exception
     assertDoesNotThrow(() -> containerBalancerClient.stopContainerBalancer());
   }
 }
