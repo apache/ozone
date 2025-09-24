@@ -156,6 +156,7 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
+  @SuppressWarnings("checkstyle:methodlength")
   public OzoneContainer(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context, CertificateClient certClient,
@@ -204,8 +205,8 @@ public class OzoneContainer {
     metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
-    IncrementalReportSender<Container> icrSender = container -> {
-      synchronized (containerSet) {
+    IncrementalReportSender<Container> icrSender = new IncrementalReportSender<Container>() {
+      private void sendICR(Container container, boolean immediate) throws StorageContainerException {
         ContainerReplicaProto containerReport = container.getContainerReport();
 
         IncrementalContainerReportProto icr = IncrementalContainerReportProto
@@ -213,7 +214,23 @@ public class OzoneContainer {
             .addReport(containerReport)
             .build();
         context.addIncrementalReport(icr);
-        context.getParent().triggerHeartbeat();
+        if (immediate) {
+          context.getParent().triggerHeartbeat();
+        }
+      }
+      
+      @Override
+      public void send(Container container) throws StorageContainerException {
+        synchronized (containerSet) {
+          sendICR(container, true); // Immediate
+        }
+      }
+      
+      @Override
+      public void sendDeferred(Container container) throws StorageContainerException {
+        synchronized (containerSet) {
+          sendICR(container, false); // Deferred
+        }
       }
     };
 
