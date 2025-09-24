@@ -60,7 +60,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
 /**
  * OM metadata manager interface.
  */
-public interface OMMetadataManager extends DBStoreHAManager {
+public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   /**
    * Start metadata manager.
    *

@@ -90,9 +90,6 @@ import org.mockito.stubbing.Answer;
 public class TestDeleteBlocksCommandHandler {
   @TempDir
   private Path folder;
-  private OzoneConfiguration conf;
-  private ContainerLayoutVersion layout;
-  private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
   private DeleteBlocksCommandHandler handler;
   private String schemaVersion;
@@ -101,17 +98,16 @@ public class TestDeleteBlocksCommandHandler {
 
   private void prepareTest(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     setup();
   }
 
   private void setup() throws Exception {
-    conf = new OzoneConfiguration();
-    layout = ContainerLayoutVersion.FILE_PER_BLOCK;
-    ozoneContainer = mock(OzoneContainer.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     containerSet = newContainerSet();
     volume1 = mock(HddsVolume.class);
     when(volume1.getStorageID()).thenReturn("uuid-1");

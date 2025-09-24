@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+import static org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo.INVALID_REPLICA_INDEX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -44,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
@@ -98,6 +100,11 @@ public class ContainerSet implements Iterable<Container<?>> {
     return clock.millis();
   }
 
+  @Nullable
+  public WitnessedContainerMetadataStore getContainerMetadataStore() {
+    return containerMetadataStore;
+  }
+
   @VisibleForTesting
   public void setRecoveringTimeout(long recoveringTimeout) {
     this.recoveringTimeout = recoveringTimeout;
@@ -144,11 +151,11 @@ public class ContainerSet implements Iterable<Container<?>> {
    * exist in the set.
    * @param containerID The container in this set to scan.
    */
-  public void scanContainer(long containerID) {
+  public void scanContainer(long containerID, String reasonForScan) {
     if (containerScanner != null) {
       Container<?> container = getContainer(containerID);
       if (container != null) {
-        containerScanner.scanContainer(container);
+        containerScanner.scanContainer(container, reasonForScan);
       } else {
         LOG.warn("Request to scan container {} which was not found in the container set", containerID);
       }
@@ -160,11 +167,11 @@ public class ContainerSet implements Iterable<Container<?>> {
    * This is a no-op if no scanner is registered or the container does not exist in the set.
    * @param containerID The container in this set to scan.
    */
-  public void scanContainerWithoutGap(long containerID) {
+  public void scanContainerWithoutGap(long containerID, String reasonForScan) {
     if (containerScanner != null) {
       Container<?> container = getContainer(containerID);
       if (container != null) {
-        containerScanner.scanContainerWithoutGap(container);
+        containerScanner.scanContainerWithoutGap(container, reasonForScan);
       } else {
         LOG.warn("Request to scan container {} which was not found in the container set", containerID);
       }
@@ -192,7 +199,7 @@ public class ContainerSet implements Iterable<Container<?>> {
         LOG.debug("Container with container Id {} is added to containerMap",
             containerId);
       }
-      updateContainerIdTable(containerId, containerState);
+      updateContainerIdTable(containerId, container.getContainerData());
       missingContainerSet.remove(containerId);
       if (container.getContainerData().getState() == RECOVERING) {
         recoveringContainerMap.put(
@@ -207,11 +214,17 @@ public class ContainerSet implements Iterable<Container<?>> {
     }
   }
 
-  private void updateContainerIdTable(long containerId, State containerState) throws StorageContainerException {
+  private void updateContainerIdTable(long containerId, ContainerData containerData) throws StorageContainerException {
     if (null != containerMetadataStore) {
       try {
-        containerMetadataStore.getContainerCreateInfoTable().put(ContainerID.valueOf(containerId),
-            ContainerCreateInfo.valueOf(containerState));
+        ContainerID containerIdObj = ContainerID.valueOf(containerId);
+        Table<ContainerID, ContainerCreateInfo> containerCreateInfoTable =
+            containerMetadataStore.getContainerCreateInfoTable();
+        ContainerCreateInfo containerCreateInfo = containerCreateInfoTable.get(containerIdObj);
+        if (containerCreateInfo == null || containerCreateInfo.getReplicaIndex() == INVALID_REPLICA_INDEX) {
+          containerCreateInfoTable.put(containerIdObj,
+              ContainerCreateInfo.valueOf(containerData.getState(), containerData.getReplicaIndex()));
+        }
       } catch (IOException e) {
         throw new StorageContainerException(e, ContainerProtos.Result.IO_EXCEPTION);
       }

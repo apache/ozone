@@ -47,7 +47,6 @@ public final class OmTestManagers {
   private final OzoneManager om;
   private final KeyManager keyManager;
   private final OMMetadataManager metadataManager;
-  private KeyProviderCryptoExtension kmsProvider;
   private final VolumeManager volumeManager;
   private final BucketManager bucketManager;
   private final PrefixManager prefixManager;
@@ -148,7 +147,7 @@ public final class OmTestManagers {
 
   //initializing and returning a mock kmsProvider
   public KeyProviderCryptoExtension kmsProviderInit() {
-    kmsProvider = mock(KeyProviderCryptoExtension.class);
+    KeyProviderCryptoExtension kmsProvider = mock(KeyProviderCryptoExtension.class);
 
     HddsWhiteboxTestUtils.setInternalState(om,
             "kmsProvider", kmsProvider);

@@ -82,6 +82,8 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
         threshold);
   }
 
+
+
   /**
    * Nested class for testing NSSummaryTaskWithFSO reprocess.
    */
@@ -109,10 +111,10 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
 
     @Test
     public void testReprocessGetFiles() {
-      assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(2, nsSummaryForBucket1.getNumOfFiles());
       assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
 
-      assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
+      assertEquals(KEY_ONE_SIZE + KEY_THREE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
       assertEquals(KEY_TWO_OLD_SIZE + KEY_FOUR_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
     }
@@ -225,13 +227,6 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
    */
   @Nested
   public class TestProcess {
-    private OMDBUpdateEvent keyEvent1;
-    private OMDBUpdateEvent keyEvent2;
-    private OMDBUpdateEvent keyEvent3;
-    private OMDBUpdateEvent keyEvent4;
-    private OMDBUpdateEvent keyEvent5;
-    private OMDBUpdateEvent keyEvent6;
-    private OMDBUpdateEvent keyEvent7;
 
     private Pair<Integer, Boolean> result;
 
@@ -247,28 +242,28 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
       String omPutKey = BUCKET_TWO_OBJECT_ID + OM_KEY_PREFIX + FILE_FIVE;
       OmKeyInfo omPutKeyInfo = buildOmKeyInfo(VOL, BUCKET_TWO, KEY_FIVE,
           FILE_FIVE, KEY_FIVE_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_FIVE_SIZE);
-      keyEvent1 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
-          .setKey(omPutKey)
-          .setValue(omPutKeyInfo)
-          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
-              .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
-          .build();
+      OMDBUpdateEvent keyEvent1 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omPutKey)
+                                      .setValue(omPutKeyInfo)
+                                      .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
+                                                    .getName())
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+                                      .build();
 
       // delete file 1 under bucket 1
       String omDeleteKey = BUCKET_ONE_OBJECT_ID + OM_KEY_PREFIX + FILE_ONE;
       OmKeyInfo omDeleteInfo = buildOmKeyInfo(
           VOL, BUCKET_ONE, KEY_ONE, FILE_ONE,
           KEY_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID);
-      keyEvent2 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
-          .setKey(omDeleteKey)
-          .setValue(omDeleteInfo)
-          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
-              .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
-          .build();
+      OMDBUpdateEvent keyEvent2 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omDeleteKey)
+                                      .setValue(omDeleteInfo)
+                                      .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
+                                                    .getName())
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+                                      .build();
 
       // update file 2's size under bucket 2
       String omUpdateKey = BUCKET_TWO_OBJECT_ID + OM_KEY_PREFIX + FILE_TWO;
@@ -278,52 +273,52 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
       OmKeyInfo omUpdateInfo = buildOmKeyInfo(
           VOL, BUCKET_TWO, KEY_TWO, FILE_TWO,
           KEY_TWO_OBJECT_ID, BUCKET_TWO_OBJECT_ID, KEY_TWO_UPDATE_SIZE);
-      keyEvent3 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmKeyInfo>()
-          .setKey(omUpdateKey)
-          .setValue(omUpdateInfo)
-          .setOldValue(omOldInfo)
-          .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
-              .getName())
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
-          .build();
+      OMDBUpdateEvent keyEvent3 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmKeyInfo>()
+                                      .setKey(omUpdateKey)
+                                      .setValue(omUpdateInfo)
+                                      .setOldValue(omOldInfo)
+                                      .setTable(getOmMetadataManager().getKeyTable(getBucketLayout())
+                                                    .getName())
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
+                                      .build();
 
       // Events for DirectoryTable change:
       // add dir 4 under bucket 1
       String omDirPutKey1 = BUCKET_ONE_OBJECT_ID + OM_KEY_PREFIX + DIR_FOUR;
       OmDirectoryInfo omDirPutValue1 = buildOmDirInfo(DIR_FOUR,
           DIR_FOUR_OBJECT_ID, BUCKET_ONE_OBJECT_ID);
-      keyEvent4 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmDirectoryInfo>()
-          .setKey(omDirPutKey1)
-          .setValue(omDirPutValue1)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
-          .setTable(getOmMetadataManager().getDirectoryTable().getName())
-          .build();
+      OMDBUpdateEvent keyEvent4 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmDirectoryInfo>()
+                                      .setKey(omDirPutKey1)
+                                      .setValue(omDirPutValue1)
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+                                      .setTable(getOmMetadataManager().getDirectoryTable().getName())
+                                      .build();
 
       // add dir 5 under bucket 2
       String omDirPutKey2 = BUCKET_TWO_OBJECT_ID + OM_KEY_PREFIX + DIR_FIVE;
       OmDirectoryInfo omDirPutValue2 = buildOmDirInfo(DIR_FIVE,
           DIR_FIVE_OBJECT_ID, BUCKET_TWO_OBJECT_ID);
-      keyEvent5 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmDirectoryInfo>()
-          .setKey(omDirPutKey2)
-          .setValue(omDirPutValue2)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
-          .setTable(getOmMetadataManager().getDirectoryTable().getName())
-          .build();
+      OMDBUpdateEvent keyEvent5 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmDirectoryInfo>()
+                                      .setKey(omDirPutKey2)
+                                      .setValue(omDirPutValue2)
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.PUT)
+                                      .setTable(getOmMetadataManager().getDirectoryTable().getName())
+                                      .build();
 
       // delete dir 3 under dir 1
       String omDirDeleteKey = DIR_ONE_OBJECT_ID + OM_KEY_PREFIX + DIR_THREE;
       OmDirectoryInfo omDirDeleteValue = buildOmDirInfo(DIR_THREE,
           DIR_THREE_OBJECT_ID, DIR_ONE_OBJECT_ID);
-      keyEvent6 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmDirectoryInfo>()
-          .setKey(omDirDeleteKey)
-          .setValue(omDirDeleteValue)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
-          .setTable(getOmMetadataManager().getDirectoryTable().getName())
-          .build();
+      OMDBUpdateEvent keyEvent6 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmDirectoryInfo>()
+                                      .setKey(omDirDeleteKey)
+                                      .setValue(omDirDeleteValue)
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
+                                      .setTable(getOmMetadataManager().getDirectoryTable().getName())
+                                      .build();
 
       // rename dir1
       String omDirUpdateKey = BUCKET_ONE_OBJECT_ID + OM_KEY_PREFIX + DIR_ONE;
@@ -331,14 +326,14 @@ public class TestNSSummaryTaskWithFSO extends AbstractNSSummaryTaskTest {
           DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID);
       OmDirectoryInfo omDirUpdateValue = buildOmDirInfo(DIR_ONE_RENAME,
           DIR_ONE_OBJECT_ID, BUCKET_ONE_OBJECT_ID);
-      keyEvent7 = new OMDBUpdateEvent.
-          OMUpdateEventBuilder<String, OmDirectoryInfo>()
-          .setKey(omDirUpdateKey)
-          .setValue(omDirUpdateValue)
-          .setOldValue(omDirOldValue)
-          .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
-          .setTable(getOmMetadataManager().getDirectoryTable().getName())
-          .build();
+      OMDBUpdateEvent keyEvent7 = new OMDBUpdateEvent.
+                                          OMUpdateEventBuilder<String, OmDirectoryInfo>()
+                                      .setKey(omDirUpdateKey)
+                                      .setValue(omDirUpdateValue)
+                                      .setOldValue(omDirOldValue)
+                                      .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
+                                      .setTable(getOmMetadataManager().getDirectoryTable().getName())
+                                      .build();
 
       return new OMUpdateEventBatch(Arrays.asList(
           keyEvent1, keyEvent2, keyEvent3, keyEvent4, keyEvent5,
