@@ -285,7 +285,7 @@ public class DiskBalancerManager {
   public DiskBalancerStatus getStatus(DatanodeDetails datanodeDetails) {
     return statusMap.computeIfAbsent(datanodeDetails,
         dn -> new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN, new DiskBalancerConfiguration(),
-            0, 0, 0, 0, 0.0));
+            0, 0, 0, 0, Double.NaN));
   }
 
   @VisibleForTesting
@@ -306,8 +306,7 @@ public class DiskBalancerManager {
     long failureMoveCount = reportProto.getFailureMoveCount();
     long bytesToMove = reportProto.getBytesToMove();
     long balancedBytes = reportProto.getBalancedBytes();
-    double volumeDataDensity = reportProto.hasVolumeDataDensity() ? 
-        reportProto.getVolumeDataDensity() : 0.0;
+    double volumeDataDensity = reportProto.getVolumeDataDensity();
 
     statusMap.put(dn, new DiskBalancerStatus(
         isRunning ? DiskBalancerRunningStatus.RUNNING : DiskBalancerRunningStatus.STOPPED,
