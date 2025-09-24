@@ -102,62 +102,58 @@ public final class KeyPrefixContainerCodec
     final ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer();
     final int totalLength = byteBuffer.remaining();
     final int startPosition = byteBuffer.position();
-
     final byte[] delimiterBytes = KEY_DELIMITER.getBytes(UTF_8);
+    final int delimiterLength = delimiterBytes.length;
 
-    int firstDelimiterIndex = findDelimiterInBuffer(byteBuffer, delimiterBytes);
-
-    byteBuffer.position(startPosition);
-
-    // If no delimiter found, entire buffer is key prefix
-    if (firstDelimiterIndex == -1) {
-      String keyPrefix = decodeStringFromBuffer(byteBuffer, totalLength);
-      return KeyPrefixContainer.get(keyPrefix, -1, -1);
-    }
-
-    // Decode key prefix without copying
-    String keyPrefix = decodeStringFromBuffer(byteBuffer, firstDelimiterIndex);
-
-    // Skip delimiter
-    byteBuffer.position(byteBuffer.position() + delimiterBytes.length);
-
-    long version = -1;
-    long containerId = -1;
-
-    if (byteBuffer.remaining() >= Long.BYTES) {
-      version = byteBuffer.getLong();
-
-      if (byteBuffer.remaining() >= delimiterBytes.length + Long.BYTES) {
-        // Skip delimiter
-        byteBuffer.position(byteBuffer.position() + delimiterBytes.length);
-        containerId = byteBuffer.getLong();
-      }
-    }
-
-    return KeyPrefixContainer.get(keyPrefix, version, containerId);
-  }
-
-  /**
-   * Find delimiter in ByteBuffer without copying data.
-   * Returns relative position of delimiter, or -1 if not found.
-   */
-  private int findDelimiterInBuffer(ByteBuffer buffer, byte[] delimiter) {
-    final int startPos = buffer.position();
-    final int limit = buffer.limit();
-
-    for (int i = startPos; i <= limit - delimiter.length; i++) {
-      boolean found = true;
-      for (int j = 0; j < delimiter.length; j++) {
-        if (buffer.get(i + j) != delimiter[j]) {
-          found = false;
+    // Check if we have at least one delimiter + long value
+    if (totalLength >= delimiterLength + Long.BYTES) {
+      // Check for delimiter before the last 8 bytes - could be containerId or version
+      boolean hasLastDelimiter = true;
+      int lastDelimiterStart = startPosition + totalLength - Long.BYTES - delimiterLength;
+      byteBuffer.position(lastDelimiterStart);
+      for (byte delimiterByte : delimiterBytes) {
+        if (byteBuffer.get() != delimiterByte) {
+          hasLastDelimiter = false;
           break;
         }
       }
-      if (found) {
-        return i - startPos;
+
+      if (hasLastDelimiter) {
+        // Extract the last value
+        long lastValue = byteBuffer.getLong();
+        int remainingLength = lastDelimiterStart - startPosition;
+
+        // Check if there's another delimiter+long before this one
+        if (remainingLength >= delimiterLength + Long.BYTES) {
+          boolean hasSecondLastDelimiter = true;
+          int secondLastDelimiterStart = startPosition + remainingLength - Long.BYTES - delimiterLength;
+          byteBuffer.position(secondLastDelimiterStart);
+          for (byte delimiterByte : delimiterBytes) {
+            if (byteBuffer.get() != delimiterByte) {
+              hasSecondLastDelimiter = false;
+              break;
+            }
+          }
+
+          if (hasSecondLastDelimiter) {
+            long version = byteBuffer.getLong();
+
+            byteBuffer.position(startPosition);
+            String keyPrefix = decodeStringFromBuffer(byteBuffer, secondLastDelimiterStart - startPosition);
+            return KeyPrefixContainer.get(keyPrefix, version, lastValue);
+          }
+        }
+
+        // Only one delimiter+value pair - it's a version, not containerId
+        byteBuffer.position(startPosition);
+        String keyPrefix = decodeStringFromBuffer(byteBuffer, remainingLength);
+        return KeyPrefixContainer.get(keyPrefix, lastValue, -1);
       }
     }
-    return -1;
+
+    byteBuffer.position(startPosition);
+    String keyPrefix = decodeStringFromBuffer(byteBuffer, totalLength);
+    return KeyPrefixContainer.get(keyPrefix, -1, -1);
   }
 
   /**
