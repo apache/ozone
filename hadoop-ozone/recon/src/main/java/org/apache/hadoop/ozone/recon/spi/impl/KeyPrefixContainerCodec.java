@@ -21,11 +21,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
+import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
-import jakarta.annotation.Nonnull;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -62,7 +62,7 @@ public final class KeyPrefixContainerCodec
   }
 
   @Override
-  public CodecBuffer toCodecBuffer(@Nonnull KeyPrefixContainer object, CodecBuffer.Allocator allocator) throws CodecException {
+  public CodecBuffer toCodecBuffer(@Nonnull KeyPrefixContainer object, CodecBuffer.Allocator allocator) {
     Preconditions.checkNotNull(object, "Null object can't be converted to CodecBuffer.");
 
     final byte[] keyPrefixBytes = object.getKeyPrefix().getBytes(UTF_8);
