@@ -33,10 +33,13 @@
     <aopalliance.version>1.0</aopalliance.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
+    <aspectj.java11.version>1.9.20</aspectj.java11.version>
+    <aspectj.java21.version>1.9.24</aspectj.java21.version>
+    <!-- Default aspectj version for java8 -->
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.4</assertj.version>
+    <assertj.version>3.27.5</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.33.4</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.33.9</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.81</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -60,7 +63,7 @@
     <commons-net.version>3.11.1</commons-net.version>
     <commons-text.version>1.13.1</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
-    <compile-testing.version>0.22.0</compile-testing.version>
+    <compile-testing.version>0.23.0</compile-testing.version>
     <copy-rename-maven-plugin.version>1.0.1</copy-rename-maven-plugin.version>
     <curator.version>4.2.0</curator.version>
     <cyclonedx.version>2.9.1</cyclonedx.version>
@@ -91,7 +94,7 @@
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
     <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
     <gson.version>2.13.1</gson.version>
-    <guava.version>33.4.8-jre</guava.version>
+    <guava.version>33.5.0-jre</guava.version>
     <guice.version>6.0.0</guice.version>
     <hadoop-thirdparty.version>1.4.0</hadoop-thirdparty.version>
     <hadoop.version>3.4.1</hadoop.version>
@@ -105,7 +108,6 @@
     <io.grpc.version>1.71.0</io.grpc.version>
     <jackson2-bom.version>2.16.2</jackson2-bom.version>
     <jacoco.version>0.8.13</jacoco.version>
-    <jaeger.version>1.8.1</jaeger.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.validation.version>2.0.2</jakarta.validation.version>
@@ -124,7 +126,7 @@
     <jetty.version>9.4.58.v20250814</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
-    <jline.version>3.30.5</jline.version>
+    <jline.version>3.30.6</jline.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
@@ -163,6 +165,7 @@
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
     <maven.compiler.createMissingPackageInfoClass>false</maven.compiler.createMissingPackageInfoClass>
+    <maven.compiler.release>${javac.version}</maven.compiler.release>
     <maven.core.version>3.9.10</maven.core.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <metainf-services.version>1.11</metainf-services.version>
@@ -174,7 +177,7 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentracing.version>0.33.0</opentracing.version>
+    <opentelemetry.version>1.54.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.release>Joshua Tree</ozone.release>
     <ozone.version>2.1.0-SNAPSHOT</ozone.version>
@@ -534,35 +537,34 @@
         <version>${dropwizard-metrics.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.jaegertracing</groupId>
-        <artifactId>jaeger-client</artifactId>
-        <version>${jaeger.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-core</artifactId>
-          </exclusion>
-        </exclusions>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-api</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.jaegertracing</groupId>
-        <artifactId>jaeger-core</artifactId>
-        <version>${jaeger.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-context</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.opentracing</groupId>
-        <artifactId>opentracing-api</artifactId>
-        <version>${opentracing.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-exporter-otlp</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.opentracing</groupId>
-        <artifactId>opentracing-noop</artifactId>
-        <version>${opentracing.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
-        <groupId>io.opentracing</groupId>
-        <artifactId>opentracing-util</artifactId>
-        <version>${opentracing.version}</version>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk-common</artifactId>
+        <version>${opentelemetry.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-sdk-trace</artifactId>
+        <version>${opentelemetry.version}</version>
       </dependency>
       <dependency>
         <groupId>io.prometheus</groupId>
@@ -1232,6 +1234,11 @@
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-mini-cluster</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-multitenancy-ranger</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
@@ -2676,25 +2683,23 @@
         </plugins>
       </build>
     </profile>
-    <!-- Profiles for specific JDK versions -->
+    <!-- Profiles for specific aspectj versions -->
     <profile>
-      <id>java8</id>
+      <id>aspectj-java11-20</id>
       <activation>
-        <jdk>[,8]</jdk>
+        <jdk>[11,20]</jdk>
       </activation>
       <properties>
-        <maven.compiler.source>${javac.version}</maven.compiler.source>
-        <maven.compiler.target>${javac.version}</maven.compiler.target>
+        <aspectj.version>${aspectj.java11.version}</aspectj.version>
       </properties>
     </profile>
     <profile>
-      <id>java9-or-later</id>
+      <id>aspectj-java21-or-later</id>
       <activation>
-        <jdk>[9,]</jdk>
+        <jdk>[21,]</jdk>
       </activation>
       <properties>
-        <!-- supported since Java 9 -->
-        <maven.compiler.release>${javac.version}</maven.compiler.release>
+        <aspectj.version>${aspectj.java21.version}</aspectj.version>
       </properties>
     </profile>
     <profile>
