@@ -548,6 +548,11 @@ public final class OzoneConsts {
       "compactionLogTable";
 
   /**
+   * DB operation info table name. Referenced in RDBStore.
+   */
+  public static final String OPERATION_INFO_TABLE = "operationInfoTable";
+
+  /**
    * S3G multipart upload request's ETag header key.
    */
   public static final String ETAG = "ETag";
