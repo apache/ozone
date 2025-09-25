@@ -26,8 +26,6 @@ import com.codahale.metrics.Slf4jReporter;
 import io.opentelemetry.api.trace.StatusCode;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
