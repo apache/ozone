@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -150,32 +151,35 @@ public final class ContainerMerkleTreeTestUtils {
   }
 
   public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numBlocks) {
-    return buildTestTree(conf, numBlocks, 0);
-  }
-
-  public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numLiveBlocks,
-      int numDeletedBlocks) {
     ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
 
     byte byteValue = 1;
-    for (int i = 0; i < numLiveBlocks; i++) {
-      // Use even block ID's for live blocks.
-      int blockID = (i + 1) * 2;
+    for (int i = 0; i < numBlocks; i++) {
+      long blockID = i + 1;
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
         tree.addChunks(blockID, true,
             buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
       }
     }
-
-    for (int i = 0; i < numDeletedBlocks; i++) {
-      // Use odd block ID's for deleted blocks.
-      int blockID = (i * 2) + 1;
-      for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
-        tree.setDeletedBlock(blockID, byteValue++);
-      }
-    }
-
     return tree;
+  }
+
+  /**
+   * Builds a tree with continuous block IDs from 1 to numLiveBlocks, then writes marks the specified IDs within that
+   * set of blocks as deleted.
+   */
+  public static ContainerProtos.ContainerMerkleTree buildTestTree(ConfigurationSource conf, int numLiveBlocks,
+                                                        long... deletedBlockIDs) {
+
+    ContainerMerkleTreeWriter treeWriter = buildTestTree(conf, numLiveBlocks);
+    return treeWriter.addDeletedBlocks(getDeletedBlockData(conf, deletedBlockIDs), true);
+  }
+
+  public static List<BlockData> getDeletedBlockData(ConfigurationSource conf, long... blockIDs) {
+    List<BlockData> deletedBlockData = new ArrayList<>();
+    // Container ID within the block is not used in these tests.
+    Arrays.stream(blockIDs).forEach(id -> deletedBlockData.add(buildBlockData(conf, 1, id)));
+    return deletedBlockData;
   }
 
   /**
