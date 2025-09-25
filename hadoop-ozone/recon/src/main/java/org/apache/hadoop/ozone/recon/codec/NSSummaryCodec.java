@@ -21,9 +21,13 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.ShortCodec;
@@ -54,6 +58,101 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
   @Override
   public Class<NSSummary> getTypeClass() {
     return NSSummary.class;
+  }
+
+  @Override
+  public boolean supportCodecBuffer() {
+    return true;
+  }
+
+  @Override
+  public CodecBuffer toCodecBuffer(@Nonnull NSSummary object, CodecBuffer.Allocator allocator) throws CodecException {
+    try {
+      Set<Long> childDirs = object.getChildDir();
+      int numOfChildDirs = childDirs.size();
+      String dirName = object.getDirName();
+
+      CodecBuffer dirNameBuffer = stringCodec.toCodecBuffer(dirName, allocator);
+      int dirNameSize = dirNameBuffer.readableBytes();
+
+      // total size: primitives + childDirs + dirName length + dirName data
+      final int totalSize = Integer.BYTES * (3 + ReconConstants.NUM_OF_FILE_SIZE_BINS) // numFiles + sizes + buckets
+          + Long.BYTES * (numOfChildDirs + 2) // childDirs + sizeOfFiles + parentId
+          + Short.BYTES // fileSizeBucket length
+          + dirNameSize; // actual dirName bytes
+
+      CodecBuffer buffer = allocator.apply(totalSize);
+
+      buffer.putInt(object.getNumOfFiles());
+      buffer.putLong(object.getSizeOfFiles());
+      buffer.putShort((short) ReconConstants.NUM_OF_FILE_SIZE_BINS);
+      
+      int[] fileSizeBucket = object.getFileSizeBucket();
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
+        buffer.putInt(fileSizeBucket[i]);
+      }
+
+      buffer.putInt(numOfChildDirs);
+      for (long childDirId : childDirs) {
+        buffer.putLong(childDirId);
+      }
+
+      buffer.putInt(dirNameSize);
+      if (dirNameSize > 0) {
+        buffer.put(dirNameBuffer.asReadOnlyByteBuffer());
+      }
+
+      buffer.putLong(object.getParentId());
+
+      return buffer;
+    } catch (Exception e) {
+      throw new CodecException("Failed to encode NSSummary to CodecBuffer", e);
+    }
+  }
+
+  @Override
+  public NSSummary fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
+    try {
+      ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer();
+      NSSummary result = new NSSummary();
+
+      result.setNumOfFiles(byteBuffer.getInt());
+      result.setSizeOfFiles(byteBuffer.getLong());
+
+      short bucketLength = byteBuffer.getShort();
+      assert (bucketLength == (short) ReconConstants.NUM_OF_FILE_SIZE_BINS);
+
+      int[] fileSizeBucket = new int[bucketLength];
+      for (int i = 0; i < bucketLength; ++i) {
+        fileSizeBucket[i] = byteBuffer.getInt();
+      }
+      result.setFileSizeBucket(fileSizeBucket);
+
+      int numChildDirs = byteBuffer.getInt();
+      Set<Long> childDirs = new HashSet<>(numChildDirs);
+      for (int i = 0; i < numChildDirs; ++i) {
+        childDirs.add(byteBuffer.getLong());
+      }
+      result.setChildDir(childDirs);
+
+      int dirNameSize = byteBuffer.getInt();
+      if (dirNameSize > 0) {
+        byte[] dirNameBytes = new byte[dirNameSize];
+        byteBuffer.get(dirNameBytes);
+        String dirName = stringCodec.fromPersistedFormat(dirNameBytes);
+        result.setDirName(dirName);
+      }
+
+      if (byteBuffer.remaining() >= Long.BYTES) {
+        result.setParentId(byteBuffer.getLong());
+      } else {
+        result.setParentId(-1);
+      }
+
+      return result;
+    } catch (Exception e) {
+      throw new CodecException("Failed to decode NSSummary from CodecBuffer", e);
+    }
   }
 
   @Override
