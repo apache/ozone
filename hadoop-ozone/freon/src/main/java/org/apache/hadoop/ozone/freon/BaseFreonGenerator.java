@@ -327,8 +327,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
     LongSupplier supplier;
     if (duration != null) {
       maxValue = durationInSecond;
-      supplier = () -> Duration.between(
-          Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
+      supplier = () -> (Time.monotonicNow() - startTime) / 1000;
     } else {
       maxValue = testNo;
       supplier = () -> successCounter.get() + failureCounter.get();
