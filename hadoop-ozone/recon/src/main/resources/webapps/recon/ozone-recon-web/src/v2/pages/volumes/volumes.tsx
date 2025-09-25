@@ -118,7 +118,7 @@ const Volumes: React.FC<{}> = () => {
       setLoading(false);
     }).catch(error => {
       setLoading(false);
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 

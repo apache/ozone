@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import axios, { CanceledError, AxiosError } from 'axios';
+import axios, { CanceledError } from 'axios';
 import filesize from 'filesize';
 import { Row, Col, Tabs, message } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
@@ -27,7 +27,7 @@ import { graphic, type EChartsOption } from 'echarts';
 import { EChart } from '@/components/eChart/eChart';
 import { MultiSelect, IOption } from '@/components/multiSelect/multiSelect';
 import { showDataFetchError } from '@/utils/common';
-import { PromiseAllSettledGetHelper, PromiseAllSettledError } from '@/utils/axiosRequestHelper';
+import { PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
 
 import './insights.less';
 
@@ -420,7 +420,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       this.setState({
         isLoading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   }
 

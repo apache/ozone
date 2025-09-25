@@ -285,7 +285,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
       this.setState({
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   }
 
@@ -342,7 +342,7 @@ export class MissingContainers extends React.Component<Record<string, object>, I
             expandedRowData: { ...expandedRowData, [record.containerID]: expandedRowState }
           };
         });
-        showDataFetchError(error.toString());
+        showDataFetchError(error);
       });
     }
     else {
