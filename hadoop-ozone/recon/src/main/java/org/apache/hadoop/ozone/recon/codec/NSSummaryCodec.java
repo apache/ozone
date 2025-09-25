@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.codec;
 
+import jakarta.annotation.Nonnull;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -24,7 +25,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
-import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecException;
@@ -86,7 +86,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
       buffer.putInt(object.getNumOfFiles());
       buffer.putLong(object.getSizeOfFiles());
       buffer.putShort((short) ReconConstants.NUM_OF_FILE_SIZE_BINS);
-      
+
       int[] fileSizeBucket = object.getFileSizeBucket();
       for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         buffer.putInt(fileSizeBucket[i]);

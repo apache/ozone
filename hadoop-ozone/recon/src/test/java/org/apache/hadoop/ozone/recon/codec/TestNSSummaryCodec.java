@@ -17,12 +17,11 @@
 
 package org.apache.hadoop.ozone.recon.codec;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.HashSet;
 import java.util.Set;
-
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.ozone.recon.ReconConstants;
@@ -49,7 +48,7 @@ public class TestNSSummaryCodec {
   @Test
   public void testCodecBufferEmptyDirectory() throws Exception {
     NSSummary original = new NSSummary();
-    original.setDirName("/empty");
+    original.setDirName("empty");
     original.setParentId(42L);
 
     CodecBuffer buffer = codec.toCodecBuffer(original, CodecBuffer.Allocator.DIRECT);
@@ -61,7 +60,7 @@ public class TestNSSummaryCodec {
   @Test
   public void testCodecBufferLargeDirectory() throws Exception {
     NSSummary original = new NSSummary();
-    original.setDirName("/large");
+    original.setDirName("large");
     original.setNumOfFiles(10000);
     original.setSizeOfFiles(1024L * 1024L * 100L); // 100MB
     original.setParentId(999L);
@@ -86,7 +85,7 @@ public class TestNSSummaryCodec {
 
   private NSSummary createTestNSSummary() {
     NSSummary summary = new NSSummary();
-    summary.setDirName("/test/directory");
+    summary.setDirName("test/directory");
     summary.setNumOfFiles(100);
     summary.setSizeOfFiles(1024L * 512L); // 512KB
     summary.setParentId(42L);
