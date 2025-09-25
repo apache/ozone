@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM_EXTENS
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.primitives.UnsignedBytes;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
 import java.io.FileNotFoundException;

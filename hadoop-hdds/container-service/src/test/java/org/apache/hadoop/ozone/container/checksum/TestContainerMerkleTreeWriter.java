@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.container.checksum;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildChunk;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -423,8 +423,10 @@ class TestContainerMerkleTreeWriter {
     // Test that an empty block is preserved during tree conversion.
     ContainerProtos.BlockMerkleTree blockTree3 = buildExpectedBlockTree(blockID3);
     // Test that a deleted block is preserved during tree conversion.
-    ContainerProtos.BlockMerkleTree blockTree4 = buildExpectedDeletedBlockTree(blockID4, deletedBlockChecksum);
-    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(blockTree1, blockTree2, blockTree3, blockTree4);
+    ContainerProtos.BlockMerkleTree blockTree4 = buildExpectedDeletedBlockTree(blockID4, 
+        deletedBlockChecksum);
+    ContainerProtos.ContainerMerkleTree expectedTree = buildExpectedContainerTree(blockTree1, 
+        blockTree2, blockTree3, blockTree4);
 
     ContainerMerkleTreeWriter treeWriter = new ContainerMerkleTreeWriter(expectedTree);
     ContainerProtos.ContainerMerkleTree actualTree = treeWriter.toProto();
@@ -437,7 +439,8 @@ class TestContainerMerkleTreeWriter {
 
     blockTree3 = buildExpectedBlockTree(blockID3, buildExpectedChunkTree(b3c1, false));
     ContainerProtos.BlockMerkleTree blockTree5 = buildExpectedBlockTree(blockID5);
-    ContainerProtos.ContainerMerkleTree expectedUpdatedTree = buildExpectedContainerTree(blockTree1, blockTree2, blockTree3, blockTree4, blockTree5);
+    ContainerProtos.ContainerMerkleTree expectedUpdatedTree = buildExpectedContainerTree(blockTree1, 
+        blockTree2, blockTree3, blockTree4, blockTree5);
 
     assertTreesSortedAndMatch(expectedUpdatedTree, treeWriter.toProto());
   }
@@ -719,7 +722,8 @@ class TestContainerMerkleTreeWriter {
     writer.setDeletedBlock(ourDeletedBlockID, ourDeletedChecksum);
 
     // Existing tree contains a deleted block (should be included) and a live block (should be ignored)
-    ContainerProtos.BlockMerkleTree existingDeleted = buildExpectedDeletedBlockTree(existingDeletedBlockID, existingDeletedChecksum);
+    ContainerProtos.BlockMerkleTree existingDeleted = buildExpectedDeletedBlockTree(existingDeletedBlockID, 
+        existingDeletedChecksum);
     ContainerProtos.ChunkInfo existingLiveChunk = buildChunk(config, 0, ByteBuffer.wrap(new byte[]{7, 7, 7}));
     ContainerProtos.BlockMerkleTree existingLiveBlock = buildExpectedBlockTree(existingLiveBlockID,
         buildExpectedChunkTree(existingLiveChunk));

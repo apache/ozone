@@ -120,7 +120,6 @@ public class ContainerMerkleTreeMetrics {
     this.numDivergedDeletedBlocksIdentified.incr(value);
   }
 
-
   public MutableRate getWriteContainerMerkleTreeLatencyNS() {
     return this.merkleTreeWriteLatencyNS;
   }

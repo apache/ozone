@@ -42,10 +42,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -693,8 +691,6 @@ public class TestContainerReader {
     KeyValueContainerData loadedData = (KeyValueContainerData) loadedContainer.getContainerData();
     assertNotSame(containerData, loadedData);
     assertEquals(expectedDataChecksum, loadedData.getDataChecksum());
-    ContainerProtos.ContainerChecksumInfo loadedChecksumInfo =
-        ContainerChecksumTreeManager.readChecksumInfo(loadedData);
     verifyAllDataChecksumsMatch(loadedData, conf);
   }
 
