@@ -40,9 +40,12 @@ public class TestNSSummaryCodec {
     NSSummary original = createTestNSSummary();
 
     CodecBuffer buffer = codec.toCodecBuffer(original, CodecBuffer.Allocator.DIRECT);
-    NSSummary decoded = codec.fromCodecBuffer(buffer);
-
-    assertNSSummaryEquals(original, decoded);
+    try {
+      NSSummary decoded = codec.fromCodecBuffer(buffer);
+      assertNSSummaryEquals(original, decoded);
+    } finally {
+      buffer.close();
+    }
   }
 
   @Test
@@ -52,9 +55,12 @@ public class TestNSSummaryCodec {
     original.setParentId(42L);
 
     CodecBuffer buffer = codec.toCodecBuffer(original, CodecBuffer.Allocator.DIRECT);
-    NSSummary decoded = codec.fromCodecBuffer(buffer);
-
-    assertNSSummaryEquals(original, decoded);
+    try {
+      NSSummary decoded = codec.fromCodecBuffer(buffer);
+      assertNSSummaryEquals(original, decoded);
+    } finally {
+      buffer.close();
+    }
   }
 
   @Test
@@ -78,9 +84,12 @@ public class TestNSSummaryCodec {
     original.setFileSizeBucket(buckets);
 
     CodecBuffer buffer = codec.toCodecBuffer(original, CodecBuffer.Allocator.DIRECT);
-    NSSummary decoded = codec.fromCodecBuffer(buffer);
-
-    assertNSSummaryEquals(original, decoded);
+    try {
+      NSSummary decoded = codec.fromCodecBuffer(buffer);
+      assertNSSummaryEquals(original, decoded);
+    } finally {
+      buffer.close();
+    }
   }
 
   private NSSummary createTestNSSummary() {
