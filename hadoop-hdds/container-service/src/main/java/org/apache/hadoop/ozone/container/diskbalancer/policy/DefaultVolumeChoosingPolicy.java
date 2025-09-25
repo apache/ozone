@@ -60,7 +60,7 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
         return null; // Can't balance with less than 2 volumes.
       }
       
-      // Calculate ideal usage using the same immutable volume snapshot
+      // Calculate ideal usage using the same immutable volume
       double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(allVolumes);
 
       // Threshold is given as a percentage

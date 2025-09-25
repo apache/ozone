@@ -64,7 +64,7 @@ public final class DiskBalancerVolumeCalculation {
    * @return Ideal usage as a ratio (used space / total capacity)
    * @throws IllegalArgumentException if total capacity is zero
    */
-  public static double getIdealUsage(List<HddsVolume> volumes) {
+  public static double getIdealUsage(ImmutableList<HddsVolume> volumes) {
     long totalCapacity = 0L, totalFree = 0L;
     
     for (HddsVolume volume : volumes) {
@@ -84,27 +84,24 @@ public final class DiskBalancerVolumeCalculation {
    * @param deltaMap Map of volume to delta sizes (ongoing operations), can be null
    * @return VolumeDataDensity sum across all volumes
    */
-  public static double calculateVolumeDataDensity(MutableVolumeSet volumeSet, Map<HddsVolume, Long> deltaMap) {
+  public static double calculateVolumeDataDensity(ImmutableList<HddsVolume> volumeSet, Map<HddsVolume, Long> deltaMap) {
     if (volumeSet == null) {
       LOG.warn("VolumeSet is null, returning 0.0 for VolumeDataDensity");
       return 0.0;
     }
     
     try {
-      // Create truly immutable snapshot of volumes to ensure consistency
-      ImmutableList<HddsVolume> volumesList = getImmutableVolumeSet(volumeSet);
-      
       // If there is only one volume, return 0.0 as there's no imbalance to measure
-      if (volumesList.size() <= 1) {
+      if (volumeSet.size() <= 1) {
         return 0.0;
       }
 
       // Calculate ideal usage using the same immutable volume snapshot
-      double idealUsage = getIdealUsage(volumesList);
+      double idealUsage = getIdealUsage(volumeSet);
       double volumeDensitySum = 0.0;
 
       // Calculate density for each volume using the same snapshot
-      for (HddsVolume volume : volumesList) {
+      for (HddsVolume volume : volumeSet) {
         SpaceUsageSource usage = volume.getCurrentUsage();
         Preconditions.checkArgument(usage.getCapacity() != 0);
 

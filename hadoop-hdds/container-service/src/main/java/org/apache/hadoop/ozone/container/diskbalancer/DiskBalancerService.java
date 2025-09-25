@@ -402,7 +402,7 @@ public class DiskBalancerService extends BackgroundService {
       }
     }
 
-    if (queue.isEmpty()) {
+    if (queue.isEmpty() && inProgressContainers.isEmpty()) {
       if (stopAfterDiskEven) {
         LOG.info("Disk balancer is stopped due to disk even as" +
             " the property StopAfterDiskEven is set to true.");
@@ -618,15 +618,17 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
+    ImmutableList<HddsVolume> immutableVolumeSet = DiskBalancerVolumeCalculation.getImmutableVolumeSet(volumeSet);
+
     // Calculate volumeDataDensity
     double volumeDatadensity = 0.0;
-    volumeDatadensity = DiskBalancerVolumeCalculation.calculateVolumeDataDensity(volumeSet, deltaSizes);
+    volumeDatadensity = DiskBalancerVolumeCalculation.calculateVolumeDataDensity(immutableVolumeSet, deltaSizes);
 
     long bytesToMove = 0;
     if (this.operationalState == DiskBalancerOperationalState.RUNNING) {
       // this calculates live changes in bytesToMove
       // calculate bytes to move if the balancer is in a running state, else 0.
-      bytesToMove = calculateBytesToMove(volumeSet);
+      bytesToMove = calculateBytesToMove(immutableVolumeSet);
     }
 
     return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
@@ -634,23 +636,20 @@ public class DiskBalancerService extends BackgroundService {
         metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDatadensity);
   }
 
-  public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
-    // Create truly immutable volumes to ensure consistency
-    ImmutableList<HddsVolume> volumes = DiskBalancerVolumeCalculation.getImmutableVolumeSet(inputVolumeSet);
-    
+  public long calculateBytesToMove(ImmutableList<HddsVolume> inputVolumeSet) {
     // If there are no available volumes or only one volume, return 0 bytes to move
-    if (volumes.isEmpty() || volumes.size() < 2) {
+    if (inputVolumeSet.isEmpty() || inputVolumeSet.size() < 2) {
       return 0;
     }
 
     // Calculate ideal usage
-    double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(volumes);
+    double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(inputVolumeSet);
     double normalizedThreshold = threshold / 100.0;
 
     long totalBytesToMove = 0;
 
     // Calculate excess data in overused volumes
-    for (HddsVolume volume : volumes) {
+    for (HddsVolume volume : inputVolumeSet) {
       SpaceUsageSource usage = volume.getCurrentUsage();
 
       if (usage.getCapacity() == 0) {
