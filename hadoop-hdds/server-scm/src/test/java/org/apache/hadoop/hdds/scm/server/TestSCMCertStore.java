@@ -57,20 +57,18 @@ public class TestSCMCertStore {
 
   private static final String COMPONENT_NAME = "scm";
 
-  private OzoneConfiguration config;
   private SCMMetadataStore scmMetadataStore;
   private CertificateStore scmCertStore;
-  private SecurityConfig securityConfig;
   private KeyPair keyPair;
 
   @BeforeEach
   public void setUp(@TempDir Path tempDir) throws Exception {
-    config = new OzoneConfiguration();
+    OzoneConfiguration config = new OzoneConfiguration();
 
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempDir.toAbsolutePath().toString());
 
-    securityConfig = new SecurityConfig(config);
+    SecurityConfig securityConfig = new SecurityConfig(config);
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
 
     final SCMRatisServer ratisServer = mock(SCMRatisServer.class);

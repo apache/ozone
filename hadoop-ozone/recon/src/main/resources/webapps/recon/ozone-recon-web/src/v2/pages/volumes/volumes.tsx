@@ -31,7 +31,7 @@ import { showDataFetchError } from '@/utils/common';
 import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
 
 import {
   Volume,

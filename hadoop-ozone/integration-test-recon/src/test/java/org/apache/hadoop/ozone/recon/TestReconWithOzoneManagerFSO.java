@@ -55,13 +55,12 @@ public class TestReconWithOzoneManagerFSO {
 
   private static OzoneClient client;
   private static MiniOzoneCluster cluster = null;
-  private static OzoneConfiguration conf;
   private static ObjectStore store;
   private static ReconService recon;
 
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
     recon = new ReconService(conf);

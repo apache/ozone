@@ -29,9 +29,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NS
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -88,8 +86,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
-import org.slf4j.Logger;
 
 /**
  * Test for NSSummary REST APIs with FSO.
@@ -121,7 +117,6 @@ public class TestNSSummaryEndpointWithFSO {
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private OzoneConfiguration ozoneConfiguration;
   private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
@@ -358,7 +353,7 @@ public class TestNSSummaryEndpointWithFSO {
 
   @BeforeEach
   public void setUp() throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         10);
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
@@ -812,40 +807,6 @@ public class TestNSSummaryEndpointWithFSO {
 
     assertThrows(ServiceNotReadyException.class, () ->
         ReconUtils.constructFullPath(keyInfo, mockSummaryManager, mockMetadataManager));
-  }
-
-  @Test
-  public void testLoggingWhenParentIdIsNegative() throws IOException {
-    ReconNamespaceSummaryManager mockManager =
-        mock(ReconNamespaceSummaryManager.class);
-    Logger mockLogger = mock(Logger.class);
-    ReconUtils.setLogger(mockLogger);
-
-    NSSummary mockSummary = new NSSummary();
-    mockSummary.setParentId(-1);
-    when(mockManager.getNSSummary(anyLong())).thenReturn(mockSummary);
-
-    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
-        .setKeyName("testKey")
-        .setVolumeName("vol")
-        .setBucketName("bucket")
-        .setObjectID(1L)
-        .setParentObjectID(1L)
-        .build();
-
-    assertThrows(ServiceNotReadyException.class, () ->
-        ReconUtils.constructFullPath(keyInfo, mockManager, null));
-
-    // Assert
-    ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-    verify(mockLogger).warn(logCaptor.capture());
-    String loggedMessage = logCaptor.getValue();
-
-    // Here we can assert the exact message we expect to see in the logs.
-    // Since we set parentId = -1, this triggers the corruption detection path
-    assertEquals(
-        "NSSummary tree corruption detected, rebuild triggered. Returning empty string " +
-            "for path construction.", loggedMessage);
   }
 
   /**

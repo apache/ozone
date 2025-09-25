@@ -42,7 +42,6 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestDatanodeVersionFile {
 
   private File versionFile;
-  private DatanodeVersionFile dnVersionFile;
   private Properties properties;
 
   private String storageID;
@@ -64,12 +63,12 @@ public class TestDatanodeVersionFile {
     cTime = Time.now();
     lv = HDDSVolumeLayoutVersion.getLatestVersion().getVersion();
 
-    dnVersionFile = new DatanodeVersionFile(
+    DatanodeVersionFile dnVersionFile = new DatanodeVersionFile(
         storageID, clusterID, datanodeUUID, cTime, lv);
 
     dnVersionFile.createVersionFile(versionFile);
 
-    properties = dnVersionFile.readFrom(versionFile);
+    properties = DatanodeVersionFile.readFrom(versionFile);
   }
 
   @Test
@@ -101,10 +100,10 @@ public class TestDatanodeVersionFile {
   @Test
   public void testVerifyCTime() throws IOException {
     long invalidCTime = -10;
-    dnVersionFile = new DatanodeVersionFile(
+    DatanodeVersionFile dnVersionFile = new DatanodeVersionFile(
         storageID, clusterID, datanodeUUID, invalidCTime, lv);
     dnVersionFile.createVersionFile(versionFile);
-    properties = dnVersionFile.readFrom(versionFile);
+    properties = DatanodeVersionFile.readFrom(versionFile);
 
     InconsistentStorageStateException exception = assertThrows(InconsistentStorageStateException.class,
         () -> StorageVolumeUtil.getCreationTime(properties, versionFile));
@@ -114,10 +113,10 @@ public class TestDatanodeVersionFile {
   @Test
   public void testVerifyLayOut() throws IOException {
     int invalidLayOutVersion = 100;
-    dnVersionFile = new DatanodeVersionFile(
+    DatanodeVersionFile dnVersionFile = new DatanodeVersionFile(
         storageID, clusterID, datanodeUUID, cTime, invalidLayOutVersion);
     dnVersionFile.createVersionFile(versionFile);
-    Properties props = dnVersionFile.readFrom(versionFile);
+    Properties props = DatanodeVersionFile.readFrom(versionFile);
     InconsistentStorageStateException exception = assertThrows(InconsistentStorageStateException.class,
         () -> StorageVolumeUtil.getLayOutVersion(props, versionFile));
     assertThat(exception).hasMessageContaining("Invalid layOutVersion.");

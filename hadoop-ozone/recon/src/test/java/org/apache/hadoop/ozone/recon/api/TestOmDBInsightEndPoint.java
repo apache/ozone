@@ -98,15 +98,9 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   @TempDir
   private Path temporaryFolder;
-  private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
-  private OMMetadataManager omMetadataManager;
-  private ReconPipelineManager reconPipelineManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy;
-  private NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
-  private NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private OMDBInsightEndpoint omdbInsightEndpoint;
   private Pipeline pipeline;
   private Random random = new Random();
@@ -268,7 +262,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   @BeforeEach
   public void setUp() throws Exception {
-    omMetadataManager = initializeNewOmMetadataManager(
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve(
             "JunitOmMetadata")).toFile());
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
@@ -293,23 +287,23 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
     omdbInsightEndpoint = reconTestInjector.getInstance(
         OMDBInsightEndpoint.class);
-    ozoneStorageContainerManager =
+    OzoneStorageContainerManager ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
-    reconPipelineManager = (ReconPipelineManager)
-        ozoneStorageContainerManager.getPipelineManager();
+    ReconPipelineManager reconPipelineManager = (ReconPipelineManager)
+                                                    ozoneStorageContainerManager.getPipelineManager();
     pipeline = getRandomPipeline();
     reconPipelineManager.addPipeline(pipeline);
     ozoneConfiguration = new OzoneConfiguration();
     reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
     setUpOmData();
-    nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
+    NSSummaryTaskWithLegacy nSSummaryTaskWithLegacy = new NSSummaryTaskWithLegacy(
         reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration, 10);
-    nsSummaryTaskWithOBS  = new NSSummaryTaskWithOBS(
+    NSSummaryTaskWithOBS nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
         reconNamespaceSummaryManager,
         reconOMMetadataManager, 10);
-    nsSummaryTaskWithFSO  = new NSSummaryTaskWithFSO(
+    NSSummaryTaskWithFSO nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager,
         reconOMMetadataManager, 10);
     reconNamespaceSummaryManager.clearNSSummaryTable();
