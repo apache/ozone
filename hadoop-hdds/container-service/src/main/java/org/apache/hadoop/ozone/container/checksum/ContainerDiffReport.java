@@ -104,7 +104,8 @@ public class ContainerDiffReport {
    * it reconciles with other peers.
    */
   public boolean needsRepair() {
-    return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty() || !divergedDeletedBlocks.isEmpty();
+    return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty() ||
+        !divergedDeletedBlocks.isEmpty();
   }
 
   public long getNumCorruptChunks() {
