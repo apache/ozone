@@ -42,6 +42,9 @@ public final class KeyPrefixContainerCodec
       new KeyPrefixContainerCodec();
 
   private static final String KEY_DELIMITER = "_";
+  private static final byte[] KEY_DELIMITER_BYTES = KEY_DELIMITER.getBytes(UTF_8);
+  private static final ByteBuffer KEY_DELIMITER_BUFFER = ByteBuffer.wrap(KEY_DELIMITER_BYTES).asReadOnlyBuffer();
+  private static final int LONG_SERIALIZED_SIZE = KEY_DELIMITER_BYTES.length + Long.BYTES;
 
   public static Codec<KeyPrefixContainer> get() {
     return INSTANCE;
@@ -69,22 +72,22 @@ public final class KeyPrefixContainerCodec
     int totalSize = keyPrefixBytes.length;
 
     if (object.getKeyVersion() != -1) {
-      totalSize += KEY_DELIMITER.getBytes(UTF_8).length + Long.BYTES;
+      totalSize += LONG_SERIALIZED_SIZE;
     }
     if (object.getContainerId() != -1) {
-      totalSize += KEY_DELIMITER.getBytes(UTF_8).length + Long.BYTES;
+      totalSize += LONG_SERIALIZED_SIZE;
     }
 
     final CodecBuffer buffer = allocator.apply(totalSize);
     buffer.put(ByteBuffer.wrap(keyPrefixBytes));
 
     if (object.getKeyVersion() != -1) {
-      buffer.put(ByteBuffer.wrap(KEY_DELIMITER.getBytes(UTF_8)));
+      buffer.put(KEY_DELIMITER_BUFFER.duplicate());
       buffer.putLong(object.getKeyVersion());
     }
 
     if (object.getContainerId() != -1) {
-      buffer.put(ByteBuffer.wrap(KEY_DELIMITER.getBytes(UTF_8)));
+      buffer.put(KEY_DELIMITER_BUFFER.duplicate());
       buffer.putLong(object.getContainerId());
     }
 
@@ -94,63 +97,46 @@ public final class KeyPrefixContainerCodec
   @Override
   public KeyPrefixContainer fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
 
-    Object wrapped = buffer.getWrapped();
-    if (wrapped instanceof byte[]) {
-      return fromPersistedFormat((byte[]) wrapped);
-    }
-
     final ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer();
     final int totalLength = byteBuffer.remaining();
     final int startPosition = byteBuffer.position();
-    final byte[] delimiterBytes = KEY_DELIMITER.getBytes(UTF_8);
-    final int delimiterLength = delimiterBytes.length;
+    final int delimiterLength = KEY_DELIMITER_BYTES.length;
 
-    // Check if we have at least one delimiter + long value
-    if (totalLength >= delimiterLength + Long.BYTES) {
-      // Check for delimiter before the last 8 bytes - could be containerId or version
-      boolean hasLastDelimiter = true;
-      int lastDelimiterStart = startPosition + totalLength - Long.BYTES - delimiterLength;
-      byteBuffer.position(lastDelimiterStart);
-      for (byte delimiterByte : delimiterBytes) {
-        if (byteBuffer.get() != delimiterByte) {
-          hasLastDelimiter = false;
-          break;
-        }
-      }
+    // Check for two delimiters + two longs (version and containerId)
+    if (totalLength >= 2 * (delimiterLength + Long.BYTES)) {
+      // Extract keyPrefix (everything except last 2 delimiters + 2 longs)
+      int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
+      byteBuffer.position(startPosition);
+      String keyPrefix = decodeStringFromBuffer(byteBuffer, keyPrefixLength);
 
-      if (hasLastDelimiter) {
-        // Extract the last value
-        long lastValue = byteBuffer.getLong();
-        int remainingLength = lastDelimiterStart - startPosition;
+      // Skip delimiter and read version
+      byteBuffer.position(startPosition + keyPrefixLength + delimiterLength);
+      long version = byteBuffer.getLong();
 
-        // Check if there's another delimiter+long before this one
-        if (remainingLength >= delimiterLength + Long.BYTES) {
-          boolean hasSecondLastDelimiter = true;
-          int secondLastDelimiterStart = startPosition + remainingLength - Long.BYTES - delimiterLength;
-          byteBuffer.position(secondLastDelimiterStart);
-          for (byte delimiterByte : delimiterBytes) {
-            if (byteBuffer.get() != delimiterByte) {
-              hasSecondLastDelimiter = false;
-              break;
-            }
-          }
+      // Skip delimiter and read containerId
+      byteBuffer.position(startPosition + keyPrefixLength + delimiterLength + Long.BYTES + delimiterLength);
+      long containerId = byteBuffer.getLong();
 
-          if (hasSecondLastDelimiter) {
-            long version = byteBuffer.getLong();
-
-            byteBuffer.position(startPosition);
-            String keyPrefix = decodeStringFromBuffer(byteBuffer, secondLastDelimiterStart - startPosition);
-            return KeyPrefixContainer.get(keyPrefix, version, lastValue);
-          }
-        }
-
-        // Only one delimiter+value pair - it's a version, not containerId
-        byteBuffer.position(startPosition);
-        String keyPrefix = decodeStringFromBuffer(byteBuffer, remainingLength);
-        return KeyPrefixContainer.get(keyPrefix, lastValue, -1);
-      }
+      return KeyPrefixContainer.get(keyPrefix, version, containerId);
     }
 
+    // Check for one delimiter + one long
+    if (totalLength >= delimiterLength + Long.BYTES) {
+      // Extract keyPrefix (everything except last delimiter + long)
+      int keyPrefixLength = totalLength - delimiterLength - Long.BYTES;
+      byteBuffer.position(startPosition);
+      String keyPrefix = decodeStringFromBuffer(byteBuffer, keyPrefixLength);
+
+      // Skip delimiter and read the long value
+      byteBuffer.position(startPosition + keyPrefixLength + delimiterLength);
+      long longValue = byteBuffer.getLong();
+
+      // Based on encoding logic: if keyVersion != -1, it's encoded first, then containerId
+      // So if we have only one long value, it should be the keyVersion
+      return KeyPrefixContainer.get(keyPrefix, longValue, -1);
+    }
+
+    // If we reach here, the buffer contains only the key prefix (no delimiters found)
     byteBuffer.position(startPosition);
     String keyPrefix = decodeStringFromBuffer(byteBuffer, totalLength);
     return KeyPrefixContainer.get(keyPrefix, -1, -1);
@@ -167,7 +153,7 @@ public final class KeyPrefixContainerCodec
 
     try {
       ByteBuffer slice = buffer.duplicate();
-      slice.limit(buffer.position() + length);
+      slice.limit(slice.position() + length);
 
       buffer.position(buffer.position() + length);
 
@@ -189,15 +175,13 @@ public final class KeyPrefixContainerCodec
     //Prefix seek can be done only with keyPrefix. In that case, we can
     // expect the version and the containerId to be undefined.
     if (keyPrefixContainer.getKeyVersion() != -1) {
-      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER
-          .getBytes(UTF_8));
+      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
       keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, Longs.toByteArray(
           keyPrefixContainer.getKeyVersion()));
     }
 
     if (keyPrefixContainer.getContainerId() != -1) {
-      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER
-          .getBytes(UTF_8));
+      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
       keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, Longs.toByteArray(
           keyPrefixContainer.getContainerId()));
     }
