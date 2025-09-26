@@ -23,7 +23,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -77,10 +76,13 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
       int dirNameSize = dirNameBuffer.readableBytes();
 
       // total size: primitives + childDirs + dirName length + dirName data
-      final int totalSize = Integer.BYTES * (3 + ReconConstants.NUM_OF_FILE_SIZE_BINS) // numFiles + numOfChildDirs + dirNameSize + fileSizeBucket
-          + Long.BYTES * (numOfChildDirs + 2) // childDirs + sizeOfFiles + parentId
-          + Short.BYTES // fileSizeBucket length
-          + dirNameSize; // actual dirName bytes
+      // Integer Bytes: numFiles + numOfChildDirs + dirNameSize + fileSizeBucket
+      // Long Bytes: childDirs + sizeOfFiles + parentId
+      // Short Bytes: fileSizeBucket length
+      final int totalSize = Integer.BYTES * (3 + ReconConstants.NUM_OF_FILE_SIZE_BINS)
+          + Long.BYTES * (numOfChildDirs + 2)
+          + Short.BYTES
+          + dirNameSize;
 
       CodecBuffer buffer = allocator.apply(totalSize);
 
