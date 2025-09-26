@@ -1860,10 +1860,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
 
       if (addCacheMetrics) {
-        final TableCacheMetrics previous = tableCacheMetricsMap.put(name, table.createCacheMetrics());
-        if (previous != null) {
-          previous.unregister();
+        if (tableCacheMetricsMap.containsKey(name)) {
+          tableCacheMetricsMap.get(name).unregister();
         }
+        tableCacheMetricsMap.put(name, table.createCacheMetrics());
       }
       return table;
     }
