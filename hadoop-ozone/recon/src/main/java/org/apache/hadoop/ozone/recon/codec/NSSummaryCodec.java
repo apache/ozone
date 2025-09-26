@@ -67,12 +67,13 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull NSSummary object, CodecBuffer.Allocator allocator) throws CodecException {
+    CodecBuffer dirNameBuffer = null;
     try {
       Set<Long> childDirs = object.getChildDir();
       int numOfChildDirs = childDirs.size();
       String dirName = object.getDirName();
 
-      CodecBuffer dirNameBuffer = stringCodec.toCodecBuffer(dirName, allocator);
+      dirNameBuffer = stringCodec.toCodecBuffer(dirName, allocator);
       int dirNameSize = dirNameBuffer.readableBytes();
 
       // total size: primitives + childDirs + dirName length + dirName data
@@ -106,8 +107,14 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
       }
       buffer.putLong(object.getParentId());
 
+      dirNameBuffer.release();
+      dirNameBuffer = null;
+
       return buffer;
     } catch (Exception e) {
+      if (dirNameBuffer != null) {
+        dirNameBuffer.release();
+      }
       throw new CodecException("Failed to encode NSSummary to CodecBuffer", e);
     }
   }
@@ -145,8 +152,12 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
       byte[] dirNameBytes = new byte[dirNameSize];
       byteBuffer.get(dirNameBytes);
       CodecBuffer dirNameBuffer = CodecBuffer.wrap(dirNameBytes);
-      String dirName = stringCodec.fromCodecBuffer(dirNameBuffer);
-      result.setDirName(dirName);
+      try {
+        String dirName = stringCodec.fromCodecBuffer(dirNameBuffer);
+        result.setDirName(dirName);
+      } finally {
+        dirNameBuffer.release();
+      }
       result.setParentId(byteBuffer.getLong());
 
       return result;
