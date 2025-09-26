@@ -1651,10 +1651,11 @@ public class KeyValueHandler extends Handler {
           continue;
         }
 
-        // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with
-        // the next peer.
-        ContainerMerkleTreeWriter updatedTreeWriter = new ContainerMerkleTreeWriter();
-        updatedTreeWriter.update(latestChecksumInfo.getContainerMerkleTree());
+        // This tree writer is initialized with our current persisted tree, then updated with the modifications done
+        // while reconciling with the peer. Once we finish reconciling with this peer, we will write the updated version
+        // back to the disk and pick it up as the starting point for reconciling with the next peer.
+        ContainerMerkleTreeWriter updatedTreeWriter =
+            new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
         ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
         Pipeline pipeline = createSingleNodePipeline(peer);
 
