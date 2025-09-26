@@ -52,13 +52,12 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestOmMetadataManagerMetrics {
 
   private OMMetadataManager omMetadataManager;
-  private OzoneConfiguration ozoneConfiguration;
   @TempDir
   private File folder;
 
   @BeforeEach
   public void setup() throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OZONE_OM_DB_DIRS, folder.getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
   }
