@@ -146,6 +146,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
 
       int dirNameSize = byteBuffer.getInt();
       if (dirNameSize == 0) {
+        result.setParentId(byteBuffer.getLong());
         return result;
       }
 
