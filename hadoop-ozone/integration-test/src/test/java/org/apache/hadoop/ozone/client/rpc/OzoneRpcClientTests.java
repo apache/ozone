@@ -30,6 +30,7 @@ import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByI
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
@@ -37,6 +38,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
@@ -196,6 +198,7 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ozone.test.tag.Unhealthy;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
@@ -259,6 +262,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     //  for testZReadKeyWithUnhealthyContainerReplica.
     conf.set("ozone.scm.stale.node.interval", "10s");
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
 
     ClientConfigForTesting.newBuilder(StorageUnit.MB)
         .setDataStreamMinPacketSize(1)
@@ -1551,17 +1556,17 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
-  public void testBucketUsedBytes() throws IOException {
+  public void testBucketUsedBytes() throws IOException, InterruptedException, TimeoutException {
     bucketUsedBytesTestHelper(BucketLayout.OBJECT_STORE);
   }
 
   @Test
-  public void testFSOBucketUsedBytes() throws IOException {
+  public void testFSOBucketUsedBytes() throws IOException, InterruptedException, TimeoutException {
     bucketUsedBytesTestHelper(BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   private void bucketUsedBytesTestHelper(BucketLayout bucketLayout)
-      throws IOException {
+      throws IOException, InterruptedException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
@@ -1592,8 +1597,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     bucket.deleteKey(keyName);
-    assertEquals(0L,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
   }
 
   static Stream<BucketLayout> bucketLayouts() {
@@ -1645,7 +1650,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   //       do cleanup when EC branch gets merged into master.
   @ParameterizedTest
   @MethodSource("replicationConfigs")
-  void testBucketQuota(ReplicationConfig repConfig) throws IOException {
+  void testBucketQuota(ReplicationConfig repConfig) throws IOException, InterruptedException, TimeoutException {
     int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
         OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
@@ -1656,7 +1661,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   private void bucketQuotaTestHelper(int keyLength, ReplicationConfig repConfig)
-      throws IOException {
+      throws IOException, InterruptedException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
@@ -1692,13 +1697,14 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
 
     bucket.deleteKey(keyName);
-    assertEquals(0L,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == store.getVolume(volumeName)
+            .getBucket(bucketName).getUsedBytes(), 1000, 30000);
   }
 
   @ParameterizedTest
   @MethodSource("bucketLayoutsWithEnablePaths")
-  public void testBucketUsedNamespace(BucketLayout layout, boolean enablePaths) throws IOException {
+  public void testBucketUsedNamespace(BucketLayout layout, boolean enablePaths)
+      throws IOException, InterruptedException, TimeoutException {
     boolean originalEnablePaths = cluster.getOzoneManager().getConfig().isFileSystemPathEnabled();
     cluster.getOzoneManager().getConfig().setFileSystemPathEnabled(enablePaths);
     String volumeName = UUID.randomUUID().toString();
@@ -1723,9 +1729,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     writeKey(bucket, keyName2, ONE, value, valueLength);
     assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
     bucket.deleteKey(keyName1);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor(
+        (CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName, bucketName),
+        1000, 30000);
     bucket.deleteKey(keyName2);
-    assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor(
+        (CheckedSupplier<Boolean, IOException>) () -> 0L == getBucketUsedNamespace(volumeName, bucketName),
+        1000, 30000);
 
     RpcClient client = new RpcClient(cluster.getConf(), null);
     try {
@@ -1869,7 +1879,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   @Test
-  public void testBucketQuotaInNamespace() throws IOException {
+  public void testBucketQuotaInNamespace() throws IOException, InterruptedException, TimeoutException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String key1 = UUID.randomUUID().toString();
@@ -1907,8 +1917,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
 
     bucket.deleteKeys(Arrays.asList(key1, key2));
-    assertEquals(0L,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedNamespace(), 1000, 30000);
   }
 
   private void writeKey(OzoneBucket bucket, String keyName,

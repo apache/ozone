@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
+import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -57,6 +58,7 @@ public final class OmKeyInfo extends WithParentObjectId
 
   private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
   private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
+  private static final String COMMITTED_KEY_DELETED_FLAG = "COMMITTED_KEY_DELETED";
 
   private final String volumeName;
   private final String bucketName;
@@ -69,6 +71,7 @@ public final class OmKeyInfo extends WithParentObjectId
   private ReplicationConfig replicationConfig;
   private FileEncryptionInfo encInfo;
   private final FileChecksum fileChecksum;
+
   /**
    * Support OFS use-case to identify if the key is a file or a directory.
    */
@@ -183,6 +186,18 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public String getOwnerName() {
     return ownerName;
+  }
+
+  public void setCommittedKeyDeletedFlag(boolean val) {
+    if (val) {
+      this.getMetadata().put(COMMITTED_KEY_DELETED_FLAG, "true");
+    } else {
+      this.getMetadata().remove(COMMITTED_KEY_DELETED_FLAG);
+    }
+  }
+
+  public boolean isDeletedKeyCommitted() {
+    return Boolean.parseBoolean(getMetadata().get(COMMITTED_KEY_DELETED_FLAG));
   }
 
   /**
@@ -926,5 +941,18 @@ public final class OmKeyInfo extends WithParentObjectId
       return getKeyName();
     }
     return getParentObjectID() + OzoneConsts.OM_KEY_PREFIX + getFileName();
+  }
+
+  public static boolean isKeyEmpty(@Nullable OmKeyInfo keyInfo) {
+    if (keyInfo == null) {
+      return true;
+    }
+    for (OmKeyLocationInfoGroup keyLocationList : keyInfo
+        .getKeyLocationVersions()) {
+      if (keyLocationList.getLocationListCount() != 0) {
+        return false;
+      }
+    }
+    return true;
   }
 }
