@@ -31,14 +31,14 @@ public class ContainerDiffReport {
   private final List<ContainerProtos.BlockMerkleTree> missingBlocks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks;
-  private final List<DeletedBlock> deletedBlocks;
+  private final List<DeletedBlock> divergedDeletedBlocks;
   private final long containerID;
 
   public ContainerDiffReport(long containerID) {
     this.missingBlocks = new ArrayList<>();
     this.missingChunks = new HashMap<>();
     this.corruptChunks = new HashMap<>();
-    this.deletedBlocks = new ArrayList<>();
+    this.divergedDeletedBlocks = new ArrayList<>();
     this.containerID = containerID;
   }
 
@@ -69,8 +69,8 @@ public class ContainerDiffReport {
     this.corruptChunks.computeIfAbsent(blockId, any -> new ArrayList<>()).add(corruptChunk);
   }
 
-  public void addDeletedBlock(ContainerProtos.BlockMerkleTree blockMerkleTree) {
-    this.deletedBlocks.add(new DeletedBlock(blockMerkleTree.getBlockID(), blockMerkleTree.getDataChecksum()));
+  public void addDivergedDeletedBlock(ContainerProtos.BlockMerkleTree blockMerkleTree) {
+    this.divergedDeletedBlocks.add(new DeletedBlock(blockMerkleTree.getBlockID(), blockMerkleTree.getDataChecksum()));
   }
 
   /**
@@ -94,8 +94,8 @@ public class ContainerDiffReport {
     return corruptChunks;
   }
 
-  public List<DeletedBlock> getDeletedBlocks() {
-    return deletedBlocks;
+  public List<DeletedBlock> getDivergedDeletedBlocks() {
+    return divergedDeletedBlocks;
   }
 
   /**
@@ -104,7 +104,7 @@ public class ContainerDiffReport {
    * it reconciles with other peers.
    */
   public boolean needsRepair() {
-    return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty() || !deletedBlocks.isEmpty();
+    return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty() || !divergedDeletedBlocks.isEmpty();
   }
 
   public long getNumCorruptChunks() {
@@ -119,8 +119,8 @@ public class ContainerDiffReport {
     return missingBlocks.size();
   }
 
-  public long getNumDeletedBlocks() {
-    return deletedBlocks.size();
+  public long getNumdivergedDeletedBlocks() {
+    return divergedDeletedBlocks.size();
   }
 
   @Override
@@ -129,7 +129,7 @@ public class ContainerDiffReport {
         " Missing Blocks: " + getNumMissingBlocks() +
         " Missing Chunks: " + getNumMissingChunks() + " chunks from " + missingChunks.size() + " blocks" +
         " Corrupt Chunks: " + getNumCorruptChunks() + " chunks from " + corruptChunks.size() + " blocks" +
-        " Diverged Deleted Blocks: " + getNumDeletedBlocks();
+        " Diverged Deleted Blocks: " + getNumdivergedDeletedBlocks();
   }
 
   /**

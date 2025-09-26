@@ -108,7 +108,7 @@ public class ContainerChecksumTreeManager {
       metrics.incrementCorruptChunksIdentified(report.getNumCorruptChunks());
       metrics.incrementMissingBlocksIdentified(report.getNumMissingBlocks());
       metrics.incrementMissingChunksIdentified(report.getNumMissingChunks());
-      metrics.incrementDivergedDeletedBlocksIdentified(report.getNumDeletedBlocks());
+      metrics.incrementDivergedDeletedBlocksIdentified(report.getNumdivergedDeletedBlocks());
     } else {
       metrics.incrementNoRepairContainerDiffs();
     }
@@ -148,7 +148,7 @@ public class ContainerChecksumTreeManager {
         // Peer block's ID is smaller, so we do not have this block. Add it to the corresponding list of missing blocks
         // and advance peerIdx
         if (peerBlockMerkleTree.getDeleted()) {
-          report.addDeletedBlock(peerBlockMerkleTree);
+          report.addDivergedDeletedBlock(peerBlockMerkleTree);
         } else {
           report.addMissingBlock(peerBlockMerkleTree);
         }
@@ -160,7 +160,7 @@ public class ContainerChecksumTreeManager {
     while (peerIdx < peerBlockMerkleTreeList.size()) {
       ContainerProtos.BlockMerkleTree peerBlockMerkleTree = peerBlockMerkleTreeList.get(peerIdx);
       if (peerBlockMerkleTree.getDeleted()) {
-        report.addDeletedBlock(peerBlockMerkleTree);
+        report.addDivergedDeletedBlock(peerBlockMerkleTree);
       } else {
         report.addMissingBlock(peerBlockMerkleTree);
       }
@@ -182,7 +182,7 @@ public class ContainerChecksumTreeManager {
       if (peerBlockDeleted && thisBlockMerkleTree.getDataChecksum() < peerBlockMerkleTree.getDataChecksum()) {
         // If the peer's block is also deleted, use the largest checksum value as the winner so that the values converge
         // since there is no data corresponding to this block.
-        report.addDeletedBlock(peerBlockMerkleTree);
+        report.addDivergedDeletedBlock(peerBlockMerkleTree);
       }
       // Else, either the peer has not deleted the block or they have a lower checksum for their deleted block.
       // In these cases the peer needs to update their block.
@@ -195,7 +195,7 @@ public class ContainerChecksumTreeManager {
         // Our container scanner will not update this deleted block in the merkle tree further even if it is still on
         // disk so that we remain in sync with the peer.
         // TODO HDDS-11765 Add support for deleting blocks from our replica when a peer has already deleted the block.
-        report.addDeletedBlock(peerBlockMerkleTree);
+        report.addDivergedDeletedBlock(peerBlockMerkleTree);
       } else {
         // Neither our nor peer's block is deleted. Walk the chunk list to find differences.
         compareChunkMerkleTrees(thisBlockMerkleTree, peerBlockMerkleTree, report);

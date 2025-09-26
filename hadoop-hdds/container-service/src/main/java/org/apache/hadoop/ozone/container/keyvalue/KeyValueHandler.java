@@ -1714,7 +1714,7 @@ public class KeyValueHandler extends Handler {
         }
 
         // Merge block deletes from the peer that do not match our list of deleted blocks.
-        for (ContainerDiffReport.DeletedBlock deletedBlock : diffReport.getDeletedBlocks()) {
+        for (ContainerDiffReport.DeletedBlock deletedBlock : diffReport.getDivergedDeletedBlocks()) {
           updatedTreeWriter.setDeletedBlock(deletedBlock.getBlockID(), deletedBlock.getDataChecksum());
           numDivergedDeletedBlocksUpdated++;
         }
@@ -1746,10 +1746,10 @@ public class KeyValueHandler extends Handler {
                   "Diverged deleted blocks updated:  {}/{}\n" +
                   "Time taken: {} ms",
               containerID, peer, checksumToString(previousDataChecksum), checksumToString(latestDataChecksum),
-              numMissingBlocksRepaired, diffReport.getMissingBlocks().size(),
-              numMissingChunksRepaired, diffReport.getMissingChunks().size(),
-              numCorruptChunksRepaired, diffReport.getCorruptChunks().size(),
-              numDivergedDeletedBlocksUpdated, diffReport.getNumDeletedBlocks(),
+              numMissingBlocksRepaired, diffReport.getNumMissingBlocks(),
+              numMissingChunksRepaired, diffReport.getNumMissingChunks(),
+              numCorruptChunksRepaired, diffReport.getNumCorruptChunks(),
+              numDivergedDeletedBlocksUpdated, diffReport.getNumdivergedDeletedBlocks(),
               duration);
         }
 
