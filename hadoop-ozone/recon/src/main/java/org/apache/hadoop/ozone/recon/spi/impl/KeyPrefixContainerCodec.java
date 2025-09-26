@@ -191,23 +191,45 @@ public final class KeyPrefixContainerCodec
 
   @Override
   public KeyPrefixContainer fromPersistedFormat(byte[] rawData) {
-    // When reading from byte[], we can always expect to have the key, version
-    // and version parts in the byte array.
-    byte[] keyBytes = ArrayUtils.subarray(rawData,
-        0, rawData.length - Long.BYTES * 2 - 2);
-    String keyPrefix = new String(keyBytes, UTF_8);
+    int totalLength = rawData.length;
+    int delimiterLength = KEY_DELIMITER_BYTES.length;
 
-    // Second 8 bytes is the key version.
-    byte[] versionBytes = ArrayUtils.subarray(rawData,
-        rawData.length - Long.BYTES * 2 - 1,
-        rawData.length - Long.BYTES - 1);
-    long version = ByteBuffer.wrap(versionBytes).getLong();
+    // Check for two delimiters + two longs (version and containerId)
+    if (totalLength >= 2 * (delimiterLength + Long.BYTES)) {
+      // Extract keyPrefix (everything except last 2 delimiters + 2 longs)
+      int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
+      String keyPrefix = new String(ArrayUtils.subarray(rawData, 0, keyPrefixLength), UTF_8);
 
-    // Last 8 bytes is the containerId.
-    long containerIdFromDB = ByteBuffer.wrap(ArrayUtils.subarray(rawData,
-        rawData.length - Long.BYTES,
-        rawData.length)).getLong();
-    return KeyPrefixContainer.get(keyPrefix, version, containerIdFromDB);
+      // Read version (skip delimiter)
+      int versionStart = keyPrefixLength + delimiterLength;
+      byte[] versionBytes = ArrayUtils.subarray(rawData, versionStart, versionStart + Long.BYTES);
+      long version = ByteBuffer.wrap(versionBytes).getLong();
+
+      // Read containerId (skip delimiter)
+      int containerIdStart = versionStart + Long.BYTES + delimiterLength;
+      byte[] containerIdBytes = ArrayUtils.subarray(rawData, containerIdStart, containerIdStart + Long.BYTES);
+      long containerId = ByteBuffer.wrap(containerIdBytes).getLong();
+
+      return KeyPrefixContainer.get(keyPrefix, version, containerId);
+    }
+
+    // Check for one delimiter + one long (version only)
+    if (totalLength >= delimiterLength + Long.BYTES) {
+      // Extract keyPrefix (everything except last delimiter + long)
+      int keyPrefixLength = totalLength - delimiterLength - Long.BYTES;
+      String keyPrefix = new String(ArrayUtils.subarray(rawData, 0, keyPrefixLength), UTF_8);
+
+      // Read version (skip delimiter)
+      int versionStart = keyPrefixLength + delimiterLength;
+      byte[] versionBytes = ArrayUtils.subarray(rawData, versionStart, versionStart + Long.BYTES);
+      long version = ByteBuffer.wrap(versionBytes).getLong();
+
+      return KeyPrefixContainer.get(keyPrefix, version, -1);
+    }
+
+    // If we reach here, the buffer contains only the key prefix (no delimiters found)
+    String keyPrefix = new String(rawData, UTF_8);
+    return KeyPrefixContainer.get(keyPrefix, -1, -1);
   }
 
   @Override

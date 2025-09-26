@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -77,7 +78,12 @@ public class TestKeyPrefixContainerCodec {
     final CodecBuffer codecBuffer = codec.toCodecBuffer(
         original, CodecBuffer.Allocator.getHeap());
     final KeyPrefixContainer fromBuffer = codec.fromCodecBuffer(codecBuffer);
+
+    final byte[] bytes = codec.toPersistedFormat(original);
+    assertArrayEquals(bytes, codecBuffer.getArray());
+
     codecBuffer.release();
     assertEquals(original, fromBuffer);
+    assertEquals(original, codec.fromPersistedFormat(bytes));
   }
 }
