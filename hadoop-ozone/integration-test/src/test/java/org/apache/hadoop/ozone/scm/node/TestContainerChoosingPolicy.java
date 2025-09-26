@@ -19,8 +19,10 @@ package org.apache.hadoop.ozone.scm.node;
 
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -28,7 +30,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +59,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -77,6 +83,7 @@ public class TestContainerChoosingPolicy {
   private static final int NUM_THREADS = 10;
   private static final int NUM_ITERATIONS = 10000;
   private static final int MAX_IN_PROGRESS = 100;
+  private static final double THRESHOLD = 10.0;
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
@@ -88,6 +95,8 @@ public class TestContainerChoosingPolicy {
   private OzoneContainer ozoneContainer;
   private ContainerChoosingPolicy containerChoosingPolicy;
   private ExecutorService executor;
+  private MutableVolumeSet volumeSet;
+  private Map<HddsVolume, Long> deltaMap;
 
   // Simulate containers currently being balanced (in progress)
   private Set<ContainerID> inProgressContainerIDs = ConcurrentHashMap.newKeySet();
@@ -103,6 +112,14 @@ public class TestContainerChoosingPolicy {
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     containerChoosingPolicy = new DefaultContainerChoosingPolicy();
     executor = Executors.newFixedThreadPool(NUM_THREADS);
+    deltaMap = new HashMap<>();
+
+    // Create a spied MutableVolumeSet and inject the test volumes
+    String datanodeUuid = UUID.randomUUID().toString();
+    volumeSet = spy(new MutableVolumeSet(datanodeUuid, CONF, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null));
+    when(volumeSet.getVolumesList())
+        .thenReturn(new ArrayList<>(volumes));
   }
 
   @AfterEach
@@ -123,24 +140,31 @@ public class TestContainerChoosingPolicy {
 
   @Test
   @Timeout(300)
-  public void testConcurrentVolumeChoosingPerformance() throws Exception {
+  public void testConcurrentContainerChoosingPerformance() throws Exception {
     testPolicyPerformance("ContainerChoosingPolicy", containerChoosingPolicy);
   }
 
   @Test
   public void testContainerDeletionAfterIteratorGeneration() throws Exception {
     HddsVolume volume = volumes.get(0);
+    HddsVolume destVolume = volumes.get(1);
+
     List<Container<?>> containerList = ozoneContainer.getContainerSet().getContainerMap().values().stream()
         .filter(x -> volume.getStorageID().equals(x.getContainerData().getVolume().getStorageID()))
         .filter(x -> x.getContainerData().isClosed())
         .sorted(ContainerDataScanOrder.INSTANCE)
         .collect(Collectors.toList());
     inProgressContainerIDs.clear();
-    ContainerData container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume, inProgressContainerIDs);
+
+    ContainerData container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume, destVolume,
+        inProgressContainerIDs, deltaMap, THRESHOLD, volumeSet);
+    assertNotNull(container);
     assertEquals(containerList.get(0).getContainerData().getContainerID(), container.getContainerID());
+
     ozoneContainer.getContainerSet().removeContainer(containerList.get(1).getContainerData().getContainerID());
     inProgressContainerIDs.add(ContainerID.valueOf(container.getContainerID()));
-    container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume, inProgressContainerIDs);
+    container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume,
+        destVolume, inProgressContainerIDs, deltaMap, THRESHOLD, volumeSet);
     assertEquals(containerList.get(1).getContainerData().getContainerID(), container.getContainerID());
   }
 
@@ -165,11 +189,17 @@ public class TestContainerChoosingPolicy {
           int containerNotChosen = 0;
           int failures = 0;
           // Choose a random volume
-          HddsVolume volume = volumes.get(rand.nextInt(NUM_VOLUMES));
+          HddsVolume srcVolume = volumes.get(rand.nextInt(NUM_VOLUMES));
+          HddsVolume destVolume;
+
+          do {
+            destVolume = volumes.get(rand.nextInt(NUM_VOLUMES));
+          } while (srcVolume.equals(destVolume));
 
           for (int j = 0; j < NUM_ITERATIONS; j++) {
             try {
-              ContainerData c = policy.chooseContainer(ozoneContainer, volume, inProgressContainerIDs);
+              ContainerData c = policy.chooseContainer(ozoneContainer, srcVolume,
+                  destVolume, inProgressContainerIDs, deltaMap, THRESHOLD, volumeSet);
               if (c == null) {
                 containerNotChosen++;
               } else {
