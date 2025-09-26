@@ -26,12 +26,12 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
- * This class captures the Storage Volume Scanner Metrics.
+ * This class captures the Background Storage Volume Scanner Metrics.
  **/
 @InterfaceAudience.Private
-@Metrics(about = "Storage Volume Scanner Metrics", context = "dfs")
-public class StorageVolumeScannerMetrics {
-  public static final String SOURCE_NAME = StorageVolumeScannerMetrics.class.getSimpleName();
+@Metrics(about = "Background Volume Scanner Metrics", context = "dfs")
+public class BackgroundVolumeScannerMetrics {
+  public static final String SOURCE_NAME = BackgroundVolumeScannerMetrics.class.getSimpleName();
 
   @Metric("number of volumes scanned in the last iteration")
   private MutableGaugeLong numVolumesScannedInLastIteration;
@@ -49,12 +49,12 @@ public class StorageVolumeScannerMetrics {
       "since the last iteration had not elapsed")
   private MutableCounterLong numIterationsSkipped;
 
-  public StorageVolumeScannerMetrics() {
+  public BackgroundVolumeScannerMetrics() {
   }
 
-  public static StorageVolumeScannerMetrics create() {
+  public static BackgroundVolumeScannerMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "Storage Volume Scanner Metrics", new StorageVolumeScannerMetrics());
+    return ms.register(SOURCE_NAME, "Background Volume Scanner Metrics", new BackgroundVolumeScannerMetrics());
   }
 
   /**

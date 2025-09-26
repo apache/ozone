@@ -25,7 +25,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 
-import com.google.common.base.Preconditions;
 import com.sun.jersey.api.client.ClientResponse;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,6 +33,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OmUtils;
@@ -81,9 +81,9 @@ public class RangerClientMultiTenantAccessController implements
     // OMMultiTenantManager#checkAndEnableMultiTenancy at this point.
 
     String rangerHttpsAddress = conf.get(OZONE_RANGER_HTTPS_ADDRESS_KEY);
-    Preconditions.checkNotNull(rangerHttpsAddress);
+    Objects.requireNonNull(rangerHttpsAddress);
     rangerServiceName = conf.get(OZONE_RANGER_SERVICE);
-    Preconditions.checkNotNull(rangerServiceName);
+    Objects.requireNonNull(rangerServiceName);
 
     // Determine auth type (KERBEROS or SIMPLE)
     final String authType;
@@ -109,14 +109,14 @@ public class RangerClientMultiTenantAccessController implements
       authType = AuthenticationMethod.KERBEROS.name();
 
       String configuredOmPrincipal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
-      Preconditions.checkNotNull(configuredOmPrincipal);
+      Objects.requireNonNull(configuredOmPrincipal);
 
       // Replace _HOST pattern with host name in the Kerberos principal.
       // Ranger client currently does not do this automatically.
       omPrincipal = SecurityUtil.getServerPrincipal(
           configuredOmPrincipal, OmUtils.getOmAddress(conf).getHostName());
       final String keytabPath = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
-      Preconditions.checkNotNull(keytabPath);
+      Objects.requireNonNull(keytabPath);
 
       // Convert to short name to be used in some Ranger requests
       shortName = UserGroupInformation.createRemoteUser(omPrincipal)

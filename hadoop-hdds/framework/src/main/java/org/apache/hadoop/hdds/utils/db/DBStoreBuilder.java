@@ -207,24 +207,32 @@ public final class DBStoreBuilder {
     }
 
     Set<TableConfig> tableConfigs = makeTableConfigs();
-
+    ManagedWriteOptions writeOptions = null;
     try {
       if (rocksDBOption == null) {
         rocksDBOption = getDefaultDBOptions(tableConfigs);
       }
       setDBOptionsProps(rocksDBOption);
-      ManagedWriteOptions writeOptions = new ManagedWriteOptions();
-      writeOptions.setSync(rocksDBConfiguration.getSyncOption());
-
       File dbFile = getDBFile();
       if (!dbFile.getParentFile().exists()) {
         throw new RocksDatabaseException("The DB destination directory should exist.");
       }
+      writeOptions = new ManagedWriteOptions();
+      writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           openReadOnly, dbJmxBeanNameName, enableCompactionDag,
           maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
           enableRocksDbMetrics);
+    } catch (Exception ex) {
+      try {
+        if (writeOptions != null) {
+          writeOptions.close();
+        }
+      } catch (Exception suppressed) {
+        ex.addSuppressed(suppressed);
+      }
+      throw ex;
     } finally {
       tableConfigs.forEach(TableConfig::close);
     }

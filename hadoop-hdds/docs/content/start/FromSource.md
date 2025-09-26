@@ -95,6 +95,35 @@ make
 mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dversion=${PROTOBUF_VERSION} -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=src/protoc
 # workaround for Maven 3.9.x. Not needed for 3.8.x or earlier
 cp $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64.exe
+
+cd ..
+# Patch protobuf 3.19.6
+PROTOBUF_VERSION="3.19.6"
+curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_VERSION}/protobuf-all-${PROTOBUF_VERSION}.tar.gz
+tar xzf protobuf-all-${PROTOBUF_VERSION}.tar.gz
+cd protobuf-${PROTOBUF_VERSION}
+./configure --disable-shared
+make -j
+mvn install:install-file -DgroupId=com.google.protobuf -DartifactId=protoc -Dversion=${PROTOBUF_VERSION} -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=src/protoc
+# workaround for Maven 3.9.x. Not needed for 3.8.x or earlier
+cp $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64 $HOME/.m2/repository/com/google/protobuf/protoc/${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-osx-aarch_64.exe
+
+cd ..
+# Compile grpc
+# Pre-req: Manually install Gradle (version 7.0 or higher) and a compatible JVM (JDK 8 or higher) as required by gRPC Java v1.71.0. See https://github.com/grpc/grpc-java/blob/v1.71.0/README.md for details.
+git clone https://github.com/grpc/grpc-java.git
+cd grpc-java
+git checkout v1.71.0
+PARENTDIR=$(cd .. && pwd)
+export PROTOBUF_ROOT="$PARENTDIR/protobuf-${PROTOBUF_VERSION}"
+export PATH="${PROTOBUF_ROOT}/src:$PATH"
+export CPPFLAGS="-I${PROTOBUF_ROOT}/src"
+export LDFLAGS="-L${PROTOBUF_ROOT}/src/.libs"
+./gradlew :grpc-compiler:java_pluginExecutable -PskipAndroid=true
+PLUGIN="protoc-gen-grpc-java-1.71.0-osx-aarch_64.exe"
+cp compiler/build/exe/java_plugin/protoc-gen-grpc-java $PLUGIN
+mvn install:install-file -DgroupId=io.grpc -DartifactId=protoc-gen-grpc-java -Dversion=1.71.0 -Dclassifier=osx-aarch_64 -Dpackaging=exe -Dfile=$PLUGIN
+cd ..
 ```
 
 ## Build Ozone
