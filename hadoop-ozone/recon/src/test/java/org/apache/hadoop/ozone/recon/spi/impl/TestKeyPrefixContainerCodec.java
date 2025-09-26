@@ -34,18 +34,6 @@ public class TestKeyPrefixContainerCodec {
   private final Codec<KeyPrefixContainer> codec = KeyPrefixContainerCodec.get();
 
   @Test
-  public void testKeyPrefixOnly() throws Exception {
-    KeyPrefixContainer original = KeyPrefixContainer.get("testKey");
-    testCodecBuffer(original);
-  }
-
-  @Test
-  public void testKeyPrefixAndVersion() throws Exception {
-    KeyPrefixContainer original = KeyPrefixContainer.get("testKey", 123L);
-    testCodecBuffer(original);
-  }
-
-  @Test
   public void testKeyPrefixVersionAndContainer() throws Exception {
     KeyPrefixContainer original = KeyPrefixContainer.get("testKey", 123L, 456L);
     testCodecBuffer(original);
@@ -61,6 +49,13 @@ public class TestKeyPrefixContainerCodec {
   public void testKeyPrefixWithDelimiter() throws Exception {
     KeyPrefixContainer original = KeyPrefixContainer.get("test_key_with_underscores", 789L, 101112L);
     testCodecBuffer(original);
+  }
+
+  @Test
+  public void testLongKeyPrefix() throws Exception {
+    KeyPrefixContainer originalWithBoth = KeyPrefixContainer.get(
+        "test___________________________________Key", 123L, 456L);
+    testCodecBuffer(originalWithBoth);
   }
 
   @Test
@@ -84,6 +79,8 @@ public class TestKeyPrefixContainerCodec {
 
     codecBuffer.release();
     assertEquals(original, fromBuffer);
-    assertEquals(original, codec.fromPersistedFormat(bytes));
+
+    KeyPrefixContainer fromPersisted = codec.fromPersistedFormat(bytes);
+    assertEquals(original, fromPersisted);
   }
 }

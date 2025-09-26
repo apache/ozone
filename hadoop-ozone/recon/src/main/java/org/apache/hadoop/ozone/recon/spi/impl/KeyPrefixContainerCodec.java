@@ -102,7 +102,7 @@ public final class KeyPrefixContainerCodec
     final int startPosition = byteBuffer.position();
     final int delimiterLength = KEY_DELIMITER_BYTES.length;
 
-    // Check for two delimiters + two longs (version and containerId)
+    // Only support decoding when we have both version and containerId
     if (totalLength >= 2 * (delimiterLength + Long.BYTES)) {
       // Extract keyPrefix (everything except last 2 delimiters + 2 longs)
       int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
@@ -120,23 +120,8 @@ public final class KeyPrefixContainerCodec
       return KeyPrefixContainer.get(keyPrefix, version, containerId);
     }
 
-    // Check for one delimiter + one long
-    if (totalLength >= delimiterLength + Long.BYTES) {
-      // Extract keyPrefix (everything except last delimiter + long)
-      int keyPrefixLength = totalLength - delimiterLength - Long.BYTES;
-      byteBuffer.position(startPosition);
-      String keyPrefix = decodeStringFromBuffer(byteBuffer, keyPrefixLength);
-
-      // Skip delimiter and read the long value
-      byteBuffer.position(startPosition + keyPrefixLength + delimiterLength);
-      long longValue = byteBuffer.getLong();
-
-      // Based on encoding logic: if keyVersion != -1, it's encoded first, then containerId
-      // So if we have only one long value, it should be the keyVersion
-      return KeyPrefixContainer.get(keyPrefix, longValue, -1);
-    }
-
-    // If we reach here, the buffer contains only the key prefix (no delimiters found)
+    // For backwards compatibility during transition, treat anything else as keyPrefix only
+    // This should not be used in production as it cannot handle keys with underscores
     byteBuffer.position(startPosition);
     String keyPrefix = decodeStringFromBuffer(byteBuffer, totalLength);
     return KeyPrefixContainer.get(keyPrefix, -1, -1);
@@ -194,18 +179,18 @@ public final class KeyPrefixContainerCodec
     int totalLength = rawData.length;
     int delimiterLength = KEY_DELIMITER_BYTES.length;
 
-    // Check for two delimiters + two longs (version and containerId)
+    // Only support decoding when we have both version and containerId
     if (totalLength >= 2 * (delimiterLength + Long.BYTES)) {
       // Extract keyPrefix (everything except last 2 delimiters + 2 longs)
       int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
       String keyPrefix = new String(ArrayUtils.subarray(rawData, 0, keyPrefixLength), UTF_8);
 
-      // Read version (skip delimiter)
+      // Read version
       int versionStart = keyPrefixLength + delimiterLength;
       byte[] versionBytes = ArrayUtils.subarray(rawData, versionStart, versionStart + Long.BYTES);
       long version = ByteBuffer.wrap(versionBytes).getLong();
 
-      // Read containerId (skip delimiter)
+      // Read containerId
       int containerIdStart = versionStart + Long.BYTES + delimiterLength;
       byte[] containerIdBytes = ArrayUtils.subarray(rawData, containerIdStart, containerIdStart + Long.BYTES);
       long containerId = ByteBuffer.wrap(containerIdBytes).getLong();
@@ -213,21 +198,8 @@ public final class KeyPrefixContainerCodec
       return KeyPrefixContainer.get(keyPrefix, version, containerId);
     }
 
-    // Check for one delimiter + one long (version only)
-    if (totalLength >= delimiterLength + Long.BYTES) {
-      // Extract keyPrefix (everything except last delimiter + long)
-      int keyPrefixLength = totalLength - delimiterLength - Long.BYTES;
-      String keyPrefix = new String(ArrayUtils.subarray(rawData, 0, keyPrefixLength), UTF_8);
-
-      // Read version (skip delimiter)
-      int versionStart = keyPrefixLength + delimiterLength;
-      byte[] versionBytes = ArrayUtils.subarray(rawData, versionStart, versionStart + Long.BYTES);
-      long version = ByteBuffer.wrap(versionBytes).getLong();
-
-      return KeyPrefixContainer.get(keyPrefix, version, -1);
-    }
-
-    // If we reach here, the buffer contains only the key prefix (no delimiters found)
+    // For backwards compatibility during transition, treat anything else as keyPrefix only
+    // This should not be used in production as it cannot handle keys with underscores
     String keyPrefix = new String(rawData, UTF_8);
     return KeyPrefixContainer.get(keyPrefix, -1, -1);
   }
