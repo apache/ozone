@@ -24,6 +24,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -76,7 +77,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
       int dirNameSize = dirNameBuffer.readableBytes();
 
       // total size: primitives + childDirs + dirName length + dirName data
-      final int totalSize = Integer.BYTES * (3 + ReconConstants.NUM_OF_FILE_SIZE_BINS) // numFiles + sizes + buckets
+      final int totalSize = Integer.BYTES * (3 + ReconConstants.NUM_OF_FILE_SIZE_BINS) // numFiles + numOfChildDirs + dirNameSize + fileSizeBucket
           + Long.BYTES * (numOfChildDirs + 2) // childDirs + sizeOfFiles + parentId
           + Short.BYTES // fileSizeBucket length
           + dirNameSize; // actual dirName bytes
@@ -101,7 +102,6 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
       if (dirNameSize > 0) {
         buffer.put(dirNameBuffer.asReadOnlyByteBuffer());
       }
-
       buffer.putLong(object.getParentId());
 
       return buffer;
@@ -129,25 +129,23 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
       result.setFileSizeBucket(fileSizeBucket);
 
       int numChildDirs = byteBuffer.getInt();
-      Set<Long> childDirs = new HashSet<>(numChildDirs);
+      Set<Long> childDirs = new LinkedHashSet<>(numChildDirs);
       for (int i = 0; i < numChildDirs; ++i) {
         childDirs.add(byteBuffer.getLong());
       }
       result.setChildDir(childDirs);
 
       int dirNameSize = byteBuffer.getInt();
-      if (dirNameSize > 0) {
-        byte[] dirNameBytes = new byte[dirNameSize];
-        byteBuffer.get(dirNameBytes);
-        String dirName = stringCodec.fromPersistedFormat(dirNameBytes);
-        result.setDirName(dirName);
+      if (dirNameSize == 0) {
+        return result;
       }
 
-      if (byteBuffer.remaining() >= Long.BYTES) {
-        result.setParentId(byteBuffer.getLong());
-      } else {
-        result.setParentId(-1);
-      }
+      byte[] dirNameBytes = new byte[dirNameSize];
+      byteBuffer.get(dirNameBytes);
+      CodecBuffer dirNameBuffer = CodecBuffer.wrap(dirNameBytes);
+      String dirName = stringCodec.fromCodecBuffer(dirNameBuffer);
+      result.setDirName(dirName);
+      result.setParentId(byteBuffer.getLong());
 
       return result;
     } catch (Exception e) {
@@ -203,7 +201,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     res.setFileSizeBucket(fileSizeBucket);
 
     int listSize = in.readInt();
-    Set<Long> childDir = new HashSet<>();
+    Set<Long> childDir = new LinkedHashSet<>();
     for (int i = 0; i < listSize; ++i) {
       childDir.add(in.readLong());
     }
