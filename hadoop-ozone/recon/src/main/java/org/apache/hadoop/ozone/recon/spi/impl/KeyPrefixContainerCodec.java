@@ -44,7 +44,7 @@ public final class KeyPrefixContainerCodec
   private static final String KEY_DELIMITER = "_";
   private static final byte[] KEY_DELIMITER_BYTES = KEY_DELIMITER.getBytes(UTF_8);
   private static final ByteBuffer KEY_DELIMITER_BUFFER = ByteBuffer.wrap(KEY_DELIMITER_BYTES).asReadOnlyBuffer();
-  private static final int LONG_SERIALIZED_SIZE = KEY_DELIMITER_BYTES.length + Long.BYTES;
+  public static final int LONG_SERIALIZED_SIZE = KEY_DELIMITER_BYTES.length + Long.BYTES;
 
   public static Codec<KeyPrefixContainer> get() {
     return INSTANCE;
@@ -102,53 +102,59 @@ public final class KeyPrefixContainerCodec
     final int startPosition = byteBuffer.position();
     final int delimiterLength = KEY_DELIMITER_BYTES.length;
 
-    // Only support decoding when we have both version and containerId
-    if (totalLength >= 2 * (delimiterLength + Long.BYTES)) {
-      // Extract keyPrefix (everything except last 2 delimiters + 2 longs)
-      int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
-      byteBuffer.position(startPosition);
-      String keyPrefix = decodeStringFromBuffer(byteBuffer, keyPrefixLength);
+    // We expect: keyPrefix + delimiter + version(8 bytes) + delimiter + containerId(8 bytes)
+    final int minimumLength = delimiterLength + Long.BYTES + delimiterLength + Long.BYTES;
 
-      // Skip delimiter and read version
-      byteBuffer.position(startPosition + keyPrefixLength + delimiterLength);
-      long version = byteBuffer.getLong();
-
-      // Skip delimiter and read containerId
-      byteBuffer.position(startPosition + keyPrefixLength + delimiterLength + Long.BYTES + delimiterLength);
-      long containerId = byteBuffer.getLong();
-
-      return KeyPrefixContainer.get(keyPrefix, version, containerId);
+    if (totalLength < minimumLength) {
+      throw new CodecException("Buffer too small to contain all required fields.");
     }
 
-    // For backwards compatibility during transition, treat anything else as keyPrefix only
-    // This should not be used in production as it cannot handle keys with underscores
+    int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
+    if (keyPrefixLength < 0) {
+      throw new CodecException("Invalid buffer format: negative key prefix length");
+    }
+
     byteBuffer.position(startPosition);
-    String keyPrefix = decodeStringFromBuffer(byteBuffer, totalLength);
-    return KeyPrefixContainer.get(keyPrefix, -1, -1);
+    byteBuffer.limit(startPosition + keyPrefixLength);
+    String keyPrefix = decodeStringFromBuffer(byteBuffer);
+    byteBuffer.limit(startPosition + totalLength);
+
+    byteBuffer.position(startPosition + keyPrefixLength);
+    for (int i = 0; i < delimiterLength; i++) {
+      if (byteBuffer.get() != KEY_DELIMITER_BYTES[i]) {
+        throw new CodecException("Expected delimiter after keyPrefix at position " +
+            (startPosition + keyPrefixLength));
+      }
+    }
+    long version = byteBuffer.getLong();
+    for (int i = 0; i < delimiterLength; i++) {
+      if (byteBuffer.get() != KEY_DELIMITER_BYTES[i]) {
+        throw new CodecException("Expected delimiter after version at position " +
+            (startPosition + keyPrefixLength + delimiterLength + Long.BYTES));
+      }
+    }
+    long containerId = byteBuffer.getLong();
+
+    return KeyPrefixContainer.get(keyPrefix, version, containerId);
   }
 
-  /**
-   * Decode string from ByteBuffer without copying to intermediate byte array.
-   * Uses CharsetDecoder for efficient decoding.
-   */
-  private String decodeStringFromBuffer(ByteBuffer buffer, int length) throws CodecException {
-    if (length == 0) {
+  private static String decodeStringFromBuffer(ByteBuffer buffer) {
+    if (buffer.remaining() == 0) {
       return "";
     }
 
-    try {
-      ByteBuffer slice = buffer.duplicate();
-      slice.limit(slice.position() + length);
-
+    final byte[] bytes;
+    if (buffer.hasArray()) {
+      int offset = buffer.arrayOffset() + buffer.position();
+      int length = buffer.remaining();
+      bytes = new byte[length];
+      System.arraycopy(buffer.array(), offset, bytes, 0, length);
       buffer.position(buffer.position() + length);
-
-      CharsetDecoder decoder = UTF_8.newDecoder();
-      CharBuffer charBuffer = decoder.decode(slice);
-      return charBuffer.toString();
-
-    } catch (CharacterCodingException e) {
-      throw new CodecException("Failed to decode UTF-8 string from buffer", e);
+    } else {
+      bytes = new byte[buffer.remaining()];
+      buffer.get(bytes);
     }
+    return new String(bytes, UTF_8);
   }
 
   @Override
@@ -157,7 +163,7 @@ public final class KeyPrefixContainerCodec
             "Null object can't be converted to byte array.");
     byte[] keyPrefixBytes = keyPrefixContainer.getKeyPrefix().getBytes(UTF_8);
 
-    //Prefix seek can be done only with keyPrefix. In that case, we can
+    // Prefix seek can be done only with keyPrefix. In that case, we can
     // expect the version and the containerId to be undefined.
     if (keyPrefixContainer.getKeyVersion() != -1) {
       keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
@@ -176,32 +182,23 @@ public final class KeyPrefixContainerCodec
 
   @Override
   public KeyPrefixContainer fromPersistedFormat(byte[] rawData) {
-    int totalLength = rawData.length;
-    int delimiterLength = KEY_DELIMITER_BYTES.length;
+    // When reading from byte[], we can always expect to have the key, version
+    // and version parts in the byte array.
+    byte[] keyBytes = ArrayUtils.subarray(rawData,
+        0, rawData.length - Long.BYTES * 2 - 2);
+    String keyPrefix = new String(keyBytes, UTF_8);
 
-    // Only support decoding when we have both version and containerId
-    if (totalLength >= 2 * (delimiterLength + Long.BYTES)) {
-      // Extract keyPrefix (everything except last 2 delimiters + 2 longs)
-      int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
-      String keyPrefix = new String(ArrayUtils.subarray(rawData, 0, keyPrefixLength), UTF_8);
+    // Second 8 bytes is the key version.
+    byte[] versionBytes = ArrayUtils.subarray(rawData,
+        rawData.length - Long.BYTES * 2 - 1,
+        rawData.length - Long.BYTES - 1);
+    long version = ByteBuffer.wrap(versionBytes).getLong();
 
-      // Read version
-      int versionStart = keyPrefixLength + delimiterLength;
-      byte[] versionBytes = ArrayUtils.subarray(rawData, versionStart, versionStart + Long.BYTES);
-      long version = ByteBuffer.wrap(versionBytes).getLong();
-
-      // Read containerId
-      int containerIdStart = versionStart + Long.BYTES + delimiterLength;
-      byte[] containerIdBytes = ArrayUtils.subarray(rawData, containerIdStart, containerIdStart + Long.BYTES);
-      long containerId = ByteBuffer.wrap(containerIdBytes).getLong();
-
-      return KeyPrefixContainer.get(keyPrefix, version, containerId);
-    }
-
-    // For backwards compatibility during transition, treat anything else as keyPrefix only
-    // This should not be used in production as it cannot handle keys with underscores
-    String keyPrefix = new String(rawData, UTF_8);
-    return KeyPrefixContainer.get(keyPrefix, -1, -1);
+    // Last 8 bytes is the containerId.
+    long containerIdFromDB = ByteBuffer.wrap(ArrayUtils.subarray(rawData,
+        rawData.length - Long.BYTES,
+        rawData.length)).getLong();
+    return KeyPrefixContainer.get(keyPrefix, version, containerIdFromDB);
   }
 
   @Override

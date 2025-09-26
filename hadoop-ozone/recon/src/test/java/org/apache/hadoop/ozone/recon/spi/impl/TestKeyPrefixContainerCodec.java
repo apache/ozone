@@ -34,28 +34,11 @@ public class TestKeyPrefixContainerCodec {
   private final Codec<KeyPrefixContainer> codec = KeyPrefixContainerCodec.get();
 
   @Test
-  public void testKeyPrefixVersionAndContainer() throws Exception {
-    KeyPrefixContainer original = KeyPrefixContainer.get("testKey", 123L, 456L);
-    testCodecBuffer(original);
-  }
-
-  @Test
-  public void testEmptyKeyPrefix() throws Exception {
-    KeyPrefixContainer original = KeyPrefixContainer.get("");
-    testCodecBuffer(original);
-  }
-
-  @Test
   public void testKeyPrefixWithDelimiter() throws Exception {
-    KeyPrefixContainer original = KeyPrefixContainer.get("test_key_with_underscores", 789L, 101112L);
-    testCodecBuffer(original);
-  }
-
-  @Test
-  public void testLongKeyPrefix() throws Exception {
-    KeyPrefixContainer originalWithBoth = KeyPrefixContainer.get(
-        "test___________________________________Key", 123L, 456L);
-    testCodecBuffer(originalWithBoth);
+    runTest("testKey", 123L, 456L);
+    runTest("test_key_with_underscores", 789L, 101112L);
+    runTest("test___________________________________Key", 1L, 2L);
+    runTest("", 0L, 0L);
   }
 
   @Test
@@ -68,19 +51,42 @@ public class TestKeyPrefixContainerCodec {
     assertEquals(KeyPrefixContainer.class, codec.getTypeClass());
   }
 
-  private void testCodecBuffer(KeyPrefixContainer original) throws Exception {
+  void runTest(String keyPrefix, long version, long containerId) throws Exception {
+    final KeyPrefixContainer original = KeyPrefixContainer.get(keyPrefix, version, containerId);
+    final KeyPrefixContainer keyAndVersion = KeyPrefixContainer.get(keyPrefix, version);
+    final KeyPrefixContainer keyOnly = KeyPrefixContainer.get(keyPrefix);
 
-    final CodecBuffer codecBuffer = codec.toCodecBuffer(
-        original, CodecBuffer.Allocator.getHeap());
-    final KeyPrefixContainer fromBuffer = codec.fromCodecBuffer(codecBuffer);
+    final CodecBuffer.Allocator allocator = CodecBuffer.Allocator.getHeap();
+    try (CodecBuffer originalBuffer = codec.toCodecBuffer(original, allocator);
+         CodecBuffer keyOnlyBuffer = codec.toCodecBuffer(keyOnly, allocator);
+         CodecBuffer keyAndVersionBuffer = codec.toCodecBuffer(keyAndVersion, allocator)) {
+      assertEquals(original, codec.fromCodecBuffer(originalBuffer));
+      assertTrue(originalBuffer.startsWith(keyAndVersionBuffer));
+      assertTrue(originalBuffer.startsWith(keyOnlyBuffer));
 
+      final byte[] originalBytes = assertCodecBuffer(original, originalBuffer);
+      assertEquals(original, codec.fromPersistedFormat(originalBytes));
+
+      final byte[] keyAndVersionBytes = assertCodecBuffer(keyAndVersion, keyAndVersionBuffer);
+      assertPrefix(originalBytes.length - KeyPrefixContainerCodec.LONG_SERIALIZED_SIZE,
+          originalBytes, keyAndVersionBytes);
+
+      final byte[] keyOnlyBytes = assertCodecBuffer(keyOnly, keyOnlyBuffer);
+      assertPrefix(originalBytes.length - 2 * KeyPrefixContainerCodec.LONG_SERIALIZED_SIZE,
+          originalBytes, keyOnlyBytes);
+    }
+  }
+
+  static void assertPrefix(int expectedLength, byte[] array, byte[] prefix) {
+    assertEquals(expectedLength, prefix.length);
+    for (int i = 0; i < prefix.length; i++) {
+      assertEquals(array[i], prefix[i]);
+    }
+  }
+
+  byte[] assertCodecBuffer(KeyPrefixContainer original, CodecBuffer buffer) throws Exception {
     final byte[] bytes = codec.toPersistedFormat(original);
-    assertArrayEquals(bytes, codecBuffer.getArray());
-
-    codecBuffer.release();
-    assertEquals(original, fromBuffer);
-
-    KeyPrefixContainer fromPersisted = codec.fromPersistedFormat(bytes);
-    assertEquals(original, fromPersisted);
+    assertArrayEquals(bytes, buffer.getArray());
+    return bytes;
   }
 }
