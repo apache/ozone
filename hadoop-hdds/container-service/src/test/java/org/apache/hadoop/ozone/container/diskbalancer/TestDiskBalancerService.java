@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -251,8 +252,10 @@ public class TestDiskBalancerService {
     long expectedBytesToMove = (long) Math.ceil(
         (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
 
+    ImmutableList<HddsVolume> immutableVolumes = DiskBalancerVolumeCalculation.getImmutableVolumeSet(volumeSet);
+
     // data precision loss due to double data involved in calculation
-    assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeSet)) <= 1);
+    assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(immutableVolumes)) <= 1);
   }
 
   @Test

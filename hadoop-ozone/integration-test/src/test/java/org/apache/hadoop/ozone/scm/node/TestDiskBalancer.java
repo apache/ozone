@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -42,7 +43,9 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
+import org.apache.hadoop.hdds.scm.node.DiskBalancerReportHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -63,6 +66,7 @@ public class TestDiskBalancer {
   private static ScmClient storageClient;
   private static MiniOzoneCluster cluster;
   private static DiskBalancerManager diskBalancerManager;
+  private static DiskBalancerReportHandler diskBalancerReportHandler;
 
   @BeforeAll
   public static void setup() throws Exception {
@@ -76,6 +80,8 @@ public class TestDiskBalancer {
     cluster.waitForClusterToBeReady();
     diskBalancerManager = cluster.getStorageContainerManager()
         .getDiskBalancerManager();
+    diskBalancerReportHandler =
+        new DiskBalancerReportHandler(diskBalancerManager);
 
     for (DatanodeDetails dn: cluster.getStorageContainerManager()
         .getScmNodeManager().getAllNodes()) {
@@ -93,6 +99,13 @@ public class TestDiskBalancer {
 
   @Test
   public void testDatanodeDiskBalancerReport() throws IOException {
+    // Populate disk balancer reports for all datanodes to avoid Double.NaN comparison issues.
+    for (DatanodeDetails dn : cluster.getStorageContainerManager()
+        .getScmNodeManager().getAllNodes()) {
+      diskBalancerReportHandler.onMessage(
+          new SCMDatanodeHeartbeatDispatcher.DiskBalancerReportFromDatanode(dn, generateRandomReport()), null);
+    }
+
     List<HddsProtos.DatanodeDiskBalancerInfoProto> reportProtoList =
         storageClient.getDiskBalancerReport(2);
 
@@ -185,5 +198,19 @@ public class TestDiskBalancer {
         null,
         ClientVersion.CURRENT_VERSION);
     assertEquals(1, statusProtoList.size());
+  }
+
+  private DiskBalancerReportProto generateRandomReport() {
+    return DiskBalancerReportProto.newBuilder()
+        .setIsRunning(true)
+        .setBalancedBytes(1000)
+        .setVolumeDataDensity(Math.random() * 10)
+        .setDiskBalancerConf(
+            HddsProtos.DiskBalancerConfigurationProto.newBuilder()
+                .setThreshold(10)
+                .setParallelThread(2)
+                .setDiskBandwidthInMB(50)
+                .build())
+        .build();
   }
 }

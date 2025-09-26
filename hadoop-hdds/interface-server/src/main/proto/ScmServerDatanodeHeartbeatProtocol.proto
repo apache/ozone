@@ -496,6 +496,7 @@ message DiskBalancerReportProto {
   optional uint64 successMoveCount = 4;
   optional uint64 failureMoveCount = 5;
   optional uint64 bytesToMove = 6;
+  optional double volumeDataDensity = 7;
 }
 
 /**

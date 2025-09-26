@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,6 +39,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -121,7 +123,6 @@ public class DiskBalancerService extends BackgroundService {
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
-  private long bytesToMove;
   private long containerDefaultSize;
 
   /**
@@ -401,8 +402,7 @@ public class DiskBalancerService extends BackgroundService {
       }
     }
 
-    if (queue.isEmpty()) {
-      bytesToMove = 0;
+    if (queue.isEmpty() && inProgressContainers.isEmpty()) {
       if (stopAfterDiskEven) {
         LOG.info("Disk balancer is stopped due to disk even as" +
             " the property StopAfterDiskEven is set to true.");
@@ -415,8 +415,6 @@ public class DiskBalancerService extends BackgroundService {
         }
       }
       metrics.incrIdleLoopNoAvailableVolumePairCount();
-    } else {
-      bytesToMove = calculateBytesToMove(volumeSet);
     }
 
     return queue;
@@ -620,43 +618,58 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public DiskBalancerInfo getDiskBalancerInfo() {
-    return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
-        parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
-        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes());
-  }
+    ImmutableList<HddsVolume> immutableVolumeSet = DiskBalancerVolumeCalculation.getImmutableVolumeSet(volumeSet);
 
-  public long calculateBytesToMove(MutableVolumeSet inputVolumeSet) {
-    long bytesPendingToMove = 0;
-    long totalFreeSpace = 0;
-    long totalCapacity = 0;
+    // Calculate volumeDataDensity
+    double volumeDatadensity = 0.0;
+    volumeDatadensity = DiskBalancerVolumeCalculation.calculateVolumeDataDensity(immutableVolumeSet, deltaSizes);
 
-    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
-      totalFreeSpace += volume.getCurrentUsage().getAvailable();
-      totalCapacity += volume.getCurrentUsage().getCapacity();
+    long bytesToMove = 0;
+    if (this.operationalState == DiskBalancerOperationalState.RUNNING) {
+      // this calculates live changes in bytesToMove
+      // calculate bytes to move if the balancer is in a running state, else 0.
+      bytesToMove = calculateBytesToMove(immutableVolumeSet);
     }
 
-    if (totalCapacity == 0) {
+    return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
+        parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
+        metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDatadensity);
+  }
+
+  public long calculateBytesToMove(ImmutableList<HddsVolume> inputVolumeSet) {
+    // If there are no available volumes or only one volume, return 0 bytes to move
+    if (inputVolumeSet.isEmpty() || inputVolumeSet.size() < 2) {
       return 0;
     }
 
-    double datanodeUtilization = ((double) (totalCapacity - totalFreeSpace)) / totalCapacity;
+    // Calculate ideal usage
+    double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(inputVolumeSet);
+    double normalizedThreshold = threshold / 100.0;
 
-    double thresholdFraction = threshold / 100.0;
-    double upperLimit = datanodeUtilization + thresholdFraction;
+    long totalBytesToMove = 0;
 
     // Calculate excess data in overused volumes
-    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(inputVolumeSet.getVolumesList())) {
-      long freeSpace = volume.getCurrentUsage().getAvailable();
-      long capacity = volume.getCurrentUsage().getCapacity();
-      double volumeUtilization = ((double) (capacity - freeSpace)) / capacity;
+    for (HddsVolume volume : inputVolumeSet) {
+      SpaceUsageSource usage = volume.getCurrentUsage();
 
-      // Consider only volumes exceeding the upper threshold
-      if (volumeUtilization > upperLimit) {
-        long excessData = (capacity - freeSpace) - (long) (upperLimit * capacity);
-        bytesPendingToMove += excessData;
+      if (usage.getCapacity() == 0) {
+        continue;
+      }
+
+      long deltaSize = deltaSizes.getOrDefault(volume, 0L);
+      double currentUsage = (double)((usage.getCapacity() - usage.getAvailable())
+          + deltaSize + volume.getCommittedBytes()) / usage.getCapacity();
+
+      double volumeUtilisation = currentUsage - idealUsage;
+
+      // Only consider volumes that exceed the threshold (source volumes)
+      if (volumeUtilisation >= normalizedThreshold) {
+        // Calculate excess bytes that need to be moved from this volume
+        long excessBytes = (long) ((volumeUtilisation - normalizedThreshold) * usage.getCapacity());
+        totalBytesToMove += Math.max(0, excessBytes);
       }
     }
-    return bytesPendingToMove;
+    return totalBytesToMove;
   }
 
   private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
