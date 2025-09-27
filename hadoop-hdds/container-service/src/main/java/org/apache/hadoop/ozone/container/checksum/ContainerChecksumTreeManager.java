@@ -171,6 +171,15 @@ public class ContainerChecksumTreeManager {
     // us when they reconcile.
   }
 
+  /**
+   * When comparing blocks, resolve checksum conflicts using the following function:
+   * - If both blocks are live: compute the checksum from a union of the blocks' chunks
+   * - If one block is live and one is deleted: overwrite the live block with the deleted block using the checksum of
+   * the deleted block
+   * - If both blocks are deleted: use the largest checksum
+   * This should be commutative, associative, and idempotent, so that all replicas converge after a single round of
+   * reconciliation when all peers have communicated.
+   */
   private void compareBlockMerkleTree(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
       ContainerProtos.BlockMerkleTree peerBlockMerkleTree, ContainerDiffReport report) {
 
@@ -350,9 +359,12 @@ public class ContainerChecksumTreeManager {
   }
 
   /**
-   * Writes the specified container merkle tree to the specified container's checksum file.
-   * Concurrent writes to the same file are coordinated internally.
-   * TODO update javadoc
+   * Performs a read-modify-write cycle on the container's checksum file:
+   * The lock is taken
+   * The file's contents are read into memory
+   * A new set of file contents are created using the specified merge function
+   * The new contents are written back to the file
+   * The lock is released
    */
   private ContainerProtos.ContainerChecksumInfo write(ContainerData data, Function<ContainerProtos.ContainerMerkleTree,
       ContainerProtos.ContainerMerkleTree> mergeFunction) throws IOException {

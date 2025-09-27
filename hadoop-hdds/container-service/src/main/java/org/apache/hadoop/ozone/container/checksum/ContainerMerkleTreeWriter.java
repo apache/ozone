@@ -165,7 +165,9 @@ public class ContainerMerkleTreeWriter {
   /**
    * Adds deleted blocks to this merkle tree. The blocks' checksums are computed from the checksums in the BlockData.
    * If a block with the same ID already exists in the tree, it is overwritten as deleted with the checksum computed
-   * from the chunk checksums in the BlockData.
+   * from the chunk checksums in the BlockData. If we reconciled with a peer and already marked this block as deleted
+   * during that process, this will overwrite that value. If it changes the block's checksum from what the peer had,
+   * one more round of reconciliation may be required to bring them in sync.
    *
    * The top level container data checksum is only computed in the returned tree proto if computeChecksum is true.
    * If it is false, the resulting tree proto will have data checksums for each block, but an empty/unset data checksum
