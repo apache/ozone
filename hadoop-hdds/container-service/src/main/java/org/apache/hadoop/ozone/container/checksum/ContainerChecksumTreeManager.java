@@ -359,12 +359,12 @@ public class ContainerChecksumTreeManager {
   }
 
   /**
-   * Performs a read-modify-write cycle on the container's checksum file:
-   * The lock is taken
-   * The file's contents are read into memory
-   * A new set of file contents are created using the specified merge function
-   * The new contents are written back to the file
-   * The lock is released
+   * Performs a read-modify-write cycle on the container's checksum file.
+   * 1. The lock is taken
+   * 2. The file's contents are read into memory
+   * 3. A new set of file contents are created using the specified merge function
+   * 4. The new contents are written back to the file
+   * 5. The lock is released
    */
   private ContainerProtos.ContainerChecksumInfo write(ContainerData data, Function<ContainerProtos.ContainerMerkleTree,
       ContainerProtos.ContainerMerkleTree> mergeFunction) throws IOException {
