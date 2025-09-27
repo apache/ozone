@@ -722,12 +722,12 @@ public final class HddsServerUtil {
     return toStartupShutdownString("STARTUP_MSG: ",
         "Starting " + className,
         "  host = " + hostname,
-        "  args = " + (args != null ? Arrays.asList(args) : new ArrayList<>()),
         "  version = " + versionInfo.getVersion(),
-        "  classpath = " + System.getProperty("java.class.path"),
         "  build = " + versionInfo.getUrl() + "/"
             + versionInfo.getRevision(),
         "  java = " + System.getProperty("java.version"),
+        "  args = " + (args != null ? Arrays.asList(args) : new ArrayList<>()),
+        "  classpath = " + System.getProperty("java.class.path"),
         "  conf = " + conf);
   }
 
