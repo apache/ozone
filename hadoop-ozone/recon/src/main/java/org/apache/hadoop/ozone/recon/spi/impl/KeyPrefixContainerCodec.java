@@ -23,9 +23,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.CharsetDecoder;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -145,11 +142,7 @@ public final class KeyPrefixContainerCodec
 
     final byte[] bytes;
     if (buffer.hasArray()) {
-      int offset = buffer.arrayOffset() + buffer.position();
-      int length = buffer.remaining();
-      bytes = new byte[length];
-      System.arraycopy(buffer.array(), offset, bytes, 0, length);
-      buffer.position(buffer.position() + length);
+      bytes = buffer.array();
     } else {
       bytes = new byte[buffer.remaining()];
       buffer.get(bytes);
