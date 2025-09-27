@@ -21,9 +21,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
+import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 
 /**
@@ -36,6 +39,9 @@ public final class KeyPrefixContainerCodec
       new KeyPrefixContainerCodec();
 
   private static final String KEY_DELIMITER = "_";
+  private static final byte[] KEY_DELIMITER_BYTES = KEY_DELIMITER.getBytes(UTF_8);
+  private static final ByteBuffer KEY_DELIMITER_BUFFER = ByteBuffer.wrap(KEY_DELIMITER_BYTES).asReadOnlyBuffer();
+  public static final int LONG_SERIALIZED_SIZE = KEY_DELIMITER_BYTES.length + Long.BYTES;
 
   public static Codec<KeyPrefixContainer> get() {
     return INSTANCE;
@@ -51,23 +57,115 @@ public final class KeyPrefixContainerCodec
   }
 
   @Override
+  public boolean supportCodecBuffer() {
+    return true;
+  }
+
+  @Override
+  public CodecBuffer toCodecBuffer(@Nonnull KeyPrefixContainer object, CodecBuffer.Allocator allocator) {
+    Preconditions.checkNotNull(object, "Null object can't be converted to CodecBuffer.");
+
+    final byte[] keyPrefixBytes = object.getKeyPrefix().getBytes(UTF_8);
+    int totalSize = keyPrefixBytes.length;
+
+    if (object.getKeyVersion() != -1) {
+      totalSize += LONG_SERIALIZED_SIZE;
+    }
+    if (object.getContainerId() != -1) {
+      totalSize += LONG_SERIALIZED_SIZE;
+    }
+
+    final CodecBuffer buffer = allocator.apply(totalSize);
+    buffer.put(ByteBuffer.wrap(keyPrefixBytes));
+
+    if (object.getKeyVersion() != -1) {
+      buffer.put(KEY_DELIMITER_BUFFER.duplicate());
+      buffer.putLong(object.getKeyVersion());
+    }
+
+    if (object.getContainerId() != -1) {
+      buffer.put(KEY_DELIMITER_BUFFER.duplicate());
+      buffer.putLong(object.getContainerId());
+    }
+
+    return buffer;
+  }
+
+  @Override
+  public KeyPrefixContainer fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
+
+    final ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer();
+    final int totalLength = byteBuffer.remaining();
+    final int startPosition = byteBuffer.position();
+    final int delimiterLength = KEY_DELIMITER_BYTES.length;
+
+    // We expect: keyPrefix + delimiter + version(8 bytes) + delimiter + containerId(8 bytes)
+    final int minimumLength = delimiterLength + Long.BYTES + delimiterLength + Long.BYTES;
+
+    if (totalLength < minimumLength) {
+      throw new CodecException("Buffer too small to contain all required fields.");
+    }
+
+    int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
+    if (keyPrefixLength < 0) {
+      throw new CodecException("Invalid buffer format: negative key prefix length");
+    }
+
+    byteBuffer.position(startPosition);
+    byteBuffer.limit(startPosition + keyPrefixLength);
+    String keyPrefix = decodeStringFromBuffer(byteBuffer);
+    byteBuffer.limit(startPosition + totalLength);
+
+    byteBuffer.position(startPosition + keyPrefixLength);
+    for (int i = 0; i < delimiterLength; i++) {
+      if (byteBuffer.get() != KEY_DELIMITER_BYTES[i]) {
+        throw new CodecException("Expected delimiter after keyPrefix at position " +
+            (startPosition + keyPrefixLength));
+      }
+    }
+    long version = byteBuffer.getLong();
+    for (int i = 0; i < delimiterLength; i++) {
+      if (byteBuffer.get() != KEY_DELIMITER_BYTES[i]) {
+        throw new CodecException("Expected delimiter after version at position " +
+            (startPosition + keyPrefixLength + delimiterLength + Long.BYTES));
+      }
+    }
+    long containerId = byteBuffer.getLong();
+
+    return KeyPrefixContainer.get(keyPrefix, version, containerId);
+  }
+
+  private static String decodeStringFromBuffer(ByteBuffer buffer) {
+    if (buffer.remaining() == 0) {
+      return "";
+    }
+
+    final byte[] bytes;
+    if (buffer.hasArray()) {
+      bytes = buffer.array();
+    } else {
+      bytes = new byte[buffer.remaining()];
+      buffer.get(bytes);
+    }
+    return new String(bytes, UTF_8);
+  }
+
+  @Override
   public byte[] toPersistedFormat(KeyPrefixContainer keyPrefixContainer) {
     Preconditions.checkNotNull(keyPrefixContainer,
             "Null object can't be converted to byte array.");
     byte[] keyPrefixBytes = keyPrefixContainer.getKeyPrefix().getBytes(UTF_8);
 
-    //Prefix seek can be done only with keyPrefix. In that case, we can
+    // Prefix seek can be done only with keyPrefix. In that case, we can
     // expect the version and the containerId to be undefined.
     if (keyPrefixContainer.getKeyVersion() != -1) {
-      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER
-          .getBytes(UTF_8));
+      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
       keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, Longs.toByteArray(
           keyPrefixContainer.getKeyVersion()));
     }
 
     if (keyPrefixContainer.getContainerId() != -1) {
-      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER
-          .getBytes(UTF_8));
+      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
       keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, Longs.toByteArray(
           keyPrefixContainer.getContainerId()));
     }
