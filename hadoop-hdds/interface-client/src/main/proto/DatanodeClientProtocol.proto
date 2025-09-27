@@ -566,6 +566,7 @@ message BlockMerkleTree {
   optional int64 blockID = 1;
   optional int64 dataChecksum = 2;
   repeated ChunkMerkleTree chunkMerkleTree = 3;
+  optional bool deleted = 4;
 }
 
 message ContainerMerkleTree {
@@ -576,7 +577,6 @@ message ContainerMerkleTree {
 message ContainerChecksumInfo {
   optional int64 containerID = 1;
   optional ContainerMerkleTree containerMerkleTree = 2;
-  repeated BlockMerkleTree deletedBlocks = 3;
 }
 
 service XceiverClientProtocolService {

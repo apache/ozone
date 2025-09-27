@@ -54,6 +54,9 @@ public class ContainerMerkleTreeMetrics {
   @Metric(about = "Number of corrupt chunks identified during container reconciliation")
   private MutableCounterLong numCorruptChunksIdentified;
 
+  @Metric(about = "Number of diverged block deletes identified during container reconciliation")
+  private MutableCounterLong numDivergedDeletedBlocksIdentified;
+
   @Metric(about = "Merkle tree write latency")
   private MutableRate merkleTreeWriteLatencyNS;
 
@@ -111,6 +114,10 @@ public class ContainerMerkleTreeMetrics {
 
   public void incrementCorruptChunksIdentified(long value) {
     this.numCorruptChunksIdentified.incr(value);
+  }
+
+  public void incrementDivergedDeletedBlocksIdentified(long value) {
+    this.numDivergedDeletedBlocksIdentified.incr(value);
   }
 
   public MutableRate getWriteContainerMerkleTreeLatencyNS() {
