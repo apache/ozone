@@ -93,13 +93,11 @@ public final class KeyPrefixContainerCodec
 
   @Override
   public KeyPrefixContainer fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
-
-    final ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer();
+    final ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer().slice();
     final int totalLength = byteBuffer.remaining();
-    final int startPosition = byteBuffer.position();
     final int delimiterLength = KEY_DELIMITER_BYTES.length;
 
-    // We expect: keyPrefix + delimiter + version(8 bytes) + delimiter + containerId(8 bytes)
+    // keyPrefix + delimiter + version(8 bytes) + delimiter + containerId(8 bytes)
     final int minimumLength = delimiterLength + Long.BYTES + delimiterLength + Long.BYTES;
 
     if (totalLength < minimumLength) {
@@ -107,31 +105,27 @@ public final class KeyPrefixContainerCodec
     }
 
     int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
-    if (keyPrefixLength < 0) {
-      throw new CodecException("Invalid buffer format: negative key prefix length");
-    }
-
-    byteBuffer.position(startPosition);
-    byteBuffer.limit(startPosition + keyPrefixLength);
+    byteBuffer.position(0);
+    byteBuffer.limit(keyPrefixLength);
     String keyPrefix = decodeStringFromBuffer(byteBuffer);
-    byteBuffer.limit(startPosition + totalLength);
+    byteBuffer.limit(totalLength);
 
-    byteBuffer.position(startPosition + keyPrefixLength);
+    byteBuffer.position(keyPrefixLength);
     for (int i = 0; i < delimiterLength; i++) {
       if (byteBuffer.get() != KEY_DELIMITER_BYTES[i]) {
-        throw new CodecException("Expected delimiter after keyPrefix at position " +
-            (startPosition + keyPrefixLength));
+        throw new CodecException("Expected delimiter after keyPrefix at position " + keyPrefixLength);
       }
     }
+
     long version = byteBuffer.getLong();
     for (int i = 0; i < delimiterLength; i++) {
       if (byteBuffer.get() != KEY_DELIMITER_BYTES[i]) {
         throw new CodecException("Expected delimiter after version at position " +
-            (startPosition + keyPrefixLength + delimiterLength + Long.BYTES));
+            (keyPrefixLength + delimiterLength + Long.BYTES));
       }
     }
-    long containerId = byteBuffer.getLong();
 
+    long containerId = byteBuffer.getLong();
     return KeyPrefixContainer.get(keyPrefix, version, containerId);
   }
 
