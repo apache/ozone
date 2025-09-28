@@ -93,55 +93,49 @@ public final class KeyPrefixContainerCodec
 
   @Override
   public KeyPrefixContainer fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
-    final ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer().slice();
+    final ByteBuffer byteBuffer = buffer.asReadOnlyByteBuffer();
     final int totalLength = byteBuffer.remaining();
-    final int delimiterLength = KEY_DELIMITER_BYTES.length;
 
-    // keyPrefix + delimiter + version(8 bytes) + delimiter + containerId(8 bytes)
-    final int minimumLength = delimiterLength + Long.BYTES + delimiterLength + Long.BYTES;
-
-    if (totalLength < minimumLength) {
-      throw new CodecException("Buffer too small to contain all required fields.");
+    if (totalLength == 0) {
+      throw new CodecException("Empty buffer");
     }
 
-    int keyPrefixLength = totalLength - 2 * delimiterLength - 2 * Long.BYTES;
-    byteBuffer.position(0);
-    byteBuffer.limit(keyPrefixLength);
-    String keyPrefix = decodeStringFromBuffer(byteBuffer);
-    byteBuffer.limit(totalLength);
+    final byte[] data = new byte[totalLength];
+    byteBuffer.get(data);
 
-    byteBuffer.position(keyPrefixLength);
-    for (int i = 0; i < delimiterLength; i++) {
-      if (byteBuffer.get() != KEY_DELIMITER_BYTES[i]) {
-        throw new CodecException("Expected delimiter after keyPrefix at position " + keyPrefixLength);
-      }
+    int lastDelimiter = findLastDelimiter(data);
+    if (lastDelimiter == -1) {
+      return KeyPrefixContainer.get(new String(data, UTF_8));
     }
 
-    long version = byteBuffer.getLong();
-    for (int i = 0; i < delimiterLength; i++) {
-      if (byteBuffer.get() != KEY_DELIMITER_BYTES[i]) {
-        throw new CodecException("Expected delimiter after version at position " +
-            (keyPrefixLength + delimiterLength + Long.BYTES));
-      }
+    int secondLastDelimiter = findLastDelimiter(data, lastDelimiter - 1);
+    if (secondLastDelimiter == -1) {
+      String keyPrefix = new String(data, 0, lastDelimiter, UTF_8);
+      long version = Longs.fromByteArray(ArrayUtils.subarray(data,
+          lastDelimiter + 1, lastDelimiter + 1 + Long.BYTES));
+      return KeyPrefixContainer.get(keyPrefix, version);
     }
 
-    long containerId = byteBuffer.getLong();
+    String keyPrefix = new String(data, 0, secondLastDelimiter, UTF_8);
+    long version = Longs.fromByteArray(ArrayUtils.subarray(data,
+        secondLastDelimiter + 1, secondLastDelimiter + 1 + Long.BYTES));
+    long containerId = Longs.fromByteArray(ArrayUtils.subarray(data,
+        lastDelimiter + 1, lastDelimiter + 1 + Long.BYTES));
+
     return KeyPrefixContainer.get(keyPrefix, version, containerId);
   }
 
-  private static String decodeStringFromBuffer(ByteBuffer buffer) {
-    if (buffer.remaining() == 0) {
-      return "";
-    }
+  private int findLastDelimiter(byte[] data) {
+    return findLastDelimiter(data, data.length - 1);
+  }
 
-    final byte[] bytes;
-    if (buffer.hasArray()) {
-      bytes = buffer.array();
-    } else {
-      bytes = new byte[buffer.remaining()];
-      buffer.get(bytes);
+  private int findLastDelimiter(byte[] data, int endPos) {
+    for (int i = endPos - Long.BYTES; i >= 0; i--) {
+      if (data[i] == '_') {
+        return i;
+      }
     }
-    return new String(bytes, UTF_8);
+    return -1;
   }
 
   @Override
