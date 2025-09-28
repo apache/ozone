@@ -18,8 +18,11 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.ByteBuffer;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
 import org.junit.jupiter.api.Test;
@@ -69,5 +72,89 @@ public class TestOmSnapshotDiffJobCodec {
     assertEquals(original.getTotalDiffEntries(), parsed.getTotalDiffEntries());
 
     assertEquals(0.0, parsed.getKeysProcessedPct());
+  }
+
+  @Test
+  public void testCodecBufferSupport() throws Exception {
+    assertTrue(newCodec.supportCodecBuffer());
+
+    SnapshotDiffJob original = new SnapshotDiffJob(
+        System.currentTimeMillis(),
+        "test-job-buffer",
+        JobStatus.DONE,
+        "testVol",
+        "testBucket",
+        "fromSnap",
+        "toSnap",
+        false,
+        true,
+        500L,
+        SubStatus.OBJECT_ID_MAP_GEN_FSO,
+        75.5
+    );
+
+    // Test with direct allocator
+    try (CodecBuffer buffer = newCodec.toCodecBuffer(original, CodecBuffer.Allocator.getDirect())) {
+      SnapshotDiffJob decoded = newCodec.fromCodecBuffer(buffer);
+      assertSnapshotDiffJobEquals(original, decoded);
+    }
+
+    // Test with heap allocator
+    try (CodecBuffer buffer = newCodec.toCodecBuffer(original, CodecBuffer.Allocator.getHeap())) {
+      SnapshotDiffJob decoded = newCodec.fromCodecBuffer(buffer);
+      assertSnapshotDiffJobEquals(original, decoded);
+    }
+  }
+
+  @Test
+  public void testCodecBufferBackwardCompatibility() throws Exception {
+
+    SnapshotDiffJob original = new SnapshotDiffJob(
+        987654321L,
+        "compat-job",
+        JobStatus.FAILED,
+        "volX",
+        "buckY",
+        "oldSnap",
+        "newSnap",
+        true,
+        true,
+        0L,
+        null,
+        0.0
+    );
+    original.setReason("Test failure reason");
+
+
+    byte[] jsonData = oldCodec.toPersistedFormatImpl(original);
+
+    // Create a CodecBuffer from the JSON data
+    // This simulates reading old format data from storage
+    try (CodecBuffer buffer = CodecBuffer.Allocator.getHeap().apply(jsonData.length)) {
+      buffer.put(ByteBuffer.wrap(jsonData));
+
+      // The new codec should handle JSON fallback in fromCodecBuffer
+      SnapshotDiffJob decoded = newCodec.fromCodecBuffer(buffer);
+
+      assertEquals(original.getJobId(), decoded.getJobId());
+      assertEquals(original.getStatus(), decoded.getStatus());
+      assertEquals(original.getReason(), decoded.getReason());
+    }
+  }
+
+  private void assertSnapshotDiffJobEquals(SnapshotDiffJob expected, SnapshotDiffJob actual) {
+    assertEquals(expected.getCreationTime(), actual.getCreationTime());
+    assertEquals(expected.getJobId(), actual.getJobId());
+    assertEquals(expected.getStatus(), actual.getStatus());
+    assertEquals(expected.getVolume(), actual.getVolume());
+    assertEquals(expected.getBucket(), actual.getBucket());
+    assertEquals(expected.getFromSnapshot(), actual.getFromSnapshot());
+    assertEquals(expected.getToSnapshot(), actual.getToSnapshot());
+    assertEquals(expected.isForceFullDiff(), actual.isForceFullDiff());
+    assertEquals(expected.isNativeDiffDisabled(), actual.isNativeDiffDisabled());
+    assertEquals(expected.getTotalDiffEntries(), actual.getTotalDiffEntries());
+    assertEquals(expected.getSubStatus(), actual.getSubStatus());
+    assertEquals(expected.getKeysProcessedPct(), actual.getKeysProcessedPct(), 0.001);
+    assertEquals(expected.getReason(), actual.getReason());
   }
 }

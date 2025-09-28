@@ -21,10 +21,14 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.InvalidProtocolBufferException;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffJobProto;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
@@ -309,6 +313,51 @@ public class SnapshotDiffJob {
     private static final ObjectMapper MAPPER = new ObjectMapper()
         .setSerializationInclusion(JsonInclude.Include.NON_NULL)
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    @Override
+    public boolean supportCodecBuffer() {
+      return true;
+    }
+
+    @Override
+    public CodecBuffer toCodecBuffer(@Nonnull SnapshotDiffJob object,
+        CodecBuffer.Allocator allocator) throws CodecException {
+
+      SnapshotDiffJobProto proto = object.toProtoBuf();
+      final int size = proto.getSerializedSize();
+      final CodecBuffer buffer = allocator.apply(size);
+
+      buffer.put(out -> {
+        try {
+          proto.writeTo(out);
+          return size;
+        } catch (IOException e) {
+          throw new IllegalStateException("Failed to write protobuf to buffer", e);
+        }
+      });
+      return buffer;
+    }
+
+    @Override
+    public SnapshotDiffJob fromCodecBuffer(@Nonnull CodecBuffer buffer)
+        throws CodecException {
+      // Direct protobuf parsing from InputStream to avoid byte array copy
+      try (java.io.InputStream in = buffer.getInputStream()) {
+        SnapshotDiffJobProto proto = SnapshotDiffJobProto.parseFrom(in);
+        return SnapshotDiffJob.getFromProtoBuf(proto);
+      } catch (InvalidProtocolBufferException e) {
+        ByteBuffer bb = buffer.asReadOnlyByteBuffer();
+        byte[] data = new byte[bb.remaining()];
+        bb.get(data);
+        try {
+          return MAPPER.readValue(data, SnapshotDiffJob.class);
+        } catch (IOException ex) {
+          throw new CodecException("Failed to deserialize SnapshotDiffJob from JSON", ex);
+        }
+      } catch (IOException e) {
+        throw new CodecException("Failed to read from CodecBuffer", e);
+      }
+    }
 
     @Override
     public Class<SnapshotDiffJob> getTypeClass() {
