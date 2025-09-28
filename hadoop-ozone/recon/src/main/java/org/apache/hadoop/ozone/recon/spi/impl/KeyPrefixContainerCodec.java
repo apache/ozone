@@ -156,12 +156,11 @@ public final class KeyPrefixContainerCodec
       keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
       keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, Longs.toByteArray(
           keyPrefixContainer.getKeyVersion()));
-    }
-
-    if (keyPrefixContainer.getContainerId() != -1) {
-      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
-      keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, Longs.toByteArray(
-          keyPrefixContainer.getContainerId()));
+      if (keyPrefixContainer.getContainerId() != -1) {
+        keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, KEY_DELIMITER_BYTES);
+        keyPrefixBytes = ArrayUtils.addAll(keyPrefixBytes, Longs.toByteArray(
+            keyPrefixContainer.getContainerId()));
+      }
     }
 
     return keyPrefixBytes;
