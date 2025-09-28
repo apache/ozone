@@ -37,6 +37,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotDir
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -125,7 +126,7 @@ import org.slf4j.LoggerFactory;
  * Ozone metadata manager interface.
  */
 public class OmMetadataManagerImpl implements OMMetadataManager,
-    S3SecretStore {
+    S3SecretStore, Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmMetadataManagerImpl.class);
 
@@ -1809,6 +1810,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return false;
   }
 
+  @Override
+  public void close() throws IOException {
+    stop();
+  }
+
   private final class S3SecretBatcher implements S3Batcher {
     @Override
     public void addWithBatch(AutoCloseable batchOperator, String id, S3SecretValue s3SecretValue)
@@ -1854,10 +1860,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
 
       if (addCacheMetrics) {
-        final TableCacheMetrics previous = tableCacheMetricsMap.put(name, table.createCacheMetrics());
-        if (previous != null) {
-          previous.unregister();
+        if (tableCacheMetricsMap.containsKey(name)) {
+          tableCacheMetricsMap.get(name).unregister();
         }
+        tableCacheMetricsMap.put(name, table.createCacheMetrics());
       }
       return table;
     }

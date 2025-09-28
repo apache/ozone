@@ -517,8 +517,13 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
     OmSnapshotManager omSnapshotManager =
         ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager();
-    // Create the snapshot local property file.
-    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager, omMetadataManager, snapshotInfo, store);
+    OzoneConfiguration configuration = ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getConfiguration();
+    try (OmMetadataManagerImpl checkpointMetadataManager =
+             OmMetadataManagerImpl.createCheckpointMetadataManager(configuration, dbCheckpoint)) {
+      // Create the snapshot local property file.
+      OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager,
+          (RDBStore) checkpointMetadataManager.getStore(), snapshotInfo);
+    }
 
     // Clean up active DB's deletedTable right after checkpoint is taken,
     // Snapshot create is processed as a single transaction and
@@ -532,11 +537,11 @@ public final class OmSnapshotManager implements AutoCloseable {
     deleteKeysFromSnapRenamedTableInSnapshotScope(omMetadataManager,
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), batchOperation);
 
-    if (dbCheckpoint != null && snapshotDirExist) {
+    if (snapshotDirExist) {
       LOG.info("Checkpoint: {} for snapshot {} already exists.",
           dbCheckpoint.getCheckpointLocation(), snapshotInfo.getTableKey());
       return dbCheckpoint;
-    } else if (dbCheckpoint != null) {
+    } else {
       LOG.info("Created checkpoint: {} for snapshot {}",
           dbCheckpoint.getCheckpointLocation(),
           snapshotInfo.getTableKey());
@@ -632,16 +637,15 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   /**
    * Creates and writes snapshot local properties to a YAML file with uncompacted SST file list.
-   * @param omMetadataManager the metadata manager
-   * @param snapshotInfo The metadata of snapshot to be created
-   * @param store The store used to get uncompacted SST file list from.
+   * @param snapshotManager snapshot manager instance.
+   * @param snapshotStore snapshot metadata manager.
+   * @param snapshotInfo snapshot info instance corresponding to snapshot.
    */
-  public static void createNewOmSnapshotLocalDataFile(OmSnapshotManager snapshotManager,
-      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo, RDBStore store)
-      throws IOException {
-    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(omMetadataManager, snapshotInfo));
+  public static void createNewOmSnapshotLocalDataFile(OmSnapshotManager snapshotManager, RDBStore snapshotStore,
+      SnapshotInfo snapshotInfo) throws IOException {
+    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(snapshotStore.getDbLocation().toPath()));
     Files.deleteIfExists(snapshotLocalDataPath);
-    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(store),
+    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(snapshotStore),
         snapshotInfo.getPathPreviousSnapshotId());
     snapshotLocalDataYaml.writeToYaml(snapshotManager, snapshotLocalDataPath.toFile());
   }

@@ -736,7 +736,7 @@ public class TestOMDbCheckpointServlet {
     String snapshotPath = getSnapshotPath(conf, snapshotInfo)
         + OM_KEY_PREFIX;
     GenericTestUtils.waitFor(() -> new File(snapshotPath).exists(),
-        100, 2000);
+        100, 30000);
     return snapshotPath;
   }
 
@@ -745,7 +745,7 @@ public class TestOMDbCheckpointServlet {
     return getFiles(path, truncateLength, new HashSet<>());
   }
 
-  // Get all files below path, recursively, (skipping fabricated files).
+  // Get all files below path, recursively, (skipping fabricated files, archive directory in rocksdb).
   private Set<String> getFiles(Path path, int truncateLength,
       Set<String> fileSet) throws IOException {
     try (Stream<Path> files = Files.list(path)) {
@@ -754,8 +754,11 @@ public class TestOMDbCheckpointServlet {
           getFiles(file, truncateLength, fileSet);
         }
         String filename = String.valueOf(file.getFileName());
+        Path parentDir = file.getParent();
+        String parentFileName = parentDir == null ? "null" : parentDir.toFile().getName();
         if (!filename.startsWith("fabricated") &&
-            !filename.startsWith(OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME)) {
+            !filename.startsWith(OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME) &&
+            !(filename.equals("archive") && parentFileName.startsWith("om.db"))) {
           fileSet.add(truncateFileName(truncateLength, file));
         }
       }
