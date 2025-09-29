@@ -389,7 +389,7 @@ public class DiskBalancerService extends BackgroundService {
       HddsVolume sourceVolume = pair.getLeft(), destVolume = pair.getRight();
       ContainerData toBalanceContainer = containerChoosingPolicy
           .chooseContainer(ozoneContainer, sourceVolume, destVolume,
-              inProgressContainers, deltaSizes, threshold, volumeSet);
+              inProgressContainers, threshold, volumeSet);
       if (toBalanceContainer != null) {
         DiskBalancerTask task = new DiskBalancerTask(toBalanceContainer, sourceVolume,
             destVolume);

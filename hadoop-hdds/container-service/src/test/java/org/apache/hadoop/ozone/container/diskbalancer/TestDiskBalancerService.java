@@ -293,7 +293,7 @@ public class TestDiskBalancerService {
     when(containerData.getBytesUsed()).thenReturn(100L);
 
     when(volumePolicy.chooseVolume(any(), anyDouble(), any(), anyLong())).thenReturn(Pair.of(source, dest));
-    when(containerPolicy.chooseContainer(any(), any(), any(), any(), any(), any(), any())).thenReturn(containerData);
+    when(containerPolicy.chooseContainer(any(), any(), any(), any(), any(), any())).thenReturn(containerData);
 
     // Test when no tasks are in progress, it should schedule up to the limit
     BackgroundTaskQueue queue = svc.getTasks();
