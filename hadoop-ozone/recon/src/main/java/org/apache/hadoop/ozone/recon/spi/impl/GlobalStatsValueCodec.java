@@ -46,40 +46,30 @@ public final class GlobalStatsValueCodec implements Codec<GlobalStatsValue> {
   @Override
   public byte[] toPersistedFormat(GlobalStatsValue value) {
     Preconditions.checkNotNull(value, "Null object can't be converted to byte array.");
-    
-    // Fixed 16-byte format: 8-byte value + 8-byte timestamp
+
+    // Simple 8-byte format: just the value
     Long val = value.getValue() != null ? value.getValue() : 0L;
-    Long timestamp = value.getLastUpdatedTimestamp() != null ? 
-        value.getLastUpdatedTimestamp() : 0L;
-    
-    byte[] valueBytes = Longs.toByteArray(val);
-    byte[] timestampBytes = Longs.toByteArray(timestamp);
-    
-    return ArrayUtils.addAll(valueBytes, timestampBytes);
+    return Longs.toByteArray(val);
   }
 
   @Override
   public GlobalStatsValue fromPersistedFormat(byte[] rawData) {
-    if (rawData.length != 16) {
-      throw new IllegalArgumentException("GlobalStatsValue data must be exactly 16 bytes, got: " + rawData.length);
+    if (rawData.length == 8) {
+      // New format: 8-byte value only
+      long value = Longs.fromByteArray(rawData);
+      return new GlobalStatsValue(value);
+    } else if (rawData.length == 16) {
+      // Legacy format: 8-byte value + 8-byte timestamp (ignore timestamp)
+      byte[] valueBytes = ArrayUtils.subarray(rawData, 0, Long.BYTES);
+      long value = Longs.fromByteArray(valueBytes);
+      return new GlobalStatsValue(value);
+    } else {
+      throw new IllegalArgumentException("GlobalStatsValue data must be 8 or 16 bytes, got: " + rawData.length);
     }
-    
-    // First 8 bytes is the value
-    byte[] valueBytes = ArrayUtils.subarray(rawData, 0, Long.BYTES);
-    long value = Longs.fromByteArray(valueBytes);
-    
-    // Last 8 bytes is the timestamp
-    byte[] timestampBytes = ArrayUtils.subarray(rawData, Long.BYTES, 16);
-    long timestamp = Longs.fromByteArray(timestampBytes);
-    
-    return new GlobalStatsValue(value, timestamp);
   }
 
   @Override
   public GlobalStatsValue copyObject(GlobalStatsValue object) {
-    return new GlobalStatsValue(
-        object.getValue(),
-        object.getLastUpdatedTimestamp()
-    );
+    return new GlobalStatsValue(object.getValue());
   }
 }

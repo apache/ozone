@@ -19,49 +19,23 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 /**
  * Value class for global statistics stored in RocksDB.
- * Contains the statistic value and last updated timestamp (as epoch milliseconds)
- * for efficient storage in the GLOBAL_STATS column family.
+ * Contains only the statistic value for efficient storage in the GLOBAL_STATS column family.
  */
 public class GlobalStatsValue {
   private final Long value;
-  private final Long lastUpdatedTimestamp; // epoch milliseconds for RocksDB storage
 
-  public GlobalStatsValue(Long value, Long lastUpdatedTimestamp) {
+  public GlobalStatsValue(Long value) {
     this.value = value;
-    this.lastUpdatedTimestamp = lastUpdatedTimestamp;
   }
 
   public Long getValue() {
     return value;
   }
 
-  public Long getLastUpdatedTimestamp() {
-    return lastUpdatedTimestamp;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof GlobalStatsValue) {
-      GlobalStatsValue other = (GlobalStatsValue) obj;
-      return (value != null ? value.equals(other.value) : other.value == null) &&
-          (lastUpdatedTimestamp != null ? lastUpdatedTimestamp.equals(other.lastUpdatedTimestamp) : 
-              other.lastUpdatedTimestamp == null);
-    }
-    return false;
-  }
-
-  @Override
-  public int hashCode() {
-    int result = value != null ? value.hashCode() : 0;
-    result = 31 * result + (lastUpdatedTimestamp != null ? lastUpdatedTimestamp.hashCode() : 0);
-    return result;
-  }
-
   @Override
   public String toString() {
     return "GlobalStatsValue{" +
         "value=" + value +
-        ", lastUpdatedTimestamp=" + lastUpdatedTimestamp +
         '}';
   }
 }

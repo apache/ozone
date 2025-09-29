@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.recon.tasks.FileSizeCountKey;
  */
 public final class FileCountBySizeKeyCodec implements Codec<FileSizeCountKey> {
 
-  private static final String KEY_DELIMITER = "_";
+  private static final String KEY_DELIMITER = "/";
 
   private static final Codec<FileSizeCountKey> INSTANCE = new FileCountBySizeKeyCodec();
 
@@ -51,7 +51,8 @@ public final class FileCountBySizeKeyCodec implements Codec<FileSizeCountKey> {
   public byte[] toPersistedFormat(FileSizeCountKey key) {
     Preconditions.checkNotNull(key, "Null object can't be converted to byte array.");
     
-    // Serialize: volume + delimiter + bucket + delimiter + fileSize (8 bytes)
+    // Serialize: volume + "/" + bucket + "/" + fileSize (8 bytes)
+    // Using "/" as delimiter (consistent with OZONE_URI_DELIMITER and OM_KEY_PREFIX)
     byte[] volumeBytes = key.getVolume().getBytes(UTF_8);
     byte[] bucketBytes = key.getBucket().getBytes(UTF_8);
     byte[] fileSizeBytes = Longs.toByteArray(key.getFileSizeUpperBound());

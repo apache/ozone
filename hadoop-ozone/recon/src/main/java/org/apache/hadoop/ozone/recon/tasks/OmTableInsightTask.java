@@ -276,7 +276,7 @@ public class OmTableInsightTask implements ReconOmTask {
       for (Entry<String, Long> entry : dataMap.entrySet()) {
         String key = entry.getKey();
         Long value = entry.getValue();
-        GlobalStatsValue globalStatsValue = new GlobalStatsValue(value, currentTime);
+        GlobalStatsValue globalStatsValue = new GlobalStatsValue(value);
         reconGlobalStatsManager.batchStoreGlobalStats(rdbBatchOperation, key, globalStatsValue);
       }
       reconGlobalStatsManager.commitBatchOperation(rdbBatchOperation);
