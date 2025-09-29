@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
@@ -54,7 +53,6 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public ContainerData chooseContainer(OzoneContainer ozoneContainer,
                                        HddsVolume srcVolume, HddsVolume destVolume,
                                        Set<ContainerID> inProgressContainerIDs,
-                                       Map<HddsVolume, Long> deltaMap,
                                        Double threshold, MutableVolumeSet volumeSet) {
     Iterator<Container<?>> itr;
     try {
@@ -72,7 +70,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
           (containerData.isClosed() || (test && containerData.isQuasiClosed()))) {
 
         // This is a candidate container. Now, check if moving it would be productive.
-        if (isMoveProductive(containerData, destVolume, deltaMap, threshold, volumeSet)) {
+        if (isMoveProductive(containerData, destVolume, threshold, volumeSet)) {
           return containerData;
         }
       }
@@ -96,7 +94,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
    */
   private boolean isMoveProductive(ContainerData containerData,
                                    HddsVolume destVolume,
-                                   Map<HddsVolume, Long> deltaMap, Double threshold,
+                                   Double threshold,
                                    MutableVolumeSet volumeSet) {
 
     long containerSize = containerData.getBytesUsed();
@@ -107,8 +105,8 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     SpaceUsageSource usage = destVolume.getCurrentUsage();
 
     double newDestUtilization =
-        (double) ((usage.getCapacity() - usage.getAvailable()) + destVolume.getCommittedBytes() +
-            deltaMap.getOrDefault(destVolume, 0L) + containerSize) / usage.getCapacity();
+        (double) ((usage.getCapacity() - usage.getAvailable()) + destVolume.getCommittedBytes() + containerSize)
+            / usage.getCapacity();
 
     if (newDestUtilization <= maxAllowedUtilization) {
       // The move is productive.
