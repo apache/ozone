@@ -92,10 +92,12 @@
     <exec-maven-plugin.version>3.5.1</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
-    <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
     <gson.version>2.13.1</gson.version>
     <guava.version>33.5.0-jre</guava.version>
     <guice.version>6.0.0</guice.version>
+    <!-- versions included in hadoop-thirdparty, update in sync (+ jar-report and LICENSE) -->
+    <hadoop-thirdparty.protobuf.artifact>hadoop-shaded-protobuf_3_25</hadoop-thirdparty.protobuf.artifact>
+    <hadoop-thirdparty.protobuf.version>3.25.5</hadoop-thirdparty.protobuf.version>
     <hadoop-thirdparty.version>1.4.0</hadoop-thirdparty.version>
     <hadoop.version>3.4.1</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
@@ -192,13 +194,14 @@
     <prometheus.version>0.16.0</prometheus.version>
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
-    <!-- ProtocolBuffer version, used to verify the protoc version and -->
-    <!-- define the protobuf JAR version                               -->
-    <proto2.hadooprpc.protobuf.version>2.5.0</proto2.hadooprpc.protobuf.version>
-    <proto3.hadooprpc.protobuf.version>3.25.5</proto3.hadooprpc.protobuf.version>
-    <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
+    <protobuf2.version>2.5.0</protobuf2.version>
+    <protobuf3.version>3.25.5</protobuf3.version>
     <ranger.version>2.6.0</ranger.version>
+    <!-- versions included in ratis-thirdparty, update in sync -->
+    <ratis-thirdparty.grpc.version>1.71.0</ratis-thirdparty.grpc.version>
+    <ratis-thirdparty.netty.version>4.1.119.Final</ratis-thirdparty.netty.version>
+    <ratis-thirdparty.protobuf.version>3.25.5</ratis-thirdparty.protobuf.version>
     <ratis.thirdparty.version>1.0.9</ratis.thirdparty.version>
     <ratis.version>3.2.0</ratis.version>
     <re2j.version>1.7</re2j.version>
@@ -410,7 +413,7 @@
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
-        <version>${proto2.hadooprpc.protobuf.version}</version>
+        <version>${protobuf2.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.re2j</groupId>
@@ -956,7 +959,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
-        <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
+        <artifactId>${hadoop-thirdparty.protobuf.artifact}</artifactId>
         <version>${hadoop-thirdparty.version}</version>
       </dependency>
       <dependency>

@@ -39,7 +39,7 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-      <version>${grpc.protobuf-compile.version}</version>
+      <version>${protobuf3.version}</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
@@ -154,7 +154,7 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java-util</artifactId>
-      <version>${grpc.protobuf-compile.version}</version>
+      <version>${protobuf3.version}</version>
       <scope>provided</scope>
       <exclusions>
         <exclusion>
@@ -223,7 +223,7 @@
         <version>${protobuf-maven-plugin.version}</version>
         <extensions>true</extensions>
         <configuration>
-          <protocArtifact>com.google.protobuf:protoc:${grpc.protobuf-compile.version}:exe:${os.detected.classifier}</protocArtifact>
+          <protocArtifact>com.google.protobuf:protoc:${protobuf3.version}:exe:${os.detected.classifier}</protocArtifact>
           <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
           <includes>
             <include>csi.proto</include>
