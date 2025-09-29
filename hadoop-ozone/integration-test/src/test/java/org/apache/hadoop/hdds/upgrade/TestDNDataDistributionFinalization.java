@@ -300,6 +300,8 @@ public class TestDNDataDistributionFinalization {
           if (isPostFinalization) {
             // Post-finalization should have both block count and bytes
             assertTrue(containerData.getStatistics().getBlockPendingDeletionBytes() >= 0);
+          } else {
+            assertEquals(0, containerData.getStatistics().getBlockPendingDeletionBytes());
           }
         }
       }
