@@ -188,7 +188,7 @@ public final class ReplicationManagerUtil {
           excludedNodes.add(r.getDatanodeDetails());
           continue;
         }
-        if (nodeStatus.isDead()) {
+        if (nodeStatus.isMaintenance() && nodeStatus.isDead()) {
           // Dead maintenance nodes are removed from the network topology, so the topology logic can't find
           // out their location and hence can't consider them for figuring out rack placement. So, we don't add them
           // to the used nodes list. We also don't add them to excluded nodes, as the placement policy logic won't
