@@ -31,6 +31,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -214,4 +215,47 @@ public final class OmSnapshotUtils {
       }
     }
   }
+
+  static String getSSTFullPath(String sstFilename, String sstBackupDir,
+      String... dbPaths) {
+
+    // Try to locate the SST in the backup dir first
+    final Path sstPathInBackupDir = Paths.get(sstBackupDir,
+        sstFilename);
+    if (Files.exists(sstPathInBackupDir)) {
+      return sstPathInBackupDir.toString();
+    }
+
+    // SST file does not exist in the SST backup dir, this means the SST file
+    // has not gone through any compactions yet and is only available in the
+    // src DB directory or destDB directory
+    for (String dbPath : dbPaths) {
+      final Path sstPathInDBDir = Paths.get(dbPath,
+          sstFilename);
+      if (Files.exists(sstPathInDBDir)) {
+        return sstPathInDBDir.toString();
+      }
+    }
+
+    // TODO: More graceful error handling?
+    throw new RuntimeException("Unable to locate SST file: " +
+        sstFilename);
+  }
+
+  static Set<String> getSSTDiffListWithFullPath(List<String> diffFiles, String srcDbPath,
+      String dstDbPath, String sstFilesDirForSnapDiffJob)  {
+    return diffFiles.stream().map(sst -> {
+      String sstFullPath = getSSTFullPath(sst, srcDbPath, dstDbPath);
+      Path link = Paths.get(sstFilesDirForSnapDiffJob, sst);
+      Path srcFile = Paths.get(sstFullPath);
+      try {
+        Files.createLink(link, srcFile);
+      } catch (IOException e) {
+        LOG.error("Exception in creating hard link for {}", srcFile);
+        throw new RuntimeException("Failed to create hard link", e);
+      }
+      return link.toString();
+    }).collect(Collectors.toSet());
+  }
+
 }
