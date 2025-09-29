@@ -156,7 +156,6 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
-  @SuppressWarnings("checkstyle:methodlength")
   public OzoneContainer(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context, CertificateClient certClient,
@@ -205,34 +204,7 @@ public class OzoneContainer {
     metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
-    IncrementalReportSender<Container> icrSender = new IncrementalReportSender<Container>() {
-      private void sendICR(Container container, boolean immediate) throws StorageContainerException {
-        ContainerReplicaProto containerReport = container.getContainerReport();
-
-        IncrementalContainerReportProto icr = IncrementalContainerReportProto
-            .newBuilder()
-            .addReport(containerReport)
-            .build();
-        context.addIncrementalReport(icr);
-        if (immediate) {
-          context.getParent().triggerHeartbeat();
-        }
-      }
-      
-      @Override
-      public void send(Container container) throws StorageContainerException {
-        synchronized (containerSet) {
-          sendICR(container, true); // Immediate
-        }
-      }
-      
-      @Override
-      public void sendDeferred(Container container) throws StorageContainerException {
-        synchronized (containerSet) {
-          sendICR(container, false); // Deferred
-        }
-      }
-    };
+    IncrementalReportSender<Container> icrSender = createIncrementalReportSender();
 
     checksumTreeManager = new ContainerChecksumTreeManager(config);
     for (ContainerType containerType : ContainerType.values()) {
@@ -386,6 +358,36 @@ public class OzoneContainer {
 
     LOG.info("Build ContainerSet costs {}s",
         (Time.monotonicNow() - startTime) / 1000);
+  }
+
+  private IncrementalReportSender<Container> createIncrementalReportSender() {
+    return new IncrementalReportSender<Container>() {
+      private void sendICR(Container container, boolean immediate) throws StorageContainerException {
+        ContainerReplicaProto containerReport = container.getContainerReport();
+        IncrementalContainerReportProto icr = IncrementalContainerReportProto
+            .newBuilder()
+            .addReport(containerReport)
+            .build();
+        context.addIncrementalReport(icr);
+        if (immediate) {
+          context.getParent().triggerHeartbeat();
+        }
+      }
+
+      @Override
+      public void send(Container container) throws StorageContainerException {
+        synchronized (containerSet) {
+          sendICR(container, true); // Immediate
+        }
+      }
+
+      @Override
+      public void sendDeferred(Container container) throws StorageContainerException {
+        synchronized (containerSet) {
+          sendICR(container, false); // Deferred
+        }
+      }
+    };
   }
 
   /**
