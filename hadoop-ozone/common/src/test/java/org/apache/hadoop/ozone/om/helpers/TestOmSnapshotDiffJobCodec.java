@@ -37,7 +37,6 @@ public class TestOmSnapshotDiffJobCodec {
 
   @Test
   public void testOldJsonSerializedDataCanBeReadByNewCodec() throws Exception {
-    // Step 1: Construct a SnapshotDiffJob instance
     SnapshotDiffJob original = new SnapshotDiffJob(
         123456789L,
         "job-001",
@@ -53,13 +52,10 @@ public class TestOmSnapshotDiffJobCodec {
         0.0
     );
 
-    // Step 2: Serialize using the old Jackson-based codec
     byte[] oldFormatData = oldCodec.toPersistedFormatImpl(original);
 
-    // Step 3: Deserialize using the new default codec (with Protobuf + JSON fallback)
     SnapshotDiffJob parsed = newCodec.fromPersistedFormatImpl(oldFormatData);
 
-    // Step 4: Verify critical fields remain consistent after round-trip
     assertEquals(original.getJobId(), parsed.getJobId());
     assertEquals(original.getStatus(), parsed.getStatus());
     assertEquals(original.getVolume(), parsed.getVolume());

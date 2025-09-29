@@ -341,7 +341,7 @@ public class SnapshotDiffJob {
     @Override
     public SnapshotDiffJob fromCodecBuffer(@Nonnull CodecBuffer buffer)
         throws CodecException {
-      // Direct protobuf parsing from InputStream to avoid byte array copy
+      
       try (java.io.InputStream in = buffer.getInputStream()) {
         SnapshotDiffJobProto proto = SnapshotDiffJobProto.parseFrom(in);
         return SnapshotDiffJob.getFromProtoBuf(proto);
