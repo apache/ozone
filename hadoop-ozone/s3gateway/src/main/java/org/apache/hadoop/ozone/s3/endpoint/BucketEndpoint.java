@@ -355,9 +355,11 @@ public class BucketEndpoint extends EndpointBase {
       int maxUploads)
       throws OS3Exception, IOException {
 
-    if (maxUploads < 1 || maxUploads > 1000) {
+    if (maxUploads < 1) {
       throw newError(S3ErrorTable.INVALID_ARGUMENT, "max-uploads",
-          new Exception("max-uploads must be between 1 and 1000"));
+          new Exception("max-uploads must be positive"));
+    } else {
+      maxUploads = Math.min(maxUploads, 1000);
     }
 
     long startNanos = Time.monotonicNowNanos();
