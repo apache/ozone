@@ -70,9 +70,10 @@ public final class KeyPrefixContainerCodec
 
     if (object.getKeyVersion() != -1) {
       totalSize += LONG_SERIALIZED_SIZE;
-    }
-    if (object.getContainerId() != -1) {
-      totalSize += LONG_SERIALIZED_SIZE;
+
+      if (object.getContainerId() != -1) {
+        totalSize += LONG_SERIALIZED_SIZE;
+      }
     }
 
     final CodecBuffer buffer = allocator.apply(totalSize);
@@ -81,11 +82,11 @@ public final class KeyPrefixContainerCodec
     if (object.getKeyVersion() != -1) {
       buffer.put(KEY_DELIMITER_BUFFER.duplicate());
       buffer.putLong(object.getKeyVersion());
-    }
 
-    if (object.getContainerId() != -1) {
-      buffer.put(KEY_DELIMITER_BUFFER.duplicate());
-      buffer.putLong(object.getContainerId());
+      if (object.getContainerId() != -1) {
+        buffer.put(KEY_DELIMITER_BUFFER.duplicate());
+        buffer.putLong(object.getContainerId());
+      }
     }
 
     return buffer;
