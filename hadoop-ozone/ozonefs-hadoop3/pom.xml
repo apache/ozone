@@ -72,6 +72,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.6.1</version>
         <executions>
           <execution>
             <id>include-dependencies</id>
@@ -81,12 +82,19 @@
             <phase>prepare-package</phase>
             <configuration>
               <skip>${maven.shade.skip}</skip>
-              <excludes>META-INF/versions/**/*.*</excludes>
+              <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+              <excludes>com/google/protobuf/**,
+                google/protobuf/**,</excludes>
               <artifactItems>
                 <artifactItem>
                   <groupId>org.apache.ozone</groupId>
                   <artifactId>ozone-filesystem-shaded</artifactId>
                   <version>${project.version}</version>
+                  <type>jar</type>
+                  <overWrite>true</overWrite>
+                  <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                  <excludes>com/google/protobuf/**,
+                    google/protobuf/**,</excludes>
                 </artifactItem>
               </artifactItems>
               <outputDirectory>target/classes</outputDirectory>
