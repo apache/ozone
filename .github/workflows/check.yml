@@ -232,13 +232,6 @@ jobs:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
           OZONE_WITH_COVERAGE: ${{ inputs.with-coverage }}
 
-      - name: 'Debug: List target directory contents'
-        if: always() && inputs.script == 'javadoc'
-        run: |
-          echo "--- Listing contents of target directory ---"
-          ls -lR target
-          echo "--- End of target directory listing ---"
-
       - name: Execute post-failure steps
         if: ${{ failure() && inputs.post-failure }}
         run: |
