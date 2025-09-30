@@ -68,7 +68,7 @@ public class TestDefaultContainerChoosingPolicy {
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static final long MB = 1024L * 1024L;
-  private static final long VOLUME_CAPACITY = 2500L * MB; // 1000MB
+  private static final long VOLUME_CAPACITY = 2500L * MB; // 2500MB
   private static final double THRESHOLD = 10.0;
 
   private ContainerChoosingPolicy policy;

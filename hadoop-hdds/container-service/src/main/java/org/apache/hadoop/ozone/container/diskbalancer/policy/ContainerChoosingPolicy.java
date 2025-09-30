@@ -40,7 +40,7 @@ public interface ContainerChoosingPolicy {
    * @return a Container
    */
   ContainerData chooseContainer(OzoneContainer ozoneContainer,
-                                HddsVolume srcVolume, HddsVolume destVolume,
-                                Set<ContainerID> inProgressContainerIDs,
-                                Double threshold, MutableVolumeSet volumeSet);
+      HddsVolume srcVolume, HddsVolume destVolume,
+      Set<ContainerID> inProgressContainerIDs,
+      Double threshold, MutableVolumeSet volumeSet);
 }
