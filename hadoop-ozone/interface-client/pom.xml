@@ -110,7 +110,7 @@
         <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc-OmGrpc</id>
+            <id>compile-proto</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
@@ -127,7 +127,7 @@
             </configuration>
           </execution>
           <execution>
-            <id>compile-protoc3</id>
+            <id>compile-proto-for-hadoop</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>

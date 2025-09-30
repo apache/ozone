@@ -63,7 +63,7 @@
         <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc-2</id>
+            <id>compile-proto</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
