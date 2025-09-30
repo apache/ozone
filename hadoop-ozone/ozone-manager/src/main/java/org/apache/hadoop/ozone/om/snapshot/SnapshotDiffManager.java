@@ -1048,7 +1048,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  private OmSnapshotLocalData getSnapshotLocalData(SnapshotInfo fsInfo) throws IOException {
+  OmSnapshotLocalData getSnapshotLocalData(SnapshotInfo fsInfo) throws IOException {
     String yamlPath = OmSnapshotManager.getSnapshotLocalPropertyYamlPath(
         ozoneManager.getMetadataManager(), fsInfo);
     return OmSnapshotLocalDataYaml.getFromYamlFile(

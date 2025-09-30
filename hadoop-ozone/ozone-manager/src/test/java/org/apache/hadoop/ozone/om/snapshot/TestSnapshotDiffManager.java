@@ -126,6 +126,7 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -448,6 +449,10 @@ public class TestSnapshotDiffManager {
 
     SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
     SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap2);
+    OmSnapshotLocalData fsLocalData = mock(OmSnapshotLocalData.class);
+    when(fsLocalData.getVersion()).thenReturn(0);
+    OmSnapshotLocalData tsLocalData = mock(OmSnapshotLocalData.class);
+    when(tsLocalData.getVersion()).thenReturn(0);
     when(jobTableIterator.isValid()).thenReturn(false);
     try (MockedStatic<RdbUtil> mockedRdbUtil = Mockito.mockStatic(RdbUtil.class, Mockito.CALLS_REAL_METHODS);
          MockedStatic<RocksDiffUtils> mockedRocksDiffUtils = Mockito.mockStatic(RocksDiffUtils.class,
@@ -458,6 +463,8 @@ public class TestSnapshotDiffManager {
       SnapshotDiffManager spy = spy(snapshotDiffManager);
       doNothing().when(spy).recordActivity(any(), any());
       doNothing().when(spy).updateProgress(anyString(), anyDouble());
+      doReturn(fsLocalData).when(spy).getSnapshotLocalData(fromSnapshotInfo);
+      doReturn(tsLocalData).when(spy).getSnapshotLocalData(toSnapshotInfo);
       Set<String> deltaFiles = spy.getDeltaFiles(
           fromSnapshot,
           toSnapshot,
@@ -528,10 +535,16 @@ public class TestSnapshotDiffManager {
 
       SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
       SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
+      OmSnapshotLocalData fsLocalData = mock(OmSnapshotLocalData.class);
+      when(fsLocalData.getVersion()).thenReturn(0);
+      OmSnapshotLocalData tsLocalData = mock(OmSnapshotLocalData.class);
+      when(tsLocalData.getVersion()).thenReturn(0);
       when(jobTableIterator.isValid()).thenReturn(false);
       SnapshotDiffManager spy = spy(snapshotDiffManager);
       doNothing().when(spy).recordActivity(any(), any());
       doNothing().when(spy).updateProgress(anyString(), anyDouble());
+      doReturn(fsLocalData).when(spy).getSnapshotLocalData(fromSnapshotInfo);
+      doReturn(tsLocalData).when(spy).getSnapshotLocalData(toSnapshotInfo);
       Set<String> deltaFiles = spy.getDeltaFiles(
           fromSnapshot,
           toSnapshot,
@@ -599,11 +612,17 @@ public class TestSnapshotDiffManager {
 
       SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
       SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
+      OmSnapshotLocalData fsLocalData = mock(OmSnapshotLocalData.class);
+      when(fsLocalData.getVersion()).thenReturn(0);
+      OmSnapshotLocalData tsLocalData = mock(OmSnapshotLocalData.class);
+      when(tsLocalData.getVersion()).thenReturn(0);
       when(jobTableIterator.isValid()).thenReturn(false);
       String diffJobKey = snap1 + DELIMITER + snap2;
       SnapshotDiffManager spy = spy(snapshotDiffManager);
       doNothing().when(spy).recordActivity(any(), any());
       doNothing().when(spy).updateProgress(anyString(), anyDouble());
+      doReturn(fsLocalData).when(spy).getSnapshotLocalData(fromSnapshotInfo);
+      doReturn(tsLocalData).when(spy).getSnapshotLocalData(toSnapshotInfo);
       Set<String> deltaFiles = spy.getDeltaFiles(
           fromSnapshot,
           toSnapshot,
@@ -1562,8 +1581,11 @@ public class TestSnapshotDiffManager {
       return null;
     }).when(spy).getSSTFileMapForSnapshot(Mockito.any(OmSnapshot.class),
         Mockito.anyList());
+    OmSnapshotLocalData fsLocalData = mock(OmSnapshotLocalData.class);
+    when(fsLocalData.getVersion()).thenReturn(0);
     doNothing().when(spy).recordActivity(any(), any());
     doNothing().when(spy).updateProgress(anyString(), anyDouble());
+    doReturn(fsLocalData).when(spy).getSnapshotLocalData(any());
     String diffJobKey = snap1 + DELIMITER + snap2;
     Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptyList(), snapshotInfo,
         snapshotInfo, true, Collections.emptyMap(), null, diffJobKey);
