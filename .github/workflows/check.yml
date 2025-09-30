@@ -264,6 +264,7 @@ jobs:
           name: ${{ (inputs.split && format('{0}-{1}', inputs.script, inputs.split)) || inputs.script }}
           path: |
             target/${{ inputs.script }}
+            target/reports/apidocs
             target/site/apidocs
         continue-on-error: true
 
