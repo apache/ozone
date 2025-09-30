@@ -84,7 +84,6 @@
               <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>DatanodeClientProtocol.proto</include>
-                <include>SCMClientProtocol.proto</include>
               </includes>
               <outputDirectory>target/generated-sources/java</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
