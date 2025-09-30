@@ -47,18 +47,20 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 /**
- * Integration test for OM HA admin privileges.
- * Tests that admin privileges are node-specific and don't transfer 
- * when leadership changes between OM nodes.
+ * Integration test for OM HA leader-specific ACL enforcement.
+ * Demonstrates that ACL check responsibility depends entirely on the current leader,
+ * with no expectation that all leaders are synchronized. Each leader enforces
+ * ACLs based on its own configuration independently.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestOMHAAdminPrivileges {
+public class TestOMHALeaderSpecificACLEnforcement {
 
   private static final String OM_SERVICE_ID = "om-service-test-admin";
   private static final int NUM_OF_OMS = 3;
@@ -96,12 +98,12 @@ public class TestOMHAAdminPrivileges {
   }
 
   /**
-   * Main test method that validates admin privileges behavior with OM HA.
+   * Main test method that validates leader-specific ACL enforcement in OM HA.
    * 1. Creates a mini cluster with OM HA
-   * 2. Adds test user as admin to only the leader OM node
-   * 3. Validates user can create volume and bucket
-   * 4. Forces leadership to another node
-   * 5. Checks that user is denied access to create volume and bucket in admin-owned volume
+   * 2. Adds test user as admin to only the current leader OM node
+   * 3. Validates user can perform admin operations when leader has the config
+   * 4. Transfers leadership to another node (with independent configuration)
+   * 5. Demonstrates that ACL enforcement depends entirely on new leader's config
    */
   @Test
   public void testOMHAAdminPrivilegesAfterLeadershipChange() throws Exception {
@@ -295,7 +297,14 @@ public class TestOMHAAdminPrivileges {
     currentLeader.transferLeadership(targetNodeId);
     
     // Wait for leadership transfer to complete
-    Thread.sleep(3000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        OzoneManager currentLeaderCheck = cluster.getOMLeader();
+        return !currentLeaderCheck.getOMNodeId().equals(currentLeader.getOMNodeId());
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 30000);
     
     // Verify leadership change
     cluster.waitForLeaderOM();
