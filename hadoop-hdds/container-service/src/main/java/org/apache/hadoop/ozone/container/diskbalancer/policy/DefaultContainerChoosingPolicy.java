@@ -51,9 +51,9 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
 
   @Override
   public ContainerData chooseContainer(OzoneContainer ozoneContainer,
-                                       HddsVolume srcVolume, HddsVolume destVolume,
-                                       Set<ContainerID> inProgressContainerIDs,
-                                       Double threshold, MutableVolumeSet volumeSet) {
+      HddsVolume srcVolume, HddsVolume destVolume,
+      Set<ContainerID> inProgressContainerIDs,
+      Double threshold, MutableVolumeSet volumeSet) {
     Iterator<Container<?>> itr;
     try {
       itr = CACHE.get().get(srcVolume,
@@ -63,6 +63,10 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
       return null;
     }
 
+    // Calculate maxAllowedUtilization
+    double idealUsage = volumeSet.getIdealUsage();
+    double maxAllowedUtilization = idealUsage + (threshold / 100.0);
+
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
       if (!inProgressContainerIDs.contains(
@@ -70,7 +74,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
           (containerData.isClosed() || (test && containerData.isQuasiClosed()))) {
 
         // This is a candidate container. Now, check if moving it would be productive.
-        if (isMoveProductive(containerData, destVolume, threshold, volumeSet)) {
+        if (isMoveProductive(containerData, destVolume, maxAllowedUtilization)) {
           return containerData;
         }
       }
@@ -90,18 +94,13 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
    *
    * @param containerData The container to be moved.
    * @param destVolume The destination volume.
+   * @param maxAllowedUtilization The maximum allowed utilization
+   * for the destination volume.
    * @return true if the move is productive, false otherwise.
    */
-  private boolean isMoveProductive(ContainerData containerData,
-                                   HddsVolume destVolume,
-                                   Double threshold,
-                                   MutableVolumeSet volumeSet) {
-
+  private boolean isMoveProductive(ContainerData containerData, HddsVolume destVolume,
+      Double maxAllowedUtilization) {
     long containerSize = containerData.getBytesUsed();
-
-    double idealUsage = volumeSet.getIdealUsage();
-    double maxAllowedUtilization = idealUsage + (threshold / 100.0);
-
     SpaceUsageSource usage = destVolume.getCurrentUsage();
 
     double newDestUtilization =
