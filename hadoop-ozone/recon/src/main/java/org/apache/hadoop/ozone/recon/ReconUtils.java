@@ -27,6 +27,8 @@ import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
@@ -49,6 +51,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -56,6 +59,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -79,6 +83,13 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.util.EntityUtils;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -93,6 +104,13 @@ public class ReconUtils {
 
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
+  
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static CloseableHttpClient httpClient;
+  private static final int MAX_CONNECTIONS_PER_ROUTE = 20;
+  private static final int MAX_TOTAL_CONNECTIONS = 100;
+  private static final int CONNECTION_TIMEOUT_MS = 5000;
+  private static final int SOCKET_TIMEOUT_MS = 10000;
 
   public ReconUtils() {
   }
@@ -105,6 +123,40 @@ public class ReconUtils {
    */
   public static org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState getNSSummaryRebuildState() {
     return org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.getRebuildState();
+  }
+
+  static {
+    initializeHttpClient();
+  }
+
+  private static void initializeHttpClient() {
+    PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+    connectionManager.setMaxTotal(MAX_TOTAL_CONNECTIONS);
+    connectionManager.setDefaultMaxPerRoute(MAX_CONNECTIONS_PER_ROUTE);
+    connectionManager.setValidateAfterInactivity(30000); // 30 seconds
+
+    RequestConfig requestConfig = RequestConfig.custom()
+        .setConnectionRequestTimeout(CONNECTION_TIMEOUT_MS)
+        .setConnectTimeout(CONNECTION_TIMEOUT_MS)
+        .setSocketTimeout(SOCKET_TIMEOUT_MS)
+        .build();
+
+    httpClient = HttpClientBuilder.create()
+        .setConnectionManager(connectionManager)
+        .setDefaultRequestConfig(requestConfig)
+        .setConnectionTimeToLive(60, TimeUnit.SECONDS)
+        .evictIdleConnections(30, TimeUnit.SECONDS)
+        .build();
+
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        if (httpClient != null) {
+          httpClient.close();
+        }
+      } catch (IOException e) {
+        log.warn("Error closing HTTP client", e);
+      }
+    }));
   }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
@@ -846,5 +898,54 @@ public class ReconUtils {
       pathBuilder.append(OM_KEY_PREFIX).append(id);
     }
     return pathBuilder.toString();
+  }
+
+  public static long getMetricsFromDatanode(DatanodeDetails datanode, String service, String name, String keyName)
+      throws IOException {
+    // Construct metrics URL for DataNode JMX endpoint
+    String metricsUrl = String.format("http://%s:%d/jmx?qry=Hadoop:service=%s,name=%s",
+        datanode.getIpAddress(),
+        datanode.getPort(DatanodeDetails.Port.Name.HTTP).getValue(),
+        service,
+        name);
+    HttpGet request = new HttpGet(metricsUrl);
+    try (CloseableHttpResponse response = httpClient.execute(request)) {
+      if (response.getStatusLine().getStatusCode() != 200) {
+        throw new IOException("HTTP request failed with status: " +
+            response.getStatusLine().getStatusCode());
+      }
+
+      String jsonResponse = EntityUtils.toString(response.getEntity());
+      return parseMetrics(jsonResponse, name, keyName);
+    } catch (IOException e) {
+      log.error("Error getting metrics from datanode: {}", datanode.getIpAddress(), e);
+    }
+    return 0;
+  }
+
+  private static long parseMetrics(String jsonResponse, String serviceName, String keyName) {
+    if (jsonResponse == null || jsonResponse.isEmpty()) {
+      return -1L;
+    }
+    try {
+      JsonNode root = OBJECT_MAPPER.readTree(jsonResponse);
+      JsonNode beans = root.get("beans");
+      if (beans != null && beans.isArray()) {
+        for (JsonNode bean : beans) {
+          String name = bean.path("name").asText("");
+          if (name.contains(serviceName)) {
+            return extractMetrics(bean, keyName);
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse block deletion metrics JSON: {}", e.toString());
+    }
+    return 0L;
+  }
+
+  /** Extract block deletion metrics from JMX bean node. */
+  private static long extractMetrics(JsonNode beanNode, String keyName) {
+    return beanNode.path(keyName).asLong(0L);
   }
 }

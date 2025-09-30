@@ -340,7 +340,7 @@ public class OMDBInsightEndpoint {
    *
    * @param keysSummary A map to store the keys summary information.
    */
-  private void createKeysSummaryForOpenKey(
+  public void createKeysSummaryForOpenKey(
       Map<String, Long> keysSummary) {
     try {
       Long replicatedSizeOpenKey = getValueFromId(reconGlobalStatsManager.getGlobalStatsValue(
@@ -409,7 +409,7 @@ public class OMDBInsightEndpoint {
    *
    * @param keysSummary A map to store the keys summary information.
    */
-  private void createKeysSummaryForOpenMPUKey(Map<String, Long> keysSummary) {
+  protected void createKeysSummaryForOpenMPUKey(Map<String, Long> keysSummary) {
     try {
       Long replicatedSizeOpenMPUKey = getValueFromId(reconGlobalStatsManager.getGlobalStatsValue(
           OmTableInsightTask.getReplicatedSizeKeyFromTable(MULTIPART_INFO_TABLE)));
@@ -604,7 +604,7 @@ public class OMDBInsightEndpoint {
    *
    * @param keysSummary A map to store the keys summary information.
    */
-  private void createKeysSummaryForDeletedKey(Map<String, Long> keysSummary) {
+  protected void createKeysSummaryForDeletedKey(Map<String, Long> keysSummary) {
     try {
       // Fetch the necessary metrics for deleted keys
       Long replicatedSizeDeleted = getValueFromId(reconGlobalStatsManager.getGlobalStatsValue(
@@ -681,7 +681,7 @@ public class OMDBInsightEndpoint {
             pendingForDeletionKeyInfo.getReplicatedDataSize() +
                 keyEntityInfo.getReplicatedSize());
         deletedDirInfoList.add(keyEntityInfo);
-        if (deletedDirInfoList.size() == limit) {
+        if (limit > 0 && deletedDirInfoList.size() == limit) {
           break;
         }
       }
