@@ -1442,10 +1442,10 @@ message PurgeDirectoriesRequest {
 }
 
 message BucketNameInfo {
-  required uint64 volumeId = 1;
-  required uint64 bucketId = 2;
-  required string volumeName = 3;
-  required string bucketName = 4;
+  optional uint64 volumeId = 1;
+  optional uint64 bucketId = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
 }
 
 message NullableUUID {
