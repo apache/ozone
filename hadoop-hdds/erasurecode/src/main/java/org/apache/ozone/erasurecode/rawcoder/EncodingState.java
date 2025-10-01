@@ -17,7 +17,6 @@
 
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
@@ -36,11 +35,11 @@ abstract class EncodingState {
    */
   <T> void checkParameters(T[] inputs, T[] outputs) {
     if (inputs.length != encoder.getNumDataUnits()) {
-      throw new HadoopIllegalArgumentException("Invalid inputs length "
+      throw new IllegalArgumentException("Invalid inputs length "
           + inputs.length + " !=" + encoder.getNumDataUnits());
     }
     if (outputs.length != encoder.getNumParityUnits()) {
-      throw new HadoopIllegalArgumentException("Invalid outputs length "
+      throw new IllegalArgumentException("Invalid outputs length "
           + outputs.length + " !=" + encoder.getNumParityUnits());
     }
   }

@@ -42,10 +42,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -679,8 +677,6 @@ public class TestContainerReader {
     KeyValueContainerData containerData = container.getContainerData();
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
     ContainerChecksumTreeManager checksumManager = keyValueHandler.getChecksumManager();
-    List<Long> deletedBlockIds = Arrays.asList(1L, 2L, 3L);
-    checksumManager.markBlocksAsDeleted(containerData, deletedBlockIds);
     keyValueHandler.updateContainerChecksum(container, treeWriter);
     long expectedDataChecksum = checksumManager.read(containerData).getContainerMerkleTree().getDataChecksum();
 
@@ -695,17 +691,7 @@ public class TestContainerReader {
     KeyValueContainerData loadedData = (KeyValueContainerData) loadedContainer.getContainerData();
     assertNotSame(containerData, loadedData);
     assertEquals(expectedDataChecksum, loadedData.getDataChecksum());
-    ContainerProtos.ContainerChecksumInfo loadedChecksumInfo =
-        ContainerChecksumTreeManager.readChecksumInfo(loadedData);
     verifyAllDataChecksumsMatch(loadedData, conf);
-
-    // Verify the deleted block IDs match what we set
-    List<Long> loadedDeletedBlockIds = loadedChecksumInfo.getDeletedBlocksList().stream()
-        .map(ContainerProtos.BlockMerkleTree::getBlockID)
-        .sorted()
-        .collect(Collectors.toList());
-    assertEquals(3, loadedChecksumInfo.getDeletedBlocksCount());
-    assertEquals(deletedBlockIds, loadedDeletedBlockIds);
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -718,8 +704,7 @@ public class TestContainerReader {
     KeyValueContainerData containerData = container.getContainerData();
     ContainerMerkleTreeWriter treeWriter = ContainerMerkleTreeTestUtils.buildTestTree(conf);
     ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
-    ContainerProtos.ContainerChecksumInfo checksumInfo =
-        checksumManager.writeContainerDataTree(containerData, treeWriter);
+    ContainerProtos.ContainerChecksumInfo checksumInfo = checksumManager.updateTree(containerData, treeWriter);
     long dataChecksum = checksumInfo.getContainerMerkleTree().getDataChecksum();
 
     // Verify no checksum in RocksDB initially

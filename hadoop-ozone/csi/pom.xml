@@ -27,6 +27,7 @@
 
   <properties>
     <classpath.skip>false</classpath.skip>
+    <maven.javadoc.skip>true</maven.javadoc.skip>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
     <protobuf.version>${protobuf3.version}</protobuf.version>
