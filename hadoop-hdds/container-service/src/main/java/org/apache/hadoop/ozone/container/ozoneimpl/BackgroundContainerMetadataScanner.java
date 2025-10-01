@@ -54,24 +54,7 @@ public class BackgroundContainerMetadataScanner extends
   @Override
   public void scanContainer(Container<?> container)
       throws IOException, InterruptedException {
-    if (!scanHelper.shouldScanMetadata(container)) {
-      return;
-    }
-
-    long containerID = container.getContainerData().getContainerID();
-
-    MetadataScanResult result = container.scanMetaData();
-    if (result.isDeleted()) {
-      LOG.debug("Container [{}] has been deleted during the metadata scan.", containerID);
-      return;
-    }
-    if (result.hasErrors()) {
-      scanHelper.handleUnhealthyScanResult(containerID, result);
-    }
-
-    // Do not update the scan timestamp after the scan since this was just a
-    // metadata scan, not a full data scan.
-    metrics.incNumContainersScanned();
+    scanHelper.scanMetadata(container);
   }
 
   @Override
