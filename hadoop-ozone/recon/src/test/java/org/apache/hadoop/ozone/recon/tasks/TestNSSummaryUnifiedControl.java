@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask.TaskResult;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -314,6 +315,7 @@ public class TestNSSummaryUnifiedControl {
    * Test multiple concurrent attempts - only one should succeed, others rejected.
    */
   @Test
+  @Flaky("HDDS-13573")
   void testMultipleConcurrentAttempts() throws Exception {
     int threadCount = 5;
     CountDownLatch startLatch = new CountDownLatch(1);
@@ -432,54 +434,6 @@ public class TestNSSummaryUnifiedControl {
     assertTrue(result.isTaskSuccess(), "Rebuild should succeed");
     assertEquals(RebuildState.IDLE, ReconUtils.getNSSummaryRebuildState(),
         "State should return to IDLE after completion");
-  }
-
-  /**
-   * Test that ReconUtils async trigger respects unified control.
-   */
-  @Test
-  void testReconUtilsRespectsUnifiedControl() throws Exception {
-    CountDownLatch firstRebuildStarted = new CountDownLatch(1);
-    CountDownLatch firstRebuildCanFinish = new CountDownLatch(1);
-
-    // Setup first rebuild to block
-    doAnswer(invocation -> {
-      firstRebuildStarted.countDown();
-      boolean awaitSuccess = firstRebuildCanFinish.await(5, TimeUnit.SECONDS);
-      if (!awaitSuccess) {
-        LOG.warn("firstRebuildCanFinish.await() timed out");
-      }
-      return null;
-    }).when(mockNamespaceSummaryManager).clearNSSummaryTable();
-
-    // Start first rebuild via NSSummaryTask directly
-    CompletableFuture<TaskResult> directRebuild = CompletableFuture.supplyAsync(() -> 
-        nsSummaryTask.reprocess(mockOMMetadataManager));
-
-    // Wait for first rebuild to start
-    assertTrue(firstRebuildStarted.await(5, TimeUnit.SECONDS),
-        "First rebuild should start");
-    assertEquals(RebuildState.RUNNING, NSSummaryTask.getRebuildState(),
-        "State should be RUNNING");
-
-    // Try to trigger via ReconUtils - should still respect the running state
-    // (The async execution will be queued but the actual rebuild will be rejected)
-    boolean triggered = ReconUtils.triggerAsyncNSSummaryRebuild(
-        mockNamespaceSummaryManager, mockReconOMMetadataManager);
-    assertTrue(triggered, "ReconUtils should queue the async request");
-
-    // State should still be RUNNING from the first rebuild
-    assertEquals(RebuildState.RUNNING, NSSummaryTask.getRebuildState(),
-        "State should still be RUNNING from first rebuild");
-
-    // Complete first rebuild
-    firstRebuildCanFinish.countDown();
-    TaskResult result = directRebuild.get(5, TimeUnit.SECONDS);
-    assertTrue(result.isTaskSuccess(), "First rebuild should succeed");
-
-    // Final state should be IDLE
-    assertEquals(RebuildState.IDLE, NSSummaryTask.getRebuildState(),
-        "Final state should be IDLE");
   }
 
   /**

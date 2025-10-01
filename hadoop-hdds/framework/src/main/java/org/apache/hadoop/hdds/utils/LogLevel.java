@@ -33,7 +33,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -144,7 +143,7 @@ public final class LogLevel {
       try {
         parseArguments(args);
         sendLogLevelRequest();
-      } catch (HadoopIllegalArgumentException e) {
+      } catch (IllegalArgumentException e) {
         printUsage();
         return -1;
       }
@@ -153,11 +152,11 @@ public final class LogLevel {
 
     /**
      * Send HTTP/HTTPS request to the daemon.
-     * @throws HadoopIllegalArgumentException if arguments are invalid.
+     * @throws IllegalArgumentException if arguments are invalid.
      * @throws Exception if unable to connect
      */
     private void sendLogLevelRequest()
-        throws HadoopIllegalArgumentException, Exception {
+        throws IllegalArgumentException, Exception {
       switch (operation) {
       case GETLEVEL:
         doGetLevel();
@@ -166,15 +165,15 @@ public final class LogLevel {
         doSetLevel();
         break;
       default:
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
           "Expect either -getlevel or -setlevel");
       }
     }
 
     public void parseArguments(String[] args) throws
-        HadoopIllegalArgumentException {
+        IllegalArgumentException {
       if (args.length == 0) {
-        throw new HadoopIllegalArgumentException("No arguments specified");
+        throw new IllegalArgumentException("No arguments specified");
       }
       int nextArgIndex = 0;
       while (nextArgIndex < args.length) {
@@ -185,14 +184,14 @@ public final class LogLevel {
         } else if (args[nextArgIndex].equals("-protocol")) {
           nextArgIndex = parseProtocolArgs(args, nextArgIndex);
         } else {
-          throw new HadoopIllegalArgumentException(
+          throw new IllegalArgumentException(
               "Unexpected argument " + args[nextArgIndex]);
         }
       }
 
       // if operation is never specified in the arguments
       if (operation == Operations.UNKNOWN) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "Must specify either -getlevel or -setlevel");
       }
 
@@ -203,15 +202,15 @@ public final class LogLevel {
     }
 
     private int parseGetLevelArgs(String[] args, int index) throws
-        HadoopIllegalArgumentException {
+        IllegalArgumentException {
       // fail if multiple operations are specified in the arguments
       if (operation != Operations.UNKNOWN) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "Redundant -getlevel command");
       }
       // check number of arguments is sufficient
       if (index + 2 >= args.length) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "-getlevel needs two parameters");
       }
       operation = Operations.GETLEVEL;
@@ -221,15 +220,15 @@ public final class LogLevel {
     }
 
     private int parseSetLevelArgs(String[] args, int index) throws
-        HadoopIllegalArgumentException {
+        IllegalArgumentException {
       // fail if multiple operations are specified in the arguments
       if (operation != Operations.UNKNOWN) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "Redundant -setlevel command");
       }
       // check number of arguments is sufficient
       if (index + 3 >= args.length) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "-setlevel needs three parameters");
       }
       operation = Operations.SETLEVEL;
@@ -240,21 +239,21 @@ public final class LogLevel {
     }
 
     private int parseProtocolArgs(String[] args, int index) throws
-        HadoopIllegalArgumentException {
+        IllegalArgumentException {
       // make sure only -protocol is specified
       if (protocol != null) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "Redundant -protocol command");
       }
       // check number of arguments is sufficient
       if (index + 1 >= args.length) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "-protocol needs one parameter");
       }
       // check protocol is valid
       protocol = args[index + 1];
       if (!isValidProtocol(protocol)) {
-        throw new HadoopIllegalArgumentException(
+        throw new IllegalArgumentException(
             "Invalid protocol: " + protocol);
       }
       return index + 2;
@@ -263,7 +262,7 @@ public final class LogLevel {
     /**
      * Send HTTP/HTTPS request to get log level.
      *
-     * @throws HadoopIllegalArgumentException if arguments are invalid.
+     * @throws IllegalArgumentException if arguments are invalid.
      * @throws Exception if unable to connect
      */
     private void doGetLevel() throws Exception {
@@ -273,7 +272,7 @@ public final class LogLevel {
     /**
      * Send HTTP/HTTPS request to set log level.
      *
-     * @throws HadoopIllegalArgumentException if arguments are invalid.
+     * @throws IllegalArgumentException if arguments are invalid.
      * @throws Exception if unable to connect
      */
     private void doSetLevel() throws Exception {

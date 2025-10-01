@@ -164,9 +164,13 @@ public final class S3Utils {
     }
   }
 
-  public static String validateSignatureHeader(HttpHeaders headers, String resource) throws OS3Exception {
+  public static String validateSignatureHeader(HttpHeaders headers, String resource, boolean isSignedPayload)
+      throws OS3Exception {
     String xAmzContentSha256Header = headers.getHeaderString(X_AMZ_CONTENT_SHA256);
     if (xAmzContentSha256Header == null) {
+      if (!isSignedPayload) {
+        return UNSIGNED_PAYLOAD;
+      }
       OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
       ex.setErrorMessage("An error occurred (InvalidArgument): " +
           "The " + X_AMZ_CONTENT_SHA256 + " header is not specified");

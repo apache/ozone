@@ -39,6 +39,11 @@ public final class ContainerImplTestUtils {
   public static ContainerSet newContainerSet(long recoveringTimeout) {
     WitnessedContainerMetadataStore mockMetadataStore = mock(WitnessedContainerMetadataStore.class);
     when(mockMetadataStore.getContainerCreateInfoTable()).thenReturn(new InMemoryTestTable<>());
+    return newContainerSet(recoveringTimeout, mockMetadataStore);
+  }
+
+  public static ContainerSet newContainerSet(
+      long recoveringTimeout, WitnessedContainerMetadataStore mockMetadataStore) {
     return ContainerSet.newRwContainerSet(mockMetadataStore, recoveringTimeout);
   }
 

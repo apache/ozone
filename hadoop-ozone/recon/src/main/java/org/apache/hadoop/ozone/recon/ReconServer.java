@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
@@ -81,7 +82,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   private ReconDBProvider reconDBProvider;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OzoneStorageContainerManager reconStorageContainerManager;
-  private ReconSafeModeManager reconSafeModeMgr;
   private OzoneConfiguration configuration;
   private ReconStorageConfig reconStorage;
   private CertificateClient certClient;
@@ -146,8 +146,8 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       reconSchemaManager.createReconSchema();
       LOG.debug("Recon schema creation done.");
 
-      this.reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
-      this.reconSafeModeMgr.setInSafeMode(true);
+      ReconSafeModeManager reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
+      reconSafeModeMgr.setInSafeMode(true);
       httpServer = injector.getInstance(ReconHttpServer.class);
       this.ozoneManagerServiceProvider =
           injector.getInstance(OzoneManagerServiceProvider.class);
@@ -413,6 +413,11 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   @VisibleForTesting
   public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
     return reconNamespaceSummaryManager;
+  }
+  
+  @VisibleForTesting
+  public ReconTaskController getReconTaskController() {
+    return injector.getInstance(ReconTaskController.class);
   }
 
   @VisibleForTesting

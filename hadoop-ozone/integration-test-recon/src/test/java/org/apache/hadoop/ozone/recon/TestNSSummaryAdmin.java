@@ -44,7 +44,6 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   private static ObjectStore store;
 
   private static OzoneAdmin ozoneAdmin;
-  private static OzoneConfiguration conf;
   private static MiniOzoneCluster cluster;
 
   private static String volumeName;
@@ -55,7 +54,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
   @BeforeAll
   public static void init() throws Exception {
     ozoneAdmin = new OzoneAdmin();
-    conf = ozoneAdmin.getOzoneConf();
+    OzoneConfiguration conf = ozoneAdmin.getOzoneConf();
     OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
     conf.set(OZONE_RECON_ADDRESS_KEY, "localhost:9888");
     cluster = MiniOzoneCluster.newBuilder(conf)

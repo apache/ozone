@@ -1324,6 +1324,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  @Deprecated
   public GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxn(
       GetFailedDeletedBlocksTxnRequestProto request) throws IOException {
     long startTxId = request.hasStartTxId() ? request.getStartTxId() : 0;
@@ -1333,6 +1334,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  @Deprecated
   public ResetDeletedBlockRetryCountResponseProto
       getResetDeletedBlockRetryCount(ResetDeletedBlockRetryCountRequestProto
       request) throws IOException {

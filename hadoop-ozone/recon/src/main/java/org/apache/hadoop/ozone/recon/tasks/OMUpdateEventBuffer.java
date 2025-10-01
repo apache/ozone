@@ -25,14 +25,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Buffer for OM update events during task reprocessing.
+ * Buffer for Recon events during task reprocessing.
  * When tasks are being reprocessed on staging DB, this buffer holds
- * incoming delta updates to prevent blocking the OM sync process.
+ * incoming events (OM delta updates and control events) to prevent blocking the OM sync process.
  */
 public class OMUpdateEventBuffer {
   private static final Logger LOG = LoggerFactory.getLogger(OMUpdateEventBuffer.class);
   
-  private final BlockingQueue<OMUpdateEventBatch> eventQueue;
+  private final BlockingQueue<ReconEvent> eventQueue;
   private final int maxCapacity;
   private final AtomicLong totalBufferedEvents = new AtomicLong(0);
   private final AtomicLong droppedBatches = new AtomicLong(0);
@@ -43,41 +43,41 @@ public class OMUpdateEventBuffer {
   }
 
   /**
-   * Add an event batch to the buffer.
+   * Add an event to the buffer.
    * 
-   * @param eventBatch The event batch to buffer
+   * @param event The event to buffer
    * @return true if successfully buffered, false if queue full
    */
-  public boolean offer(OMUpdateEventBatch eventBatch) {
-    boolean added = eventQueue.offer(eventBatch);
+  public boolean offer(ReconEvent event) {
+    boolean added = eventQueue.offer(event);
     if (added) {
-      totalBufferedEvents.addAndGet(eventBatch.getEvents().size());
-      LOG.debug("Buffered event batch with {} events. Queue size: {}, Total buffered events: {}",
-          eventBatch.getEvents().size(), eventQueue.size(), totalBufferedEvents.get());
+      totalBufferedEvents.addAndGet(event.getEventCount());
+      LOG.debug("Buffered event {} with {} events. Queue size: {}, Total buffered events: {}",
+          event.getEventType(), event.getEventCount(), eventQueue.size(), totalBufferedEvents.get());
     } else {
       droppedBatches.incrementAndGet();
-      LOG.warn("Event buffer queue is full (capacity: {}). Dropping event batch with {} events. " +
+      LOG.warn("Event buffer queue is full (capacity: {}). Dropping event {} with {} events. " +
               "Total dropped batches: {}",
-          maxCapacity, eventBatch.getEvents().size(), droppedBatches.get());
+          maxCapacity, event.getEventType(), event.getEventCount(), droppedBatches.get());
     }
     return added;
   }
   
   /**
-   * Poll an event batch from the buffer with timeout.
+   * Poll an event from the buffer with timeout.
    * 
    * @param timeoutMs timeout in milliseconds
-   * @return event batch or null if timeout
+   * @return event or null if timeout
    */
-  public OMUpdateEventBatch poll(long timeoutMs) {
+  public ReconEvent poll(long timeoutMs) {
     try {
-      OMUpdateEventBatch batch = eventQueue.poll(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
-      if (batch != null) {
-        totalBufferedEvents.addAndGet(-batch.getEvents().size());
-        LOG.debug("Polled event batch with {} events. Queue size: {}, Total buffered events: {}", 
-            batch.getEvents().size(), eventQueue.size(), totalBufferedEvents.get());
+      ReconEvent event = eventQueue.poll(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+      if (event != null) {
+        totalBufferedEvents.addAndGet(-event.getEventCount());
+        LOG.debug("Polled event {} with {} events. Queue size: {}, Total buffered events: {}", 
+            event.getEventType(), event.getEventCount(), eventQueue.size(), totalBufferedEvents.get());
       }
-      return batch;
+      return event;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return null;
@@ -110,6 +110,27 @@ public class OMUpdateEventBuffer {
     eventQueue.clear();
     totalBufferedEvents.set(0);
     // Note: We don't reset droppedBatches here to maintain overflow detection
+  }
+  
+  /**
+   * Drain all buffered events to the provided collection.
+   * 
+   * @param drainedEvents Collection to drain events into
+   * @return number of events drained
+   */
+  @VisibleForTesting
+  public int drainTo(java.util.Collection<? super ReconEvent> drainedEvents) {
+    int drained = eventQueue.drainTo(drainedEvents);
+    if (drained > 0) {
+      // Update total buffered events count
+      long totalEventCount = drainedEvents.stream()
+          .mapToLong(event -> ((ReconEvent) event).getEventCount())
+          .sum();
+      totalBufferedEvents.addAndGet(-totalEventCount);
+      LOG.debug("Drained {} events from buffer. Remaining queue size: {}, Total buffered events: {}", 
+          drained, eventQueue.size(), totalBufferedEvents.get());
+    }
+    return drained;
   }
 
   /**

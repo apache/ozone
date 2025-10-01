@@ -35,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mockStatic;
@@ -45,6 +46,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -65,6 +67,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -74,6 +77,7 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -101,6 +105,7 @@ import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
@@ -114,6 +119,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -1038,21 +1044,157 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
   }
 
+  @Test
+  @DisplayName("Verify PurgeKeysRequest is batched according to Ratis byte limit")
+  @Flaky("HDDS-13661")
+  void testPurgeKeysRequestBatching() throws Exception {
+    // Define a small Ratis limit to force multiple batches for testing
+    // The actual byte size of protobuf messages depends on content.
+    // A small value like 1KB or 2KB should ensure batching for ~10-20 keys.
+    final int actualRatisLimitBytes = 1138;
+    final int testRatisLimitBytes = 1024; // 2 KB to encourage multiple batches, 90% of the actualRatisLimitBytes.
+
+    // Create a fresh configuration for this test to control the Ratis limit
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    File innerTestDir = Files.createTempDirectory("TestKDS").toFile();
+    ServerUtils.setOzoneMetaDirPath(testConf, innerTestDir.toString());
+
+    testConf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    // Set the specific Ratis limit for this test
+    testConf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        testRatisLimitBytes, StorageUnit.BYTES);
+    testConf.setQuietMode(false);
+
+    ScmBlockLocationTestingClient testScmBlockTestingClient = new ScmBlockLocationTestingClient(null, null, 0);
+    OmTestManagers testOmTestManagers = new OmTestManagers(testConf, testScmBlockTestingClient, null);
+    KeyManager testKeyManager = testOmTestManagers.getKeyManager();
+    testKeyManager.getDeletingService().suspend();
+    KeyDeletingService testKds = (KeyDeletingService) testKeyManager.getDeletingService();
+    OzoneManager testOm = testOmTestManagers.getOzoneManager();
+
+    try (MockedStatic<OzoneManagerRatisUtils> mockedRatisUtils =
+        mockStatic(OzoneManagerRatisUtils.class, CALLS_REAL_METHODS)) {
+
+      // Capture all OMRequests submitted via Ratis
+      ArgumentCaptor<OzoneManagerProtocolProtos.OMRequest> requestCaptor =
+          ArgumentCaptor.forClass(OzoneManagerProtocolProtos.OMRequest.class);
+
+      // Mock submitRequest to capture requests and return success
+      mockedRatisUtils.when(() -> OzoneManagerRatisUtils.submitRequest(
+              any(OzoneManager.class),
+              requestCaptor.capture(), // Capture the OMRequest here
+              any(),
+              anyLong()))
+          .thenAnswer(invocation -> {
+            // Return a successful OMResponse for each captured request
+            return OzoneManagerProtocolProtos.OMResponse.newBuilder()
+                .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
+                .setStatus(OzoneManagerProtocolProtos.Status.OK)
+                .build();
+          });
+
+      final int numKeysToCreate = 50; // Create enough keys to ensure multiple batches
+      // Create and delete keys using the test-specific managers
+      createAndDeleteKeys(numKeysToCreate, 1, testOmTestManagers);
+
+      testKds.resume();
+
+      // Manually trigger the KeyDeletingService to run its task immediately.
+      // This will initiate the purge requests to Ratis.
+      testKds.runPeriodicalTaskNow();
+
+      // Verify that submitRequest was called multiple times.
+      // The exact number of calls depends on the key size and testRatisLimitBytes,
+      // but it must be more than one to confirm batching.
+      mockedRatisUtils.verify(() -> OzoneManagerRatisUtils.submitRequest(
+              any(OzoneManager.class), any(OzoneManagerProtocolProtos.OMRequest.class), any(), anyLong()),
+          atLeast(2)); // At least 2 calls confirms batching
+
+      // Get all captured requests that were sent
+      List<OzoneManagerProtocolProtos.OMRequest> capturedRequests = requestCaptor.getAllValues();
+      int totalPurgedKeysAcrossBatches = 0;
+
+      // Iterate through each captured Ratis request (batch)
+      for (OzoneManagerProtocolProtos.OMRequest omRequest : capturedRequests) {
+        assertNotNull(omRequest);
+        assertEquals(OzoneManagerProtocolProtos.Type.PurgeKeys, omRequest.getCmdType());
+
+        OzoneManagerProtocolProtos.PurgeKeysRequest purgeRequest = omRequest.getPurgeKeysRequest();
+
+        // At runtime we enforce ~90% of the Ratis limit as a safety margin,
+        // but in tests we assert against the actual limit to avoid false negatives.
+        // This ensures no batch ever exceeds the true Ratis size limit.
+        assertThat(omRequest.getSerializedSize())
+            .as("Batch size " + omRequest.getSerializedSize() + " should be <= ratisLimit " + actualRatisLimitBytes)
+            .isLessThanOrEqualTo(actualRatisLimitBytes);
+
+        // Sum up all the keys purged in this batch (may be spread across multiple DeletedKeys entries)
+        totalPurgedKeysAcrossBatches += purgeRequest.getDeletedKeysList()
+            .stream()
+            .mapToInt(OzoneManagerProtocolProtos.DeletedKeys::getKeysCount)
+            .sum();
+      }
+
+      // Assert that the sum of keys across all batches equals the total number of keys initially deleted.
+      assertEquals(numKeysToCreate, totalPurgedKeysAcrossBatches,
+          "Total keys purged across all batches should match initial keys deleted.");
+
+    } finally {
+      // Clean up the temporary OzoneManager and its resources
+      if (testOm.stop()) {
+        testOm.join();
+      }
+      // Clean up the temporary directory for this test
+      org.apache.commons.io.FileUtils.deleteDirectory(innerTestDir);
+    }
+  }
+
   private void createAndDeleteKeys(int keyCount, int numBlocks) throws IOException {
+    createAndDeleteKeysInternal(keyCount, numBlocks, null);
+  }
+
+  private void createAndDeleteKeys(int keyCount, int numBlocks, OmTestManagers testManager) throws IOException {
+    createAndDeleteKeysInternal(keyCount, numBlocks, testManager);
+  }
+
+  private void createAndDeleteKeysInternal(int keyCount, int numBlocks,
+      OmTestManagers testManager) throws IOException {
     for (int x = 0; x < keyCount; x++) {
       final String volumeName = getTestName();
       final String bucketName = uniqueObjectName("bucket");
       final String keyName = uniqueObjectName("key");
 
-      // Create Volume and Bucket
-      createVolumeAndBucket(volumeName, bucketName, false);
+      if (testManager != null) {
+        // Create volume and bucket manually in metadata manager
+        OMRequestTestUtils.addVolumeToOM(
+            testManager.getKeyManager().getMetadataManager(),
+            OmVolumeArgs.newBuilder()
+                .setOwnerName("o")
+                .setAdminName("a")
+                .setVolume(volumeName)
+                .build());
 
-      // Create the key
-      OmKeyArgs keyArg = createAndCommitKey(volumeName, bucketName,
-          keyName, numBlocks);
+        OMRequestTestUtils.addBucketToOM(
+            testManager.getKeyManager().getMetadataManager(),
+            OmBucketInfo.newBuilder()
+                .setVolumeName(volumeName)
+                .setBucketName(bucketName)
+                .setIsVersionEnabled(false)
+                .build());
 
-      // Delete the key
-      writeClient.deleteKey(keyArg);
+        // Create and delete key via provided writeClient
+        OmKeyArgs keyArg = createAndCommitKey(volumeName, bucketName,
+            keyName, numBlocks, 0, testManager.getWriteClient());
+        testManager.getWriteClient().deleteKey(keyArg);
+
+      } else {
+        // Use default client-based creation
+        createVolumeAndBucket(volumeName, bucketName, false);
+
+        OmKeyArgs keyArg = createAndCommitKey(volumeName, bucketName,
+            keyName, numBlocks);
+        writeClient.deleteKey(keyArg);
+      }
     }
   }
 
@@ -1140,58 +1282,58 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   private OmKeyArgs createAndCommitKey(String volumeName,
       String bucketName, String keyName, int numBlocks) throws IOException {
-    return createAndCommitKey(volumeName, bucketName, keyName,
-        numBlocks, 0);
+    return createAndCommitKey(volumeName, bucketName, keyName, numBlocks, 0, this.writeClient);
   }
 
   private OmKeyArgs createAndCommitKey(String volumeName,
-      String bucketName, String keyName, int numBlocks, int numUncommitted)
-      throws IOException {
-    // Even if no key size is appointed, there will be at least one
-    // block pre-allocated when key is created
-    OmKeyArgs keyArg =
-        new OmKeyArgs.Builder()
-            .setVolumeName(volumeName)
-            .setBucketName(bucketName)
-            .setKeyName(keyName)
-            .setAcls(Collections.emptyList())
-            .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-            .setDataSize(DATA_SIZE)
-            .setLocationInfoList(new ArrayList<>())
-            .setOwnerName("user" + RandomStringUtils.secure().nextNumeric(5))
-            .build();
-    //Open and Commit the Key in the Key Manager.
-    OpenKeySession session = writeClient.openKey(keyArg);
+      String bucketName, String keyName, int numBlocks, int numUncommitted) throws IOException {
+    return createAndCommitKey(volumeName, bucketName, keyName, numBlocks, numUncommitted, this.writeClient);
+  }
 
-    // add pre-allocated blocks into args and avoid creating excessive block
-    OmKeyLocationInfoGroup keyLocationVersions = session.getKeyInfo().
-        getLatestVersionLocations();
+  private OmKeyArgs createAndCommitKey(String volumeName,
+      String bucketName, String keyName, int numBlocks, int numUncommitted,
+      OzoneManagerProtocol customWriteClient) throws IOException {
+
+    OmKeyArgs keyArg = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setAcls(Collections.emptyList())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setDataSize(1000L)
+        .setLocationInfoList(new ArrayList<>())
+        .setOwnerName("user" + RandomStringUtils.secure().nextNumeric(5))
+        .build();
+
+    // Open and Commit the Key in the Key Manager.
+    OpenKeySession session = customWriteClient.openKey(keyArg);
+
+    OmKeyLocationInfoGroup keyLocationVersions = session.getKeyInfo()
+        .getLatestVersionLocations();
     assert keyLocationVersions != null;
-    List<OmKeyLocationInfo> latestBlocks = keyLocationVersions.
-        getBlocksLatestVersionOnly();
+
+    List<OmKeyLocationInfo> latestBlocks = keyLocationVersions
+        .getBlocksLatestVersionOnly();
+
     int preAllocatedSize = latestBlocks.size();
     for (OmKeyLocationInfo block : latestBlocks) {
       keyArg.addLocationInfo(block);
     }
 
-    // allocate blocks until the blocks num equal to numBlocks
     LinkedList<OmKeyLocationInfo> allocated = new LinkedList<>();
     for (int i = 0; i < numBlocks - preAllocatedSize; i++) {
-      allocated.add(writeClient.allocateBlock(keyArg, session.getId(),
-          new ExcludeList()));
+      allocated.add(customWriteClient.allocateBlock(keyArg, session.getId(), new ExcludeList()));
     }
 
-    // remove the blocks not to be committed
     for (int i = 0; i < numUncommitted; i++) {
       allocated.removeFirst();
     }
 
-    // add the blocks to be committed
-    for (OmKeyLocationInfo block: allocated) {
+    for (OmKeyLocationInfo block : allocated) {
       keyArg.addLocationInfo(block);
     }
 
-    writeClient.commitKey(keyArg, session.getId());
+    customWriteClient.commitKey(keyArg, session.getId());
     return keyArg;
   }
 

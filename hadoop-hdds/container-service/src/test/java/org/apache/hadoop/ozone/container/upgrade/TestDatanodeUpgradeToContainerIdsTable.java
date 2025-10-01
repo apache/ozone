@@ -55,7 +55,6 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   private Path tempFolder;
 
   private DatanodeStateMachine dsm;
-  private ContainerDispatcher dispatcher;
   private OzoneConfiguration conf;
   private static final String CLUSTER_ID = "clusterID";
 
@@ -93,7 +92,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
-    dispatcher = dsm.getContainer().getDispatcher();
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
     // add a container
@@ -129,7 +128,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
-    dispatcher = dsm.getContainer().getDispatcher();
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
     // add a container
