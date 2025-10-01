@@ -26,6 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -134,6 +135,15 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    *    e.g. /-9223372036854772480/-9223372036854771968/
    */
   String getBucketKeyPrefixFSO(String volume, String bucket) throws IOException;
+
+
+  /**
+   * Retrieves a pair of volume ID and bucket ID associated with the provided FSO (File System Object) key.
+   *
+   * @param fsoKey the key representing the File System Object, used to identify the corresponding volume and bucket.
+   * @return a Pair containing the volume ID as the first element and the bucket ID as the second element.
+   */
+  Pair<Long, Long> getVolumeBucketIdPairFSO(String fsoKey);
 
   /**
    * Given a volume, bucket and a key, return the corresponding DB key.

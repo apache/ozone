@@ -30,9 +30,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -76,6 +78,7 @@ import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableDirFilter;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketNameInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedFunction;
@@ -262,6 +265,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       long remainingBufLimit, KeyManager keyManager,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableDirChecker,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableFileChecker,
+      Collection<BucketNameInfo> bucketInfos,
       UUID expectedPreviousSnapshotId, long rnCnt) throws InterruptedException {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
@@ -269,6 +273,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     int subdirDelNum = 0;
     int subDirRecursiveCnt = 0;
     int consumedSize = 0;
+    Map<Pair<Long, Long>, BucketNameInfo> bucketNameInfoMap =
+        bucketInfos.stream().collect(Collectors.toMap(
+            bucketInfo -> Pair.of(bucketInfo.getVolumeId(), bucketInfo.getBucketId()),
+            bucketInfo -> bucketInfo, (o1, o2) -> o1));
     while (subDirRecursiveCnt < allSubDirList.size() && remainingBufLimit > 0) {
       try {
         Pair<String, OmKeyInfo> stringOmKeyInfoPair = allSubDirList.get(subDirRecursiveCnt++);
@@ -297,7 +305,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       }
     }
     if (!purgePathRequestList.isEmpty()) {
-      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId);
+      submitPurgePaths(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap);
     }
 
     if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
@@ -458,7 +466,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   private OzoneManagerProtocolProtos.OMResponse submitPurgePaths(List<PurgePathRequest> requests,
-      String snapTableKey, UUID expectedPreviousSnapshotId) throws InterruptedException {
+      String snapTableKey, UUID expectedPreviousSnapshotId, Map<Pair<Long, Long>, BucketNameInfo> bucketNameInfoMap)
+      throws InterruptedException {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
 
@@ -473,6 +482,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     purgeDirRequest.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
 
     purgeDirRequest.addAllDeletedPath(requests);
+    purgeDirRequest.addAllBucketNameInfos(requests.stream().map(purgePathRequest ->
+        Pair.of(purgePathRequest.getVolumeId(), purgePathRequest.getBucketId())).distinct()
+        .map(bucketNameInfoMap::get).filter(Objects::nonNull).collect(Collectors.toList()));
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
@@ -613,12 +625,27 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         long subFileNum = 0L;
         int consumedSize = 0;
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
+        Map<Pair<String, String>, BucketNameInfo> bucketNameInfos = new HashMap<>();
+
         List<Pair<String, OmKeyInfo>> allSubDirList = new ArrayList<>();
         while (remainingBufLimit > 0) {
           KeyValue<String, OmKeyInfo> pendingDeletedDirInfo = dirSupplier.get();
           if (pendingDeletedDirInfo == null) {
             break;
           }
+          Pair<String, String> volumeBucketPair = Pair.of(pendingDeletedDirInfo.getValue().getVolumeName(),
+              pendingDeletedDirInfo.getValue().getBucketName());
+          if (!bucketNameInfos.containsKey(volumeBucketPair)) {
+            Pair<Long, Long> volumeBucketIdPairFSO =
+                keyManager.getMetadataManager().getVolumeBucketIdPairFSO(pendingDeletedDirInfo.getKey());
+            bucketNameInfos.put(volumeBucketPair,
+                BucketNameInfo.newBuilder().setVolumeId(volumeBucketIdPairFSO.getKey())
+                    .setBucketId(volumeBucketIdPairFSO.getRight())
+                    .setVolumeName(pendingDeletedDirInfo.getValue().getVolumeName())
+                    .setBucketName(pendingDeletedDirInfo.getValue().getBucketName())
+                    .build());
+          }
+
           boolean isDirReclaimable = reclaimableDirFilter.apply(pendingDeletedDirInfo);
           Optional<PurgePathRequest> request = prepareDeleteDirRequest(
               pendingDeletedDirInfo.getValue(),
@@ -642,7 +669,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
             subFileNum, allSubDirList, purgePathRequestList, snapshotTableKey,
             startTime, remainingBufLimit, getOzoneManager().getKeyManager(),
-            reclaimableDirFilter, reclaimableFileFilter, expectedPreviousSnapshotId,
+            reclaimableDirFilter, reclaimableFileFilter, bucketNameInfos.values(), expectedPreviousSnapshotId,
             runCount);
         Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableFileFilter.getExclusiveReplicatedSizeMap();
         Map<UUID, Long> exclusiveSizeMap = reclaimableFileFilter.getExclusiveSizeMap();

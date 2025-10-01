@@ -1438,6 +1438,14 @@ message PurgeDirectoriesRequest {
   optional string snapshotTableKey = 2;
   // previous snapshotID can also be null & this field would be absent in older requests.
   optional NullableUUID expectedPreviousSnapshotID = 3;
+  repeated BucketNameInfo bucketNameInfos = 4;
+}
+
+message BucketNameInfo {
+  required uint64 volumeId = 1;
+  required uint64 bucketId = 2;
+  required string volumeName = 3;
+  required string bucketName = 4;
 }
 
 message NullableUUID {
