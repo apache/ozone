@@ -196,7 +196,7 @@
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
     <protobuf2.version>2.5.0</protobuf2.version>
-    <protobuf3.version>3.25.5</protobuf3.version>
+    <protobuf3.version>3.25.8</protobuf3.version>
     <ranger.version>2.6.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
     <ratis-thirdparty.grpc.version>1.71.0</ratis-thirdparty.grpc.version>
