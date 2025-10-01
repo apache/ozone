@@ -29,6 +29,7 @@
     <classpath.skip>false</classpath.skip>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
+    <protobuf.version>${protobuf3.version}</protobuf.version>
   </properties>
 
   <dependencies>
@@ -39,7 +40,7 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
-      <version>${protobuf3.version}</version>
+      <version>${protobuf.version}</version>
     </dependency>
     <dependency>
       <groupId>commons-io</groupId>
@@ -154,7 +155,7 @@
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java-util</artifactId>
-      <version>${protobuf3.version}</version>
+      <version>${protobuf.version}</version>
       <scope>provided</scope>
       <exclusions>
         <exclusion>
@@ -220,20 +221,9 @@
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
-        <extensions>true</extensions>
-        <configuration>
-          <protocArtifact>com.google.protobuf:protoc:${protobuf3.version}:exe:${os.detected.classifier}</protocArtifact>
-          <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-          <includes>
-            <include>csi.proto</include>
-          </includes>
-          <outputDirectory>target/generated-sources/java</outputDirectory>
-          <clearOutputDirectory>false</clearOutputDirectory>
-        </configuration>
         <executions>
           <execution>
-            <id>compile-proto</id>
+            <id>compile-proto-${protobuf.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
@@ -243,6 +233,11 @@
             <configuration>
               <pluginId>grpc-java</pluginId>
               <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <includes>
+                <include>csi.proto</include>
+              </includes>
+              <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>
           </execution>
         </executions>
