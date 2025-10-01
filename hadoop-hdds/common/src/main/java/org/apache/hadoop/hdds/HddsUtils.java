@@ -69,9 +69,12 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
@@ -88,6 +91,7 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.util.SizeInBytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,8 +105,8 @@ public final class HddsUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(HddsUtils.class);
 
-  public static final ByteString REDACTED =
-      ByteString.copyFromUtf8("<redacted>");
+  public static final String REDACTED_STRING = "<redacted>";
+  public static final ByteString REDACTED = ByteString.copyFromUtf8(REDACTED_STRING);
 
   private static final int ONE_MB = SizeInBytes.valueOf("1m").getSizeInt();
 
@@ -463,8 +467,7 @@ public final class HddsUtils {
    * false if block token does not apply to the command.
    *
    */
-  public static boolean requireBlockToken(
-      ContainerProtos.Type cmdType) {
+  public static boolean requireBlockToken(Type cmdType) {
     switch (cmdType) {
     case DeleteBlock:
     case DeleteChunk:
@@ -482,8 +485,7 @@ public final class HddsUtils {
     }
   }
 
-  public static boolean requireContainerToken(
-      ContainerProtos.Type cmdType) {
+  public static boolean requireContainerToken(Type cmdType) {
     switch (cmdType) {
     case CloseContainer:
     case CreateContainer:
@@ -503,7 +505,7 @@ public final class HddsUtils {
    * @return block ID.
    */
   public static BlockID getBlockID(ContainerCommandRequestProtoOrBuilder msg) {
-    ContainerProtos.DatanodeBlockID blockID = null;
+    DatanodeBlockID blockID = null;
     switch (msg.getCmdType()) {
     case DeleteBlock:
       if (msg.hasDeleteBlock()) {
@@ -727,42 +729,37 @@ public final class HddsUtils {
    * Remove binary data from request {@code msg}.  (May be incomplete, feel
    * free to add any missing cleanups.)
    */
-  public static ContainerProtos.ContainerCommandRequestProto processForDebug(
-      ContainerProtos.ContainerCommandRequestProto msg) {
-
+  public static String processForDebug(ContainerCommandRequestProto msg) {
     if (msg == null) {
       return null;
     }
 
     if (msg.hasWriteChunk() || msg.hasPutSmallFile()) {
-      ContainerProtos.ContainerCommandRequestProto.Builder builder =
-          msg.toBuilder();
+      final ContainerCommandRequestProto.Builder builder = msg.toBuilder();
       if (msg.hasWriteChunk()) {
         builder.getWriteChunkBuilder().setData(REDACTED);
       }
       if (msg.hasPutSmallFile()) {
         builder.getPutSmallFileBuilder().setData(REDACTED);
       }
-      return builder.build();
+      return TextFormat.shortDebugString(builder);
     }
 
-    return msg;
+    return TextFormat.shortDebugString(msg);
   }
 
   /**
    * Remove binary data from response {@code msg}.  (May be incomplete, feel
    * free to add any missing cleanups.)
    */
-  public static ContainerProtos.ContainerCommandResponseProto processForDebug(
-      ContainerProtos.ContainerCommandResponseProto msg) {
+  public static String processForDebug(ContainerCommandResponseProto msg) {
 
     if (msg == null) {
       return null;
     }
 
     if (msg.hasReadChunk() || msg.hasGetSmallFile()) {
-      ContainerProtos.ContainerCommandResponseProto.Builder builder =
-          msg.toBuilder();
+      final ContainerCommandResponseProto.Builder builder = msg.toBuilder();
       if (msg.hasReadChunk()) {
         if (msg.getReadChunk().hasData()) {
           builder.getReadChunkBuilder().setData(REDACTED);
@@ -784,10 +781,10 @@ public final class HddsUtils {
                   .addBuffers(REDACTED);
         }
       }
-      return builder.build();
+      return TextFormat.shortDebugString(builder);
     }
 
-    return msg;
+    return TextFormat.shortDebugString(msg);
   }
 
   /**
