@@ -60,7 +60,7 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
   private static final String AUDIT_PARAM_TO_SNAPSHOT_TABLE_KEY_OR_AOS = "toSnapshotTableKeyOrAOS";
   private static final String AUDIT_PARAM_DEL_KEYS_MOVED = "deletedKeysMoved";
   private static final String AUDIT_PARAM_RENAMED_KEYS_MOVED = "renamedKeysMoved";
-  private static final String AUDIT_PARAM_DEL_DIRS_MOVED = "deletdDirsMoved";
+  private static final String AUDIT_PARAM_DEL_DIRS_MOVED = "deletedDirsMoved";
   private static final String AUDIT_PARAM_DEL_KEYS_MOVED_LIST = "deletedKeysMovedList";
   private static final String AUDIT_PARAM_RENAMED_KEYS_LIST = "renamedKeysList";
   private static final String AUDIT_PARAM_DEL_DIRS_MOVED_LIST = "deletedDirsMovedList";
