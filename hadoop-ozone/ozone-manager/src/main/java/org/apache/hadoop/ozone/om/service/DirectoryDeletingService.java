@@ -390,9 +390,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           pendingDeletedDirInfo.getKeyName());
     }
 
-    final String[] keys = delDirName.split(OM_KEY_PREFIX);
-    final long volumeId = Long.parseLong(keys[1]);
-    final long bucketId = Long.parseLong(keys[2]);
+    Pair<Long, Long> volumeBucketIdPairFSO = keyManager.getMetadataManager().getVolumeBucketIdPairFSO(delDirName);
+    final long volumeId = volumeBucketIdPairFSO.getLeft();
+    final long bucketId = volumeBucketIdPairFSO.getRight();
 
     // step-1: get all sub directories under the deletedDir
     DeleteKeysResult subDirDeleteResult =
