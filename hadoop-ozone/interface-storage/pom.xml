@@ -104,7 +104,6 @@
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
             </configuration>
           </execution>

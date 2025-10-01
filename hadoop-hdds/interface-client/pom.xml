@@ -79,7 +79,6 @@
             </goals>
             <configuration>
               <protocArtifact>com.google.protobuf:protoc:${ratis-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>DatanodeClientProtocol.proto</include>
               </includes>
@@ -97,7 +96,6 @@
             </goals>
             <configuration>
               <protocArtifact>com.google.protobuf:protoc:${protobuf2.version}:exe:${os.detected.classifier}</protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>hdds.proto</include>
                 <include>ReconfigureProtocol.proto</include>
@@ -114,7 +112,6 @@
             </goals>
             <configuration>
               <protocArtifact>com.google.protobuf:protoc:${hadoop-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>hdds.proto</include>
                 <include>ReconfigureProtocol.proto</include>

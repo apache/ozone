@@ -81,7 +81,6 @@
             </goals>
             <configuration>
               <protocArtifact>com.google.protobuf:protoc:${ratis-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <includes>
                 <include>InterSCMProtocol.proto</include>
                 <include>SCMUpdateProtocol.proto</include>
@@ -100,7 +99,6 @@
             </goals>
             <configuration>
               <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <excludes>
                 <exclude>InterSCMProtocol.proto</exclude>
                 <exclude>SCMUpdateProtocol.proto</exclude>

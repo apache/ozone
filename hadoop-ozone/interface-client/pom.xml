@@ -117,7 +117,6 @@
             </goals>
             <configuration>
               <protocArtifact>com.google.protobuf:protoc:${protobuf2.version}:exe:${os.detected.classifier}</protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <outputDirectory>target/generated-sources/proto-java-protobuf-${protobuf2.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
               <pluginId>grpc-java</pluginId>
@@ -131,7 +130,6 @@
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <protocArtifact>com.google.protobuf:protoc:${hadoop-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
               <outputDirectory>target/generated-sources/proto-java-for-hadoop</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
