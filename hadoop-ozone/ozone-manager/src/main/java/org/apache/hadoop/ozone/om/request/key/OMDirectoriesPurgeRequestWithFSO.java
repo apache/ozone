@@ -120,7 +120,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     List<String[]> bucketLockKeys = getBucketLockKeySet(purgeDirsRequest);
-    boolean lockAcquired = omMetadataManager.getLock().acquireWriteLocks(BUCKET_LOCK, bucketLockKeys);
+    boolean lockAcquired = omMetadataManager.getLock().acquireWriteLocks(BUCKET_LOCK, bucketLockKeys).isLockAcquired();
     if (!lockAcquired && !purgeDirsRequest.getBucketNameInfosList().isEmpty()) {
       OMException oe = new OMException("Unable to acquire write locks on buckets while performing DirectoryPurge",
           OMException.ResultCodes.KEY_DELETION_ERROR);
