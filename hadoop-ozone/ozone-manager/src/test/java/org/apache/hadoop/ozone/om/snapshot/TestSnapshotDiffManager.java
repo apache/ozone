@@ -57,6 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyDouble;
@@ -74,6 +75,7 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -85,11 +87,13 @@ import com.google.common.collect.Sets;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -125,6 +129,7 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -147,6 +152,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ExitUtil;
+import org.apache.ozone.compaction.log.SstFileInfo;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
@@ -211,6 +217,8 @@ public class TestSnapshotDiffManager {
   private RocksDBCheckpointDiffer differ;
   @Mock
   private OMMetadataManager omMetadataManager;
+  @Mock
+  private OmMetadataManagerImpl omMetadataManagerImpl;
   @Mock
   private OzoneManager ozoneManager;
   @Mock
@@ -1672,5 +1680,243 @@ public class TestSnapshotDiffManager {
         assertEquals(diffJob.getStatus(), snapshotDiffReport.getJobStatus());
       }
     }
+  }
+
+  @Test
+  public void testGetDeltaFilesWithDefragmentedSnapshotsSameVersion() throws IOException {
+    // Setup test snapshots
+    UUID fromSnapId = UUID.randomUUID();
+    UUID toSnapId = UUID.randomUUID();
+    String fromSnapName = "fromSnap-" + fromSnapId;
+    String toSnapName = "toSnap-" + toSnapId;
+    // Create mock snapshots
+    OmSnapshot fromSnapshot = getMockedOmSnapshot(fromSnapId);
+    OmSnapshot toSnapshot = getMockedOmSnapshot(toSnapId);
+    SnapshotInfo fromSnapshotInfo = getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, fromSnapName, fromSnapId);
+    SnapshotInfo toSnapshotInfo = getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, toSnapName, toSnapId);
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManagerImpl);
+    // Create mock local data with version 1 for both snapshots
+    // fromSnapshot has: [common.sst]
+    // toSnapshot has: [common.sst, unique_to.sst]
+    // Expected diff: [unique_to.sst]
+    OmSnapshotLocalData fromLocalData = createMockVersionedLocalData(1,
+        Arrays.asList("common.sst"), null, 0);
+    OmSnapshotLocalData toLocalData = createMockVersionedLocalData(1,
+        Arrays.asList("common.sst", "unique_to.sst"), fromSnapId, 1);
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    // Mock dependencies
+    doNothing().when(spy).recordActivity(any(), any());
+    doNothing().when(spy).updateProgress(anyString(), anyDouble());
+    doReturn(fromLocalData).when(spy).getSnapshotLocalData(fromSnapshotInfo);
+    doReturn(toLocalData).when(spy).getSnapshotLocalData(toSnapshotInfo);
+
+    String diffJobKey = fromSnapId + DELIMITER + toSnapId;
+    String diffDir = snapDiffDir.getAbsolutePath();
+
+    try (MockedStatic<OmSnapshotUtils> mockedUtils = mockStatic(OmSnapshotUtils.class);
+        MockedStatic<OmSnapshotManager> mockedManager = mockStatic(OmSnapshotManager.class);
+        MockedStatic<SnapshotUtils> snapshotUtilsMockedStatic = mockStatic(SnapshotUtils.class)) {
+      // Mock path resolution
+      mockedManager.when(
+              () -> OmSnapshotManager.getSnapshotPath(any(OmMetadataManagerImpl.class), eq(fromSnapshotInfo)))
+          .thenReturn(Paths.get("/path/to/from"));
+      mockedManager.when(() -> OmSnapshotManager.getSnapshotPath(any(OmMetadataManagerImpl.class), eq(toSnapshotInfo)))
+          .thenReturn(Paths.get("/path/to/to"));
+      snapshotUtilsMockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(
+          eq(ozoneManager),
+          any(),
+          eq(fromSnapId))).thenReturn(fromSnapshotInfo);
+
+      snapshotUtilsMockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(
+          eq(ozoneManager),
+          any(),
+          eq(toSnapId))).thenReturn(toSnapshotInfo);
+      // Expected diff files: files that are different between snapshots
+      Set<String> expectedDiffFiles = Sets.newHashSet("unique_to.sst");
+      // Mock the utility method to return the expected diff files
+      mockedUtils.when(
+          () -> OmSnapshotUtils.getSSTDiffListWithFullPath(eq(Arrays.asList("unique_to.sst")), anyString(), anyString(),
+              eq(diffDir))).thenReturn(expectedDiffFiles);
+      // Execute the method under test
+      Set<String> result = spy.getDeltaFiles(
+          fromSnapshot,
+          toSnapshot,
+          Arrays.asList("cf1", "cf2"),
+          fromSnapshotInfo,
+          toSnapshotInfo,
+          false,  // useFullDiff = false to test optimized path
+          Collections.emptyMap(),
+          diffDir,
+          diffJobKey);
+      // Verify results - should contain exactly the 2 different files
+      assertEquals(expectedDiffFiles, result);
+      assertEquals(1, result.size());
+      assertTrue(result.contains("unique_to.sst"));
+      // Verify the optimized path was taken (version > 0)
+      verify(spy, atLeast(2)).getSnapshotLocalData(any());
+      // Verify traditional path was not taken
+      verify(spy, never()).getSSTFileMapForSnapshot(any(), any());
+    }
+  }
+
+  @Test
+  public void testGetDeltaFilesWithDefragmentedSnapshotsDifferentVersion() throws IOException {
+    /*
+    Initial state :
+    S1 - [1.sst , 2.sst] - v1
+    S2 - [1.sst , 2.sst, 3.sst] - v1
+    S3 - [1.sst , 2.sst., 3.sst, 4.sst] - v1
+    S4 - [1.sst, 2.sst, 3.sst, 4.sst, 5.sst] -v1
+    S5 - [1.sst,2.sst,3.sst,4.sst,5.sst,6.sst] - v1
+    S6 - [1.sst,2.sst,3.sst,4.sst,5.sst,6.sst,7.sst] - v1
+
+    Say S3 is purged now, so all snapshots from S3 i.e S4 and S5 are re-defragmented
+
+    S1 - [1.sst,2.sst] - v1
+    S2 - [1.sst,2.sst,3.sst] - v1
+    S4 - [1.sst,2.sst,3.sst,4’.sst] - v2
+    S5 - [1.sst,2.sst,3.sst,4’.sst,5’.sst] - v2
+    At this point ———calculate diff b/w S4 and S6 ——
+    Chain: S1→S2→S4→S5→S6 (S3 purged)
+    S6 was built when S4 was at version 1, so diff should use S4's v1, not current
+    */
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManagerImpl);
+    UUID s2SnapId = UUID.randomUUID();
+    UUID s4SnapId = UUID.randomUUID();
+    UUID s5SnapId = UUID.randomUUID();
+    UUID s6SnapId = UUID.randomUUID();
+
+    String s4SnapName = "s4-" + s4SnapId;
+    String s6SnapName = "s6-" + s6SnapId;
+    // Create mock snapshots
+    OmSnapshot s4Snapshot = getMockedOmSnapshot(s4SnapId);
+    OmSnapshot s6Snapshot = getMockedOmSnapshot(s6SnapId);
+    SnapshotInfo s4SnapshotInfo = getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, s4SnapName, s4SnapId);
+    SnapshotInfo s6SnapshotInfo = getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, s6SnapName, s6SnapId);
+    // Create S4 local data (re-defragmented to version 2 after S3 purge)
+    // Version 1 (original): [1.sst, 2.sst, 3.sst, 4.sst, 5.sst]
+    // Version 2 (after re-defrag): [1.sst, 2.sst, 3.sst, 4'.sst]
+    Map<Integer, OmSnapshotLocalData.VersionMeta> s4VersionMap = new LinkedHashMap<>();
+    s4VersionMap.put(1, createMockVersionMeta(Arrays.asList("1.sst", "2.sst", "3.sst", "4.sst", "5.sst"), 0));
+    s4VersionMap.put(2, createMockVersionMeta(Arrays.asList("1.sst", "2.sst", "3.sst", "4'.sst"), 1));
+    OmSnapshotLocalData s4LocalData = mock(OmSnapshotLocalData.class);
+    when(s4LocalData.getVersion()).thenReturn(2); // Current version after re-defrag
+    when(s4LocalData.getVersionSstFileInfos()).thenReturn(s4VersionMap);
+    when(s4LocalData.getPreviousSnapshotId()).thenReturn(s2SnapId);
+    // Create intermediate chain nodes
+    OmSnapshotLocalData s5LocalData = mock(OmSnapshotLocalData.class);
+    when(s5LocalData.getPreviousSnapshotId()).thenReturn(s4SnapId);
+    when(s5LocalData.getVersion()).thenReturn(2);
+    Map<Integer, OmSnapshotLocalData.VersionMeta> s5VersionMap = new LinkedHashMap<>();
+    // S5's version 1 was built from S4's version 1, so previousSnapshotVersion = 1
+    s5VersionMap.put(1, createMockVersionMeta(Arrays.asList("1.sst", "2.sst", "3.sst", "4.sst", "5.sst", "6.sst"), 1));
+    s5VersionMap.put(2, createMockVersionMeta(Arrays.asList("1.sst", "2.sst", "3.sst", "4'.sst", "5'.sst"), 1));
+    when(s5LocalData.getVersionSstFileInfos()).thenReturn(s5VersionMap);
+    // Create S6 local data (unchanged at version 1)
+    // S6 was built from S5's version 1, which in turn was built from S4's version 1
+    OmSnapshotLocalData s6LocalData = mock(OmSnapshotLocalData.class);
+    when(s6LocalData.getVersion()).thenReturn(1);
+    Map<Integer, OmSnapshotLocalData.VersionMeta> s6VersionMap = new LinkedHashMap<>();
+    // S6's version 1 was built from S5's version 1, so previousSnapshotVersion = 1
+    s6VersionMap.put(1, createMockVersionMeta(Arrays.asList("1.sst", "2.sst", "3.sst", "4.sst",
+        "5.sst", "6.sst", "7.sst"), 1));
+    when(s6LocalData.getVersionSstFileInfos()).thenReturn(s6VersionMap);
+    when(s6LocalData.getPreviousSnapshotId()).thenReturn(s5SnapId);
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    // Mock dependencies
+    doNothing().when(spy).recordActivity(any(), any());
+    doNothing().when(spy).updateProgress(anyString(), anyDouble());
+    // Mock the getSnapshotLocalData calls for chain traversal
+    doReturn(s4LocalData).when(spy).getSnapshotLocalData(s4SnapshotInfo);
+    doReturn(s6LocalData).when(spy).getSnapshotLocalData(s6SnapshotInfo);
+    // Chain traversal mocks
+    doReturn(s5LocalData).when(spy).getSnapshotLocalData(argThat(info ->
+        info != null && info.getSnapshotId().equals(s5SnapId)));
+
+    String diffJobKey = s4SnapId + DELIMITER + s6SnapId;
+    String diffDir = snapDiffDir.getAbsolutePath();
+    try (MockedStatic<OmSnapshotUtils> mockedUtils = mockStatic(OmSnapshotUtils.class);
+        MockedStatic<OmSnapshotManager> mockedManager = mockStatic(OmSnapshotManager.class);
+        MockedStatic<SnapshotUtils> snapshotUtilsMockedStatic = mockStatic(SnapshotUtils.class)) {
+      // Mock path resolution
+      mockedManager.when(() -> OmSnapshotManager.getSnapshotPath(any(OmMetadataManagerImpl.class), eq(s4SnapshotInfo)))
+          .thenReturn(Paths.get("/path/to/s4"));
+      mockedManager.when(() -> OmSnapshotManager.getSnapshotPath(any(OmMetadataManagerImpl.class), eq(s6SnapshotInfo)))
+          .thenReturn(Paths.get("/path/to/s6"));
+      // Mock chain traversal for resolveBaseVersionMeta
+      snapshotUtilsMockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(
+              eq(ozoneManager), any(), eq(s5SnapId)))
+          .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, "s5", s5SnapId));
+      snapshotUtilsMockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(
+              eq(ozoneManager), any(), eq(s4SnapId)))
+          .thenReturn(s4SnapshotInfo);
+      // Expected logic with correct resolveBaseVersionMeta:
+      // 1. toSnapVersionMeta = S6's version 1: [1.sst, 2.sst, 3.sst, 4.sst, 5.sst, 6.sst, 7.sst]
+      // 2. Chain traversal: S6→S5→S4, find that S6 was built from S4's version 1
+      // 3. fromSnapVersionMeta = S4's version 1: [1.sst, 2.sst, 3.sst, 4.sst, 5.sst] (NOT current v2!)
+      // 4. Symmetric difference: [6.sst, 7.sst]
+      Set<String> expectedDiffFiles = Sets.newHashSet("6.sst", "7.sst");
+      // Mock the utility method - expects only the 2 additional files
+      mockedUtils.when(() -> OmSnapshotUtils.getSSTDiffListWithFullPath(
+              eq(Arrays.asList("6.sst", "7.sst")), anyString(), anyString(), eq(diffDir)))
+          .thenReturn(expectedDiffFiles);
+      mockedUtils.when(() -> OmSnapshotUtils.getSSTDiffListWithFullPath(
+              eq(Arrays.asList("7.sst", "6.sst")), anyString(), anyString(), eq(diffDir)))
+          .thenReturn(expectedDiffFiles);
+      // Execute the method under test
+      Set<String> result = spy.getDeltaFiles(
+          s4Snapshot,
+          s6Snapshot,
+          Arrays.asList("cf1", "cf2"),
+          s4SnapshotInfo,
+          s6SnapshotInfo,
+          false,  // useFullDiff = false to test optimized path
+          Collections.emptyMap(),
+          diffDir,
+          diffJobKey);
+      // Verify correct results
+      assertEquals(expectedDiffFiles, result);
+      assertEquals(2, result.size());
+      // Should only contain the 2 files added in S6
+      assertTrue(result.contains("6.sst"));
+      assertTrue(result.contains("7.sst"));
+      // Should NOT contain files from S4's version 2 (the bug would include 4'.sst)
+      assertFalse(result.contains("4'.sst"));
+      // Should NOT contain common files
+      assertFalse(result.contains("1.sst"));
+      assertFalse(result.contains("2.sst"));
+      assertFalse(result.contains("3.sst"));
+      assertFalse(result.contains("4.sst"));
+      assertFalse(result.contains("5.sst"));
+      // Verify the optimized path was taken
+      verify(spy, atLeast(3)).getSnapshotLocalData(any()); // S4, S6, plus S5 in chain traversal
+      // Verify traditional path was not taken
+      verify(spy, never()).getSSTFileMapForSnapshot(any(), any());
+    }
+  }
+
+  private OmSnapshotLocalData createMockVersionedLocalData(int version, List<String> sstFiles, UUID prevSnapId,
+      int prevSnapshotVersion) {
+    OmSnapshotLocalData localData = mock(OmSnapshotLocalData.class);
+    when(localData.getVersion()).thenReturn(version);
+    Map<Integer, OmSnapshotLocalData.VersionMeta> versionMap = new LinkedHashMap<>();
+    versionMap.put(version, createMockVersionMeta(sstFiles, prevSnapshotVersion));
+    when(localData.getVersionSstFileInfos()).thenReturn(versionMap);
+    when(localData.getPreviousSnapshotId()).thenReturn(prevSnapId);
+    return localData;
+  }
+
+  private OmSnapshotLocalData.VersionMeta createMockVersionMeta(List<String> sstFileNames, int prevSnapshotVersion) {
+    OmSnapshotLocalData.VersionMeta versionMeta = mock(OmSnapshotLocalData.VersionMeta.class);
+    List<SstFileInfo> sstFiles = sstFileNames.stream()
+        .map(fileName -> {
+          SstFileInfo sstFileInfo = mock(SstFileInfo.class);
+          when(sstFileInfo.getFileName()).thenReturn(fileName);
+          return sstFileInfo;
+        })
+        .collect(Collectors.toList());
+    when(versionMeta.getSstFiles()).thenReturn(sstFiles);
+    when(versionMeta.getPreviousSnapshotVersion()).thenReturn(prevSnapshotVersion);
+    return versionMeta;
   }
 }

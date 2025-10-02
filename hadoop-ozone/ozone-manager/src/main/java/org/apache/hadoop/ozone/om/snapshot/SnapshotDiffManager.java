@@ -1201,10 +1201,10 @@ public class SnapshotDiffManager implements AutoCloseable {
       if (fromSnapshotVersion > 0 && toSnapshotVersion > 0) {
         // both snapshots are defragmented, To calculate snap-diff, we can simply compare the
         // SST files contained in OmSnapshotLocalData instances of both these and get the delta files
-        OmSnapshotLocalData.VersionMeta fromSnapVersionMeta =
-            fromSnapshotLocalData.getVersionSstFileInfos().get(fromSnapshotVersion);
-        // get the source snapshot SST files (versionMeta)  corresponding to target snapshot
         OmSnapshotLocalData.VersionMeta toSnapVersionMeta =
+            toSnapshotLocalData.getVersionSstFileInfos().get(toSnapshotVersion);
+        // get the source snapshot SST files (versionMeta)  corresponding to target snapshot
+        OmSnapshotLocalData.VersionMeta fromSnapVersionMeta =
             resolveBaseVersionMeta(toSnapshotLocalData, fromSnapshot.getSnapshotID());
         // Calculate diff files using helper method
         if (toSnapVersionMeta == null) {
@@ -1286,11 +1286,13 @@ public class SnapshotDiffManager implements AutoCloseable {
               metadataManager.getSnapshotChainManager(),
               parentId));
     }
-    OmSnapshotLocalData fromSnapshot = getSnapshotLocalData(
-        getSnapshotInfo(ozoneManager,
-            metadataManager.getSnapshotChainManager(),
-            fromSnapshotId));
-    return fromSnapshot.getVersionSstFileInfos().get(fromSnapshot.getVersion());
+    SnapshotInfo snapshotInfo =
+        getSnapshotInfo(ozoneManager, metadataManager.getSnapshotChainManager(), fromSnapshotId);
+    OmSnapshotLocalData fromSnapshot = getSnapshotLocalData(snapshotInfo);
+    // Get the version that the child was built from
+    OmSnapshotLocalData.VersionMeta childVersionMeta = child.getVersionSstFileInfos().get(child.getVersion());
+    int versionUsedWhenBuildingChild = childVersionMeta.getPreviousSnapshotVersion();
+    return fromSnapshot.getVersionSstFileInfos().get(versionUsedWhenBuildingChild);
   }
 
   /**
