@@ -73,10 +73,6 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Private;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -136,7 +132,6 @@ import org.slf4j.LoggerFactory;
  * @see Client
  */
 @Public
-@InterfaceStability.Evolving
 public abstract class Server {
   private final boolean authorize;
   private List<AuthMethod> enabledAuthMethods;
@@ -703,7 +698,6 @@ public abstract class Server {
    * Returns a handle to the serviceAuthorizationManager (required in tests)
    * @return instance of ServiceAuthorizationManager for this server
    */
-  @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
   public ServiceAuthorizationManager getServiceAuthorizationManager() {
     return serviceAuthorizationManager;
   }
@@ -879,15 +873,11 @@ public abstract class Server {
      * but an expensive pre-condition must be satisfied before it's sent
      * to the client.
      */
-    @InterfaceStability.Unstable
-    @InterfaceAudience.LimitedPrivate({"HDFS"})
     public final void postponeResponse() {
       int count = responseWaitCount.incrementAndGet();
       assert count > 0 : "response has already been sent";
     }
 
-    @InterfaceStability.Unstable
-    @InterfaceAudience.LimitedPrivate({"HDFS"})
     public final void sendResponse() throws IOException {
       int count = responseWaitCount.decrementAndGet();
       assert count >= 0 : "response has already been sent";
@@ -896,8 +886,6 @@ public abstract class Server {
       }
     }
 
-    @InterfaceStability.Unstable
-    @InterfaceAudience.LimitedPrivate({"HDFS"})
     public final void abortResponse(Throwable t) throws IOException {
       // don't send response if the call was already sent or aborted.
       if (responseWaitCount.getAndSet(-1) > 0) {
@@ -942,12 +930,10 @@ public abstract class Server {
       return this.isCallCoordinated;
     }
 
-    @InterfaceStability.Unstable
     public void deferResponse() {
       this.deferredResponse = true;
     }
 
-    @InterfaceStability.Unstable
     public boolean isResponseDeferred() {
       return this.deferredResponse;
     }
@@ -1748,7 +1734,6 @@ public abstract class Server {
     }
   }
 
-  @InterfaceAudience.Private
   public enum AuthProtocol {
     NONE(0),
     SASL(-33);

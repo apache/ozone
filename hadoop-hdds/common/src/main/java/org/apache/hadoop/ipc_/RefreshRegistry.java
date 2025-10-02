@@ -24,7 +24,6 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 
-import org.apache.hadoop.classification.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +31,6 @@ import org.slf4j.LoggerFactory;
  * Used to registry custom methods to refresh at runtime.
  * Each identifier maps to one or more RefreshHandlers.
  */
-@InterfaceStability.Unstable
 public class RefreshRegistry {
   public static final Logger LOG =
       LoggerFactory.getLogger(RefreshRegistry.class);

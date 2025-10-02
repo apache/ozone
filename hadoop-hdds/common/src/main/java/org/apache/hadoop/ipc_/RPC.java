@@ -40,7 +40,6 @@ import java.util.regex.Pattern;
 
 import javax.net.SocketFactory;
 
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.io.Writable;
@@ -55,8 +54,6 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 
@@ -82,8 +79,6 @@ import org.slf4j.LoggerFactory;
  * All methods in the protocol should throw only IOException.  No field data of
  * the protocol instance is transmitted.
  */
-@InterfaceAudience.LimitedPrivate(value = { "Common", "HDFS", "MapReduce", "Yarn" })
-@InterfaceStability.Evolving
 public class RPC {
   final static int RPC_SERVICE_CLASS_DEFAULT = 0;
   public enum RpcKind {
@@ -700,13 +695,13 @@ public class RPC {
    * 
    * @param proxy
    *          the RPC proxy object to be stopped
-   * @throws HadoopIllegalArgumentException
+   * @throws IllegalArgumentException
    *           if the proxy does not implement {@link Closeable} interface or
    *           does not have closeable {@link InvocationHandler}
    */
   public static void stopProxy(Object proxy) {
     if (proxy == null) {
-      throw new HadoopIllegalArgumentException(
+      throw new IllegalArgumentException(
           "Cannot close proxy since it is null");
     }
     try {
@@ -729,7 +724,7 @@ public class RPC {
     // If you see this error on a mock object in a unit test you're
     // developing, make sure to use MockitoUtil.mockProtocol() to
     // create your mock.
-    throw new HadoopIllegalArgumentException(
+    throw new IllegalArgumentException(
         "Cannot close proxy - is not Closeable or "
             + "does not provide closeable invocation handler "
             + proxy.getClass());
@@ -837,17 +832,17 @@ public class RPC {
     /**
      * Build the RPC Server. 
      * @throws IOException on error
-     * @throws HadoopIllegalArgumentException when mandatory fields are not set
+     * @throws IllegalArgumentException when mandatory fields are not set
      */
-    public Server build() throws IOException, HadoopIllegalArgumentException {
+    public Server build() throws IOException, IllegalArgumentException {
       if (this.conf == null) {
-        throw new HadoopIllegalArgumentException("conf is not set");
+        throw new IllegalArgumentException("conf is not set");
       }
       if (this.protocol == null) {
-        throw new HadoopIllegalArgumentException("protocol is not set");
+        throw new IllegalArgumentException("protocol is not set");
       }
       if (this.instance == null) {
-        throw new HadoopIllegalArgumentException("instance is not set");
+        throw new IllegalArgumentException("instance is not set");
       }
       
       return getProtocolEngine(this.protocol, this.conf).getServer(

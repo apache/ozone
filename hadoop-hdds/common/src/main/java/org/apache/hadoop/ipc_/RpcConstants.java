@@ -20,9 +20,7 @@ package org.apache.hadoop.ipc_;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 
-@InterfaceAudience.Private
 public class RpcConstants {
   private RpcConstants() {
     // Hidden Constructor

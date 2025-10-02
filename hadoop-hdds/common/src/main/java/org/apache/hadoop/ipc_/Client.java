@@ -22,10 +22,6 @@ import org.apache.hadoop.security.AccessControlException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceAudience.Public;
-import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -84,7 +80,6 @@ import static org.apache.hadoop.ipc_.RpcConstants.PING_CALL_ID;
  * @see Server
  */
 @Public
-@InterfaceStability.Evolving
 public class Client implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(Client.class);
 
@@ -106,7 +101,6 @@ public class Client implements AutoCloseable {
       };
 
   @SuppressWarnings("unchecked")
-  @Unstable
   public static <T extends Writable> AsyncGet<T, IOException>
       getAsyncRpcResponse() {
     return (AsyncGet<T, IOException>) ASYNC_RPC_RESPONSE.get();
@@ -1565,7 +1559,6 @@ public class Client implements AutoCloseable {
    * @returns true, if RPC is in asynchronous mode, otherwise false for
    *          synchronous mode.
    */
-  @Unstable
   public static boolean isAsynchronousMode() {
     return asynchronousMode.get();
   }
@@ -1577,7 +1570,6 @@ public class Client implements AutoCloseable {
    *          true, RPC will be in asynchronous mode, otherwise false for
    *          synchronous mode
    */
-  @Unstable
   public static void setAsynchronousMode(boolean async) {
     asynchronousMode.set(async);
   }
@@ -1626,8 +1618,6 @@ public class Client implements AutoCloseable {
   }
 
   // for unit testing only
-  @InterfaceAudience.Private
-  @InterfaceStability.Unstable
   Set<ConnectionId> getConnectionIds() {
     return connections.keySet();
   }
@@ -1682,8 +1672,6 @@ public class Client implements AutoCloseable {
    * This class holds the address and the user ticket. The client connections
    * to servers are uniquely identified by <remoteAddress, protocol, ticket>
    */
-  @InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
-  @InterfaceStability.Evolving
   public static class ConnectionId {
     InetSocketAddress address;
     UserGroupInformation ticket;
@@ -1877,7 +1865,6 @@ public class Client implements AutoCloseable {
   }
 
   @Override
-  @Unstable
   public void close() throws Exception {
     stop();
   }
@@ -1885,7 +1872,6 @@ public class Client implements AutoCloseable {
   /** Manages the input and output streams for an IPC connection.
    *  Only exposed for use by SaslRpcClient.
    */
-  @InterfaceAudience.Private
   public static class IpcStreams implements Closeable, Flushable {
     private DataInputStream in;
     public DataOutputStream out;

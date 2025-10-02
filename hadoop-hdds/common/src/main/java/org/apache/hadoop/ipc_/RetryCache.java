@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.ipc_.metrics.RetryCacheMetrics;
 import org.apache.hadoop.util.LightWeightCache;
 import org.apache.hadoop.util.LightWeightGSet;
@@ -42,7 +41,6 @@ import org.slf4j.LoggerFactory;
  * <p>
  * To look an implementation using this cache, see HDFS FSNamesystem class.
  */
-@InterfaceAudience.Private
 public class RetryCache {
   public static final Logger LOG = LoggerFactory.getLogger(RetryCache.class);
   private final RetryCacheMetrics retryCacheMetrics;

@@ -19,14 +19,12 @@ package org.apache.hadoop.ipc_;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 
 import com.google.protobuf.ServiceException;
 
 /**
  * Helper methods for protobuf related RPC implementation
  */
-@InterfaceAudience.Private
 public class ProtobufHelper {
   private ProtobufHelper() {
     // Hidden constructor for class with only static helper methods

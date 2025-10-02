@@ -19,16 +19,12 @@ package org.apache.hadoop.ipc_;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * This interface is implemented by the client side translators and can be used
  * to obtain information about underlying protocol e.g. to check if a method is
  * supported on the server side.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Stable
 public interface ProtocolMetaInterface {
   
   /**

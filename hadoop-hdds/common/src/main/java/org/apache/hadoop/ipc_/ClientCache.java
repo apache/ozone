@@ -23,8 +23,6 @@ import java.util.Map;
 
 import javax.net.SocketFactory;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.ObjectWritable;
 import org.apache.hadoop.io.Writable;
@@ -32,8 +30,6 @@ import org.apache.hadoop.io.Writable;
 import com.google.common.annotations.VisibleForTesting;
 
 /* Cache a client using its socket factory as the hash key */
-@InterfaceAudience.LimitedPrivate({"HDFS", "MapReduce"})
-@InterfaceStability.Evolving
 public class ClientCache {
   private Map<SocketFactory, Client> clients =
     new HashMap<SocketFactory, Client>();

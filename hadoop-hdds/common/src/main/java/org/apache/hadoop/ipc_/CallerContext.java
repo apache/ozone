@@ -19,8 +19,6 @@ package org.apache.hadoop.ipc_;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -32,9 +30,6 @@ import java.util.Arrays;
  *
  * This class is immutable.
  */
-@InterfaceAudience.LimitedPrivate({"HBase", "HDFS", "Hive", "MapReduce",
-    "Pig", "Spark", "YARN"})
-@InterfaceStability.Evolving
 public final class CallerContext {
   public static final Charset SIGNATURE_ENCODING = StandardCharsets.UTF_8;
   /** The caller context.
@@ -68,7 +63,6 @@ public final class CallerContext {
         null : Arrays.copyOf(signature, signature.length);
   }
 
-  @InterfaceAudience.Private
   public boolean isContextValid() {
     return context != null && !context.isEmpty();
   }

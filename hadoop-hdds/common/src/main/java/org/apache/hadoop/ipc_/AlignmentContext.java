@@ -20,8 +20,6 @@ package org.apache.hadoop.ipc_;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcRequestHeaderProto;
 import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcResponseHeaderProto;
 
@@ -33,8 +31,6 @@ import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcResponseHeaderProto;
  * and can be used to pass state information on RPC responses from server
  * to client.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Evolving
 public interface AlignmentContext {
 
   /**

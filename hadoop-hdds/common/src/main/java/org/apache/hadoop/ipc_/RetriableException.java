@@ -19,7 +19,6 @@ package org.apache.hadoop.ipc_;
 
 import java.io.IOException;
 
-import org.apache.hadoop.classification.InterfaceStability;
 
 /**
  * Exception thrown by a server typically to indicate that server is in a state
@@ -27,7 +26,6 @@ import org.apache.hadoop.classification.InterfaceStability;
  * Client may retry the request. If the service is up, the server may be able to
  * process a retried request.
  */
-@InterfaceStability.Evolving
 public class RetriableException extends IOException {
   private static final long serialVersionUID = 1915561725516487301L;
   

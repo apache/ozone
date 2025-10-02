@@ -24,9 +24,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 
-@InterfaceAudience.Private
 /** generates byte-length framed buffers. */
 public class ResponseBuffer extends DataOutputStream {
 

@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ipc_;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,8 +26,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * Stores the times that a call takes to be processed through each step.
  */
-@InterfaceStability.Unstable
-@InterfaceAudience.Private
 public class ProcessingDetails {
   public static final Logger LOG =
       LoggerFactory.getLogger(ProcessingDetails.class);
