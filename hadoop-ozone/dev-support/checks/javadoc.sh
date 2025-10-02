@@ -14,9 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
+set -u -o pipefail
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-mvn javadoc:aggregate
+BASE_DIR="$(pwd -P)"
+REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/javadoc"}
+REPORT_FILE="$REPORT_DIR/summary.txt"
+
+MAVEN_OPTIONS="-B -fae -DskipRecon --no-transfer-progress ${MAVEN_OPTIONS:-}"
+
+mvn ${MAVEN_OPTIONS} javadoc:aggregate "$@" | tee output.log
+rc=$?
+
+mkdir -p "$REPORT_DIR"
+mv output.log target/reports/apidocs ${REPORT_DIR}/
+
+ERROR_PATTERN="\[ERROR\]"
+
+source "${DIR}/_post_process.sh"
