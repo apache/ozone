@@ -194,6 +194,10 @@ import org.rocksdb.RocksIterator;
 public class TestSnapshotDiffManager {
   private static final String VOLUME_NAME = "volume";
   private static final String BUCKET_NAME = "bucket";
+  public static final String PATH_TO_S_6 = "/path/to/s6";
+  public static final String PATH_TO_S_4 = "/path/to/s4";
+  public static final String PATH_TO_FROM = "/path/to/from";
+  public static final String PATH_TO_TO = "/path/to/to";
   private ManagedRocksDB db;
   private ManagedDBOptions dbOptions;
   private ManagedColumnFamilyOptions columnFamilyOptions;
@@ -1719,9 +1723,9 @@ public class TestSnapshotDiffManager {
       // Mock path resolution
       mockedManager.when(
               () -> OmSnapshotManager.getSnapshotPath(any(OmMetadataManagerImpl.class), eq(fromSnapshotInfo)))
-          .thenReturn(Paths.get("/path/to/from"));
+          .thenReturn(Paths.get(PATH_TO_FROM));
       mockedManager.when(() -> OmSnapshotManager.getSnapshotPath(any(OmMetadataManagerImpl.class), eq(toSnapshotInfo)))
-          .thenReturn(Paths.get("/path/to/to"));
+          .thenReturn(Paths.get(PATH_TO_TO));
       snapshotUtilsMockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(
           eq(ozoneManager),
           any(),
@@ -1840,9 +1844,9 @@ public class TestSnapshotDiffManager {
         MockedStatic<SnapshotUtils> snapshotUtilsMockedStatic = mockStatic(SnapshotUtils.class)) {
       // Mock path resolution
       mockedManager.when(() -> OmSnapshotManager.getSnapshotPath(any(OmMetadataManagerImpl.class), eq(s4SnapshotInfo)))
-          .thenReturn(Paths.get("/path/to/s4"));
+          .thenReturn(Paths.get(PATH_TO_S_4));
       mockedManager.when(() -> OmSnapshotManager.getSnapshotPath(any(OmMetadataManagerImpl.class), eq(s6SnapshotInfo)))
-          .thenReturn(Paths.get("/path/to/s6"));
+          .thenReturn(Paths.get(PATH_TO_S_6));
       // Mock chain traversal for resolveBaseVersionMeta
       snapshotUtilsMockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(
               eq(ozoneManager), any(), eq(s5SnapId)))
