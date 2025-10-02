@@ -63,7 +63,7 @@ import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcSaslProto.SaslAuth;
 import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcSaslProto.SaslState;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SaslPropertiesResolver;
-import org.apache.hadoop.security_.SaslRpcServer.AuthMethod;
+import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.hadoop.security.token.Token;
