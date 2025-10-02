@@ -22,7 +22,6 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ipc_.Server;
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -39,7 +38,6 @@ import org.slf4j.LoggerFactory;
  * This class is for maintaining  the various RPC statistics
  * and publishing them through the metrics interfaces.
  */
-@InterfaceAudience.Private
 @Metrics(about="Aggregate RPC metrics", context="rpc")
 public class RpcMetrics {
 

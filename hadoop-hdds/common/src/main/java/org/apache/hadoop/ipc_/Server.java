@@ -128,7 +128,6 @@ import org.slf4j.LoggerFactory;
  * 
  * @see Client
  */
-@Public
 public abstract class Server {
   private final boolean authorize;
   private List<AuthMethod> enabledAuthMethods;
@@ -685,7 +684,6 @@ public abstract class Server {
    * Refresh the service authorization ACL for the service handled by this server
    * using the specified Configuration.
    */
-  @Private
   public void refreshServiceAclWithLoadedConfiguration(Configuration conf,
       PolicyProvider provider) {
     serviceAuthorizationManager.refreshWithLoadedConfiguration(conf, provider);

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ipc_.metrics;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -30,7 +29,6 @@ import org.slf4j.LoggerFactory;
  * This class is for maintaining RPC method related statistics
  * and publishing them through the metrics interfaces.
  */
-@InterfaceAudience.Private
 @Metrics(about="Per method RPC metrics", context="rpcdetailed")
 public class RpcDetailedMetrics {
 

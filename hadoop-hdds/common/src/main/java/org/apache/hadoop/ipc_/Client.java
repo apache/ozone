@@ -77,7 +77,6 @@ import static org.apache.hadoop.ipc_.RpcConstants.PING_CALL_ID;
  * 
  * @see Server
  */
-@Public
 public class Client implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(Client.class);
 
