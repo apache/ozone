@@ -32,8 +32,6 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.AsyncGet;
-import org.apache.htrace.core.TraceScope;
-import org.apache.htrace.core.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -204,15 +202,6 @@ public class ProtobufRpcEngine implements RpcEngine {
             + method.getName() + "]");
       }
 
-      // if Tracing is on then start a new span for this rpc.
-      // guard it in the if statement to make sure there isn't
-      // any extra string manipulation.
-      Tracer tracer = Tracer.curThreadTracer();
-      TraceScope traceScope = null;
-      if (tracer != null) {
-        traceScope = tracer.newScope(RpcClientUtil.methodToTraceString(method));
-      }
-
       if (LOG.isTraceEnabled()) {
         LOG.trace(Thread.currentThread().getId() + ": Call -> " +
             remoteId + ": " + method.getName() +
@@ -233,13 +222,7 @@ public class ProtobufRpcEngine implements RpcEngine {
               remoteId + ": " + method.getName() +
                 " {" + e + "}");
         }
-        if (traceScope != null) {
-          traceScope.addTimelineAnnotation("Call got exception: " +
-              e.toString());
-        }
         throw new ServiceException(e);
-      } finally {
-        if (traceScope != null) traceScope.close();
       }
 
       if (LOG.isDebugEnabled()) {

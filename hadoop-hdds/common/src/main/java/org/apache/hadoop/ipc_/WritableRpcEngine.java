@@ -37,8 +37,6 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.conf.*;
-import org.apache.htrace.core.TraceScope;
-import org.apache.htrace.core.Tracer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -234,22 +232,9 @@ public class WritableRpcEngine implements RpcEngine {
         startTime = Time.monotonicNow();
       }
 
-      // if Tracing is on then start a new span for this rpc.
-      // guard it in the if statement to make sure there isn't
-      // any extra string manipulation.
-      Tracer tracer = Tracer.curThreadTracer();
-      TraceScope traceScope = null;
-      if (tracer != null) {
-        traceScope = tracer.newScope(RpcClientUtil.methodToTraceString(method));
-      }
-      ObjectWritable value;
-      try {
-        value = (ObjectWritable)
-          client.call(RPC.RpcKind.RPC_WRITABLE, new Invocation(method, args),
-            remoteId, fallbackToSimpleAuth, alignmentContext);
-      } finally {
-        if (traceScope != null) traceScope.close();
-      }
+      ObjectWritable value = (ObjectWritable)
+        client.call(RPC.RpcKind.RPC_WRITABLE, new Invocation(method, args),
+          remoteId, fallbackToSimpleAuth, alignmentContext);
       if (LOG.isDebugEnabled()) {
         long callTime = Time.monotonicNow() - startTime;
         LOG.debug("Call: " + method.getName() + " " + callTime);
