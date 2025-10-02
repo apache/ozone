@@ -26,8 +26,6 @@ import org.apache.hadoop.ipc_.protobuf.IpcConnectionContextProtos.UserInformatio
 import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.*;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.htrace.core.Span;
-import org.apache.htrace.core.Tracer;
 
 import com.google.protobuf.ByteString;
 
@@ -173,15 +171,6 @@ public abstract class ProtoUtil {
     RpcRequestHeaderProto.Builder result = RpcRequestHeaderProto.newBuilder();
     result.setRpcKind(convert(rpcKind)).setRpcOp(operation).setCallId(callId)
         .setRetryCount(retryCount).setClientId(ByteString.copyFrom(uuid));
-
-    // Add tracing info if we are currently tracing.
-    Span span = Tracer.getCurrentSpan();
-    if (span != null) {
-      result.setTraceInfo(RPCTraceInfoProto.newBuilder()
-          .setTraceId(span.getSpanId().getHigh())
-          .setParentId(span.getSpanId().getLow())
-            .build());
-    }
 
     // Add caller context if it is not null
     CallerContext callerContext = CallerContext.getCurrent();
