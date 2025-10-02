@@ -255,7 +255,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   }
 
   private List<String[]> getBucketLockKeySet(PurgeDirectoriesRequest purgeDirsRequest) {
-    if (purgeDirsRequest.getBucketNameInfosList().isEmpty()) {
+    if (!purgeDirsRequest.getBucketNameInfosList().isEmpty()) {
       return purgeDirsRequest.getBucketNameInfosList().stream()
           .map(keyInfo -> new String[] {keyInfo.getVolumeName(), keyInfo.getBucketName()})
           .collect(Collectors.toList());

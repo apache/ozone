@@ -389,21 +389,20 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           pendingDeletedDirInfo.getKeyName());
     }
 
-    Pair<Long, Long> volumeBucketIdPairFSO = keyManager.getMetadataManager().getVolumeBucketIdPairFSO(delDirName);
-    final long volumeId = volumeBucketIdPairFSO.getLeft();
-    final long bucketId = volumeBucketIdPairFSO.getRight();
+    OMMetadataManager.VolumeBucketId volumeBucketId = keyManager.getMetadataManager()
+        .getVolumeBucketIdPairFSO(delDirName);
 
     // step-1: get all sub directories under the deletedDir
     DeleteKeysResult subDirDeleteResult =
-        keyManager.getPendingDeletionSubDirs(volumeId, bucketId,
+        keyManager.getPendingDeletionSubDirs(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
             pendingDeletedDirInfo, keyInfo -> true, remainingBufLimit);
     List<OmKeyInfo> subDirs = subDirDeleteResult.getKeysToDelete();
     remainingBufLimit -= subDirDeleteResult.getConsumedSize();
 
     OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
     for (OmKeyInfo dirInfo : subDirs) {
-      String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeId,
-          bucketId, dirInfo.getParentObjectID(), dirInfo.getFileName());
+      String ozoneDbKey = omMetadataManager.getOzonePathKey(volumeBucketId.getVolumeId(),
+          volumeBucketId.getBucketId(), dirInfo.getParentObjectID(), dirInfo.getFileName());
       String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
           dirInfo.getObjectID(), ozoneDbKey);
       subDirList.add(Pair.of(ozoneDeleteKey, dirInfo));
@@ -413,7 +412,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     // step-2: get all sub files under the deletedDir
     // Only remove sub files if the parent directory is going to be deleted or can be reclaimed.
     DeleteKeysResult subFileDeleteResult =
-        keyManager.getPendingDeletionSubFiles(volumeId, bucketId,
+        keyManager.getPendingDeletionSubFiles(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
             pendingDeletedDirInfo, keyInfo -> purgeDir || reclaimableFileFilter.apply(keyInfo), remainingBufLimit);
     List<OmKeyInfo> subFiles = subFileDeleteResult.getKeysToDelete();
 
@@ -430,7 +429,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     if (purgeDeletedDir == null && subFiles.isEmpty() && subDirs.isEmpty()) {
       return Optional.empty();
     }
-    return Optional.of(wrapPurgeRequest(volumeId, bucketId,
+    return Optional.of(wrapPurgeRequest(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
         purgeDeletedDir, subFiles, subDirs));
   }
 
@@ -635,11 +634,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           Pair<String, String> volumeBucketPair = Pair.of(pendingDeletedDirInfo.getValue().getVolumeName(),
               pendingDeletedDirInfo.getValue().getBucketName());
           if (!bucketNameInfos.containsKey(volumeBucketPair)) {
-            Pair<Long, Long> volumeBucketIdPairFSO =
+            OMMetadataManager.VolumeBucketId volumeBucketId =
                 keyManager.getMetadataManager().getVolumeBucketIdPairFSO(pendingDeletedDirInfo.getKey());
             bucketNameInfos.put(volumeBucketPair,
-                BucketNameInfo.newBuilder().setVolumeId(volumeBucketIdPairFSO.getKey())
-                    .setBucketId(volumeBucketIdPairFSO.getRight())
+                BucketNameInfo.newBuilder().setVolumeId(volumeBucketId.getVolumeId())
+                    .setBucketId(volumeBucketId.getBucketId())
                     .setVolumeName(pendingDeletedDirInfo.getValue().getVolumeName())
                     .setBucketName(pendingDeletedDirInfo.getValue().getBucketName())
                     .build());

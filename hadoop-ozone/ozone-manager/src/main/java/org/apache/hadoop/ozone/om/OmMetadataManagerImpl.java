@@ -60,7 +60,6 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -549,9 +548,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * {@inheritDoc}
    */
   @Override
-  public Pair<Long, Long> getVolumeBucketIdPairFSO(String fsoKey) {
+  public VolumeBucketId getVolumeBucketIdPairFSO(String fsoKey) {
     String[] keySplit = fsoKey.split(OM_KEY_PREFIX);
-    return Pair.of(Long.parseLong(keySplit[1]), Long.parseLong(keySplit[2]));
+    return new VolumeBucketId(Long.parseLong(keySplit[1]), Long.parseLong(keySplit[2]));
   }
 
   @Override
