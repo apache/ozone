@@ -51,6 +51,7 @@ import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ipc_.Server.Connection;
 import org.apache.hadoop.ipc_.StandbyException;
 import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.SaslPlainServer;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
