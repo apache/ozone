@@ -24,7 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.reset;
@@ -42,6 +43,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -232,8 +235,6 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     List<OmKeyInfo> subDirs = new ArrayList<>();
     List<String> subFileKeys = new ArrayList<>();
     List<String> subDirKeys = new ArrayList<>();
-    List<String> deletedSubDirKeys = new ArrayList<>();
-    List<String> deletedSubFiles = new ArrayList<>();
     for (int id = 1; id < 10; id++) {
       OmDirectoryInfo subdir = new OmDirectoryInfo.Builder()
           .setName("subdir" + id)
@@ -260,9 +261,6 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
       subFiles.add(subFile);
       subDirs.add(getOmKeyInfo(volumeName, bucketInfo.getBucketName(), subdir,
           "dir1/" + subdir.getName()));
-      deletedSubDirKeys.add(omMetadataManager.getOzoneDeletePathKey(subdir.getObjectID(), subDirectoryPath));
-      deletedSubFiles.add(omMetadataManager.getOzoneDeletePathKey(subFile.getObjectID(),
-          omMetadataManager.getOzoneKey(volumeName, bucketInfo.getBucketName(), subFile.getKeyName())));
     }
     String deletedDirKey = OMRequestTestUtils.deleteDir(dirKey, volumeName, bucketInfo.getBucketName(),
         omMetadataManager);
@@ -299,22 +297,26 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     PurgePathRequest purgePathRequest2 = createBucketDataAndGetPurgePathRequest(bucketInfo2);
     IOzoneManagerLock lock = spy(omMetadataManager.getLock());
     Set<Long> acquiredLockIds = new ConcurrentSkipListSet<>();
+    Set<String> acquiredLockKeys = new ConcurrentSkipListSet<>();
+    doAnswer(i -> {
+      long threadId = Thread.currentThread().getId();
+      GenericTestUtils.waitFor(() -> !acquiredLockIds.contains(threadId) || acquiredLockIds.size() == 2, 1000, 30000);
+      OMLockDetails lockDetails = (OMLockDetails) i.callRealMethod();
+      acquiredLockIds.add(threadId);
+      acquiredLockKeys.add(i.getArgument(1) + "/" + i.getArgument(2));
+      return lockDetails;
+    }).when(lock).acquireWriteLock(eq(BUCKET_LOCK), anyString(), anyString());
 
     doAnswer(i -> {
       long threadId = Thread.currentThread().getId();
       GenericTestUtils.waitFor(() -> !acquiredLockIds.contains(threadId) || acquiredLockIds.size() == 2, 1000, 30000);
       OMLockDetails lockDetails = (OMLockDetails) i.callRealMethod();
       acquiredLockIds.add(threadId);
+      for (String[] lockKey : (List<String[]>) i.getArgument(1)) {
+        acquiredLockKeys.add(lockKey[0] + "/" + lockKey[1]);
+      }
       return lockDetails;
-    }).when(lock).acquireWriteLock(eq(BUCKET_LOCK), any());
-
-    doAnswer(i -> {
-      long threadId = Thread.currentThread().getId();
-      GenericTestUtils.waitFor(() -> !acquiredLockIds.contains(threadId) || acquiredLockIds.size() == 2, 1000, 30000);
-      OMLockDetails lockDetails = (OMLockDetails) i.callRealMethod();
-      acquiredLockIds.add(threadId);
-      return lockDetails;
-    }).when(lock).acquireWriteLocks(eq(BUCKET_LOCK), any());
+    }).when(lock).acquireWriteLocks(eq(BUCKET_LOCK), anyCollection());
     when(omMetadataManager.getLock()).thenReturn(lock);
     OMDirectoriesPurgeRequestWithFSO purgePathRequests1 = new OMDirectoriesPurgeRequestWithFSO(
         preExecute(createPurgeKeysRequest(null, Arrays.asList(purgePathRequest1, purgePathRequest2))));
@@ -326,6 +328,9 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
         100L));
     future1.get();
     future2.get();
+    assertEquals(Stream.of(bucketInfo1.getVolumeName() + "/" + bucketInfo1.getBucketName(),
+            bucketInfo2.getVolumeName() + "/" + bucketInfo2.getBucketName()).collect(Collectors.toSet()),
+        acquiredLockKeys);
     reset(lock);
   }
 
