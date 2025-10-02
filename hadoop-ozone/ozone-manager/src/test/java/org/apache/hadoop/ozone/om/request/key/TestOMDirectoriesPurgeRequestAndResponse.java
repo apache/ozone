@@ -66,10 +66,10 @@ import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
-import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -298,7 +298,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     OmBucketInfo bucketInfo2 = omMetadataManager.getBucketTable().get(bucketKey2);
     PurgePathRequest purgePathRequest2 = createBucketDataAndGetPurgePathRequest(bucketInfo2);
     IOzoneManagerLock lock = spy(omMetadataManager.getLock());
-    Set<Long> acquiredLockIds = Sets.newConcurrentHashSet();
+    Set<Long> acquiredLockIds = new ConcurrentHashSet<>();
 
     doAnswer(i -> {
       long threadId = Thread.currentThread().getId();
