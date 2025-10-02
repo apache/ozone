@@ -29,7 +29,6 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableFactories;
 import org.apache.hadoop.io.WritableFactory;
 
-import com.google.common.annotations.VisibleForTesting;
 
 public class ProtocolSignature implements Writable {
   static {               // register a ctor
@@ -171,7 +170,6 @@ public class ProtocolSignature implements Writable {
      PROTOCOL_FINGERPRINT_CACHE = 
        new HashMap<String, ProtocolSigFingerprint>();
   
-  @VisibleForTesting
   public static void resetCache() {
     PROTOCOL_FINGERPRINT_CACHE.clear();
   }

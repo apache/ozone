@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ipc_;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.*;
 import com.google.protobuf.Descriptors.MethodDescriptor;
 import org.apache.hadoop.conf.Configuration;
@@ -316,13 +315,11 @@ public class ProtobufRpcEngine implements RpcEngine {
     }
   }
 
-  @VisibleForTesting
   static Client getClient(Configuration conf) {
     return CLIENTS.getClient(conf, SocketFactory.getDefault(),
         RpcWritable.Buffer.class);
   }
   
-  @VisibleForTesting
   public static void clearClientCache() {
     CLIENTS.clearCache();
   }

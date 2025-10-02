@@ -31,7 +31,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ipc_.CallQueueManager.CallQueueOverflowException;
@@ -180,7 +179,6 @@ public class FairCallQueue<E extends Schedulable> extends AbstractQueue<E>
    * @param priority - queue priority
    * @param e - element to add
    */
-  @VisibleForTesting
   void putQueue(int priority, E e) throws InterruptedException {
     queues.get(priority).put(e);
     signalNotEmpty();
@@ -192,7 +190,6 @@ public class FairCallQueue<E extends Schedulable> extends AbstractQueue<E>
    * @param e - element to add
    * @return boolean if added to the given queue
    */
-  @VisibleForTesting
   boolean offerQueue(int priority, E e) {
     boolean ret = queues.get(priority).offer(e);
     if (ret) {
@@ -450,7 +447,6 @@ public class FairCallQueue<E extends Schedulable> extends AbstractQueue<E>
     return calls;
   }
 
-  @VisibleForTesting
   public void setMultiplexer(RpcMultiplexer newMux) {
     this.multiplexer = newMux;
   }

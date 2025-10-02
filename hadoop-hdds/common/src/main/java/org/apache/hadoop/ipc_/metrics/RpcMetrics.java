@@ -19,7 +19,6 @@ package org.apache.hadoop.ipc_.metrics;
 
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.conf.Configuration;
@@ -316,7 +315,6 @@ public class RpcMetrics {
     return deferredRpcProcessingTime.lastStat().stddev();
   }
 
-  @VisibleForTesting
   public MetricsTag getTag(String tagName) {
     return registry.getTag(tagName);
   }

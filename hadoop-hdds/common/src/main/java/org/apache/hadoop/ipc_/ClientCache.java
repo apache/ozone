@@ -27,7 +27,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.ObjectWritable;
 import org.apache.hadoop.io.Writable;
 
-import com.google.common.annotations.VisibleForTesting;
 
 /* Cache a client using its socket factory as the hash key */
 public class ClientCache {
@@ -113,7 +112,6 @@ public class ClientCache {
     }
   }
 
-  @VisibleForTesting
   public void clearCache() {
     clients.values().forEach(c -> c.stop());
     clients.clear();

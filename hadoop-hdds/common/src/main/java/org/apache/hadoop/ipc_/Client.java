@@ -19,7 +19,6 @@
 package org.apache.hadoop.ipc_;
 
 import org.apache.hadoop.security.AccessControlException;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
@@ -269,7 +268,6 @@ public class Client implements AutoCloseable {
     conf.setInt(CommonConfigurationKeys.IPC_CLIENT_CONNECT_TIMEOUT_KEY, timeout);
   }
 
-  @VisibleForTesting
   public static final ExecutorService getClientExecutor() {
     return Client.clientExcecutorFactory.clientExecutor;
   }
@@ -1564,7 +1562,6 @@ public class Client implements AutoCloseable {
     asyncCallCounter.decrementAndGet();
   }
 
-  @VisibleForTesting
   int getAsyncCallCount() {
     return asyncCallCounter.get();
   }
@@ -1756,7 +1753,6 @@ public class Client implements AutoCloseable {
       return pingInterval;
     }
     
-    @VisibleForTesting
     String getSaslQop() {
       return saslQop;
     }

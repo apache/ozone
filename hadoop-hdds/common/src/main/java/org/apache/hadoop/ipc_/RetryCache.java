@@ -27,7 +27,6 @@ import org.apache.hadoop.util.LightWeightCache;
 import org.apache.hadoop.util.LightWeightGSet;
 import org.apache.hadoop.util.LightWeightGSet.LinkedElement;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -220,12 +219,10 @@ public class RetryCache {
     retryCacheMetrics.incrCacheCleared();
   }
 
-  @VisibleForTesting
   public LightWeightGSet<CacheEntry, CacheEntry> getCacheSet() {
     return set;
   }
 
-  @VisibleForTesting
   public RetryCacheMetrics getMetricsForTests() {
     return retryCacheMetrics;
   }
