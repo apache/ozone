@@ -75,7 +75,8 @@ import picocli.CommandLine.Command;
         ListSubcommand.class,
         InfoSubcommand.class,
         ExportSubcommand.class,
-        InspectSubcommand.class
+        InspectSubcommand.class,
+        DiffSubcommand.class
     })
 public class ContainerCommands extends AbstractSubcommand {
 
