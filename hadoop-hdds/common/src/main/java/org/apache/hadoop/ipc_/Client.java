@@ -42,7 +42,7 @@ import org.apache.hadoop.ipc_.protobuf.RpcHeaderProtos.RpcResponseHeaderProto.Rp
 import org.apache.hadoop.net.ConnectTimeoutException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.KerberosInfo;
-import org.apache.hadoop.security.SaslRpcClient;
+import org.apache.hadoop.security_.SaslRpcClient;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
