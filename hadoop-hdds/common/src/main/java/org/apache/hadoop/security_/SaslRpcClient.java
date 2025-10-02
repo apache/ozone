@@ -67,7 +67,6 @@ import org.apache.hadoop.security.SaslPropertiesResolver;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.TokenInfo;
@@ -326,8 +325,8 @@ public class SaslRpcClient {
         throw new IllegalArgumentException(
             "Failed to specify server's Kerberos principal name");
       }
-      KerberosName name = new KerberosName(confPrincipal);
-      if (name.getHostName() == null) {
+      String hostName = KerberosName.getHostName(confPrincipal);
+      if (hostName == null) {
         throw new IllegalArgumentException(
             "Kerberos principal name does NOT have the expected hostname part: "
                 + confPrincipal);
@@ -687,6 +686,31 @@ public class SaslRpcClient {
           LOG.debug("SASL client callback: setting realm: "
               + rc.getDefaultText());
         rc.setText(rc.getDefaultText());
+      }
+    }
+  }
+
+  /** Minimal copy of org.apache.hadoop.security.authentication.util.KerberosName, just for name parsing. */
+  private static class KerberosName {
+    /**
+     * A pattern that matches a Kerberos name with at most 2 components.
+     */
+    private static final java.util.regex.Pattern nameParser =
+        java.util.regex.Pattern.compile("([^/@]+)(/([^/@]+))?(@([^/@]+))?");
+
+    /**
+     * Get the second component of the name.
+     * @param name full Kerberos principal name.
+     * @return the second section of the Kerberos principal name, and may be null
+     */
+    public static String getHostName(String name) {
+      java.util.regex.Matcher match = nameParser.matcher(name);
+      if (match.matches()) {
+        return match.group(3);
+      } else if (name.contains("@")) {
+        throw new IllegalArgumentException("Malformed Kerberos name: " + name);
+      } else {
+        return null;
       }
     }
   }
