@@ -80,8 +80,8 @@ public class DecayRpcScheduler implements RpcScheduler,
 
   /**
    * Decay factor controls how much each count is suppressed by on each sweep.
-   * Valid numbers are > 0 and < 1. Decay factor works in tandem with period
-   * to control how long the scheduler remembers an identity.
+   * Valid numbers are between 0 and 1, exclusive. Decay factor works in tandem
+   * with period to control how long the scheduler remembers an identity.
    */
   public static final String IPC_SCHEDULER_DECAYSCHEDULER_FACTOR_KEY =
       "decay-scheduler.decay-factor";

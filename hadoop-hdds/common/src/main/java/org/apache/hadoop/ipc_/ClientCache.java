@@ -34,7 +34,7 @@ public class ClientCache {
     new HashMap<SocketFactory, Client>();
 
   /**
-   * Construct & cache an IPC client with the user-provided SocketFactory 
+   * Construct and cache an IPC client with the user-provided SocketFactory
    * if no cached client exists.
    * 
    * @param conf Configuration
@@ -63,7 +63,7 @@ public class ClientCache {
   }
 
   /**
-   * Construct & cache an IPC client with the default SocketFactory 
+   * Construct and cache an IPC client with the default SocketFactory
    * and default valueClass if no cached client exists. 
    * 
    * @param conf Configuration
@@ -74,7 +74,7 @@ public class ClientCache {
   }
   
   /**
-   * Construct & cache an IPC client with the user-provided SocketFactory 
+   * Construct and cache an IPC client with the user-provided SocketFactory
    * if no cached client exists. Default response type is ObjectWritable.
    * 
    * @param conf Configuration
