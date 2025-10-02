@@ -220,7 +220,6 @@
                   <pattern>com</pattern>
                   <shadedPattern>${shaded.prefix}.com</shadedPattern>
                   <excludes>
-                    <exclude>com.google.protobuf.**</exclude>
                     <!-- These packages are the ones that are not shaded in the hadoop release package.
                     To prevent conflicts, we do not include these packages in the ozone client release package.
                     Ozone will use hadoop / JVM to provide these dependencies. -->
