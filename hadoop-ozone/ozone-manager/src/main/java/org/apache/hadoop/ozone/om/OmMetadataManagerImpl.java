@@ -548,9 +548,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * {@inheritDoc}
    */
   @Override
-  public VolumeBucketId getVolumeBucketIdPairFSO(String fsoKey) {
+  public VolumeBucketId getVolumeBucketIdPairFSO(String fsoKey) throws IOException {
     String[] keySplit = fsoKey.split(OM_KEY_PREFIX);
-    return new VolumeBucketId(Long.parseLong(keySplit[1]), Long.parseLong(keySplit[2]));
+    try {
+      return new VolumeBucketId(Long.parseLong(keySplit[1]), Long.parseLong(keySplit[2]));
+    } catch (NumberFormatException e) {
+      throw new IOException("Invalid format for FSO Key: " + fsoKey, e);
+    }
   }
 
   @Override

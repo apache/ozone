@@ -143,7 +143,7 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @param fsoKey the key representing the File System Object, used to identify the corresponding volume and bucket.
    * @return a Pair containing the volume ID as the first element and the bucket ID as the second element.
    */
-  VolumeBucketId getVolumeBucketIdPairFSO(String fsoKey);
+  VolumeBucketId getVolumeBucketIdPairFSO(String fsoKey) throws IOException;
 
   /**
    * Given a volume, bucket and a key, return the corresponding DB key.
