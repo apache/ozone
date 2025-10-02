@@ -77,7 +77,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.ipc_.CallQueueManager.CallQueueOverflowException;
@@ -1392,7 +1392,7 @@ public abstract class Server {
         // If the connectionManager can't take it, close the connection.
         if (c == null) {
           if (channel.isOpen()) {
-            IOUtils.cleanup(null, channel);
+            IOUtils.closeQuietly(channel);
           }
           connectionManager.droppedConnections.getAndIncrement();
           continue;
@@ -2816,9 +2816,9 @@ public abstract class Server {
         LOG.debug("Ignoring socket shutdown exception", e);
       }
       if (channel.isOpen()) {
-        IOUtils.cleanup(null, channel);
+        IOUtils.closeQuietly(channel);
       }
-      IOUtils.cleanup(null, socket);
+      IOUtils.closeQuietly(socket);
     }
   }
 
