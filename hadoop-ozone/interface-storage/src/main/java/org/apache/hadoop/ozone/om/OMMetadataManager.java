@@ -693,12 +693,12 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * to uniquely identify a bucket within a storage system.
    */
   class VolumeBucketId {
-    private long volumeId;
-    private long bucketId;
+    private final long volumeId;
+    private final long bucketId;
 
-    protected VolumeBucketId(long bucketId, long volumeId) {
-      this.bucketId = bucketId;
+    protected VolumeBucketId(long volumeId, long bucketId) {
       this.volumeId = volumeId;
+      this.bucketId = bucketId;
     }
 
     public long getBucketId() {

@@ -242,11 +242,11 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, ex));
       throw new IllegalStateException(ex);
     } finally {
-      omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketLockKeys);
       for (Map.Entry<Pair<String, String>, OmBucketInfo> entry :
           volBucketInfoMap.entrySet()) {
         entry.setValue(entry.getValue().copyObject());
       }
+      omMetadataManager.getLock().releaseWriteLocks(BUCKET_LOCK, bucketLockKeys);
     }
 
     return new OMDirectoriesPurgeResponseWithFSO(
