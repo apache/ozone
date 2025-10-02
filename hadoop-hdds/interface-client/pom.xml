@@ -89,17 +89,17 @@
             </configuration>
           </execution>
           <execution>
-            <id>compile-proto-${protobuf2.version}</id>
+            <id>compile-proto-${protobuf3.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${protobuf2.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf3.version}:exe:${os.detected.classifier}</protocArtifact>
               <excludes>
                 <exclude>DatanodeClientProtocol.proto</exclude>
               </excludes>
-              <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf2.version}</outputDirectory>
+              <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf3.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>
           </execution>

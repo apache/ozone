@@ -195,7 +195,6 @@
     <properties.maven.plugin.version>1.2.1</properties.maven.plugin.version>
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
     <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
-    <protobuf2.version>2.5.0</protobuf2.version>
     <protobuf3.version>3.25.8</protobuf3.version>
     <ranger.version>2.6.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
@@ -413,7 +412,7 @@
       <dependency>
         <groupId>com.google.protobuf</groupId>
         <artifactId>protobuf-java</artifactId>
-        <version>${protobuf2.version}</version>
+        <version>${protobuf3.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.re2j</groupId>

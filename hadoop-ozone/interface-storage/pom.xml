@@ -25,7 +25,7 @@
   <name>Apache Ozone Storage Interface</name>
   <description>Apache Ozone Storage Interface</description>
   <properties>
-    <protobuf.version>${protobuf2.version}</protobuf.version>
+    <protobuf.version>${protobuf3.version}</protobuf.version>
   </properties>
   <dependencies>
     <dependency>
