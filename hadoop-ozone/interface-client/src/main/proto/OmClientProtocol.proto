@@ -1219,6 +1219,7 @@ message DirectoryInfo {
 
 message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
+    optional uint64 bucketId = 2;
 }
 
 message OzoneFileStatusProto {
@@ -2042,6 +2043,7 @@ message SnapshotMoveTableKeysRequest {
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
+  optional uint64 bucketId = 3;
 }
 
 message SnapshotPurgeRequest {

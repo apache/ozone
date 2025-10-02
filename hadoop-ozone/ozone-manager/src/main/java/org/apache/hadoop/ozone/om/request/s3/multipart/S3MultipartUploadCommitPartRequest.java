@@ -234,7 +234,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         OmKeyInfo partKeyToBeDeleted =
             OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
         correctedSpace -= partKeyToBeDeleted.getReplicatedSize();
-        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(partKeyToBeDeleted, trxnLogIndex);
+        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(partKeyToBeDeleted, omBucketInfo.getObjectID(),
+            trxnLogIndex);
         // Unlike normal key commit, we can reuse the objectID for MPU part key because MPU part key
         // always use a new object ID regardless whether there is an existing key.
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(
@@ -252,7 +253,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
       final OmKeyInfo pseudoKeyInfo = wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
-      keyVersionsToDeleteMap = addKeyInfoToDeleteMap(ozoneManager, trxnLogIndex, ozoneKey,
+      keyVersionsToDeleteMap = addKeyInfoToDeleteMap(ozoneManager, trxnLogIndex, ozoneKey, omBucketInfo.getObjectID(),
           pseudoKeyInfo, keyVersionsToDeleteMap);
 
       MultipartCommitUploadPartResponse.Builder commitResponseBuilder = MultipartCommitUploadPartResponse.newBuilder()

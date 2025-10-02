@@ -100,7 +100,7 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
         String deleteKey = omMetadataManager.getOzoneDeletePathKey(
             keyInfoToRemove.getObjectID(), multipartKey);
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-            deleteKey, new RepeatedOmKeyInfo(keyInfoToRemove));
+            deleteKey, new RepeatedOmKeyInfo(keyInfoToRemove, omBucketInfo.getObjectID()));
       }
     }
 

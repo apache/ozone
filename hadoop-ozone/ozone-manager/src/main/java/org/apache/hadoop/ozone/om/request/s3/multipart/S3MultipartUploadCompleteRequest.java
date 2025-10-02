@@ -318,7 +318,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         boolean isNamespaceUpdate = false;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
-              keyToDelete, trxnLogIndex);
+              keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
           usedBytesDiff -= keyToDelete.getReplicatedSize();
         } else {

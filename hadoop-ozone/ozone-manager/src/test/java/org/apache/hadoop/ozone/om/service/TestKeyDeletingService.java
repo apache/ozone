@@ -819,7 +819,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             .setParentObjectID(2)
             .build();
         Map<String, RepeatedOmKeyInfo> keysToModify = Collections.singletonMap("key1",
-            new RepeatedOmKeyInfo(Collections.singletonList(omKeyInfo)));
+            new RepeatedOmKeyInfo(Collections.singletonList(omKeyInfo), 0L));
         keyDeletingService.processKeyDeletes(blockGroups, keysToModify, renameEntriesToBeDeleted, null, null, null);
         assertTrue(purgeRequest.get().getPurgeKeysRequest().getKeysToUpdateList().isEmpty());
         assertEquals(renameEntriesToBeDeleted, purgeRequest.get().getPurgeKeysRequest().getRenamedKeysList());

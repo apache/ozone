@@ -155,7 +155,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         }
 
         RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            keyInfo, keyInfo.getUpdateID());
+            keyInfo, bucketId, keyInfo.getUpdateID());
 
         String deletedKey = keySpaceOmMetadataManager
             .getOzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),

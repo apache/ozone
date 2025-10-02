@@ -41,6 +41,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false);
 
   private final List<OmKeyInfo> omKeyInfoList;
+  private final long bucketId;
 
   private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline) {
     return new DelegatedCodec<>(
@@ -54,17 +55,20 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
   }
 
-  public RepeatedOmKeyInfo() {
+  public RepeatedOmKeyInfo(long bucketId) {
     this.omKeyInfoList = new ArrayList<>();
+    this.bucketId = bucketId;
   }
 
-  public RepeatedOmKeyInfo(List<OmKeyInfo> omKeyInfos) {
+  public RepeatedOmKeyInfo(List<OmKeyInfo> omKeyInfos, long bucketId) {
     this.omKeyInfoList = omKeyInfos;
+    this.bucketId = bucketId;
   }
 
-  public RepeatedOmKeyInfo(OmKeyInfo omKeyInfos) {
+  public RepeatedOmKeyInfo(OmKeyInfo omKeyInfos, long bucketId) {
     this.omKeyInfoList = new ArrayList<>();
     this.omKeyInfoList.add(omKeyInfos);
+    this.bucketId = bucketId;
   }
 
   public void addOmKeyInfo(OmKeyInfo info) {
@@ -119,6 +123,10 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     return builder.build();
   }
 
+  public long getBucketId() {
+    return bucketId;
+  }
+
   @Override
   public String toString() {
     return "RepeatedOmKeyInfo{" +
@@ -131,6 +139,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
    */
   public static class Builder {
     private List<OmKeyInfo> omKeyInfos;
+    private long bucketId;
 
     public Builder() { }
 
@@ -139,13 +148,18 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
       return this;
     }
 
+    public Builder setBucketId(long bucketId) {
+      this.bucketId = bucketId;
+      return this;
+    }
+
     public RepeatedOmKeyInfo build() {
-      return new RepeatedOmKeyInfo(omKeyInfos);
+      return new RepeatedOmKeyInfo(omKeyInfos, bucketId);
     }
   }
 
   @Override
   public RepeatedOmKeyInfo copyObject() {
-    return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList));
+    return new RepeatedOmKeyInfo(new ArrayList<>(omKeyInfoList), bucketId);
   }
 }

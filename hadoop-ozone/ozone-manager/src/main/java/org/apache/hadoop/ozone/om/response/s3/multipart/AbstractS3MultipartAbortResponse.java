@@ -84,7 +84,7 @@ public abstract class AbstractS3MultipartAbortResponse extends OmKeyResponse {
         //  deletedTable if it does.
 
         RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            currentKeyPartInfo, omMultipartKeyInfo.getUpdateID()
+            currentKeyPartInfo, omBucketInfo.getObjectID(), omMultipartKeyInfo.getUpdateID()
         );
 
         // multi-part key format is volumeName/bucketName/keyName/uploadId
