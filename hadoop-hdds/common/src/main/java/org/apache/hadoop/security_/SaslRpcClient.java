@@ -46,7 +46,7 @@ import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslClient;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.GlobPattern;
+import org.apache.hadoop.hdds.utils.GlobPattern;
 import org.apache.hadoop.ipc_.Client.IpcStreams;
 import org.apache.hadoop.ipc_.ProtoUtil;
 import org.apache.hadoop.ipc_.RPC.RpcKind;
