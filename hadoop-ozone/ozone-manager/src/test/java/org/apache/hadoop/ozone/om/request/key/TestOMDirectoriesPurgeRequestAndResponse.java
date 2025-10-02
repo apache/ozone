@@ -41,6 +41,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentSkipListSet;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -69,7 +70,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePa
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -298,7 +298,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     OmBucketInfo bucketInfo2 = omMetadataManager.getBucketTable().get(bucketKey2);
     PurgePathRequest purgePathRequest2 = createBucketDataAndGetPurgePathRequest(bucketInfo2);
     IOzoneManagerLock lock = spy(omMetadataManager.getLock());
-    Set<Long> acquiredLockIds = new ConcurrentHashSet<>();
+    Set<Long> acquiredLockIds = new ConcurrentSkipListSet<>();
 
     doAnswer(i -> {
       long threadId = Thread.currentThread().getId();
