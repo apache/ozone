@@ -97,6 +97,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
         updateOpenKeyTableCache(ozoneManager, trxnLogIndex,
             openKeyBucket, deletedOpenKeys);
       }
+
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
           deletedOpenKeys, getBucketLayout());
 

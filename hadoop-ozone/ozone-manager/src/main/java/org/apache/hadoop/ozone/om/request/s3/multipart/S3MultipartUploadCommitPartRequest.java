@@ -139,7 +139,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
+      copyBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       String uploadID = keyArgs.getMultipartUploadID();
       multipartKey = getMultipartKey(volumeName, bucketName, keyName,
               omMetadataManager, uploadID);
@@ -222,7 +222,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheKey<>(openKey),
           CacheValue.get(trxnLogIndex));
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = copyBucketInfo;
 
       // This map should contain maximum of two entries
       // 1. Overwritten part
