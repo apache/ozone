@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 /**
  * Represents filtered Datanode information for json use.
  */
-public class BasicDatanodeInfo {
+public final class BasicDatanodeInfo {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private Long used = null;
   @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -37,20 +37,58 @@ public class BasicDatanodeInfo {
   private final DatanodeDetails dn;
   private final HddsProtos.NodeOperationalState opState;
   private final HddsProtos.NodeState healthState;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Integer totalVolumeCount = null;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Integer healthyVolumeCount = null;
   
-  public BasicDatanodeInfo(DatanodeDetails dnDetails, HddsProtos.NodeOperationalState opState,
-      HddsProtos.NodeState healthState) {
-    this.dn = dnDetails;
-    this.opState = opState;
-    this.healthState = healthState;
+  private BasicDatanodeInfo(Builder builder) {
+    this.dn = builder.dn;
+    this.opState = builder.opState;
+    this.healthState = builder.healthState;
+    this.used = builder.used;
+    this.capacity = builder.capacity;
+    this.percentUsed = builder.percentUsed;
+    this.totalVolumeCount = builder.totalVolumeCount;
+    this.healthyVolumeCount = builder.healthyVolumeCount;
   }
 
-  public BasicDatanodeInfo(DatanodeDetails dnDetails, HddsProtos.NodeOperationalState opState,
-      HddsProtos.NodeState healthState, long used, long capacity, double percentUsed) {
-    this(dnDetails, opState, healthState);
-    this.used = used;
-    this.capacity = capacity;
-    this.percentUsed = percentUsed;
+  /**
+   * Builder class for creating instances of BasicDatanodeInfo.
+   */
+  public static class Builder {
+    private DatanodeDetails dn;
+    private HddsProtos.NodeOperationalState opState;
+    private HddsProtos.NodeState healthState;
+    private Long used;
+    private Long capacity;
+    private Double percentUsed;
+    private Integer totalVolumeCount;
+    private Integer healthyVolumeCount;
+
+    public Builder(DatanodeDetails dn, HddsProtos.NodeOperationalState opState,
+                   HddsProtos.NodeState healthState) {
+      this.dn = dn;
+      this.opState = opState;
+      this.healthState = healthState;
+    }
+
+    public Builder withUsageInfo(long usedBytes, long capacityBytes, double percentUsedBytes) {
+      this.used = usedBytes;
+      this.capacity = capacityBytes;
+      this.percentUsed = percentUsedBytes;
+      return this;
+    }
+
+    public Builder withVolumeCounts(Integer total, Integer healthy) {
+      this.totalVolumeCount = total;
+      this.healthyVolumeCount = healthy;
+      return this;
+    }
+
+    public BasicDatanodeInfo build() {
+      return new BasicDatanodeInfo(this);
+    }
   }
   
   @JsonProperty(index = 5)
@@ -156,6 +194,16 @@ public class BasicDatanodeInfo {
   @JsonProperty(index = 105)
   public Double getPercentUsed() {
     return percentUsed;
+  }
+
+  @JsonProperty(index = 110)
+  public Integer getTotalVolumeCount() {
+    return totalVolumeCount;
+  }
+
+  @JsonProperty(index = 111)
+  public Integer getHealthyVolumeCount() {
+    return healthyVolumeCount;
   }
 
   @JsonIgnore
