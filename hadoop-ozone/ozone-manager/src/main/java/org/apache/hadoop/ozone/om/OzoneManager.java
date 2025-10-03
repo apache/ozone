@@ -233,6 +233,8 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.om.eventlistener.NotificationCheckpointStrategy;
+import org.apache.hadoop.ozone.om.eventlistener.OzoneFileCheckpointStrategy;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -479,6 +481,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OzoneLockProvider ozoneLockProvider;
   private final OMPerformanceMetrics perfMetrics;
   private final BucketUtilizationMetrics bucketUtilizationMetrics;
+  private final OzoneFileCheckpointStrategy ozoneFileCheckpointStrategy;
 
   private boolean fsSnapshotEnabled;
 
@@ -728,6 +731,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
     omHostName = HddsUtils.getHostName(conf);
+    ozoneFileCheckpointStrategy = new OzoneFileCheckpointStrategy(this, omMetadataReader);
+
   }
 
   public void initializeEdekCache(OzoneConfiguration conf) {
@@ -3498,6 +3503,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                 auditMap));
       }
     }
+  }
+
+  public NotificationCheckpointStrategy getNotificationCheckpointStrategy() {
+    return ozoneFileCheckpointStrategy;
   }
 
   @Override
