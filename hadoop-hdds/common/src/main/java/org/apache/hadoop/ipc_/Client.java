@@ -1414,7 +1414,7 @@ public class Client implements AutoCloseable {
    * @param remoteId - the target rpc server
    * @param fallbackToSimpleAuth - set to true or false during this method to
    *   indicate if a secure client falls back to simple auth
-   * @returns the rpc response
+   * @return the rpc response
    * Throws exceptions if there are network problems or if the remote code
    * threw an exception.
    */
@@ -1539,7 +1539,7 @@ public class Client implements AutoCloseable {
   /**
    * Check if RPC is in asynchronous mode or not.
    *
-   * @returns true, if RPC is in asynchronous mode, otherwise false for
+   * @return true, if RPC is in asynchronous mode, otherwise false for
    *          synchronous mode.
    */
   public static boolean isAsynchronousMode() {
