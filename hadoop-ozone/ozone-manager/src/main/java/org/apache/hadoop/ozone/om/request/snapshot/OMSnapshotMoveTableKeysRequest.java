@@ -74,10 +74,8 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     SnapshotChainManager snapshotChainManager = omMetadataManager.getSnapshotChainManager();
-    Map<String, String> auditParams = new LinkedHashMap<>();
     SnapshotMoveTableKeysRequest moveTableKeysRequest = getOmRequest().getSnapshotMoveTableKeysRequest();
     UUID fromSnapshotID = fromProtobuf(moveTableKeysRequest.getFromSnapshotID());
-    auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY, snapshotChainManager.getTableKey(fromSnapshotID));
     SnapshotInfo fromSnapshot = SnapshotUtils.getSnapshotInfo(ozoneManager,
         snapshotChainManager, fromSnapshotID);
     String bucketKeyPrefix = omMetadataManager.getBucketKeyPrefix(fromSnapshot.getVolumeName(),
@@ -96,15 +94,19 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
         if (!deletedKey.getKey().startsWith(bucketKeyPrefix)) {
           OMException ex = new OMException("Deleted Key: " + deletedKey + " doesn't start with prefix "
               + bucketKeyPrefix, OMException.ResultCodes.INVALID_KEY_NAME);
-          AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
-              auditParams, ex));
+          if (LOG.isDebugEnabled()) {
+            AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
+                null, ex));
+          }
           throw ex;
         }
         if (keys.contains(deletedKey.getKey())) {
           OMException ex = new OMException("Duplicate Deleted Key: " + deletedKey + " in request",
               OMException.ResultCodes.INVALID_REQUEST);
-          AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
-              auditParams, ex));
+          if (LOG.isDebugEnabled()) {
+            AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
+                null, ex));
+          }
           throw ex;
         } else {
           keys.add(deletedKey.getKey());
@@ -121,15 +123,19 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
         if (!renamedKey.getKey().startsWith(bucketKeyPrefix)) {
           OMException ex = new OMException("Rename Key: " + renamedKey + " doesn't start with prefix "
               + bucketKeyPrefix, OMException.ResultCodes.INVALID_KEY_NAME);
-          AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
-              auditParams, ex));
+          if (LOG.isDebugEnabled()) {
+            AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
+                null, ex));
+          }
           throw ex;
         }
         if (keys.contains(renamedKey.getKey())) {
           OMException ex = new OMException("Duplicate rename Key: " + renamedKey + " in request",
               OMException.ResultCodes.INVALID_REQUEST);
-          AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
-              auditParams, ex));
+          if (LOG.isDebugEnabled()) {
+            AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
+                null, ex));
+          }
           throw ex;
         } else {
           keys.add(renamedKey.getKey());
@@ -148,15 +154,19 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
         if (!deletedDir.getKey().startsWith(bucketKeyPrefixFSO)) {
           OMException ex = new OMException("Deleted dir: " + deletedDir + " doesn't start with prefix " +
               bucketKeyPrefixFSO, OMException.ResultCodes.INVALID_KEY_NAME);
-          AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
-              auditParams, ex));
+          if (LOG.isDebugEnabled()) {
+            AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
+                null, ex));
+          }
           throw ex;
         }
         if (keys.contains(deletedDir.getKey())) {
           OMException ex = new OMException("Duplicate deleted dir Key: " + deletedDir + " in request",
               OMException.ResultCodes.INVALID_REQUEST);
-          AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
-              auditParams, ex));
+          if (LOG.isDebugEnabled()) {
+            AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
+                null, ex));
+          }
           throw ex;
         } else {
           keys.add(deletedDir.getKey());
@@ -181,26 +191,22 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
 
     OMClientResponse omClientResponse;
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    Map<String, String> auditParams = new LinkedHashMap<>();
+
     UUID fromSnapshotID = fromProtobuf(moveTableKeysRequest.getFromSnapshotID());
-    auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY, snapshotChainManager.getTableKey(fromSnapshotID));
     try {
       SnapshotInfo fromSnapshot = SnapshotUtils.getSnapshotInfo(ozoneManager,
           snapshotChainManager, fromSnapshotID);
       // If there is no snapshot in the chain after the current snapshot move the keys to Active Object Store.
       SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
-      if (nextSnapshot != null) {
-        auditParams.put(AUDIT_PARAM_TO_SNAPSHOT_TABLE_KEY_OR_AOS, nextSnapshot.getTableKey());
-      }  else {
-        auditParams.put(AUDIT_PARAM_TO_SNAPSHOT_TABLE_KEY_OR_AOS, AOS);
-      }
 
       // If next snapshot is not active then ignore move. Since this could be a redundant operations.
       if (nextSnapshot != null && nextSnapshot.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
         OMException ex = new OMException("Next snapshot : " + nextSnapshot + " in chain is not active.",
             OMException.ResultCodes.INVALID_SNAPSHOT_ERROR);
-        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
-            auditParams, ex));
+        if (LOG.isDebugEnabled()) {
+          AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
+              null, ex));
+        }
         throw ex;
       }
 
@@ -212,30 +218,40 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
           deletedKeysList, deletedDirsList, renamedKeysList);
       omSnapshotIntMetrics.incNumSnapshotMoveTableKeys();
 
-      auditParams.put(AUDIT_PARAM_DEL_KEYS_MOVED, String.valueOf(deletedKeysList.size()));
-      auditParams.put(AUDIT_PARAM_DEL_DIRS_MOVED, String.valueOf(deletedDirsList.size()));
-      auditParams.put(AUDIT_PARAM_RENAMED_KEYS_MOVED, String.valueOf(renamedKeysList.size()));
-      if (!deletedKeysList.isEmpty()) {
-        auditParams.put(AUDIT_PARAM_DEL_KEYS_MOVED_LIST,
-            deletedKeysList.stream().map(SnapshotMoveKeyInfos::getKey)
-                .collect(java.util.stream.Collectors.joining(",")));
+      if (LOG.isDebugEnabled()) {
+        Map<String, String> auditParams = new LinkedHashMap<>();
+        auditParams.put(AUDIT_PARAM_FROM_SNAPSHOT_TABLE_KEY, snapshotChainManager.getTableKey(fromSnapshotID));
+        if (nextSnapshot != null) {
+          auditParams.put(AUDIT_PARAM_TO_SNAPSHOT_TABLE_KEY_OR_AOS, nextSnapshot.getTableKey());
+        } else {
+          auditParams.put(AUDIT_PARAM_TO_SNAPSHOT_TABLE_KEY_OR_AOS, AOS);
+        }
+        auditParams.put(AUDIT_PARAM_DEL_KEYS_MOVED, String.valueOf(deletedKeysList.size()));
+        auditParams.put(AUDIT_PARAM_DEL_DIRS_MOVED, String.valueOf(deletedDirsList.size()));
+        auditParams.put(AUDIT_PARAM_RENAMED_KEYS_MOVED, String.valueOf(renamedKeysList.size()));
+        if (!deletedKeysList.isEmpty()) {
+          auditParams.put(AUDIT_PARAM_DEL_KEYS_MOVED_LIST,
+              deletedKeysList.stream().map(SnapshotMoveKeyInfos::getKey)
+                  .collect(java.util.stream.Collectors.joining(",")));
+        }
+        if (!deletedDirsList.isEmpty()) {
+          auditParams.put(AUDIT_PARAM_DEL_DIRS_MOVED_LIST,
+              deletedDirsList.stream().map(SnapshotMoveKeyInfos::getKey)
+                  .collect(java.util.stream.Collectors.joining(",")));
+        }
+        if (!renamedKeysList.isEmpty()) {
+          auditParams.put(AUDIT_PARAM_RENAMED_KEYS_LIST, renamedKeysList.toString());
+        }
+        AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
+            auditParams));
       }
-      if (!deletedDirsList.isEmpty()) {
-        auditParams.put(AUDIT_PARAM_DEL_DIRS_MOVED_LIST,
-            deletedDirsList.stream().map(SnapshotMoveKeyInfos::getKey)
-                .collect(java.util.stream.Collectors.joining(",")));
-      }
-      if (!renamedKeysList.isEmpty()) {
-        auditParams.put(AUDIT_PARAM_RENAMED_KEYS_LIST, renamedKeysList.toString());
-      }
-      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
-          auditParams));
-
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveTableKeysResponse(createErrorOMResponse(omResponse, ex));
       omSnapshotIntMetrics.incNumSnapshotMoveTableKeysFails();
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
-          auditParams, ex));
+      if (LOG.isDebugEnabled()) {
+        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
+            null, ex));
+      }
     }
     return omClientResponse;
   }
