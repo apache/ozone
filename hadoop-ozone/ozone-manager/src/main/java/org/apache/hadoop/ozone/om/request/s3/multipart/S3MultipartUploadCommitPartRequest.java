@@ -131,6 +131,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     Result result = null;
     OmBucketInfo omBucketInfo = null;
     OmBucketInfo copyBucketInfo = null;
+    long bucketId = 0;
     try {
       long clientID = multipartCommitUploadPartRequest.getClientID();
 
@@ -139,7 +140,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      copyBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
       String uploadID = keyArgs.getMultipartUploadID();
       multipartKey = getMultipartKey(volumeName, bucketName, keyName,
               omMetadataManager, uploadID);
@@ -222,7 +223,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheKey<>(openKey),
           CacheValue.get(trxnLogIndex));
 
-      omBucketInfo = copyBucketInfo;
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // This map should contain maximum of two entries
       // 1. Overwritten part
@@ -266,7 +267,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omClientResponse =
           getOmClientResponse(ozoneManager, keyVersionsToDeleteMap, openKey,
               omKeyInfo, multipartKey, multipartKeyInfo, omResponse.build(),
-              omBucketInfo.copyObject());
+              omBucketInfo.copyObject(), bucketId);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
@@ -275,7 +276,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omClientResponse =
           getOmClientResponse(ozoneManager, null, openKey,
               omKeyInfo, multipartKey, multipartKeyInfo,
-              createErrorOMResponse(omResponse, exception), copyBucketInfo);
+              createErrorOMResponse(omResponse, exception), copyBucketInfo, bucketId);
     } finally {
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
@@ -304,11 +305,11 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       OzoneManager ozoneManager, Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
       String openKey, OmKeyInfo omKeyInfo, String multipartKey,
       OmMultipartKeyInfo multipartKeyInfo, OMResponse build,
-      OmBucketInfo omBucketInfo) {
+      OmBucketInfo omBucketInfo, long bucketId) {
 
     return new S3MultipartUploadCommitPartResponse(build, multipartKey, openKey,
         multipartKeyInfo, keyToDeleteMap, omKeyInfo,
-        omBucketInfo, getBucketLayout());
+        omBucketInfo, bucketId, getBucketLayout());
   }
 
   protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,

@@ -83,8 +83,7 @@ public abstract class AbstractS3MultipartAbortResponse extends OmKeyResponse {
         //  MPU part actually contains blocks, and only move the to
         //  deletedTable if it does.
 
-        RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            currentKeyPartInfo, omBucketInfo.getObjectID(), omMultipartKeyInfo.getUpdateID()
+        RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(omBucketInfo.getObjectID(), currentKeyPartInfo, omMultipartKeyInfo.getUpdateID()
         );
 
         // multi-part key format is volumeName/bucketName/keyName/uploadId

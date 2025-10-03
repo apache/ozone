@@ -1141,7 +1141,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
       @Nonnull OmKeyInfo keyToDelete, long bucketId, long trxnLogIndex) throws IOException {
-    return OmUtils.prepareKeyForDelete(keyToDelete, bucketId, trxnLogIndex);
+    return OmUtils.prepareKeyForDelete(bucketId, keyToDelete, trxnLogIndex);
   }
 
   protected OzoneLockStrategy getOzoneLockStrategy(OzoneManager ozoneManager) {
