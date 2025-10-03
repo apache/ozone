@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.om.DeleteKeysResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager.VolumeBucketId;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -272,9 +273,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     int subdirDelNum = 0;
     int subDirRecursiveCnt = 0;
     int consumedSize = 0;
-    Map<Pair<Long, Long>, BucketNameInfo> bucketNameInfoMap =
+    Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap =
         bucketInfos.stream().collect(Collectors.toMap(
-            bucketInfo -> Pair.of(bucketInfo.getVolumeId(), bucketInfo.getBucketId()),
+            bucketInfo -> new VolumeBucketId(bucketInfo.getVolumeId(), bucketInfo.getBucketId()),
             bucketInfo -> bucketInfo, (o1, o2) -> o1));
     while (subDirRecursiveCnt < allSubDirList.size() && remainingBufLimit > 0) {
       try {
@@ -389,7 +390,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           pendingDeletedDirInfo.getKeyName());
     }
 
-    OMMetadataManager.VolumeBucketId volumeBucketId = keyManager.getMetadataManager()
+    VolumeBucketId volumeBucketId = keyManager.getMetadataManager()
         .getVolumeBucketIdPairFSO(delDirName);
 
     // step-1: get all sub directories under the deletedDir
@@ -464,7 +465,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   private OzoneManagerProtocolProtos.OMResponse submitPurgePaths(List<PurgePathRequest> requests,
-      String snapTableKey, UUID expectedPreviousSnapshotId, Map<Pair<Long, Long>, BucketNameInfo> bucketNameInfoMap)
+      String snapTableKey, UUID expectedPreviousSnapshotId, Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap)
       throws InterruptedException {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDirRequest =
         OzoneManagerProtocolProtos.PurgeDirectoriesRequest.newBuilder();
@@ -481,7 +482,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     purgeDirRequest.addAllDeletedPath(requests);
     purgeDirRequest.addAllBucketNameInfos(requests.stream().map(purgePathRequest ->
-        Pair.of(purgePathRequest.getVolumeId(), purgePathRequest.getBucketId())).distinct()
+        new VolumeBucketId(purgePathRequest.getVolumeId(), purgePathRequest.getBucketId())).distinct()
         .map(bucketNameInfoMap::get).filter(Objects::nonNull).collect(Collectors.toList()));
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
@@ -631,16 +632,17 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           if (pendingDeletedDirInfo == null) {
             break;
           }
+          OmKeyInfo deletedDirInfo = pendingDeletedDirInfo.getValue();
           Pair<String, String> volumeBucketPair = Pair.of(pendingDeletedDirInfo.getValue().getVolumeName(),
               pendingDeletedDirInfo.getValue().getBucketName());
           if (!bucketNameInfos.containsKey(volumeBucketPair)) {
-            OMMetadataManager.VolumeBucketId volumeBucketId =
+            VolumeBucketId volumeBucketId =
                 keyManager.getMetadataManager().getVolumeBucketIdPairFSO(pendingDeletedDirInfo.getKey());
             bucketNameInfos.put(volumeBucketPair,
                 BucketNameInfo.newBuilder().setVolumeId(volumeBucketId.getVolumeId())
                     .setBucketId(volumeBucketId.getBucketId())
-                    .setVolumeName(pendingDeletedDirInfo.getValue().getVolumeName())
-                    .setBucketName(pendingDeletedDirInfo.getValue().getBucketName())
+                    .setVolumeName(deletedDirInfo.getVolumeName())
+                    .setBucketName(deletedDirInfo.getBucketName())
                     .build());
           }
 

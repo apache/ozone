@@ -696,7 +696,7 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
     private final long volumeId;
     private final long bucketId;
 
-    protected VolumeBucketId(long volumeId, long bucketId) {
+    public VolumeBucketId(long volumeId, long bucketId) {
       this.volumeId = volumeId;
       this.bucketId = bucketId;
     }
