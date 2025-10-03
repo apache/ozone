@@ -89,7 +89,6 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     SnapshotPurgeRequest snapshotPurgeRequest = getOmRequest()
         .getSnapshotPurgeRequest();
 
-    Map<String, String> auditParams = new LinkedHashMap<>();
     List<String> snapshotDbKeys = snapshotPurgeRequest
         .getSnapshotDBKeysList();
     try {
@@ -134,17 +133,23 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       omSnapshotIntMetrics.incNumSnapshotPurges();
       LOG.info("Successfully executed snapshotPurgeRequest: {{}} along with updating snapshots:{}.",
           snapshotPurgeRequest, updatedSnapshotInfos);
-      
-      auditParams.put(AUDIT_PARAM_SNAPSHOT_KEYS, snapshotDbKeys.toString());
-      auditParams.put(AUDIT_PARAM_SNAPSHOTS_SET_FOR_DEEP_CLEAN, String.join(",", updatedSnapshotInfos.keySet()));
-      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_PURGE, auditParams));
+      if (LOG.isDebugEnabled()) {
+        Map<String, String> auditParams = new LinkedHashMap<>();
+        auditParams.put(AUDIT_PARAM_SNAPSHOT_KEYS, snapshotDbKeys.toString());
+        auditParams.put(AUDIT_PARAM_SNAPSHOTS_SET_FOR_DEEP_CLEAN, String.join(",", updatedSnapshotInfos.keySet()));
+        AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_PURGE, auditParams));
+      }
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotPurgeResponse(
           createErrorOMResponse(omResponse, ex));
       omSnapshotIntMetrics.incNumSnapshotPurgeFails();
-      auditParams.put(AUDIT_PARAM_SNAPSHOT_KEYS, snapshotDbKeys.toString());
       LOG.error("Failed to execute snapshotPurgeRequest:{{}}.", snapshotPurgeRequest, ex);
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_PURGE, auditParams, ex));
+      if (LOG.isDebugEnabled()) {
+        Map<String, String> auditParams = new LinkedHashMap<>();
+        auditParams.put(AUDIT_PARAM_SNAPSHOT_KEYS, snapshotDbKeys.toString());
+        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_PURGE, auditParams, ex));
+      }
+
     }
 
     return omClientResponse;
