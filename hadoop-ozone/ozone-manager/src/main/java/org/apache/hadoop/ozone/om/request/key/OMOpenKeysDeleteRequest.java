@@ -22,10 +22,14 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -52,6 +56,10 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
   private static final Logger LOG =
           LoggerFactory.getLogger(OMOpenKeysDeleteRequest.class);
+
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
+  private static final String AUDIT_PARAM_NUM_OPEN_KEYS = "numOpenKeysDeleted";
+  private static final String AUDIT_PARAM_OPEN_KEYS = "openKeysDeleted";
 
   public OMOpenKeysDeleteRequest(OMRequest omRequest,
                                  BucketLayout bucketLayout) {
@@ -86,7 +94,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     Map<String, OmKeyInfo> deletedOpenKeys = new HashMap<>();
-
+    Map<String, String> auditParams = new LinkedHashMap<>();
     try {
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBuckets) {
         // For each bucket where keys will be deleted from,
@@ -99,8 +107,12 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           deletedOpenKeys, getBucketLayout());
 
       result = Result.SUCCESS;
+      auditParams.put(AUDIT_PARAM_NUM_OPEN_KEYS, String.valueOf(deletedOpenKeys.size()));
+      auditParams.put(AUDIT_PARAM_OPEN_KEYS, deletedOpenKeys.toString());
+      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.OPEN_KEY_CLEANUP, auditParams));
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.OPEN_KEY_CLEANUP, auditParams, ex));
       exception = ex;
       omClientResponse =
           new OMOpenKeysDeleteResponse(createErrorOMResponse(omResponse,
