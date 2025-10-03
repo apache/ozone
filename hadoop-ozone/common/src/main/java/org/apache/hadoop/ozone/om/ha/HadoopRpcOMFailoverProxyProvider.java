@@ -74,7 +74,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     List<String> omNodeIDList = new ArrayList<>();
     Map<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
 
-    Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config,
+    Collection<String> omNodeIds = OmUtils.getActiveNonListenerOMNodeIds(config,
         omSvcId);
 
     for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {

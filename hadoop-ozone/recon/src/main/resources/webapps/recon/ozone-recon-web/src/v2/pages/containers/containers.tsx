@@ -29,7 +29,7 @@ import AutoReloadPanel from "@/components/autoReloadPanel/autoReloadPanel";
 import { showDataFetchError } from "@/utils/common";
 import { AutoReloadHelper } from "@/utils/autoReloadHelper";
 import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
-import { useDebounce } from "@/v2/hooks/debounce.hook";
+import { useDebounce } from "@/v2/hooks/useDebounce";
 
 import {
   Container,

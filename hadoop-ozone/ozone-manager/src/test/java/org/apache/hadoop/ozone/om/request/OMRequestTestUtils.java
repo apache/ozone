@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteT
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartCommitUploadPartRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateRequest;
@@ -203,11 +204,11 @@ public final class OMRequestTestUtils {
    * @throws Exception
    */
   @SuppressWarnings("parameterNumber")
-  public static void addKeyToTable(boolean openKeyTable, String volumeName,
+  public static OmKeyInfo addKeyToTable(boolean openKeyTable, String volumeName,
       String bucketName, String keyName, long clientID,
       ReplicationConfig replicationConfig,
       OMMetadataManager omMetadataManager) throws Exception {
-    addKeyToTable(openKeyTable, false, volumeName, bucketName, keyName,
+    return addKeyToTable(openKeyTable, false, volumeName, bucketName, keyName,
         clientID, replicationConfig, 0L, omMetadataManager);
   }
 
@@ -264,7 +265,7 @@ public final class OMRequestTestUtils {
    * @throws Exception
    */
   @SuppressWarnings("parameternumber")
-  public static void addKeyToTable(boolean openKeyTable, boolean addToCache,
+  public static OmKeyInfo addKeyToTable(boolean openKeyTable, boolean addToCache,
       String volumeName, String bucketName, String keyName, long clientID,
       ReplicationConfig replicationConfig, long trxnLogIndex,
       OMMetadataManager omMetadataManager) throws Exception {
@@ -274,6 +275,8 @@ public final class OMRequestTestUtils {
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
         omMetadataManager);
+
+    return omKeyInfo;
   }
 
   /**
@@ -301,6 +304,23 @@ public final class OMRequestTestUtils {
         replicationConfig, new OmKeyLocationInfoGroup(0, new ArrayList<>(), isMultipartKey))
         .setObjectID(trxnLogIndex)
         .build();
+
+    addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
+        omMetadataManager);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public static void addKeyToTable(boolean openKeyTable, boolean isMultipartKey,
+      boolean addToCache, String volumeName, String bucketName, String keyName,
+      long clientID, ReplicationConfig replicationConfig, long trxnLogIndex,
+      OMMetadataManager omMetadataManager, List<OmKeyLocationInfo> locationList, long version) throws Exception {
+
+    OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
+        replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>(), isMultipartKey))
+        .setObjectID(trxnLogIndex)
+        .build();
+
+    omKeyInfo.appendNewBlocks(locationList, false);
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
         omMetadataManager);
@@ -462,7 +482,7 @@ public final class OMRequestTestUtils {
    * @param omMetadataManager
    */
   @SuppressWarnings("parameterNumber")
-  public static void addKeyToTableCache(String volumeName,
+  public static OmKeyInfo addKeyToTableCache(String volumeName,
       String bucketName,
       String keyName,
       ReplicationConfig replicationConfig,
@@ -474,6 +494,8 @@ public final class OMRequestTestUtils {
     omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
         new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName)), CacheValue.get(1L, omKeyInfo));
+
+    return omKeyInfo;
   }
 
   /**
@@ -1056,16 +1078,10 @@ public final class OMRequestTestUtils {
         .build();
   }
 
-  /**
-   * Create OMRequest which encapsulates InitiateMultipartUpload request.
-   * @param volumeName
-   * @param bucketName
-   * @param keyName
-   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static OMRequest createCommitPartMPURequest(String volumeName,
       String bucketName, String keyName, long clientID, long size,
-      String multipartUploadID, int partNumber) {
-
+      String multipartUploadID, int partNumber, List<KeyLocation> keyLocations) {
     MessageDigest eTagProvider;
     try {
       eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
@@ -1080,7 +1096,7 @@ public final class OMRequestTestUtils {
         .setDataSize(size)
         .setMultipartNumber(partNumber)
         .setMultipartUploadID(multipartUploadID)
-        .addAllKeyLocations(new ArrayList<>())
+        .addAllKeyLocations(keyLocations)
         .addMetadata(KeyValue.newBuilder()
             .setKey(OzoneConsts.ETAG)
             .setValue(DatatypeConverter.printHexBinary(

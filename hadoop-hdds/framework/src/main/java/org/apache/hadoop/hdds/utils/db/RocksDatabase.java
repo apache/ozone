@@ -130,7 +130,7 @@ public final class RocksDatabase implements Closeable {
         .stream()
         .map(TableConfig::toName)
         .filter(familyName -> !existingFamilyNames.contains(familyName))
-        .map(TableConfig::newTableConfig)
+        .map(familyName -> TableConfig.newTableConfig(file.toPath(), familyName))
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
       LOG.debug("Found column families in DB {}: {}", file, columnFamilies);
@@ -299,6 +299,16 @@ public final class RocksDatabase implements Closeable {
         writeBatch.delete(getHandle(), key);
       } catch (RocksDBException e) {
         throw toRocksDatabaseException(this, "batchDelete key " + bytes2String(key), e);
+      }
+    }
+
+    public void batchDeleteRange(ManagedWriteBatch writeBatch, byte[] beginKey, byte[] endKey)
+        throws RocksDatabaseException {
+      try (UncheckedAutoCloseable ignored = acquire()) {
+        writeBatch.deleteRange(getHandle(), beginKey, endKey);
+      } catch (RocksDBException e) {
+        throw toRocksDatabaseException(this, "batchDeleteRange key " + bytes2String(beginKey) + " - " +
+            bytes2String(endKey), e);
       }
     }
 

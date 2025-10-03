@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -29,6 +29,7 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Collection;
 import org.apache.hadoop.hdds.NodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
@@ -44,25 +45,30 @@ import org.apache.http.client.utils.URIBuilder;
 public final class OMNodeDetails extends NodeDetails {
   private int rpcPort;
   private boolean isDecommissioned = false;
+  private boolean isRatisListener = false;
 
   /**
    * Constructs OMNodeDetails object.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private OMNodeDetails(String serviceId, String nodeId,
       InetSocketAddress rpcAddr, int rpcPort, int ratisPort,
-      String httpAddress, String httpsAddress) {
+      String httpAddress, String httpsAddress, boolean isRatisListener) {
     super(serviceId, nodeId, rpcAddr, ratisPort, httpAddress, httpsAddress);
     this.rpcPort = rpcPort;
+    this.isRatisListener = isRatisListener;
   }
 
   /**
    * Constructs OMNodeDetails object.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private OMNodeDetails(String serviceId, String nodeId, String hostAddr,
-      int rpcPort, int ratisPort, String httpAddress, String httpsAddress) {
+      int rpcPort, int ratisPort, String httpAddress, String httpsAddress, boolean isRatisListener) {
     super(serviceId, nodeId, hostAddr, rpcPort, ratisPort, httpAddress,
         httpsAddress);
     this.rpcPort = rpcPort;
+    this.isRatisListener = isRatisListener;
   }
 
   public void setDecommissioningState() {
@@ -71,6 +77,14 @@ public final class OMNodeDetails extends NodeDetails {
 
   public boolean isDecommissioned() {
     return isDecommissioned;
+  }
+
+  public void setRatisListener() {
+    isRatisListener = true;
+  }
+
+  public boolean isRatisListener() {
+    return isRatisListener;
   }
 
   @Override
@@ -83,6 +97,7 @@ public final class OMNodeDetails extends NodeDetails {
         ", ratisPort=" + getRatisPort() +
         ", httpAddress=" + getHttpAddress() +
         ", httpsAddress=" + getHttpsAddress() +
+        ", isListener=" + isRatisListener() +
         "]";
   }
 
@@ -102,6 +117,7 @@ public final class OMNodeDetails extends NodeDetails {
     private int ratisPort;
     private String httpAddr;
     private String httpsAddr;
+    private boolean isListener = false;
 
     public Builder setHostAddress(String hostName) {
       this.hostAddress = hostName;
@@ -150,13 +166,18 @@ public final class OMNodeDetails extends NodeDetails {
       return this;
     }
 
+    public Builder setIsListener(boolean isListener) {
+      this.isListener = isListener;
+      return this;
+    }
+
     public OMNodeDetails build() {
       if (rpcAddress != null) {
         return new OMNodeDetails(omServiceId, omNodeId, rpcAddress, rpcPort,
-            ratisPort, httpAddr, httpsAddr);
+            ratisPort, httpAddr, httpsAddr, isListener);
       } else {
         return new OMNodeDetails(omServiceId, omNodeId, hostAddress, rpcPort,
-            ratisPort, httpAddr, httpsAddr);
+            ratisPort, httpAddr, httpsAddr, isListener);
       }
     }
   }
@@ -168,7 +189,7 @@ public final class OMNodeDetails extends NodeDetails {
       URIBuilder urlBuilder = new URIBuilder().
           setScheme(isHttp ? "http" : "https").
           setHost(isHttp ? getHttpAddress() : getHttpsAddress()).
-          setPath(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT).
+          setPath(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2).
           addParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA, "true").
           addParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH,
               flush ? "true" : "false");
@@ -216,6 +237,9 @@ public final class OMNodeDetails extends NodeDetails {
     String httpsAddr = OmUtils.getHttpsAddressForOMPeerNode(conf,
         omServiceId, omNodeId, omRpcAddress.getHostName());
 
+    Collection<String> listenerOmNodeIds = OmUtils.getListenerOMNodeIds(conf, omServiceId);
+    boolean isListener = listenerOmNodeIds.contains(omNodeId);
+
     return new Builder()
         .setOMNodeId(omNodeId)
         .setRatisPort(ratisPort)
@@ -223,6 +247,7 @@ public final class OMNodeDetails extends NodeDetails {
         .setHttpsAddress(httpsAddr)
         .setOMServiceId(omServiceId)
         .setRpcAddress(omRpcAddress)
+        .setIsListener(isListener)
         .build();
   }
 
@@ -234,6 +259,7 @@ public final class OMNodeDetails extends NodeDetails {
         .setRatisPort(getRatisPort())
         .setNodeState(isDecommissioned ?
             NodeState.DECOMMISSIONED : NodeState.ACTIVE)
+        .setIsListener(isRatisListener)
         .build();
   }
 
@@ -243,6 +269,7 @@ public final class OMNodeDetails extends NodeDetails {
         .setHostAddress(omNodeInfo.getHostAddress())
         .setRpcPort(omNodeInfo.getRpcPort())
         .setRatisPort(omNodeInfo.getRatisPort())
+        .setIsListener(omNodeInfo.getIsListener())
         .build();
     if (omNodeInfo.hasNodeState() &&
         omNodeInfo.getNodeState().equals(NodeState.DECOMMISSIONED)) {

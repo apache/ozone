@@ -85,12 +85,7 @@ public class TestRootCARotationManager {
   private RootCARotationManager rootCARotationManager;
   private StorageContainerManager scm;
   private SCMCertificateClient scmCertClient;
-  private SCMServiceManager scmServiceManager;
-  private SCMHAManager scmhaManager;
   private SCMContext scmContext;
-  private SequenceIdGenerator sequenceIdGenerator;
-  private SCMStorageConfig scmStorageConfig;
-  private SCMSecurityProtocolServer scmSecurityProtocolServer;
   private RootCARotationHandlerImpl handler;
   private StatefulServiceStateManager statefulServiceStateManager;
   @TempDir
@@ -112,14 +107,14 @@ public class TestRootCARotationManager {
     securityConfig = new SecurityConfig(ozoneConfig);
     scmCertClient = new SCMCertificateClient(securityConfig, null, scmID, cID,
         certID.toString(), "localhost");
-    scmServiceManager = new SCMServiceManager();
+    SCMServiceManager scmServiceManager = new SCMServiceManager();
     scmContext = mock(SCMContext.class);
-    scmhaManager = mock(SCMHAManager.class);
-    sequenceIdGenerator = mock(SequenceIdGenerator.class);
-    scmStorageConfig = new SCMStorageConfig(ozoneConfig);
+    SCMHAManager scmhaManager = mock(SCMHAManager.class);
+    SequenceIdGenerator sequenceIdGenerator = mock(SequenceIdGenerator.class);
+    SCMStorageConfig scmStorageConfig = new SCMStorageConfig(ozoneConfig);
     scmStorageConfig.setScmId(scmID);
     scmStorageConfig.setClusterId(cID);
-    scmSecurityProtocolServer = mock(SCMSecurityProtocolServer.class);
+    SCMSecurityProtocolServer scmSecurityProtocolServer = mock(SCMSecurityProtocolServer.class);
     handler = mock(RootCARotationHandlerImpl.class);
     statefulServiceStateManager = mock(StatefulServiceStateManager.class);
     when(scmContext.isLeader()).thenReturn(true);

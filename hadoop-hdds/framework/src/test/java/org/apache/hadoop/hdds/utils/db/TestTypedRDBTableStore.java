@@ -68,13 +68,12 @@ public class TestTypedRDBTableStore {
           "Sixth", "Seven", "Eighth",
           "Ninth", "Ten");
   private RDBStore rdbStore = null;
-  private ManagedDBOptions options = null;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
     CodecBuffer.enableLeakDetection();
 
-    options = new ManagedDBOptions();
+    ManagedDBOptions options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
 

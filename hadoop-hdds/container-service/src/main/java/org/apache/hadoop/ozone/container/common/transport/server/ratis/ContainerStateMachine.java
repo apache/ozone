@@ -1265,8 +1265,10 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyLogFailed(Throwable t, LogEntryProto failedEntry) {
-    LOG.error("{}: {} {}", getGroupId(), TermIndex.valueOf(failedEntry),
-        toStateMachineLogEntryString(failedEntry.getStateMachineLogEntry()), t);
+    String stateMachineLogEntry = failedEntry == null
+        ? "null"
+        : toStateMachineLogEntryString(failedEntry.getStateMachineLogEntry());
+    LOG.error("{}: {} {}", getGroupId(), TermIndex.valueOf(failedEntry), stateMachineLogEntry, t);
     ratisServer.handleNodeLogFailure(getGroupId(), t);
   }
 

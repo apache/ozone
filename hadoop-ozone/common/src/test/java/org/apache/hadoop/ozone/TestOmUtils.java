@@ -218,5 +218,44 @@ public class TestOmUtils {
     assertEquals("0.0.0.0", addr.getHostString());
     assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT, addr.getPort());
   }
+
+  @Test
+  public void testGetListenerOMNodeIdsUnion() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    String serviceId = "om-service-test1";
+    conf.set(org.apache.hadoop.ozone.ha.ConfUtils.addKeySuffixes(
+        org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,
+        serviceId), "s1,s2");
+
+    java.util.Collection<String> result = OmUtils.getListenerOMNodeIds(conf, serviceId);
+    java.util.Set<String> expected = new java.util.HashSet<>();
+    expected.add("s1");
+    expected.add("s2");
+
+    assertEquals(expected.size(), result.size());
+    assertTrue(result.containsAll(expected));
+  }
+
+  @Test
+  public void testGetActiveNonListenerOMNodeIdsFiltering() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String serviceId = "om-service-test1";
+
+    conf.set(org.apache.hadoop.ozone.ha.ConfUtils.addKeySuffixes(
+        org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY, serviceId),
+        "n1,n2,n3");
+    conf.set(org.apache.hadoop.ozone.ha.ConfUtils.addKeySuffixes(
+        org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,
+        serviceId), "n2");
+
+    java.util.Collection<String> result = OmUtils.getActiveNonListenerOMNodeIds(conf, serviceId);
+    java.util.Set<String> expected = new java.util.HashSet<>();
+    expected.add("n1");
+    expected.add("n3");
+
+    assertEquals(expected.size(), result.size());
+    assertTrue(result.containsAll(expected));
+  }
 }
 
