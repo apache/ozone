@@ -1392,7 +1392,7 @@ public abstract class Server {
         // If the connectionManager can't take it, close the connection.
         if (c == null) {
           if (channel.isOpen()) {
-            IOUtils.closeQuietly(channel);
+            IOUtils.cleanupWithLogger(LOG, channel);
           }
           connectionManager.droppedConnections.getAndIncrement();
           continue;
@@ -2816,9 +2816,9 @@ public abstract class Server {
         LOG.debug("Ignoring socket shutdown exception", e);
       }
       if (channel.isOpen()) {
-        IOUtils.closeQuietly(channel);
+        IOUtils.cleanupWithLogger(LOG, channel);
       }
-      IOUtils.closeQuietly(socket);
+      IOUtils.cleanupWithLogger(LOG, socket);
     }
   }
 
