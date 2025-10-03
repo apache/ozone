@@ -69,10 +69,10 @@ public class DiskBalancerStartSubcommand extends ScmSubcommand {
         scmClient.startDiskBalancer(threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
             commonOptions.getSpecifiedDatanodes());
 
-    System.out.println("Start DiskBalancer on datanode(s):\n" +
-        commonOptions.getHostString());
-
-    if (!errors.isEmpty()) {
+    if (errors.isEmpty()) {
+      System.out.println("Start DiskBalancer on datanode(s):\n" +
+          commonOptions.getHostString());
+    } else {
       for (DatanodeAdminError error : errors) {
         System.err.println("Error: " + error.getHostname() + ": "
             + error.getError());
