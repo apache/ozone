@@ -151,17 +151,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
     List<OpenKeySession> openFileList = res.getOpenKeys();
 
-    String msg = res.getTotalOpenKeyCount() +
-        " total open files (est.). Showing " + openFileList.size() +
-        " open files (limit " + limit + ") under path prefix:\n  " + pathPrefix;
-
-    if (startItem != null && !startItem.isEmpty()) {
-      msg += "\nafter continuation token:\n  " + startItem;
-    }
-    msg += "\n\nClient ID\t\t\tCreation time\t\tHsync'ed\t";
-    msg += showDeleted ? "Deleted\t" : "";
-    msg += showOverwritten ? "Overwritten\t" : "";
-    msg += "Open File Path";
+    String msg = getMessageString(res, openFileList);
     System.out.println(msg);
 
     for (OpenKeySession e : openFileList) {
@@ -214,6 +204,33 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     } else {
       System.out.println("\nReached the end of the list.");
     }
+  }
+
+  /**
+   * @return formatted output message for the command.
+   */
+  private String getMessageString(ListOpenFilesResult res, List<OpenKeySession> openFileList) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(res.getTotalOpenKeyCount())
+          .append(" total open files. Showing ");
+    sb.append(openFileList.size())
+        .append(" open files (limit ")
+        .append(limit)
+        .append(") under path prefix:\n  ")
+        .append(pathPrefix);
+    if (startItem != null && !startItem.isEmpty()) {
+      sb.append("\nafter continuation token:\n  ")
+          .append(startItem);
+    }
+    sb.append("\n\nClient ID\t\t\tCreation time\t\tHsync'ed\t");
+    if (showDeleted) {
+      sb.append("Deleted\t");
+    }
+    if (showOverwritten) {
+      sb.append("Overwritten\t");
+    }
+    sb.append("Open File Path");
+    return sb.toString();
   }
 
   /**
