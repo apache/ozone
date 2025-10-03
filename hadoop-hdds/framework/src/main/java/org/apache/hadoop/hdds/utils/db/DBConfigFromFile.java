@@ -114,7 +114,7 @@ public final class DBConfigFromFile {
   public static ManagedDBOptions readDBOptionsFromFile(Path dbPath) throws RocksDBException {
     Path generatedDBPath = generateDBPath(dbPath);
     if (!generatedDBPath.toFile().exists()) {
-      LOG.warn("Error trying to read generated rocksDB file: {}, file does not exists.", generatedDBPath);
+      LOG.debug("Error trying to read generated rocksDB file: {}, file does not exists.", generatedDBPath);
       return null;
     }
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
@@ -138,7 +138,7 @@ public final class DBConfigFromFile {
       throws RocksDBException {
     Path generatedDBPath = generateDBPath(optionsPath);
     if (!generatedDBPath.toFile().exists()) {
-      LOG.warn("Error trying to read column family options from file: {}, file does not exists.", generatedDBPath);
+      LOG.debug("Error trying to read column family options from file: {}, file does not exists.", generatedDBPath);
       return null;
     }
     List<ColumnFamilyDescriptor> descriptors = new ArrayList<>();
