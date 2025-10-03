@@ -57,7 +57,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
   private static final Logger LOG = LoggerFactory.getLogger(OMSnapshotPurgeRequest.class);
 
   private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
-  private static final String AUDIT_PARAM_SNAPSHOT_KEYS = "snapshotKeys";
+  private static final String AUDIT_PARAM_SNAPSHOT_DB_KEYS = "snapshotsDBKeys";
   private static final String AUDIT_PARAM_SNAPSHOTS_SET_FOR_DEEP_CLEAN = "snapshotsSetForDeepClean";
 
   /**
@@ -135,7 +135,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           snapshotPurgeRequest, updatedSnapshotInfos);
       if (LOG.isDebugEnabled()) {
         Map<String, String> auditParams = new LinkedHashMap<>();
-        auditParams.put(AUDIT_PARAM_SNAPSHOT_KEYS, snapshotDbKeys.toString());
+        auditParams.put(AUDIT_PARAM_SNAPSHOT_DB_KEYS, snapshotDbKeys.toString());
         auditParams.put(AUDIT_PARAM_SNAPSHOTS_SET_FOR_DEEP_CLEAN, String.join(",", updatedSnapshotInfos.keySet()));
         AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_PURGE, auditParams));
       }
@@ -146,7 +146,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       LOG.error("Failed to execute snapshotPurgeRequest:{{}}.", snapshotPurgeRequest, ex);
       if (LOG.isDebugEnabled()) {
         Map<String, String> auditParams = new LinkedHashMap<>();
-        auditParams.put(AUDIT_PARAM_SNAPSHOT_KEYS, snapshotDbKeys.toString());
+        auditParams.put(AUDIT_PARAM_SNAPSHOT_DB_KEYS, snapshotDbKeys.toString());
         AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_PURGE, auditParams, ex));
       }
 

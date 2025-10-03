@@ -60,8 +60,8 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
   private static final String AUDIT_PARAM_SNAPSHOT_DB_KEY = "snapshotDBKey";
   private static final String AUDIT_PARAM_SNAPSHOT_EXCLUSIVE_SIZE = "snapshotExclusiveSize";
   private static final String AUDIT_PARAM_SNAPSHOT_EXCLUSIVE_REPL_SIZE = "snapshotExclusiveReplicatedSize";
-  private static final String AUDIT_PARAM_DEEP_CLEANED_DEL_DIR = "deepCleanedDeletedDir";
-  private static final String AUDIT_PARAM_DEEP_CLEANED_DEL_KEY = "deepCleanedDeletedKey";
+  private static final String AUDIT_PARAM_DEEP_CLEAN_DEL_DIR = "deepCleanDeletedDir";
+  private static final String AUDIT_PARAM_DEEP_CLEAN_DEL_KEY = "deepCleanDeletedKey";
   private static final String AUDIT_PARAM_EXCLUSIVE_SIZE_DELTA_FROM_DIR_DEEP_CLEAN =
       "exclusiveSizeDeltaFromDirDeepCleaning";
   private static final String AUDIT_PARAM_EXCLUSIVE_REPL_SIZE_DELTA_FROM_DIR_DEEP_CLEAN =
@@ -77,14 +77,14 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     if (setSnapshotPropertyRequest.hasDeepCleanedDeletedDir()) {
       snapInfo.setDeepCleanedDeletedDir(setSnapshotPropertyRequest
           .getDeepCleanedDeletedDir());
-      auditParams.put(AUDIT_PARAM_DEEP_CLEANED_DEL_DIR, String.valueOf(setSnapshotPropertyRequest
+      auditParams.put(AUDIT_PARAM_DEEP_CLEAN_DEL_DIR, String.valueOf(setSnapshotPropertyRequest
           .getDeepCleanedDeletedDir()));
     }
 
     if (setSnapshotPropertyRequest.hasDeepCleanedDeletedKey()) {
       snapInfo.setDeepClean(setSnapshotPropertyRequest
           .getDeepCleanedDeletedKey());
-      auditParams.put(AUDIT_PARAM_DEEP_CLEANED_DEL_KEY, String.valueOf(setSnapshotPropertyRequest
+      auditParams.put(AUDIT_PARAM_DEEP_CLEAN_DEL_KEY, String.valueOf(setSnapshotPropertyRequest
           .getDeepCleanedDeletedKey()));
     }
 
@@ -147,8 +147,8 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
                   }
                 });
         if (updatedSnapInfo == null) {
-          LOG.error("Snapshot: '{}' doesn't not exist in snapshot table.", snapshotKey);
-          OMException e = new OMException("Snapshot: '{}' doesn't not exist in snapshot table." + snapshotKey
+          LOG.error("Snapshot: '{}' does not exist in snapshot table.", snapshotKey);
+          OMException e = new OMException("Snapshot: '{}' does not exist in snapshot table." + snapshotKey
               + "Request: " + setSnapshotPropertyRequests, FILE_NOT_FOUND);
           AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_SET_PROPERTY,
               null, e));
