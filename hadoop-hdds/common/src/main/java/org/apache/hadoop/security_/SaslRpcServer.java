@@ -205,7 +205,11 @@ public class SaslRpcServer {
                       StandardCharsets.UTF_8).toCharArray();
   }
 
-  /** Splitting fully qualified Kerberos name into parts */
+  /**
+   * Splitting fully qualified Kerberos name into parts.
+   * @param fullName fullName.
+   * @return splitKerberosName.
+   */
   public static String[] splitKerberosName(String fullName) {
     return fullName.split("[/@]");
   }

@@ -34,7 +34,7 @@ public class ClientId {
   private static final int shiftWidth = 8;
   
   /**
-   * Return clientId as byte[]
+   * @return Return clientId as byte[].
    */
   public static byte[] getClientId() {
     UUID uuid = UUID.randomUUID();
@@ -44,7 +44,10 @@ public class ClientId {
     return buf.array();
   }
   
-  /** Convert a clientId byte[] to string */
+  /**
+   * @return Convert a clientId byte[] to string.
+   * @param clientId input clientId.
+   */
   public static String toString(byte[] clientId) {
     // clientId can be null or an empty array
     if (clientId == null || clientId.length == 0) {
@@ -73,7 +76,10 @@ public class ClientId {
     return lsb;
   }
   
-  /** Convert from clientId string byte[] representation of clientId */
+  /**
+   * @return Convert from clientId string byte[] representation of clientId.
+   * @param id input id.
+   */
   public static byte[] toBytes(String id) {
     if (id == null || "".equals(id)) {
       return new byte[0];
