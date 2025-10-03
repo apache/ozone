@@ -254,9 +254,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ (inputs.split && format('{0}-{1}', inputs.script, inputs.split)) || inputs.script }}
-          path: |
-            target/${{ inputs.script }}
-            target/reports/apidocs
+          # please keep path as a single item; move to that directory all files needed in the artifact
+          path: target/${{ inputs.script }}
         continue-on-error: true
 
       # The following steps are hard-coded to be run only for 'build' check,
