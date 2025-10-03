@@ -106,7 +106,11 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     for (KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
       list.add(OmKeyInfo.getFromProtobuf(k));
     }
-    return new RepeatedOmKeyInfo.Builder().setOmKeyInfos(list).build();
+    RepeatedOmKeyInfo.Builder builder = new RepeatedOmKeyInfo.Builder().setOmKeyInfos(list);
+    if (repeatedKeyInfo.hasBucketId()) {
+      builder.setBucketId(repeatedKeyInfo.getBucketId());
+    }
+    return builder.build();
   }
 
   /**
@@ -119,7 +123,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     }
 
     RepeatedKeyInfo.Builder builder = RepeatedKeyInfo.newBuilder()
-        .addAllKeyInfo(list);
+        .addAllKeyInfo(list).setBucketId(bucketId);
     return builder.build();
   }
 
