@@ -80,6 +80,13 @@ public class TestDBConfigFromFile {
   }
 
   @Test
+  public void readFromEmptyFilePath() throws RocksDBException {
+    final DBOptions options = DBConfigFromFile.readDBOptionsFromFile(Paths.get(""));
+    // This has to return a Null, since the path is empty.
+    assertNull(options);
+  }
+
+  @Test
   public void readFromEmptyFile() throws IOException {
     File emptyFile = new File(Paths.get(System.getProperty(DBConfigFromFile.CONFIG_DIR)).toString(), "empty.ini");
     assertTrue(emptyFile.createNewFile());
