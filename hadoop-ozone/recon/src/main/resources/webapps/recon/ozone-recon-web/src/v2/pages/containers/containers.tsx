@@ -18,7 +18,6 @@
 
 import React, { useRef, useState } from "react";
 import moment from "moment";
-import { AxiosError } from "axios";
 import { Card, Row, Tabs } from "antd";
 import { ValueType } from "react-select/src/types";
 
@@ -117,7 +116,7 @@ const Containers: React.FC<{}> = () => {
       setLoading(false)
     }).catch(error => {
       setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
+      showDataFetchError(error);
     });
   }
 

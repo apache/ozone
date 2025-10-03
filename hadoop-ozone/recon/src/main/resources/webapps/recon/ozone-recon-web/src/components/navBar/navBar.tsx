@@ -82,7 +82,7 @@ class NavBar extends React.Component<INavBarProps> {
       this.setState({
         isLoading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 

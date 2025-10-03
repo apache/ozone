@@ -17,42 +17,52 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
 export interface ApiState<T> {
   data: T;
   loading: boolean;
   error: string | null;
   lastUpdated: number | null;
+  success: boolean; // For non-GET requests to indicate successful completion
 }
 
 export interface UseApiDataOptions {
+  method?: HttpMethod;
   retryAttempts?: number;
   retryDelay?: number;
   initialFetch?: boolean;
-  onError?: (error: string) => void;
-};
+  onError?: (error: AxiosError | string | unknown) => void;
+  onSuccess?: (data: any) => void;
+}
 
 export function useApiData<T>(
   url: string,
   defaultValue: T,
   options: UseApiDataOptions = {}
 ): ApiState<T> & {
-  refetch: () => void;
+  execute: (data?: any) => Promise<any>;
+  refetch: () => Promise<any>;
   clearError: () => void;
+  reset: () => void;
 } {
   const {
+    method = 'GET',
     retryAttempts = 3,
     retryDelay = 1000,
-    initialFetch = true,
-    onError
+    initialFetch = method === 'GET', // Only auto-fetch for GET requests
+    onError,
+    onSuccess
   } = options;
 
   const [state, setState] = useState<ApiState<T>>({
     data: defaultValue,
     loading: initialFetch,
     error: null,
-    lastUpdated: null
+    lastUpdated: null,
+    success: false
   });
 
   const controllerRef = useRef<AbortController>();
@@ -61,14 +71,20 @@ export function useApiData<T>(
   
   // Store stable references
   const urlRef = useRef(url);
+  const methodRef = useRef(method);
   const retryAttemptsRef = useRef(retryAttempts);
   const retryDelayRef = useRef(retryDelay);
   const onErrorRef = useRef(onError);
+  const onSuccessRef = useRef(onSuccess);
 
   // Update refs when props change
   useEffect(() => {
     urlRef.current = url;
   }, [url]);
+
+  useEffect(() => {
+    methodRef.current = method;
+  }, [method]);
 
   useEffect(() => {
     retryAttemptsRef.current = retryAttempts;
@@ -82,40 +98,66 @@ export function useApiData<T>(
     onErrorRef.current = onError;
   }, [onError]);
 
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
-  const fetchData = async (isRetry = false) => {
+  const executeRequest = async (requestData?: any, isRetry = false) => {
     if (!isRetry) {
-      setState(prev => ({ ...prev, loading: true, error: null }));
+      setState(prev => ({ ...prev, loading: true, error: null, success: false }));
       retryCountRef.current = 0;
     }
 
-    try {
-      const { request, controller } = AxiosGetHelper(
-        urlRef.current,
-        controllerRef.current,
-        'Request cancelled due to component unmount or new request'
-      );
-      controllerRef.current = controller;
+    // Cancel previous request
+    if (controllerRef.current) {
+      controllerRef.current.abort('New request initiated');
+    }
 
-      const response = await request;
+    // Create new AbortController
+    controllerRef.current = new AbortController();
+
+    try {
+      const config: AxiosRequestConfig = {
+        url: urlRef.current,
+        method: methodRef.current,
+        signal: controllerRef.current.signal,
+      };
+
+      // Add data for non-GET requests
+      if (methodRef.current !== 'GET' && requestData !== undefined) {
+        config.data = requestData;
+      }
+
+      // Add query parameters for GET requests if data is provided as params
+      if (methodRef.current === 'GET' && requestData !== undefined) {
+        config.params = requestData;
+      }
+
+      const response = await axios(config);
       
       setState({
         data: response.data,
         loading: false,
         error: null,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
+        success: true
       });
 
+      if (onSuccessRef.current) {
+        onSuccessRef.current(response.data);
+      }
+
       retryCountRef.current = 0;
+      return response;
     } catch (error: any) {
-      if (error.name === 'CanceledError') {
-        return;
+      if (error.name === 'CanceledError' || error.name === 'AbortError') {
+        return Promise.reject(error);
       }
 
       const errorMessage = error.response?.data?.message ||
                           error.response?.statusText ||
                           error.message ||
-                          `Request failed with status: ${error.response?.status || 'unknown'}`;
+                          `${methodRef.current} request failed with status: ${error.response?.status || 'unknown'}`;
 
       // Clear any existing retry timeout
       if (retryTimeoutRef.current) {
@@ -127,36 +169,53 @@ export function useApiData<T>(
           (!error.response?.status || error.response?.status >= 500)) {
         retryCountRef.current++;
         retryTimeoutRef.current = setTimeout(() => {
-          fetchData(true);
+          executeRequest(requestData, true);
         }, retryDelayRef.current * retryCountRef.current);
-        return;
+        return Promise.reject(error);
       }
 
       if (onErrorRef.current) {
-        onErrorRef.current(errorMessage);
+        onErrorRef.current(error);
       }
 
       setState({
         data: defaultValue,
         loading: false,
         error: errorMessage,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
+        success: false
       });
+
+      return Promise.reject(error);
     }
   };
 
+  const execute = (data?: any) => {
+    return executeRequest(data);
+  };
+
   const refetch = () => {
-    fetchData();
+    return executeRequest();
   };
 
   const clearError = () => {
     setState(prev => ({ ...prev, error: null }));
   };
 
-  // Initial fetch only
+  const reset = () => {
+    setState({
+      data: defaultValue,
+      loading: false,
+      error: null,
+      lastUpdated: null,
+      success: false
+    });
+  };
+
+  // Initial fetch for GET requests only
   useEffect(() => {
-    if (initialFetch) {
-      fetchData();
+    if (initialFetch && methodRef.current === 'GET') {
+      executeRequest();
     }
 
     // Cleanup retry timeout on unmount
@@ -181,7 +240,35 @@ export function useApiData<T>(
 
   return {
     ...state,
+    execute,
     refetch,
-    clearError
+    clearError,
+    reset
   };
+}
+
+// Utility function for manual single requests (for dynamic/on-demand usage)
+export async function fetchData<T>(
+  url: string, 
+  method: HttpMethod = 'GET', 
+  data?: any
+): Promise<T> {
+  const controller = new AbortController();
+  
+  const config: AxiosRequestConfig = {
+    url,
+    method,
+    signal: controller.signal,
+  };
+
+  if (method !== 'GET' && data !== undefined) {
+    config.data = data;
+  }
+
+  if (method === 'GET' && data !== undefined) {
+    config.params = data;
+  }
+
+  const response = await axios(config);
+  return response.data;
 }
