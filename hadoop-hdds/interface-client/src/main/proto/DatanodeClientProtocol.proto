@@ -549,6 +549,7 @@ message SendContainerRequest {
   required bytes data = 3;
   optional int64 checksum = 4;
   optional CopyContainerCompressProto compression = 5;
+  optional int64 size = 6;
 }
 
 message SendContainerResponse {
