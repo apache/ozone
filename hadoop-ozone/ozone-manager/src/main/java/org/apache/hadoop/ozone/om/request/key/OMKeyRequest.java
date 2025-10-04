@@ -46,6 +46,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -1217,20 +1219,20 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param referenceKey OmKeyInfo
    * @param keysToBeFiltered RepeatedOmKeyInfo
    */
-  protected void filterOutBlocksStillInUse(OmKeyInfo referenceKey,
-                                           RepeatedOmKeyInfo keysToBeFiltered) {
+  protected Pair<Map<OmKeyInfo, List<OmKeyLocationInfo>>, Integer> filterOutBlocksStillInUse(OmKeyInfo referenceKey,
+      RepeatedOmKeyInfo keysToBeFiltered) {
 
     LOG.debug("Before block filtering, keysToBeFiltered = {}",
         keysToBeFiltered);
 
     // A HashSet for fast lookup. Gathers all ContainerBlockID entries inside
     // the referenceKey.
-    HashSet<ContainerBlockID> cbIdSet = referenceKey.getKeyLocationVersions()
+    Map<ContainerBlockID, OmKeyLocationInfo> cbIdSet = referenceKey.getKeyLocationVersions()
         .stream()
         .flatMap(e -> e.getLocationList().stream())
-        .map(omKeyLocationInfo ->
-            omKeyLocationInfo.getBlockID().getContainerBlockID())
-        .collect(Collectors.toCollection(HashSet::new));
+        .collect(Collectors.toMap(omKeyLocationInfo -> omKeyLocationInfo.getBlockID().getContainerBlockID(),
+            Function.identity()));
+    Map<OmKeyInfo, List<OmKeyLocationInfo>> filteredOutBlocks = new HashMap<>();
 
     // Pardon the nested loops. ContainerBlockID is 9-layer deep from:
     // keysToBeFiltered               // Layer 0. RepeatedOmKeyInfo
@@ -1249,7 +1251,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Layer 1: List<OmKeyInfo>
     Iterator<OmKeyInfo> iterOmKeyInfo = keysToBeFiltered
         .getOmKeyInfoList().iterator();
-
+    int emptyKeyRemovedCount = 0;
     while (iterOmKeyInfo.hasNext()) {
       // Note with HDDS-8462, each RepeatedOmKeyInfo should have only one entry,
       // so this outer most loop should never be entered twice in each call.
@@ -1283,8 +1285,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
             ContainerBlockID cbId = keyLocationInfo
                 .getBlockID().getContainerBlockID();
 
-            if (cbIdSet.contains(cbId)) {
+            if (cbIdSet.containsKey(cbId)) {
               // Remove this block from oldVerKeyInfo because it is referenced.
+              filteredOutBlocks.computeIfAbsent(oldOmKeyInfo, (k) -> new ArrayList<>()).add(keyLocationInfo);
               iterKeyLocInfo.remove();
               LOG.debug("Filtered out block: {}", cbId);
             }
@@ -1304,6 +1307,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
       // Cleanup when Layer 3 is an empty list
       if (oldOmKeyInfo.getKeyLocationVersions().isEmpty()) {
+        emptyKeyRemovedCount++;
         iterOmKeyInfo.remove();
       }
     }
@@ -1311,6 +1315,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Intentional extra space for alignment
     LOG.debug("After block filtering,  keysToBeFiltered = {}",
         keysToBeFiltered);
+    return Pair.of(filteredOutBlocks, emptyKeyRemovedCount);
   }
 
   protected void validateEncryptionKeyInfo(OmBucketInfo bucketInfo, KeyArgs keyArgs) throws OMException {

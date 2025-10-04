@@ -28,6 +28,7 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -193,36 +194,40 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     // Step 1: Process DeleteBlockGroupResults
     for (DeleteBlockGroupResult result : results) {
-      String deletedKey = result.getObjectKey();
-      if (result.isSuccess()) {
-        // Add key to PurgeKeys list.
-        if (keysToModify == null || !keysToModify.containsKey(deletedKey)) {
-          completePurgedKeys.add(deletedKey);
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Key {} set to be purged from OM DB", deletedKey);
+      String deletedKeyGroup = result.getObjectKey();
+      PurgedKey purgedKey = purgedKeys.get(deletedKeyGroup);
+      if (purgedKey != null) {
+        if (result.isSuccess()) {
+          // Add key to PurgeKeys list.
+          if (keysToModify == null || !keysToModify.containsKey(deletedKeyGroup)) {
+            completePurgedKeys.add(deletedKeyGroup);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Key {} set to be purged from OM DB", deletedKeyGroup);
+            }
+          } else {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("Key {} set to be updated in OM DB, Other versions " +
+                  "of the key that are reclaimable are reclaimed.", deletedKeyGroup);
+            }
           }
-        } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Key {} set to be updated in OM DB, Other versions " +
-                "of the key that are reclaimable are reclaimed.", deletedKey);
+          if (purgedKeys.containsKey(deletedKeyGroup)) {
+            deletedReplSize += purgedKeys.get(deletedKeyGroup).getPurgedBytes();
           }
-        }
-        if (purgedKeys.containsKey(deletedKey)) {
-          deletedReplSize += purgedKeys.get(deletedKey).getPurgedBytes();
-        }
-        deletedCount++;
-      } else {
-        // If the block deletion failed, then the deleted keys should also not be modified and
-        // any other version of the key should also not be purged.
-        failedDeletedKeys.add(deletedKey);
-        purgeSuccess = false;
-        if (LOG.isDebugEnabled()) {
-          LOG.error("Failed Block Delete corresponding to Key {} with block result : {}.", deletedKey,
-              result.getBlockResultList());
+          deletedCount++;
         } else {
-          LOG.error("Failed Block Delete corresponding to Key {}.", deletedKey);
+          // If the block deletion failed, then the deleted keys should also not be modified and
+          // any other version of the key should also not be purged.
+          failedDeletedKeys.add(deletedKeyGroup);
+          purgeSuccess = false;
+          if (LOG.isDebugEnabled()) {
+            LOG.error("Failed Block Delete corresponding to Key {} with block result : {}.", deletedKeyGroup,
+                result.getBlockResultList());
+          } else {
+            LOG.error("Failed Block Delete corresponding to Key {}.", deletedKeyGroup);
+          }
         }
       }
+
     }
     // Filter out the key even if one version of the key purge has failed. This is to prevent orphan blocks, and
     // this needs to be retried.
@@ -267,7 +272,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     OzoneManagerProtocolProtos.DeletedKeys.Builder bucketDeleteKeys = null;
     long purgedBytes = 0;
     long purgedNamespace = 0;
-
+    Map<String, List<PurgedKey>> modifiedKeyPurgedKeys = new HashMap<>();
     while (purgeKeyIndex < purgedKeyList.size() || updateIndex < keysToUpdateList.size() ||
         (renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size())) {
       // 3.1 Purge keys (one at a time)
@@ -287,18 +292,20 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           // Add volume name and bucket name length to the current batch size.
           currSize += bucketDeleteKeys.buildPartial().getSerializedSize();
         }
-        String deletedKey = purgedKey.getBlockGroup().getGroupID();
+        String deletedKey = purgedKey.getDeleteKeyName();
         // Add to purge keys only if there are no other version of key that needs to be retained.
         if (completePurgedKeys.contains(deletedKey)) {
           bucketDeleteKeys.addKeys(deletedKey);
           int estimatedKeySize = ProtobufUtils.computeRepeatedStringSize(deletedKey);
           currSize += estimatedKeySize;
+          if (purgedKey.isCommittedKey()) {
+            purgedBytes += purgedKey.getPurgedBytes();
+            purgedNamespace++;
+          }
+        } else if (purgedKey.isCommittedKey()) {
+          modifiedKeyPurgedKeys.computeIfAbsent(deletedKey, k -> new ArrayList<>()).add(purgedKey);
         }
-        if (purgedKey.isCommittedKey()) {
-          purgedBytes += purgedKey.getPurgedBytes();
-          purgedNamespace++;
-        }
-
+        new RuntimeException("Swaminathan3\t" + deletedKey + "\t" + purgedKey.getPurgedBytes() + "\t" + purgedKey.isCommittedKey()).printStackTrace();
         purgeKeyIndex++;
       } else if (updateIndex < keysToUpdateList.size()) {
         // 3.2 Add keysToUpdate

@@ -1404,12 +1404,9 @@ message DeleteKeyResponse {
 }
 
 message DeletedKeys {
-    required string volumeName = 1;
-    required string bucketName = 2;
+    required string volumeName = 1 [deprecated = true];
+    required string bucketName = 2 [deprecated = true];
     repeated string keys = 3;
-    optional uint64 purgedBytes = 4;
-    optional uint64 purgedNamespace = 5;
-
 }
 
 message PurgeKeysRequest {
@@ -1420,6 +1417,13 @@ message PurgeKeysRequest {
     // previous snapshotID can also be null & this field would be absent in older requests.
     optional NullableUUID expectedPreviousSnapshotID = 4;
     repeated string renamedKeys = 5;
+    repeated BucketPurgeKeysSize bucketPurgeKeysSize = 6;
+}
+
+message BucketPurgeKeysSize {
+  optional BucketNameInfo bucketNameInfo = 1;
+  optional uint64 purgedBytes = 2;
+  optional uint64 purgedNamespace = 3;
 }
 
 message PurgeKeysResponse {

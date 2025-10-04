@@ -826,10 +826,10 @@ class TestKeyDeletingService extends OzoneTestBase {
               return OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(purgeRequest.get().getCmdType())
                   .setStatus(OzoneManagerProtocolProtos.Status.TIMEOUT).build();
             });
-        BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1")
+        BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1/1")
             .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build();
         Map<String, PurgedKey> blockGroups = Collections.singletonMap(blockGroup.getGroupID(), new PurgedKey("vol",
-            "buck", blockGroup, 30, true));
+            "buck", blockGroup, "key1", 30, true));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
         OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
             .setBucketName("buck")

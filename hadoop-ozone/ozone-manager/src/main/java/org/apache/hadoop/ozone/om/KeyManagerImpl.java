@@ -766,6 +766,7 @@ public class KeyManagerImpl implements KeyManager {
           Map<String, PurgedKey> reclaimableKeys = Maps.newHashMap();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
+          int reclaimableKeyCount = 0;
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
@@ -773,10 +774,12 @@ public class KeyManagerImpl implements KeyManager {
               List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
-              BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
+              String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
+              BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(blockGroupName)
                   .addAllBlockIDs(blockIDS).build();
-              reclaimableKeys.put(keyBlocks.getGroupID(), new PurgedKey(info.getVolumeName(), info.getBucketName(),
-                  keyBlocks, OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
+              reclaimableKeys.put(blockGroupName,
+                  new PurgedKey(info.getVolumeName(), info.getBucketName(),
+                  keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);

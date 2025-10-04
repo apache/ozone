@@ -1583,18 +1583,21 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName = UUID.randomUUID().toString();
 
     writeKey(bucket, keyName, ONE, value, valueLength);
-    assertEquals(valueLength,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> valueLength ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     writeKey(bucket, keyName, ONE, value, valueLength);
-    assertEquals(valueLength,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> valueLength ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     // pre-allocate more blocks than needed
     int fakeValueLength = valueLength + blockSize;
     writeKey(bucket, keyName, ONE, value, fakeValueLength);
-    assertEquals(valueLength,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
+      new RuntimeException("Swaminathan1\t" + ozoneManager.getBucketManager().getBucketInfo(volumeName, bucketName).getUsedBytes() + "\t" + ozoneManager.getBucketManager().getBucketInfo(volumeName, bucketName).getSnapshotUsedBytes() + "\t" + valueLength).printStackTrace();
+      return valueLength ==
+          store.getVolume(volumeName).getBucket(bucketName).getUsedBytes();
+    }, 1000, 30000);
 
     bucket.deleteKey(keyName);
     GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L ==
@@ -1677,28 +1680,32 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     OzoneOutputStream out = bucket.createKey(keyName, keyLength,
         repConfig, new HashMap<>());
     // Write a new key and do not update Bucket UsedBytes until commit.
-    assertEquals(0,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0 ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
     out.write(value);
     out.close();
     // After committing the new key, the Bucket UsedBytes must be updated to
     // keyQuota.
-    assertEquals(keyQuota,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> keyQuota ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     out = bucket.createKey(keyName, keyLength, repConfig, new HashMap<>());
     // Overwrite an old key. The Bucket UsedBytes are not updated before the
     // commit. So the Bucket UsedBytes remain unchanged.
-    assertEquals(keyQuota,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> keyQuota ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
     out.write(value);
     out.close();
-    assertEquals(keyQuota,
-        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes());
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> keyQuota ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     bucket.deleteKey(keyName);
-    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == store.getVolume(volumeName)
-            .getBucket(bucketName).getUsedBytes(), 1000, 30000);
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
+//      new RuntimeException("Swaminathan \t" + store.getVolume(volumeName)
+//          .getBucket(bucketName).getUsedBytes()).printStackTrace();
+      return 0L == store.getVolume(volumeName)
+          .getBucket(bucketName).getUsedBytes();
+    }, 1000, 30000);
   }
 
   @ParameterizedTest
@@ -1722,12 +1729,15 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     String keyName2 = UUID.randomUUID().toString();
 
     writeKey(bucket, keyName1, ONE, value, valueLength);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     // Test create a file twice will not increase usedNamespace twice
     writeKey(bucket, keyName1, ONE, value, valueLength);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     writeKey(bucket, keyName2, ONE, value, valueLength);
-    assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 2L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     bucket.deleteKey(keyName1);
     GenericTestUtils.waitFor(
         (CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName, bucketName),
@@ -1743,10 +1753,12 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       String directoryName2 = UUID.randomUUID().toString();
 
       client.createDirectory(volumeName, bucketName, directoryName1);
-      assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+          bucketName), 1000, 30000);
       // Test create a directory twice will not increase usedNamespace twice
       client.createDirectory(volumeName, bucketName, directoryName2);
-      assertEquals(2L, getBucketUsedNamespace(volumeName, bucketName));
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 2L == getBucketUsedNamespace(volumeName,
+          bucketName), 1000, 30000);
 
       if (layout == BucketLayout.LEGACY) {
         handleLegacyBucketDelete(volumeName, bucketName, directoryName1, directoryName2);
@@ -1765,7 +1777,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   }
 
   private void handleLegacyBucketDelete(String volumeName, String bucketName, String dir1, String dir2)
-      throws IOException {
+      throws IOException, InterruptedException, TimeoutException {
     String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
     cluster.getConf().set(FS_DEFAULT_NAME_KEY, rootPath);
     FileSystem fs = FileSystem.get(cluster.getConf());
@@ -1774,17 +1786,21 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     org.apache.hadoop.fs.Path dir2Path = new org.apache.hadoop.fs.Path(OZONE_URI_DELIMITER, dir2);
 
     fs.delete(dir1Path, false);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     fs.delete(dir2Path, false);
-    assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
   }
 
   private void handleNonLegacyBucketDelete(RpcClient client, String volumeName, String bucketName, String dir1,
-      String dir2) throws IOException {
+      String dir2) throws IOException, InterruptedException, TimeoutException {
     client.deleteKey(volumeName, bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(dir1), false);
-    assertEquals(1L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 1L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
     client.deleteKey(volumeName, bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(dir2), false);
-    assertEquals(0L, getBucketUsedNamespace(volumeName, bucketName));
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == getBucketUsedNamespace(volumeName,
+        bucketName), 1000, 30000);
   }
 
   @ParameterizedTest
