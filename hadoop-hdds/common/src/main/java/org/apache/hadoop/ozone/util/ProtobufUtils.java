@@ -46,4 +46,8 @@ public final class ProtobufUtils {
   public static int computeRepeatedStringSize(String value) {
     return CodedOutputStream.computeStringSizeNoTag(value);
   }
+
+  public static int computeLongSizeWithTag(long value) {
+    return CodedOutputStream.computeInt64Size(10, value);
+  }
 }
