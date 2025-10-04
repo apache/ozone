@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class OMClientRequest implements RequestAuditor {
 
-  private static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(OMClientRequest.class);
 
   private OMRequest omRequest;
