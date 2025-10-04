@@ -265,7 +265,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       long remainingBufLimit, KeyManager keyManager,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableDirChecker,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> reclaimableFileChecker,
-      Collection<BucketNameInfo> bucketInfos,
+      Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap,
       UUID expectedPreviousSnapshotId, long rnCnt) throws InterruptedException {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
@@ -273,10 +273,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     int subdirDelNum = 0;
     int subDirRecursiveCnt = 0;
     int consumedSize = 0;
-    Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap =
-        bucketInfos.stream().collect(Collectors.toMap(
-            bucketInfo -> new VolumeBucketId(bucketInfo.getVolumeId(), bucketInfo.getBucketId()),
-            bucketInfo -> bucketInfo, (o1, o2) -> o1));
     while (subDirRecursiveCnt < allSubDirList.size() && remainingBufLimit > 0) {
       try {
         Pair<String, OmKeyInfo> stringOmKeyInfoPair = allSubDirList.get(subDirRecursiveCnt++);
@@ -624,7 +620,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         long subFileNum = 0L;
         int consumedSize = 0;
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
-        Map<Pair<String, String>, BucketNameInfo> bucketNameInfos = new HashMap<>();
+        Map<VolumeBucketId, BucketNameInfo> bucketNameInfos = new HashMap<>();
 
         List<Pair<String, OmKeyInfo>> allSubDirList = new ArrayList<>();
         while (remainingBufLimit > 0) {
@@ -633,18 +629,14 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             break;
           }
           OmKeyInfo deletedDirInfo = pendingDeletedDirInfo.getValue();
-          Pair<String, String> volumeBucketPair = Pair.of(pendingDeletedDirInfo.getValue().getVolumeName(),
-              pendingDeletedDirInfo.getValue().getBucketName());
-          if (!bucketNameInfos.containsKey(volumeBucketPair)) {
-            VolumeBucketId volumeBucketId =
-                keyManager.getMetadataManager().getVolumeBucketIdPairFSO(pendingDeletedDirInfo.getKey());
-            bucketNameInfos.put(volumeBucketPair,
-                BucketNameInfo.newBuilder().setVolumeId(volumeBucketId.getVolumeId())
-                    .setBucketId(volumeBucketId.getBucketId())
-                    .setVolumeName(deletedDirInfo.getVolumeName())
-                    .setBucketName(deletedDirInfo.getBucketName())
-                    .build());
-          }
+          VolumeBucketId volumeBucketId =
+              keyManager.getMetadataManager().getVolumeBucketIdPairFSO(pendingDeletedDirInfo.getKey());
+          bucketNameInfos.computeIfAbsent(volumeBucketId,
+              (k) -> BucketNameInfo.newBuilder().setVolumeId(volumeBucketId.getVolumeId())
+              .setBucketId(volumeBucketId.getBucketId())
+              .setVolumeName(deletedDirInfo.getVolumeName())
+              .setBucketName(deletedDirInfo.getBucketName())
+              .build());
 
           boolean isDirReclaimable = reclaimableDirFilter.apply(pendingDeletedDirInfo);
           Optional<PurgePathRequest> request = prepareDeleteDirRequest(
@@ -669,7 +661,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
             subFileNum, allSubDirList, purgePathRequestList, snapshotTableKey,
             startTime, remainingBufLimit, getOzoneManager().getKeyManager(),
-            reclaimableDirFilter, reclaimableFileFilter, bucketNameInfos.values(), expectedPreviousSnapshotId,
+            reclaimableDirFilter, reclaimableFileFilter, bucketNameInfos, expectedPreviousSnapshotId,
             runCount);
         Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableFileFilter.getExclusiveReplicatedSizeMap();
         Map<UUID, Long> exclusiveSizeMap = reclaimableFileFilter.getExclusiveSizeMap();
