@@ -23,6 +23,8 @@ package org.apache.hadoop.ozone.audit;
  */
 public enum OMSystemAction implements AuditAction {
   STARTUP,
+  LEADER_CHANGE,
+  OPEN_KEY_CLEANUP,
   DIRECTORY_DELETION,
   KEY_DELETION,
   SNAPSHOT_MOVE_DEL_KEYS,
