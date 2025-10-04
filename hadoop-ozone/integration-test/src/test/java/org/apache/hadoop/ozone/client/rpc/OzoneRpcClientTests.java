@@ -4441,7 +4441,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
       verifyReplication(volumeName, bucketName, keyName,
           RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
     }
-
+    ozoneManager.awaitDoubleBufferFlush();
     //Step 4
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())

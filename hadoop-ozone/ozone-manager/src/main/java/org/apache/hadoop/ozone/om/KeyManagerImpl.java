@@ -760,9 +760,9 @@ public class KeyManagerImpl implements KeyManager {
       }
       int currentCount = 0;
       while (delKeyIter.hasNext() && currentCount < count) {
-        RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
         if (kv != null) {
+          RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo(kv.getValue().getBucketId());
           Map<String, PurgedKey> reclaimableKeys = Maps.newHashMap();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();

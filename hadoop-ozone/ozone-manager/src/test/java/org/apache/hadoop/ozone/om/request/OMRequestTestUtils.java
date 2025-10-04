@@ -122,10 +122,9 @@ public final class OMRequestTestUtils {
    * @param omMetadataManager
    * @throws Exception
    */
-  public static void addVolumeAndBucketToDB(String volumeName,
+  public static OmBucketInfo addVolumeAndBucketToDB(String volumeName,
       String bucketName, OMMetadataManager omMetadataManager) throws Exception {
-
-    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
+    return addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager,
         BucketLayout.DEFAULT);
   }
 
@@ -137,10 +136,10 @@ public final class OMRequestTestUtils {
             omMetadataManager.getVolumeKey(volumeName))) {
       addVolumeToDB(volumeName, omMetadataManager);
     }
-    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
-        omMetadataManager.getBucketKey(volumeName, bucketName));
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     if (omBucketInfo == null) {
-      omBucketInfo = addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
+      return addBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
     }
     return omBucketInfo;
   }
@@ -707,11 +706,10 @@ public final class OMRequestTestUtils {
    * @param omMetadataManager
    * @throws Exception
    */
-  public static void addBucketToDB(String volumeName, String bucketName,
+  public static long addBucketToDB(String volumeName, String bucketName,
       OMMetadataManager omMetadataManager) throws Exception {
-
-    addBucketToDB(volumeName, bucketName, omMetadataManager,
-        BucketLayout.DEFAULT);
+    return addBucketToDB(volumeName, bucketName, omMetadataManager,
+        BucketLayout.DEFAULT).getObjectID();
   }
 
   public static OmBucketInfo addBucketToDB(String volumeName,
@@ -719,7 +717,7 @@ public final class OMRequestTestUtils {
       BucketLayout bucketLayout)
       throws Exception {
     return addBucketToDB(omMetadataManager,
-        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+        OmBucketInfo.newBuilder().setVolumeName(volumeName).setObjectID(System.currentTimeMillis())
             .setBucketName(bucketName)
             .setBucketLayout(bucketLayout)
     );
@@ -1005,18 +1003,15 @@ public final class OMRequestTestUtils {
    * Deletes key from Key table and adds it to DeletedKeys table.
    * @return the deletedKey name
    */
-  public static String deleteKey(String ozoneKey,
-      OMMetadataManager omMetadataManager, long trxnLogIndex)
-      throws IOException {
+  public static String deleteKey(String ozoneKey, long bucketId, OMMetadataManager omMetadataManager,
+      long trxnLogIndex) throws IOException {
     // Retrieve the keyInfo
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getDefaultBucketLayout()).get(ozoneKey);
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getDefaultBucketLayout()).get(ozoneKey);
 
     // Delete key from KeyTable and put in DeletedKeyTable
     omMetadataManager.getKeyTable(getDefaultBucketLayout()).delete(ozoneKey);
 
-    RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-        omKeyInfo, trxnLogIndex);
+    RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketId, omKeyInfo, trxnLogIndex);
 
     omMetadataManager.getDeletedTable().put(ozoneKey, repeatedOmKeyInfo);
 
