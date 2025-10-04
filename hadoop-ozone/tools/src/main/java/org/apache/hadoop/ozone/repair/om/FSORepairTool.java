@@ -420,7 +420,7 @@ public class FSORepairTool extends RepairTool {
 
               info("Deleting unreferenced file " + fileKey);
               if (!isDryRun()) {
-                markFileForDeletion(fileKey, fileInfo);
+                markFileForDeletion(bucket, fileKey, fileInfo);
               }
             }
           } else {
@@ -433,12 +433,12 @@ public class FSORepairTool extends RepairTool {
       }
     }
 
-    protected void markFileForDeletion(String fileKey, OmKeyInfo fileInfo) throws IOException {
+    protected void markFileForDeletion(OmBucketInfo bucketInfo, String fileKey, OmKeyInfo fileInfo) throws IOException {
       try (BatchOperation batch = store.initBatchOperation()) {
         fileTable.deleteWithBatch(batch, fileKey);
 
         RepeatedOmKeyInfo originalRepeatedKeyInfo = deletedTable.get(fileKey);
-        RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+        RepeatedOmKeyInfo updatedRepeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketInfo.getObjectID(),
             fileInfo, fileInfo.getUpdateID());
         // NOTE: The FSO code seems to write the open key entry with the whole
         // path, using the object's names instead of their ID. This would only

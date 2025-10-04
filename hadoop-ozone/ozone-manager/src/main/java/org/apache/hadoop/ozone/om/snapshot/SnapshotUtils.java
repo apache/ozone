@@ -244,7 +244,8 @@ public final class SnapshotUtils {
    * @throws IOException
    */
   public static RepeatedOmKeyInfo createMergedRepeatedOmKeyInfoFromDeletedTableEntry(
-      OzoneManagerProtocolProtos.SnapshotMoveKeyInfos snapshotMoveKeyInfos, OMMetadataManager metadataManager) throws
+      OzoneManagerProtocolProtos.SnapshotMoveKeyInfos snapshotMoveKeyInfos, long bucketId,
+      OMMetadataManager metadataManager) throws
       IOException {
     String dbKey = snapshotMoveKeyInfos.getKey();
     List<OmKeyInfo> keyInfoList = new ArrayList<>();
@@ -260,7 +261,7 @@ public final class SnapshotUtils {
     // can happen on om transaction replay on snapshotted rocksdb.
     RepeatedOmKeyInfo result = metadataManager.getDeletedTable().get(dbKey);
     if (result == null) {
-      result = new RepeatedOmKeyInfo(keyInfoList);
+      result = new RepeatedOmKeyInfo(keyInfoList, bucketId);
     } else if (!isSameAsLatestOmKeyInfo(keyInfoList, result)) {
       keyInfoList.forEach(result::addOmKeyInfo);
     }

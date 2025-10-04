@@ -907,7 +907,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * Return bucket info for the specified bucket.
    */
   @Nullable
-  protected OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
+  public static OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
       String volume, String bucket) {
     String bucketKey = omMetadataManager.getBucketKey(volume, bucket);
 
@@ -1134,13 +1134,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * Prepare key for deletion service on overwrite.
    *
    * @param keyToDelete OmKeyInfo of a key to be in deleteTable
+   * @param bucketId
    * @param trxnLogIndex
    * @return Old keys eligible for deletion.
    * @throws IOException
    */
   protected RepeatedOmKeyInfo getOldVersionsToCleanUp(
-      @Nonnull OmKeyInfo keyToDelete, long trxnLogIndex) throws IOException {
-    return OmUtils.prepareKeyForDelete(keyToDelete, trxnLogIndex);
+      @Nonnull OmKeyInfo keyToDelete, long bucketId, long trxnLogIndex) throws IOException {
+    return OmUtils.prepareKeyForDelete(bucketId, keyToDelete, trxnLogIndex);
   }
 
   protected OzoneLockStrategy getOzoneLockStrategy(OzoneManager ozoneManager) {
@@ -1176,7 +1177,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   protected static Map<String, RepeatedOmKeyInfo> addKeyInfoToDeleteMap(OzoneManager om,
-      long trxnLogIndex, String ozoneKey, OmKeyInfo keyInfo, Map<String, RepeatedOmKeyInfo> deleteMap) {
+      long trxnLogIndex, String ozoneKey, long bucketId, OmKeyInfo keyInfo, Map<String, RepeatedOmKeyInfo> deleteMap) {
     if (keyInfo == null) {
       return deleteMap;
     }
@@ -1185,7 +1186,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (deleteMap == null) {
       deleteMap = new HashMap<>();
     }
-    deleteMap.computeIfAbsent(delKeyName, key -> new RepeatedOmKeyInfo())
+    deleteMap.computeIfAbsent(delKeyName, key -> new RepeatedOmKeyInfo(bucketId))
         .addOmKeyInfo(keyInfo);
     return deleteMap;
   }

@@ -101,7 +101,7 @@ public class OMKeyDeleteResponseWithFSO extends OMKeyDeleteResponse {
       deletedKey = omMetadataManager.getOzoneDeletePathKey(
           omKeyInfo.getObjectID(), deletedKey);
       addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
-          ozoneDbKey, deletedKey, omKeyInfo);
+          ozoneDbKey, deletedKey, omKeyInfo, getOmBucketInfo().getObjectID());
     }
 
     // update bucket usedBytes.

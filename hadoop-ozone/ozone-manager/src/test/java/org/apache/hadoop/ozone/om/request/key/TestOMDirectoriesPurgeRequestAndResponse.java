@@ -96,6 +96,9 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     // Add volume, bucket and key entries to OM DB.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket,
         omMetadataManager);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+        bucketKey);
 
     List<OmKeyInfo> deletedKeyNames = new ArrayList<>(numKeys);
     List<String> ozoneKeyNames = new ArrayList<>(numKeys);
@@ -115,7 +118,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
     for (String ozoneKey : ozoneKeyNames) {
       OMRequestTestUtils.deleteKey(
-          ozoneKey, omMetadataManager, trxnIndex++);
+          ozoneKey, omBucketInfo.getObjectID(), omMetadataManager, trxnIndex++);
     }
 
     return deletedKeyNames;

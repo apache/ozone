@@ -234,6 +234,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 .map(k -> k.getProtobuf(ClientVersion.CURRENT_VERSION))
                 .collect(Collectors.toList());
         keyToUpdate.addAllKeyInfos(keyInfos);
+        keyToUpdate.setBucketId(keyToModify.getValue().getBucketId());
         keysToUpdateList.add(keyToUpdate.build());
       }
     }
