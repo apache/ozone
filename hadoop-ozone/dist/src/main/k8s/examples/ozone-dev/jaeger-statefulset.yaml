@@ -32,10 +32,10 @@ spec:
         component: jaeger
     spec:
       containers:
-        - name: jaeger
-          image: jaegertracing/jaeger:latest
-          ports:
-            - containerPort: 16686
-              name: web
-            - containerPort: 4317
-              name: otlp-grpc
+      - name: jaeger
+        image: jaegertracing/jaeger:latest
+        ports:
+        - containerPort: 16686
+          name: web
+        - containerPort: 4317
+          name: otlp-grpc
