@@ -629,8 +629,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
             break;
           }
           OmKeyInfo deletedDirInfo = pendingDeletedDirInfo.getValue();
-          Pair<String, String> volumeBucketPair = Pair.of(pendingDeletedDirInfo.getValue().getVolumeName(),
-              pendingDeletedDirInfo.getValue().getBucketName());
           VolumeBucketId volumeBucketId =
               keyManager.getMetadataManager().getVolumeBucketIdPairFSO(pendingDeletedDirInfo.getKey());
           bucketNameInfos.computeIfAbsent(volumeBucketId,
