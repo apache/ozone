@@ -15,7 +15,15 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.s3web;
+
+import org.glassfish.jersey.server.ResourceConfig;
+
 /**
- * This package contains the top level generic classes of s3 secret gateway.
+ * JaxRS resource definition.
  */
-package org.apache.hadoop.ozone.s3secret;
+public class Application extends ResourceConfig {
+  public Application() {
+    packages(true, "org.apache.hadoop.ozone.s3web");
+  }
+}
