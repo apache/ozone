@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager.VolumeBucketId;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -56,6 +58,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketNameInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeDirectoriesRequest;
@@ -131,9 +134,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     }
     try {
       int numSubDirMoved = 0, numSubFilesMoved = 0, numDirsDeleted = 0;
+      Map<VolumeBucketId, BucketNameInfo> volumeBucketIdMap = purgeDirsRequest.getBucketNameInfosList().stream()
+          .collect(Collectors.toMap(bucketNameInfo ->
+                  new VolumeBucketId(bucketNameInfo.getVolumeId(), bucketNameInfo.getBucketId()),
+              Function.identity()));
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
-        for (OzoneManagerProtocolProtos.KeyInfo key :
-            path.getMarkDeletedSubDirsList()) {
+        for (OzoneManagerProtocolProtos.KeyInfo key : path.getMarkDeletedSubDirsList()) {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
           
           String pathKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
@@ -162,8 +168,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
           }
         }
 
-        for (OzoneManagerProtocolProtos.KeyInfo key :
-            path.getDeletedSubFilesList()) {
+        for (OzoneManagerProtocolProtos.KeyInfo key : path.getDeletedSubFilesList()) {
           OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
 
           String pathKey = omMetadataManager.getOzonePathKey(path.getVolumeId(),
@@ -210,16 +215,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         }
         if (path.hasDeletedDir()) {
           deletedDirNames.add(path.getDeletedDir());
-          // Using deletedDirInfo since there is no reverse mapping for volumeId and bucketId.
-          OMMetadataManager metadataManager = fromSnapshotInfo == null ? ozoneManager.getMetadataManager()
-              : supplier.get().getMetadataManager();
-          OmKeyInfo deletedDirInfo = metadataManager.getDeletedDirTable().get(path.getDeletedDir());
-          if (deletedDirInfo != null) {
-            OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
-                deletedDirInfo.getVolumeName(), deletedDirInfo.getBucketName());
-            if (omBucketInfo != null) {
-              omBucketInfo.purgeSnapshotUsedNamespace(1);
-            }
+          BucketNameInfo bucketNameInfo = volumeBucketIdMap.get(new VolumeBucketId(path.getVolumeId(),
+              path.getBucketId()));
+          OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
+              bucketNameInfo.getVolumeName(), bucketNameInfo.getBucketName());
+          if (omBucketInfo != null && omBucketInfo.getObjectID() == path.getBucketId()) {
+            omBucketInfo.purgeSnapshotUsedNamespace(1);
           }
           numDirsDeleted++;
         }
