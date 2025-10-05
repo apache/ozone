@@ -217,8 +217,7 @@ public abstract class TestObjectStore implements NonHATests.TestCase {
   private void createLinkBucket(OzoneVolume sourceVolume, String sourceBucket,
                                 String linkBucket) throws IOException {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
-    builder.setBucketLayout(BucketLayout.DEFAULT)
-        .setSourceVolume(sourceVolume.getName())
+    builder.setSourceVolume(sourceVolume.getName())
         .setSourceBucket(sourceBucket);
     sourceVolume.createBucket(linkBucket, builder.build());
   }
