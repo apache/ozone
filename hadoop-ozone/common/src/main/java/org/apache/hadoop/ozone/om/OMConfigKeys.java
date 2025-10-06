@@ -441,7 +441,8 @@ public final class OMConfigKeys {
   public static final String OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL =
       "ozone.snapshot.defrag.service.interval";
   public static final String
-      OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL_DEFAULT = "60s";
+      OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL_DEFAULT = "-1";
+  // TODO: Disabled by default. Do not enable by default until upgrade handling is complete.
 
   public static final String
       OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT =
