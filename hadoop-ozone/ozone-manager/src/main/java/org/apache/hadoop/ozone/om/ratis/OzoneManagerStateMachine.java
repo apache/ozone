@@ -187,7 +187,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManager.omHAMetricsInit(newLeaderId.toString());
 
     Map<String, String> auditParams = new LinkedHashMap<>();
-    auditParams.put(AUDIT_PARAM_PREVIOUS_LEADER, String.valueOf(actualPreviousLeader));
+    auditParams.put(AUDIT_PARAM_PREVIOUS_LEADER,
+        actualPreviousLeader != null ? String.valueOf(actualPreviousLeader) : "NONE");
     auditParams.put(AUDIT_PARAM_NEW_LEADER, String.valueOf(newLeaderId));
     AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.LEADER_CHANGE, auditParams));
 

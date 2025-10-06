@@ -149,7 +149,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     }
   }
 
-  private void updateOpenKeyTableCache(OzoneManager ozoneManager,
+  protected void updateOpenKeyTableCache(OzoneManager ozoneManager,
       long trxnLogIndex, OpenKeyBucket keysPerBucket,
       Map<String, OmKeyInfo> deletedOpenKeys) throws IOException {
 
