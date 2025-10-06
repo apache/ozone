@@ -34,15 +34,14 @@ import picocli.CommandLine.Command;
 
 /**
  * Handles {@code ozone debug datanode container checksum} command.
- * Displays the unserialized version of a container checksum tree file in JSON format.
+ * Displays the deserialized version of a container checksum tree file in JSON format.
  */
 @Command(
     name = "checksum",
     description = "Display container checksum tree file in JSON format")
 public class ChecksumSubcommand implements Callable<Void> {
 
-  @CommandLine.Option(names = {"--tree", "-t"},
-      required = true,
+  @CommandLine.Parameters(index = "0", arity = "1",
       description = "Path to the container checksum tree file (.tree)")
   private String treeFilePath;
 
@@ -58,36 +57,25 @@ public class ChecksumSubcommand implements Callable<Void> {
   public Void call() throws Exception {
     File treeFile = new File(treeFilePath);
     if (!treeFile.exists()) {
-      System.err.println("Error: Tree file does not exist: " + treeFilePath);
       throw new RuntimeException("Tree file does not exist: " + treeFilePath);
     }
 
     try {
       ContainerProtos.ContainerChecksumInfo checksumInfo = readChecksumInfo(treeFile);
-      ChecksumInfoWrapper wrapper = new ChecksumInfoWrapper(checksumInfo, treeFilePath);
+      ChecksumInfoWrapper wrapper = new ChecksumInfoWrapper(checksumInfo);
       
       try (SequenceWriter writer = JsonUtils.getStdoutSequenceWriter()) {
         writer.write(wrapper);
         writer.flush();
       }
       System.out.println();
-      System.out.flush();
     } catch (IOException e) {
-      System.err.println("Error reading tree file: " + getExceptionMessage(e));
       throw new RuntimeException("Failed to read tree file: " + treeFilePath, e);
     } catch (Exception e) {
-      System.err.println("Error processing tree file: " + getExceptionMessage(e));
       throw new RuntimeException("Failed to process tree file: " + treeFilePath, e);
     }
 
     return null;
-  }
-
-  /**
-   * Extract clean exception message without stack trace for user display.
-   */
-  private String getExceptionMessage(Exception ex) {
-    return ex.getMessage() != null ? ex.getMessage().split("\n", 2)[0] : ex.getClass().getSimpleName();
   }
 
   /**
@@ -104,22 +92,16 @@ public class ChecksumSubcommand implements Callable<Void> {
    */
   private static class ChecksumInfoWrapper {
     private final long containerID;
-    private final String filePath;
     private final ContainerMerkleTreeWrapper containerMerkleTree;
 
-    ChecksumInfoWrapper(ContainerProtos.ContainerChecksumInfo checksumInfo, String filePath) {
+    ChecksumInfoWrapper(ContainerProtos.ContainerChecksumInfo checksumInfo) {
       this.containerID = checksumInfo.getContainerID();
-      this.filePath = filePath;
       this.containerMerkleTree = checksumInfo.hasContainerMerkleTree() ? 
           new ContainerMerkleTreeWrapper(checksumInfo.getContainerMerkleTree()) : null;
     }
 
     public long getContainerID() {
       return containerID;
-    }
-
-    public String getFilePath() {
-      return filePath;
     }
 
     public ContainerMerkleTreeWrapper getContainerMerkleTree() {
@@ -167,12 +149,8 @@ public class ChecksumSubcommand implements Callable<Void> {
       this.deleted = blockTree.getDeleted();
       this.dataChecksum = blockTree.hasDataChecksum() ? blockTree.getDataChecksum() : 0L;
       this.chunkMerkleTrees = new ArrayList<>();
-      
-      // Only include chunk trees if block is not deleted
-      if (!deleted) {
-        for (ContainerProtos.ChunkMerkleTree chunkTree : blockTree.getChunkMerkleTreeList()) {
-          this.chunkMerkleTrees.add(new ChunkMerkleTreeWrapper(chunkTree));
-        }
+      for (ContainerProtos.ChunkMerkleTree chunkTree : blockTree.getChunkMerkleTreeList()) {
+        this.chunkMerkleTrees.add(new ChunkMerkleTreeWrapper(chunkTree));
       }
     }
 
