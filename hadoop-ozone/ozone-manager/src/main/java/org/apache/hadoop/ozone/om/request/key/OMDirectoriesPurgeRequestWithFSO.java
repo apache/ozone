@@ -240,13 +240,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   /**
    * Helper class to hold processed key information.
    */
-  @SuppressWarnings("visibilitymodifier")
   private static class ProcessedKeyInfo {
-    final OmKeyInfo keyInfo;
-    final String deleteKey;
-    final String volumeName;
-    final String bucketName;
-    final Pair<String, String> volBucketPair;
+    private final OmKeyInfo keyInfo;
+    private final String deleteKey;
+    private final String volumeName;
+    private final String bucketName;
+    private final Pair<String, String> volBucketPair;
 
     ProcessedKeyInfo(OmKeyInfo keyInfo, String deleteKey, String volumeName, String bucketName,
                      Pair<String, String> volBucketPair) {
