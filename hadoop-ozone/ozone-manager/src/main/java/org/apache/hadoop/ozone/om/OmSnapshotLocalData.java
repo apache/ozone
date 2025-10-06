@@ -123,24 +123,24 @@ public abstract class OmSnapshotLocalData {
   }
 
   /**
-   * Sets the last compaction time, in epoch milliseconds.
-   * @param lastDefragTime Timestamp of the last compaction
+   * Sets the last defrag time, in epoch milliseconds.
+   * @param lastDefragTime Timestamp of the last defrag
    */
   public void setLastDefragTime(Long lastDefragTime) {
     this.lastDefragTime = lastDefragTime;
   }
 
   /**
-   * Returns whether the snapshot needs compaction.
-   * @return true if the snapshot needs compaction, false otherwise
+   * Returns whether the snapshot needs defrag.
+   * @return true if the snapshot needs defrag, false otherwise
    */
   public boolean getNeedsDefrag() {
     return needsDefrag;
   }
 
   /**
-   * Sets whether the snapshot needs compaction.
-   * @param needsDefrag true if the snapshot needs compaction, false otherwise
+   * Sets whether the snapshot needs defrag.
+   * @param needsDefrag true if the snapshot needs defrag, false otherwise
    */
   public void setNeedsDefrag(boolean needsDefrag) {
     this.needsDefrag = needsDefrag;
