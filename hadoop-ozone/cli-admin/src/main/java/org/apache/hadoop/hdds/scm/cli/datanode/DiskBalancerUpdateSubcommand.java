@@ -70,7 +70,7 @@ public class DiskBalancerUpdateSubcommand extends ScmSubcommand {
             parallelThread, stopAfterDiskEven, commonOptions.getSpecifiedDatanodes());
 
     if (errors.isEmpty()) {
-      System.out.println("Update DiskBalancer Configuration on datanode(s):\n" +
+      System.out.println("Update DiskBalancer Configuration on datanode(s) " +
           commonOptions.getHostString());
     } else {
       for (DatanodeAdminError error : errors) {

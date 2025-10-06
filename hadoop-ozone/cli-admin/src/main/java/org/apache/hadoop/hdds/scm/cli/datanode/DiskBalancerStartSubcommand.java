@@ -70,7 +70,7 @@ public class DiskBalancerStartSubcommand extends ScmSubcommand {
             commonOptions.getSpecifiedDatanodes());
 
     if (errors.isEmpty()) {
-      System.out.println("Start DiskBalancer on datanode(s):\n" +
+      System.out.println("Starting DiskBalancer on datanode(s) " +
           commonOptions.getHostString());
     } else {
       for (DatanodeAdminError error : errors) {

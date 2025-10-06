@@ -258,6 +258,16 @@ public class DiskBalancerManager {
     return errors;
   }
 
+  /**
+   * Checks if the datanode is in an optimal state for disk balancing operations.
+   * A datanode is considered to be in optimal state when it has both:
+   * - NodeOperationalState.IN_SERVICE(not decommissioning, decommissioned, or in maintenance)
+   * - NodeState.HEALTHY(not stale, dead, or readonly)
+   *
+   * @param dn the DatanodeDetails to check
+   * @param errors list to add any error messages if the datanode is not in optimal state
+   * @return true if the datanode is in optimal state (IN_SERVICE and HEALTHY), false otherwise
+   */
   private boolean isDatanodeInOptimalState(DatanodeDetails dn,
       List<DatanodeAdminError> errors) throws NodeNotFoundException {
     NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
