@@ -50,9 +50,9 @@ Latest release artifacts (source release and binary packages) are [available](ht
 
 ## Quick start
 
-### Run Ozone from Docker Compose
+### Run Ozone with Docker Compose
 
-The easiest way to start a cluster with docker is to use docker compose:
+The easiest way to start a cluster with docker is by using Docker Compose:
 
 - Obtain Ozone’s sample Docker Compose configuration:
 ```bash
@@ -63,6 +63,8 @@ curl -O https://raw.githubusercontent.com/apache/ozone-docker/refs/heads/latest/
 ```bash
 docker compose up -d --scale datanode=3
 ```
+
+- Note: By default, the cluster will be started with replication factor set to 1. It can be changed by setting the environment variable `OZONE_REPLICATION_FACTOR` to the desired value.
 
 And you can use AWS S3 cli:
 
