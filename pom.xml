@@ -37,9 +37,9 @@
     <aspectj.java21.version>1.9.24</aspectj.java21.version>
     <!-- Default aspectj version for java8 -->
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.5</assertj.version>
+    <assertj.version>3.27.6</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.33.9</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.35.0</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.81</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -91,7 +91,7 @@
     <excluded-test-groups>unhealthy</excluded-test-groups>
     <exec-maven-plugin.version>3.5.1</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
-    <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
+    <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
     <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
     <gson.version>2.13.1</gson.version>
     <guava.version>33.5.0-jre</guava.version>
@@ -135,10 +135,10 @@
     <json-simple.version>1.1.1</json-simple.version>
     <jsp-api.version>2.1</jsp-api.version>
     <jsr311-api.version>1.1.1</jsr311-api.version>
-    <junit5.version>5.13.4</junit5.version>
+    <junit5.version>5.14.0</junit5.version>
     <kerby.version>1.0.1</kerby.version>
     <kotlin.version>1.9.25</kotlin.version>
-    <license-maven-plugin.version>2.6.0</license-maven-plugin.version>
+    <license-maven-plugin.version>2.7.0</license-maven-plugin.version>
     <log4j2.version>2.25.0</log4j2.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
     <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
@@ -177,7 +177,7 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentelemetry.version>1.54.0</opentelemetry.version>
+    <opentelemetry.version>1.54.1</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.release>Joshua Tree</ozone.release>
     <ozone.version>2.1.0-SNAPSHOT</ozone.version>
@@ -233,7 +233,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.4</zookeeper.version>
-    <zstd-jni.version>1.5.7-4</zstd-jni.version>
+    <zstd-jni.version>1.5.7-5</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
@@ -1851,6 +1851,11 @@
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
+            <excludePackageNames>org.apache.hadoop.hdds.protocol.datanode.proto:org.apache.hadoop.hdds.protocol.proto:org.apache.hadoop.hdds.protocol.proto3:org.apache.hadoop.hdds.protocol.scm.proto:org.apache.hadoop.ozone.protocol.proto:org.apache.hadoop.ozone.protocol.proto3:org.apache.hadoop.ozone.security.proto:org.apache.hadoop.ozone.security.proto3:org.apache.hadoop.ozone.storage.proto:org.apache.ozone.recon.schema.generated:org.apache.ozone.recon.schema.generated.tables</excludePackageNames>
+            <sourceFileExcludes>
+              <exclude>**/package-info.java</exclude>
+              <exclude>**/org/apache/ozone/recon/schema/generated/tables/**/*.java</exclude>
+            </sourceFileExcludes>
             <doclint>none</doclint>
             <notimestamp>true</notimestamp>
           </configuration>
@@ -2013,6 +2018,17 @@
                     <reason>Disable with @Unhealthy or @Slow instead (see HDDS-9276)</reason>
                     <bannedImports>
                       <bannedImport>org.junit.jupiter.api.Disabled</bannedImport>
+                    </bannedImports>
+                    <excludedSourceRoots>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
+                      <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
+                    </excludedSourceRoots>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Prefer JDK built-in</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.hadoop.HadoopIllegalArgumentException</bannedImport>
                     </bannedImports>
                     <excludedSourceRoots>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>

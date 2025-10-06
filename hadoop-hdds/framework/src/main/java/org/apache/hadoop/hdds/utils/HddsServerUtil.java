@@ -676,7 +676,7 @@ public final class HddsServerUtil {
     final String className = clazz.getSimpleName();
 
     if (log.isInfoEnabled()) {
-      log.info(createStartupShutdownMessage(versionInfo, className, hostname,
+      log.info(createStartupMessage(versionInfo, className, hostname,
           args, HddsUtils.processForLogging(conf)));
     }
 
@@ -716,19 +716,18 @@ public final class HddsServerUtil {
    * @param args Command arguments
    * @return a string to log.
    */
-  public static String createStartupShutdownMessage(VersionInfo versionInfo,
+  private static String createStartupMessage(VersionInfo versionInfo,
       String className, String hostname, String[] args,
       Map<String, String> conf) {
     return toStartupShutdownString("STARTUP_MSG: ",
         "Starting " + className,
-        "  host = " + hostname,
-        "  args = " + (args != null ? Arrays.asList(args) : new ArrayList<>()),
-        "  version = " + versionInfo.getVersion(),
+        "       host = " + hostname,
+        "    version = " + versionInfo.getVersion(),
+        "      build = " + versionInfo.getUrl() + "/" + versionInfo.getRevision(),
+        "       java = " + System.getProperty("java.version"),
+        "       args = " + (args != null ? Arrays.asList(args) : new ArrayList<>()),
         "  classpath = " + System.getProperty("java.class.path"),
-        "  build = " + versionInfo.getUrl() + "/"
-            + versionInfo.getRevision(),
-        "  java = " + System.getProperty("java.version"),
-        "  conf = " + conf);
+        "       conf = " + conf);
   }
 
 }
