@@ -644,7 +644,7 @@ public class OzoneManagerServiceProviderImpl
         long deltaApplyDuration = Time.monotonicNow() - deltaApplyStartTime;
         reconSyncMetrics.updateDeltaApplyDuration(deltaApplyDuration);
 
-      } catch (Exception e) {
+      } catch (RocksDBException | IOException e) {
         // Track delta apply failures
         reconSyncMetrics.incrDeltaApplyFailures();
         throw e;
