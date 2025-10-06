@@ -82,9 +82,7 @@ public final class OzoneVersionInfo {
         "Source code repository " + OZONE_VERSION_INFO.getUrl() + " -r " +
             OZONE_VERSION_INFO.getRevision());
     System.out.println(
-        "Compiled with protoc " + OZONE_VERSION_INFO.getHadoopProtoc2Version() +
-            ", " + OZONE_VERSION_INFO.getGrpcProtocVersion() +
-            " and " + OZONE_VERSION_INFO.getHadoopProtoc3Version());
+        "Compiled with protoc " + OZONE_VERSION_INFO.getProtoVersions());
     System.out.println(
         "From source with checksum " + OZONE_VERSION_INFO.getSrcChecksum());
     System.out.println(
