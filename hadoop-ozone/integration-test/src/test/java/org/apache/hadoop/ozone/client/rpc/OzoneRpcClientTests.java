@@ -1593,11 +1593,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     // pre-allocate more blocks than needed
     int fakeValueLength = valueLength + blockSize;
     writeKey(bucket, keyName, ONE, value, fakeValueLength);
-    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
-      new RuntimeException("Swaminathan1\t" + ozoneManager.getBucketManager().getBucketInfo(volumeName, bucketName).getUsedBytes() + "\t" + ozoneManager.getBucketManager().getBucketInfo(volumeName, bucketName).getSnapshotUsedBytes() + "\t" + valueLength).printStackTrace();
-      return valueLength ==
-          store.getVolume(volumeName).getBucket(bucketName).getUsedBytes();
-    }, 1000, 30000);
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> valueLength ==
+        store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     bucket.deleteKey(keyName);
     GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L ==
@@ -1700,12 +1697,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         store.getVolume(volumeName).getBucket(bucketName).getUsedBytes(), 1000, 30000);
 
     bucket.deleteKey(keyName);
-    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> {
-//      new RuntimeException("Swaminathan \t" + store.getVolume(volumeName)
-//          .getBucket(bucketName).getUsedBytes()).printStackTrace();
-      return 0L == store.getVolume(volumeName)
-          .getBucket(bucketName).getUsedBytes();
-    }, 1000, 30000);
+    GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () -> 0L == store.getVolume(volumeName)
+        .getBucket(bucketName).getUsedBytes(), 1000, 30000);
   }
 
   @ParameterizedTest

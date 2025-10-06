@@ -346,7 +346,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           for (OmKeyInfo olderKeyVersions : oldVerKeyInfo.getOmKeyInfoList()) {
             olderKeyVersions.setCommittedKeyDeletedFlag(true);
             totalSize += sumBlockLengths(olderKeyVersions);
-            new RuntimeException("Swaminathan4\t" + delKeyName + "\t" + sumBlockLengths(olderKeyVersions)).printStackTrace();
             totalNamespace += 1;
           }
         }

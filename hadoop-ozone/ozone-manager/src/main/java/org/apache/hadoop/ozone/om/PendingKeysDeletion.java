@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -65,15 +64,17 @@ public class PendingKeysDeletion {
   public static class PurgedKey {
     private final String volume;
     private final String bucket;
+    private final long bucketId;
     private final BlockGroup blockGroup;
     private final long purgedBytes;
     private final boolean isCommittedKey;
     private final String deleteKeyName;
 
-    public PurgedKey(String volume, String bucket, BlockGroup group, String deleteKeyName, long purgedBytes,
-        boolean isCommittedKey) {
+    public PurgedKey(String volume, String bucket, long bucketId, BlockGroup group, String deleteKeyName,
+        long purgedBytes, boolean isCommittedKey) {
       this.volume = volume;
       this.bucket = bucket;
+      this.bucketId = bucketId;
       this.blockGroup = group;
       this.purgedBytes = purgedBytes;
       this.isCommittedKey = isCommittedKey;
@@ -96,6 +97,10 @@ public class PendingKeysDeletion {
       return bucket;
     }
 
+    public long getBucketId() {
+      return bucketId;
+    }
+
     public boolean isCommittedKey() {
       return isCommittedKey;
     }
@@ -110,6 +115,7 @@ public class PendingKeysDeletion {
           "blockGroup=" + blockGroup +
           ", volume='" + volume + '\'' +
           ", bucket='" + bucket + '\'' +
+          ", bucketId=" + bucketId +
           ", purgedBytes=" + purgedBytes +
           ", isCommittedKey=" + isCommittedKey +
           ", deleteKeyName='" + deleteKeyName + '\'' +

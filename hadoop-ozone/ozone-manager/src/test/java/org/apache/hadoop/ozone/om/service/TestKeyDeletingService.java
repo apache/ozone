@@ -829,7 +829,7 @@ class TestKeyDeletingService extends OzoneTestBase {
         BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1/1")
             .addAllBlockIDs(Collections.singletonList(new BlockID(1, 1))).build();
         Map<String, PurgedKey> blockGroups = Collections.singletonMap(blockGroup.getGroupID(), new PurgedKey("vol",
-            "buck", blockGroup, "key1", 30, true));
+            "buck", 1, blockGroup, "key1", 30, true));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
         OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
             .setBucketName("buck")

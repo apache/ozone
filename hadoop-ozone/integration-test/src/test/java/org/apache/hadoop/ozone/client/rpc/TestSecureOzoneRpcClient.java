@@ -26,7 +26,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
-import static org.apache.hadoop.ozone.om.request.key.OMKeyRequest.sumBlockLengths;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -74,16 +73,12 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -320,17 +315,8 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
             (CheckedSupplier<Boolean, ? extends Exception>) () -> 1 == volume.getBucket(bucketName).getUsedNamespace(),
             1000, 30000);
         GenericTestUtils.waitFor(
-            (CheckedSupplier<Boolean, ? extends Exception>) () -> {
-              OmBucketInfo bucketInfo = getCluster().getOzoneManager().getBucketManager().getBucketInfo(volumeName,
-                  bucketName);
-              OmKeyInfo keyInfo =
-                  getCluster().getOzoneManager().getKeyManager().getKeyInfo(new OmKeyArgs.Builder().setKeyName(keyName).setBucketName(bucketName).setVolumeName(volumeName).build(), new ResolvedBucket(volumeName, bucketName, bucketInfo), "");
-//              System.out.println("Swaminathan \t" + volume.getBucket(bucketName).getUsedBytes() + "\t" + dataSize * ReplicationFactor.THREE.getValue() + "\t" + bucketInfo.getUsedBytes() + "\t" + bucketInfo.getQuotaInBytes() + "\t" + bucketInfo.getUsedNamespace() + "\t" + bucketInfo.getSnapshotUsedBytes() + "\t" +
-//                  keyInfo.getReplicatedSize() + "\t" + sumBlockLengths(keyInfo));
-
-              return dataSize * ReplicationFactor.THREE.getValue()
-                  == volume.getBucket(bucketName).getUsedBytes();
-            }, 1000, 30000);
+            (CheckedSupplier<Boolean, ? extends Exception>) () -> dataSize * ReplicationFactor.THREE.getValue()
+                == volume.getBucket(bucketName).getUsedBytes(), 1000, 30000);
         // check unused pre-allocated blocks are reclaimed
         Table<String, RepeatedOmKeyInfo> deletedTable =
             getCluster().getOzoneManager().getMetadataManager().getDeletedTable();

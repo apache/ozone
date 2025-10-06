@@ -766,6 +766,7 @@ public class KeyManagerImpl implements KeyManager {
           Map<String, PurgedKey> reclaimableKeys = Maps.newHashMap();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
+          long bucketId = infoList.getBucketId();
           int reclaimableKeyCount = 0;
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
 
@@ -778,7 +779,7 @@ public class KeyManagerImpl implements KeyManager {
               BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(blockGroupName)
                   .addAllBlockIDs(blockIDS).build();
               reclaimableKeys.put(blockGroupName,
-                  new PurgedKey(info.getVolumeName(), info.getBucketName(),
+                  new PurgedKey(info.getVolumeName(), info.getBucketName(), bucketId,
                   keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
               currentCount++;
             } else {

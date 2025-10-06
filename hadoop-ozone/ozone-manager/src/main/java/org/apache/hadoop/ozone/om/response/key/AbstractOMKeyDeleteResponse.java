@@ -99,6 +99,7 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
    * @param omKeyInfo
    * @throws IOException
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected void addDeletionToBatch(
       OMMetadataManager omMetadataManager,
       BatchOperation batchOperation,

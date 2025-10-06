@@ -283,7 +283,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   public void incrUsedBytes(long bytes) {
     this.usedBytes += bytes;
-    new RuntimeException("Swaminathan incr used bytes\t" + this.usedBytes + "\t" + bytes).printStackTrace();
   }
 
   public void decrUsedBytes(long bytes, boolean increasePendingDeleteBytes) {
@@ -291,7 +290,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (increasePendingDeleteBytes) {
       incrSnapshotUsedBytes(bytes);
     }
-    new RuntimeException("Swaminathan decr used bytes\t" + this.usedBytes + "\t" + bytes).printStackTrace();
   }
 
   private void incrSnapshotUsedBytes(long bytes) {
@@ -300,7 +298,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   public void incrUsedNamespace(long namespaceToUse) {
     this.usedNamespace += namespaceToUse;
-    new RuntimeException("Swaminathan incr used namespace\t" + this.usedNamespace + "\t" + namespaceToUse).printStackTrace();
   }
 
   public void decrUsedNamespace(long namespaceToUse, boolean increasePendingDeleteNamespace) {
@@ -308,7 +305,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     if (increasePendingDeleteNamespace) {
       incrSnapshotUsedNamespace(namespaceToUse);
     }
-    new RuntimeException("Swaminathan decr used namespace\t" + this.usedNamespace + "\t" + namespaceToUse).printStackTrace();
   }
 
   private void incrSnapshotUsedNamespace(long namespaceToUse) {

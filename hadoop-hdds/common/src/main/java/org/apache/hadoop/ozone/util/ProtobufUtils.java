@@ -47,7 +47,7 @@ public final class ProtobufUtils {
     return CodedOutputStream.computeStringSizeNoTag(value);
   }
 
-  public static int computeLongSizeWithTag(long value) {
-    return CodedOutputStream.computeInt64Size(10, value);
+  public static int computeLongSizeWithTag(int fieldNumber, long value) {
+    return CodedOutputStream.computeInt64Size(fieldNumber, value);
   }
 }

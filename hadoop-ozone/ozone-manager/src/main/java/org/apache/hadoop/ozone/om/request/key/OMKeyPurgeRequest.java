@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -43,12 +42,11 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketNameInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketPurgeKeysSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -168,14 +166,13 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, oe));
     }
-
   }
 
   private List<OmBucketInfo> updateBucketSize(List<BucketPurgeKeysSize> bucketPurgeKeysSizeList,
       OMMetadataManager omMetadataManager) throws OMException {
     Map<String, Map<String, List<BucketPurgeKeysSize>>> bucketPurgeKeysSizes = bucketPurgeKeysSizeList.stream()
-            .collect(Collectors.groupingBy(BucketPurgeKeysSize::getVolumeName,
-                Collectors.groupingBy(BucketPurgeKeysSize::getBucketName)));
+            .collect(Collectors.groupingBy(bucketPurgeKey -> bucketPurgeKey.getBucketNameInfo().getVolumeName(),
+                Collectors.groupingBy(bucketPurgeKey -> bucketPurgeKey.getBucketNameInfo().getBucketName())));
     List<String[]> bucketKeyList = bucketPurgeKeysSizes.entrySet().stream()
         .flatMap(volEntry -> volEntry.getValue().keySet().stream()
             .map(bucketEntry -> new String[]{volEntry.getKey(), bucketEntry}))
@@ -195,11 +192,18 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
           // Check null if bucket has been deleted.
           if (omBucketInfo != null) {
+            boolean bucketUpdated = false;
             for (BucketPurgeKeysSize bucketPurgeKeysSize : bucketEntry.getValue()) {
-              omBucketInfo.purgeSnapshotUsedBytes(bucketPurgeKeysSize.getPurgedBytes());
-              omBucketInfo.purgeSnapshotUsedNamespace(bucketPurgeKeysSize.getPurgedNamespace());
+              BucketNameInfo bucketNameInfo = bucketPurgeKeysSize.getBucketNameInfo();
+              if (bucketNameInfo.getBucketId() == omBucketInfo.getObjectID()) {
+                omBucketInfo.purgeSnapshotUsedBytes(bucketPurgeKeysSize.getPurgedBytes());
+                omBucketInfo.purgeSnapshotUsedNamespace(bucketPurgeKeysSize.getPurgedNamespace());
+                bucketUpdated = true;
+              }
             }
-            bucketInfoList.add(omBucketInfo.copyObject());
+            if (bucketUpdated) {
+              bucketInfoList.add(omBucketInfo.copyObject());
+            }
           }
         }
       }
