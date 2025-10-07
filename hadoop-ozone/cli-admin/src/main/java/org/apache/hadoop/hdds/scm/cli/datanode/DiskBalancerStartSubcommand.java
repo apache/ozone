@@ -56,6 +56,11 @@ public class DiskBalancerStartSubcommand extends ScmSubcommand {
       description = "Stop DiskBalancer automatically after disk utilization is even.")
   private Boolean stopAfterDiskEven;
 
+  @Option(names = {"-m", "--min-source-volume-density"},
+      description = "Minimum source volume density (utilization percentage) " +
+          "required to trigger disk balancing.")
+  private Double minSourceVolumeDensity;
+
   @CommandLine.Mixin
   private DiskBalancerCommonOptions commonOptions =
       new DiskBalancerCommonOptions();
@@ -67,7 +72,7 @@ public class DiskBalancerStartSubcommand extends ScmSubcommand {
     }
     List<DatanodeAdminError> errors =
         scmClient.startDiskBalancer(threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
-            commonOptions.getSpecifiedDatanodes());
+            minSourceVolumeDensity, commonOptions.getSpecifiedDatanodes());
 
     if (errors.isEmpty()) {
       System.out.println("Starting DiskBalancer on datanode(s) " +

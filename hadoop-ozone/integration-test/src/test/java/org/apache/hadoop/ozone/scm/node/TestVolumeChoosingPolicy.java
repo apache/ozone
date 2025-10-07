@@ -119,7 +119,7 @@ public class TestVolumeChoosingPolicy {
     for (StorageVolume volume: volumeSet.getVolumesList()) {
       volume.setConf(CONF);
     }
-    assertNull(volumeChoosingPolicy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, 0));
+    assertNull(volumeChoosingPolicy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, 0, 5.0));
     assertEquals(NUM_VOLUMES, volumeSet.getVolumesList().size());
   }
 
@@ -174,7 +174,7 @@ public class TestVolumeChoosingPolicy {
 
             long threadStart = System.nanoTime();
             try {
-              Pair<HddsVolume, HddsVolume> pair = policy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, 0);
+              Pair<HddsVolume, HddsVolume> pair = policy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, 0, 5.0);
 
               if (pair == null) {
                 volumeNotChosen++;

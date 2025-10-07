@@ -81,6 +81,7 @@ public final class DiskBalancerYaml {
           diskBalancerInfoYaml.getBandwidthInMB(),
           diskBalancerInfoYaml.getParallelThread(),
           diskBalancerInfoYaml.isStopAfterDiskEven(),
+          diskBalancerInfoYaml.getMinSourceVolumeDensity(),
           DiskBalancerVersion.getDiskBalancerVersion(
               diskBalancerInfoYaml.version));
     }
@@ -97,6 +98,7 @@ public final class DiskBalancerYaml {
     private long bandwidthInMB;
     private int parallelThread;
     private boolean stopAfterDiskEven;
+    private double minSourceVolumeDensity;
 
     private int version;
 
@@ -105,12 +107,13 @@ public final class DiskBalancerYaml {
     }
 
     private DiskBalancerInfoYaml(DiskBalancerOperationalState operationalState, double threshold,
-        long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, int version) {
+        long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, double minSourceVolumeDensity, int version) {
       this.operationalState = operationalState;
       this.threshold = threshold;
       this.bandwidthInMB = bandwidthInMB;
       this.parallelThread = parallelThread;
       this.stopAfterDiskEven = stopAfterDiskEven;
+      this.minSourceVolumeDensity = minSourceVolumeDensity;
       this.version = version;
     }
 
@@ -154,6 +157,14 @@ public final class DiskBalancerYaml {
       this.stopAfterDiskEven = stopAfterDiskEven;
     }
 
+    public double getMinSourceVolumeDensity() {
+      return minSourceVolumeDensity;
+    }
+
+    public void setMinSourceVolumeDensity(double minSourceVolumeDensity) {
+      this.minSourceVolumeDensity = minSourceVolumeDensity;
+    }
+
     public void setVersion(int version) {
       this.version = version;
     }
@@ -172,6 +183,7 @@ public final class DiskBalancerYaml {
         diskBalancerInfo.getBandwidthInMB(),
         diskBalancerInfo.getParallelThread(),
         diskBalancerInfo.isStopAfterDiskEven(),
+        diskBalancerInfo.getMinSourceVolumeDensity(),
         diskBalancerInfo.getVersion().getVersion());
   }
 }

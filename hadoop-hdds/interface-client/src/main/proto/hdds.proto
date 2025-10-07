@@ -556,6 +556,7 @@ message DiskBalancerConfigurationProto {
     optional uint64 diskBandwidthInMB = 2;
     optional int32 parallelThread = 3;
     optional bool stopAfterDiskEven = 4;
+    optional double minSourceVolumeDensity = 5;
 }
 
 enum DiskBalancerRunningStatus {

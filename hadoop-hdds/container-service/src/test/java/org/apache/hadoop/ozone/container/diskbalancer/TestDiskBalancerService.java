@@ -131,7 +131,7 @@ public class TestDiskBalancerService {
 
     // Set a low bandwidth to delay job
     DiskBalancerInfo initialInfo = new DiskBalancerInfo(DiskBalancerOperationalState.RUNNING, 10.0d, 1L, 5,
-        true, DiskBalancerVersion.DEFAULT_VERSION);
+        true, 60.0d, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(initialInfo);
 
     svc.start();
@@ -142,7 +142,7 @@ public class TestDiskBalancerService {
     assertEquals(5, svc.getDiskBalancerInfo().getParallelThread());
     assertTrue(svc.getDiskBalancerInfo().isStopAfterDiskEven());
 
-    DiskBalancerInfo newInfo = new DiskBalancerInfo(DiskBalancerOperationalState.STOPPED, 20.0d, 5L, 10, false);
+    DiskBalancerInfo newInfo = new DiskBalancerInfo(DiskBalancerOperationalState.STOPPED, 20.0d, 5L, 10, false, 50.0d);
     svc.refresh(newInfo);
 
     assertFalse(svc.getDiskBalancerInfo().isShouldRun());
@@ -275,7 +275,7 @@ public class TestDiskBalancerService {
     // Set operational state to RUNNING
     DiskBalancerInfo info = new DiskBalancerInfo(
         DiskBalancerOperationalState.RUNNING, 10.0d, 100L, parallelThread,
-        false, DiskBalancerVersion.DEFAULT_VERSION);
+        false, 60.0d, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(info);
 
     DiskBalancerVolumeChoosingPolicy volumePolicy = mock(DiskBalancerVolumeChoosingPolicy.class);
@@ -292,7 +292,7 @@ public class TestDiskBalancerService {
     when(containerData.getContainerID()).thenAnswer(invocation -> System.nanoTime());
     when(containerData.getBytesUsed()).thenReturn(100L);
 
-    when(volumePolicy.chooseVolume(any(), anyDouble(), any(), anyLong())).thenReturn(Pair.of(source, dest));
+    when(volumePolicy.chooseVolume(any(), anyDouble(), any(), anyLong(), anyDouble())).thenReturn(Pair.of(source, dest));
     when(containerPolicy.chooseContainer(any(), any(), any(), any(), any(), any(), any())).thenReturn(containerData);
 
     // Test when no tasks are in progress, it should schedule up to the limit

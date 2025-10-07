@@ -93,6 +93,7 @@ public class DiskBalancerService extends BackgroundService {
   private long bandwidthInMB;
   private int parallelThread;
   private boolean stopAfterDiskEven;
+  private double minSourceVolumeDensity;
   private DiskBalancerVersion version;
 
   // State field using the new enum
@@ -247,6 +248,7 @@ public class DiskBalancerService extends BackgroundService {
     setBandwidthInMB(diskBalancerInfo.getBandwidthInMB());
     setParallelThread(diskBalancerInfo.getParallelThread());
     setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
+    setMinSourceVolumeDensity(diskBalancerInfo.getMinSourceVolumeDensity());
     setVersion(diskBalancerInfo.getVersion());
 
     // Default executorService is ScheduledThreadPoolExecutor, so we can
@@ -354,6 +356,10 @@ public class DiskBalancerService extends BackgroundService {
     this.stopAfterDiskEven = stopAfterDiskEven;
   }
 
+  public void setMinSourceVolumeDensity(double minSourceVolumeDensity) {
+    this.minSourceVolumeDensity = minSourceVolumeDensity;
+  }
+
   public void setVersion(DiskBalancerVersion version) {
     this.version = version;
   }
@@ -382,7 +388,7 @@ public class DiskBalancerService extends BackgroundService {
 
     for (int i = 0; i < availableTaskCount; i++) {
       Pair<HddsVolume, HddsVolume> pair = volumeChoosingPolicy
-          .chooseVolume(volumeSet, threshold, deltaSizes, containerDefaultSize);
+          .chooseVolume(volumeSet, threshold, deltaSizes, containerDefaultSize, minSourceVolumeDensity);
       if (pair == null) {
         continue;
       }
@@ -633,7 +639,7 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     return new DiskBalancerInfo(operationalState, threshold, bandwidthInMB,
-        parallelThread, stopAfterDiskEven, version, metrics.getSuccessCount(),
+        parallelThread, stopAfterDiskEven, minSourceVolumeDensity, version, metrics.getSuccessCount(),
         metrics.getFailureCount(), bytesToMove, metrics.getSuccessBytes(), volumeDatadensity);
   }
 

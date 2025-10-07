@@ -85,7 +85,7 @@ public class TestHeartbeatEndpointTask {
     datanodeStateMachine = mock(DatanodeStateMachine.class);
     container = mock(OzoneContainer.class);
     when(container.getDiskBalancerInfo()).thenReturn(new DiskBalancerInfo(
-        DiskBalancerOperationalState.RUNNING, 10, 20, 30, true));
+        DiskBalancerOperationalState.RUNNING, 10, 20, 30, true, 60));
     when(datanodeStateMachine.getContainer()).thenReturn(container);
     PipelineReportsProto pipelineReportsProto = mock(PipelineReportsProto.class);
     when(pipelineReportsProto.getPipelineReportList()).thenReturn(Collections.emptyList());

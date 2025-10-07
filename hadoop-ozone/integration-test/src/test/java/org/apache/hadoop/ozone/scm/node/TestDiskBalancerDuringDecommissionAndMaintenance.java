@@ -128,6 +128,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
         10L,
         5,
         false,
+        60.0,
         null);
 
     NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
@@ -232,6 +233,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
         10L,
         1,
         false,
+        60.0,
         dnAddressList);
 
     // Verify diskBalancer is running
@@ -307,7 +309,12 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
 
     // Attempt to start disk balancer on the decommissioning DN
     List<DatanodeAdminError> dnErrors = diskBalancerManager.startDiskBalancer(
-        10.0, 10L, 1, false, dnAddressList);
+        10.0,
+        10L,
+        1,
+        false,
+        60.0,
+        dnAddressList);
 
     // Verify disk balancer start command is not sent to decommissioning DN
     assertEquals(1, dnErrors.size());

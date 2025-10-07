@@ -116,10 +116,21 @@ public final class DiskBalancerConfiguration {
       description = "If true, the DiskBalancer will automatically stop once disks are balanced.")
   private boolean stopAfterDiskEven = true;
 
+  @Config(key = "min.source.volume.density", type = ConfigType.DOUBLE,
+      defaultValue = "60", tags = {ConfigTag.DISKBALANCER},
+      description = "Minimum source volume density (utilization percentage) " +
+          "required to trigger disk balancing. Only volumes with utilization " +
+          "greater than or equal to this value can be selected as source " +
+          "volumes for container movement. This prevents balancing when disks " +
+          "are under-utilized, even if they are imbalanced relative to each other. " +
+          "Value should be between 0 and 100.")
+  private double minSourceVolumeDensity = 60d;
+
   public DiskBalancerConfiguration(Double threshold,
       Long bandwidthInMB,
       Integer parallelThread,
-      Boolean stopAfterDiskEven) {
+      Boolean stopAfterDiskEven,
+      Double minSourceVolumeDensity) {
     if (threshold != null) {
       this.threshold = threshold;
     }
@@ -131,6 +142,9 @@ public final class DiskBalancerConfiguration {
     }
     if (stopAfterDiskEven != null) {
       this.stopAfterDiskEven = stopAfterDiskEven;
+    }
+    if (minSourceVolumeDensity != null) {
+      this.minSourceVolumeDensity = minSourceVolumeDensity;
     }
   }
 
@@ -179,6 +193,18 @@ public final class DiskBalancerConfiguration {
   
   public void setStopAfterDiskEven(boolean stopAfterDiskEven) {
     this.stopAfterDiskEven = stopAfterDiskEven;
+  }
+
+  public double getMinSourceVolumeDensity() {
+    return minSourceVolumeDensity;
+  }
+
+  public void setMinSourceVolumeDensity(double minSourceVolumeDensity) {
+    if (minSourceVolumeDensity < 0d || minSourceVolumeDensity > 100d) {
+      throw new IllegalArgumentException(
+          "MinSourceVolumeDensity must be a percentage(double) in the range 0 to 100.");
+    }
+    this.minSourceVolumeDensity = minSourceVolumeDensity;
   }
 
   /**
@@ -259,10 +285,12 @@ public final class DiskBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
+            "%-50s %s%n" +
             "%-50s %s%n",
             "Key", "Value",
         "Threshold", threshold, "Max disk bandwidth", diskBandwidthInMB,
-        "Parallel Thread", parallelThread, "Stop After Disk Even", stopAfterDiskEven);
+        "Parallel Thread", parallelThread, "Stop After Disk Even", stopAfterDiskEven,
+        "Min Source Volume Density", minSourceVolumeDensity);
   }
 
   public HddsProtos.DiskBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -272,7 +300,8 @@ public final class DiskBalancerConfiguration {
     builder.setThreshold(threshold)
         .setDiskBandwidthInMB(diskBandwidthInMB)
         .setParallelThread(parallelThread)
-        .setStopAfterDiskEven(stopAfterDiskEven);
+        .setStopAfterDiskEven(stopAfterDiskEven)
+        .setMinSourceVolumeDensity(minSourceVolumeDensity);
     return builder;
   }
 
@@ -290,6 +319,9 @@ public final class DiskBalancerConfiguration {
     }
     if (proto.hasStopAfterDiskEven()) {
       config.setStopAfterDiskEven(proto.getStopAfterDiskEven());
+    }
+    if (proto.hasMinSourceVolumeDensity()) {
+      config.setMinSourceVolumeDensity(proto.getMinSourceVolumeDensity());
     }
     return config;
   }
