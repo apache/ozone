@@ -322,7 +322,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // Run KeyDeletingService
       GenericTestUtils.waitFor(
           () -> getDeletedKeyCount() >= initialDeletedCount + 2,
-          1000, 1000000);
+          1000, 100000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
       assertThat(keyManager.getPendingDeletionKeys(new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),

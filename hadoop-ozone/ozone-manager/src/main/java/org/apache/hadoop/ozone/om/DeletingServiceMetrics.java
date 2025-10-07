@@ -110,6 +110,12 @@ public final class DeletingServiceMetrics {
   @Metric("Snapshot: No. of not reclaimable keys the last run")
   private MutableGaugeLong snapKeysNotReclaimableLast;
 
+  /**
+   * Metric to track the term ID of the last key that was purged from the
+   * Active Object Store (AOS). This term ID represents the state of the
+   * most recent successful purge operation in the AOS. This value would be used ensure that a background
+   * KeyDeletingService/DirectoryDeletingService doesn't start the next run until the previous run has been flushed.
+   */
   @Metric("Last Purge Key termIndex on Active Object Store")
   private MutableGaugeLong lastAOSPurgeTermId;
   @Metric("Last Purge Key transactionId on Active Object Store")
@@ -297,7 +303,7 @@ public final class DeletingServiceMetrics {
     return TransactionInfo.valueOf(lastAOSPurgeTermId.value(), lastAOSPurgeTransactionId.value());
   }
 
-  public synchronized void setLastAOSTransactionId(TransactionInfo transactionInfo) {
+  public synchronized void setLastAOSTransactionInfo(TransactionInfo transactionInfo) {
     TransactionInfo previousTransactionInfo = getLastAOSTransactionId();
     if (transactionInfo.compareTo(previousTransactionInfo) > 0) {
       this.lastAOSPurgeTermId.set(transactionInfo.getTerm());

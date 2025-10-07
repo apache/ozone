@@ -142,7 +142,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       } else {
         // Update the deletingServiceMetrics with the transaction index to indicate the
         // last purge transaction when running for AOS
-        deletingServiceMetrics.setLastAOSTransactionId(transactionInfo);
+        deletingServiceMetrics.setLastAOSTransactionInfo(transactionInfo);
       }
       auditParams.put(AUDIT_PARAM_KEYS_DELETED, String.valueOf(numKeysDeleted));
       auditParams.put(AUDIT_PARAM_RENAMED_KEYS_PURGED, String.valueOf(renamedKeysToBePurged.size()));

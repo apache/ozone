@@ -2218,7 +2218,7 @@ public class KeyManagerImpl implements KeyManager {
       while (iterator.hasNext() && remainingBufLimit > 0) {
         KeyValue<String, T> entry = iterator.next();
         final long objectSerializedSize = entry.getValueByteSize();
-        //No need to check the table again as the value in cache and iterator would be same when directory
+        // No need to check the table again as the value in cache and iterator would be same when directory
         // deleting service runs.
         if (remainingBufLimit - objectSerializedSize < 0) {
           break;

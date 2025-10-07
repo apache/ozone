@@ -161,7 +161,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       long quotaReleased = sumBlockLengths(omKeyInfo);
       boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);
       omBucketInfo.decrUsedBytes(quotaReleased, isKeyNonEmpty);
-      omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty);
+      omBucketInfo.decrUsedNamespace(1L, true);
       OmKeyInfo deletedOpenKeyInfo = null;
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
