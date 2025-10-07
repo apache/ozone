@@ -159,9 +159,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
                                   OMMetadataManager metadataManager)
       throws IOException {
     for (SnapshotMoveKeyInfos dBKey : reclaimKeysList) {
-      RepeatedOmKeyInfo omKeyInfos =
-          createRepeatedOmKeyInfo(dBKey.
-              getKeyInfosList(), bucketId);
+      RepeatedOmKeyInfo omKeyInfos = createRepeatedOmKeyInfo(dBKey.getKeyInfosList(), bucketId);
       // omKeyInfos can be null, because everything from RepeatedOmKeyInfo
       // is moved to next snapshot which means this key can be deleted in
       // the current snapshot processed by SDS. The reclaim key here indicates
