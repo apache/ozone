@@ -65,7 +65,7 @@ public class GrpcContainerUploader implements ContainerUploader {
     Long containerSize = null;
     Container<?> container = containerController.getContainer(containerId);
     if (container != null) {
-      LOG.info("Starting upload of container {} to {} with size {}",
+      LOG.debug("Starting upload of container {} to {} with size {}",
           containerId, target, container.getContainerData().getBytesUsed());
       containerSize = container.getContainerData().getBytesUsed();
     }

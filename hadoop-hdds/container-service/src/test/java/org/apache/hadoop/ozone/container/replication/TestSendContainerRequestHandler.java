@@ -211,7 +211,7 @@ public class TestSendContainerRequestHandler {
   public void testOverAllocatedReservesMoreSpace() {
     long containerId1 = 1;
     long containerId2 = 2;
-    long overallocatedSize = 10L * 1024L * 1024L * 1024L; // 10GB
+    long overallocatedSize = containerMaxSize * 2; // 10GB
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
     // Test overallocated container (10GB)

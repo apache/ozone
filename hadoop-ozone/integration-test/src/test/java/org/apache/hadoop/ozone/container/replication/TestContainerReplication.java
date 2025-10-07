@@ -65,6 +65,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.event.Level;
 
 /**
  * Tests ozone containers replication.
@@ -189,6 +190,8 @@ class TestContainerReplication {
   @MethodSource("sizeProvider")
   void testPushWithOverAllocatedContainer(String testName, Long containerSize)
       throws Exception {
+    GenericTestUtils.setLogLevel(GrpcContainerUploader.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ContainerImporter.class, Level.DEBUG);
     LogCapturer grpcLog = LogCapturer.captureLogs(GrpcContainerUploader.class);
     LogCapturer containerImporterLog = LogCapturer.captureLogs(ContainerImporter.class);
 

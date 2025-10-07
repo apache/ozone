@@ -148,7 +148,7 @@ public class ContainerImporter {
 
   HddsVolume chooseNextVolume(long spaceToReserve) throws IOException {
     // Choose volume that can hold both container in tmp and dest directory
-    LOG.info("Choosing volume to reserve space : {}", spaceToReserve);
+    LOG.debug("Choosing volume to reserve space : {}", spaceToReserve);
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
         spaceToReserve);
