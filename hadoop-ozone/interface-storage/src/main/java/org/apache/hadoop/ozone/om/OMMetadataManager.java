@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.DBStoreHAManager;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -458,6 +459,9 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
 
   @Override
   Table<String, TransactionInfo> getTransactionInfoTable();
+
+  @Override
+  Table<Long, FlushedTransactionInfo> getFlushedTransactionsTable();
 
   Table<String, OmDBAccessIdInfo> getTenantAccessIdTable();
 

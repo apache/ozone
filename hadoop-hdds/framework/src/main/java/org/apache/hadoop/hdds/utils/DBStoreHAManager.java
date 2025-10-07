@@ -28,4 +28,8 @@ public interface DBStoreHAManager {
   default Table<String, TransactionInfo> getTransactionInfoTable() {
     return null;
   }
+
+  default Table<Long, FlushedTransactionInfo> getFlushedTransactionsTable() {
+    return null;
+  }
 }

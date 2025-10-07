@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -66,6 +67,12 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private final CodecBuffer.Capacity bufferCapacity
       = new CodecBuffer.Capacity(this, BUFFER_SIZE_DEFAULT);
   private final TableCache<KEY, VALUE> cache;
+  private final Function<KEY, Boolean> keyValidatorFunction;
+
+  TypedTable(RDBTable rawTable, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, CacheType cacheType)
+      throws RocksDatabaseException, CodecException {
+    this(rawTable, keyCodec, valueCodec, cacheType, (k) -> true);
+  }
 
   /**
    * Create an TypedTable from the raw table with specified cache type.
@@ -74,13 +81,14 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * @param keyCodec The key codec.
    * @param valueCodec The value codec.
    * @param cacheType How to cache the entries?
+   * @param keyValidatorFunction A function to validate the key before performing a write operation.
    */
-  TypedTable(RDBTable rawTable, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, CacheType cacheType)
-      throws RocksDatabaseException, CodecException {
+  TypedTable(RDBTable rawTable, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, CacheType cacheType,
+      Function<KEY, Boolean> keyValidatorFunction) throws RocksDatabaseException, CodecException {
     this.rawTable = Objects.requireNonNull(rawTable, "rawTable==null");
     this.keyCodec = Objects.requireNonNull(keyCodec, "keyCodec == null");
     this.valueCodec = Objects.requireNonNull(valueCodec, "valueCodec == null");
-
+    this.keyValidatorFunction = keyValidatorFunction;
     this.info = getClassSimpleName(getClass()) + "-" + getName() + "(" + getClassSimpleName(keyCodec.getTypeClass())
         + "->" + getClassSimpleName(valueCodec.getTypeClass()) + ")";
 
@@ -132,6 +140,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void put(KEY key, VALUE value) throws RocksDatabaseException, CodecException {
+    assert this.keyValidatorFunction.apply(key);
     if (supportCodecBuffer) {
       try (CodecBuffer k = keyCodec.toDirectCodecBuffer(key);
            CodecBuffer v = valueCodec.toDirectCodecBuffer(value)) {
@@ -144,6 +153,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void putWithBatch(BatchOperation batch, KEY key, VALUE value) throws RocksDatabaseException, CodecException {
+    assert this.keyValidatorFunction.apply(key);
     if (supportCodecBuffer) {
       CodecBuffer keyBuffer = null;
       CodecBuffer valueBuffer = null;
@@ -366,6 +376,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void delete(KEY key) throws RocksDatabaseException, CodecException {
+    assert this.keyValidatorFunction.apply(key);
     if (keyCodec.supportCodecBuffer()) {
       try (CodecBuffer buffer = keyCodec.toDirectCodecBuffer(key)) {
         rawTable.delete(buffer.asReadOnlyByteBuffer());
@@ -377,16 +388,19 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException {
+    assert this.keyValidatorFunction.apply(key);
     rawTable.deleteWithBatch(batch, encodeKey(key));
   }
 
   @Override
   public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws CodecException {
+    assert this.keyValidatorFunction.apply(beginKey) && this.keyValidatorFunction.apply(endKey);
     rawTable.deleteRangeWithBatch(batch, encodeKey(beginKey), encodeKey(endKey));
   }
 
   @Override
   public void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException {
+    assert this.keyValidatorFunction.apply(beginKey) && this.keyValidatorFunction.apply(endKey);
     rawTable.deleteRange(encodeKey(beginKey), encodeKey(endKey));
   }
 

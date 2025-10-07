@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.FLUSHEDTRANSACTIONS;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.META;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.MOVE;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
@@ -43,12 +44,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.MoveDataNodePair;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.FlushedTransactionInfo;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +71,8 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   private Table<ContainerID, ContainerInfo> containerTable;
 
   private Table<PipelineID, Pipeline> pipelineTable;
+
+  private Table<Long, FlushedTransactionInfo> flushedTransactionsTable;
 
   private Table<String, TransactionInfo> transactionInfoTable;
 
@@ -142,6 +147,10 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       checkAndPopulateTable(containerTable, CONTAINERS.getName());
 
+      flushedTransactionsTable = FLUSHEDTRANSACTIONS.getTable(store, TableCache.CacheType.PARTIAL_CACHE,
+          (tid) -> tid >= 0);
+      checkAndPopulateTable(flushedTransactionsTable, FLUSHEDTRANSACTIONS.getName());
+
       transactionInfoTable = TRANSACTIONINFO.getTable(store);
 
       checkAndPopulateTable(transactionInfoTable, TRANSACTIONINFO.getName());
@@ -201,6 +210,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
   @Override
   public Table<String, TransactionInfo> getTransactionInfoTable() {
     return transactionInfoTable;
+  }
+
+  @Override
+  public Table<Long, FlushedTransactionInfo> getFlushedTransactionsTable() {
+    return flushedTransactionsTable;
   }
 
   @Override
