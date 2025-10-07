@@ -58,6 +58,11 @@ public final class OmKeyInfo extends WithParentObjectId
 
   private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
   private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
+  /**
+   * Metadata key flag to indicate whether a deleted key was a committed key.
+   * The flag is set when a committed key is deleted from AOS but still held in
+   * a snapshot to help with accurate bucket quota usage calculation.
+   */
   private static final String COMMITTED_KEY_DELETED_FLAG = "CKDEL";
 
   private final String volumeName;
