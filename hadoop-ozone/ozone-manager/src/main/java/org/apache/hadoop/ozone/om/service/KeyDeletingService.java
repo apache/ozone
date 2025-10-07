@@ -315,7 +315,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       if (purgeKeyIndex < purgedKeyList.size()) {
         PurgedKey purgedKey = purgedKeyList.get(purgeKeyIndex);
         if (bucketDeleteKeys == null) {
-          bucketDeleteKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder();
+          bucketDeleteKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder().setVolumeName("").setBucketName("");
           currSize.addAndGet(bucketDeleteKeys.buildPartial().getSerializedSize());
         }
         String deletedKey = purgedKey.getDeleteKeyName();
