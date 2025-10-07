@@ -119,7 +119,12 @@ public class TestQuasiClosedStuckOverReplicationHandler {
         Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(
-        ContainerReplicaOp.PendingOpType.DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+        ContainerReplicaOp.PendingOpType.DELETE,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        0,
+        null,
+        Long.MAX_VALUE,
+        0));
 
     int count = handler.processAndSendCommands(replicas, pendingOps, getOverReplicatedHealthResult(), 1);
     assertEquals(0, count);

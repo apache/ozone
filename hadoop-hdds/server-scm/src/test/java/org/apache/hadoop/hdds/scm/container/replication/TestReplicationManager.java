@@ -1635,7 +1635,13 @@ public class TestReplicationManager {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
 
-    ContainerReplicaOp addOp = new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD, dn1, 1, null, Long.MAX_VALUE, 0);
+    ContainerReplicaOp addOp = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        dn1,
+        1,
+        null,
+        Long.MAX_VALUE,
+        0);
     ContainerReplicaOp delOp = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE, dn2, 1, command, commandDeadline, 0);
 
