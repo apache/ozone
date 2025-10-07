@@ -391,7 +391,7 @@ public class ContainerManagerImpl implements ContainerManager {
    * Returns the container ID's matching with specified owner.
    * @param pipeline
    * @param owner
-   * @return NavigableSet<ContainerID>
+   * @return {@code NavigableSet<ContainerID>}
    */
   private NavigableSet<ContainerID> getContainersForOwner(
       Pipeline pipeline, String owner) throws IOException {
