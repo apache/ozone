@@ -590,7 +590,8 @@ public class SnapshotDefragService extends BackgroundService
       }
 
       // TODO: Handle pagination when diffList is bigger than server page size
-      // 2025-08-16 09:10:52,500 [IPC Server handler 1 on default port 9862] INFO om.SnapshotDefragService: Found 1000 differences to process
+      // 2025-08-16 09:10:52,500 [IPC Server handler 1 on default port 9862] INFO
+      //  om.SnapshotDefragService: Found 1000 differences to process
       LOG.info("Found {} differences to process", diffReport.getDiffList().size());
 
       // Get table references for target database
