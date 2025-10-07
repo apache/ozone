@@ -227,9 +227,9 @@ public class TestECContainerReplicaCount {
 
     List<ContainerReplicaOp> pending =
         getContainerReplicaOps(ImmutableList.of(), ImmutableList.of(1));
-    pending.add(ContainerReplicaOp
-        .create(ContainerReplicaOp.PendingOpType.DELETE,
-            MockDatanodeDetails.randomDatanodeDetails(), 2));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE,
+        MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
 
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica, pending, 1);
