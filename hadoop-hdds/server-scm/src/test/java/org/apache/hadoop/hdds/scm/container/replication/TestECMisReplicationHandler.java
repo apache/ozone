@@ -161,7 +161,7 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
     when(placementPolicy.validateContainerPlacement(anyList(),
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = singletonList(
-            ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
+            new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
                     MockDatanodeDetails.randomDatanodeDetails(), 1));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);

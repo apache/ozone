@@ -114,9 +114,9 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
+    pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pending.add(ContainerReplicaOp.create(
+    pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
 
     when(replicationManager.getNodeStatus(any())).thenAnswer(
@@ -203,9 +203,9 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
+    pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pending.add(ContainerReplicaOp.create(
+    pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
 
     when(replicationManager.getNodeStatus(any())).thenAnswer(
@@ -286,9 +286,9 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
+    pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pending.add(ContainerReplicaOp.create(
+    pending.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
 
     // set up mocks such ContainerReplicaPendingOps returns the containerSizeScheduled map

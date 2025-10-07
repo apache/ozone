@@ -32,18 +32,17 @@ public class ContainerReplicaOp {
   private final long deadlineEpochMillis;
   private final long containerSize;
 
-  public static ContainerReplicaOp create(PendingOpType opType,
-      DatanodeDetails target, int replicaIndex) {
-    return new ContainerReplicaOp(opType, target, replicaIndex, null,
-        System.currentTimeMillis(), 0);
-  }
-
-  public ContainerReplicaOp(PendingOpType opType,
-      DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
-      long deadlineEpochMillis) {
-    this(opType, target, replicaIndex, command, deadlineEpochMillis, 0);
-  }
-
+  /**
+   * Creates a ContainerReplicaOp with all parameters.
+   * This is the single constructor that should be used for all cases.
+   * 
+   * @param opType the type of operation (ADD or DELETE)
+   * @param target the target datanode
+   * @param replicaIndex the replica index (zero for Ratis, > 0 for EC)
+   * @param command the SCM command (can be null)
+   * @param deadlineEpochMillis the deadline in epoch milliseconds
+   * @param containerSize the size of the container
+   */
   public ContainerReplicaOp(PendingOpType opType,
       DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
       long deadlineEpochMillis, long containerSize) {

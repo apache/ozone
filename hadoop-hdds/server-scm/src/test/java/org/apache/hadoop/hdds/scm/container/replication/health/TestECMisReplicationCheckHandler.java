@@ -172,7 +172,7 @@ public class TestECMisReplicationCheckHandler {
     });
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
+    pending.add(new ContainerReplicaOp(
         ADD, MockDatanodeDetails.randomDatanodeDetails(), 1));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
@@ -229,7 +229,7 @@ public class TestECMisReplicationCheckHandler {
             State.UNHEALTHY);
     replicas.add(unhealthyReplica);
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
+    pending.add(new ContainerReplicaOp(
         DELETE, unhealthyReplica.getDatanodeDetails(), 1));
 
     ContainerCheckRequest request = requestBuilder
