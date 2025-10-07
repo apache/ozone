@@ -1270,6 +1270,7 @@ class TestKeyDeletingService extends OzoneTestBase {
     OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName)
+            .setObjectID(OBJECT_COUNTER.incrementAndGet())
             .setIsVersionEnabled(isVersioningEnabled)
             .build());
   }

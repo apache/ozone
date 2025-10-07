@@ -1363,11 +1363,6 @@ public class TestHSync {
         assertArrayEquals(data1.getBytes(UTF_8), readBuffer.array());
       }
 
-      // verify bucket info
-      ozoneBucket = volume.getBucket(bucket.getName());
-      assertEquals(keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes,
-          ozoneBucket.getUsedBytes());
-
       // Resume openKeyCleanupService
       openKeyCleanupService.resume();
       // Verify entry from openKey gets deleted eventually
@@ -1378,6 +1373,16 @@ public class TestHSync {
           throw new RuntimeException(e);
         }
       }, 100, 5000);
+      // verify bucket info
+      ozoneManager.getKeyManager().getDeletingService().resume();
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes ==
+              volume.getBucket(bucket.getName()).getUsedBytes();
+        } catch (IOException e) {
+          return false;
+        }
+      }, 1000, 30000);
     } finally {
       cleanupDeletedTable(ozoneManager);
       cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
@@ -1439,7 +1444,8 @@ public class TestHSync {
       assertEquals(0, openKeys.size());
       // There should be one key in delete table
       assertEquals(1, deletedKeys.size());
-
+      assertTrue(deletedKeys.values().stream().findFirst().get().getOmKeyInfoList().get(0).isDeletedKeyCommitted());
+      ozoneManager.getKeyManager().getDeletingService().resume();
       // final file will have data2 content
       OzoneKeyDetails keyInfo = bucket.getKey(file.getName());
       try (OzoneInputStream is = bucket.readKey(file.getName())) {
@@ -1450,9 +1456,14 @@ public class TestHSync {
       }
 
       // verify bucket info
-      ozoneBucket = volume.getBucket(bucket.getName());
-      assertEquals(keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes,
-          ozoneBucket.getUsedBytes());
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes ==
+              volume.getBucket(bucket.getName()).getUsedBytes();
+        } catch (IOException e) {
+          return false;
+        }
+      }, 1000, 30000);
     } finally {
       cleanupDeletedTable(ozoneManager);
       cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
@@ -1527,11 +1538,16 @@ public class TestHSync {
         assertEquals(keyInfo.getDataSize(), readLen);
         assertArrayEquals(data2.getBytes(UTF_8), readBuffer.array());
       }
-
+      ozoneManager.getKeyManager().getDeletingService().resume();
       // verify bucket info
-      ozoneBucket = volume.getBucket(bucket.getName());
-      assertEquals(keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes,
-          ozoneBucket.getUsedBytes());
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() +
+              usedBytes == volume.getBucket(bucket.getName()).getUsedBytes();
+        } catch (IOException e) {
+          return false;
+        }
+      }, 100, 30000);
     } finally {
       cleanupDeletedTable(ozoneManager);
       cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
