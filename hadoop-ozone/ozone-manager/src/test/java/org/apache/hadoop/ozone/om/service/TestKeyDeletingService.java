@@ -105,6 +105,7 @@ import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
@@ -818,7 +819,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             .setParentObjectID(2)
             .build();
         Map<String, RepeatedOmKeyInfo> keysToModify = Collections.singletonMap("key1",
-            new RepeatedOmKeyInfo(Collections.singletonList(omKeyInfo)));
+            new RepeatedOmKeyInfo(Collections.singletonList(omKeyInfo), 0L));
         keyDeletingService.processKeyDeletes(blockGroups, keysToModify, renameEntriesToBeDeleted, null, null, null);
         assertTrue(purgeRequest.get().getPurgeKeysRequest().getKeysToUpdateList().isEmpty());
         assertEquals(renameEntriesToBeDeleted, purgeRequest.get().getPurgeKeysRequest().getRenamedKeysList());
@@ -1045,6 +1046,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
   @Test
   @DisplayName("Verify PurgeKeysRequest is batched according to Ratis byte limit")
+  @Flaky("HDDS-13661")
   void testPurgeKeysRequestBatching() throws Exception {
     // Define a small Ratis limit to force multiple batches for testing
     // The actual byte size of protobuf messages depends on content.

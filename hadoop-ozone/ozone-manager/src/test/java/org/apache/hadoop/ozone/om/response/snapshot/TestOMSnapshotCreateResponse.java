@@ -91,6 +91,7 @@ public class TestOMSnapshotCreateResponse {
     };
     OzoneManager ozoneManager = mock(OzoneManager.class);
     OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     when(omSnapshotManager.getSnapshotLocalYaml()).thenReturn(yamlSupplier);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
