@@ -717,7 +717,8 @@ public final class OMRequestTestUtils {
       BucketLayout bucketLayout)
       throws Exception {
     return addBucketToDB(omMetadataManager,
-        OmBucketInfo.newBuilder().setVolumeName(volumeName).setObjectID(System.currentTimeMillis())
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setObjectID(System.currentTimeMillis())
             .setBucketName(bucketName)
             .setBucketLayout(bucketLayout)
     );

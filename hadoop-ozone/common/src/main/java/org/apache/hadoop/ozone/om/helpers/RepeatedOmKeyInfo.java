@@ -41,6 +41,14 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
   private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false);
 
   private final List<OmKeyInfo> omKeyInfoList;
+  /**
+   * Represents the unique identifier for a bucket. This variable is used to
+   * distinguish between different instances of a bucket, even if a bucket
+   * with the same name is deleted and recreated.
+   *
+   * It is particularly useful for tracking and updating the quota usage
+   * associated with a bucket.
+   */
   private final long bucketId;
 
   private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline) {
