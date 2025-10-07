@@ -151,7 +151,8 @@ public class SnapshotDefragService extends BackgroundService
     try {
       // Read YAML metadata using the correct API
       File yamlFile = new File(snapshotPath + ".yaml");
-      OmSnapshotLocalDataYaml yamlData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
+      OmSnapshotLocalDataYaml yamlData = OmSnapshotLocalDataYaml.getFromYamlFile(
+          ozoneManager.getOmSnapshotManager(), yamlFile);  // TODO: Verify new usage
 
       // Check if snapshot needs compaction (defragmentation)
       boolean needsDefrag = yamlData.getNeedsDefrag();
@@ -955,13 +956,14 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
     try {
       // Read current YAML data using the correct API
       File yamlFile = new File(snapshotPath + ".yaml");
-      OmSnapshotLocalDataYaml yamlData = OmSnapshotLocalDataYaml.getFromYamlFile(yamlFile);
+      OmSnapshotLocalDataYaml yamlData = OmSnapshotLocalDataYaml.getFromYamlFile(
+          ozoneManager.getOmSnapshotManager(), yamlFile);  // TODO: Verify new usage
 
       // Mark as defragmented by setting needsCompaction to false
-      yamlData.setNeedsDefragmentation(false);
+      yamlData.setNeedsDefrag(false);
 
       // Write updated YAML data
-      yamlData.writeToYaml(yamlFile);
+      yamlData.writeToYaml(ozoneManager.getOmSnapshotManager(), yamlFile);  // TODO: Verify new usage
 
       LOG.info("Successfully updated metadata for snapshot: {}, " +
               "marked as defragmented (needsCompaction=false)",
