@@ -43,10 +43,8 @@ import org.junit.jupiter.api.Test;
 public class TestSCMRestart {
 
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
   private static Pipeline ratisPipeline1;
   private static Pipeline ratisPipeline2;
-  private static ContainerManager containerManager;
   private static ContainerManager newContainerManager;
   private static PipelineManager pipelineManager;
 
@@ -58,7 +56,7 @@ public class TestSCMRestart {
   @BeforeAll
   public static void init() throws Exception {
     final int numOfNodes = 4;
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
             TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1000, TimeUnit.MILLISECONDS);
@@ -71,7 +69,7 @@ public class TestSCMRestart {
         .build();
     cluster.waitForClusterToBeReady();
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    containerManager = scm.getContainerManager();
+    ContainerManager containerManager = scm.getContainerManager();
     pipelineManager = scm.getPipelineManager();
     ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(

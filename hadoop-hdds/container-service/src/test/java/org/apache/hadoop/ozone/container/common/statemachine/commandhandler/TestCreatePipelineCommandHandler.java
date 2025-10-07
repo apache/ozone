@@ -61,7 +61,6 @@ import org.mockito.quality.Strictness;
 public class TestCreatePipelineCommandHandler {
 
   private OzoneContainer ozoneContainer;
-  private StateContext stateContext;
   private SCMConnectionManager connectionManager;
   private RaftClient raftClient;
   private GroupManagementApi raftClientGroupManager;
@@ -86,7 +85,7 @@ public class TestCreatePipelineCommandHandler {
     final SCMCommand<CreatePipelineCommandProto> command =
         new CreatePipelineCommand(pipelineID, HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, datanodes);
-    stateContext = ContainerTestUtils.getMockContext(datanodes.get(0), conf);
+    StateContext stateContext = ContainerTestUtils.getMockContext(datanodes.get(0), conf);
 
     final XceiverServerSpi writeChanel = mock(XceiverServerSpi.class);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChanel);
@@ -118,7 +117,7 @@ public class TestCreatePipelineCommandHandler {
             HddsProtos.ReplicationFactor.THREE, datanodes);
 
     final XceiverServerSpi writeChanel = mock(XceiverServerSpi.class);
-    stateContext = ContainerTestUtils.getMockContext(datanodes.get(0), conf);
+    StateContext stateContext = ContainerTestUtils.getMockContext(datanodes.get(0), conf);
     when(ozoneContainer.getWriteChannel()).thenReturn(writeChanel);
     when(writeChanel.isExist(pipelineID.getProtobuf()))
         .thenReturn(true);

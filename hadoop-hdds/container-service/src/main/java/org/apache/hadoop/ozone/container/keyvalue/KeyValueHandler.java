@@ -607,8 +607,13 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
     try {
+      ContainerProtos.ContainerDataProto.State previousState = kvContainer.getContainerState();
       markContainerForClose(kvContainer);
       closeContainer(kvContainer);
+      if (previousState == RECOVERING) {
+        // trigger container scan for recovered containers, i.e., after EC reconstruction
+        containerSet.scanContainer(kvContainer.getContainerData().getContainerID(), "EC Reconstruction");
+      }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -1455,8 +1460,7 @@ public class KeyValueHandler extends Handler {
     // merkle tree.
     long originalDataChecksum = containerData.getDataChecksum();
     boolean hadDataChecksum = !containerData.needsDataChecksum();
-    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.writeContainerDataTree(containerData,
-        treeWriter);
+    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.updateTree(containerData, treeWriter);
     long updatedDataChecksum = updateChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
     if (updatedDataChecksum != originalDataChecksum) {
@@ -1592,9 +1596,21 @@ public class KeyValueHandler extends Handler {
     deleteInternal(container, force);
   }
 
-  @SuppressWarnings("checkstyle:MethodLength")
   @Override
   public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
+      Collection<DatanodeDetails> peers) throws IOException {
+    long containerID = container.getContainerData().getContainerID();
+    try {
+      reconcileContainerInternal(dnClient, container, peers);
+    } finally {
+      // Trigger on demand scanner after reconciliation
+      containerSet.scanContainerWithoutGap(containerID,
+          "Container reconciliation");
+    }
+  }
+
+  @SuppressWarnings("checkstyle:MethodLength")
+  private void reconcileContainerInternal(DNContainerOperationClient dnClient, Container<?> container,
       Collection<DatanodeDetails> peers) throws IOException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
@@ -1602,7 +1618,7 @@ public class KeyValueHandler extends Handler {
 
     // Obtain the original checksum info before reconciling with any peers.
     ContainerProtos.ContainerChecksumInfo originalChecksumInfo = checksumManager.read(containerData);
-    if (!originalChecksumInfo.hasContainerMerkleTree()) {
+    if (!ContainerChecksumTreeManager.hasDataChecksum(originalChecksumInfo)) {
       // Try creating the merkle tree from RocksDB metadata if it is not present.
       originalChecksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
     }
@@ -1618,6 +1634,7 @@ public class KeyValueHandler extends Handler {
         long numMissingBlocksRepaired = 0;
         long numCorruptChunksRepaired = 0;
         long numMissingChunksRepaired = 0;
+        long numDivergedDeletedBlocksUpdated = 0;
 
         LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
             containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
@@ -1634,8 +1651,9 @@ public class KeyValueHandler extends Handler {
           continue;
         }
 
-        // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with
-        // the next peer.
+        // This tree writer is initialized with our current persisted tree, then updated with the modifications done
+        // while reconciling with the peer. Once we finish reconciling with this peer, we will write the updated version
+        // back to the disk and pick it up as the starting point for reconciling with the next peer.
         ContainerMerkleTreeWriter updatedTreeWriter =
             new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
         ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
@@ -1695,6 +1713,12 @@ public class KeyValueHandler extends Handler {
           }
         }
 
+        // Merge block deletes from the peer that do not match our list of deleted blocks.
+        for (ContainerDiffReport.DeletedBlock deletedBlock : diffReport.getDivergedDeletedBlocks()) {
+          updatedTreeWriter.setDeletedBlock(deletedBlock.getBlockID(), deletedBlock.getDataChecksum());
+          numDivergedDeletedBlocksUpdated++;
+        }
+
         // Based on repaired done with this peer, write the updated merkle tree to the container.
         // This updated tree will be used when we reconcile with the next peer.
         ContainerProtos.ContainerChecksumInfo previousChecksumInfo = latestChecksumInfo;
@@ -1705,7 +1729,10 @@ public class KeyValueHandler extends Handler {
         long previousDataChecksum = ContainerChecksumTreeManager.getDataChecksum(previousChecksumInfo);
         long latestDataChecksum = ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo);
         if (previousDataChecksum == latestDataChecksum) {
-          if (numCorruptChunksRepaired != 0 || numMissingBlocksRepaired != 0 || numMissingChunksRepaired != 0) {
+          if (numCorruptChunksRepaired != 0 ||
+              numMissingBlocksRepaired != 0 ||
+              numMissingChunksRepaired != 0 ||
+              numDivergedDeletedBlocksUpdated != 0) {
             // This condition should never happen.
             LOG.error("Checksum of container was not updated but blocks were repaired.");
           }
@@ -1716,11 +1743,13 @@ public class KeyValueHandler extends Handler {
                   ".\nMissing blocks repaired: {}/{}\n" +
                   "Missing chunks repaired: {}/{}\n" +
                   "Corrupt chunks repaired:  {}/{}\n" +
+                  "Diverged deleted blocks updated:  {}/{}\n" +
                   "Time taken: {} ms",
               containerID, peer, checksumToString(previousDataChecksum), checksumToString(latestDataChecksum),
-              numMissingBlocksRepaired, diffReport.getMissingBlocks().size(),
-              numMissingChunksRepaired, diffReport.getMissingChunks().size(),
-              numCorruptChunksRepaired, diffReport.getCorruptChunks().size(),
+              numMissingBlocksRepaired, diffReport.getNumMissingBlocks(),
+              numMissingChunksRepaired, diffReport.getNumMissingChunks(),
+              numCorruptChunksRepaired, diffReport.getNumCorruptChunks(),
+              numDivergedDeletedBlocksUpdated, diffReport.getNumdivergedDeletedBlocks(),
               duration);
         }
 

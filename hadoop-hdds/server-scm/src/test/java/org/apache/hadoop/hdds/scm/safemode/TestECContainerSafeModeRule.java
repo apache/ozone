@@ -56,7 +56,6 @@ public class TestECContainerSafeModeRule {
   private SCMSafeModeManager safeModeManager;
   private SafeModeMetrics metrics;
   private List<ContainerInfo> containers;
-
   private ECContainerSafeModeRule rule;
 
   @BeforeEach

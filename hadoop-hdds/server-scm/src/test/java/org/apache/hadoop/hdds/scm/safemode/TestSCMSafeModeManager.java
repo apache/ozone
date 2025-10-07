@@ -413,7 +413,6 @@ public class TestSCMSafeModeManager {
               .PipelineReport.newBuilder()
               .setPipelineID(pipelineID)
               .setIsLeader(true)
-              .setBytesWritten(0)
               .build());
       StorageContainerDatanodeProtocolProtos
               .PipelineReportsProto.Builder pipelineReportsProto =

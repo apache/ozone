@@ -83,9 +83,6 @@ public class TestOzoneFileChecksum {
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster = null;
   private FileSystem fs;
-  private RootedOzoneFileSystem ofs;
-  private BasicRootedOzoneClientAdapterImpl adapter;
-  private String rootPath;
   private OzoneClient client;
 
   @BeforeEach
@@ -99,7 +96,7 @@ public class TestOzoneFileChecksum {
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
-    rootPath = String.format("%s://%s/",
+    String rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     String disableCache = String.format("fs.%s.impl.disable.cache",
         OzoneConsts.OZONE_OFS_URI_SCHEME);
@@ -126,8 +123,8 @@ public class TestOzoneFileChecksum {
 
     conf.setInt("ozone.client.bytes.per.checksum", (int) (checksumSizeInMB * 1024 * 1024));
     fs = FileSystem.get(conf);
-    ofs = (RootedOzoneFileSystem) fs;
-    adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+    RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) fs;
+    BasicRootedOzoneClientAdapterImpl adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
     String volumeName = UUID.randomUUID().toString();
     String legacyBucket = UUID.randomUUID().toString();
     String ecBucketName = UUID.randomUUID().toString();

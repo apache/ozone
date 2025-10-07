@@ -34,20 +34,16 @@
       <artifactId>guava</artifactId>
     </dependency>
     <dependency>
-      <groupId>commons-collections</groupId>
-      <artifactId>commons-collections</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.opentracing</groupId>
-      <artifactId>opentracing-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.opentracing</groupId>
-      <artifactId>opentracing-util</artifactId>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-api</artifactId>
     </dependency>
     <dependency>
       <groupId>jakarta.annotation</groupId>
       <artifactId>jakarta.annotation-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>

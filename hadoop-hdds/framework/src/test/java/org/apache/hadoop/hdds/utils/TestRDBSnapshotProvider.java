@@ -72,7 +72,6 @@ public class TestRDBSnapshotProvider {
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
 
   private RDBStore rdbStore = null;
-  private ManagedDBOptions options = null;
   private Set<TableConfig> configSet;
   private RDBSnapshotProvider rdbSnapshotProvider;
   private File testDir;
@@ -85,7 +84,7 @@ public class TestRDBSnapshotProvider {
   public void init(@TempDir File tempDir) throws Exception {
     CodecBuffer.enableLeakDetection();
 
-    options = getNewDBOptions();
+    ManagedDBOptions options = getNewDBOptions();
     configSet = new HashSet<>();
     for (String name : families) {
       TableConfig newConfig = new TableConfig(name,

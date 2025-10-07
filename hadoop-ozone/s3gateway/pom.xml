@@ -63,16 +63,8 @@
       <artifactId>picocli</artifactId>
     </dependency>
     <dependency>
-      <groupId>io.opentracing</groupId>
-      <artifactId>opentracing-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.opentracing</groupId>
-      <artifactId>opentracing-noop</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.opentracing</groupId>
-      <artifactId>opentracing-util</artifactId>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-api</artifactId>
     </dependency>
     <dependency>
       <groupId>jakarta.annotation</groupId>
