@@ -1276,8 +1276,11 @@ public class SnapshotDiffManager implements AutoCloseable {
   /**
    * Resolve the VersionMeta of the ancestor snapshot (fromSnapshotId)
    * that the given snapshot (toSnapshot) was built on.
-   *
    * Traverses the snapshot chain backwards using prevSnapId.
+   *
+   * @param toSnapshot the target snapshot.
+   * @param fromSnapshotId UUID of the source snapshot.
+   * @return the resolved VersionMeta of the source that was used to build the target.
    */
   private OmSnapshotLocalData.VersionMeta resolveBaseVersionMeta(
       OmSnapshotLocalData toSnapshot,
