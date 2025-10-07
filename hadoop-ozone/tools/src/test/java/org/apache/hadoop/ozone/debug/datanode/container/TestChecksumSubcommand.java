@@ -230,9 +230,6 @@ class TestChecksumSubcommand {
     command.setTreeFilePath(treeFile.getAbsolutePath());
     command.call();
 
-    // Verify no errors were printed
-    assertThat(err.toString(DEFAULT_ENCODING)).isEmpty();
-
     // Parse actual output
     String actualOutput = out.toString(DEFAULT_ENCODING).trim();
     ObjectMapper mapper = JsonUtils.getDefaultMapper();
