@@ -2209,20 +2209,12 @@ public class KeyManagerImpl implements KeyManager {
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
     long consumedSize = 0;
-    boolean processedSubPaths = false;
     try (TableIterator<String, ? extends KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
       while (iterator.hasNext() && remainingBufLimit > 0) {
         KeyValue<String, T> entry = iterator.next();
-        T withParentObjectId = entry.getValue();
         final long objectSerializedSize = entry.getValueByteSize();
-        if (!OMFileRequest.isImmediateChild(withParentObjectId.getParentObjectID(),
-            parentInfo.getObjectID())) {
-          processedSubPaths = true;
-          break;
-        }
-        if (!table.isExist(entry.getKey())) {
-          continue;
-        }
+        // No need to check the table again as the value in cache and iterator would be same when directory
+        // deleting service runs.
         if (remainingBufLimit - objectSerializedSize < 0) {
           break;
         }
@@ -2233,8 +2225,7 @@ public class KeyManagerImpl implements KeyManager {
           consumedSize += objectSerializedSize;
         }
       }
-      processedSubPaths = processedSubPaths || (!iterator.hasNext());
-      return new DeleteKeysResult(keyInfos, consumedSize, processedSubPaths);
+      return new DeleteKeysResult(keyInfos, consumedSize, !iterator.hasNext());
     }
   }
 
