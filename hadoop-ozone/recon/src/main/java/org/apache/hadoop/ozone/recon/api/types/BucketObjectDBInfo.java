@@ -40,8 +40,8 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
   @JsonProperty("usedBytes")
   private long usedBytes;
 
-  @JsonProperty("pendingDeleteSnapshotBytes")
-  private long pendingDeleteSnapshotBytes;
+  @JsonProperty("snapshotUsedBytes")
+  private long snapshotUsedBytes;
 
   @JsonProperty("encryptionInfo")
   private BucketEncryptionKeyInfo bekInfo;
@@ -84,7 +84,7 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     this.owner = omBucketInfo.getOwner();
     this.bekInfo = omBucketInfo.getEncryptionKeyInfo();
     this.usedBytes = omBucketInfo.getUsedBytes();
-    this.pendingDeleteSnapshotBytes = omBucketInfo.getSnapshotUsedBytes();
+    this.snapshotUsedBytes = omBucketInfo.getSnapshotUsedBytes();
   }
 
   public String getVolumeName() {
@@ -107,8 +107,8 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     return usedBytes;
   }
 
-  public long getPendingDeleteSnapshotBytes() {
-    return pendingDeleteSnapshotBytes;
+  public long getSnapshotUsedBytes() {
+    return snapshotUsedBytes;
   }
 
   public void setUsedBytes(long usedBytes) {

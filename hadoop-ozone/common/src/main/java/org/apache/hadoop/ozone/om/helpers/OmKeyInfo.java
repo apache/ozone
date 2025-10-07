@@ -58,7 +58,7 @@ public final class OmKeyInfo extends WithParentObjectId
 
   private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
   private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
-  private static final String COMMITTED_KEY_DELETED_FLAG = "COMMITTED_KEY_DELETED";
+  private static final String COMMITTED_KEY_DELETED_FLAG = "CKDEL";
 
   private final String volumeName;
   private final String bucketName;
@@ -943,16 +943,19 @@ public final class OmKeyInfo extends WithParentObjectId
     return getParentObjectID() + OzoneConsts.OM_KEY_PREFIX + getFileName();
   }
 
+  public boolean hasBlocks() {
+    for (OmKeyLocationInfoGroup keyLocationList : getKeyLocationVersions()) {
+      if (keyLocationList.getLocationListCount() != 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public static boolean isKeyEmpty(@Nullable OmKeyInfo keyInfo) {
     if (keyInfo == null) {
       return true;
     }
-    for (OmKeyLocationInfoGroup keyLocationList : keyInfo
-        .getKeyLocationVersions()) {
-      if (keyLocationList.getLocationListCount() != 0) {
-        return false;
-      }
-    }
-    return true;
+    return !keyInfo.hasBlocks();
   }
 }

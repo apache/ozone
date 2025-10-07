@@ -378,8 +378,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     auditMap.put(OzoneConsts.USED_BYTES, String.valueOf(this.usedBytes));
     auditMap.put(OzoneConsts.USED_NAMESPACE,
         String.valueOf(this.usedNamespace));
-    auditMap.put(OzoneConsts.PENDING_DELETE_SNAPSHOT_BYTES, String.valueOf(this.snapshotUsedBytes));
-    auditMap.put(OzoneConsts.PENDING_DELETE_SNAPSHOT_NAMESPACE, String.valueOf(this.snapshotUsedNamespace));
+    auditMap.put(OzoneConsts.SNAPSHOT_USED_BYTES, String.valueOf(this.snapshotUsedBytes));
+    auditMap.put(OzoneConsts.SNAPSHOT_USED_NAMESPACE, String.valueOf(this.snapshotUsedNamespace));
     auditMap.put(OzoneConsts.OWNER, this.owner);
     auditMap.put(OzoneConsts.REPLICATION_TYPE,
         (this.defaultReplicationConfig != null) ?
