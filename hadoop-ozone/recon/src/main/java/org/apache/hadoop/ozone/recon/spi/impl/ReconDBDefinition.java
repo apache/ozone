@@ -85,15 +85,15 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
       FILE_COUNT_BY_SIZE =
       new DBColumnFamilyDefinition<>(
           "fileCountBySizeTable",
-          FileCountBySizeKeyCodec.get(),
+          FileSizeCountKey.getCodec(),
           LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, GlobalStatsValue>
       GLOBAL_STATS =
       new DBColumnFamilyDefinition<>(
-          "globalStatsTable", 
+          "globalStatsTable",
           StringCodec.get(),
-          GlobalStatsValueCodec.get());
+          GlobalStatsValue.getCodec());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(

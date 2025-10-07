@@ -272,7 +272,6 @@ public class OmTableInsightTask implements ReconOmTask {
    */
   private void writeDataToDB(Map<String, Long> dataMap) {
     try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      long currentTime = System.currentTimeMillis();
       for (Entry<String, Long> entry : dataMap.entrySet()) {
         String key = entry.getKey();
         Long value = entry.getValue();

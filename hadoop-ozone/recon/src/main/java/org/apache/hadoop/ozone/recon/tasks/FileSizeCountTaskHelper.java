@@ -148,7 +148,7 @@ public abstract class FileSizeCountTaskHelper {
         // Flush to RocksDB periodically.
         if (fileSizeCountMap.size() >= 100000) {
           // For reprocess, we don't need to check existing values since table was truncated
-          LOG.info("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
+          LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
           writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
           fileSizeCountMap.clear();
         }

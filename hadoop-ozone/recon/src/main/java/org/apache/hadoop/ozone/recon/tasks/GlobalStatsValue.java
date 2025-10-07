@@ -17,19 +17,48 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GlobalStatsValueProto;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+
 /**
  * Value class for global statistics stored in RocksDB.
  * Contains only the statistic value for efficient storage in the GLOBAL_STATS column family.
  */
 public class GlobalStatsValue {
+  private static final Codec<GlobalStatsValue> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(GlobalStatsValueProto.getDefaultInstance()),
+      GlobalStatsValue::fromProto,
+      GlobalStatsValue::toProto,
+      GlobalStatsValue.class);
+
   private final Long value;
 
   public GlobalStatsValue(Long value) {
     this.value = value;
   }
 
+  public static Codec<GlobalStatsValue> getCodec() {
+    return CODEC;
+  }
+
   public Long getValue() {
     return value;
+  }
+
+  public GlobalStatsValueProto toProto() {
+    GlobalStatsValueProto.Builder builder = GlobalStatsValueProto.newBuilder();
+    if (value != null) {
+      builder.setValue(value);
+    } else {
+      builder.setValue(0L);
+    }
+    return builder.build();
+  }
+
+  public static GlobalStatsValue fromProto(GlobalStatsValueProto proto) {
+    return new GlobalStatsValue(proto.getValue());
   }
 
   @Override

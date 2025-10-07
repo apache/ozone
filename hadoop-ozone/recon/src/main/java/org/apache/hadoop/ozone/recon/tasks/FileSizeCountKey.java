@@ -17,12 +17,23 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.FileSizeCountKeyProto;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+
 /**
  * Key class used for grouping file size counts in RocksDB storage.
  * Represents a composite key of (volume, bucket, fileSizeUpperBound) for
  * FILE_COUNT_BY_SIZE column family.
  */
 public class FileSizeCountKey {
+  private static final Codec<FileSizeCountKey> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(FileSizeCountKeyProto.getDefaultInstance()),
+      FileSizeCountKey::fromProto,
+      FileSizeCountKey::toProto,
+      FileSizeCountKey.class);
+
   private final String volume;
   private final String bucket;
   private final Long fileSizeUpperBound;
@@ -31,6 +42,10 @@ public class FileSizeCountKey {
     this.volume = volume;
     this.bucket = bucket;
     this.fileSizeUpperBound = fileSizeUpperBound;
+  }
+
+  public static Codec<FileSizeCountKey> getCodec() {
+    return CODEC;
   }
 
   public String getVolume() {
@@ -45,20 +60,46 @@ public class FileSizeCountKey {
     return fileSizeUpperBound;
   }
 
+  public FileSizeCountKeyProto toProto() {
+    return FileSizeCountKeyProto.newBuilder()
+        .setVolume(volume)
+        .setBucket(bucket)
+        .setFileSizeUpperBound(fileSizeUpperBound)
+        .build();
+  }
+
+  public static FileSizeCountKey fromProto(FileSizeCountKeyProto proto) {
+    return new FileSizeCountKey(
+        proto.getVolume(),
+        proto.getBucket(),
+        proto.getFileSizeUpperBound()
+    );
+  }
+
   @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof FileSizeCountKey) {
-      FileSizeCountKey other = (FileSizeCountKey) obj;
-      return volume.equals(other.volume) &&
-          bucket.equals(other.bucket) &&
-          fileSizeUpperBound.equals(other.fileSizeUpperBound);
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
     }
-    return false;
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    FileSizeCountKey that = (FileSizeCountKey) o;
+    if (!volume.equals(that.volume)) {
+      return false;
+    }
+    if (!bucket.equals(that.bucket)) {
+      return false;
+    }
+    return fileSizeUpperBound.equals(that.fileSizeUpperBound);
   }
 
   @Override
   public int hashCode() {
-    return (volume + bucket + fileSizeUpperBound).hashCode();
+    int result = volume.hashCode();
+    result = 31 * result + bucket.hashCode();
+    result = 31 * result + fileSizeUpperBound.hashCode();
+    return result;
   }
 
   @Override
