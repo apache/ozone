@@ -229,7 +229,7 @@ public class TestECReplicationCheckHandler {
         Pair.of(DECOMMISSIONING, 4), Pair.of(DECOMMISSIONED, 5));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3, null, Long.MAX_VALUE, 0));
 
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
