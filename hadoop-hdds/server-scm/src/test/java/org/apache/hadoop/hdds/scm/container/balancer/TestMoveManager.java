@@ -201,13 +201,13 @@ public class TestMoveManager {
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
-    pendingOps.add(new ContainerReplicaOp(ADD, tgt, 0, null, clock.millis(, null, System.currentTimeMillis(), 0), 0));
+    pendingOps.add(new ContainerReplicaOp(ADD, tgt, 0, null, clock.millis(), 0));
 
     assertMoveFailsWith(REPLICATION_FAIL_INFLIGHT_REPLICATION,
         containerInfo.containerID());
 
     pendingOps.clear();
-    pendingOps.add(new ContainerReplicaOp(DELETE, src, 0, null, clock.millis(, null, System.currentTimeMillis(), 0), 0));
+    pendingOps.add(new ContainerReplicaOp(DELETE, src, 0, null, clock.millis(), 0));
     assertMoveFailsWith(REPLICATION_FAIL_INFLIGHT_DELETION,
         containerInfo.containerID());
   }
