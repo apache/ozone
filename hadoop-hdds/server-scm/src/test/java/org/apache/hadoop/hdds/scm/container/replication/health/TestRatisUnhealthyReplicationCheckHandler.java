@@ -167,7 +167,7 @@ public class TestRatisUnhealthyReplicationCheckHandler {
         = createReplicas(container.containerID(),
         ContainerReplicaProto.State.UNHEALTHY, 0);
     List<ContainerReplicaOp> pendingOps =
-        ImmutableList.of(ContainerReplicaOp.create(
+        ImmutableList.of(new ContainerReplicaOp(
             ContainerReplicaOp.PendingOpType.ADD,
             MockDatanodeDetails.randomDatanodeDetails(), 0));
     requestBuilder.setContainerReplicas(replicas)
@@ -201,7 +201,7 @@ public class TestRatisUnhealthyReplicationCheckHandler {
         = createReplicas(container.containerID(),
         ContainerReplicaProto.State.UNHEALTHY, 0, 0);
     List<ContainerReplicaOp> pendingOps =
-        ImmutableList.of(ContainerReplicaOp.create(
+        ImmutableList.of(new ContainerReplicaOp(
             ContainerReplicaOp.PendingOpType.ADD,
             MockDatanodeDetails.randomDatanodeDetails(), 0));
     requestBuilder.setContainerReplicas(replicas)
@@ -235,7 +235,7 @@ public class TestRatisUnhealthyReplicationCheckHandler {
         = createReplicas(container.containerID(),
         ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps =
-        ImmutableList.of(ContainerReplicaOp.create(
+        ImmutableList.of(new ContainerReplicaOp(
             ContainerReplicaOp.PendingOpType.DELETE,
             replicas.stream().findFirst().get().getDatanodeDetails(), 0));
     requestBuilder.setContainerReplicas(replicas)
@@ -297,7 +297,7 @@ public class TestRatisUnhealthyReplicationCheckHandler {
         = createReplicas(container.containerID(),
         ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps =
-        ImmutableList.of(ContainerReplicaOp.create(
+        ImmutableList.of(new ContainerReplicaOp(
             ContainerReplicaOp.PendingOpType.DELETE,
             replicas.stream().findFirst().get().getDatanodeDetails(), 0));
     requestBuilder.setContainerReplicas(replicas)

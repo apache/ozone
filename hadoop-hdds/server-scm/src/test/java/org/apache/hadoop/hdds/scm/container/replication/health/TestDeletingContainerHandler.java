@@ -174,7 +174,7 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     containerReplicas.forEach(r -> pendingOps.add(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
             r.getDatanodeDetails(), r.getReplicaIndex())));
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 0);
 
@@ -186,7 +186,7 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     pendingOps.clear();
     containerReplicas.forEach(r -> pendingOps.add(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
             r.getDatanodeDetails(), r.getReplicaIndex())));
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 0);
 
@@ -207,7 +207,7 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     containerReplicas.stream().limit(2).forEach(replica -> pendingOps.add(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
             replica.getDatanodeDetails(), replica.getReplicaIndex())));
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 1);
 
@@ -219,7 +219,7 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     pendingOps.clear();
     containerReplicas.stream().limit(3).forEach(replica -> pendingOps.add(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
             replica.getDatanodeDetails(), replica.getReplicaIndex())));
     //since one delete command is end when testing ratis container, so
     //here should be 1+2 = 3 times

@@ -159,7 +159,7 @@ public class TestReplicationManager {
 
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(clock);
+        new ContainerReplicaPendingOps(clock, null);
 
     when(containerManager
         .getContainerReplicas(any(ContainerID.class))).thenAnswer(
@@ -1635,9 +1635,9 @@ public class TestReplicationManager {
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
 
-    ContainerReplicaOp addOp = ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD, dn1, 1);
+    ContainerReplicaOp addOp = new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD, dn1, 1, null, System.currentTimeMillis(), 0);
     ContainerReplicaOp delOp = new ContainerReplicaOp(
-        ContainerReplicaOp.PendingOpType.DELETE, dn2, 1, command, commandDeadline);
+        ContainerReplicaOp.PendingOpType.DELETE, dn2, 1, command, commandDeadline, 0);
 
     replicationManager.opCompleted(addOp, ContainerID.valueOf(1L), false);
     replicationManager.opCompleted(delOp, ContainerID.valueOf(1L), false);

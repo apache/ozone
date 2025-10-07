@@ -92,7 +92,7 @@ public class TestECContainerReplicaCount {
     // appears missing
     ContainerReplicaOp op = new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD,
-        MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE);
+        MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0);
     rcnt.addPendingOp(op);
     assertTrue(rcnt.isSufficientlyReplicated(true));
     assertEquals(0, rcnt.unavailableIndexes(true).size());
@@ -213,7 +213,7 @@ public class TestECContainerReplicaCount {
     // as not over replicated.
     rcnt.addPendingOp(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
-        MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE));
+        MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
     assertFalse(rcnt.isOverReplicated(true));
   }
 
@@ -711,19 +711,19 @@ public class TestECContainerReplicaCount {
     replica.add(unhealthyReplica);
 
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
-    pendingOps.add(ContainerReplicaOp.create(
+    pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
         unhealthyReplica.getDatanodeDetails(),
-        unhealthyReplica.getReplicaIndex()));
+        unhealthyReplica.getReplicaIndex(), null, System.currentTimeMillis(), 0));
 
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, replica, pendingOps, 1);
     assertTrue(rcnt.isSufficientlyReplicated(false));
 
     // Add another pending delete to an index that is not an unhealthy index
-    pendingOps.add(ContainerReplicaOp.create(
+    pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
-        MockDatanodeDetails.randomDatanodeDetails(), 2));
+        MockDatanodeDetails.randomDatanodeDetails(), 2, null, System.currentTimeMillis(), 0));
 
     rcnt = new ECContainerReplicaCount(container, replica, pendingOps, 1);
     assertFalse(rcnt.isSufficientlyReplicated(false));

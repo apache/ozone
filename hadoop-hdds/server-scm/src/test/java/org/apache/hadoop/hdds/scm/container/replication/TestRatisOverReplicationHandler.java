@@ -113,7 +113,7 @@ public class TestRatisOverReplicationHandler {
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
             MockDatanodeDetails.randomDatanodeDetails(), 0));
 
     // 1 replica is already pending delete, so only 1 new command should be
@@ -220,7 +220,7 @@ public class TestRatisOverReplicationHandler {
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         State.UNHEALTHY, 0, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
             MockDatanodeDetails.randomDatanodeDetails(), 0));
 
     // 1 replica is already pending delete, so only 1 new command should be
@@ -409,7 +409,7 @@ public class TestRatisOverReplicationHandler {
     replicas = createReplicas(container.containerID(),
         ContainerReplicaProto.State.CLOSED, 0, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = ImmutableList.of(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
             MockDatanodeDetails.randomDatanodeDetails(), 0));
 
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
