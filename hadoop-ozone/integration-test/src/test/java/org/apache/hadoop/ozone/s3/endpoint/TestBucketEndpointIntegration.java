@@ -30,7 +30,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Integration tests for the refactored BucketEndpoint.get() method.
+ * Integration tests for the refactored {@link BucketEndpoint#get} path.
+ *
+ * Purpose: Validate end-to-end behavior of the S3 list-objects flow after
+ * refactoring, including request parameter handling (delimiter, prefix,
+ * encodingType, maxKeys), pagination flags, and error mapping. These tests
+ * exercise the API surface as a consumer would, not internal helpers.
  */
 public class TestBucketEndpointIntegration {
 
