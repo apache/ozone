@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTest
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStream;
@@ -32,6 +34,7 @@ import java.nio.file.Path;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.container.checksum.ContainerDiffReport;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.junit.jupiter.api.AfterEach;
@@ -84,12 +87,22 @@ public class TestDiffSubcommand {
     File treeFile1 = createTreeFile("tree1.tree", tree.toProto());
     File treeFile2 = createTreeFile("tree2.tree", tree.toProto());
 
-    String output = runDiffCommand(treeFile1, treeFile2);
-    assertThat(output).contains("\"containerID\" : " + CONTAINER_ID);
-    assertThat(output).contains("\"needsRepair\" : false");
-    assertThat(output).contains("\"missingBlocks\" : 0");
-    assertThat(output).contains("\"missingChunks\" : 0");
-    assertThat(output).contains("\"corruptChunks\" : 0");
+    JsonNode result = runDiffCommand(treeFile1, treeFile2);
+    // Verify container ID
+    assertThat(result.get("containerID").asLong()).isEqualTo(CONTAINER_ID);
+    
+    // Verify bidirectional diff: both replicas should show no differences
+    JsonNode replica1 = result.get("replica1");
+    assertThat(replica1.get("needsRepair").asBoolean()).isFalse();
+    assertThat(replica1.get("summary").get("missingBlocks").asLong()).isEqualTo(0);
+    assertThat(replica1.get("summary").get("missingChunks").asLong()).isEqualTo(0);
+    assertThat(replica1.get("summary").get("corruptChunks").asLong()).isEqualTo(0);
+    
+    JsonNode replica2 = result.get("replica2");
+    assertThat(replica2.get("needsRepair").asBoolean()).isFalse();
+    assertThat(replica2.get("summary").get("missingBlocks").asLong()).isEqualTo(0);
+    assertThat(replica2.get("summary").get("missingChunks").asLong()).isEqualTo(0);
+    assertThat(replica2.get("summary").get("corruptChunks").asLong()).isEqualTo(0);
   }
 
   @Test
@@ -98,19 +111,32 @@ public class TestDiffSubcommand {
     ContainerMerkleTreeWriter baseTree = buildTestTree(config);
     
     // Create tree with mismatches
-    Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport> result = 
+    Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport> treeWithMismatches =
         buildTestTreeWithMismatches(baseTree, 1, 2, 1); // 1 missing block, 2 missing chunks, 1 corrupt chunk
-    ContainerProtos.ContainerMerkleTree modifiedTree = result.getLeft();
+    ContainerProtos.ContainerMerkleTree modifiedTree = treeWithMismatches.getLeft();
     
     File treeFile1 = createTreeFile("tree1.tree", modifiedTree);
     File treeFile2 = createTreeFile("tree2.tree", baseTree.toProto());
 
-    String output = runDiffCommand(treeFile1, treeFile2);
-    assertThat(output).contains("\"containerID\" : " + CONTAINER_ID);
-    assertThat(output).contains("\"needsRepair\" : true");
-    assertThat(output).contains("\"missingBlocks\" : 1");
-    assertThat(output).contains("\"missingChunks\" : 2");
-    assertThat(output).contains("\"corruptChunks\" : 1");
+    JsonNode result = runDiffCommand(treeFile1, treeFile2);
+
+    // Verify container ID
+    assertThat(result.get("containerID").asLong()).isEqualTo(CONTAINER_ID);
+    
+    // Verify bidirectional diff:
+    // replica1 (modified tree) should show missing blocks/chunks compared to replica2
+    JsonNode replica1 = result.get("replica1");
+    assertThat(replica1.get("needsRepair").asBoolean()).isTrue();
+    assertThat(replica1.get("summary").get("missingBlocks").asLong()).isEqualTo(1);
+    assertThat(replica1.get("summary").get("missingChunks").asLong()).isEqualTo(2);
+    assertThat(replica1.get("summary").get("corruptChunks").asLong()).isEqualTo(1);
+    
+    // replica2 (base tree) should show no missing blocks (it has everything replica1 has)
+    JsonNode replica2 = result.get("replica2");
+    assertThat(replica2.get("needsRepair").asBoolean()).isFalse();
+    assertThat(replica2.get("summary").get("missingBlocks").asLong()).isEqualTo(0);
+    assertThat(replica2.get("summary").get("missingChunks").asLong()).isEqualTo(0);
+    assertThat(replica2.get("summary").get("corruptChunks").asLong()).isEqualTo(0);
   }
 
   @Test
@@ -122,7 +148,6 @@ public class TestDiffSubcommand {
     RuntimeException exception = assertThrows(RuntimeException.class, () -> 
         runDiffCommand(nonExistentFile1, nonExistentFile2));
 
-    assertThat(err.toString(DEFAULT_ENCODING)).contains("Error: First tree file does not exist");
     assertThat(exception.getMessage()).contains("First tree file does not exist");
   }
 
@@ -138,8 +163,8 @@ public class TestDiffSubcommand {
     RuntimeException exception = assertThrows(RuntimeException.class, () -> 
         runDiffCommand(treeFile1, treeFile2));
 
-    assertThat(err.toString(DEFAULT_ENCODING)).contains("Error: Container IDs do not match");
-    assertThat(exception.getMessage()).isNotNull();
+    assertThat(exception.getMessage()).contains("Failed to compare tree files");
+    assertThat(exception.getCause().getMessage()).contains("Container IDs do not match");
   }
 
   @Test
@@ -156,7 +181,6 @@ public class TestDiffSubcommand {
     RuntimeException exception = assertThrows(RuntimeException.class, () -> 
         runDiffCommand(treeFile1, treeFile2));
 
-    assertThat(err.toString(DEFAULT_ENCODING)).contains("Error reading tree files");
     assertThat(exception.getMessage()).contains("Failed to read tree files");
   }
 
@@ -166,19 +190,32 @@ public class TestDiffSubcommand {
     ContainerMerkleTreeWriter baseTree = buildTestTree(config, 10); // Larger tree for more mismatches
     
     // Create tree with multiple types of mismatches
-    Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport> result = 
+    Pair<ContainerProtos.ContainerMerkleTree, ContainerDiffReport> treeWithMismatches =
         buildTestTreeWithMismatches(baseTree, 3, 5, 2); // 3 missing blocks, 5 missing chunks, 2 corrupt chunks
-    ContainerProtos.ContainerMerkleTree modifiedTree = result.getLeft();
+    ContainerProtos.ContainerMerkleTree modifiedTree = treeWithMismatches.getLeft();
     
     File treeFile1 = createTreeFile("tree1.tree", modifiedTree);
     File treeFile2 = createTreeFile("tree2.tree", baseTree.toProto());
 
-    String output = runDiffCommand(treeFile1, treeFile2);
-    assertThat(output).contains("\"containerID\" : " + CONTAINER_ID);
-    assertThat(output).contains("\"needsRepair\" : true");
-    assertThat(output).contains("\"missingBlocks\" : 3");
-    assertThat(output).contains("\"missingChunks\" : 5");
-    assertThat(output).contains("\"corruptChunks\" : 2");
+    JsonNode result = runDiffCommand(treeFile1, treeFile2);
+
+    // Verify container ID
+    assertThat(result.get("containerID").asLong()).isEqualTo(CONTAINER_ID);
+    
+    // Verify bidirectional diff:
+    // replica1 (modified tree) should show missing/corrupt blocks and chunks
+    JsonNode replica1 = result.get("replica1");
+    assertThat(replica1.get("needsRepair").asBoolean()).isTrue();
+    assertThat(replica1.get("summary").get("missingBlocks").asLong()).isEqualTo(3);
+    assertThat(replica1.get("summary").get("missingChunks").asLong()).isEqualTo(5);
+    assertThat(replica1.get("summary").get("corruptChunks").asLong()).isEqualTo(2);
+    
+    // replica2 (base tree) should show no issues
+    JsonNode replica2 = result.get("replica2");
+    assertThat(replica2.get("needsRepair").asBoolean()).isFalse();
+    assertThat(replica2.get("summary").get("missingBlocks").asLong()).isEqualTo(0);
+    assertThat(replica2.get("summary").get("missingChunks").asLong()).isEqualTo(0);
+    assertThat(replica2.get("summary").get("corruptChunks").asLong()).isEqualTo(0);
   }
 
   @Test
@@ -203,12 +240,23 @@ public class TestDiffSubcommand {
       emptyInfo2.writeTo(fos2);
     }
 
-    String output = runDiffCommand(treeFile1, treeFile2);
-    assertThat(output).contains("\"containerID\" : " + CONTAINER_ID);
-    assertThat(output).contains("\"needsRepair\" : false");
-    assertThat(output).contains("\"missingBlocks\" : 0");
-    assertThat(output).contains("\"missingChunks\" : 0");
-    assertThat(output).contains("\"corruptChunks\" : 0");
+    JsonNode result = runDiffCommand(treeFile1, treeFile2);
+
+    // Verify container ID
+    assertThat(result.get("containerID").asLong()).isEqualTo(CONTAINER_ID);
+    
+    // Verify bidirectional diff: both empty replicas should show no differences
+    JsonNode replica1 = result.get("replica1");
+    assertThat(replica1.get("needsRepair").asBoolean()).isFalse();
+    assertThat(replica1.get("summary").get("missingBlocks").asLong()).isEqualTo(0);
+    assertThat(replica1.get("summary").get("missingChunks").asLong()).isEqualTo(0);
+    assertThat(replica1.get("summary").get("corruptChunks").asLong()).isEqualTo(0);
+    
+    JsonNode replica2 = result.get("replica2");
+    assertThat(replica2.get("needsRepair").asBoolean()).isFalse();
+    assertThat(replica2.get("summary").get("missingBlocks").asLong()).isEqualTo(0);
+    assertThat(replica2.get("summary").get("missingChunks").asLong()).isEqualTo(0);
+    assertThat(replica2.get("summary").get("corruptChunks").asLong()).isEqualTo(0);
   }
 
   private File createTreeFile(String fileName, ContainerProtos.ContainerMerkleTree tree) throws Exception {
@@ -232,10 +280,17 @@ public class TestDiffSubcommand {
   /**
    * Helper method to run DiffSubcommand with two file paths and return output.
    */
-  private String runDiffCommand(File tree1File, File tree2File) throws Exception {
+  private JsonNode runDiffCommand(File tree1File, File tree2File) throws Exception {
     DiffSubcommand command = new DiffSubcommand();
     command.setTreeFilePaths(tree1File.getAbsolutePath(), tree2File.getAbsolutePath());
     command.call();
-    return out.toString(DEFAULT_ENCODING);
+
+    // Verify no errors were printed
+    assertThat(err.toString(DEFAULT_ENCODING)).isEmpty();
+
+    // Parse actual output
+    String actualOutput = out.toString(DEFAULT_ENCODING).trim();
+    ObjectMapper mapper = JsonUtils.getDefaultMapper();
+    return mapper.readTree(actualOutput).get(0);
   }
 }

@@ -48,37 +48,33 @@ import picocli.CommandLine.Command;
     description = "Compare two container checksum tree files and show differences in JSON format")
 public class DiffSubcommand implements Callable<Void> {
 
-  @CommandLine.Option(names = {"--tree1", "-t1"},
-      required = true,
-      description = "Path to the first container checksum tree file (.tree)")
-  private String tree1FilePath;
-
-  @CommandLine.Option(names = {"--tree2", "-t2"},
-      required = true,
-      description = "Path to the second container checksum tree file (.tree)")
-  private String tree2FilePath;
+  @CommandLine.Parameters(index = "0", arity = "2",
+      description = "Paths to two container checksum tree files (.tree) to compare")
+  private List<String> treeFilePaths;
 
   /**
    * Sets the tree file paths. Used for testing.
    */
   @VisibleForTesting
   public void setTreeFilePaths(String tree1Path, String tree2Path) {
-    this.tree1FilePath = tree1Path;
-    this.tree2FilePath = tree2Path;
+    this.treeFilePaths = new ArrayList<>();
+    this.treeFilePaths.add(tree1Path);
+    this.treeFilePaths.add(tree2Path);
   }
 
   @Override
   public Void call() throws Exception {
+    String tree1FilePath = treeFilePaths.get(0);
+    String tree2FilePath = treeFilePaths.get(1);
+    
     File tree1File = new File(tree1FilePath);
     File tree2File = new File(tree2FilePath);
 
     if (!tree1File.exists()) {
-      System.err.println("Error: First tree file does not exist: " + tree1FilePath);
       throw new RuntimeException("First tree file does not exist: " + tree1FilePath);
     }
 
     if (!tree2File.exists()) {
-      System.err.println("Error: Second tree file does not exist: " + tree2FilePath);
       throw new RuntimeException("Second tree file does not exist: " + tree2FilePath);
     }
 
@@ -88,38 +84,29 @@ public class DiffSubcommand implements Callable<Void> {
 
       // Validate that both trees are for the same container
       if (checksumInfo1.getContainerID() != checksumInfo2.getContainerID()) {
-        String errorMsg = "Container IDs do not match. Tree1: " + 
-            checksumInfo1.getContainerID() + ", Tree2: " + checksumInfo2.getContainerID();
-        System.err.println("Error: " + errorMsg);
-        throw new RuntimeException(errorMsg);
+        throw new RuntimeException("Container IDs do not match. Tree1: " + checksumInfo1.getContainerID() +
+            ", Tree2: " + checksumInfo2.getContainerID());
       }
 
-      ContainerDiffReport diffReport = performDiff(checksumInfo1, checksumInfo2);
-      DiffReportWrapper wrapper = new DiffReportWrapper(diffReport, checksumInfo1, checksumInfo2, 
-          tree1FilePath, tree2FilePath);
+      // Perform bidirectional diff
+      ContainerDiffReport diffReport1to2 = performDiff(checksumInfo1, checksumInfo2);
+      ContainerDiffReport diffReport2to1 = performDiff(checksumInfo2, checksumInfo1);
+      
+      DiffReportWrapper wrapper = new DiffReportWrapper(
+          diffReport1to2, diffReport2to1, checksumInfo1, checksumInfo2);
       
       try (SequenceWriter writer = JsonUtils.getStdoutSequenceWriter()) {
         writer.write(wrapper);
         writer.flush();
       }
       System.out.println();
-      System.out.flush();
     } catch (IOException e) {
-      System.err.println("Error reading tree files: " + getExceptionMessage(e));
       throw new RuntimeException("Failed to read tree files", e);
     } catch (Exception e) {
-      System.err.println("Error comparing tree files: " + getExceptionMessage(e));
       throw new RuntimeException("Failed to compare tree files", e);
     }
 
     return null;
-  }
-
-  /**
-   * Extract clean exception message without stack trace for user display.
-   */
-  private String getExceptionMessage(Exception ex) {
-    return ex.getMessage() != null ? ex.getMessage().split("\n", 2)[0] : ex.getClass().getSimpleName();
   }
 
   /**
@@ -146,38 +133,54 @@ public class DiffSubcommand implements Callable<Void> {
    */
   private static class DiffReportWrapper {
     private final long containerID;
-    private final boolean needsRepair;
-    private final TreeInfoWrapper tree1;
-    private final TreeInfoWrapper tree2;
-    private final SummaryWrapper summary;
-    private final DifferencesWrapper differences;
+    private final TreeDiffWrapper replica1;
+    private final TreeDiffWrapper replica2;
 
-    DiffReportWrapper(ContainerDiffReport diffReport, 
+    DiffReportWrapper(ContainerDiffReport diffReport1to2,
+        ContainerDiffReport diffReport2to1,
         ContainerProtos.ContainerChecksumInfo checksumInfo1,
-        ContainerProtos.ContainerChecksumInfo checksumInfo2,
-        String tree1FilePath, String tree2FilePath) {
-      this.containerID = diffReport.getContainerID();
-      this.needsRepair = diffReport.needsRepair();
-      this.tree1 = new TreeInfoWrapper(checksumInfo1, tree1FilePath);
-      this.tree2 = new TreeInfoWrapper(checksumInfo2, tree2FilePath);
-      this.summary = new SummaryWrapper(diffReport);
-      this.differences = new DifferencesWrapper(diffReport);
+        ContainerProtos.ContainerChecksumInfo checksumInfo2) {
+      this.containerID = diffReport1to2.getContainerID();
+      this.replica1 = new TreeDiffWrapper(checksumInfo1, diffReport1to2);
+      this.replica2 = new TreeDiffWrapper(checksumInfo2, diffReport2to1);
     }
 
     public long getContainerID() {
       return containerID;
     }
 
+    public TreeDiffWrapper getReplica1() {
+      return replica1;
+    }
+
+    public TreeDiffWrapper getReplica2() {
+      return replica2;
+    }
+  }
+
+  /**
+   * Wrapper class for tree information with its diff results.
+   */
+  private static class TreeDiffWrapper {
+    @JsonSerialize(using = JsonUtils.ChecksumSerializer.class)
+    private final long dataChecksum;
+    private final boolean needsRepair;
+    private final SummaryWrapper summary;
+    private final DifferencesWrapper differences;
+
+    TreeDiffWrapper(ContainerProtos.ContainerChecksumInfo checksumInfo, ContainerDiffReport diffReport) {
+      this.dataChecksum = hasDataChecksum(checksumInfo) ? checksumInfo.getContainerMerkleTree().getDataChecksum() : 0L;
+      this.needsRepair = diffReport.needsRepair();
+      this.summary = new SummaryWrapper(diffReport);
+      this.differences = new DifferencesWrapper(diffReport);
+    }
+
+    public long getDataChecksum() {
+      return dataChecksum;
+    }
+
     public boolean isNeedsRepair() {
       return needsRepair;
-    }
-
-    public TreeInfoWrapper getTree1() {
-      return tree1;
-    }
-
-    public TreeInfoWrapper getTree2() {
-      return tree2;
     }
 
     public SummaryWrapper getSummary() {
@@ -186,28 +189,6 @@ public class DiffSubcommand implements Callable<Void> {
 
     public DifferencesWrapper getDifferences() {
       return differences;
-    }
-  }
-
-  /**
-   * Wrapper class for tree information.
-   */
-  private static class TreeInfoWrapper {
-    private final String filePath;
-    @JsonSerialize(using = JsonUtils.ChecksumSerializer.class)
-    private final long dataChecksum;
-
-    TreeInfoWrapper(ContainerProtos.ContainerChecksumInfo checksumInfo, String filePath) {
-      this.filePath = filePath;
-      this.dataChecksum = hasDataChecksum(checksumInfo) ? checksumInfo.getContainerMerkleTree().getDataChecksum() : 0L;
-    }
-
-    public String getFilePath() {
-      return filePath;
-    }
-
-    public long getDataChecksum() {
-      return dataChecksum;
     }
   }
 
