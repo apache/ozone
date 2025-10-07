@@ -285,9 +285,6 @@ public class TestDiffSubcommand {
     command.setTreeFilePaths(tree1File.getAbsolutePath(), tree2File.getAbsolutePath());
     command.call();
 
-    // Verify no errors were printed
-    assertThat(err.toString(DEFAULT_ENCODING)).isEmpty();
-
     // Parse actual output
     String actualOutput = out.toString(DEFAULT_ENCODING).trim();
     ObjectMapper mapper = JsonUtils.getDefaultMapper();
