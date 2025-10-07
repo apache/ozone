@@ -159,6 +159,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       long quotaReleased = sumBlockLengths(omKeyInfo);
+      // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
       boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);
       omBucketInfo.decrUsedBytes(quotaReleased, isKeyNonEmpty);
       omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty);
