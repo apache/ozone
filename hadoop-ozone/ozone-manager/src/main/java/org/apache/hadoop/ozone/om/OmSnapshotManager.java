@@ -625,7 +625,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   /**
    * Captures the list of SST files for keyTable, fileTable and directoryTable in the DB.
-   * @param store AOS or snapshot DB for uncompacted or compacted snapshot respectively.
+   * @param store AOS or snapshot DB for not defragged or defragged snapshot respectively.
    * @return a Map of (table, set of SST files corresponding to the table)
    */
   private static List<LiveFileMetaData> getSnapshotSSTFileList(RDBStore store)
@@ -636,7 +636,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Creates and writes snapshot local properties to a YAML file with uncompacted SST file list.
+   * Creates and writes snapshot local properties to a YAML file with not defragged SST file list.
    * @param snapshotManager snapshot manager instance.
    * @param snapshotStore snapshot metadata manager.
    * @param snapshotInfo snapshot info instance corresponding to snapshot.

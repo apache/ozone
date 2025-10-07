@@ -1219,6 +1219,7 @@ message DirectoryInfo {
 
 message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
+    optional uint64 bucketId = 2;
 }
 
 message OzoneFileStatusProto {
@@ -1438,6 +1439,14 @@ message PurgeDirectoriesRequest {
   optional string snapshotTableKey = 2;
   // previous snapshotID can also be null & this field would be absent in older requests.
   optional NullableUUID expectedPreviousSnapshotID = 3;
+  repeated BucketNameInfo bucketNameInfos = 4;
+}
+
+message BucketNameInfo {
+  optional uint64 volumeId = 1;
+  optional uint64 bucketId = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
 }
 
 message NullableUUID {
@@ -2042,6 +2051,7 @@ message SnapshotMoveTableKeysRequest {
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
+  optional uint64 bucketId = 3;
 }
 
 message SnapshotPurgeRequest {

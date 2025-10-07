@@ -282,20 +282,20 @@ class TestOmSnapshotManager {
   public void testCreateNewSnapshotLocalYaml() throws IOException {
     SnapshotInfo snapshotInfo = createSnapshotInfo("vol1", "buck1");
 
-    Map<String, List<String>> expUncompactedSSTFileList = new TreeMap<>();
-    OmSnapshotLocalData.VersionMeta uncompactedVersionMeta = new OmSnapshotLocalData.VersionMeta(0,
+    Map<String, List<String>> expNotDefraggedSSTFileList = new TreeMap<>();
+    OmSnapshotLocalData.VersionMeta notDefraggedVersionMeta = new OmSnapshotLocalData.VersionMeta(0,
         ImmutableList.of(new SstFileInfo("dt1.sst", "k1", "k2", DIRECTORY_TABLE),
             new SstFileInfo("dt2.sst", "k1", "k2", DIRECTORY_TABLE),
             new SstFileInfo("ft1.sst", "k1", "k2", FILE_TABLE),
             new SstFileInfo("ft2.sst", "k1", "k2", FILE_TABLE),
             new SstFileInfo("kt1.sst", "k1", "k2", KEY_TABLE),
             new SstFileInfo("kt2.sst", "k1", "k2", KEY_TABLE)));
-    expUncompactedSSTFileList.put(KEY_TABLE, Stream.of("kt1.sst", "kt2.sst").collect(Collectors.toList()));
-    expUncompactedSSTFileList.put(FILE_TABLE, Stream.of("ft1.sst", "ft2.sst").collect(Collectors.toList()));
-    expUncompactedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1.sst", "dt2.sst").collect(Collectors.toList()));
+    expNotDefraggedSSTFileList.put(KEY_TABLE, Stream.of("kt1.sst", "kt2.sst").collect(Collectors.toList()));
+    expNotDefraggedSSTFileList.put(FILE_TABLE, Stream.of("ft1.sst", "ft2.sst").collect(Collectors.toList()));
+    expNotDefraggedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1.sst", "dt2.sst").collect(Collectors.toList()));
 
     List<LiveFileMetaData> mockedLiveFiles = new ArrayList<>();
-    for (Map.Entry<String, List<String>> entry : expUncompactedSSTFileList.entrySet()) {
+    for (Map.Entry<String, List<String>> entry : expNotDefraggedSSTFileList.entrySet()) {
       String cfname = entry.getKey();
       for (String fname : entry.getValue()) {
         mockedLiveFiles.add(createMockLiveFileMetadata(cfname, fname));
@@ -325,10 +325,10 @@ class TestOmSnapshotManager {
     OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, snapshotYaml.toFile());
     assertNotNull(localData);
     assertEquals(0, localData.getVersion());
-    assertEquals(uncompactedVersionMeta, localData.getVersionSstFileInfos().get(0));
+    assertEquals(notDefraggedVersionMeta, localData.getVersionSstFileInfos().get(0));
     assertFalse(localData.getSstFiltered());
-    assertEquals(0L, localData.getLastCompactionTime());
-    assertFalse(localData.getNeedsCompaction());
+    assertEquals(0L, localData.getLastDefragTime());
+    assertFalse(localData.getNeedsDefrag());
     assertEquals(1, localData.getVersionSstFileInfos().size());
 
     // Cleanup

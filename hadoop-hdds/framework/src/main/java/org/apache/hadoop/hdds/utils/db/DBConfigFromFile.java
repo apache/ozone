@@ -82,7 +82,7 @@ public final class DBConfigFromFile {
    */
   public static String getOptionsFileNameFromDB(String dbFileName) {
     Preconditions.checkNotNull(dbFileName);
-    return dbFileName + ".ini";
+    return dbFileName.isEmpty() ? "" : dbFileName + ".ini";
   }
 
   /**
@@ -113,6 +113,9 @@ public final class DBConfigFromFile {
    */
   public static ManagedDBOptions readDBOptionsFromFile(Path dbPath) throws RocksDBException {
     Path generatedDBPath = generateDBPath(dbPath);
+    if (generatedDBPath.toString().isEmpty()) {
+      return null;
+    }
     if (!generatedDBPath.toFile().exists()) {
       LOG.warn("Error trying to read generated rocksDB file: {}, file does not exists.", generatedDBPath);
       return null;
@@ -137,6 +140,9 @@ public final class DBConfigFromFile {
   public static ManagedColumnFamilyOptions readCFOptionsFromFile(Path optionsPath, String cfName)
       throws RocksDBException {
     Path generatedDBPath = generateDBPath(optionsPath);
+    if (generatedDBPath.toString().isEmpty()) {
+      return null;
+    }
     if (!generatedDBPath.toFile().exists()) {
       LOG.warn("Error trying to read column family options from file: {}, file does not exists.", generatedDBPath);
       return null;
@@ -173,6 +179,10 @@ public final class DBConfigFromFile {
    * @throws RocksDBException
    */
   private static Path generateDBPath(Path path) {
+    String dbPath = path == null ? "" : path.toString();
+    if (dbPath.isEmpty()) {
+      return Paths.get("");
+    }
     if (path.toFile().exists()) {
       LOG.debug("RocksDB path found: {}, opening db from it.", path);
       return path;
@@ -190,5 +200,4 @@ public final class DBConfigFromFile {
     LOG.info("No RocksDB path found");
     return Paths.get("");
   }
-
 }
