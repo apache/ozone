@@ -80,7 +80,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   }
 
   boolean isPreviousPurgeTransactionFlushed() throws IOException {
-    TransactionInfo lastAOSTransactionId = metrics.getLastAOSTransactionId();
+    TransactionInfo lastAOSTransactionId = metrics.getLastAOSTransactionInfo();
     TransactionInfo flushedTransactionId = TransactionInfo.readTransactionInfo(
         getOzoneManager().getMetadataManager());
     if (flushedTransactionId != null && lastAOSTransactionId.compareTo(flushedTransactionId) > 0) {

@@ -299,12 +299,12 @@ public final class DeletingServiceMetrics {
     return snapKeysNotReclaimableLast.value();
   }
 
-  public synchronized TransactionInfo getLastAOSTransactionId() {
+  public synchronized TransactionInfo getLastAOSTransactionInfo() {
     return TransactionInfo.valueOf(lastAOSPurgeTermId.value(), lastAOSPurgeTransactionId.value());
   }
 
   public synchronized void setLastAOSTransactionInfo(TransactionInfo transactionInfo) {
-    TransactionInfo previousTransactionInfo = getLastAOSTransactionId();
+    TransactionInfo previousTransactionInfo = getLastAOSTransactionInfo();
     if (transactionInfo.compareTo(previousTransactionInfo) > 0) {
       this.lastAOSPurgeTermId.set(transactionInfo.getTerm());
       this.lastAOSPurgeTransactionId.set(transactionInfo.getTransactionIndex());
