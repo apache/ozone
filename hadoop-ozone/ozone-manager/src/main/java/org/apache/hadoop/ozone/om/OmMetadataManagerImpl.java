@@ -1336,8 +1336,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         count += 1;
         keyValueTableIterator.next();
       }
-    } catch (UncheckedIOException e) {
-      throw e.getCause();
     }
     return count;
   }
