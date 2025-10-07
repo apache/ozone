@@ -37,7 +37,6 @@ import MultiSelect, { Option } from '@/v2/components/select/multiSelect';
 import DatanodesTable, { COLUMNS } from '@/v2/components/tables/datanodesTable';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import { showDataFetchError } from '@/utils/common';
-import { AutoReloadHelper } from '@/utils/autoReloadHelper';
 import { useApiData } from '@/v2/hooks/useAPIData.hook';
 
 import { useDebounce } from '@/v2/hooks/useDebounce';
@@ -50,6 +49,7 @@ import {
 } from '@/v2/types/datanode.types';
 
 import './datanodes.less'
+import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
 
 // Type for decommission API response
 type DecommissionAPIResponse = {
@@ -200,14 +200,14 @@ const Datanodes: React.FC<{}> = () => {
     }
   }, [decommissionAPI.loading, datanodesAPI.loading, decommissionAPI.data, datanodesAPI.data]);
 
-  const autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
+  const autoReload = useAutoReload(loadData);
 
   useEffect(() => {
-    autoReloadHelper.startPolling();
+    autoReload.startPolling();
     loadData();
 
     return (() => {
-      autoReloadHelper.stopPolling();
+      autoReload.stopPolling();
     });
   }, []);
 
@@ -234,7 +234,7 @@ const Datanodes: React.FC<{}> = () => {
         <AutoReloadPanel
           isLoading={loading}
           lastRefreshed={lastUpdated}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle}
+          togglePolling={autoReload.handleAutoReloadToggle}
           onReload={loadData} />
       </div>
       <div className='data-container'>

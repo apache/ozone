@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useRef, useState } from "react";
+import React, { useState, useCallback } from "react";
 import moment from "moment";
 import { Card, Row, Tabs } from "antd";
 import { ValueType } from "react-select/src/types";
@@ -26,9 +26,9 @@ import MultiSelect, { Option } from "@/v2/components/select/multiSelect";
 import ContainerTable, { COLUMNS } from "@/v2/components/tables/containersTable";
 import AutoReloadPanel from "@/components/autoReloadPanel/autoReloadPanel";
 import { showDataFetchError } from "@/utils/common";
-import { AutoReloadHelper } from "@/utils/autoReloadHelper";
-import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
 import { useDebounce } from "@/v2/hooks/useDebounce";
+import { useApiData } from "@/v2/hooks/useAPIData.hook";
+import { useAutoReload } from "@/v2/hooks/useAutoReload.hook";
 
 import {
   Container,
@@ -37,7 +37,6 @@ import {
 } from "@/v2/types/container.types";
 
 import './containers.less';
-
 
 const SearchableColumnOpts = [{
   label: 'Container ID',
@@ -52,10 +51,11 @@ const defaultColumns = COLUMNS.map(column => ({
   value: column.key as string
 }));
 
+const DEFAULT_CONTAINERS_RESPONSE = {
+  containers: []
+};
+
 const Containers: React.FC<{}> = () => {
-
-  const cancelSignal = useRef<AbortController>();
-
   const [state, setState] = useState<ContainerState>({
     lastUpdated: 0,
     columnOptions: defaultColumns,
@@ -66,8 +66,6 @@ const Containers: React.FC<{}> = () => {
     mismatchedReplicaContainerData: []
   });
   const [expandedRow, setExpandedRow] = useState<ExpandedRow>({});
-
-  const [loading, setLoading] = useState<boolean>(false);
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedTab, setSelectedTab] = useState<string>('1');
@@ -75,18 +73,21 @@ const Containers: React.FC<{}> = () => {
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
-  function loadData() {
-    setLoading(true);
+  // Use the modern hooks pattern
+  const containersData = useApiData<{ containers: Container[] }>(
+    '/api/v1/containers/unhealthy',
+    DEFAULT_CONTAINERS_RESPONSE,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
 
-    const { request, controller } = AxiosGetHelper(
-      '/api/v1/containers/unhealthy',
-      cancelSignal.current
-    );
-
-    cancelSignal.current = controller;
-
-    request.then(response => {
-      const containers: Container[] = response.data.containers;
+  // Process containers data when it changes
+  React.useEffect(() => {
+    if (containersData.data && containersData.data.containers) {
+      const containers: Container[] = containersData.data.containers;
 
       const missingContainerData: Container[] = containers?.filter(
         container => container.containerState === 'MISSING'
@@ -101,107 +102,81 @@ const Containers: React.FC<{}> = () => {
         container => container.containerState === 'MIS_REPLICATED'
       ) ?? [];
       const mismatchedReplicaContainerData: Container[] = containers?.filter(
-        container => container.containerState === 'REPLICA_MISMATCH'
+        container => container.containerState === 'MISMATCHED_REPLICA'
       ) ?? [];
 
       setState({
         ...state,
-        missingContainerData: missingContainerData,
-        underReplicatedContainerData: underReplicatedContainerData,
-        overReplicatedContainerData: overReplicatedContainerData,
-        misReplicatedContainerData: misReplicatedContainerData,
-        mismatchedReplicaContainerData: mismatchedReplicaContainerData,
+        missingContainerData,
+        underReplicatedContainerData,
+        overReplicatedContainerData,
+        misReplicatedContainerData,
+        mismatchedReplicaContainerData,
         lastUpdated: Number(moment())
       });
-      setLoading(false)
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError(error);
-    });
-  }
+    }
+  }, [containersData.data]);
 
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
   }
 
-  const autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
-
-  React.useEffect(() => {
-    autoReloadHelper.startPolling();
-    loadData();
-
-    return (() => {
-      autoReloadHelper.stopPolling();
-      cancelRequests([cancelSignal.current!])
-    })
-  }, []);
-
-  const {
-    lastUpdated, columnOptions,
-    missingContainerData, underReplicatedContainerData,
-    overReplicatedContainerData, misReplicatedContainerData, mismatchedReplicaContainerData
-  } = state;
-
-  // Mapping the data to the Tab keys for enabling/disabling search
-  const dataToTabKeyMap: Record<string, Container[]> = {
-    1: missingContainerData,
-    2: underReplicatedContainerData,
-    3: overReplicatedContainerData,
-    4: misReplicatedContainerData,
-    5: mismatchedReplicaContainerData
+  function handleTagClose(label: string) {
+    setSelectedColumns(
+      selectedColumns.filter((column) => column.label !== label)
+    );
   }
 
-  const highlightData = (
-    <div style={{
-        display: 'flex',
-        width: '90%',
-        justifyContent: 'space-between'
-      }}>
-      <div className='highlight-content'>
-        Missing <br/>
-        <span className='highlight-content-value'>{missingContainerData?.length ?? 'N/A'}</span>
-      </div>
-      <div className='highlight-content'>
-        Under-Replicated <br/>
-        <span className='highlight-content-value'>{underReplicatedContainerData?.length ?? 'N/A'}</span>
-      </div>
-      <div className='highlight-content'>
-        Over-Replicated <br/>
-        <span className='highlight-content-value'>{overReplicatedContainerData?.length ?? 'N/A'}</span>
-      </div>
-      <div className='highlight-content'>
-        Mis-Replicated <br/>
-        <span className='highlight-content-value'>{misReplicatedContainerData?.length ?? 'N/A'}</span>
-      </div>
-      <div className='highlight-content'>
-        Mismatched Replicas <br/>
-        <span className='highlight-content-value'>{mismatchedReplicaContainerData?.length ?? 'N/A'}</span>
-      </div>
-    </div>
-  )
+  function handleTabChange(key: string) {
+    setSelectedTab(key);
+  }
+
+  // Create refresh function for auto-reload
+  const loadContainersData = () => {
+    containersData.refetch();
+  };
+
+  const autoReload = useAutoReload(loadContainersData);
+
+  const {
+    lastUpdated,
+    columnOptions,
+    missingContainerData,
+    underReplicatedContainerData,
+    overReplicatedContainerData,
+    misReplicatedContainerData,
+    mismatchedReplicaContainerData
+  } = state;
+
+  const getCurrentTabData = () => {
+    switch (selectedTab) {
+      case '1':
+        return missingContainerData;
+      case '2':
+        return underReplicatedContainerData;
+      case '3':
+        return overReplicatedContainerData;
+      case '4':
+        return misReplicatedContainerData;
+      case '5':
+        return mismatchedReplicaContainerData;
+      default:
+        return missingContainerData;
+    }
+  };
 
   return (
     <>
       <div className='page-header-v2'>
         Containers
         <AutoReloadPanel
-          isLoading={loading}
+          isLoading={containersData.loading}
           lastRefreshed={lastUpdated}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle}
-          onReload={loadData}
+          togglePolling={autoReload.handleAutoReloadToggle}
+          onReload={loadContainersData}
         />
       </div>
-      <div style={{ padding: '24px' }}>
-        <div style={{ marginBottom: '12px' }}>
-          <Card
-            title='Highlights'
-            loading={loading}>
-              <Row
-                align='middle'>
-                  {highlightData}
-                </Row>
-          </Card>
-        </div>
+      <div className='data-container'>
         <div className='content-div'>
           <div className='table-header-section'>
             <div className='table-filter-section'>
@@ -211,12 +186,12 @@ const Containers: React.FC<{}> = () => {
                 selected={selectedColumns}
                 placeholder='Columns'
                 onChange={handleColumnChange}
+                onTagClose={handleTagClose}
                 fixedColumn='containerID'
-                onTagClose={() => { }}
-                columnLength={columnOptions.length} />
+                columnLength={COLUMNS.length} />
             </div>
             <Search
-              disabled={dataToTabKeyMap[selectedTab]?.length < 1}
+              disabled={getCurrentTabData()?.length < 1}
               searchOptions={SearchableColumnOpts}
               searchInput={searchTerm}
               searchColumn={searchColumn}
@@ -228,74 +203,60 @@ const Containers: React.FC<{}> = () => {
                 setSearchColumn(value as 'containerID' | 'pipelineID');
               }} />
           </div>
-          <Tabs defaultActiveKey='1'
-            onChange={(activeKey: string) => setSelectedTab(activeKey)}>
-            <Tabs.TabPane
-              key='1'
-              tab='Missing'>
-              <ContainerTable
-                data={missingContainerData}
-                loading={loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane
-              key='2'
-              tab='Under-Replicated'>
-              <ContainerTable
-                data={underReplicatedContainerData}
-                loading={loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane
-              key='3'
-              tab='Over-Replicated'>
-              <ContainerTable
-                data={overReplicatedContainerData}
-                loading={loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane
-              key='4'
-              tab='Mis-Replicated'>
-              <ContainerTable
-                data={misReplicatedContainerData}
-                loading={loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
-            <Tabs.TabPane
-              key='5'
-              tab='Mismatched Replicas'>
-              <ContainerTable
-                data={mismatchedReplicaContainerData}
-                loading={loading}
-                searchColumn={searchColumn}
-                searchTerm={debouncedSearch}
-                selectedColumns={selectedColumns}
-                expandedRow={expandedRow}
-                expandedRowSetter={setExpandedRow}
-              />
-            </Tabs.TabPane>
-          </Tabs>
+          <Card>
+            <Tabs activeKey={selectedTab} onChange={handleTabChange}>
+              <Tabs.TabPane tab={`Missing (${missingContainerData.length})`} key="1">
+                <ContainerTable
+                  loading={containersData.loading}
+                  data={missingContainerData}
+                  searchColumn={searchColumn}
+                  searchTerm={debouncedSearch}
+                  selectedColumns={selectedColumns}
+                  expandedRow={expandedRow}
+                  expandedRowSetter={setExpandedRow} />
+              </Tabs.TabPane>
+              <Tabs.TabPane tab={`Under Replicated (${underReplicatedContainerData.length})`} key="2">
+                <ContainerTable
+                  loading={containersData.loading}
+                  data={underReplicatedContainerData}
+                  searchColumn={searchColumn}
+                  searchTerm={debouncedSearch}
+                  selectedColumns={selectedColumns}
+                  expandedRow={expandedRow}
+                  expandedRowSetter={setExpandedRow} />
+              </Tabs.TabPane>
+              <Tabs.TabPane tab={`Over Replicated (${overReplicatedContainerData.length})`} key="3">
+                <ContainerTable
+                  loading={containersData.loading}
+                  data={overReplicatedContainerData}
+                  searchColumn={searchColumn}
+                  searchTerm={debouncedSearch}
+                  selectedColumns={selectedColumns}
+                  expandedRow={expandedRow}
+                  expandedRowSetter={setExpandedRow} />
+              </Tabs.TabPane>
+              <Tabs.TabPane tab={`Mis Replicated (${misReplicatedContainerData.length})`} key="4">
+                <ContainerTable
+                  loading={containersData.loading}
+                  data={misReplicatedContainerData}
+                  searchColumn={searchColumn}
+                  searchTerm={debouncedSearch}
+                  selectedColumns={selectedColumns}
+                  expandedRow={expandedRow}
+                  expandedRowSetter={setExpandedRow} />
+              </Tabs.TabPane>
+              <Tabs.TabPane tab={`Mismatched Replica (${mismatchedReplicaContainerData.length})`} key="5">
+                <ContainerTable
+                  loading={containersData.loading}
+                  data={mismatchedReplicaContainerData}
+                  searchColumn={searchColumn}
+                  searchTerm={debouncedSearch}
+                  selectedColumns={selectedColumns}
+                  expandedRow={expandedRow}
+                  expandedRowSetter={setExpandedRow} />
+              </Tabs.TabPane>
+            </Tabs>
+          </Card>
         </div>
       </div>
     </>

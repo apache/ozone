@@ -125,12 +125,13 @@ const NUMetadata: React.FC<MetadataProps> = ({
 }) => {
   const [state, setState] = useState<MetadataState>([]);
   const [isProcessingData, setIsProcessingData] = useState<boolean>(false);
-  
   // Individual API calls that resolve together
   const summaryAPI = useApiData<SummaryResponse>(
     `/api/v1/namespace/summary?path=${path}`,
     {} as SummaryResponse,
     {
+      retryAttempts: 2,
+      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -139,11 +140,21 @@ const NUMetadata: React.FC<MetadataProps> = ({
     `/api/v1/namespace/quota?path=${path}`,
     {},
     {
+      retryAttempts: 2,
+      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
   
   const loading = summaryAPI.loading || quotaAPI.loading || isProcessingData;
+
+  // Refetch data when path changes
+  useEffect(() => {
+    if (path) {
+      summaryAPI.refetch();
+      quotaAPI.refetch();
+    }
+  }, [path]);
 
   const getObjectInfoMapping = useCallback((summaryResponse) => {
     const data: MetadataState = [];
