@@ -206,7 +206,8 @@ public class BucketEndpoint extends EndpointBase {
     private final Iterator<? extends OzoneKey> ozoneKeyIterator;
     private final ContinueToken decodedToken;
 
-    public BucketListingContext(String bucketName, String delimiter, String encodingType,
+    @SuppressWarnings("parameternumber")
+    BucketListingContext(String bucketName, String delimiter, String encodingType,
                                String marker, int maxKeys, String prefix, String continueToken,
                                String startAfter, String prevKey, boolean shallow,
                                OzoneBucket bucket, Iterator<? extends OzoneKey> ozoneKeyIterator,
@@ -227,19 +228,57 @@ public class BucketEndpoint extends EndpointBase {
     }
 
     // Getters
-    public String getBucketName() { return bucketName; }
-    public String getDelimiter() { return delimiter; }
-    public String getEncodingType() { return encodingType; }
-    public String getMarker() { return marker; }
-    public int getMaxKeys() { return maxKeys; }
-    public String getPrefix() { return prefix; }
-    public String getContinueToken() { return continueToken; }
-    public String getStartAfter() { return startAfter; }
-    public String getPrevKey() { return prevKey; }
-    public boolean isShallow() { return shallow; }
-    public OzoneBucket getBucket() { return bucket; }
-    public Iterator<? extends OzoneKey> getOzoneKeyIterator() { return ozoneKeyIterator; }
-    public ContinueToken getDecodedToken() { return decodedToken; }
+    public String getBucketName() {
+      return bucketName;
+    }
+
+    public String getDelimiter() {
+      return delimiter;
+    }
+
+    public String getEncodingType() {
+      return encodingType;
+    }
+
+    public String getMarker() {
+      return marker;
+    }
+
+    public int getMaxKeys() {
+      return maxKeys;
+    }
+
+    public String getPrefix() {
+      return prefix;
+    }
+
+    public String getContinueToken() {
+      return continueToken;
+    }
+
+    public String getStartAfter() {
+      return startAfter;
+    }
+
+    public String getPrevKey() {
+      return prevKey;
+    }
+
+    public boolean isShallow() {
+      return shallow;
+    }
+
+    public OzoneBucket getBucket() {
+      return bucket;
+    }
+
+    public Iterator<? extends OzoneKey> getOzoneKeyIterator() {
+      return ozoneKeyIterator;
+    }
+
+    public ContinueToken getDecodedToken() {
+      return decodedToken;
+    }
   }
 
   /**
@@ -258,6 +297,7 @@ public class BucketEndpoint extends EndpointBase {
   /**
    * Validate and prepare parameters for bucket listing.
    */
+  @SuppressWarnings({"parameternumber", "checkstyle:ParameterNumber"})
   BucketListingContext validateAndPrepareParameters(
       String bucketName, String delimiter, String encodingType, String marker,
       int maxKeys, String prefix, String continueToken, String startAfter)
@@ -302,6 +342,7 @@ public class BucketEndpoint extends EndpointBase {
   /**
    * Initialize ListObjectResponse object.
    */
+  @SuppressWarnings({"parameternumber", "checkstyle:ParameterNumber"})
   ListObjectResponse initializeListObjectResponse(
       String bucketName, String delimiter, String encodingType, String marker,
       int maxKeys, String prefix, String continueToken, String startAfter) {

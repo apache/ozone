@@ -36,12 +36,11 @@ import org.junit.jupiter.api.Test;
 public class TestBucketEndpointRefactoredSimple {
 
   private BucketEndpoint bucketEndpoint;
-  private OzoneClientStub client;
 
   @BeforeEach
   public void setUp() throws IOException {
     bucketEndpoint = new BucketEndpoint();
-    client = new OzoneClientStub();
+    OzoneClientStub client = new OzoneClientStub();
     
     bucketEndpoint.setClient(client);
     bucketEndpoint.setRequestIdentifier(new RequestIdentifier());
