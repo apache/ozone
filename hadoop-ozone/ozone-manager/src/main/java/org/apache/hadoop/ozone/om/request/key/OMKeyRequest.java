@@ -890,7 +890,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * @return the number of bytes used by blocks pointed to by {@code omKeyInfo}.
+   * @return the number of bytes (replicated size) used by blocks pointed to by {@code omKeyInfo}.
    */
   public static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;

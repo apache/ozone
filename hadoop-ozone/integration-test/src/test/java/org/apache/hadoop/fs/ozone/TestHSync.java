@@ -126,6 +126,7 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
@@ -1375,14 +1376,9 @@ public class TestHSync {
       }, 100, 5000);
       // verify bucket info
       ozoneManager.getKeyManager().getDeletingService().resume();
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes ==
-              volume.getBucket(bucket.getName()).getUsedBytes();
-        } catch (IOException e) {
-          return false;
-        }
-      }, 1000, 30000);
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
+          keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes ==
+          volume.getBucket(bucket.getName()).getUsedBytes(), 1000, 30000);
     } finally {
       cleanupDeletedTable(ozoneManager);
       cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
@@ -1456,14 +1452,9 @@ public class TestHSync {
       }
 
       // verify bucket info
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes ==
-              volume.getBucket(bucket.getName()).getUsedBytes();
-        } catch (IOException e) {
-          return false;
-        }
-      }, 1000, 30000);
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
+          keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes ==
+              volume.getBucket(bucket.getName()).getUsedBytes(), 1000, 30000);
     } finally {
       cleanupDeletedTable(ozoneManager);
       cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);
@@ -1540,14 +1531,9 @@ public class TestHSync {
       }
       ozoneManager.getKeyManager().getDeletingService().resume();
       // verify bucket info
-      GenericTestUtils.waitFor(() -> {
-        try {
-          return keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() +
-              usedBytes == volume.getBucket(bucket.getName()).getUsedBytes();
-        } catch (IOException e) {
-          return false;
-        }
-      }, 100, 30000);
+      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
+          keyInfo.getDataSize() * keyInfo.getReplicationConfig().getRequiredNodes() + usedBytes ==
+              volume.getBucket(bucket.getName()).getUsedBytes(), 100, 30000);
     } finally {
       cleanupDeletedTable(ozoneManager);
       cleanupOpenKeyTable(ozoneManager, BUCKET_LAYOUT);

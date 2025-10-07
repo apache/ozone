@@ -324,18 +324,17 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           bucketDeleteKeys.addKeys(deletedKey);
           int estimatedKeySize = ProtobufUtils.computeRepeatedStringSize(deletedKey);
           currSize.addAndGet(estimatedKeySize);
-          BucketPurgeSize purgeSize = bucketPurgeKeysSizeMap.computeIfAbsent(purgedKey.getBucketId(),
-              (bucketId) -> {
-                BucketPurgeSize bucketPurgeSize = new BucketPurgeSize(purgedKey.getVolume(),
-                    purgedKey.getBucket(), purgedKey.getBucketId());
-                currSize.addAndGet(bucketPurgeSize.getEstimatedSize());
-                return bucketPurgeSize;
-              });
-          purgeSize.incrementPurgedNamespace(1);
           if (purgedKey.isCommittedKey()) {
-            purgeSize.incrementPurgedBytes(purgedKey.getPurgedBytes());
+            bucketPurgeKeysSizeMap.computeIfAbsent(purgedKey.getBucketId(),
+                    (bucketId) -> {
+                      BucketPurgeSize bucketPurgeSize = new BucketPurgeSize(purgedKey.getVolume(),
+                          purgedKey.getBucket(), purgedKey.getBucketId());
+                      currSize.addAndGet(bucketPurgeSize.getEstimatedSize());
+                      return bucketPurgeSize;
+                    }).incrementPurgedBytes(purgedKey.getPurgedBytes())
+                .incrementPurgedNamespace(1);
           }
-        } else {
+        } else if (purgedKey.isCommittedKey()) {
           modifiedKeyPurgedKeys.computeIfAbsent(deletedKey, k -> new ArrayList<>()).add(purgedKey);
         }
         purgeKeyIndex++;
@@ -348,16 +347,15 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         requestBuilder.addKeysToUpdate(nextUpdate);
         if (modifiedKeyPurgedKeys.containsKey(nextUpdate.getKey())) {
           for (PurgedKey purgedKey : modifiedKeyPurgedKeys.get(nextUpdate.getKey())) {
-            BucketPurgeSize purgeSize = bucketPurgeKeysSizeMap.computeIfAbsent(purgedKey.getBucketId(),
-                (bucketId) -> {
-                  BucketPurgeSize bucketPurgeSize = new BucketPurgeSize(purgedKey.getVolume(),
-                      purgedKey.getBucket(), purgedKey.getBucketId());
-                  currSize.addAndGet(bucketPurgeSize.getEstimatedSize());
-                  return bucketPurgeSize;
-                });
-            purgeSize.incrementPurgedNamespace(1);
             if (purgedKey.isCommittedKey()) {
-              purgeSize.incrementPurgedBytes(purgedKey.getPurgedBytes());
+              bucketPurgeKeysSizeMap.computeIfAbsent(purgedKey.getBucketId(),
+                      (bucketId) -> {
+                        BucketPurgeSize bucketPurgeSize = new BucketPurgeSize(purgedKey.getVolume(),
+                            purgedKey.getBucket(), purgedKey.getBucketId());
+                        currSize.addAndGet(bucketPurgeSize.getEstimatedSize());
+                        return bucketPurgeSize;
+                      }).incrementPurgedBytes(purgedKey.getPurgedBytes())
+                  .incrementPurgedNamespace(1);
             }
           }
         }

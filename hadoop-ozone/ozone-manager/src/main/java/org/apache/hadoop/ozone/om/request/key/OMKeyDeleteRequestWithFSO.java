@@ -160,7 +160,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       long quotaReleased = sumBlockLengths(omKeyInfo);
       boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);
       omBucketInfo.decrUsedBytes(quotaReleased, isKeyNonEmpty);
-      omBucketInfo.decrUsedNamespace(1L, true);
+      omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty);
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String dbOpenKey = null;
