@@ -73,14 +73,14 @@ import org.slf4j.LoggerFactory;
  * the node state change should happen only via NodeStateManager. It also
  * runs a heartbeat thread which periodically updates the node state.
  * <p>
- * The getNode(byState) functions make copy of node maps and then creates a list
- * based on that. It should be assumed that these get functions always report
- * *stale* information. For example, getting the deadNodeCount followed by
- * getNodes(DEAD) could very well produce totally different count. Also
- * getNodeCount(HEALTHY) + getNodeCount(DEAD) + getNodeCode(STALE), is not
- * guaranteed to add up to the total nodes that we know off. Please treat all
- * get functions in this file as a snap-shot of information that is inconsistent
- * as soon as you read it.
+ * The getNode(byState) functions copy the node maps and then create a list
+ * based on that copy. These functions should be assumed to report
+ * transient information. For example, getting the {@code deadNodeCount}
+ * followed by {@code getNodes(DEAD)} could produce different counts. Also,
+ * {@code getNodeCount(HEALTHY)} + {@code getNodeCount(DEAD)} +
+ * {@code getNodeCount(STALE)} is not guaranteed to add up to the total nodes
+ * at any given instant. Treat all getters in this file as a snapshot that may
+ * already be inconsistent by the time it is read.
  */
 public class NodeStateManager implements Runnable, Closeable {
 
