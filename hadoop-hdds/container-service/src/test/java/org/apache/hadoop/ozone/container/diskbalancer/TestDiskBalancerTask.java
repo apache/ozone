@@ -218,9 +218,10 @@ public class TestDiskBalancerTask {
     destVolume = (HddsVolume) volumes.get(1);
 
     // reset volume's usedBytes
+    // source volume is 80% full which is greater than default minSourceVolumeDensity (60%)
     sourceVolume.incrementUsedSpace(0 - sourceVolume.getCurrentUsage().getUsedSpace());
     destVolume.incrementUsedSpace(0 - destVolume.getCurrentUsage().getUsedSpace());
-    sourceVolume.incrementUsedSpace(sourceVolume.getCurrentUsage().getCapacity() / 2);
+    sourceVolume.incrementUsedSpace((long) (sourceVolume.getCurrentUsage().getCapacity() * 0.8));
 
     containerSet = ContainerSet.newReadOnlyContainerSet(1000);
     ContainerMetrics containerMetrics = ContainerMetrics.create(conf);

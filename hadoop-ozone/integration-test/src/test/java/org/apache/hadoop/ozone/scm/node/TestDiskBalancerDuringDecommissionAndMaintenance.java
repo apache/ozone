@@ -127,6 +127,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
         10L,
         5,
         false,
+        60.0,
         null);
 
     NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
@@ -231,6 +232,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
         10L,
         1,
         false,
+        60.0,
         dnAddressList);
 
     // Verify diskBalancer is running
@@ -312,6 +314,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
         10L,
         1,
         false,
+        60.0,
         dnAddressList);
 
     // Verify disk balancer goes to PAUSED_BY_NODE_STATE

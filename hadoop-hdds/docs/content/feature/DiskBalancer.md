@@ -74,14 +74,16 @@ ozone admin datanode diskbalancer update [options]
 ```
 **Options include:**
 
-| Options                      | Description                                                                                           |                                                                                                                                                             
-|------------------------------|-------------------------------------------------------------------------------------------------------|
-| `-t, --threshold`            | Percentage deviation from average utilization of the disks after which a datanode will be rebalanced. |
-| `-b, --bandwith-in-mb`       | Maximum bandwidth for DiskBalancer per second.                                                        |
-| `-p, --parallel-thread`      | Max parallelThread for DiskBalancer.                                                                  |
-| `-s, --stop-after-disk-even` | Stop DiskBalancer automatically after disk utilization is even.                                       |
-| `-a, --all`                  | Run commands on all datanodes.                                                                        |
-| `-d, --datanodes`            | Run commands on specific datanodes                                                                    |
+| Options                           | Description                                                                                                                                                                                  |                                                                                                                                                             
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-t, --threshold`                 | Percentage deviation from average utilization of the disks after which a datanode will be rebalanced.                                                                                        |
+| `-b, --bandwith-in-mb`            | Maximum bandwidth for DiskBalancer per second.                                                                                                                                               |
+| `-p, --parallel-thread`           | Max parallelThread for DiskBalancer.                                                                                                                                                         |
+| `-s, --stop-after-disk-even`      | Stop DiskBalancer automatically after disk utilization is even.                                                                                                                              |
+| `-a, --all`                       | Run commands on all datanodes.                                                                                                                                                               |
+| `-d, --datanodes`                 | Run commands on specific datanodes                                                                                                                                                           
+| `-m, --min-source-volume-density` | Minimum disk utilisation to be considered as source volume for diskBalancing. This prevents balancing when all disks are under-utilized, even if they are imbalanced relative to each other. |
+
 
 ### **Stop DiskBalancer**
 To stop DiskBalancer on all Datanodes:
@@ -124,7 +126,8 @@ The DiskBalancer's behavior can be controlled using the following configuration 
 | `hdds.datanode.disk.balancer.max.disk.throughputInMBPerSec` | `10`                                                                                   | The maximum bandwidth (in MB/s) that the balancer can use for moving data, to avoid impacting client I/O.                                                                 |
 | `hdds.datanode.disk.balancer.parallel.thread`               | `5`                                                                                    | The number of worker threads to use for moving containers in parallel.                                                                                                    |
 | `hdds.datanode.disk.balancer.service.interval`              | `60s`                                                                                  | The time interval at which the Datanode DiskBalancer service checks for imbalance and updates its configuration.                                                          |
-| `hdds.datanode.disk.balancer.stop.after.disk.even`          | `true`                                                                                 | If true, the DiskBalancer will automatically stop its balancing activity once disks are considered balanced (i.e., all volume densities are within the threshold).        |
+| `hdds.datanode.disk.balancer.stop.after.disk.even`          | `true`                                                                                 | If true, the DiskBalancer will automatically stop its balancing activity once disks are considered balanced (i.e., all volume densities are within the threshold).
+| `hdds.datanode.disk.balancer.min.source.volume.density`     | `60.0`                                                                                 | Minimum disk utilisation to be considered as source volume for diskBalancing. This prevents balancing when all disks are under-utilized, even if they are imbalanced relative to each other. |
 | `hdds.datanode.disk.balancer.volume.choosing.policy`        | `org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy`    | The policy class for selecting source and destination volumes for balancing.                                                                                              |
 | `hdds.datanode.disk.balancer.container.choosing.policy`     | `org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy` | The policy class for selecting which containers to move from a source volume to destination volume.                                                                       |
 | `hdds.datanode.disk.balancer.service.timeout`               | `300s`                                                                                 | Timeout for the Datanode DiskBalancer service operations.                                                                                                                 |

@@ -155,7 +155,7 @@ public class DiskBalancerManager {
   public List<DatanodeAdminError> startDiskBalancer(
       Double threshold, Long bandwidthInMB,
       Integer parallelThread, Boolean stopAfterDiskEven,
-      List<String> hosts) throws IOException {
+      Double minSourceVolumeDensity, List<String> hosts) throws IOException {
     List<DatanodeDetails> dns;
     if (hosts != null && !hosts.isEmpty()) {
       dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts,
@@ -175,7 +175,7 @@ public class DiskBalancerManager {
         // If command doesn't have configuration change, then we reuse the
         // latest configuration reported from Datnaodes
         DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
-            threshold, bandwidthInMB, parallelThread, stopAfterDiskEven);
+            threshold, bandwidthInMB, parallelThread, stopAfterDiskEven, minSourceVolumeDensity);
         DiskBalancerCommand command = new DiskBalancerCommand(
             HddsProtos.DiskBalancerOpType.START, updateConf);
         sendCommand(dn, command);
@@ -227,8 +227,8 @@ public class DiskBalancerManager {
    */
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
       Double threshold, Long bandwidthInMB,
-      Integer parallelThread, Boolean stopAfterDiskEven, List<String> hosts)
-      throws IOException {
+      Integer parallelThread, Boolean stopAfterDiskEven,
+      Double minSourceVolumeDensity, List<String> hosts) throws IOException {
     List<DatanodeDetails> dns;
     if (hosts != null && !hosts.isEmpty()) {
       dns = NodeUtils.mapHostnamesToDatanodes(nodeManager, hosts,
@@ -243,7 +243,7 @@ public class DiskBalancerManager {
         // If command doesn't have configuration change, then we reuse the
         // latest configuration reported from Datnaodes
         DiskBalancerConfiguration updateConf = attachDiskBalancerConf(dn,
-            threshold, bandwidthInMB, parallelThread, stopAfterDiskEven);
+            threshold, bandwidthInMB, parallelThread, stopAfterDiskEven, minSourceVolumeDensity);
         DiskBalancerCommand command = new DiskBalancerCommand(
             HddsProtos.DiskBalancerOpType.UPDATE, updateConf);
         sendCommand(dn, command);
@@ -360,7 +360,8 @@ public class DiskBalancerManager {
 
   private DiskBalancerConfiguration attachDiskBalancerConf(
       DatanodeDetails dn, Double threshold,
-      Long bandwidthInMB, Integer parallelThread, Boolean stopAfterDiskEven) {
+      Long bandwidthInMB, Integer parallelThread,
+      Boolean stopAfterDiskEven, Double minSourceVolumeDensity) {
     DiskBalancerConfiguration baseConf = statusMap.containsKey(dn) ?
         statusMap.get(dn).getDiskBalancerConfiguration() :
         new DiskBalancerConfiguration();
@@ -375,6 +376,9 @@ public class DiskBalancerManager {
     }
     if (stopAfterDiskEven != null) {
       baseConf.setStopAfterDiskEven(stopAfterDiskEven);
+    }
+    if (minSourceVolumeDensity != null) {
+      baseConf.setMinSourceVolumeDensity(minSourceVolumeDensity);
     }
     return baseConf;
   }

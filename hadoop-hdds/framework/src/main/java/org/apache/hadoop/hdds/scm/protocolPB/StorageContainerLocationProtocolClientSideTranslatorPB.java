@@ -1224,8 +1224,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<DatanodeAdminError> startDiskBalancer(Double threshold,
       @Nullable Long bandwidthInMB, @Nullable Integer parallelThread,
-      @Nullable Boolean stopAfterDiskEven, @Nullable List<String> hosts)
-      throws IOException {
+      @Nullable Boolean stopAfterDiskEven,
+      @Nullable Double minSourceVolumeDensity,
+      @Nullable List<String> hosts) throws IOException {
     HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
         HddsProtos.DiskBalancerConfigurationProto.newBuilder();
     if (threshold != null) {
@@ -1239,6 +1240,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     }
     if (stopAfterDiskEven != null) {
       confBuilder.setStopAfterDiskEven(stopAfterDiskEven);
+    }
+    if (minSourceVolumeDensity != null) {
+      confBuilder.setMinSourceVolumeDensity(minSourceVolumeDensity);
     }
 
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
@@ -1288,7 +1292,10 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
       @Nullable Double threshold, @Nullable Long bandwidthInMB,
-      @Nullable Integer parallelThread, @Nullable Boolean stopAfterDiskEven, @Nullable List<String> hosts)
+      @Nullable Integer parallelThread,
+      @Nullable Boolean stopAfterDiskEven,
+      @Nullable Double minSourceVolumeDensity,
+      @Nullable List<String> hosts)
       throws IOException {
     HddsProtos.DiskBalancerConfigurationProto.Builder confBuilder =
         HddsProtos.DiskBalancerConfigurationProto.newBuilder();
@@ -1303,6 +1310,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     }
     if (stopAfterDiskEven != null) {
       confBuilder.setStopAfterDiskEven(stopAfterDiskEven);
+    }
+    if (minSourceVolumeDensity != null) {
+      confBuilder.setMinSourceVolumeDensity(minSourceVolumeDensity);
     }
 
     DatanodeDiskBalancerOpRequestProto.Builder requestBuilder =
