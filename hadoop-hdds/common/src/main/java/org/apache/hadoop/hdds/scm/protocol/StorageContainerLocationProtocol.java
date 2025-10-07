@@ -514,6 +514,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
       @Nullable Long bandwidthInMB,
       @Nullable Integer parallelThread,
       @Nullable Boolean stopAfterDiskEven,
+      @Nullable Double minSourceVolumeDensity,
       @Nullable List<String> hosts) throws IOException;
 
   /**
@@ -530,6 +531,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
       @Nullable Long bandwidthInMB,
       @Nullable Integer parallelThread,
       @Nullable Boolean stopAfterDiskEven,
+      @Nullable Double minSourceVolumeDensity,
       @Nullable List<String> hosts) throws IOException;
 
   /**

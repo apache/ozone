@@ -35,6 +35,7 @@ import picocli.CommandLine.Command;
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
  *      [ -s/--stop-after-disk-even {@literal <stopAfterDiskEven>}]
+ *      [ -m/--min-source-volume-density {@literal <minSourceVolumeDensity>}]
  *      [ -a/--all {@literal <alldatanodes>}]
  *      [ -d/--datanodes {@literal <datanodes>}]
  *      [ {@literal <hosts>}]
@@ -54,6 +55,9 @@ import picocli.CommandLine.Command;
  *      ozone admin datanode diskbalancer start -s=false -a}
  *        start balancer on each datanode and will keep running even after
  *        disks are balanced until stopped by the stop command.
+ *      ozone admin datanode diskbalancer start -m 10 -d {@literal <hosts>}
+ *         start balancer to only move data from source volumes with
+ *         density higher than 10%.
  * To stop:
  *      ozone admin datanode diskbalancer stop -a
  *        stop diskblancer on all datanodes

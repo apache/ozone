@@ -1511,9 +1511,11 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<DatanodeAdminError> startDiskBalancer(@Nullable Double threshold,
-      @Nullable Long bandwidthInMB, Integer parallelThread,
-      @Nullable Boolean stopAfterDiskEven, List<String> hosts)
-      throws IOException {
+      @Nullable Long bandwidthInMB,
+      @Nullable Integer parallelThread,
+      @Nullable Boolean stopAfterDiskEven,
+      @Nullable Double minSourceVolumeDensity,
+      @Nullable List<String> hosts) throws IOException {
     checkDiskBalancerEnabled();
 
     try {
@@ -1524,7 +1526,7 @@ public class SCMClientProtocolServer implements
     }
 
     return scm.getDiskBalancerManager()
-        .startDiskBalancer(threshold, bandwidthInMB, parallelThread, stopAfterDiskEven, hosts);
+        .startDiskBalancer(threshold, bandwidthInMB, parallelThread, stopAfterDiskEven, minSourceVolumeDensity, hosts);
   }
 
   @Override
@@ -1543,8 +1545,12 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<DatanodeAdminError> updateDiskBalancerConfiguration(
-      @Nullable Double threshold, @Nullable Long bandwidthInMB,
-      @Nullable Integer parallelThread, @Nullable Boolean stopAfterDiskEven, @Nullable List<String> hosts)
+      @Nullable Double threshold,
+      @Nullable Long bandwidthInMB,
+      @Nullable Integer parallelThread,
+      @Nullable Boolean stopAfterDiskEven,
+      @Nullable Double minSourceVolumeDensity,
+      @Nullable List<String> hosts)
       throws IOException {
     checkDiskBalancerEnabled();
 
@@ -1556,7 +1562,7 @@ public class SCMClientProtocolServer implements
     }
 
     return scm.getDiskBalancerManager().updateDiskBalancerConfiguration(
-        threshold, bandwidthInMB, parallelThread, stopAfterDiskEven, hosts);
+        threshold, bandwidthInMB, parallelThread, stopAfterDiskEven, minSourceVolumeDensity, hosts);
   }
 
   private void checkDiskBalancerEnabled() throws SCMException {

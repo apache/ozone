@@ -132,6 +132,25 @@ considered stable, the default value may be changed to `true` in a future releas
 is currently considered experimental and is disabled by default. The command is, however, fully functional for those who
 wish to enable and use the feature.
 
+## Minimum Source Volume Density
+
+To prevent unnecessary container movement when disks are under-utilized, the DiskBalancer includes a
+**Minimum Source Volume Density** threshold. This feature addresses scenarios where disks may appear
+imbalanced but are actually just under-utilized.
+
+### Problem Scenario
+Consider a datanode with disk utilizations of `1%, 2%, 8%, 9%`. While these disks are technically
+"imbalanced" relative to each other, they are all significantly under-utilized. Moving containers
+between such under-utilized disks provides no meaningful benefit and wastes system resources.
+
+### Solution
+The `minSourceVolumeDensity` configuration parameter ensures that disk balancing only occurs when
+the source volume (highest utilized disk) meets a minimum utilization threshold:
+
+- **Default Value**: `60%`
+- **Behavior**: Only volumes with utilization ≥ `minSourceVolumeDensity` can be selected as source volumes
+- **Benefit**: Prevents unnecessary container movement when all disks are under-utilized
+
 ## DiskBalancer Metrics
 
 The DiskBalancer service exposes JMX metrics on each Datanode for real-time monitoring. These metrics provide insights
