@@ -125,7 +125,6 @@ const Volumes: React.FC<{}> = () => {
   let autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
 
   useEffect(() => {
-    loadData();
     autoReloadHelper.startPolling();
 
     // Component will unmount

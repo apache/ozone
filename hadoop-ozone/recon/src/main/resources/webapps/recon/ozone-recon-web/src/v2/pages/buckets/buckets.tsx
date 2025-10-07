@@ -223,7 +223,6 @@ const Buckets: React.FC<{}> = () => {
         value: initialVolume
       }]);
     }
-    loadData();
 
     return (() => {
       autoReloadHelper.stopPolling();
