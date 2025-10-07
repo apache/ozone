@@ -117,7 +117,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     deletingServiceMetrics.incrNumRenameEntriesPurged(renamedKeysToBePurged.size());
 
     if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
-      OMException oe = new OMException("Invalid request since there are no keys to be purged or modified.",
+      OMException oe = new OMException("No keys found to be purged or renamed in the request.",
           OMException.ResultCodes.KEY_DELETION_ERROR);
       AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, oe));
