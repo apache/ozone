@@ -247,13 +247,12 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     private final String bucketName;
     private final Pair<String, String> volBucketPair;
 
-    ProcessedKeyInfo(OmKeyInfo keyInfo, String deleteKey, String volumeName, String bucketName,
-                     Pair<String, String> volBucketPair) {
+    ProcessedKeyInfo(OmKeyInfo keyInfo, String deleteKey, String volumeName, String bucketName) {
       this.keyInfo = keyInfo;
       this.deleteKey = deleteKey;
       this.volumeName = volumeName;
       this.bucketName = bucketName;
-      this.volBucketPair = volBucketPair;
+      this.volBucketPair = Pair.of(volumeName, bucketName);
     }
   }
 
@@ -273,9 +272,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
     String volumeName = keyInfo.getVolumeName();
     String bucketName = keyInfo.getBucketName();
-    Pair<String, String> volBucketPair = Pair.of(volumeName, bucketName);
 
-    return new ProcessedKeyInfo(keyInfo, deleteKey, volumeName, bucketName, volBucketPair);
+    return new ProcessedKeyInfo(keyInfo, deleteKey, volumeName, bucketName);
   }
 
   private List<String[]> getBucketLockKeySet(PurgeDirectoriesRequest purgeDirsRequest) {
