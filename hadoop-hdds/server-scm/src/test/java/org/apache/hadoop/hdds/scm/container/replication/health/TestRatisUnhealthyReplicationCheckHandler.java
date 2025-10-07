@@ -299,7 +299,7 @@ public class TestRatisUnhealthyReplicationCheckHandler {
     List<ContainerReplicaOp> pendingOps =
         ImmutableList.of(new ContainerReplicaOp(
             ContainerReplicaOp.PendingOpType.DELETE,
-            replicas.stream().findFirst().get().getDatanodeDetails(), 0));
+            replicas.stream().findFirst().get().getDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container)
         .setPendingOps(pendingOps);

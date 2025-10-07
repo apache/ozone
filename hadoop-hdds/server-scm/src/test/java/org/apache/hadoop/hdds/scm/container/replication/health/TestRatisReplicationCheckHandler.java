@@ -454,9 +454,9 @@ public class TestRatisReplicationCheckHandler {
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
     pending.add(new ContainerReplicaOp(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setPendingOps(pending)

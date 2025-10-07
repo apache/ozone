@@ -140,7 +140,7 @@ public class TestECReplicationCheckHandler {
         = createReplicas(container.containerID(), 1, 2, 4, 5);
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 3, null, Long.MAX_VALUE, 0));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -198,7 +198,7 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 4), Pair.of(DECOMMISSIONED, 5));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 5));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 5, null, Long.MAX_VALUE, 0));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -370,7 +370,7 @@ public class TestECReplicationCheckHandler {
         Pair.of(IN_SERVICE, 1), Pair.of(offlineState, 2));
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 2));
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -509,9 +509,9 @@ public class TestECReplicationCheckHandler {
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 1));
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
     pending.add(new ContainerReplicaOp(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 2));
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 2, null, Long.MAX_VALUE, 0));
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
         .setContainerInfo(container)
