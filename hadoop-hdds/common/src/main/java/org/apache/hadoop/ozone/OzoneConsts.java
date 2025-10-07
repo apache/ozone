@@ -262,6 +262,8 @@ public final class OzoneConsts {
   public static final String DST_KEY = "dstKey";
   public static final String USED_BYTES = "usedBytes";
   public static final String USED_NAMESPACE = "usedNamespace";
+  public static final String PENDING_DELETE_SNAPSHOT_BYTES = "pendingDeleteSnapshotBytes";
+  public static final String PENDING_DELETE_SNAPSHOT_NAMESPACE = "pendingDeleteSnapshotNamespace";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
   public static final String QUOTA_IN_NAMESPACE = "quotaInNamespace";
   public static final String OBJECT_ID = "objectID";

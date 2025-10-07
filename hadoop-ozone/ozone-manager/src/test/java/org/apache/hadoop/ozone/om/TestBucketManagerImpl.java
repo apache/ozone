@@ -439,8 +439,14 @@ class TestBucketManagerImpl extends OzoneTestBase {
         bucketInfo.getUsedBytes(),
         storedLinkBucket.getUsedBytes());
     assertEquals(
+        bucketInfo.getSnapshotUsedBytes(),
+        storedLinkBucket.getSnapshotUsedBytes());
+    assertEquals(
         bucketInfo.getUsedNamespace(),
         storedLinkBucket.getUsedNamespace());
+    assertEquals(
+        bucketInfo.getSnapshotUsedNamespace(),
+        storedLinkBucket.getSnapshotUsedNamespace());
     assertEquals(
         bucketInfo.getDefaultReplicationConfig(),
         storedLinkBucket.getDefaultReplicationConfig());

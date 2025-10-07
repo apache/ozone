@@ -326,6 +326,12 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
 
     assertEquals(Status.OK,
         omClientResponse.getOMResponse().getStatus());
+    for (OmKeyInfo openKey : openKeys.stream().map(Pair::getRight).collect(Collectors.toList())) {
+      assertEquals(0, omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(openKey.getVolumeName(), openKey.getBucketName())).getSnapshotUsedBytes());
+      assertEquals(0, omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(openKey.getVolumeName(), openKey.getBucketName())).getSnapshotUsedNamespace());
+    }
   }
 
   /**
