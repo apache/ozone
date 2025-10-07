@@ -26,6 +26,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NAT
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
@@ -195,6 +197,8 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private final boolean isNativeLibsLoaded;
 
+  private final int maxSnapshotLimit;
+
   private final BiFunction<SnapshotInfo, SnapshotInfo, String>
       generateSnapDiffJobKey =
           (SnapshotInfo fromSnapshotInfo, SnapshotInfo toSnapshotInfo) ->
@@ -269,6 +273,9 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.sstBackupDirForSnapDiffJobs = path.toString();
 
     this.isNativeLibsLoaded = initNativeLibraryForEfficientDiff(ozoneManager.getConfiguration());
+
+    this.maxSnapshotLimit = ozoneManager.getConfiguration().getInt(OZONE_OM_FS_SNAPSHOT_MAX_LIMIT,
+        OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
 
     // Ideally, loadJobsOnStartUp should run only on OM node, since SnapDiff
     // is not HA currently and running this on all the nodes would be
@@ -1219,7 +1226,8 @@ public class SnapshotDiffManager implements AutoCloseable {
             OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), tsInfo).toString(), diffDir);
       }
     } catch (Exception e) {
-      LOG.error("Failed to calculate snap-diff via optimal method, Falling back to other methods", e);
+      LOG.error("Failed to calculate snap-diff between fromSnapshot : {} , toSnapshot: {} via optimal method," +
+          "Falling back to other methods", fsInfo, tsInfo, e);
     }
 
     // Check if compaction DAG is available, use that if so
@@ -1278,13 +1286,20 @@ public class SnapshotDiffManager implements AutoCloseable {
         (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
     // Start walking back from the child snapshot
     OmSnapshotLocalData child = toSnapshot;
-    while (!child.getPreviousSnapshotId().equals(fromSnapshotId)) {
+    int numSnapshotsTraversed = 0;
+    while (numSnapshotsTraversed <= maxSnapshotLimit && !child.getPreviousSnapshotId().equals(fromSnapshotId)) {
       UUID parentId = child.getPreviousSnapshotId();
       // Load the parent snapshot in the chain
       child = getSnapshotLocalData(
           getSnapshotInfo(ozoneManager,
               metadataManager.getSnapshotChainManager(),
               parentId));
+      numSnapshotsTraversed++;
+    }
+    if (numSnapshotsTraversed > maxSnapshotLimit) {
+      LOG.error("Exceeded the traversal limit of {} while finding the VersionMeta of the fromSnapshot : {}" +
+          " that the toSnapshot was built on.", maxSnapshotLimit, fromSnapshotId);
+      return null;
     }
     SnapshotInfo snapshotInfo =
         getSnapshotInfo(ozoneManager, metadataManager.getSnapshotChainManager(), fromSnapshotId);
@@ -1297,11 +1312,12 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   /**
    * Calculates the symmetric difference of SST files between two version metadata.
-   * Returns files that are present in one snapshot but not in the other.
+   * Returns a list of SST file names that are present in one snapshot but not in the other,
+   * i.e., the symmetric difference between the two sets of SST files.
    *
-   * @param fromSnapVersionMeta Version metadata from the first snapshot
-   * @param toSnapVersionMeta Version metadata from the second snapshot
-   * @return List of SST file names that differ between the snapshots
+   * @param fromSnapVersionMeta Version metadata from the first snapshot; provides the set of SST files for comparison.
+   * @param toSnapVersionMeta Version metadata from the second snapshot; provides the set of SST files for comparison.
+   * @return List of SST file names that are present in only one of the two snapshots (symmetric difference).
    */
   private List<String> calculateDiffFiles(OmSnapshotLocalData.VersionMeta fromSnapVersionMeta,
                                           OmSnapshotLocalData.VersionMeta toSnapVersionMeta) {
