@@ -30,7 +30,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Performance tests for the refactored BucketEndpoint.get() method.
+ * Performance-oriented integration tests for the refactored
+ * {@link BucketEndpoint#get} path. The goal is to catch obvious
+ * regressions in listing throughput/latency across typical parameter
+ * combinations, not to be a micro-benchmark.
  */
 public class TestBucketEndpointPerformance {
 
