@@ -21,7 +21,9 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 /**
- * Class to wrap details used to track pending replications.
+ * ContainerReplicaOp wraps the information needed to track a pending
+ * replication operation (ADD or DELETE) against a specific datanode.
+ * It uses a single constructor so all call sites follow the same code path.
  */
 public class ContainerReplicaOp {
 
@@ -33,15 +35,14 @@ public class ContainerReplicaOp {
   private final long containerSize;
 
   /**
-   * Creates a ContainerReplicaOp with all parameters.
-   * This is the single constructor that should be used for all cases.
-   * 
-   * @param opType the type of operation (ADD or DELETE)
-   * @param target the target datanode
-   * @param replicaIndex the replica index (zero for Ratis, > 0 for EC)
-   * @param command the SCM command (can be null)
-   * @param deadlineEpochMillis the deadline in epoch milliseconds
-   * @param containerSize the size of the container
+   * Create a ContainerReplicaOp with all parameters.
+   *
+   * @param opType type of operation
+   * @param target target datanode
+   * @param replicaIndex replica index (0 for Ratis; > 0 for EC)
+   * @param command SCM command associated with the op (nullable)
+   * @param deadlineEpochMillis deadline in epoch milliseconds
+   * @param containerSize size of the container in bytes
    */
   public ContainerReplicaOp(PendingOpType opType,
       DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
@@ -79,7 +80,7 @@ public class ContainerReplicaOp {
   }
 
   /**
-   * Enum representing different types of pending Ops.
+   * Types of pending operations supported by ContainerReplicaOp.
    */
   public enum PendingOpType {
     ADD, DELETE
