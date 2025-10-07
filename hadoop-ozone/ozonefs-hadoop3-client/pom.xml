@@ -50,7 +50,7 @@
         </exclusion>
         <exclusion>
           <groupId>org.apache.hadoop.thirdparty</groupId>
-          <artifactId>hadoop-shaded-protobuf_3_25</artifactId>
+          <artifactId>${hadoop-thirdparty.protobuf.artifact}</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.slf4j</groupId>

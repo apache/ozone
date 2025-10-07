@@ -72,10 +72,10 @@ public class S3MultipartUploadCommitPartRequestWithFSO
       Map<String, RepeatedOmKeyInfo> keyToDeleteMap, String openKey,
       OmKeyInfo omKeyInfo, String multipartKey,
       OmMultipartKeyInfo multipartKeyInfo,
-      OzoneManagerProtocolProtos.OMResponse build, OmBucketInfo omBucketInfo) {
+      OzoneManagerProtocolProtos.OMResponse build, OmBucketInfo omBucketInfo, long bucketId) {
 
     return new S3MultipartUploadCommitPartResponseWithFSO(build, multipartKey,
         openKey, multipartKeyInfo, keyToDeleteMap, omKeyInfo,
-        omBucketInfo, getBucketLayout());
+        omBucketInfo, bucketId, getBucketLayout());
   }
 }

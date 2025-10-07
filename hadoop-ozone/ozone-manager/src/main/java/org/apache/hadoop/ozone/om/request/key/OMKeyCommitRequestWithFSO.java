@@ -95,7 +95,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
     Exception exception = null;
     OmKeyInfo omKeyInfo = null;
-    OmBucketInfo omBucketInfo = null;
+    OmBucketInfo omBucketInfo;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
     Result result;
@@ -250,7 +250,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
-            keyToDelete, trxnLogIndex);
+            keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
         String delKeyName = omMetadataManager
@@ -293,7 +293,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           oldKeyVersionsToDeleteMap = new HashMap<>();
         }
         oldKeyVersionsToDeleteMap.computeIfAbsent(delKeyName,
-            key -> new RepeatedOmKeyInfo()).addOmKeyInfo(pseudoKeyInfo);
+            key -> new RepeatedOmKeyInfo(omBucketInfo.getObjectID())).addOmKeyInfo(pseudoKeyInfo);
       }
 
       // Add to cache of open key table and key table.

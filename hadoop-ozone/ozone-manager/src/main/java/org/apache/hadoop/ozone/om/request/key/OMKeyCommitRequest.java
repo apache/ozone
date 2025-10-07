@@ -320,7 +320,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         // Subtract the size of blocks to be overwritten.
         correctedSpace -= keyToDelete.getReplicatedSize();
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
-            keyToDelete, trxnLogIndex);
+            keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
         // using pseudoObjId as objectId can be same in case of overwrite key
@@ -352,7 +352,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       final OmKeyInfo pseudoKeyInfo = isHSync ? null
           : wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
       oldKeyVersionsToDeleteMap = addKeyInfoToDeleteMap(ozoneManager, trxnLogIndex, dbOzoneKey,
-          pseudoKeyInfo, oldKeyVersionsToDeleteMap);
+          omBucketInfo.getObjectID(), pseudoKeyInfo, oldKeyVersionsToDeleteMap);
 
       // Add to cache of open key table and key table.
       if (!isHSync) {

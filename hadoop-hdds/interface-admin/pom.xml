@@ -28,6 +28,7 @@
   <properties>
     <!-- no testable code in this module -->
     <maven.test.skip>true</maven.test.skip>
+    <protobuf.version>${protobuf2.version}</protobuf.version>
     <!-- only generated code in this module -->
     <spotbugs.skip>true</spotbugs.skip>
   </properties>
@@ -59,19 +60,15 @@
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
-        <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc-2</id>
+            <id>compile-proto-${protobuf.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-              <outputDirectory>target/generated-sources/java</outputDirectory>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
               <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>
           </execution>
