@@ -287,9 +287,9 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
     pending.add(new ContainerReplicaOp(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
     pending.add(new ContainerReplicaOp(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
+        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0, null, Long.MAX_VALUE, 0));
 
     // set up mocks such ContainerReplicaPendingOps returns the containerSizeScheduled map
     ReplicationManagerConfiguration rmConf = new ReplicationManagerConfiguration();

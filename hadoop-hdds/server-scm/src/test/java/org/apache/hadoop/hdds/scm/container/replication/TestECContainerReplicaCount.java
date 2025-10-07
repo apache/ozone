@@ -529,15 +529,17 @@ public class TestECContainerReplicaCount {
       List<Integer> addIndexes, List<Integer> deleteIndexes) {
     List<ContainerReplicaOp> pending = new ArrayList<>();
     for (Integer addIndex : addIndexes) {
-      pending.add(ContainerReplicaOp
-          .create(ContainerReplicaOp.PendingOpType.ADD,
-              MockDatanodeDetails.randomDatanodeDetails(), addIndex));
+      pending.add(new ContainerReplicaOp(
+          ContainerReplicaOp.PendingOpType.ADD,
+          MockDatanodeDetails.randomDatanodeDetails(), addIndex,
+          null, Long.MAX_VALUE, 0));
     }
 
     for (Integer deleteIndex : deleteIndexes) {
-      pending.add(ContainerReplicaOp
-          .create(ContainerReplicaOp.PendingOpType.DELETE,
-              MockDatanodeDetails.randomDatanodeDetails(), deleteIndex));
+      pending.add(new ContainerReplicaOp(
+          ContainerReplicaOp.PendingOpType.DELETE,
+          MockDatanodeDetails.randomDatanodeDetails(), deleteIndex,
+          null, Long.MAX_VALUE, 0));
     }
     return pending;
   }
