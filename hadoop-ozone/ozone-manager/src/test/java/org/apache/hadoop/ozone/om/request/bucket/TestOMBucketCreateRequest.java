@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -42,6 +43,8 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
@@ -145,6 +148,33 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     assertNotNull(omResponse.getCreateBucketResponse());
     assertEquals(OzoneManagerProtocolProtos.Status
             .BUCKET_ALREADY_EXISTS, omResponse.getStatus());
+  }
+
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    // Enable ACLs so preExecute path performs ACL checks
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    OMRequest originalRequest = newCreateBucketRequest(
+        newBucketInfoBuilder(bucketName, volumeName)).build();
+
+    OMBucketCreateRequest req = new OMBucketCreateRequest(originalRequest) {
+      @Override
+      public void checkAcls(OzoneManager ozoneManager,
+          OzoneObj.ResourceType resType,
+          OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
+          String vol, String bucket, String key) throws java.io.IOException {
+        throw new OMException("denied",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
+
+    OMException e = assertThrows(OMException.class,
+        () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   @Test

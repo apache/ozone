@@ -37,8 +37,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.Span;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -246,8 +245,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     final String key = pathToKey(path);
     return TracingUtil.executeInNewSpan("ofs open",
         () -> {
-          Span span = GlobalTracer.get().activeSpan();
-          span.setTag("path", key);
+          Span span = TracingUtil.getActiveSpan();
+          span.setAttribute("path", key);
           return new FSDataInputStream(createFSInputStream(adapter.readFile(key)));
         });
   }
@@ -397,9 +396,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   private boolean renameInSpan(Path src, Path dst) throws IOException {
-    Span span = GlobalTracer.get().activeSpan();
-    span.setTag("src", src.toString())
-        .setTag("dst", dst.toString());
+    Span span = TracingUtil.getActiveSpan();
+    span.setAttribute("src", src.toString())
+        .setAttribute("dst", dst.toString());
     incrementCounter(Statistic.INVOCATION_RENAME, 1);
     statistics.incrementWriteOps(1);
     if (src.equals(dst)) {
