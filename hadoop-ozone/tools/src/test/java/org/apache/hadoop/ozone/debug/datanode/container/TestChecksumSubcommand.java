@@ -54,29 +54,23 @@ class TestChecksumSubcommand {
 
   private OzoneConfiguration config;
   private ByteArrayOutputStream out;
-  private ByteArrayOutputStream err;
   private PrintStream originalOut;
-  private PrintStream originalErr;
   private static final String DEFAULT_ENCODING = UTF_8.name();
 
   @BeforeEach
   void setUp() throws Exception {
     config = new OzoneConfiguration();
     
-    // Capture stdout and stderr
+    // Capture stdout
     out = new ByteArrayOutputStream();
-    err = new ByteArrayOutputStream();
     originalOut = System.out;
-    originalErr = System.err;
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
-    System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
 
   @AfterEach
   void tearDown() {
-    // Restore stdout and stderr
+    // Restore stdout
     System.setOut(originalOut);
-    System.setErr(originalErr);
   }
 
   @Test
