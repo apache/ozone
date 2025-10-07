@@ -667,7 +667,7 @@ public class TestECReplicationCheckHandler {
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(DELETE,
         unhealthyReplica.getDatanodeDetails(),
-        unhealthyReplica.getReplicaIndex()));
+        unhealthyReplica.getReplicaIndex(), null, Long.MAX_VALUE, 0));
 
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)
