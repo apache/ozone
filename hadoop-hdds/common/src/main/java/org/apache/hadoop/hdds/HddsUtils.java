@@ -738,10 +738,24 @@ public final class HddsUtils {
     if (msg.hasWriteChunk() || msg.hasPutBlock() || msg.hasPutSmallFile()) {
       final ContainerCommandRequestProto.Builder builder = msg.toBuilder();
       if (msg.hasWriteChunk()) {
-        builder.getWriteChunkBuilder()
-            .setData(REDACTED)
-            .getChunkDataBuilder()
-            .clearChecksumData();
+        if (builder.getWriteChunkBuilder().hasData()) {
+          builder.getWriteChunkBuilder()
+              .setData(REDACTED);
+        }
+
+        if (builder.getWriteChunkBuilder().hasChunkData()) {
+          builder.getWriteChunkBuilder()
+              .getChunkDataBuilder()
+              .clearChecksumData();
+        }
+
+        if (builder.getWriteChunkBuilder().hasBlock()) {
+          builder.getWriteChunkBuilder()
+              .getBlockBuilder()
+              .getBlockDataBuilder()
+              .getChunksBuilderList()
+              .forEach(ContainerProtos.ChunkInfo.Builder::clearChecksumData);
+        }
       }
 
       if (msg.hasPutBlock()) {
