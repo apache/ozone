@@ -1286,7 +1286,7 @@ public class OMDBInsightEndpoint {
     keyEntityInfo.setKey(dbKey); // Set the DB key
     keyEntityInfo.setIsKey(keyInfo.isFile());
     String fullKeyPath = ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager);
-    keyEntityInfo.setPath(fullKeyPath == "" ? keyInfo.getKeyName() : fullKeyPath);
+    keyEntityInfo.setPath(fullKeyPath.isEmpty() ? keyInfo.getKeyName() : fullKeyPath);
     keyEntityInfo.setSize(keyInfo.getDataSize());
     keyEntityInfo.setCreationTime(keyInfo.getCreationTime());
     keyEntityInfo.setModificationTime(keyInfo.getModificationTime());

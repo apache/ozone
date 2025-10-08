@@ -792,7 +792,6 @@ public class TestNSSummaryEndpointWithFSO {
     // Setup
     long dirOneObjectId = 1L; // Sample object ID for the directory
     ReconNamespaceSummaryManager mockSummaryManager = mock(ReconNamespaceSummaryManager.class);
-    ReconOMMetadataManager mockMetadataManager = mock(ReconOMMetadataManager.class);
     NSSummary dir1Summary = new NSSummary();
     dir1Summary.setParentId(-1); // Simulate directory at the top of the tree
     when(mockSummaryManager.getNSSummary(dirOneObjectId)).thenReturn(dir1Summary);
