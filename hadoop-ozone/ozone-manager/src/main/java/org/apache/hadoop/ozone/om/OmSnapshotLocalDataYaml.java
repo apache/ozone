@@ -31,6 +31,7 @@ import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.ozone.compaction.log.SstFileInfo;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.LiveFileMetaData;
@@ -66,6 +67,7 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
   public static final Tag SNAPSHOT_YAML_TAG = new Tag("OmSnapshotLocalData");
   public static final Tag SNAPSHOT_VERSION_META_TAG = new Tag("VersionMeta");
   public static final Tag SST_FILE_INFO_TAG = new Tag("SstFileInfo");
+  public static final String YAML_FILE_EXTENSION = ".yaml";
 
   /**
    * Creates a new OmSnapshotLocalDataYaml with default values.
@@ -88,7 +90,7 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * @return true if the checksum is valid, false otherwise
    * @throws IOException if there's an error computing the checksum
    */
-  public static boolean verifyChecksum(OmSnapshotManager snapshotManager, OmSnapshotLocalData snapshotData)
+  public static boolean verifyChecksum(OmSnapshotLocalDataManager localDataManager, OmSnapshotLocalData snapshotData)
       throws IOException {
     Preconditions.checkNotNull(snapshotData, "snapshotData cannot be null");
 
@@ -106,7 +108,7 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
     snapshotDataCopy.setChecksum(null);
 
     // Get the YAML representation
-    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
+    try (UncheckedAutoCloseableSupplier<Yaml> yaml = localDataManager.getSnapshotLocalYaml()) {
       // Compute new checksum
       snapshotDataCopy.computeAndSetChecksum(yaml.get());
 
@@ -272,8 +274,8 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * (without triggering checksum computation or persistence).
    * @return YAML string representation
    */
-  public String getYaml(OmSnapshotManager snapshotManager) throws IOException {
-    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
+  public String getYaml(OmSnapshotLocalDataManager snapshotLocalDataManager) throws IOException {
+    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotLocalDataManager.getSnapshotLocalYaml()) {
       return yaml.get().dump(this);
     }
   }
@@ -283,9 +285,9 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * @param yamlFile The file to write to
    * @throws IOException If there's an error writing to the file
    */
-  public void writeToYaml(OmSnapshotManager snapshotManager, File yamlFile) throws IOException {
+  public void writeToYaml(OmSnapshotLocalDataManager snapshotLocalDataManager, File yamlFile) throws IOException {
     // Create Yaml
-    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
+    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotLocalDataManager.getSnapshotLocalYaml()) {
       // Compute Checksum and update SnapshotData
       computeAndSetChecksum(yaml.get());
       // Write the SnapshotData with checksum to Yaml file.
@@ -299,11 +301,11 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * @return A new OmSnapshotLocalDataYaml instance
    * @throws IOException If there's an error reading the file
    */
-  public static OmSnapshotLocalDataYaml getFromYamlFile(OmSnapshotManager snapshotManager, File yamlFile)
-      throws IOException {
+  public static OmSnapshotLocalDataYaml getFromYamlFile(OmSnapshotLocalDataManager snapshotLocalDataManager,
+      File yamlFile) throws IOException {
     Preconditions.checkNotNull(yamlFile, "yamlFile cannot be null");
     try (InputStream inputFileStream = Files.newInputStream(yamlFile.toPath())) {
-      return getFromYamlStream(snapshotManager, inputFileStream);
+      return getFromYamlStream(snapshotLocalDataManager, inputFileStream);
     }
   }
 
@@ -311,10 +313,10 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
    * Read the YAML content InputStream, and return OmSnapshotLocalDataYaml instance.
    * @throws IOException
    */
-  public static OmSnapshotLocalDataYaml getFromYamlStream(OmSnapshotManager snapshotManager,
+  public static OmSnapshotLocalDataYaml getFromYamlStream(OmSnapshotLocalDataManager snapshotLocalDataManager,
       InputStream input) throws IOException {
     OmSnapshotLocalDataYaml dataYaml;
-    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotManager.getSnapshotLocalYaml()) {
+    try (UncheckedAutoCloseableSupplier<Yaml> yaml = snapshotLocalDataManager.getSnapshotLocalYaml()) {
       dataYaml = yaml.get().load(input);
     } catch (YAMLException ex) {
       // Unchecked exception. Convert to IOException

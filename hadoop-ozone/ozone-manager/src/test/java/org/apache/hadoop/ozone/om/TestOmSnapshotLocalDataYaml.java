@@ -44,6 +44,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.ozone.compaction.log.SstFileInfo;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -59,7 +60,7 @@ import org.yaml.snakeyaml.Yaml;
 public class TestOmSnapshotLocalDataYaml {
 
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
-  private static OmSnapshotManager omSnapshotManager;
+  private static OmSnapshotLocalDataManager snapshotLocalDataManager;
   private static final Yaml YAML = new OmSnapshotLocalDataYaml.YamlFactory().create();
   private static final UncheckedAutoCloseableSupplier<Yaml> YAML_SUPPLIER = new UncheckedAutoCloseableSupplier<Yaml>() {
     @Override
@@ -77,8 +78,8 @@ public class TestOmSnapshotLocalDataYaml {
 
   @BeforeAll
   public static void setupClassMocks() throws IOException {
-    omSnapshotManager = mock(OmSnapshotManager.class);
-    when(omSnapshotManager.getSnapshotLocalYaml()).thenReturn(YAML_SUPPLIER);
+    snapshotLocalDataManager = mock(OmSnapshotLocalDataManager.class);
+    when(snapshotLocalDataManager.getSnapshotLocalYaml()).thenReturn(YAML_SUPPLIER);
   }
 
   @BeforeEach
@@ -137,7 +138,7 @@ public class TestOmSnapshotLocalDataYaml {
     File yamlFile = new File(testRoot, yamlFilePath);
 
     // Create YAML file with SnapshotData
-    dataYaml.writeToYaml(omSnapshotManager, yamlFile);
+    dataYaml.writeToYaml(snapshotLocalDataManager, yamlFile);
 
     // Check YAML file exists
     assertTrue(yamlFile.exists());
@@ -153,7 +154,7 @@ public class TestOmSnapshotLocalDataYaml {
     UUID prevSnapId = yamlFilePrevIdPair.getRight();
 
     // Read from YAML file
-    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(snapshotLocalDataManager, yamlFile);
 
     // Verify fields
     assertEquals(44, snapshotData.getVersion());
@@ -194,7 +195,7 @@ public class TestOmSnapshotLocalDataYaml {
     File yamlFile = yamlFilePrevIdPair.getLeft();
     // Read from YAML file
     OmSnapshotLocalDataYaml dataYaml =
-        OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+        OmSnapshotLocalDataYaml.getFromYamlFile(snapshotLocalDataManager, yamlFile);
 
     // Update snapshot data
     dataYaml.setSstFiltered(false);
@@ -203,10 +204,10 @@ public class TestOmSnapshotLocalDataYaml {
         singletonList(new SstFileInfo("defragged-sst4", "k5", "k6", "table3")), 5);
 
     // Write updated data back to file
-    dataYaml.writeToYaml(omSnapshotManager, yamlFile);
+    dataYaml.writeToYaml(snapshotLocalDataManager, yamlFile);
 
     // Read back the updated data
-    dataYaml = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    dataYaml = OmSnapshotLocalDataYaml.getFromYamlFile(snapshotLocalDataManager, yamlFile);
 
     // Verify updated data
     assertThat(dataYaml.getSstFiltered()).isFalse();
@@ -225,7 +226,7 @@ public class TestOmSnapshotLocalDataYaml {
     assertTrue(emptyFile.createNewFile());
 
     IOException ex = assertThrows(IOException.class, () ->
-        OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, emptyFile));
+        OmSnapshotLocalDataYaml.getFromYamlFile(snapshotLocalDataManager, emptyFile));
 
     assertThat(ex).hasMessageContaining("Failed to load snapshot file. File is empty.");
   }
@@ -236,7 +237,7 @@ public class TestOmSnapshotLocalDataYaml {
     Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot3");
     File yamlFile = yamlFilePrevIdPair.getLeft();
     // Read from YAML file
-    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(snapshotLocalDataManager, yamlFile);
 
     // Get the original checksum
     String originalChecksum = snapshotData.getChecksum();
@@ -244,7 +245,7 @@ public class TestOmSnapshotLocalDataYaml {
     // Verify the checksum is not null or empty
     assertThat(originalChecksum).isNotNull().isNotEmpty();
 
-    assertTrue(OmSnapshotLocalDataYaml.verifyChecksum(omSnapshotManager, snapshotData));
+    assertTrue(OmSnapshotLocalDataYaml.verifyChecksum(snapshotLocalDataManager, snapshotData));
   }
 
   @Test

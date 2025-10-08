@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.SstFileInfo;
@@ -107,6 +108,7 @@ class TestOmSnapshotManager {
   private SnapshotChainManager snapshotChainManager;
   private OmMetadataManagerImpl omMetadataManager;
   private OmSnapshotManager omSnapshotManager;
+  private OmSnapshotLocalDataManager snapshotLocalDataManager;
   private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
       SNAPSHOT_CANDIDATE_DIR;
   private File leaderDir;
@@ -139,6 +141,7 @@ class TestOmSnapshotManager {
     om = omTestManagers.getOzoneManager();
     omMetadataManager = (OmMetadataManagerImpl) om.getMetadataManager();
     omSnapshotManager = om.getOmSnapshotManager();
+    snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     snapshotChainManager = omMetadataManager.getSnapshotChainManager();
   }
 
@@ -158,8 +161,8 @@ class TestOmSnapshotManager {
       SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotInfoKey);
       snapshotChainManager.deleteSnapshot(snapshotInfo);
       snapshotInfoTable.delete(snapshotInfoKey);
-      Path snapshotYaml = Paths.get(OmSnapshotManager.getSnapshotLocalPropertyYamlPath(
-          om.getMetadataManager(), snapshotInfo));
+
+      Path snapshotYaml = Paths.get(snapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo));
       Files.deleteIfExists(snapshotYaml);
     }
     omSnapshotManager.invalidateCache();
@@ -310,19 +313,19 @@ class TestOmSnapshotManager {
     when(mockedStore.getDb()).thenReturn(mockedDb);
     when(mockedDb.getLiveFilesMetaData()).thenReturn(mockedLiveFiles);
 
-    Path snapshotYaml = Paths.get(OmSnapshotManager.getSnapshotLocalPropertyYamlPath(
-        omMetadataManager, snapshotInfo));
+    Path snapshotYaml = Paths.get(snapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo));
     when(mockedStore.getDbLocation()).thenReturn(getSnapshotPath(omMetadataManager, snapshotInfo).toFile());
     // Create an existing YAML file for the snapshot
     assertTrue(snapshotYaml.toFile().createNewFile());
     assertEquals(0, Files.size(snapshotYaml));
     // Create a new YAML file for the snapshot
-    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager, mockedStore, snapshotInfo);
+    snapshotLocalDataManager.createNewOmSnapshotLocalDataFile(mockedStore, snapshotInfo);
     // Verify that previous file was overwritten
     assertTrue(Files.exists(snapshotYaml));
     assertTrue(Files.size(snapshotYaml) > 0);
     // Verify the contents of the YAML file
-    OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, snapshotYaml.toFile());
+    OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(snapshotLocalDataManager,
+        snapshotYaml.toFile());
     assertNotNull(localData);
     assertEquals(0, localData.getVersion());
     assertEquals(notDefraggedVersionMeta, localData.getVersionSstFileInfos().get(0));

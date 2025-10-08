@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -83,9 +84,11 @@ public class TestOMSnapshotDeleteResponse {
     };
     OzoneManager ozoneManager = mock(OzoneManager.class);
     OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
+    OmSnapshotLocalDataManager omSnapshotLocalDataManager = mock(OmSnapshotLocalDataManager.class);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
-    when(omSnapshotManager.getSnapshotLocalYaml()).thenReturn(yamlSupplier);
+    when(omSnapshotManager.getSnapshotLocalDataManager()).thenReturn(omSnapshotLocalDataManager);
+    when(omSnapshotLocalDataManager.getSnapshotLocalYaml()).thenReturn(yamlSupplier);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
