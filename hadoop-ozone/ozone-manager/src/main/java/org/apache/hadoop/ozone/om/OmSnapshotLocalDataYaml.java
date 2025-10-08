@@ -70,8 +70,8 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
   /**
    * Creates a new OmSnapshotLocalDataYaml with default values.
    */
-  public OmSnapshotLocalDataYaml(List<LiveFileMetaData> liveFileMetaDatas, UUID previousSnapshotId) {
-    super(liveFileMetaDatas, previousSnapshotId);
+  public OmSnapshotLocalDataYaml(UUID snapshotId, List<LiveFileMetaData> liveFileMetaDatas, UUID previousSnapshotId) {
+    super(snapshotId, liveFileMetaDatas, previousSnapshotId);
   }
 
   /**
@@ -227,8 +227,10 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
+        UUID snapId = UUID.fromString((String) nodes.get(OzoneConsts.OM_SLD_SNAP_ID));
         UUID prevSnapId = UUID.fromString((String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID));
-        OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml(Collections.emptyList(), prevSnapId);
+        OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml(snapId, Collections.emptyList(),
+            prevSnapId);
 
         // Set version from YAML
         Integer version = (Integer) nodes.get(OzoneConsts.OM_SLD_VERSION);
