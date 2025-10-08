@@ -74,7 +74,7 @@ public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
 
     for (Map.Entry<String, Pair<Long, OmKeyInfo>> keyInfoPair : keysToDelete.entrySet()) {
       addDeletionToBatch(omMetadataManager, batchOperation, openKeyTable,
-          keyInfoPair.getKey(), keyInfoPair.getValue().getValue(), keyInfoPair.getValue().getKey());
+          keyInfoPair.getKey(), keyInfoPair.getValue().getValue(), keyInfoPair.getValue().getKey(), false);
     }
   }
 }
