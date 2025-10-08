@@ -160,6 +160,8 @@ This section covers key configurations and monitoring for Ozone snapshots.
 
 See [Snapshot Configuration Properties]({{< ref "Snapshot-Configuration-Properties.md" >}}).
 
+Note: Snapshot configuration may change over time. Check `ozone-default.xml` for the most up-to-date settings.
+
 ### Monitoring
 
 Monitor OM heap usage with many snapshots or large diffs. Enable Ozone Native ACLs or Ranger for access control.
