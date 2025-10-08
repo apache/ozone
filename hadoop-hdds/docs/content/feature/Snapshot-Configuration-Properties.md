@@ -1,5 +1,5 @@
 ---
-title: "Configuration Properties"
+title: "SnapShot Configuration Properties"
 weight: 2
 menu:
   main:
