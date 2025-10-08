@@ -1921,8 +1921,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         omdbInsightEndpoint.listKeys("RATIS", "", 0, FSO_BUCKET_TWO_PATH,
             "", 1000);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(ResponseStatus.INITIALIZING, listKeysResponse.getStatus());
-    assertEquals(Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), bucketResponse.getStatus());
+    assertEquals(ResponseStatus.OK, listKeysResponse.getStatus());
+    assertEquals(Response.Status.OK.getStatusCode(), bucketResponse.getStatus());
   }
 
   @Test
