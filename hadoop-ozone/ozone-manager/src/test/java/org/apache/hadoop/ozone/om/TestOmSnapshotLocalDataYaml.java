@@ -104,7 +104,7 @@ public class TestOmSnapshotLocalDataYaml {
   /**
    * Creates a snapshot local data YAML file.
    */
-  private Pair<File, UUID> writeToYaml(String snapshotName) throws IOException {
+  private Pair<File, UUID> writeToYaml(UUID snapshotId, String snapshotName) throws IOException {
     String yamlFilePath = snapshotName + ".yaml";
     UUID previousSnapshotId = UUID.randomUUID();
     // Create snapshot data with not defragged SST files
@@ -112,7 +112,8 @@ public class TestOmSnapshotLocalDataYaml {
         createLiveFileMetaData("sst1", "table1", "k1", "k2"),
         createLiveFileMetaData("sst2", "table1", "k3", "k4"),
         createLiveFileMetaData("sst3", "table2", "k4", "k5"));
-    OmSnapshotLocalDataYaml dataYaml = new OmSnapshotLocalDataYaml(notDefraggedSSTFileList, previousSnapshotId);
+    OmSnapshotLocalDataYaml dataYaml = new OmSnapshotLocalDataYaml(snapshotId, notDefraggedSSTFileList,
+        previousSnapshotId);
 
     // Set version
     dataYaml.setVersion(42);
@@ -146,7 +147,8 @@ public class TestOmSnapshotLocalDataYaml {
 
   @Test
   public void testWriteToYaml() throws IOException {
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml("snapshot1");
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot1");
     File yamlFile = yamlFilePrevIdPair.getLeft();
     UUID prevSnapId = yamlFilePrevIdPair.getRight();
 
@@ -172,6 +174,7 @@ public class TestOmSnapshotLocalDataYaml {
     assertEquals(2, defraggedSSTFiles.get(43).getSstFiles().size());
     assertEquals(1, defraggedSSTFiles.get(44).getSstFiles().size());
     assertEquals(prevSnapId, snapshotData.getPreviousSnapshotId());
+    assertEquals(snapshotId, snapshotData.getSnapshotId());
     assertEquals(ImmutableMap.of(
         0, new VersionMeta(0,
             ImmutableList.of(new SstFileInfo("sst1", "k1", "k2", "table1"),
@@ -186,7 +189,8 @@ public class TestOmSnapshotLocalDataYaml {
 
   @Test
   public void testUpdateSnapshotDataFile() throws IOException {
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml("snapshot2");
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot2");
     File yamlFile = yamlFilePrevIdPair.getLeft();
     // Read from YAML file
     OmSnapshotLocalDataYaml dataYaml =
@@ -228,7 +232,8 @@ public class TestOmSnapshotLocalDataYaml {
 
   @Test
   public void testChecksum() throws IOException {
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml("snapshot3");
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot3");
     File yamlFile = yamlFilePrevIdPair.getLeft();
     // Read from YAML file
     OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
@@ -244,7 +249,8 @@ public class TestOmSnapshotLocalDataYaml {
 
   @Test
   public void testYamlContainsAllFields() throws IOException {
-    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml("snapshot4");
+    UUID snapshotId = UUID.randomUUID();
+    Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot4");
     File yamlFile = yamlFilePrevIdPair.getLeft();
     String content = FileUtils.readFileToString(yamlFile, Charset.defaultCharset());
 
@@ -255,5 +261,7 @@ public class TestOmSnapshotLocalDataYaml {
     assertThat(content).contains(OzoneConsts.OM_SLD_LAST_DEFRAG_TIME);
     assertThat(content).contains(OzoneConsts.OM_SLD_NEEDS_DEFRAG);
     assertThat(content).contains(OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO);
+    assertThat(content).contains(OzoneConsts.OM_SLD_SNAP_ID);
+    assertThat(content).contains(OzoneConsts.OM_SLD_PREV_SNAP_ID);
   }
 }
