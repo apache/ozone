@@ -31,6 +31,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -214,4 +215,69 @@ public final class OmSnapshotUtils {
       }
     }
   }
+
+  /**
+   * Locates the full path of the specified SST file by searching the backup directory
+   * first, followed by the provided database directories.
+   *
+   * @param sstFilename   The name of the SST file to locate.
+   * @param sstBackupDir  The directory where SST backups are stored.
+   * @param dbPaths       One or more database directories to search for the SST file.
+   * @return The full path to the SST file as a string.
+   * @throws RuntimeException if the SST file cannot be found in any of the specified directories.
+   */
+  private static String getSSTFullPath(String sstFilename, String sstBackupDir,
+      String... dbPaths) {
+
+    // Try to locate the SST in the backup dir first
+    final Path sstPathInBackupDir = Paths.get(sstBackupDir,
+        sstFilename);
+    if (Files.exists(sstPathInBackupDir)) {
+      return sstPathInBackupDir.toString();
+    }
+
+    // SST file does not exist in the SST backup dir, this means the SST file
+    // has not gone through any compactions yet and is only available in the
+    // src DB directory or destDB directory
+    for (String dbPath : dbPaths) {
+      final Path sstPathInDBDir = Paths.get(dbPath,
+          sstFilename);
+      if (Files.exists(sstPathInDBDir)) {
+        return sstPathInDBDir.toString();
+      }
+    }
+
+    // TODO: More graceful error handling?
+    throw new RuntimeException("Unable to locate SST file: " +
+        sstFilename);
+  }
+
+  /**
+   * Creates hard links for the specified SST files from the source or destination
+   * DB paths into the provided directory for SnapDiff jobs, and returns the set
+   * of full paths to the linked SST files.
+   *
+   * @param diffFiles List of SST file names to be linked.
+   * @param srcDbPath Path to the source DB directory.
+   * @param dstDbPath Path to the destination DB directory.
+   * @param sstFilesDirForSnapDiffJob Directory where hard links will be created.
+   * @return Set of full paths to the hard-linked SST files.
+   * @throws RuntimeException if a hard link cannot be created due to an IOException.
+   */
+  static Set<String> getSSTDiffListWithFullPath(List<String> diffFiles, String srcDbPath,
+      String dstDbPath, String sstFilesDirForSnapDiffJob)  {
+    return diffFiles.stream().map(sst -> {
+      String sstFullPath = getSSTFullPath(sst, srcDbPath, dstDbPath);
+      Path link = Paths.get(sstFilesDirForSnapDiffJob, sst);
+      Path srcFile = Paths.get(sstFullPath);
+      try {
+        Files.createLink(link, srcFile);
+      } catch (IOException e) {
+        LOG.error("Exception in creating hard link for {}", srcFile);
+        throw new RuntimeException("Failed to create hard link", e);
+      }
+      return link.toString();
+    }).collect(Collectors.toSet());
+  }
+
 }

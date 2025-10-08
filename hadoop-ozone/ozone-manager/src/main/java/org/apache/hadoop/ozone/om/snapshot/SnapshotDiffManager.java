@@ -26,6 +26,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NAT
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
@@ -109,7 +111,11 @@ import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
+import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -125,6 +131,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.logging.log4j.util.Strings;
+import org.apache.ozone.compaction.log.SstFileInfo;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
@@ -189,6 +196,8 @@ public class SnapshotDiffManager implements AutoCloseable {
   private final boolean diffDisableNativeLibs;
 
   private final boolean isNativeLibsLoaded;
+
+  private final int maxSnapshotLimit;
 
   private final BiFunction<SnapshotInfo, SnapshotInfo, String>
       generateSnapDiffJobKey =
@@ -264,6 +273,9 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.sstBackupDirForSnapDiffJobs = path.toString();
 
     this.isNativeLibsLoaded = initNativeLibraryForEfficientDiff(ozoneManager.getConfiguration());
+
+    this.maxSnapshotLimit = ozoneManager.getConfiguration().getInt(OZONE_OM_FS_SNAPSHOT_MAX_LIMIT,
+        OZONE_OM_FS_SNAPSHOT_MAX_LIMIT_DEFAULT);
 
     // Ideally, loadJobsOnStartUp should run only on OM node, since SnapDiff
     // is not HA currently and running this on all the nodes would be
@@ -1043,6 +1055,13 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
+  OmSnapshotLocalData getSnapshotLocalData(SnapshotInfo fsInfo) throws IOException {
+    String yamlPath = OmSnapshotManager.getSnapshotLocalPropertyYamlPath(
+        ozoneManager.getMetadataManager(), fsInfo);
+    return OmSnapshotLocalDataYaml.getFromYamlFile(
+        ozoneManager.getOmSnapshotManager(), new File(yamlPath));
+  }
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   private void getDeltaFilesAndDiffKeysToObjectIdToKeyMap(
       final Table<String, ? extends WithParentObjectId> fsTable,
@@ -1180,6 +1199,37 @@ public class SnapshotDiffManager implements AutoCloseable {
     // TODO: [SNAPSHOT] Refactor the parameter list
     Optional<Set<String>> deltaFiles = Optional.empty();
 
+    OmSnapshotLocalData fromSnapshotLocalData = getSnapshotLocalData(fsInfo);
+    int fromSnapshotVersion = fromSnapshotLocalData.getVersion();
+    OmSnapshotLocalData toSnapshotLocalData = getSnapshotLocalData(tsInfo);
+    int toSnapshotVersion = toSnapshotLocalData.getVersion();
+
+    try {
+      if (fromSnapshotVersion > 0 && toSnapshotVersion > 0) {
+        // both snapshots are defragmented, To calculate snap-diff, we can simply compare the
+        // SST files contained in OmSnapshotLocalData instances of both these and get the delta files
+        OmSnapshotLocalData.VersionMeta toSnapVersionMeta =
+            toSnapshotLocalData.getVersionSstFileInfos().get(toSnapshotVersion);
+        // get the source snapshot SST files (versionMeta)  corresponding to target snapshot
+        OmSnapshotLocalData.VersionMeta fromSnapVersionMeta =
+            resolveBaseVersionMeta(toSnapshotLocalData, fromSnapshot.getSnapshotID());
+        // Calculate diff files using helper method
+        if (toSnapVersionMeta == null) {
+          String errMsg =
+              "Cannot find corresponding version of from snapshot " + fromSnapshotVersion + " from " + tsInfo;
+          LOG.error(errMsg);
+          throw new IOException(errMsg);
+        }
+        List<String> diffFiles = calculateDiffFiles(fromSnapVersionMeta, toSnapVersionMeta);
+        return OmSnapshotUtils.getSSTDiffListWithFullPath(diffFiles,
+            OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), fsInfo).toString(),
+            OmSnapshotManager.getSnapshotPath(ozoneManager.getMetadataManager(), tsInfo).toString(), diffDir);
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to calculate snap-diff between fromSnapshot : {} , toSnapshot: {} via optimal method," +
+          "Falling back to other methods", fsInfo, tsInfo, e);
+    }
+
     // Check if compaction DAG is available, use that if so
     if (differ != null && fsInfo != null && tsInfo != null && !useFullDiff) {
       String volume = fsInfo.getVolumeName();
@@ -1221,6 +1271,81 @@ public class SnapshotDiffManager implements AutoCloseable {
     return deltaFiles.orElseThrow(() ->
         new IOException("Error getting diff files b/w " + fromSnapshot.getSnapshotTableKey() + " and " +
             toSnapshot.getSnapshotTableKey()));
+  }
+
+  /**
+   * Resolve the VersionMeta of the ancestor snapshot (fromSnapshotId)
+   * that the given snapshot (toSnapshot) was built on.
+   * Traverses the snapshot chain backwards using prevSnapId.
+   *
+   * @param toSnapshot the target snapshot.
+   * @param fromSnapshotId UUID of the source snapshot.
+   * @return the resolved VersionMeta of the source that was used to build the target.
+   */
+  private OmSnapshotLocalData.VersionMeta resolveBaseVersionMeta(
+      OmSnapshotLocalData toSnapshot,
+      UUID fromSnapshotId) throws IOException {
+    OmMetadataManagerImpl metadataManager =
+        (OmMetadataManagerImpl) ozoneManager.getMetadataManager();
+    // Start walking back from the child snapshot
+    OmSnapshotLocalData child = toSnapshot;
+    int numSnapshotsTraversed = 0;
+    while (numSnapshotsTraversed <= maxSnapshotLimit && !child.getPreviousSnapshotId().equals(fromSnapshotId)) {
+      UUID parentId = child.getPreviousSnapshotId();
+      // Load the parent snapshot in the chain
+      child = getSnapshotLocalData(
+          getSnapshotInfo(ozoneManager,
+              metadataManager.getSnapshotChainManager(),
+              parentId));
+      numSnapshotsTraversed++;
+    }
+    if (numSnapshotsTraversed > maxSnapshotLimit) {
+      LOG.error("Exceeded the traversal limit of {} while finding the VersionMeta of the fromSnapshot : {}" +
+          " that the toSnapshot was built on.", maxSnapshotLimit, fromSnapshotId);
+      return null;
+    }
+    SnapshotInfo snapshotInfo =
+        getSnapshotInfo(ozoneManager, metadataManager.getSnapshotChainManager(), fromSnapshotId);
+    OmSnapshotLocalData fromSnapshot = getSnapshotLocalData(snapshotInfo);
+    // Get the version that the child was built from
+    OmSnapshotLocalData.VersionMeta childVersionMeta = child.getVersionSstFileInfos().get(child.getVersion());
+    int versionUsedWhenBuildingChild = childVersionMeta.getPreviousSnapshotVersion();
+    return fromSnapshot.getVersionSstFileInfos().get(versionUsedWhenBuildingChild);
+  }
+
+  /**
+   * Calculates the symmetric difference of SST files between two version metadata.
+   * Returns a list of SST file names that are present in one snapshot but not in the other,
+   * i.e., the symmetric difference between the two sets of SST files.
+   *
+   * @param fromSnapVersionMeta Version metadata from the first snapshot; provides the set of SST files for comparison.
+   * @param toSnapVersionMeta Version metadata from the second snapshot; provides the set of SST files for comparison.
+   * @return List of SST file names that are present in only one of the two snapshots (symmetric difference).
+   */
+  private List<String> calculateDiffFiles(OmSnapshotLocalData.VersionMeta fromSnapVersionMeta,
+                                          OmSnapshotLocalData.VersionMeta toSnapVersionMeta) {
+    // Extract SST file names from both snapshots
+    Set<String> fromSnapSstFileNames = fromSnapVersionMeta.getSstFiles().stream()
+        .map(SstFileInfo::getFileName)
+        .collect(Collectors.toSet());
+    
+    Set<String> toSnapSstFileNames = toSnapVersionMeta.getSstFiles().stream()
+        .map(SstFileInfo::getFileName)
+        .collect(Collectors.toSet());
+
+    List<String> diffFiles = new ArrayList<>();
+    
+    // Files in fromSnapshot but NOT in toSnapshot
+    diffFiles.addAll(fromSnapSstFileNames.stream()
+        .filter(file -> !toSnapSstFileNames.contains(file))
+        .collect(Collectors.toList()));
+
+    // Files in toSnapshot but NOT in fromSnapshot  
+    diffFiles.addAll(toSnapSstFileNames.stream()
+        .filter(file -> !fromSnapSstFileNames.contains(file))
+        .collect(Collectors.toList()));
+    
+    return diffFiles;
   }
 
   private Set<String> getDiffFiles(OmSnapshot fromSnapshot, OmSnapshot toSnapshot, List<String> tablesToLookUp) {
