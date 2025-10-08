@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -110,8 +111,19 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           deletedOpenKeys, getBucketLayout());
 
       result = Result.SUCCESS;
+
+      List<String> deletedOpenKeysLight = new ArrayList<>(deletedOpenKeys.size());
+      for (Pair<Long, OmKeyInfo> key : deletedOpenKeys.values()) {
+        OmKeyInfo keyInfo = key.getRight();
+        OzoneManagerProtocolProtos.KeyArgs keyArgs = OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+            .setVolumeName(keyInfo.getVolumeName())
+            .setBucketName(keyInfo.getBucketName())
+            .setKeyName(keyInfo.getKeyName())
+            .build();
+        deletedOpenKeysLight.add(buildLightKeyArgsAuditMap(keyArgs).toString());
+      }
       auditParams.put(AUDIT_PARAM_NUM_OPEN_KEYS, String.valueOf(deletedOpenKeys.size()));
-      auditParams.put(AUDIT_PARAM_OPEN_KEYS, deletedOpenKeys.toString());
+      auditParams.put(AUDIT_PARAM_OPEN_KEYS, deletedOpenKeysLight.toString());
       AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.OPEN_KEY_CLEANUP, auditParams));
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
