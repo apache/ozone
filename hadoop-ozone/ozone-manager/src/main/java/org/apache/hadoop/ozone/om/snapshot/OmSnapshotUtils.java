@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -149,6 +150,10 @@ public final class OmSnapshotUtils {
           }
           String from = parts[1];
           String to = parts[0];
+          String omDbPrefix = OM_DB_NAME + "/";
+          if (to.startsWith(omDbPrefix)) {
+            to = to.substring(omDbPrefix.length());
+          }
           Path fullFromPath = Paths.get(dbPath.toString(), from);
           filesToDelete.add(fullFromPath);
           Path fullToPath = Paths.get(dbPath.toString(), to);
