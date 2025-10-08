@@ -781,10 +781,9 @@ public class TestNSSummaryEndpointWithFSO {
         .setObjectID(KEY_TWO_OBJECT_ID)
         .setParentObjectID(DIR_TWO_OBJECT_ID)
         .build();
-    // Call constructFullPath and verify the result
-    OmKeyInfo finalKeyInfo = keyInfo;
-    assertThrows(ServiceNotReadyException.class, () -> ReconUtils.constructFullPath(finalKeyInfo,
-        reconNamespaceSummaryManager));
+    // Call constructFullPath and verify the result - should return empty string when NSSummary parent is invalid
+    fullPath = ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager);
+    Assertions.assertEquals("", fullPath, "Should return empty string when NSSummary tree is being rebuilt");
   }
 
   @Test
@@ -804,8 +803,9 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(dirOneObjectId)
         .build();
 
-    assertThrows(ServiceNotReadyException.class, () ->
-        ReconUtils.constructFullPath(keyInfo, mockSummaryManager));
+    // Should return empty string when NSSummary has invalid parentId
+    String fullPath = ReconUtils.constructFullPath(keyInfo, mockSummaryManager);
+    Assertions.assertEquals("", fullPath, "Should return empty string when NSSummary has negative parentId");
   }
 
   /**

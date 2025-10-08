@@ -1221,9 +1221,12 @@ public class OMDBInsightEndpoint {
             // Legacy buckets are obsolete, so this code path is not optimized. We don't expect to see many Legacy
             // buckets in practice.
             prevParentID = -1;
-            keyEntityInfo.setPath(ReconUtils.constructFullPath(keyEntityInfo.getKeyName(), keyEntityInfo.getParentId(),
-                keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager
-            ));
+            String fullPath = ReconUtils.constructFullPath(keyEntityInfo.getKeyName(), keyEntityInfo.getParentId(),
+                keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager);
+            if (fullPath.isEmpty()) {
+              continue;
+            }
+            keyEntityInfo.setPath(fullPath);
           } else {
             // As we iterate keys in sorted order, its highly likely that keys have the same prefix for many keys in a
             // row. Especially for FSO buckets, its expensive to construct the path for each key. So, we construct the
@@ -1232,13 +1235,16 @@ public class OMDBInsightEndpoint {
             if (prevParentID != keyEntityInfo.getParentId()) {
               prevParentID = keyEntityInfo.getParentId();
               keyPrefix = ReconUtils.constructFullPathPrefix(keyEntityInfo.getParentId(),
-                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager
-              );
+                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager);
               keyPrefixLength = keyPrefix.length();
             }
             keyPrefix.setLength(keyPrefixLength);
             keyPrefix.append(keyEntityInfo.getKeyName());
-            keyEntityInfo.setPath(keyPrefix.toString());
+            String keyPrefixFullPath = keyPrefix.toString();
+            if (keyPrefixFullPath.isEmpty()) {
+              continue;
+            }
+            keyEntityInfo.setPath(keyPrefixFullPath);
           }
 
           results.add(keyEntityInfo);
