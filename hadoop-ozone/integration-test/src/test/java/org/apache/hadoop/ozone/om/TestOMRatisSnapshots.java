@@ -124,7 +124,7 @@ public class TestOMRatisSnapshots {
   private static final BucketLayout TEST_BUCKET_LAYOUT =
       BucketLayout.OBJECT_STORE;
   private OzoneClient client;
-  private static GenericTestUtils.PrintStreamCapturer output;
+  private GenericTestUtils.PrintStreamCapturer output;
 
   /**
    * Create a MiniOzoneCluster for testing. The cluster initially has one
@@ -289,8 +289,7 @@ public class TestOMRatisSnapshots {
 
     assertLogCapture(logCapture,
         "Install Checkpoint is finished");
-    String auditLog = output.get();
-    assertThat(auditLog).contains("op=DB_CHECKPOINT_INSTALL {\"leaderId\":\"" + leaderOMNodeId + "\",\"term\":\"" +
+    assertThat(output.get()).contains("op=DB_CHECKPOINT_INSTALL {\"leaderId\":\"" + leaderOMNodeId + "\",\"term\":\"" +
         leaderOMSnapshotTermIndex, "\"lastAppliedIndex\":\"" + followerOMLastAppliedIndex);
 
     // Read & Write after snapshot installed.
