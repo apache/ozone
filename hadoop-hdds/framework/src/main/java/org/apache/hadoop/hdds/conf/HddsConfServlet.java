@@ -94,13 +94,19 @@ public class HddsConfServlet extends HttpServlet {
       } else {
         processConfigTagRequest(request, cmd, out);
       }
-    } catch (BadFormatException bfe) {
-      response.sendError(HttpServletResponse.SC_BAD_REQUEST, bfe.getMessage());
     } catch (IllegalArgumentException iae) {
       response.sendError(HttpServletResponse.SC_NOT_FOUND, iae.getMessage());
     }
   }
 
+  /**
+   * Parse the Accept header to determine response format.
+   *
+   * @param request the HTTP servlet request
+   * @return {@link #FORMAT_JSON} if Accept header contains "application/json",
+   *         otherwise {@link #FORMAT_XML} (default for backwards compatibility)
+   * @see HttpHeaders#ACCEPT
+   */
   @VisibleForTesting
   static String parseAcceptHeader(HttpServletRequest request) {
     String format = request.getHeader(HttpHeaders.ACCEPT);
@@ -113,13 +119,11 @@ public class HddsConfServlet extends HttpServlet {
    */
   static void writeResponse(OzoneConfiguration conf,
       Writer out, String format, String propertyName)
-      throws IOException, IllegalArgumentException, BadFormatException {
+      throws IOException, IllegalArgumentException {
     if (FORMAT_JSON.equals(format)) {
       OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
     } else if (FORMAT_XML.equals(format)) {
       conf.writeXml(propertyName, out);
-    } else {
-      throw new BadFormatException("Bad format: " + format);
     }
   }
 

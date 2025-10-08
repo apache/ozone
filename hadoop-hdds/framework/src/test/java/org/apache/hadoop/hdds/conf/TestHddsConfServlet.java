@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import static org.apache.hadoop.hdds.conf.HddsConfServlet.FORMAT_JSON;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -166,14 +166,6 @@ public class TestHddsConfServlet {
     assertTrue(foundSetting);
   }
 
-  @Test
-  public void testBadFormat() throws Exception {
-    StringWriter sw = new StringWriter();
-    assertThrows(HddsConfServlet.BadFormatException.class,
-        () -> HddsConfServlet.writeResponse(getTestConf(), sw, "not a format", null));
-    assertEquals("", sw.toString());
-  }
-
   private String getResultWithCmd(OzoneConfiguration conf, String cmd)
       throws Exception {
     StringWriter sw = null;
@@ -199,6 +191,7 @@ public class TestHddsConfServlet {
       // response request
       service.doGet(request, response);
       if (cmd.equals("illegal")) {
+        // FIXME: if we are sending error response respect to xml / json, we dont need this verify
         verify(response).sendError(
             eq(HttpServletResponse.SC_NOT_FOUND),
             eq("illegal is not a valid command."));
