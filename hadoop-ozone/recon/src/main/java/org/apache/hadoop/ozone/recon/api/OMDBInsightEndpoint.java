@@ -57,6 +57,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -600,9 +601,9 @@ public class OMDBInsightEndpoint {
         keyEntityInfo.setKey(omKeyInfo.getFileName());
         keyEntityInfo.setPath(createPath(omKeyInfo));
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
-        keyEntityInfo.setSize(
-            fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
-        keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
+        Pair<Long, Long> sizeInfo = fetchSizeForDeletedDirectory(omKeyInfo.getObjectID());
+        keyEntityInfo.setSize(sizeInfo.getLeft());
+        keyEntityInfo.setReplicatedSize(sizeInfo.getRight());
         keyEntityInfo.setReplicationConfig(omKeyInfo.getReplicationConfig());
         pendingForDeletionKeyInfo.setUnreplicatedDataSize(
             pendingForDeletionKeyInfo.getUnreplicatedDataSize() +
@@ -628,20 +629,20 @@ public class OMDBInsightEndpoint {
   }
 
   /**
-   * Given an object ID, return total data size (no replication)
+   * Given an object ID, return total data size as a pair of Total Size, Total Replicated Size
    * under this object. Note:- This method is RECURSIVE.
    *
    * @param objectId the object's ID
-   * @return total used data size in bytes
+   * @return total used data size and replicated total used data size in bytes
    * @throws IOException ioEx
    */
-  protected long fetchSizeForDeletedDirectory(long objectId)
+  protected Pair<Long, Long> fetchSizeForDeletedDirectory(long objectId)
       throws IOException {
     NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(objectId);
-    if (nsSummary == null) {
-      return 0L;
+    if (nsSummary != null) {
+      return Pair.of(nsSummary.getSizeOfFiles(), nsSummary.getReplicatedSizeOfFiles());
     }
-    return nsSummary.getSizeOfFiles();
+    return Pair.of(0L, 0L);
   }
 
   /** This method retrieves set of directories pending for deletion.

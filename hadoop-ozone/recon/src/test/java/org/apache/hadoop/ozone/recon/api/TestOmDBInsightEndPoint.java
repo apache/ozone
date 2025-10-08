@@ -39,6 +39,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -49,6 +51,7 @@ import java.util.TimeZone;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -64,6 +67,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -88,9 +92,12 @@ import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithLegacy;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithOBS;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Unit test for OmDBInsightEndPoint.
@@ -106,9 +113,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
   private Set<Long> generatedIds = new HashSet<>();
-
   private static final String VOLUME_ONE = "volume1";
-
   private static final String OBS_BUCKET = "obs-bucket";
   private static final String FSO_BUCKET = "fso-bucket";
   private static final String EMPTY_OBS_BUCKET = "empty-obs-bucket";
@@ -250,6 +255,30 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     super();
   }
 
+  public static Collection<Object[]> replicationConfigValues() {
+    return Arrays.asList(new Object[][]{
+        {ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE)},
+        {ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE)},
+        {ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
+            toProto(3, 2, ECReplicationConfig.EcCodec.RS, 1024))},
+        {ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
+            toProto(6, 3, ECReplicationConfig.EcCodec.RS, 1024))},
+        {ReplicationConfig.fromProto(HddsProtos.ReplicationType.EC, null,
+            toProto(10, 4, ECReplicationConfig.EcCodec.XOR, 4096))}
+    });
+  }
+
+  public static HddsProtos.ECReplicationConfig toProto(int data, int parity, ECReplicationConfig.EcCodec codec,
+                                                       int ecChunkSize) {
+    return HddsProtos.ECReplicationConfig.newBuilder()
+        .setData(data)
+        .setParity(parity)
+        .setCodec(codec.toString())
+        .setEcChunkSize(ecChunkSize)
+        .build();
+  }
+
   private long generateUniqueRandomLong() {
     long newValue;
     do {
@@ -310,6 +339,17 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
     nsSummaryTaskWithFSO.reprocessWithFSO(reconOMMetadataManager);
+  }
+
+  /**
+   * Releases resources (network sockets, database files) after each test run.
+   * This is critical to prevent resource leaks between tests, which would otherwise cause "Too many open files" errors.
+   */
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
   }
 
   @SuppressWarnings("methodlength")
@@ -1385,14 +1425,24 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
                                  String keyName, boolean isFile) {
+    return buildOmKeyInfo(volumeName, bucketName, keyName, isFile,
+        StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE));
+  }
+
+  private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
+                                 String keyName, boolean isFile, ReplicationConfig replicationConfig) {
+    return buildOmKeyInfo(volumeName, bucketName, keyName, isFile, replicationConfig);
+  }
+
+  private OmKeyInfo buildOmKeyInfo(String volumeName, String bucketName,
+                                   String keyName, boolean isFile, ReplicationConfig replicationConfig) {
     return new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setFile(isFile)
         .setObjectID(generateUniqueRandomLong())
-        .setReplicationConfig(StandaloneReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setReplicationConfig(replicationConfig)
         .setDataSize(random.nextLong())
         .build();
   }
@@ -1497,15 +1547,17 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         keyInsightInfoResp.getLastKey());
   }
 
-  @Test
-  public void testGetDirectorySizeInfo() throws Exception {
+  @ParameterizedTest
+  @MethodSource("replicationConfigValues")
+  public void testGetDirectorySizeInfo(ReplicationConfig replicationConfig) throws Exception {
 
     OmKeyInfo omKeyInfo1 =
-        getOmKeyInfo("sampleVol", "bucketOne", "dir1", false);
+        getOmKeyInfo("sampleVol", "bucketOne", "dir1", false, replicationConfig);
     OmKeyInfo omKeyInfo2 =
-        getOmKeyInfo("sampleVol", "bucketTwo", "dir2", false);
+        getOmKeyInfo("sampleVol", "bucketTwo", "dir2", false, replicationConfig);
     OmKeyInfo omKeyInfo3 =
-        getOmKeyInfo("sampleVol", "bucketThree", "dir3", false);
+        getOmKeyInfo("sampleVol", "bucketThree", "dir3", false,
+            replicationConfig);
 
     // Add 3 entries to deleted dir table for directory dir1, dir2 and dir3
     // having object id 1, 2 and 3 respectively
@@ -1519,11 +1571,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // Prepare NS summary data and populate the table
     Table<Long, NSSummary> table = omdbInsightEndpoint.getNsSummaryTable();
     // Set size of files to 5 for directory object id 1
-    table.put(omKeyInfo1.getObjectID(), getNsSummary(5L));
+    table.put(omKeyInfo1.getObjectID(), getNsSummary(5L, replicationConfig));
     // Set size of files to 6 for directory object id 2
-    table.put(omKeyInfo2.getObjectID(), getNsSummary(6L));
+    table.put(omKeyInfo2.getObjectID(), getNsSummary(6L, replicationConfig));
     // Set size of files to 7 for directory object id 3
-    table.put(omKeyInfo3.getObjectID(), getNsSummary(7L));
+    table.put(omKeyInfo3.getObjectID(), getNsSummary(7L, replicationConfig));
 
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse keyInsightInfoResp =
@@ -1534,15 +1586,23 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // Assert the total size under directory dir1 is 5L
     assertEquals(5L,
         keyInsightInfoResp.getDeletedDirInfoList().get(0).getSize());
+    assertEquals(QuotaUtil.getReplicatedSize(5L, replicationConfig),
+        keyInsightInfoResp.getDeletedDirInfoList().get(0).getReplicatedSize());
     // Assert the total size under directory dir2 is 6L
     assertEquals(6L,
         keyInsightInfoResp.getDeletedDirInfoList().get(1).getSize());
+    assertEquals(QuotaUtil.getReplicatedSize(6L, replicationConfig),
+        keyInsightInfoResp.getDeletedDirInfoList().get(1).getReplicatedSize());
     // Assert the total size under directory dir3 is 7L
     assertEquals(7L,
         keyInsightInfoResp.getDeletedDirInfoList().get(2).getSize());
+    assertEquals(QuotaUtil.getReplicatedSize(7L, replicationConfig),
+        keyInsightInfoResp.getDeletedDirInfoList().get(2).getReplicatedSize());
 
     // Assert the total of all the deleted directories is 18L
     assertEquals(18L, keyInsightInfoResp.getUnreplicatedDataSize());
+    assertEquals(QuotaUtil.getReplicatedSize(18L, replicationConfig),
+        keyInsightInfoResp.getReplicatedDataSize());
   }
 
   @Test
@@ -2008,9 +2068,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     assertEquals("", listKeysResponse.getLastKey());
   }
 
-  private NSSummary getNsSummary(long size) {
+  private NSSummary getNsSummary(long size, ReplicationConfig replicationConfig) {
     NSSummary summary = new NSSummary();
     summary.setSizeOfFiles(size);
+    summary.setReplicatedSizeOfFiles(QuotaUtil.getReplicatedSize(size, replicationConfig));
     return summary;
   }
 }
