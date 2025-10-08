@@ -250,6 +250,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         writeDBToArchive(sstFilesToExclude, checkpointDir,
             maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
         if (includeSnapshotData) {
+          // get the list of snapshots from the checkpoint
+          OmMetadataManagerImpl checkpointMetadataManager = OmMetadataManagerImpl.createCheckpointMetadataManager(
+              om.getConfiguration(), checkpoint);
+          snapshotPaths = getSnapshotDirs(checkpointMetadataManager);
           Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
           Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
           writeDBToArchive(sstFilesToExclude, tmpCompactionLogDir, maxTotalSstSize, archiveOutputStream, tmpdir,
@@ -284,7 +288,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @param hardLinkFileMap     Map of hardlink file paths to their unique identifiers for deduplication.
    * @throws IOException if an I/O error occurs during processing.
    */
-  private void transferSnapshotData(Set<String> sstFilesToExclude, Path tmpdir, Set<Path> snapshotPaths,
+  void transferSnapshotData(Set<String> sstFilesToExclude, Path tmpdir, Set<Path> snapshotPaths,
       AtomicLong maxTotalSstSize, ArchiveOutputStream<TarArchiveEntry> archiveOutputStream,
       Map<String, String> hardLinkFileMap) throws IOException {
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
@@ -476,7 +480,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @return The created database checkpoint.
    * @throws IOException If an error occurs during checkpoint creation or file copying.
    */
-  private DBCheckpoint createAndPrepareCheckpoint(Path tmpdir, boolean flush) throws IOException {
+  DBCheckpoint createAndPrepareCheckpoint(Path tmpdir, boolean flush) throws IOException {
     // make tmp directories to contain the copies
     Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
     Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
