@@ -278,7 +278,7 @@ public class WritableECContainerProvider
     private static final String PREFIX = "ozone.scm.ec";
 
     @Config(key = "pipeline.minimum",
-        defaultValue = "5",
+        defaultValue = "20",
         reconfigurable = true,
         type = ConfigType.INT,
         description = "The minimum number of pipelines to have open for each " +
