@@ -41,6 +41,9 @@ import org.yaml.snakeyaml.Yaml;
  */
 public abstract class OmSnapshotLocalData {
 
+  // Unique identifier for the snapshot. This is used to identify the snapshot.
+  private UUID snapshotId;
+
   // Version of the snapshot local data. 0 indicates not defragged snapshot.
   // defragged snapshots will have version > 0.
   private int version;
@@ -70,7 +73,8 @@ public abstract class OmSnapshotLocalData {
   /**
    * Creates a OmSnapshotLocalData object with default values.
    */
-  public OmSnapshotLocalData(List<LiveFileMetaData> notDefraggedSSTFileList, UUID previousSnapshotId) {
+  public OmSnapshotLocalData(UUID snapshotId, List<LiveFileMetaData> notDefraggedSSTFileList, UUID previousSnapshotId) {
+    this.snapshotId = snapshotId;
     this.isSSTFiltered = false;
     this.lastDefragTime = 0L;
     this.needsDefrag = false;
@@ -93,6 +97,7 @@ public abstract class OmSnapshotLocalData {
     this.needsDefrag = source.needsDefrag;
     this.checksum = source.checksum;
     this.version = source.version;
+    this.snapshotId = source.snapshotId;
     this.previousSnapshotId = source.previousSnapshotId;
     this.versionSstFileInfos = new LinkedHashMap<>();
     setVersionSstFileInfos(source.versionSstFileInfos);
@@ -165,6 +170,10 @@ public abstract class OmSnapshotLocalData {
 
   public UUID getPreviousSnapshotId() {
     return previousSnapshotId;
+  }
+
+  public UUID getSnapshotId() {
+    return snapshotId;
   }
 
   public void setPreviousSnapshotId(UUID previousSnapshotId) {
