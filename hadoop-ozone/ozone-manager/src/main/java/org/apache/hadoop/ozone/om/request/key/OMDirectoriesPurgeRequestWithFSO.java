@@ -205,7 +205,6 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       deletingServiceMetrics.incrNumSubFilesMoved(numSubFilesMoved);
       deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
 
-      Map<String, String> auditParams = new LinkedHashMap<>();
       TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
       if (fromSnapshotInfo != null) {
         fromSnapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());

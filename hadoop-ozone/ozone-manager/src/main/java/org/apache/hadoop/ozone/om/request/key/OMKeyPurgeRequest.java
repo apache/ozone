@@ -130,7 +130,6 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     // Setting transaction info for snapshot, this is to prevent duplicate purge requests to OM from background
     // services.
     try {
-      Map<String, String> auditParams = new LinkedHashMap<>();
       TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
       if (fromSnapshotInfo != null) {
         fromSnapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
