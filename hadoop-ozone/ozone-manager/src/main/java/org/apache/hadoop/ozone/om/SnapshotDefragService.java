@@ -275,14 +275,14 @@ public class SnapshotDefragService extends BackgroundService
       OmSnapshotLocalDataYaml yamlData =
           OmSnapshotLocalDataYaml.getFromYamlFile(ozoneManager.getOmSnapshotManager(), yamlFile);
 
-      // Mark as defragmented by setting needsCompaction to false
+      // Mark as defragmented by setting needsDefrag to false
       yamlData.setNeedsDefrag(false);
 
       // Write updated YAML data
       yamlData.writeToYaml(ozoneManager.getOmSnapshotManager(), yamlFile);
 
       LOG.info("Successfully updated metadata for snapshot: {}, " +
-              "marked as defragmented (needsCompaction=false)",
+              "marked as defragmented (needsDefrag=false)",
           snapshotInfo.getName());
 
     } catch (IOException e) {
