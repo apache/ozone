@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.s3.RequestIdentifier;
 /**
  * Builder pattern for creating endpoint instances with proper configuration.
  */
-public class EndpointBuilder {
+public final class EndpointBuilder {
 
   private EndpointBuilder() {
     // Utility class - prevent instantiation
@@ -65,6 +65,7 @@ public class EndpointBuilder {
     private RequestIdentifier requestIdentifier;
     private OzoneConfiguration ozoneConfiguration;
     private HttpHeaders headers;
+    private BucketEndpoint base;
 
     /**
      * Sets the Ozone client.
@@ -127,12 +128,21 @@ public class EndpointBuilder {
     }
 
     /**
+     * Sets a pre-constructed endpoint as the base. Useful for tests where
+     * methods are overridden anonymously.
+     */
+    public BucketEndpointBuilder setBase(BucketEndpoint base) {
+      this.base = base;
+      return this;
+    }
+
+    /**
      * Builds and initializes the BucketEndpoint instance.
      * @return configured BucketEndpoint instance
      * @throws IOException if initialization fails
      */
     public BucketEndpoint build() throws IOException {
-      BucketEndpoint endpoint = new BucketEndpoint();
+      BucketEndpoint endpoint = base != null ? base : new BucketEndpoint();
       
       if (client != null) {
         endpoint.setClient(client);
@@ -228,6 +238,7 @@ public class EndpointBuilder {
     private OzoneConfiguration ozoneConfiguration;
     private HttpHeaders headers;
     private ContainerRequestContext context;
+    private ObjectEndpoint base;
 
     /**
      * Sets the Ozone client.
@@ -300,12 +311,21 @@ public class EndpointBuilder {
     }
 
     /**
+     * Sets a pre-constructed endpoint as the base. Useful for tests where
+     * methods are overridden anonymously.
+     */
+    public ObjectEndpointBuilder setBase(ObjectEndpoint base) {
+      this.base = base;
+      return this;
+    }
+
+    /**
      * Builds and initializes the ObjectEndpoint instance.
      * @return configured ObjectEndpoint instance
      * @throws IOException if initialization fails
      */
     public ObjectEndpoint build() throws IOException {
-      ObjectEndpoint endpoint = new ObjectEndpoint();
+      ObjectEndpoint endpoint = base != null ? base : new ObjectEndpoint();
       
       if (client != null) {
         endpoint.setClient(client);
