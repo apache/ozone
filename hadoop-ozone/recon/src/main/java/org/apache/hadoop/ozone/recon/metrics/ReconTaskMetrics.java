@@ -20,7 +20,11 @@ package org.apache.hadoop.ozone.recon.metrics;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
@@ -34,12 +38,16 @@ import org.apache.hadoop.ozone.OzoneConsts;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Recon Task Metrics", context = OzoneConsts.OZONE)
-public final class ReconTaskMetrics {
+public final class ReconTaskMetrics implements MetricsSource {
 
   private static final String SOURCE_NAME =
       ReconTaskMetrics.class.getSimpleName();
 
   private final MetricsRegistry registry = new MetricsRegistry(SOURCE_NAME);
+
+  // Static metric required for Hadoop Metrics framework registration
+  @Metric(about = "Total number of unique tasks tracked")
+  private MutableCounterLong numTasksTracked;
 
   // Per-task delta processing metrics stored in ConcurrentMaps
   private final ConcurrentMap<String, MutableCounterLong> taskDeltaProcessingSuccess =
@@ -150,5 +158,25 @@ public final class ReconTaskMetrics {
 
   public MutableRate getTaskReprocessDuration(String taskName) {
     return taskReprocessDuration.get(taskName);
+  }
+
+  @Override
+  public void getMetrics(MetricsCollector collector, boolean all) {
+    MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
+
+    // Snapshot static metric
+    numTasksTracked.snapshot(recordBuilder, all);
+
+    // Snapshot all dynamic per-task metrics
+    taskDeltaProcessingSuccess.values().forEach(
+        metric -> metric.snapshot(recordBuilder, all));
+    taskDeltaProcessingFailures.values().forEach(
+        metric -> metric.snapshot(recordBuilder, all));
+    taskDeltaProcessingDuration.values().forEach(
+        metric -> metric.snapshot(recordBuilder, all));
+    taskReprocessFailures.values().forEach(
+        metric -> metric.snapshot(recordBuilder, all));
+    taskReprocessDuration.values().forEach(
+        metric -> metric.snapshot(recordBuilder, all));
   }
 }
