@@ -905,22 +905,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * @return the number of bytes used by blocks pointed to by {@code omKeyInfo}.
-   */
-  public static long sumBlockLengths(OzoneManagerProtocolProtos.KeyInfo keyInfo) {
-    long bytesUsed = 0;
-    ReplicationConfig replicationConfig = ReplicationConfig.fromProto(keyInfo.getType(), keyInfo.getFactor(),
-            keyInfo.getEcReplicationConfig());
-    for (OzoneManagerProtocolProtos.KeyLocationList group: keyInfo.getKeyLocationListList()) {
-      for (OzoneManagerProtocolProtos.KeyLocation locationInfo : group.getKeyLocationsList()) {
-        bytesUsed += QuotaUtil.getReplicatedSize(locationInfo.getLength(), replicationConfig);
-      }
-    }
-
-    return bytesUsed;
-  }
-
-  /**
    * Return bucket info for the specified bucket.
    */
   @Nullable
