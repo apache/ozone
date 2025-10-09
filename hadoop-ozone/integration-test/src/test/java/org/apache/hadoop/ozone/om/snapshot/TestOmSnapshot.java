@@ -244,7 +244,7 @@ public abstract class TestOmSnapshot {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, createLinkedBucket);
+    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
     if (createLinkedBucket) {
       this.linkedBuckets.put(ozoneBucket.getName(), ozoneBucket.getSourceBucket());
     }

@@ -333,22 +333,22 @@ public class TestNSSummaryEndpointWithFSO {
 
   // some expected answers
   private static final long ROOT_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
-      KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE +
+      KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE + KEY_SEVEN_SIZE +
       KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
   private static final long VOL_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
-          KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE;
+          KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE + KEY_SEVEN_SIZE;
 
   private static final long VOL_TWO_DATA_SIZE =
       KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
 
   private static final long BUCKET_ONE_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
-          KEY_THREE_SIZE + KEY_SIX_SIZE;
+          KEY_THREE_SIZE + KEY_SIX_SIZE + KEY_SEVEN_SIZE;
 
   private static final long BUCKET_TWO_DATA_SIZE =
           KEY_FOUR_SIZE + KEY_FIVE_SIZE;
 
   private static final long DIR_ONE_DATA_SIZE = KEY_TWO_SIZE +
-          KEY_THREE_SIZE + KEY_SIX_SIZE;
+          KEY_THREE_SIZE + KEY_SIX_SIZE + KEY_SEVEN_SIZE;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -381,6 +381,7 @@ public class TestNSSummaryEndpointWithFSO {
 
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
+    setUpMultiBlockReplicatedKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
             reconOMMetadataManager, 10);
@@ -555,7 +556,6 @@ public class TestNSSummaryEndpointWithFSO {
 
   @Test
   public void testDataSizeUnderRootWithReplication() throws IOException {
-    setUpMultiBlockReplicatedKeys();
     //   withReplica is true
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
         false, true, false);
@@ -570,7 +570,6 @@ public class TestNSSummaryEndpointWithFSO {
 
   @Test
   public void testDataSizeUnderVolWithReplication() throws IOException {
-    setUpMultiBlockReplicatedKeys();
     Response volResponse = nsSummaryEndpoint.getDiskUsage(VOL_PATH,
         false, true, false);
     DUResponse replicaDUResponse = (DUResponse) volResponse.getEntity();
@@ -583,7 +582,6 @@ public class TestNSSummaryEndpointWithFSO {
 
   @Test
   public void testDataSizeUnderBucketWithReplication() throws IOException {
-    setUpMultiBlockReplicatedKeys();
     Response bucketResponse = nsSummaryEndpoint.getDiskUsage(BUCKET_ONE_PATH,
         false, true, false);
     DUResponse replicaDUResponse = (DUResponse) bucketResponse.getEntity();
@@ -602,7 +600,6 @@ public class TestNSSummaryEndpointWithFSO {
    */
   @Test
   public void testDataSizeUnderDirWithReplication() throws IOException {
-    setUpMultiBlockReplicatedKeys();
     Response dir1Response = nsSummaryEndpoint.getDiskUsage(DIR_ONE_PATH,
         false, true, false);
     DUResponse replicaDUResponse = (DUResponse) dir1Response.getEntity();
@@ -615,7 +612,6 @@ public class TestNSSummaryEndpointWithFSO {
 
   @Test
   public void testDataSizeUnderKeyWithReplication() throws IOException {
-    setUpMultiBlockReplicatedKeys();
     Response keyResponse = nsSummaryEndpoint.getDiskUsage(KEY_PATH,
         false, true, false);
     DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
@@ -674,10 +670,10 @@ public class TestNSSummaryEndpointWithFSO {
 
   @Test
   public void testFileSizeDist() throws Exception {
-    checkFileSizeDist(ROOT_PATH, 2, 3, 4, 1);
-    checkFileSizeDist(VOL_PATH, 2, 1, 2, 1);
-    checkFileSizeDist(BUCKET_ONE_PATH, 1, 1, 1, 1);
-    checkFileSizeDist(DIR_ONE_PATH, 0, 1, 1, 1);
+    checkFileSizeDist(ROOT_PATH, 2, 3, 4, 2);
+    checkFileSizeDist(VOL_PATH, 2, 1, 2, 2);
+    checkFileSizeDist(BUCKET_ONE_PATH, 1, 1, 1, 2);
+    checkFileSizeDist(DIR_ONE_PATH, 0, 1, 1, 2);
   }
 
   public void checkFileSizeDist(String path, int bin0,

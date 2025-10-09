@@ -132,7 +132,7 @@ public abstract class TestOmSnapshotFileSystem implements NonHATests.TestCase {
     writeClient = objectStore.getClientProxy().getOzoneManagerClient();
     ozoneManager = cluster().getOzoneManager();
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, createLinkedBuckets);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBuckets);
     if (createLinkedBuckets) {
       linkedBucketMaps.put(bucket.getName(), bucket.getSourceBucket());
     }

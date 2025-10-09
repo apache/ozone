@@ -34,7 +34,8 @@ public enum ReconLayoutFeature {
   UNHEALTHY_CONTAINER_REPLICA_MISMATCH(2, "Adding replica mismatch state to the unhealthy container table"),
 
   // HDDS-13432: Materialize NSSummary totals and rebuild tree on upgrade
-  NSSUMMARY_AGGREGATED_TOTALS(3, "Aggregated totals for NSSummary and auto-rebuild on upgrade");
+  NSSUMMARY_AGGREGATED_TOTALS(3, "Aggregated totals for NSSummary and auto-rebuild on upgrade"),
+  REPLICATED_SIZE_OF_FILES(4, "Adds replicatedSizeOfFiles to NSSummary");
 
   private final int version;
   private final String description;

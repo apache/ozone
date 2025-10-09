@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Scanner;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -65,13 +66,31 @@ public final class TestDataUtil {
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
-      String volumeName, String bucketName, BucketLayout bucketLayout)
+      String volumeName, String bucketName, BucketLayout bucketLayout) throws IOException {
+    BucketArgs omBucketArgs;
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    if (bucketLayout != null) {
+      builder.setBucketLayout(bucketLayout);
+    }
+    omBucketArgs = builder.build();
+
+    return createVolumeAndBucket(client, volumeName, bucketName,
+        omBucketArgs);
+  }
+
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
+      String volumeName, String bucketName, BucketLayout bucketLayout, DefaultReplicationConfig replicationConfig)
       throws IOException {
     BucketArgs omBucketArgs;
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setStorageType(StorageType.DISK);
     if (bucketLayout != null) {
       builder.setBucketLayout(bucketLayout);
+    }
+
+    if (replicationConfig != null) {
+      builder.setDefaultReplicationConfig(replicationConfig);
     }
     omBucketArgs = builder.build();
 
@@ -197,18 +216,26 @@ public final class TestDataUtil {
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
                                                   BucketLayout bucketLayout)
       throws IOException {
-    return createVolumeAndBucket(client, bucketLayout, false);
+    return createVolumeAndBucket(client, bucketLayout, null, false);
   }
 
-  public static OzoneBucket createVolumeAndBucket(OzoneClient client,
-      BucketLayout bucketLayout, boolean createLinkedBucket) throws IOException {
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client, BucketLayout bucketLayout,
+                                                  DefaultReplicationConfig replicationConfig)
+      throws IOException {
+    return createVolumeAndBucket(client, bucketLayout, replicationConfig, false);
+  }
+
+  public static OzoneBucket createVolumeAndBucket(OzoneClient client, BucketLayout bucketLayout,
+                                                  DefaultReplicationConfig replicationConfig,
+                                                  boolean createLinkedBucket)
+      throws IOException {
     final int attempts = 5;
     for (int i = 0; i < attempts; i++) {
       try {
         String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
         String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
         OzoneBucket ozoneBucket = createVolumeAndBucket(client, volumeName, bucketName,
-            bucketLayout);
+            bucketLayout, replicationConfig);
         if (createLinkedBucket) {
           String targetBucketName = ozoneBucket.getName() + RandomStringUtils.secure().nextNumeric(5);
           ozoneBucket = createLinkedBucket(client, volumeName, bucketName, targetBucketName);
