@@ -25,8 +25,6 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAP
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,8 +37,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
@@ -202,29 +198,6 @@ public class SnapshotDefragService extends BackgroundService
   private void performFullDefragmentation(SnapshotInfo snapshotInfo,
       OmSnapshot omSnapshot) throws IOException {
 
-    String snapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), snapshotInfo);
-
-    // For defraggedDbPath, we need to go up to the parent directory and use checkpointStateDefragged
-    String parentDir = Paths.get(snapshotPath).getParent().getParent().toString();
-    String checkpointDirName = Paths.get(snapshotPath).getFileName().toString();
-    String defraggedDbPath = Paths.get(parentDir, CHECKPOINT_STATE_DEFRAGGED_DIR, checkpointDirName).toString();
-
-    LOG.info("Starting full defragmentation for snapshot: {} at path: {}",
-        snapshotInfo.getName(), snapshotPath);
-    LOG.info("Target defragmented DB path: {}", defraggedDbPath);
-
-    // Create defragmented directory
-    Files.createDirectories(Paths.get(defraggedDbPath));
-
-    // TODO: Get snapshot checkpoint DB via SnapshotCache
-    RDBStore originalStore = (RDBStore) omSnapshot.getMetadataManager().getStore();
-    RocksDatabase originalDb = originalStore.getDb();
-
-    LOG.info("Starting defragmentation process for snapshot: {}", snapshotInfo.getName());
-    LOG.info("Original DB path: {}", snapshotPath);
-    LOG.info("Defragmented DB path: {}", defraggedDbPath);
-
     // TODO: Implement full defragmentation
   }
 
@@ -234,27 +207,6 @@ public class SnapshotDefragService extends BackgroundService
   private void performIncrementalDefragmentation(SnapshotInfo currentSnapshot,
       SnapshotInfo previousDefraggedSnapshot, OmSnapshot currentOmSnapshot)
       throws IOException {
-
-    String currentSnapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), currentSnapshot);
-    String previousSnapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), previousDefraggedSnapshot);
-
-    // Fix path construction similar to performFullDefragmentation
-    String previousParentDir = Paths.get(previousSnapshotPath).getParent().getParent().toString();
-    String previousCheckpointDirName = Paths.get(previousSnapshotPath).getFileName().toString();
-    String previousDefraggedDbPath = Paths.get(previousParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
-        previousCheckpointDirName).toString();
-
-    String currentParentDir = Paths.get(currentSnapshotPath).getParent().getParent().toString();
-    String currentCheckpointDirName = Paths.get(currentSnapshotPath).getFileName().toString();
-    String currentDefraggedDbPath = Paths.get(currentParentDir, CHECKPOINT_STATE_DEFRAGGED_DIR,
-        currentCheckpointDirName).toString();
-
-    LOG.info("Starting incremental defragmentation for snapshot: {} using previous: {}",
-        currentSnapshot.getName(), previousDefraggedSnapshot.getName());
-    LOG.info("Previous defragmented DB: {}", previousDefraggedDbPath);
-    LOG.info("Current target DB: {}", currentDefraggedDbPath);
 
     // TODO: Implement incremental defragmentation
   }
