@@ -31,8 +31,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
@@ -175,30 +178,38 @@ public class SnapshotDefragService extends BackgroundService
 
     LOG.debug("Searching for first snapshot needing defragmentation in active chain");
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iterator =
-             snapshotInfoTable.iterator()) {
-      iterator.seekToFirst();
+    // Get the SnapshotChainManager to iterate through the global snapshot chain
+    SnapshotChainManager snapshotChainManager =
+        ((OmMetadataManagerImpl) ozoneManager.getMetadataManager()).getSnapshotChainManager();
 
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
-        SnapshotInfo snapshotInfo = keyValue.getValue();
+    // Use iterator(false) to iterate forward through the snapshot chain
+    Iterator<UUID> snapshotIterator = snapshotChainManager.iterator(false);
 
-        // Skip deleted snapshots
-        if (snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
-          LOG.debug("Skipping deleted snapshot: {}", snapshotInfo.getName());
-          continue;
-        }
+    while (snapshotIterator.hasNext()) {
+      UUID snapshotId = snapshotIterator.next();
+      String snapshotTableKey = snapshotChainManager.getTableKey(snapshotId);
+      SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
 
-        // Check if this snapshot needs defragmentation
-        if (needsDefragmentation(snapshotInfo)) {
-          LOG.info("Found snapshot needing defragmentation: {} (ID: {})",
-              snapshotInfo.getName(), snapshotInfo.getSnapshotId());
-          return snapshotInfo;
-        }
-
-        LOG.debug("Snapshot {} already defragmented, continuing search",
-            snapshotInfo.getName());
+      if (snapshotInfo == null) {
+        LOG.warn("Snapshot with ID {} not found in snapshot info table", snapshotId);
+        continue;
       }
+
+      // Skip deleted snapshots
+      if (snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+        LOG.debug("Skipping deleted snapshot: {}", snapshotInfo.getName());
+        continue;
+      }
+
+      // Check if this snapshot needs defragmentation
+      if (needsDefragmentation(snapshotInfo)) {
+        LOG.info("Found snapshot needing defragmentation: {} (ID: {})",
+            snapshotInfo.getName(), snapshotInfo.getSnapshotId());
+        return snapshotInfo;
+      }
+
+      LOG.debug("Snapshot {} already defragmented, continuing search",
+          snapshotInfo.getName());
     }
 
     LOG.debug("No snapshots found needing defragmentation");
@@ -219,7 +230,7 @@ public class SnapshotDefragService extends BackgroundService
         currentSnapshot.getPathPreviousSnapshotId().toString() : null;
 
     while (previousSnapshotId != null) {
-      try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>> iterator =
+      try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>> iterator =
                snapshotInfoTable.iterator()) {
         iterator.seekToFirst();
 
