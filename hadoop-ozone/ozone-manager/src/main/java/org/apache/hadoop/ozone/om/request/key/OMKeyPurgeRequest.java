@@ -23,11 +23,11 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePrevious
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -170,13 +170,17 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
   private List<OmBucketInfo> updateBucketSize(List<BucketPurgeKeysSize> bucketPurgeKeysSizeList,
       OMMetadataManager omMetadataManager) throws OMException {
-    Map<String, Map<String, List<BucketPurgeKeysSize>>> bucketPurgeKeysSizes = bucketPurgeKeysSizeList.stream()
-            .collect(Collectors.groupingBy(bucketPurgeKey -> bucketPurgeKey.getBucketNameInfo().getVolumeName(),
-                Collectors.groupingBy(bucketPurgeKey -> bucketPurgeKey.getBucketNameInfo().getBucketName())));
-    List<String[]> bucketKeyList = bucketPurgeKeysSizes.entrySet().stream()
-        .flatMap(volEntry -> volEntry.getValue().keySet().stream()
-            .map(bucketEntry -> new String[]{volEntry.getKey(), bucketEntry}))
-        .collect(Collectors.toList());
+    Map<String, Map<String, List<BucketPurgeKeysSize>>> bucketPurgeKeysSizes = new HashMap<>();
+    List<String[]> bucketKeyList = new ArrayList<>();
+    for (BucketPurgeKeysSize bucketPurgeKey : bucketPurgeKeysSizeList) {
+      String volumeName = bucketPurgeKey.getBucketNameInfo().getVolumeName();
+      String bucketName = bucketPurgeKey.getBucketNameInfo().getBucketName();
+      bucketPurgeKeysSizes.computeIfAbsent(volumeName, k -> new HashMap<>())
+          .computeIfAbsent(bucketName, k -> {
+            bucketKeyList.add(new String[]{volumeName, bucketName});
+            return new ArrayList<>();
+          }).add(bucketPurgeKey);
+    }
     mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLocks(BUCKET_LOCK, bucketKeyList));
     boolean acquiredLock = getOmLockDetails().isLockAcquired();
     if (!acquiredLock) {

@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -202,9 +201,27 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     }
 
     private int getEstimatedSize() {
+      // Using -10 as the placeholder to get max size i.e. 10 bytes to store the long value in protobuf.
+      // Field number 2 in BucketPurgeKeysSize proto corresponds to purgedBytes.
       return this.bucket.getSerializedSize() + computeLongSizeWithTag(2, -10)
+      // Field number 3 in BucketPurgeKeysSize proto corresponds to purgedNamespace.
           + computeLongSizeWithTag(3, -10);
     }
+  }
+
+  private int increaseBucketPurgeSize(Map<Long, BucketPurgeSize> bucketPurgeSizeMap, PurgedKey purgedKey) {
+    BucketPurgeSize bucketPurgeSize;
+    int estimatedSize = 0;
+    if (!bucketPurgeSizeMap.containsKey(purgedKey.getBucketId())) {
+      bucketPurgeSize = bucketPurgeSizeMap.computeIfAbsent(purgedKey.getBucketId(),
+          (bucketId) -> new BucketPurgeSize(purgedKey.getVolume(), purgedKey.getBucket(),
+              purgedKey.getBucketId()));
+      estimatedSize = bucketPurgeSize.getEstimatedSize();
+    } else {
+      bucketPurgeSize = bucketPurgeSizeMap.get(purgedKey.getBucketId());
+    }
+    bucketPurgeSize.incrementPurgedBytes(purgedKey.getPurgedBytes()).incrementPurgedNamespace(1);
+    return estimatedSize;
   }
 
   /**
@@ -241,14 +258,10 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           // Add key to PurgeKeys list.
           if (keysToModify == null || !keysToModify.containsKey(deletedKeyName)) {
             completePurgedKeys.add(deletedKeyName);
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Key {} set to be purged from OM DB", deletedKeyName);
-            }
+            LOG.debug("Key {} set to be purged from OM DB", deletedKeyName);
           } else {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Key {} set to be updated in OM DB, Other versions " +
-                  "of the key that are reclaimable are reclaimed.", deletedKeyName);
-            }
+            LOG.debug("Key {} set to be updated in OM DB, Other versions " +
+                "of the key that are reclaimable are reclaimed.", deletedKeyName);
           }
           deletedReplSize += purgedKey.getPurgedBytes();
           deletedCount++;
@@ -264,6 +277,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             LOG.error("Failed Block Delete corresponding to Key {}.", deletedKeyName);
           }
         }
+      } else {
+        LOG.error("Key {} not found in the list of keys to be purged." +
+            " Skipping purge for this entry. Result of delete blocks : {}", deletedKeyGroup, result.isSuccess());
       }
     }
     // Filter out the key even if one version of the key purge has failed. This is to prevent orphan blocks, and
@@ -301,8 +317,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
     int purgeKeyIndex = 0, updateIndex = 0, renameIndex = 0;
     PurgeKeysRequest.Builder requestBuilder = getPurgeKeysRequest(snapTableKey, expectedPreviousSnapshotId);
-    AtomicInteger currSize = new AtomicInteger(requestBuilder.build().getSerializedSize());
-    int baseSize = currSize.get();
+    int currSize = requestBuilder.build().getSerializedSize();
+    int baseSize = currSize;
 
     OzoneManagerProtocolProtos.DeletedKeys.Builder bucketDeleteKeys = null;
     Map<Long, BucketPurgeSize> bucketPurgeKeysSizeMap = new HashMap<>();
@@ -316,23 +332,16 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         PurgedKey purgedKey = purgedKeyList.get(purgeKeyIndex);
         if (bucketDeleteKeys == null) {
           bucketDeleteKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder().setVolumeName("").setBucketName("");
-          currSize.addAndGet(bucketDeleteKeys.buildPartial().getSerializedSize());
+          currSize += bucketDeleteKeys.buildPartial().getSerializedSize();
         }
         String deletedKey = purgedKey.getDeleteKeyName();
         // Add to purge keys only if there are no other version of key that needs to be retained.
         if (completePurgedKeys.contains(deletedKey)) {
           bucketDeleteKeys.addKeys(deletedKey);
           int estimatedKeySize = ProtobufUtils.computeRepeatedStringSize(deletedKey);
-          currSize.addAndGet(estimatedKeySize);
+          currSize += estimatedKeySize;
           if (purgedKey.isCommittedKey()) {
-            bucketPurgeKeysSizeMap.computeIfAbsent(purgedKey.getBucketId(),
-                    (bucketId) -> {
-                      BucketPurgeSize bucketPurgeSize = new BucketPurgeSize(purgedKey.getVolume(),
-                          purgedKey.getBucket(), purgedKey.getBucketId());
-                      currSize.addAndGet(bucketPurgeSize.getEstimatedSize());
-                      return bucketPurgeSize;
-                    }).incrementPurgedBytes(purgedKey.getPurgedBytes())
-                .incrementPurgedNamespace(1);
+            currSize += increaseBucketPurgeSize(bucketPurgeKeysSizeMap, purgedKey);
           }
         } else if (purgedKey.isCommittedKey()) {
           modifiedKeyPurgedKeys.computeIfAbsent(deletedKey, k -> new ArrayList<>()).add(purgedKey);
@@ -348,18 +357,11 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         if (modifiedKeyPurgedKeys.containsKey(nextUpdate.getKey())) {
           for (PurgedKey purgedKey : modifiedKeyPurgedKeys.get(nextUpdate.getKey())) {
             if (purgedKey.isCommittedKey()) {
-              bucketPurgeKeysSizeMap.computeIfAbsent(purgedKey.getBucketId(),
-                      (bucketId) -> {
-                        BucketPurgeSize bucketPurgeSize = new BucketPurgeSize(purgedKey.getVolume(),
-                            purgedKey.getBucket(), purgedKey.getBucketId());
-                        currSize.addAndGet(bucketPurgeSize.getEstimatedSize());
-                        return bucketPurgeSize;
-                      }).incrementPurgedBytes(purgedKey.getPurgedBytes())
-                  .incrementPurgedNamespace(1);
+              currSize += increaseBucketPurgeSize(bucketPurgeKeysSizeMap, purgedKey);
             }
           }
         }
-        currSize.addAndGet(estimatedSize);
+        currSize += estimatedSize;
         updateIndex++;
 
       } else if (renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size()) {
@@ -369,7 +371,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         int estimatedSize = ProtobufUtils.computeRepeatedStringSize(nextRename);
 
         requestBuilder.addRenamedKeys(nextRename);
-        currSize.addAndGet(estimatedSize);
+        currSize += estimatedSize;
         renameIndex++;
       }
 
@@ -377,7 +379,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       boolean allDone = purgeKeyIndex == purgedKeyList.size() && updateIndex == keysToUpdateList.size() &&
           (renameEntriesToBeDeleted == null || renameIndex == renameEntriesToBeDeleted.size());
 
-      if (currSize.get() >= ratisLimit || (allDone && (hasPendingItems(requestBuilder) || bucketDeleteKeys != null))) {
+      if (currSize >= ratisLimit || (allDone && (hasPendingItems(requestBuilder) || bucketDeleteKeys != null))) {
         if (bucketDeleteKeys != null) {
           requestBuilder.addDeletedKeys(bucketDeleteKeys.build());
           bucketDeleteKeys = null;
@@ -387,7 +389,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         bucketPurgeKeysSizeMap.clear();
         purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
         requestBuilder = getPurgeKeysRequest(snapTableKey, expectedPreviousSnapshotId);
-        currSize.set(baseSize);
+        currSize = baseSize;
       }
     }
 
