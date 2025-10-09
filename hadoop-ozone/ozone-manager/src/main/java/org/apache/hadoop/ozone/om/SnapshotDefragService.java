@@ -94,6 +94,7 @@ public class SnapshotDefragService extends BackgroundService
   private static final String TEMP_DIFF_DIR = "tempDiffSstFiles";  // TODO: Put this in OzoneConsts?
 
   private final OzoneManager ozoneManager;
+  private SnapshotChainManager snapshotChainManager;
   private final AtomicLong runCount = new AtomicLong(0);
 
   // Number of snapshots to be processed in a single iteration
@@ -178,10 +179,6 @@ public class SnapshotDefragService extends BackgroundService
 
     LOG.debug("Searching for first snapshot needing defragmentation in active chain");
 
-    // Get the SnapshotChainManager to iterate through the global snapshot chain
-    SnapshotChainManager snapshotChainManager =
-        ((OmMetadataManagerImpl) ozoneManager.getMetadataManager()).getSnapshotChainManager();
-
     // Use iterator(false) to iterate forward through the snapshot chain
     Iterator<UUID> snapshotIterator = snapshotChainManager.iterator(false);
 
@@ -191,7 +188,7 @@ public class SnapshotDefragService extends BackgroundService
       SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
 
       if (snapshotInfo == null) {
-        LOG.warn("Snapshot with ID {} not found in snapshot info table", snapshotId);
+        LOG.warn("Snapshot with ID '{}' not found in snapshot info table", snapshotId);
         continue;
       }
 
@@ -213,48 +210,6 @@ public class SnapshotDefragService extends BackgroundService
     }
 
     LOG.debug("No snapshots found needing defragmentation");
-    return null;
-  }
-
-  /**
-   * Finds the previous defragmented snapshot in the chain.
-   */
-  private SnapshotInfo findPreviousDefraggedSnapshot(SnapshotInfo currentSnapshot,
-      Table<String, SnapshotInfo> snapshotInfoTable) throws IOException {
-
-    LOG.debug("Searching for previous defragmented snapshot before: {}",
-        currentSnapshot.getName());
-
-    // Walk backwards through the snapshot chain using pathPreviousSnapshotId
-    String previousSnapshotId = currentSnapshot.getPathPreviousSnapshotId() != null ?
-        currentSnapshot.getPathPreviousSnapshotId().toString() : null;
-
-    while (previousSnapshotId != null) {
-      try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>> iterator =
-               snapshotInfoTable.iterator()) {
-        iterator.seekToFirst();
-
-        while (iterator.hasNext()) {
-          Table.KeyValue<String, SnapshotInfo> keyValue = iterator.next();
-          SnapshotInfo snapshotInfo = keyValue.getValue();
-
-          if (snapshotInfo.getSnapshotId().toString().equals(previousSnapshotId)) {
-            if (!needsDefragmentation(snapshotInfo)) {
-              LOG.info("Found previous defragmented snapshot: {} (ID: {})",
-                  snapshotInfo.getName(), snapshotInfo.getSnapshotId());
-              return snapshotInfo;
-            }
-
-            // Continue searching with this snapshot's previous
-            previousSnapshotId = snapshotInfo.getPathPreviousSnapshotId() != null ?
-                snapshotInfo.getPathPreviousSnapshotId().toString() : null;
-            break;
-          }
-        }
-      }
-    }
-
-    LOG.debug("No previous defragmented snapshot found");
     return null;
   }
 
@@ -1019,7 +974,11 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
       return false;
     }
 
-    Table<String, SnapshotInfo> snapshotInfoTable =
+    // Get the SnapshotChainManager to iterate through the global snapshot chain
+    // Set this each time the task runs just in case OmMetadataManager is restarted
+    snapshotChainManager = ((OmMetadataManagerImpl) ozoneManager.getMetadataManager()).getSnapshotChainManager();
+
+    final Table<String, SnapshotInfo> snapshotInfoTable =
         ozoneManager.getMetadataManager().getSnapshotInfoTable();
 
     long snapshotLimit = snapshotLimitPerTask;
@@ -1056,18 +1015,29 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
 
           OmSnapshot omSnapshot = snapshotSupplier.get();
 
-          // Check if this is the first snapshot in the chain
-          SnapshotInfo previousDefraggedSnapshot = findPreviousDefraggedSnapshot(
-              snapshotToDefrag, snapshotInfoTable);
-
-          if (previousDefraggedSnapshot == null) {
+          UUID pathPreviousSnapshotId = snapshotToDefrag.getPathPreviousSnapshotId();
+          boolean isFirstSnapshotInPath = pathPreviousSnapshotId == null;
+          if (isFirstSnapshotInPath) {
             LOG.info("Performing full defragmentation for first snapshot: {}",
                 snapshotToDefrag.getName());
             performFullDefragmentation(snapshotToDefrag, omSnapshot);
           } else {
+            final String psIdtableKey = snapshotChainManager.getTableKey(pathPreviousSnapshotId);
+            SnapshotInfo previousDefraggedSnapshot = snapshotInfoTable.get(psIdtableKey);
+
             LOG.info("Performing incremental defragmentation for snapshot: {} " +
                     "based on previous defragmented snapshot: {}",
                 snapshotToDefrag.getName(), previousDefraggedSnapshot.getName());
+
+            // If previous path snapshot is not null, it must have been defragmented already
+            // Sanity check to ensure previous snapshot exists and is defragmented
+            if (needsDefragmentation(previousDefraggedSnapshot)) {
+              LOG.error("Fatal error before defragging snapshot: {}. " +
+                      "Previous snapshot in path {} was not defragged while it is expected to be.",
+                  snapshotToDefrag.getName(), previousDefraggedSnapshot.getName());
+              break;
+            }
+
             performIncrementalDefragmentation(snapshotToDefrag,
                 previousDefraggedSnapshot, omSnapshot);
           }

@@ -66,12 +66,11 @@ import org.slf4j.event.Level;
 
 /**
  * Test SnapshotDefragService functionality using MiniOzoneCluster.
- * TODO: Rename to TestSnapshotDefragService.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestSnapshotDefragService2 {
+public class TestSnapshotDefragService {
 
-  private static final Logger LOG = LoggerFactory.getLogger(TestSnapshotDefragService2.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestSnapshotDefragService.class);
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
