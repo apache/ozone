@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class OMClientRequest implements RequestAuditor {
 
-  private static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(OMClientRequest.class);
 
   private OMRequest omRequest;
@@ -134,8 +134,12 @@ public abstract class OMClientRequest implements RequestAuditor {
    * Validate the OMRequest and update the cache.
    * This step should verify that the request can be executed, perform
    * any authorization steps and update the in-memory cache.
-
+   *
    * This step does not persist the changes to the database.
+   *
+   * To coders and reviewers, CAUTION: Do NOT bring external dependencies into this method, doing so could potentially
+   * cause divergence in OM DB states in HA. If you have to, be extremely careful.
+   * e.g. Do NOT invoke ACL check inside validateAndUpdateCache, which can use Ranger plugin that relies on external DB.
    *
    * @return the response that will be returned to the client.
    */
