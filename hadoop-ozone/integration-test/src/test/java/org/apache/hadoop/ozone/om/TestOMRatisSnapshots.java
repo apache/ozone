@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -123,6 +124,7 @@ public class TestOMRatisSnapshots {
   private static final BucketLayout TEST_BUCKET_LAYOUT =
       BucketLayout.OBJECT_STORE;
   private OzoneClient client;
+  private GenericTestUtils.PrintStreamCapturer output;
 
   /**
    * Create a MiniOzoneCluster for testing. The cluster initially has one
@@ -145,6 +147,8 @@ public class TestOMRatisSnapshots {
         testInfo.getTestMethod().get().getName()
             .equals("testInstallSnapshot")) {
       snapshotThreshold = SNAPSHOT_THRESHOLD * 10;
+      AuditLogTestUtils.enableAuditLog();
+      output = GenericTestUtils.captureOut();
     }
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
@@ -285,6 +289,8 @@ public class TestOMRatisSnapshots {
 
     assertLogCapture(logCapture,
         "Install Checkpoint is finished");
+    assertThat(output.get()).contains("op=DB_CHECKPOINT_INSTALL {\"leaderId\":\"" + leaderOMNodeId + "\",\"term\":\"" +
+        leaderOMSnapshotTermIndex, "\"lastAppliedIndex\":\"" + followerOMLastAppliedIndex);
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -308,6 +314,8 @@ public class TestOMRatisSnapshots {
     // Confirm that there was no overlap of sst files
     // between the individual tarballs.
     assertEquals(sstFileUnion.size(), sstFileCount);
+
+    output.reset();
   }
 
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,

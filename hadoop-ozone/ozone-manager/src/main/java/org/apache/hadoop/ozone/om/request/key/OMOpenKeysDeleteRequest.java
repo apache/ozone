@@ -21,12 +21,17 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -54,6 +59,10 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
   private static final Logger LOG =
           LoggerFactory.getLogger(OMOpenKeysDeleteRequest.class);
+
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
+  private static final String AUDIT_PARAM_NUM_OPEN_KEYS = "numOpenKeysDeleted";
+  private static final String AUDIT_PARAM_OPEN_KEYS = "openKeysDeleted";
 
   public OMOpenKeysDeleteRequest(OMRequest omRequest,
                                  BucketLayout bucketLayout) {
@@ -89,7 +98,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     Result result = null;
     // Map containing a pair of BucketId and delete key info.
     Map<String, Pair<Long, OmKeyInfo>> deletedOpenKeys = new HashMap<>();
-
+    Map<String, String> auditParams = new LinkedHashMap<>();
     try {
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBuckets) {
         // For each bucket where keys will be deleted from,
@@ -102,8 +111,23 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
           deletedOpenKeys, getBucketLayout());
 
       result = Result.SUCCESS;
+
+      List<String> deletedOpenKeysLight = new ArrayList<>(deletedOpenKeys.size());
+      for (Pair<Long, OmKeyInfo> key : deletedOpenKeys.values()) {
+        OmKeyInfo keyInfo = key.getRight();
+        OzoneManagerProtocolProtos.KeyArgs keyArgs = OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+            .setVolumeName(keyInfo.getVolumeName())
+            .setBucketName(keyInfo.getBucketName())
+            .setKeyName(keyInfo.getKeyName())
+            .build();
+        deletedOpenKeysLight.add(buildLightKeyArgsAuditMap(keyArgs).toString());
+      }
+      auditParams.put(AUDIT_PARAM_NUM_OPEN_KEYS, String.valueOf(deletedOpenKeys.size()));
+      auditParams.put(AUDIT_PARAM_OPEN_KEYS, deletedOpenKeysLight.toString());
+      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.OPEN_KEY_CLEANUP, auditParams));
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
+      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.OPEN_KEY_CLEANUP, auditParams, ex));
       exception = ex;
       omClientResponse =
           new OMOpenKeysDeleteResponse(createErrorOMResponse(omResponse,
@@ -140,7 +164,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     }
   }
 
-  private void updateOpenKeyTableCache(OzoneManager ozoneManager,
+  protected void updateOpenKeyTableCache(OzoneManager ozoneManager,
       long trxnLogIndex, OpenKeyBucket keysPerBucket,
       Map<String, Pair<Long, OmKeyInfo>> deletedOpenKeys) throws IOException {
 
@@ -148,6 +172,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     String volumeName = keysPerBucket.getVolumeName();
     String bucketName = keysPerBucket.getBucketName();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
     try {
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
