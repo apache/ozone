@@ -3759,10 +3759,25 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.defrag.limit.per.task</name>
+    <value>1</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>The maximum number of snapshots that would be defragmented in
+      each task run of snapshot defragmentation service.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.filtering.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>Time interval of the SST File filtering service from Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.defrag.service.interval</name>
+    <value>-1</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Task interval of snapshot defragmentation service.
     </description>
   </property>
   <property>
