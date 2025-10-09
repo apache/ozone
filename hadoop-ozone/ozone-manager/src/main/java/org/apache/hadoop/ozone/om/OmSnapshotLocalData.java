@@ -194,6 +194,7 @@ public class OmSnapshotLocalData implements Checksum<OmSnapshotLocalData> {
    * Returns the checksum of the YAML representation.
    * @return checksum
    */
+  @Override
   public String getChecksum() {
     return checksum;
   }
