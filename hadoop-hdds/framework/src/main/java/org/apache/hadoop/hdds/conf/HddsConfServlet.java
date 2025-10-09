@@ -28,10 +28,22 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.HttpHeaders;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
+import org.apache.hadoop.util.XMLUtils;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 /**
  * A servlet to print out the running configuration data.
@@ -55,7 +67,7 @@ public class HddsConfServlet extends HttpServlet {
   private OzoneConfiguration getConfFromContext() {
     OzoneConfiguration conf =
         (OzoneConfiguration) getServletContext().getAttribute(
-        HttpServer2.CONF_CONTEXT_ATTRIBUTE);
+            HttpServer2.CONF_CONTEXT_ATTRIBUTE);
     assert conf != null;
     return conf;
   }
@@ -80,13 +92,14 @@ public class HddsConfServlet extends HttpServlet {
     Writer out = response.getWriter();
     String cmd = request.getParameter(COMMAND);
 
+    // FIXME: should close writer if any exception is thrown.
     processCommand(cmd, format, request, response, out, name);
     out.close();
   }
 
   private void processCommand(String cmd, String format,
-      HttpServletRequest request, HttpServletResponse response, Writer out,
-      String name)
+                              HttpServletRequest request, HttpServletResponse response, Writer out,
+                              String name)
       throws IOException {
     try {
       if (cmd == null) {
@@ -95,7 +108,8 @@ public class HddsConfServlet extends HttpServlet {
         processConfigTagRequest(request, cmd, out);
       }
     } catch (IllegalArgumentException iae) {
-      response.sendError(HttpServletResponse.SC_NOT_FOUND, iae.getMessage());
+      response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+      writeErrorResponse(iae.getMessage(), format, out);
     }
   }
 
@@ -104,7 +118,7 @@ public class HddsConfServlet extends HttpServlet {
    *
    * @param request the HTTP servlet request
    * @return {@link #FORMAT_JSON} if Accept header contains "application/json",
-   *         otherwise {@link #FORMAT_XML} (default for backwards compatibility)
+   * otherwise {@link #FORMAT_XML} (default for backwards compatibility)
    * @see HttpHeaders#ACCEPT
    */
   @VisibleForTesting
@@ -118,12 +132,53 @@ public class HddsConfServlet extends HttpServlet {
    * Guts of the servlet - extracted for easy testing.
    */
   static void writeResponse(OzoneConfiguration conf,
-      Writer out, String format, String propertyName)
+                            Writer out, String format, String propertyName)
       throws IOException, IllegalArgumentException {
     if (FORMAT_JSON.equals(format)) {
       OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
     } else if (FORMAT_XML.equals(format)) {
       conf.writeXml(propertyName, out);
+    }
+  }
+
+  /**
+   * Write error response respect to format
+   *
+   * @param errorMessage the error message
+   * @param format the response format (json or xml)
+   * @param out the writer
+   */
+  static void writeErrorResponse(String errorMessage, String format, Writer out)
+      throws IOException {
+    if (FORMAT_JSON.equals(format)) {
+      Map<String, String> errorMap = new HashMap<>();
+      errorMap.put("error", errorMessage);
+      out.write(JsonUtils.toJsonString(errorMap));
+    } else if (FORMAT_XML.equals(format)) {
+      writeXmlError(errorMessage, out);
+    }
+  }
+
+  private static void writeXmlError(String errorMessage, Writer out) throws IOException {
+    try {
+      DocumentBuilderFactory factory = XMLUtils.newSecureDocumentBuilderFactory();
+      DocumentBuilder builder = factory.newDocumentBuilder();
+      Document doc = builder.newDocument();
+
+      Element root = doc.createElement("error");
+      root.setTextContent(errorMessage);
+      doc.appendChild(root);
+
+      TransformerFactory transformerFactory = TransformerFactory.newInstance();
+      Transformer transformer = transformerFactory.newTransformer();
+      transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+      transformer.setOutputProperty(OutputKeys.STANDALONE, "no");
+
+      DOMSource source = new DOMSource(doc);
+      StreamResult result = new StreamResult(out);
+      transformer.transform(source, result);
+    } catch (ParserConfigurationException | TransformerException e) {
+      throw new IOException("Failed to write XML error response", e);
     }
   }
 
@@ -140,7 +195,7 @@ public class HddsConfServlet extends HttpServlet {
   }
 
   private void processConfigTagRequest(HttpServletRequest request, String cmd,
-      Writer out) throws IOException {
+                                       Writer out) throws IOException {
     OzoneConfiguration config = getOzoneConfig();
 
     switch (cmd) {
@@ -151,7 +206,7 @@ public class HddsConfServlet extends HttpServlet {
       String tags = request.getParameter("tags");
       if (tags == null || tags.isEmpty()) {
         throw new IllegalArgumentException("The tags parameter should be set" +
-                " when using the getPropertyByTag command.");
+            " when using the getPropertyByTag command.");
       }
       Map<String, Properties> propMap = new HashMap<>();
 

@@ -114,8 +114,11 @@ public class TestHddsConfServlet {
     // cmd is getPropertyByTag
     result = getResultWithCmd(conf, "getPropertyByTag");
     assertThat(result).contains("ozone.test.test.key");
-    // cmd is illegal
-    getResultWithCmd(conf, "illegal");
+    // cmd is illegal - verify XML error response
+    result = getResultWithCmd(conf, "illegal");
+    String expectedXmlResult = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>" +
+        "<error>illegal is not a valid command.</error>";
+    assertEquals(expectedXmlResult, result);
   }
 
   @Test
@@ -190,14 +193,7 @@ public class TestHddsConfServlet {
       when(response.getWriter()).thenReturn(pw);
       // response request
       service.doGet(request, response);
-      if (cmd.equals("illegal")) {
-        // FIXME: if we are sending error response respect to xml / json, we dont need this verify
-        verify(response).sendError(
-            eq(HttpServletResponse.SC_NOT_FOUND),
-            eq("illegal is not a valid command."));
-      }
-      String result = sw.toString().trim();
-      return result;
+      return sw.toString().trim();
     } finally {
       if (sw != null) {
         sw.close();
@@ -256,11 +252,9 @@ public class TestHddsConfServlet {
           }
         } else {
           // if property name is not empty, and it's not in configuration
-          // expect proper error code and error message is set to the response
-          verify(response)
-              .sendError(
-                  eq(HttpServletResponse.SC_NOT_FOUND),
-                  eq("Property " + propertyName + " not found"));
+          // expect proper error code and error message in response
+          verify(response).setStatus(eq(HttpServletResponse.SC_NOT_FOUND));
+          assertThat(result).contains("Property " + propertyName + " not found");
         }
       }
     } finally {
