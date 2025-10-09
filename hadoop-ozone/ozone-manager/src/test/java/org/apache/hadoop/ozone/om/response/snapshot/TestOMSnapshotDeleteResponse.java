@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -44,12 +43,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.yaml.snakeyaml.Yaml;
 
 /**
  * This class tests OMSnapshotDeleteResponse.
@@ -69,26 +66,12 @@ public class TestOMSnapshotDeleteResponse {
     String fsPath = folder.toAbsolutePath().toString();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
-    OmSnapshotLocalDataYaml.YamlFactory yamlFactory = new OmSnapshotLocalDataYaml.YamlFactory();
-    Yaml yaml = yamlFactory.create();
-    UncheckedAutoCloseableSupplier<Yaml> yamlSupplier = new UncheckedAutoCloseableSupplier<Yaml>() {
-      @Override
-      public Yaml get() {
-        return yaml;
-      }
-
-      @Override
-      public void close() {
-
-      }
-    };
     OzoneManager ozoneManager = mock(OzoneManager.class);
     OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
     OmSnapshotLocalDataManager omSnapshotLocalDataManager = mock(OmSnapshotLocalDataManager.class);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     when(omSnapshotManager.getSnapshotLocalDataManager()).thenReturn(omSnapshotLocalDataManager);
-    when(omSnapshotLocalDataManager.getSnapshotLocalYaml()).thenReturn(yamlSupplier);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
