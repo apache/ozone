@@ -45,6 +45,9 @@ public class OmSnapshotLocalData implements Checksum<OmSnapshotLocalData> {
   // Unique identifier for the snapshot. This is used to identify the snapshot.
   private UUID snapshotId;
 
+  // Unique identifier for the snapshot. This is used to identify the snapshot.
+  private UUID snapshotId;
+
   // Version of the snapshot local data. 0 indicates not defragged snapshot.
   // defragged snapshots will have version > 0.
   private int version;

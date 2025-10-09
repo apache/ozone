@@ -116,7 +116,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OMDirectoriesPurge. ", e);
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, e));
+      if (LOG.isDebugEnabled()) {
+        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, e));
+      }
       return new OMDirectoriesPurgeResponseWithFSO(createErrorOMResponse(omResponse, e));
     }
     List<String[]> bucketLockKeys = getBucketLockKeySet(purgeDirsRequest);
@@ -203,31 +205,37 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       deletingServiceMetrics.incrNumSubFilesMoved(numSubFilesMoved);
       deletingServiceMetrics.incrNumDirPurged(numDirsDeleted);
 
-      Map<String, String> auditParams = new LinkedHashMap<>();
       TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
       if (fromSnapshotInfo != null) {
         fromSnapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), fromSnapshotInfo));
-        auditParams.put(AUDIT_PARAM_SNAPSHOT_ID, fromSnapshotInfo.getSnapshotId().toString());
       } else {
         // Update the deletingServiceMetrics with the transaction index to indicate the
         // last purge transaction when running for AOS
         deletingServiceMetrics.setLastAOSTransactionInfo(transactionInfo);
       }
 
-      auditParams.put(AUDIT_PARAM_DIRS_DELETED, String.valueOf(numDirsDeleted));
-      auditParams.put(AUDIT_PARAM_SUBDIRS_MOVED, String.valueOf(numSubDirMoved));
-      auditParams.put(AUDIT_PARAM_SUBFILES_MOVED, String.valueOf(numSubFilesMoved));
-      auditParams.put(AUDIT_PARAM_DIRS_DELETED_LIST, String.join(",", deletedDirNames));
-      auditParams.put(AUDIT_PARAM_SUBDIRS_MOVED_LIST, String.join(",", subDirNames));
-      auditParams.put(AUDIT_PARAM_SUBFILES_MOVED_LIST, String.join(",", subFileNames));
-      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.DIRECTORY_DELETION, auditParams));
+      if (LOG.isDebugEnabled()) {
+        Map<String, String> auditParams = new LinkedHashMap<>();
+        if (fromSnapshotInfo != null) {
+          auditParams.put(AUDIT_PARAM_SNAPSHOT_ID, fromSnapshotInfo.getSnapshotId().toString());
+        }
+        auditParams.put(AUDIT_PARAM_DIRS_DELETED, String.valueOf(numDirsDeleted));
+        auditParams.put(AUDIT_PARAM_SUBDIRS_MOVED, String.valueOf(numSubDirMoved));
+        auditParams.put(AUDIT_PARAM_SUBFILES_MOVED, String.valueOf(numSubFilesMoved));
+        auditParams.put(AUDIT_PARAM_DIRS_DELETED_LIST, String.join(",", deletedDirNames));
+        auditParams.put(AUDIT_PARAM_SUBDIRS_MOVED_LIST, String.join(",", subDirNames));
+        auditParams.put(AUDIT_PARAM_SUBFILES_MOVED_LIST, String.join(",", subFileNames));
+        AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.DIRECTORY_DELETION, auditParams));
+      }
     } catch (IOException ex) {
       // Case of IOException for fromProtobuf will not happen
       // as this is created and send within OM
       // only case of upgrade where compatibility is broken can have
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, ex));
+      if (LOG.isDebugEnabled()) {
+        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.DIRECTORY_DELETION, null, ex));
+      }
       throw new IllegalStateException(ex);
     } finally {
       for (Map.Entry<Pair<String, String>, OmBucketInfo> entry :
