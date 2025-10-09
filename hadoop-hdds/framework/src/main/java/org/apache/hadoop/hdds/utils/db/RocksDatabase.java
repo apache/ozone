@@ -237,7 +237,7 @@ public final class RocksDatabase implements Closeable {
    *
    * @see ManagedCheckpoint
    */
-  public final class RocksCheckpoint implements Closeable {
+  final class RocksCheckpoint implements Closeable {
     private final ManagedCheckpoint checkpoint;
 
     private RocksCheckpoint() {
@@ -609,7 +609,7 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  public RocksCheckpoint createCheckpoint() {
+  RocksCheckpoint createCheckpoint() {
     return new RocksCheckpoint();
   }
 
@@ -660,7 +660,7 @@ public final class RocksDatabase implements Closeable {
     return Collections.unmodifiableCollection(columnFamilies.values());
   }
 
-  public byte[] get(ColumnFamily family, byte[] key) throws RocksDatabaseException {
+  byte[] get(ColumnFamily family, byte[] key) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
       return db.get().get(family.getHandle(), key);
     } catch (RocksDBException e) {

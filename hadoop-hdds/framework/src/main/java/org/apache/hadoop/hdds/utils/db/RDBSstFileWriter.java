@@ -28,7 +28,7 @@ import org.rocksdb.RocksDBException;
 /**
  * DumpFileWriter using rocksdb sst files.
  */
-public class RDBSstFileWriter implements Closeable {
+class RDBSstFileWriter implements Closeable {
 
   private ManagedSstFileWriter sstFileWriter;
   private File sstFile;
@@ -36,7 +36,7 @@ public class RDBSstFileWriter implements Closeable {
   private ManagedOptions emptyOption = new ManagedOptions();
   private final ManagedEnvOptions emptyEnvOptions = new ManagedEnvOptions();
 
-  public RDBSstFileWriter(File externalFile) throws RocksDatabaseException {
+  RDBSstFileWriter(File externalFile) throws RocksDatabaseException {
     this.sstFileWriter = new ManagedSstFileWriter(emptyEnvOptions, emptyOption);
     this.keyCounter = new AtomicLong(0);
     this.sstFile = externalFile;
