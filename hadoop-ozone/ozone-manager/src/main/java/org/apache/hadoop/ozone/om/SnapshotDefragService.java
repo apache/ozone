@@ -335,8 +335,6 @@ public class SnapshotDefragService extends BackgroundService
       // Close the defragmented DB
       defraggedStore.close();
 
-      // TODO: Rename om.db to the om.db-UUID (at least for full defrag)
-
       LOG.info("Successfully completed full defragmentation for snapshot: {} with {} keys copied",
           snapshotInfo.getName(), totalKeysCopied);
 
