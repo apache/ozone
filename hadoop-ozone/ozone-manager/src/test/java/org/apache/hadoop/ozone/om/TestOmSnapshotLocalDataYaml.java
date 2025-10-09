@@ -44,8 +44,10 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
+import org.apache.hadoop.ozone.util.ObjectSerializer;
+import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ozone.compaction.log.SstFileInfo;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,26 +61,26 @@ import org.yaml.snakeyaml.Yaml;
 public class TestOmSnapshotLocalDataYaml {
 
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
-  private static OmSnapshotManager omSnapshotManager;
-  private static final Yaml YAML = new OmSnapshotLocalDataYaml.YamlFactory().create();
-  private static final UncheckedAutoCloseableSupplier<Yaml> YAML_SUPPLIER = new UncheckedAutoCloseableSupplier<Yaml>() {
-    @Override
-    public Yaml get() {
-      return YAML;
-    }
-
-    @Override
-    public void close() {
-
-    }
-  };
+  private static final OmSnapshotLocalDataYaml.YamlFactory YAML_FACTORY = new OmSnapshotLocalDataYaml.YamlFactory();
+  private static ObjectSerializer<OmSnapshotLocalData> omSnapshotLocalDataSerializer;
 
   private static final Instant NOW = Instant.now();
 
   @BeforeAll
-  public static void setupClassMocks() throws IOException {
-    omSnapshotManager = mock(OmSnapshotManager.class);
-    when(omSnapshotManager.getSnapshotLocalYaml()).thenReturn(YAML_SUPPLIER);
+  public static void setupSerializer() throws IOException {
+    omSnapshotLocalDataSerializer = new YamlSerializer<OmSnapshotLocalData>(YAML_FACTORY) {
+      @Override
+      public void computeAndSetChecksum(Yaml yaml, OmSnapshotLocalData data) throws IOException {
+        data.computeAndSetChecksum(yaml);
+      }
+    };
+  }
+
+  @AfterAll
+  public static void cleanupSerializer() throws IOException {
+    if (omSnapshotLocalDataSerializer != null) {
+      omSnapshotLocalDataSerializer.close();
+    }
   }
 
   @BeforeEach
@@ -112,7 +114,7 @@ public class TestOmSnapshotLocalDataYaml {
         createLiveFileMetaData("sst1", "table1", "k1", "k2"),
         createLiveFileMetaData("sst2", "table1", "k3", "k4"),
         createLiveFileMetaData("sst3", "table2", "k4", "k5"));
-    OmSnapshotLocalDataYaml dataYaml = new OmSnapshotLocalDataYaml(snapshotId, notDefraggedSSTFileList,
+    OmSnapshotLocalData dataYaml = new OmSnapshotLocalData(snapshotId, notDefraggedSSTFileList,
         previousSnapshotId);
 
     // Set version
@@ -137,7 +139,7 @@ public class TestOmSnapshotLocalDataYaml {
     File yamlFile = new File(testRoot, yamlFilePath);
 
     // Create YAML file with SnapshotData
-    dataYaml.writeToYaml(omSnapshotManager, yamlFile);
+    omSnapshotLocalDataSerializer.save(yamlFile, dataYaml);
 
     // Check YAML file exists
     assertTrue(yamlFile.exists());
@@ -153,7 +155,7 @@ public class TestOmSnapshotLocalDataYaml {
     UUID prevSnapId = yamlFilePrevIdPair.getRight();
 
     // Read from YAML file
-    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
 
     // Verify fields
     assertEquals(44, snapshotData.getVersion());
@@ -193,8 +195,8 @@ public class TestOmSnapshotLocalDataYaml {
     Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot2");
     File yamlFile = yamlFilePrevIdPair.getLeft();
     // Read from YAML file
-    OmSnapshotLocalDataYaml dataYaml =
-        OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    OmSnapshotLocalData dataYaml =
+        omSnapshotLocalDataSerializer.load(yamlFile);
 
     // Update snapshot data
     dataYaml.setSstFiltered(false);
@@ -203,10 +205,10 @@ public class TestOmSnapshotLocalDataYaml {
         singletonList(new SstFileInfo("defragged-sst4", "k5", "k6", "table3")), 5);
 
     // Write updated data back to file
-    dataYaml.writeToYaml(omSnapshotManager, yamlFile);
+    omSnapshotLocalDataSerializer.save(yamlFile, dataYaml);
 
     // Read back the updated data
-    dataYaml = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    dataYaml = omSnapshotLocalDataSerializer.load(yamlFile);
 
     // Verify updated data
     assertThat(dataYaml.getSstFiltered()).isFalse();
@@ -224,10 +226,9 @@ public class TestOmSnapshotLocalDataYaml {
     File emptyFile = new File(testRoot, "empty.yaml");
     assertTrue(emptyFile.createNewFile());
 
-    IOException ex = assertThrows(IOException.class, () ->
-        OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, emptyFile));
+    IOException ex = assertThrows(IOException.class, () -> omSnapshotLocalDataSerializer.load(emptyFile));
 
-    assertThat(ex).hasMessageContaining("Failed to load snapshot file. File is empty.");
+    assertThat(ex).hasMessageContaining("Failed to load file. File is empty.");
   }
 
   @Test
@@ -236,7 +237,7 @@ public class TestOmSnapshotLocalDataYaml {
     Pair<File, UUID> yamlFilePrevIdPair = writeToYaml(snapshotId, "snapshot3");
     File yamlFile = yamlFilePrevIdPair.getLeft();
     // Read from YAML file
-    OmSnapshotLocalDataYaml snapshotData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, yamlFile);
+    OmSnapshotLocalData snapshotData = omSnapshotLocalDataSerializer.load(yamlFile);
 
     // Get the original checksum
     String originalChecksum = snapshotData.getChecksum();
@@ -244,7 +245,7 @@ public class TestOmSnapshotLocalDataYaml {
     // Verify the checksum is not null or empty
     assertThat(originalChecksum).isNotNull().isNotEmpty();
 
-    assertTrue(OmSnapshotLocalDataYaml.verifyChecksum(omSnapshotManager, snapshotData));
+    assertTrue(omSnapshotLocalDataSerializer.verifyChecksum(snapshotData));
   }
 
   @Test
