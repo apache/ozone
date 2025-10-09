@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
@@ -49,12 +50,14 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -88,11 +91,12 @@ public class TestSnapshotDefragService {
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
     conf.setBoolean(OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, BucketLayout.OBJECT_STORE.name());
-//    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY,
-//        OMLayoutFeature.SNAPSHOT_DEFRAGMENTATION.layoutVersion());
+    // TODO: Add SNAPSHOT_DEFRAGMENTATION layout feature version
+    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY,
+        OMLayoutFeature.DELEGATION_TOKEN_SYMMETRIC_SIGN.layoutVersion());
 
     conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, -1);
-//    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT, 300);
+    conf.setInt(OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT, 3000000);
     conf.setInt(SNAPSHOT_DEFRAG_LIMIT_PER_TASK, 5);
 
     conf.setQuietMode(false);
