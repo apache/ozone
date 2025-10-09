@@ -123,13 +123,20 @@ body {
   .hexagon-shape(20, 12, @orange-7);
 }
 
-.icon-text(@content, @fontcolor) {
+.ec-icon {
+  .hexagon-shape(20, 12, @geekblue-7)
+}
+
+.icon-label-base(@fontcolor) {
   text-align: center;
   font-size: 12px;
   font-weight: 700;
   position: relative;
   top: -3px;
   color: @fontcolor;
+}
+
+.icon-suffix(@content, @fontcolor) {
   &:after {
     content: @content;
     position: absolute;
@@ -143,18 +150,43 @@ body {
   }
 }
 
+.icon-label {
+  .icon-label-base(#ffde36)
+}
+
+.suffix-dot {
+  .icon-suffix(".", #ffde36);
+}
+
+.suffix-ellipsis {
+  .icon-suffix("\2026", #fff);
+}
+
+.icon-ellipsis-leader {
+  .icon-suffix("\2026", #ffde36);
+}
+
+.icon-none {
+  &:after {
+    content: none;
+  }
+}
+
 .icon-text-three-dots {
   // In Unicode, \2026 is the horizontal ellipsis (...)
-  .icon-text("\2026", #fff);
+  .icon-label-base(#fff);
+  .icon-suffix("\2026", #fff);
 }
 
 .icon-text-three-dots-leader {
   // In Unicode, \2026 is the horizontal ellipsis (...)
-  .icon-text("\2026", #ffde36);
+  .icon-label-base(#ffde36);
+  .icon-suffix("\2026", #ffde36);
 }
 
 .icon-text-one-dot {
-  .icon-text(".", #ffde36);
+  .icon-label-base(#ffde36);
+  .icon-suffix(".", #ffde36);
 }
 
 .replication-icon {
