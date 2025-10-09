@@ -324,8 +324,7 @@ class TestOmSnapshotManager {
     assertTrue(Files.exists(snapshotYaml));
     assertTrue(Files.size(snapshotYaml) > 0);
     // Verify the contents of the YAML file
-    OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(snapshotLocalDataManager,
-        snapshotYaml.toFile());
+    OmSnapshotLocalData localData = snapshotLocalDataManager.getOmSnapshotLocalData(snapshotYaml.toFile());
     assertNotNull(localData);
     assertEquals(0, localData.getVersion());
     assertEquals(notDefraggedVersionMeta, localData.getVersionSstFileInfos().get(0));

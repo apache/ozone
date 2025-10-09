@@ -19,22 +19,21 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 
-import com.google.common.graph.GraphBuilder;
-import com.google.common.graph.MutableGraph;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Objects;
-import java.util.UUID;
-import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.apache.hadoop.ozone.util.ObjectSerializer;
+import org.apache.hadoop.ozone.util.YamlSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -43,15 +42,21 @@ import org.yaml.snakeyaml.Yaml;
  */
 public class OmSnapshotLocalDataManager implements AutoCloseable {
 
-  private final GenericObjectPool<Yaml> yamlPool;
-  private final MutableGraph<VersionLocalDataNode> localDataGraph;
+  private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataManager.class);
+
+  private final ObjectSerializer<OmSnapshotLocalData> snapshotLocalDataSerializer;
   private final OMMetadataManager omMetadataManager;
 
   public OmSnapshotLocalDataManager(OMMetadataManager omMetadataManager) {
-    this.yamlPool = new GenericObjectPool(new OmSnapshotLocalDataYaml.YamlFactory());
-    this.localDataGraph = GraphBuilder.directed().build();
     this.omMetadataManager = omMetadataManager;
-    init();
+    this.snapshotLocalDataSerializer = new YamlSerializer<OmSnapshotLocalData>(
+        new OmSnapshotLocalDataYaml.YamlFactory()) {
+
+      @Override
+      public void computeAndSetChecksum(Yaml yaml, OmSnapshotLocalData data) throws IOException {
+        data.computeAndSetChecksum(yaml);
+      }
+    };
   }
 
   /**
@@ -84,77 +89,28 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     Path snapshotLocalDataPath = Paths.get(
         getSnapshotLocalPropertyYamlPath(snapshotStore.getDbLocation().toPath()));
     Files.deleteIfExists(snapshotLocalDataPath);
-    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(snapshotInfo.getSnapshotId(),
+    OmSnapshotLocalData snapshotLocalDataYaml = new OmSnapshotLocalData(snapshotInfo.getSnapshotId(),
         OmSnapshotManager.getSnapshotSSTFileList(snapshotStore), snapshotInfo.getPathPreviousSnapshotId());
-    snapshotLocalDataYaml.writeToYaml(this, snapshotLocalDataPath.toFile());
+    snapshotLocalDataSerializer.save(snapshotLocalDataPath.toFile(), snapshotLocalDataYaml);
   }
 
-  private void init() {
-    RDBStore store = (RDBStore) omMetadataManager.getStore();
-    String checkpointPrefix = store.getDbLocation().getName();
-    File snapshotDir = new File(store.getSnapshotsParentDir());
-    for (File yamlFile :
-        Objects.requireNonNull(snapshotDir.listFiles(
-            (dir, name) -> name.startsWith(checkpointPrefix) && name.endsWith(YAML_FILE_EXTENSION)))) {
-      System.out.println(yamlFile.getAbsolutePath());
-    }
+  public OmSnapshotLocalData getOmSnapshotLocalData(SnapshotInfo snapshotInfo) throws IOException {
+    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(snapshotInfo));
+    return snapshotLocalDataSerializer.load(snapshotLocalDataPath.toFile());
+  }
+
+  public OmSnapshotLocalData getOmSnapshotLocalData(File snapshotDataPath) throws IOException {
+    return snapshotLocalDataSerializer.load(snapshotDataPath);
   }
 
   @Override
   public void close() {
-    if (yamlPool != null) {
-      yamlPool.close();
-    }
-  }
-
-  private final class VersionLocalDataNode {
-    private UUID snapshotId;
-    private int version;
-    private UUID previousSnapshotId;
-    private int previousSnapshotVersion;
-
-    private VersionLocalDataNode(UUID snapshotId, int version, UUID previousSnapshotId, int previousSnapshotVersion) {
-      this.previousSnapshotId = previousSnapshotId;
-      this.previousSnapshotVersion = previousSnapshotVersion;
-      this.snapshotId = snapshotId;
-      this.version = version;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof VersionLocalDataNode)) {
-        return false;
+    if (snapshotLocalDataSerializer != null) {
+      try {
+        snapshotLocalDataSerializer.close();
+      } catch (IOException e) {
+        LOG.error("Failed to close snapshot local data serializer", e);
       }
-
-      VersionLocalDataNode that = (VersionLocalDataNode) o;
-      return version == that.version && previousSnapshotVersion == that.previousSnapshotVersion &&
-          snapshotId.equals(that.snapshotId) && Objects.equals(previousSnapshotId, that.previousSnapshotId);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(snapshotId, version, previousSnapshotId, previousSnapshotVersion);
     }
   }
-
-  public UncheckedAutoCloseableSupplier<Yaml> getSnapshotLocalYaml() throws IOException {
-    try {
-      Yaml yaml = yamlPool.borrowObject();
-      return new UncheckedAutoCloseableSupplier<Yaml>() {
-
-        @Override
-        public void close() {
-          yamlPool.returnObject(yaml);
-        }
-
-        @Override
-        public Yaml get() {
-          return yaml;
-        }
-      };
-    } catch (Exception e) {
-      throw new IOException("Failed to get snapshot local yaml", e);
-    }
-  }
-
 }
