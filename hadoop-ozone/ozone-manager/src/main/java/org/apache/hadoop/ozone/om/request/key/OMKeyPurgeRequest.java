@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.validatePrevious
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,7 +106,9 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       }
     } catch (IOException e) {
       LOG.error("Error occurred while performing OmKeyPurge. ", e);
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
+      if (LOG.isDebugEnabled()) {
+        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
+      }
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
     }
 
@@ -125,36 +128,44 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     if (keysToBePurgedList.isEmpty() && renamedKeysToBePurged.isEmpty()) {
       OMException oe = new OMException("No keys found to be purged or renamed in the request.",
           OMException.ResultCodes.KEY_DELETION_ERROR);
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
+      if (LOG.isDebugEnabled()) {
+        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, oe));
+      }
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, oe));
     }
 
     // Setting transaction info for snapshot, this is to prevent duplicate purge requests to OM from background
     // services.
     try {
-      Map<String, String> auditParams = new LinkedHashMap<>();
       TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
       if (fromSnapshotInfo != null) {
         fromSnapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
             CacheValue.get(context.getIndex(), fromSnapshotInfo));
-        auditParams.put(AUDIT_PARAM_SNAPSHOT_ID, fromSnapshotInfo.getSnapshotId().toString());
       } else {
         // Update the deletingServiceMetrics with the transaction index to indicate the
         // last purge transaction when running for AOS
         deletingServiceMetrics.setLastAOSTransactionInfo(transactionInfo);
       }
-      auditParams.put(AUDIT_PARAM_KEYS_DELETED, String.valueOf(numKeysDeleted));
-      auditParams.put(AUDIT_PARAM_RENAMED_KEYS_PURGED, String.valueOf(renamedKeysToBePurged.size()));
-      if (!keysToBePurgedList.isEmpty()) {
-        auditParams.put(AUDIT_PARAMS_DELETED_KEYS_LIST, String.join(",", keysToBePurgedList));
+      if (LOG.isDebugEnabled()) {
+        Map<String, String> auditParams = new LinkedHashMap<>();
+        if (fromSnapshotInfo != null) {
+          auditParams.put(AUDIT_PARAM_SNAPSHOT_ID, fromSnapshotInfo.getSnapshotId().toString());
+        }
+        auditParams.put(AUDIT_PARAM_KEYS_DELETED, String.valueOf(numKeysDeleted));
+        auditParams.put(AUDIT_PARAM_RENAMED_KEYS_PURGED, String.valueOf(renamedKeysToBePurged.size()));
+        if (!keysToBePurgedList.isEmpty()) {
+          auditParams.put(AUDIT_PARAMS_DELETED_KEYS_LIST, String.join(",", keysToBePurgedList));
+        }
+        if (!renamedKeysToBePurged.isEmpty()) {
+          auditParams.put(AUDIT_PARAMS_RENAMED_KEYS_LIST, String.join(",", renamedKeysToBePurged));
+        }
+        AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.KEY_DELETION, auditParams));
       }
-      if (!renamedKeysToBePurged.isEmpty()) {
-        auditParams.put(AUDIT_PARAMS_RENAMED_KEYS_LIST, String.join(",", renamedKeysToBePurged));
-      }
-      AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.KEY_DELETION, auditParams));
     } catch (IOException e) {
-      AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
+      if (LOG.isDebugEnabled()) {
+        AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.KEY_DELETION, null, e));
+      }
       return new OMKeyPurgeResponse(createErrorOMResponse(omResponse, e));
     }
     try {
@@ -170,13 +181,17 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
   private List<OmBucketInfo> updateBucketSize(List<BucketPurgeKeysSize> bucketPurgeKeysSizeList,
       OMMetadataManager omMetadataManager) throws OMException {
-    Map<String, Map<String, List<BucketPurgeKeysSize>>> bucketPurgeKeysSizes = bucketPurgeKeysSizeList.stream()
-            .collect(Collectors.groupingBy(bucketPurgeKey -> bucketPurgeKey.getBucketNameInfo().getVolumeName(),
-                Collectors.groupingBy(bucketPurgeKey -> bucketPurgeKey.getBucketNameInfo().getBucketName())));
-    List<String[]> bucketKeyList = bucketPurgeKeysSizes.entrySet().stream()
-        .flatMap(volEntry -> volEntry.getValue().keySet().stream()
-            .map(bucketEntry -> new String[]{volEntry.getKey(), bucketEntry}))
-        .collect(Collectors.toList());
+    Map<String, Map<String, List<BucketPurgeKeysSize>>> bucketPurgeKeysSizes = new HashMap<>();
+    List<String[]> bucketKeyList = new ArrayList<>();
+    for (BucketPurgeKeysSize bucketPurgeKey : bucketPurgeKeysSizeList) {
+      String volumeName = bucketPurgeKey.getBucketNameInfo().getVolumeName();
+      String bucketName = bucketPurgeKey.getBucketNameInfo().getBucketName();
+      bucketPurgeKeysSizes.computeIfAbsent(volumeName, k -> new HashMap<>())
+          .computeIfAbsent(bucketName, k -> {
+            bucketKeyList.add(new String[]{volumeName, bucketName});
+            return new ArrayList<>();
+          }).add(bucketPurgeKey);
+    }
     mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLocks(BUCKET_LOCK, bucketKeyList));
     boolean acquiredLock = getOmLockDetails().isLockAcquired();
     if (!acquiredLock) {

@@ -645,8 +645,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       SnapshotInfo snapshotInfo) throws IOException {
     Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(snapshotStore.getDbLocation().toPath()));
     Files.deleteIfExists(snapshotLocalDataPath);
-    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(getSnapshotSSTFileList(snapshotStore),
-        snapshotInfo.getPathPreviousSnapshotId());
+    OmSnapshotLocalDataYaml snapshotLocalDataYaml = new OmSnapshotLocalDataYaml(snapshotInfo.getSnapshotId(),
+        getSnapshotSSTFileList(snapshotStore), snapshotInfo.getPathPreviousSnapshotId());
     snapshotLocalDataYaml.writeToYaml(snapshotManager, snapshotLocalDataPath.toFile());
   }
 

@@ -317,7 +317,6 @@ class TestKeyDeletingService extends OzoneTestBase {
       bucketInfo = writeClient.getBucketInfo(volumeName, bucketName1);
       assertEquals(key1Size + key3Size, bucketInfo.getSnapshotUsedBytes());
       assertEquals(2, bucketInfo.getSnapshotUsedNamespace());
-      writeClient.getBucketInfo(volumeName, bucketName1);
       keyDeletingService.resume();
       // Run KeyDeletingService
       GenericTestUtils.waitFor(
@@ -763,7 +762,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           .put(snap3, keySizeMap.get(6) + keySizeMap.get(7))
           .put(snap4, 0L)
           .build();
-      // Let KeyDeletingService to run for some iterations
+      // Let KeyDeletingService run for some iterations
       GenericTestUtils.waitFor(
           () -> (getRunCount() > prevKdsRunCount + 20),
           100, 100000);

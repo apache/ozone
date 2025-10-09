@@ -63,8 +63,8 @@ import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,7 +80,7 @@ import org.mockito.MockitoAnnotations;
 public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @TempDir
   private Path temporaryFolder;
-  private static GlobalStatsDao globalStatsDao;
+  private static ReconGlobalStatsManager reconGlobalStatsManager;
   private static OmTableInsightTask omTableInsightTask;
   private static DSLContext dslContext;
   private boolean isSetupDone = false;
@@ -130,7 +130,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
-    globalStatsDao = getDao(GlobalStatsDao.class);
 
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
@@ -141,8 +140,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager = reconTestInjector.getInstance(
         ReconNamespaceSummaryManagerImpl.class);
 
+    reconGlobalStatsManager = reconTestInjector.getInstance(ReconGlobalStatsManager.class);
     omTableInsightTask = new OmTableInsightTask(
-        globalStatsDao, getConfiguration(), reconOMMetadataManager);
+        reconGlobalStatsManager, reconOMMetadataManager);
     nSSummaryTaskWithFso = new NSSummaryTaskWithFSO(
         reconNamespaceSummaryManager, reconOMMetadataManager, 10);
     dslContext = getDslContext();
@@ -642,18 +642,33 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   private long getCountForTable(String tableName) {
-    String key = OmTableInsightTask.getTableCountKeyFromTable(tableName);
-    return globalStatsDao.findById(key).getValue();
+    try {
+      String key = OmTableInsightTask.getTableCountKeyFromTable(tableName);
+      GlobalStatsValue value = reconGlobalStatsManager.getGlobalStatsValue(key);
+      return value != null ? value.getValue() : 0L;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get count for table " + tableName, e);
+    }
   }
 
   private long getUnReplicatedSizeForTable(String tableName) {
-    String key = OmTableInsightTask.getUnReplicatedSizeKeyFromTable(tableName);
-    return globalStatsDao.findById(key).getValue();
+    try {
+      String key = OmTableInsightTask.getUnReplicatedSizeKeyFromTable(tableName);
+      GlobalStatsValue value = reconGlobalStatsManager.getGlobalStatsValue(key);
+      return value != null ? value.getValue() : 0L;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get unreplicated size for table " + tableName, e);
+    }
   }
 
   private long getReplicatedSizeForTable(String tableName) {
-    String key = OmTableInsightTask.getReplicatedSizeKeyFromTable(tableName);
-    return globalStatsDao.findById(key).getValue();
+    try {
+      String key = OmTableInsightTask.getReplicatedSizeKeyFromTable(tableName);
+      GlobalStatsValue value = reconGlobalStatsManager.getGlobalStatsValue(key);
+      return value != null ? value.getValue() : 0L;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to get replicated size for table " + tableName, e);
+    }
   }
 
   private OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
