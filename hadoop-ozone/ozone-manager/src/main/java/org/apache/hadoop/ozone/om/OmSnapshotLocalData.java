@@ -41,10 +41,6 @@ import org.yaml.snakeyaml.Yaml;
  * Inspired by org.apache.hadoop.ozone.container.common.impl.ContainerData
  */
 public class OmSnapshotLocalData implements Checksum<OmSnapshotLocalData> {
-
-  // Unique identifier for the snapshot. This is used to identify the snapshot.
-  private UUID snapshotId;
-
   // Unique identifier for the snapshot. This is used to identify the snapshot.
   private UUID snapshotId;
 
