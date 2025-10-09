@@ -149,7 +149,7 @@ public class BucketEndpoint extends EndpointBase {
           continueToken, startAfter);
 
       // Process key listing
-      context.processKeyListing(response);
+      processKeyListing(context, response);
 
       // Build final response
       return buildFinalResponse(response, s3GAction, startNanos);
@@ -281,67 +281,64 @@ public class BucketEndpoint extends EndpointBase {
     }
 
     /**
-     * Process key listing logic.
+     * Process key listing logic and populate the given response.
+     * The logic only depends on the immutable inputs carried by this context.
      */
-    void processKeyListing(ListObjectResponse response) {
+    void processKeyListing(ListObjectResponse response,
+                           java.util.function.BiConsumer<ListObjectResponse, OzoneKey> keyAdder) {
       String prevDir = null;
-      if (continueToken != null) {
-        prevDir = decodedToken.getLastDir();
+      if (getContinueToken() != null) {
+        prevDir = getDecodedToken().getLastDir();
       }
-      
+
       String lastKey = null;
       int count = 0;
-      Iterator<? extends OzoneKey> iterator = ozoneKeyIterator;
-      
-      if (maxKeys > 0) {
-        while (iterator != null && iterator.hasNext()) {
-          OzoneKey next = iterator.next();
-          
-          if (bucket != null && 
-              bucket.getBucketLayout().isFileSystemOptimized() &&
-              StringUtils.isNotEmpty(prefix) &&
-              !next.getName().startsWith(prefix)) {
-            // prefix has delimiter but key don't have
-            // example prefix: dir1/ key: dir123
+      Iterator<? extends OzoneKey> iter = getOzoneKeyIterator();
+
+      if (getMaxKeys() > 0) {
+        while (iter != null && iter.hasNext()) {
+          OzoneKey next = iter.next();
+
+          if (getBucket() != null
+              && getBucket().getBucketLayout().isFileSystemOptimized()
+              && StringUtils.isNotEmpty(getPrefix())
+              && !next.getName().startsWith(getPrefix())) {
+            // prefix has delimiter but key doesn't have; e.g., prefix: dir1/ key: dir123
             continue;
           }
-          
-          if (startAfter != null && count == 0 && 
-              Objects.equals(startAfter, next.getName())) {
+
+          if (getStartAfter() != null && count == 0
+              && Objects.equals(getStartAfter(), next.getName())) {
             continue;
           }
-          
-          String relativeKeyName = next.getName().substring(prefix.length());
-          int depth = StringUtils.countMatches(relativeKeyName, delimiter);
-          
-          if (!StringUtils.isEmpty(delimiter)) {
+
+          String relativeKeyName = next.getName().substring(getPrefix().length());
+          int depth = StringUtils.countMatches(relativeKeyName, getDelimiter());
+
+          if (!StringUtils.isEmpty(getDelimiter())) {
             if (depth > 0) {
-              // means key has multiple delimiters in its value.
-              // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
-              String dirName = relativeKeyName.substring(0, relativeKeyName.indexOf(delimiter));
+              String dirName = relativeKeyName.substring(0,
+                  relativeKeyName.indexOf(getDelimiter()));
               if (!dirName.equals(prevDir)) {
                 response.addPrefix(EncodingTypeObject.createNullable(
-                    prefix + dirName + delimiter, encodingType));
+                    getPrefix() + dirName + getDelimiter(), getEncodingType()));
                 prevDir = dirName;
                 count++;
               }
-            } else if (relativeKeyName.endsWith(delimiter)) {
-              // means or key is same as prefix with delimiter at end and ends with
-              // delimiter. ex: dir/, where prefix is dir and delimiter is /
-              response.addPrefix(EncodingTypeObject.createNullable(relativeKeyName, encodingType));
+            } else if (relativeKeyName.endsWith(getDelimiter())) {
+              response.addPrefix(EncodingTypeObject.createNullable(
+                  relativeKeyName, getEncodingType()));
               count++;
             } else {
-              // means our key is matched with prefix if prefix is given and it
-              // does not have any common prefix.
-              addKey(response, next);
+              keyAdder.accept(response, next);
               count++;
             }
           } else {
-            addKey(response, next);
+            keyAdder.accept(response, next);
             count++;
           }
 
-          if (count == maxKeys) {
+          if (count == getMaxKeys()) {
             lastKey = next.getName();
             break;
           }
@@ -350,9 +347,9 @@ public class BucketEndpoint extends EndpointBase {
 
       response.setKeyCount(count);
 
-      if (count < maxKeys) {
+      if (count < getMaxKeys()) {
         response.setTruncated(false);
-      } else if (iterator.hasNext() && lastKey != null) {
+      } else if (iter.hasNext() && lastKey != null) {
         response.setTruncated(true);
         ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
         response.setNextToken(nextToken.encodeToString());
@@ -362,29 +359,10 @@ public class BucketEndpoint extends EndpointBase {
         response.setTruncated(false);
       }
     }
-
-    private void addKey(ListObjectResponse response, OzoneKey next) {
-      KeyMetadata keyMetadata = new KeyMetadata();
-      keyMetadata.setKey(EncodingTypeObject.createNullable(next.getName(),
-          response.getEncodingType()));
-      keyMetadata.setSize(next.getDataSize());
-      String eTag = next.getMetadata().get(ETAG);
-      if (eTag != null) {
-        keyMetadata.setETag(ObjectEndpoint.wrapInQuotes(eTag));
-      }
-      keyMetadata.setStorageClass(S3StorageType.fromReplicationConfig(
-          next.getReplicationConfig()).toString());
-      keyMetadata.setLastModified(next.getModificationTime());
-      String displayName = next.getOwner();
-      keyMetadata.setOwner(S3Owner.of(displayName));
-      response.addKey(keyMetadata);
-    }
   }
 
   /**
-   * Handle GetBucketAcl request.
-   * Implements AWS S3 GetBucketAcl API operation.
-   * See: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
+   * Handle ACL request.
    */
   Response handleGetBucketAcl(String bucketName, long startNanos) 
       throws OS3Exception, IOException {
@@ -406,17 +384,17 @@ public class BucketEndpoint extends EndpointBase {
       throws OS3Exception, IOException {
     
     // Validate encoding type
-    // If you specify the encoding-type request parameter, should return
+    if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
+    }
+    // If you specify the encoding-type request parameter,should return
     // encoded key name values in the following response elements:
-    // Delimiter, Prefix, Key, and StartAfter.
+    //   Delimiter, Prefix, Key, and StartAfter.
     //
     // For detail refer:
     // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
     // #AmazonS3-ListObjectsV2-response-EncodingType
-    if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
-    }
-
+    //
     maxKeys = validateMaxKeys(maxKeys);
 
     if (prefix == null) {
@@ -468,6 +446,13 @@ public class BucketEndpoint extends EndpointBase {
     response.setStartAfter(EncodingTypeObject.createNullable(startAfter, encodingType));
     
     return response;
+  }
+
+  /**
+   * Process key listing logic.
+   */
+  void processKeyListing(BucketListingContext context, ListObjectResponse response) {
+    context.processKeyListing(response, this::addKey);
   }
 
   /**
@@ -930,6 +915,23 @@ public class BucketEndpoint extends EndpointBase {
       ozoneAclList.add(accessOzoneAcl);
     }
     return ozoneAclList;
+  }
+
+  private void addKey(ListObjectResponse response, OzoneKey next) {
+    KeyMetadata keyMetadata = new KeyMetadata();
+    keyMetadata.setKey(EncodingTypeObject.createNullable(next.getName(),
+        response.getEncodingType()));
+    keyMetadata.setSize(next.getDataSize());
+    String eTag = next.getMetadata().get(ETAG);
+    if (eTag != null) {
+      keyMetadata.setETag(ObjectEndpoint.wrapInQuotes(eTag));
+    }
+    keyMetadata.setStorageClass(S3StorageType.fromReplicationConfig(
+        next.getReplicationConfig()).toString());
+    keyMetadata.setLastModified(next.getModificationTime());
+    String displayName = next.getOwner();
+    keyMetadata.setOwner(S3Owner.of(displayName));
+    response.addKey(keyMetadata);
   }
 
   @VisibleForTesting
