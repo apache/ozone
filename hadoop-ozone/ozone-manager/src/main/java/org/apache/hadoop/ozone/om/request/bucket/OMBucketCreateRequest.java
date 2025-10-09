@@ -87,6 +87,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
+    super.preExecute(ozoneManager);
+
     // Get original request.
     CreateBucketRequest createBucketRequest =
         getOmRequest().getCreateBucketRequest();
@@ -94,6 +96,22 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // Verify resource name
     OmUtils.validateBucketName(bucketInfo.getBucketName(),
         ozoneManager.isStrictS3());
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+            bucketInfo.getVolumeName(), bucketInfo.getBucketName(), null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.CREATE_BUCKET,
+                buildVolumeAuditMap(bucketInfo.getVolumeName()), ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
 
     validateMaxBucket(ozoneManager);
 
@@ -206,13 +224,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
 
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
-            volumeName, bucketName, null);
-      }
-
       mergeOmLockDetails(
           metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
