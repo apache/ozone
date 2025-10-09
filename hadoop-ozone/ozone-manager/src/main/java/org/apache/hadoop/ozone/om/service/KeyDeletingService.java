@@ -234,6 +234,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                 .map(k -> k.getProtobuf(ClientVersion.CURRENT_VERSION))
                 .collect(Collectors.toList());
         keyToUpdate.addAllKeyInfos(keyInfos);
+        keyToUpdate.setBucketId(keyToModify.getValue().getBucketId());
         keysToUpdateList.add(keyToUpdate.build());
       }
     }
@@ -565,6 +566,8 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
                   " iteration.", snapInfo);
               return EmptyTaskResult.newResult();
             }
+          } else if (!isPreviousPurgeTransactionFlushed()) {
+            return EmptyTaskResult.newResult();
           }
           try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapInfo == null ? null :
               omSnapshotManager.getActiveSnapshot(snapInfo.getVolumeName(), snapInfo.getBucketName(),

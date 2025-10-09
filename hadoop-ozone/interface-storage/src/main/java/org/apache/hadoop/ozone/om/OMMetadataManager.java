@@ -330,12 +330,6 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
       String startKey, int maxKeys) throws IOException;
 
   /**
-   * Get total open key count (estimated, due to the nature of RocksDB impl)
-   * of both OpenKeyTable and OpenFileTable.
-   */
-  long getTotalOpenKeyCount() throws IOException;
-
-  /**
    * Returns the names of up to {@code count} open keys whose age is
    * greater than or equal to {@code expireThreshold}.
    *

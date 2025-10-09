@@ -714,6 +714,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                   snapInfo);
               return BackgroundTaskResult.EmptyTaskResult.newResult();
             }
+          } else if (!isPreviousPurgeTransactionFlushed()) {
+            return BackgroundTaskResult.EmptyTaskResult.newResult();
           }
           try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapInfo == null ? null :
               omSnapshotManager.getActiveSnapshot(snapInfo.getVolumeName(), snapInfo.getBucketName(),
