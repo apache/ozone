@@ -44,7 +44,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ozone.compaction.log.SstFileInfo;
@@ -62,14 +61,14 @@ import org.yaml.snakeyaml.Yaml;
 public class TestOmSnapshotLocalDataYaml {
 
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
-  private static final OmSnapshotLocalDataYaml.YamlFactory yamlFactory = new OmSnapshotLocalDataYaml.YamlFactory();
+  private static final OmSnapshotLocalDataYaml.YamlFactory YAML_FACTORY = new OmSnapshotLocalDataYaml.YamlFactory();
   private static ObjectSerializer<OmSnapshotLocalData> omSnapshotLocalDataSerializer;
 
   private static final Instant NOW = Instant.now();
 
   @BeforeAll
   public static void setupSerializer() throws IOException {
-    omSnapshotLocalDataSerializer = new YamlSerializer<OmSnapshotLocalData>(yamlFactory) {
+    omSnapshotLocalDataSerializer = new YamlSerializer<OmSnapshotLocalData>(YAML_FACTORY) {
       @Override
       public void computeAndSetChecksum(Yaml yaml, OmSnapshotLocalData data) throws IOException {
         data.computeAndSetChecksum(yaml);

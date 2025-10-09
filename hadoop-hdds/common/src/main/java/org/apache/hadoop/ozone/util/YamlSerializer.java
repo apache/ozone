@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.util;
 
 import com.google.common.base.Preconditions;
@@ -29,6 +30,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
+/**
+ * An abstract serializer for objects that extend the {@link Checksum} interface.
+ * This class provides mechanisms for serializing and deserializing objects
+ * in a YAML format.
+ */
 public abstract class YamlSerializer<T extends Checksum<T>> implements ObjectSerializer<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(YamlSerializer.class);
@@ -59,6 +65,9 @@ public abstract class YamlSerializer<T extends Checksum<T>> implements ObjectSer
     }
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public T load(File yamlFile) throws IOException {
     Preconditions.checkNotNull(yamlFile, "yamlFile cannot be null");
@@ -67,8 +76,11 @@ public abstract class YamlSerializer<T extends Checksum<T>> implements ObjectSer
     }
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
-  public T load(InputStream input) throws IOException{
+  public T load(InputStream input) throws IOException {
     T dataYaml;
     try (UncheckedAutoCloseableSupplier<Yaml> yaml = getYaml()) {
       dataYaml = yaml.get().load(input);
@@ -86,6 +98,9 @@ public abstract class YamlSerializer<T extends Checksum<T>> implements ObjectSer
     return dataYaml;
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public boolean verifyChecksum(T data) throws IOException {
     Preconditions.checkNotNull(data, "data cannot be null");
@@ -117,6 +132,9 @@ public abstract class YamlSerializer<T extends Checksum<T>> implements ObjectSer
     }
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public void save(File yamlFile, T data) throws IOException {
     // Create Yaml
@@ -128,9 +146,12 @@ public abstract class YamlSerializer<T extends Checksum<T>> implements ObjectSer
     }
   }
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
-  public void close() throws IOException {
-
+  public void close() {
+    yamlPool.close();
   }
 
   public abstract void computeAndSetChecksum(Yaml yaml, T data) throws IOException;

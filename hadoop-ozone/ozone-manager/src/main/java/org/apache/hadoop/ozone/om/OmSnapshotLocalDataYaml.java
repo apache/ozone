@@ -17,11 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.google.common.base.Preconditions;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -29,22 +24,15 @@ import java.util.UUID;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
-import org.apache.hadoop.hdds.server.YamlUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
-import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.ozone.compaction.log.SstFileInfo;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.rocksdb.LiveFileMetaData;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.TypeDescription;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.AbstractConstruct;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
-import org.yaml.snakeyaml.error.YAMLException;
 import org.yaml.snakeyaml.introspector.BeanAccess;
 import org.yaml.snakeyaml.introspector.Property;
 import org.yaml.snakeyaml.introspector.PropertyUtils;
@@ -63,12 +51,13 @@ import org.yaml.snakeyaml.representer.Representer;
  */
 public final class OmSnapshotLocalDataYaml {
 
-  private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataYaml.class);
-
   public static final Tag SNAPSHOT_YAML_TAG = new Tag("OmSnapshotLocalData");
   public static final Tag SNAPSHOT_VERSION_META_TAG = new Tag("VersionMeta");
   public static final Tag SST_FILE_INFO_TAG = new Tag("SstFileInfo");
   public static final String YAML_FILE_EXTENSION = ".yaml";
+
+  private OmSnapshotLocalDataYaml() {
+  }
 
   /**
    * Representer class to define which fields need to be stored in yaml file.

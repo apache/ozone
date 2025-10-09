@@ -125,7 +125,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-
   @Override
   public void close() {
     if (snapshotLocalDataSerializer != null) {
