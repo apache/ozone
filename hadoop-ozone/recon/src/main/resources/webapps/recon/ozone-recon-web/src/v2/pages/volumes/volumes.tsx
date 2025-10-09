@@ -115,11 +115,6 @@ const Volumes: React.FC<{}> = () => {
     }
   }, [volumesData.data]);
 
-  // Handle limit changes by refetching data
-  useEffect(() => {
-    volumesData.refetch();
-  }, [selectedLimit.value]);
-
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
   }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Alert, Button, Tooltip } from 'antd';
 import { InfoCircleFilled, ReloadOutlined, } from '@ant-design/icons';
 import { ValueType } from 'react-select';
@@ -60,7 +60,6 @@ const NamespaceUsage: React.FC<{}> = () => {
     DEFAULT_NU_RESPONSE,
     {
       retryAttempts: 2,
-      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -86,13 +85,6 @@ const NamespaceUsage: React.FC<{}> = () => {
   const loadData = (path: string) => {
     setCurrentPath(path);
   };
-
-  // Refetch when path changes
-  React.useEffect(() => {
-    if (currentPath) {
-      namespaceUsageData.refetch();
-    }
-  }, [currentPath]);
 
   function handleLimitChange(selected: ValueType<Option, false>) {
     setLimit(selected as Option);

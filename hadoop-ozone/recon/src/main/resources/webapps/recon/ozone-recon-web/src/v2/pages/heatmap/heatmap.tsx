@@ -73,7 +73,6 @@ const Heatmap: React.FC<{}> = () => {
     DEFAULT_HEATMAP_RESPONSE,
     {
       retryAttempts: 2,
-      initialFetch: false,
       onError: (error: any) => {
         if (error.response?.status !== 404) {
           showDataFetchError(error.message.toString());
@@ -94,7 +93,6 @@ const Heatmap: React.FC<{}> = () => {
     DEFAULT_DISABLED_FEATURES_RESPONSE,
     {
       retryAttempts: 2,
-      initialFetch: false,
       onError: (error: any) => showDataFetchError(error)
     }
   );
@@ -119,20 +117,6 @@ const Heatmap: React.FC<{}> = () => {
       setIsHeatmapEnabled(!disabledFeaturesData.data.data.includes('HEATMAP'));
     }
   }, [disabledFeaturesData.data]);
-
-  // Refetch heatmap data when dependencies change (excluding inputPathState.inputPath)
-  useEffect(() => {
-    if (isHeatmapEnabled && state.date && searchPath && state.entityType) {
-      heatmapData.refetch();
-    }
-  }, [isHeatmapEnabled, state.entityType, state.date, searchPath]);
-
-  // Initial load of disabled features
-  useEffect(() => {
-    if (isHeatmapEnabled === undefined) {
-      disabledFeaturesData.refetch();
-    }
-  }, [isHeatmapEnabled]);
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;

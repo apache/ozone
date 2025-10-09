@@ -148,6 +148,44 @@ const Containers: React.FC<{}> = () => {
     mismatchedReplicaContainerData
   } = state;
 
+  // Mapping the data to the Tab keys for enabling/disabling search
+  const dataToTabKeyMap: Record<string, Container[]> = {
+    1: missingContainerData,
+    2: underReplicatedContainerData,
+    3: overReplicatedContainerData,
+    4: misReplicatedContainerData,
+    5: mismatchedReplicaContainerData
+  }
+
+  const highlightData = (
+    <div style={{
+        display: 'flex',
+        width: '90%',
+        justifyContent: 'space-between'
+      }}>
+      <div className='highlight-content'>
+        Missing <br/>
+        <span className='highlight-content-value'>{missingContainerData?.length ?? 'N/A'}</span>
+      </div>
+      <div className='highlight-content'>
+        Under-Replicated <br/>
+        <span className='highlight-content-value'>{underReplicatedContainerData?.length ?? 'N/A'}</span>
+      </div>
+      <div className='highlight-content'>
+        Over-Replicated <br/>
+        <span className='highlight-content-value'>{overReplicatedContainerData?.length ?? 'N/A'}</span>
+      </div>
+      <div className='highlight-content'>
+        Mis-Replicated <br/>
+        <span className='highlight-content-value'>{misReplicatedContainerData?.length ?? 'N/A'}</span>
+      </div>
+      <div className='highlight-content'>
+        Mismatched Replicas <br/>
+        <span className='highlight-content-value'>{mismatchedReplicaContainerData?.length ?? 'N/A'}</span>
+      </div>
+    </div>
+  )
+
   const getCurrentTabData = () => {
     switch (selectedTab) {
       case '1':
@@ -176,7 +214,17 @@ const Containers: React.FC<{}> = () => {
           onReload={loadContainersData}
         />
       </div>
-      <div className='data-container'>
+      <div style={{ padding: '24px' }}>
+        <div style={{ marginBottom: '12px' }}>
+          <Card
+            title='Highlights'
+            loading={containersData.loading}>
+              <Row
+                align='middle'>
+                  {highlightData}
+                </Row>
+          </Card>
+        </div>
         <div className='content-div'>
           <div className='table-header-section'>
             <div className='table-filter-section'>
@@ -186,12 +234,12 @@ const Containers: React.FC<{}> = () => {
                 selected={selectedColumns}
                 placeholder='Columns'
                 onChange={handleColumnChange}
-                onTagClose={handleTagClose}
                 fixedColumn='containerID'
-                columnLength={COLUMNS.length} />
+                onTagClose={() => { }}
+                columnLength={columnOptions.length} />
             </div>
             <Search
-              disabled={getCurrentTabData()?.length < 1}
+              disabled={dataToTabKeyMap[selectedTab]?.length < 1}
               searchOptions={SearchableColumnOpts}
               searchInput={searchTerm}
               searchColumn={searchColumn}
@@ -203,60 +251,74 @@ const Containers: React.FC<{}> = () => {
                 setSearchColumn(value as 'containerID' | 'pipelineID');
               }} />
           </div>
-          <Card>
-            <Tabs activeKey={selectedTab} onChange={handleTabChange}>
-              <Tabs.TabPane tab={`Missing (${missingContainerData.length})`} key="1">
-                <ContainerTable
-                  loading={containersData.loading}
-                  data={missingContainerData}
-                  searchColumn={searchColumn}
-                  searchTerm={debouncedSearch}
-                  selectedColumns={selectedColumns}
-                  expandedRow={expandedRow}
-                  expandedRowSetter={setExpandedRow} />
-              </Tabs.TabPane>
-              <Tabs.TabPane tab={`Under Replicated (${underReplicatedContainerData.length})`} key="2">
-                <ContainerTable
-                  loading={containersData.loading}
-                  data={underReplicatedContainerData}
-                  searchColumn={searchColumn}
-                  searchTerm={debouncedSearch}
-                  selectedColumns={selectedColumns}
-                  expandedRow={expandedRow}
-                  expandedRowSetter={setExpandedRow} />
-              </Tabs.TabPane>
-              <Tabs.TabPane tab={`Over Replicated (${overReplicatedContainerData.length})`} key="3">
-                <ContainerTable
-                  loading={containersData.loading}
-                  data={overReplicatedContainerData}
-                  searchColumn={searchColumn}
-                  searchTerm={debouncedSearch}
-                  selectedColumns={selectedColumns}
-                  expandedRow={expandedRow}
-                  expandedRowSetter={setExpandedRow} />
-              </Tabs.TabPane>
-              <Tabs.TabPane tab={`Mis Replicated (${misReplicatedContainerData.length})`} key="4">
-                <ContainerTable
-                  loading={containersData.loading}
-                  data={misReplicatedContainerData}
-                  searchColumn={searchColumn}
-                  searchTerm={debouncedSearch}
-                  selectedColumns={selectedColumns}
-                  expandedRow={expandedRow}
-                  expandedRowSetter={setExpandedRow} />
-              </Tabs.TabPane>
-              <Tabs.TabPane tab={`Mismatched Replica (${mismatchedReplicaContainerData.length})`} key="5">
-                <ContainerTable
-                  loading={containersData.loading}
-                  data={mismatchedReplicaContainerData}
-                  searchColumn={searchColumn}
-                  searchTerm={debouncedSearch}
-                  selectedColumns={selectedColumns}
-                  expandedRow={expandedRow}
-                  expandedRowSetter={setExpandedRow} />
-              </Tabs.TabPane>
-            </Tabs>
-          </Card>
+          <Tabs defaultActiveKey='1'
+            onChange={(activeKey: string) => setSelectedTab(activeKey)}>
+            <Tabs.TabPane
+              key='1'
+              tab='Missing'>
+              <ContainerTable
+                data={missingContainerData}
+                loading={containersData.loading}
+                searchColumn={searchColumn}
+                searchTerm={debouncedSearch}
+                selectedColumns={selectedColumns}
+                expandedRow={expandedRow}
+                expandedRowSetter={setExpandedRow}
+              />
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key='2'
+              tab='Under-Replicated'>
+              <ContainerTable
+                data={underReplicatedContainerData}
+                loading={containersData.loading}
+                searchColumn={searchColumn}
+                searchTerm={debouncedSearch}
+                selectedColumns={selectedColumns}
+                expandedRow={expandedRow}
+                expandedRowSetter={setExpandedRow}
+              />
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key='3'
+              tab='Over-Replicated'>
+              <ContainerTable
+                data={overReplicatedContainerData}
+                loading={containersData.loading}
+                searchColumn={searchColumn}
+                searchTerm={debouncedSearch}
+                selectedColumns={selectedColumns}
+                expandedRow={expandedRow}
+                expandedRowSetter={setExpandedRow}
+              />
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key='4'
+              tab='Mis-Replicated'>
+              <ContainerTable
+                data={misReplicatedContainerData}
+                loading={containersData.loading}
+                searchColumn={searchColumn}
+                searchTerm={debouncedSearch}
+                selectedColumns={selectedColumns}
+                expandedRow={expandedRow}
+                expandedRowSetter={setExpandedRow}
+              />
+            </Tabs.TabPane>
+            <Tabs.TabPane
+              key='5'
+              tab='Mismatched Replicas'>
+              <ContainerTable
+                data={mismatchedReplicaContainerData}
+                loading={containersData.loading}
+                searchColumn={searchColumn}
+                searchTerm={debouncedSearch}
+                selectedColumns={selectedColumns}
+                expandedRow={expandedRow}
+                expandedRowSetter={setExpandedRow}
+              />
+            </Tabs.TabPane>
+          </Tabs>
         </div>
       </div>
     </>

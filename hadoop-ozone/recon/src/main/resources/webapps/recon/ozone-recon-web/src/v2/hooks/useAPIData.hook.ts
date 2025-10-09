@@ -26,7 +26,7 @@ export interface ApiState<T> {
   loading: boolean;
   error: string | null;
   lastUpdated: number | null;
-  success: boolean; // For non-GET requests to indicate successful completion
+  success: boolean;
 }
 
 export interface UseApiDataOptions {
@@ -52,7 +52,7 @@ export function useApiData<T>(
     method = 'GET',
     retryAttempts = 3,
     retryDelay = 1000,
-    initialFetch = method === 'GET', // Only auto-fetch for GET requests
+    initialFetch = method === 'GET',
     onError,
     onSuccess
   } = options;
@@ -68,41 +68,14 @@ export function useApiData<T>(
   const controllerRef = useRef<AbortController>();
   const retryCountRef = useRef(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout>();
-  
-  // Store stable references
-  const urlRef = useRef(url);
-  const methodRef = useRef(method);
-  const retryAttemptsRef = useRef(retryAttempts);
-  const retryDelayRef = useRef(retryDelay);
-  const onErrorRef = useRef(onError);
-  const onSuccessRef = useRef(onSuccess);
-
-  // Update refs when props change
-  useEffect(() => {
-    urlRef.current = url;
-  }, [url]);
-
-  useEffect(() => {
-    methodRef.current = method;
-  }, [method]);
-
-  useEffect(() => {
-    retryAttemptsRef.current = retryAttempts;
-  }, [retryAttempts]);
-
-  useEffect(() => {
-    retryDelayRef.current = retryDelay;
-  }, [retryDelay]);
-
-  useEffect(() => {
-    onErrorRef.current = onError;
-  }, [onError]);
-
-  useEffect(() => {
-    onSuccessRef.current = onSuccess;
-  }, [onSuccess]);
+  const mountedRef = useRef(false);
 
   const executeRequest = async (requestData?: any, isRetry = false) => {
+    // Don't make requests if URL is empty or falsy
+    if (!url || url.trim() === '') {
+      return Promise.reject(new Error('URL is required'));
+    }
+
     if (!isRetry) {
       setState(prev => ({ ...prev, loading: true, error: null, success: false }));
       retryCountRef.current = 0;
@@ -118,18 +91,18 @@ export function useApiData<T>(
 
     try {
       const config: AxiosRequestConfig = {
-        url: urlRef.current,
-        method: methodRef.current,
+        url,
+        method,
         signal: controllerRef.current.signal,
       };
 
       // Add data for non-GET requests
-      if (methodRef.current !== 'GET' && requestData !== undefined) {
+      if (method !== 'GET' && requestData !== undefined) {
         config.data = requestData;
       }
 
       // Add query parameters for GET requests if data is provided as params
-      if (methodRef.current === 'GET' && requestData !== undefined) {
+      if (method === 'GET' && requestData !== undefined) {
         config.params = requestData;
       }
 
@@ -143,8 +116,8 @@ export function useApiData<T>(
         success: true
       });
 
-      if (onSuccessRef.current) {
-        onSuccessRef.current(response.data);
+      if (onSuccess) {
+        onSuccess(response.data);
       }
 
       retryCountRef.current = 0;
@@ -157,7 +130,7 @@ export function useApiData<T>(
       const errorMessage = error.response?.data?.message ||
                           error.response?.statusText ||
                           error.message ||
-                          `${methodRef.current} request failed with status: ${error.response?.status || 'unknown'}`;
+                          `${method} request failed with status: ${error.response?.status || 'unknown'}`;
 
       // Clear any existing retry timeout
       if (retryTimeoutRef.current) {
@@ -165,17 +138,17 @@ export function useApiData<T>(
       }
 
       // Retry logic for network errors and 5xx errors
-      if (retryCountRef.current < retryAttemptsRef.current && 
+      if (retryCountRef.current < retryAttempts && 
           (!error.response?.status || error.response?.status >= 500)) {
         retryCountRef.current++;
         retryTimeoutRef.current = setTimeout(() => {
           executeRequest(requestData, true);
-        }, retryDelayRef.current * retryCountRef.current);
+        }, retryDelay * retryCountRef.current);
         return Promise.reject(error);
       }
 
-      if (onErrorRef.current) {
-        onErrorRef.current(error);
+      if (onError) {
+        onError(error);
       }
 
       setState({
@@ -212,31 +185,38 @@ export function useApiData<T>(
     });
   };
 
-  // Initial fetch for GET requests only
+  // Handle initial fetch, URL changes, and cleanup
   useEffect(() => {
-    if (initialFetch && methodRef.current === 'GET') {
-      executeRequest();
+    // Don't make requests if URL is empty or falsy
+    if (!url || url.trim() === '') {
+      return;
     }
 
-    // Cleanup retry timeout on unmount
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
+    if (!mountedRef.current) {
+      // Initial mount - this is required since we might have a situation where
+      // the component is mounted but initial fetch is not enabled, hence we need to separate out
+      // by checking if the component is mounted or just the URL has changed.
+      mountedRef.current = true;
+      if (initialFetch && method === 'GET') {
+        executeRequest();
       }
-    };
-  }, []); // Empty dependency array
+    } else {
+      // URL changed - refetch for GET requests
+      if (method === 'GET') {
+        executeRequest();
+      }
+    }
 
-  // Cleanup on unmount
-  useEffect(() => {
+    // Cleanup on unmount
     return () => {
       if (controllerRef.current) {
-        controllerRef.current.abort('Component unmounted');
+        controllerRef.current.abort();
       }
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
     };
-  }, []);
+  }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     ...state,
@@ -253,6 +233,11 @@ export async function fetchData<T>(
   method: HttpMethod = 'GET', 
   data?: any
 ): Promise<T> {
+  // Don't make requests if URL is empty or falsy
+  if (!url || url.trim() === '') {
+    return Promise.reject(new Error('URL is required'));
+  }
+
   const controller = new AbortController();
   
   const config: AxiosRequestConfig = {

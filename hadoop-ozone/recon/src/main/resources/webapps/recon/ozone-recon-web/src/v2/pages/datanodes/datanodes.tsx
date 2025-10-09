@@ -131,17 +131,6 @@ const Datanodes: React.FC<{}> = () => {
     setSelectedColumns(selected as Option[]);
   }
 
-  // These functions now just trigger the hooks to refetch
-  const loadDecommisionAPI = () => {
-    decommissionAPI.refetch();
-    return Promise.resolve(decommissionAPI);
-  };
-
-  const loadDataNodeAPI = () => {
-    datanodesAPI.refetch();
-    return Promise.resolve(datanodesAPI);
-  };
-
   async function removeDatanode(selectedRowKeys: string[]) {
     try {
       await removeDatanodesAPI.execute(selectedRowKeys);
@@ -204,7 +193,6 @@ const Datanodes: React.FC<{}> = () => {
 
   useEffect(() => {
     autoReload.startPolling();
-    loadData();
 
     return (() => {
       autoReload.stopPolling();

@@ -131,7 +131,6 @@ const NUMetadata: React.FC<MetadataProps> = ({
     {} as SummaryResponse,
     {
       retryAttempts: 2,
-      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -141,20 +140,11 @@ const NUMetadata: React.FC<MetadataProps> = ({
     {},
     {
       retryAttempts: 2,
-      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
   
   const loading = summaryAPI.loading || quotaAPI.loading || isProcessingData;
-
-  // Refetch data when path changes
-  useEffect(() => {
-    if (path) {
-      summaryAPI.refetch();
-      quotaAPI.refetch();
-    }
-  }, [path]);
 
   const getObjectInfoMapping = useCallback((summaryResponse) => {
     const data: MetadataState = [];
