@@ -52,6 +52,8 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.types.NamedCallableTask;
@@ -72,6 +74,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private final ReconDBProvider reconDBProvider;
   private final ReconContainerMetadataManager reconContainerMetadataManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private final ReconGlobalStatsManager reconGlobalStatsManager;
+  private final ReconFileMetadataManager reconFileMetadataManager;
 
   private Map<String, ReconOmTask> reconOmTasks;
   private ExecutorService executorService;
@@ -90,16 +94,21 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private static final long RETRY_DELAY_MS = 2000; // 2 seconds
 
   @Inject
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
                                  Set<ReconOmTask> tasks,
                                  ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
                                  ReconDBProvider reconDBProvider,
                                  ReconContainerMetadataManager reconContainerMetadataManager,
-                                 ReconNamespaceSummaryManager reconNamespaceSummaryManager) {
+                                 ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                 ReconGlobalStatsManager reconGlobalStatsManager,
+                                 ReconFileMetadataManager reconFileMetadataManager) {
     this.configuration = configuration;
     this.reconDBProvider = reconDBProvider;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
+    this.reconGlobalStatsManager = reconGlobalStatsManager;
+    this.reconFileMetadataManager = reconFileMetadataManager;
     reconOmTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
@@ -232,6 +241,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         reconDBProvider.replaceStagedDb(stagedReconDBProvider);
         reconNamespaceSummaryManager.reinitialize(reconDBProvider);
         reconContainerMetadataManager.reinitialize(reconDBProvider);
+        reconGlobalStatsManager.reinitialize(reconDBProvider);
+        reconFileMetadataManager.reinitialize(reconDBProvider);
         recordAllTaskStatus(localReconOmTaskMap, 0, omMetadataManager.getLastSequenceNumberFromDB());
         LOG.info("Re-initialization of tasks completed successfully.");
       } catch (Exception e) {
@@ -241,6 +252,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         try {
           reconNamespaceSummaryManager.reinitialize(reconDBProvider);
           reconContainerMetadataManager.reinitialize(reconDBProvider);
+          reconGlobalStatsManager.reinitialize(reconDBProvider);
+          reconFileMetadataManager.reinitialize(reconDBProvider);
         } catch (IOException ex) {
           LOG.error("Re-initialization of task manager failed.", e);
         }
