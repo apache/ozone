@@ -88,12 +88,11 @@ public class HddsConfServlet extends HttpServlet {
     }
 
     String name = request.getParameter("name");
-    Writer out = response.getWriter();
     String cmd = request.getParameter(COMMAND);
 
-    // FIXME: should close writer if any exception is thrown.
-    processCommand(cmd, format, request, response, out, name);
-    out.close();
+    try (Writer out = response.getWriter()) {
+      processCommand(cmd, format, request, response, out, name);
+    }
   }
 
   private void processCommand(String cmd, ResponseFormat format,
