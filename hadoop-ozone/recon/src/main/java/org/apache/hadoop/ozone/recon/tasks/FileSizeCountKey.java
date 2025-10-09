@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.FileSizeCountKeyProto;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.FileSizeCountKeyProto;
 
 /**
  * Key class used for grouping file size counts in RocksDB storage.

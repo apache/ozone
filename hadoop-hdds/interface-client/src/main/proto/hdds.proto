@@ -450,16 +450,6 @@ message ContainerReplicaHistoryProto {
     optional int64 dataChecksum = 6;
 }
 
-message GlobalStatsValueProto {
-    required int64 value = 1;
-}
-
-message FileSizeCountKeyProto {
-    required string volume = 1;
-    required string bucket = 2;
-    required int64 fileSizeUpperBound = 3;
-}
-
 message SCMContainerReplicaProto {
     required int64 containerID = 1;
     required string state = 2;

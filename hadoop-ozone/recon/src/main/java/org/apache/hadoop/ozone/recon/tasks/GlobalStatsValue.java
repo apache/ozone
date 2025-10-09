@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GlobalStatsValueProto;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.GlobalStatsValueProto;
 
 /**
  * Value class for global statistics stored in RocksDB.
