@@ -213,6 +213,7 @@ public final class OzoneConsts {
   public static final String OM_SLD_LAST_DEFRAG_TIME = "lastDefragTime";
   public static final String OM_SLD_NEEDS_DEFRAG = "needsDefrag";
   public static final String OM_SLD_VERSION_SST_FILE_INFO = "versionSstFileInfos";
+  public static final String OM_SLD_SNAP_ID = "snapshotId";
   public static final String OM_SLD_PREV_SNAP_ID = "previousSnapshotId";
   public static final String OM_SLD_VERSION_META_SST_FILES = "sstFiles";
   public static final String OM_SLD_VERSION_META_PREV_SNAP_VERSION = "previousSnapshotVersion";
@@ -262,6 +263,8 @@ public final class OzoneConsts {
   public static final String DST_KEY = "dstKey";
   public static final String USED_BYTES = "usedBytes";
   public static final String USED_NAMESPACE = "usedNamespace";
+  public static final String SNAPSHOT_USED_BYTES = "snapshotUsedBytes";
+  public static final String SNAPSHOT_USED_NAMESPACE = "snapshotUsedNamespace";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
   public static final String QUOTA_IN_NAMESPACE = "quotaInNamespace";
   public static final String OBJECT_ID = "objectID";
