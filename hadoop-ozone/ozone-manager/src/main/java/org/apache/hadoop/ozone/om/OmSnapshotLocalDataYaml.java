@@ -227,7 +227,8 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
-        UUID prevSnapId = UUID.fromString((String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID));
+        final String prevSnapIdStr = (String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID);
+        UUID prevSnapId = prevSnapIdStr != null ? UUID.fromString(prevSnapIdStr) : null;
         OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml(Collections.emptyList(), prevSnapId);
 
         // Set version from YAML
