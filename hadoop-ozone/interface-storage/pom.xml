@@ -24,9 +24,6 @@
   <packaging>jar</packaging>
   <name>Apache Ozone Storage Interface</name>
   <description>Apache Ozone Storage Interface</description>
-  <properties>
-    <protobuf.version>${protobuf3.version}</protobuf.version>
-  </properties>
   <dependencies>
     <dependency>
       <groupId>com.google.guava</groupId>
