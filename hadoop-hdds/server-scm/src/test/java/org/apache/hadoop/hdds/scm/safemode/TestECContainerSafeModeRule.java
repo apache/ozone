@@ -50,21 +50,16 @@ import org.junit.jupiter.params.provider.EnumSource;
  * This class tests ECContainerSafeModeRule.
  */
 public class TestECContainerSafeModeRule {
-  private ContainerManager containerManager;
-  private ConfigurationSource conf;
-  private EventQueue eventQueue;
-  private SCMSafeModeManager safeModeManager;
-  private SafeModeMetrics metrics;
   private List<ContainerInfo> containers;
   private ECContainerSafeModeRule rule;
 
   @BeforeEach
   public void setup() throws ContainerNotFoundException {
-    containerManager = mock(ContainerManager.class);
-    conf = mock(ConfigurationSource.class);
-    eventQueue = mock(EventQueue.class);
-    safeModeManager = mock(SCMSafeModeManager.class);
-    metrics = mock(SafeModeMetrics.class);
+    final ContainerManager containerManager = mock(ContainerManager.class);
+    final ConfigurationSource conf = mock(ConfigurationSource.class);
+    final EventQueue eventQueue = mock(EventQueue.class);
+    final SCMSafeModeManager safeModeManager = mock(SCMSafeModeManager.class);
+    final SafeModeMetrics metrics = mock(SafeModeMetrics.class);
     containers = new ArrayList<>();
     when(containerManager.getContainers(ReplicationType.EC)).thenReturn(containers);
     when(containerManager.getContainer(any(ContainerID.class))).thenAnswer(invocation -> {
