@@ -153,8 +153,8 @@ public class SnapshotDefragService extends BackgroundService
     try {
       // Read YAML metadata using the correct API
       File yamlFile = new File(snapshotPath + ".yaml");
-      OmSnapshotLocalDataYaml yamlData = OmSnapshotLocalDataYaml.getFromYamlFile(
-          ozoneManager.getOmSnapshotManager(), yamlFile);  // TODO: Verify new usage
+      OmSnapshotLocalDataYaml yamlData =
+          OmSnapshotLocalDataYaml.getFromYamlFile(ozoneManager.getOmSnapshotManager(), yamlFile);
 
       // Check if snapshot needs compaction (defragmentation)
       boolean needsDefrag = yamlData.getNeedsDefrag();
@@ -919,14 +919,14 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
     try {
       // Read current YAML data using the correct API
       File yamlFile = new File(snapshotPath + ".yaml");
-      OmSnapshotLocalDataYaml yamlData = OmSnapshotLocalDataYaml.getFromYamlFile(
-          ozoneManager.getOmSnapshotManager(), yamlFile);  // TODO: Verify new usage
+      OmSnapshotLocalDataYaml yamlData =
+          OmSnapshotLocalDataYaml.getFromYamlFile(ozoneManager.getOmSnapshotManager(), yamlFile);
 
       // Mark as defragmented by setting needsCompaction to false
       yamlData.setNeedsDefrag(false);
 
       // Write updated YAML data
-      yamlData.writeToYaml(ozoneManager.getOmSnapshotManager(), yamlFile);  // TODO: Verify new usage
+      yamlData.writeToYaml(ozoneManager.getOmSnapshotManager(), yamlFile);
 
       LOG.info("Successfully updated metadata for snapshot: {}, " +
               "marked as defragmented (needsCompaction=false)",
@@ -990,7 +990,9 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
 
       // Acquire SNAPSHOT_GC_LOCK
       OMLockDetails gcLockDetails = ozoneManager.getMetadataManager().getLock()
-          .acquireWriteLock(SNAPSHOT_GC_LOCK, "defrag-" + snapshotToDefrag.getSnapshotId());
+          .acquireWriteLock(SNAPSHOT_GC_LOCK, snapshotToDefrag.getSnapshotId().toString());
+      LOG.debug("Acquired SNAPSHOT_GC_LOCK for snapshot: {}, ID: {}",
+          snapshotToDefrag.getName(), snapshotToDefrag.getSnapshotId());
 
       if (!gcLockDetails.isLockAcquired()) {
         LOG.warn("Failed to acquire SNAPSHOT_GC_LOCK for snapshot: {}",
@@ -1014,7 +1016,7 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
           UUID pathPreviousSnapshotId = snapshotToDefrag.getPathPreviousSnapshotId();
           boolean isFirstSnapshotInPath = pathPreviousSnapshotId == null;
           if (isFirstSnapshotInPath) {
-            LOG.info("Performing full defragmentation for first snapshot: {}",
+            LOG.info("Performing full defragmentation for first snapshot (in path): {}",
                 snapshotToDefrag.getName());
             performFullDefragmentation(snapshotToDefrag, omSnapshot);
           } else {
@@ -1066,8 +1068,9 @@ at org.apache.hadoop.hdds.utils.db.RDBSstFileWriter.delete(RDBSstFileWriter.java
       } finally {
         // Release SNAPSHOT_GC_LOCK
         ozoneManager.getMetadataManager().getLock()
-            .releaseWriteLock(SNAPSHOT_GC_LOCK, "defrag-" + snapshotToDefrag.getSnapshotId());
-        LOG.debug("Released SNAPSHOT_GC_LOCK for snapshot: {}", snapshotToDefrag.getName());
+            .releaseWriteLock(SNAPSHOT_GC_LOCK, snapshotToDefrag.getSnapshotId().toString());
+        LOG.debug("Released SNAPSHOT_GC_LOCK for snapshot: {}, ID: {}",
+            snapshotToDefrag.getName(), snapshotToDefrag.getSnapshotId());
       }
     }
 
