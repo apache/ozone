@@ -54,8 +54,6 @@ public class HddsConfServlet extends HttpServlet {
 
   private static final long serialVersionUID = 1L;
 
-  protected static final String FORMAT_JSON = "json";
-  protected static final String FORMAT_XML = "xml";
   private static final String COMMAND = "cmd";
   private static final OzoneConfiguration OZONE_CONFIG =
       new OzoneConfiguration();
@@ -81,10 +79,11 @@ public class HddsConfServlet extends HttpServlet {
       return;
     }
 
-    String format = parseAcceptHeader(request);
-    if (FORMAT_XML.equals(format)) {
+    ResponseFormat format = parseAcceptHeader(request);
+    switch (format) {
+    case JSON:
       response.setContentType("text/xml; charset=utf-8");
-    } else if (FORMAT_JSON.equals(format)) {
+    case XML:
       response.setContentType("application/json; charset=utf-8");
     }
 
@@ -97,7 +96,7 @@ public class HddsConfServlet extends HttpServlet {
     out.close();
   }
 
-  private void processCommand(String cmd, String format,
+  private void processCommand(String cmd, ResponseFormat format,
                               HttpServletRequest request, HttpServletResponse response, Writer out,
                               String name)
       throws IOException {
@@ -117,44 +116,46 @@ public class HddsConfServlet extends HttpServlet {
    * Parse the Accept header to determine response format.
    *
    * @param request the HTTP servlet request
-   * @return {@link #FORMAT_JSON} if Accept header contains "application/json",
-   * otherwise {@link #FORMAT_XML} (default for backwards compatibility)
+   * @return {@link ResponseFormat#JSON} if Accept header contains "application/json",
+   * otherwise {@link ResponseFormat#XML} (default for backwards compatibility)
    * @see HttpHeaders#ACCEPT
    */
   @VisibleForTesting
-  static String parseAcceptHeader(HttpServletRequest request) {
+  static ResponseFormat parseAcceptHeader(HttpServletRequest request) {
     String format = request.getHeader(HttpHeaders.ACCEPT);
-    return format != null && format.contains(FORMAT_JSON) ?
-        FORMAT_JSON : FORMAT_XML;
+    return format != null && format.contains(ResponseFormat.JSON.getValue()) ?
+        ResponseFormat.JSON : ResponseFormat.XML;
   }
 
   /**
    * Guts of the servlet - extracted for easy testing.
    */
   static void writeResponse(OzoneConfiguration conf,
-                            Writer out, String format, String propertyName)
+                            Writer out, ResponseFormat format, String propertyName)
       throws IOException, IllegalArgumentException {
-    if (FORMAT_JSON.equals(format)) {
+    switch (format) {
+    case JSON:
       OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
-    } else if (FORMAT_XML.equals(format)) {
+    case XML:
       conf.writeXml(propertyName, out);
     }
   }
 
   /**
-   * Write error response respect to format
+   * Write error response according to the specified format.
    *
    * @param errorMessage the error message
-   * @param format the response format (json or xml)
-   * @param out the writer
+   * @param format       the response format
+   * @param out          the writer
    */
-  static void writeErrorResponse(String errorMessage, String format, Writer out)
+  static void writeErrorResponse(String errorMessage, ResponseFormat format, Writer out)
       throws IOException {
-    if (FORMAT_JSON.equals(format)) {
+    switch (format) {
+    case JSON:
       Map<String, String> errorMap = new HashMap<>();
       errorMap.put("error", errorMessage);
       out.write(JsonUtils.toJsonString(errorMap));
-    } else if (FORMAT_XML.equals(format)) {
+    case XML:
       writeXmlError(errorMessage, out);
     }
   }
@@ -179,6 +180,25 @@ public class HddsConfServlet extends HttpServlet {
       transformer.transform(source, result);
     } catch (ParserConfigurationException | TransformerException e) {
       throw new IOException("Failed to write XML error response", e);
+    }
+  }
+
+  enum ResponseFormat {
+    JSON("json"),
+    XML("xml");
+    private final String value;
+
+    ResponseFormat(String value) {
+      this.value = value;
+    }
+
+    public String getValue() {
+      return value;
+    }
+
+    @Override
+    public String toString() {
+      return value;
     }
   }
 

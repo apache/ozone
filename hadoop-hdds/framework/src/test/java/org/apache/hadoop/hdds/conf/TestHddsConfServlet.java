@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import static org.apache.hadoop.hdds.conf.HddsConfServlet.FORMAT_JSON;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -64,22 +63,22 @@ public class TestHddsConfServlet {
     TEST_PROPERTIES.put("test.key1", "value1");
     TEST_PROPERTIES.put("test.key2", "value2");
     TEST_PROPERTIES.put("test.key3", "value3");
-    TEST_FORMATS.put(HddsConfServlet.FORMAT_XML, "application/xml");
-    TEST_FORMATS.put(HddsConfServlet.FORMAT_JSON, "application/json");
+    TEST_FORMATS.put(HddsConfServlet.ResponseFormat.XML.toString(), "application/xml");
+    TEST_FORMATS.put(HddsConfServlet.ResponseFormat.JSON.toString(), "application/json");
   }
 
   @Test
   public void testParseHeaders() throws Exception {
-    HashMap<String, String> verifyMap = new HashMap<String, String>();
-    verifyMap.put("text/plain", HddsConfServlet.FORMAT_XML);
-    verifyMap.put(null, HddsConfServlet.FORMAT_XML);
-    verifyMap.put("text/xml", HddsConfServlet.FORMAT_XML);
-    verifyMap.put("application/xml", HddsConfServlet.FORMAT_XML);
-    verifyMap.put("application/json", HddsConfServlet.FORMAT_JSON);
+    HashMap<String, HddsConfServlet.ResponseFormat> verifyMap = new HashMap<>();
+    verifyMap.put("text/plain", HddsConfServlet.ResponseFormat.XML);
+    verifyMap.put(null, HddsConfServlet.ResponseFormat.XML);
+    verifyMap.put("text/xml", HddsConfServlet.ResponseFormat.XML);
+    verifyMap.put("application/xml", HddsConfServlet.ResponseFormat.XML);
+    verifyMap.put("application/json", HddsConfServlet.ResponseFormat.JSON);
 
     HttpServletRequest request = mock(HttpServletRequest.class);
-    for (Map.Entry<String, String> entry : verifyMap.entrySet()) {
-      String contenTypeActual = entry.getValue();
+    for (Map.Entry<String, HddsConfServlet.ResponseFormat> entry : verifyMap.entrySet()) {
+      HddsConfServlet.ResponseFormat contenTypeActual = entry.getValue();
       when(request.getHeader(HttpHeaders.ACCEPT))
           .thenReturn(entry.getKey());
       assertEquals(contenTypeActual,
@@ -125,7 +124,7 @@ public class TestHddsConfServlet {
   @SuppressWarnings("unchecked")
   public void testWriteJson() throws Exception {
     StringWriter sw = new StringWriter();
-    HddsConfServlet.writeResponse(getTestConf(), sw, "json", null);
+    HddsConfServlet.writeResponse(getTestConf(), sw, HddsConfServlet.ResponseFormat.JSON, null);
     String json = sw.toString();
     boolean foundSetting = false;
     Object parsed = JSON.parse(json);
@@ -146,7 +145,7 @@ public class TestHddsConfServlet {
   @Test
   public void testWriteXml() throws Exception {
     StringWriter sw = new StringWriter();
-    HddsConfServlet.writeResponse(getTestConf(), sw, "xml", null);
+    HddsConfServlet.writeResponse(getTestConf(), sw, HddsConfServlet.ResponseFormat.XML, null);
     String xml = sw.toString();
 
     DocumentBuilderFactory docBuilderFactory =
