@@ -91,11 +91,10 @@ public class HddsConfServlet extends HttpServlet {
     }
 
     String name = request.getParameter("name");
+    Writer out = response.getWriter();
     String cmd = request.getParameter(COMMAND);
 
-    try (Writer out = response.getWriter()) {
-      processCommand(cmd, format, request, response, out, name);
-    }
+    processCommand(cmd, format, request, response, out, name);
   }
 
   private void processCommand(String cmd, ResponseFormat format,
