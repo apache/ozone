@@ -39,7 +39,7 @@ public class ContainerReplicaOp {
    *
    * @param opType type of operation
    * @param target target datanode
-   * @param replicaIndex replica index (0 for Ratis; &gt; 0 for EC)
+   * @param replicaIndex replica index (0 for Ratis; > 0 for EC)
    * @param command SCM command associated with the op (nullable)
    * @param deadlineEpochMillis deadline in epoch milliseconds
    * @param containerSize size of the container in bytes
