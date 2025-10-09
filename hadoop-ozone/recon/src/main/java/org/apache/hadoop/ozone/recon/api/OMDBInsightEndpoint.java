@@ -516,7 +516,6 @@ public class OMDBInsightEndpoint {
 
       // We know each RepeatedOmKeyInfo has just one OmKeyInfo object
       OmKeyInfo keyInfo = repeatedOmKeyInfo.getOmKeyInfoList().get(0);
-      KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), keyInfo);
 
       // Add the key directly to the list without classification
       deletedKeyInsightInfo.getRepeatedOmKeyInfoList().add(repeatedOmKeyInfo);
@@ -1222,9 +1221,14 @@ public class OMDBInsightEndpoint {
             // Legacy buckets are obsolete, so this code path is not optimized. We don't expect to see many Legacy
             // buckets in practice.
             prevParentID = -1;
-            keyEntityInfo.setPath(ReconUtils.constructFullPath(keyEntityInfo.getKeyName(), keyEntityInfo.getParentId(),
-                keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager,
-                omMetadataManager));
+            String fullPath = ReconUtils.constructFullPath(keyEntityInfo.getKeyName(), keyEntityInfo.getParentId(),
+                keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager);
+            if (fullPath.isEmpty()) {
+              LOG.warn("Full path is empty for volume: {}, bucket: {}, key: {}",
+                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), keyEntityInfo.getKeyName());
+              continue;
+            }
+            keyEntityInfo.setPath(fullPath);
           } else {
             // As we iterate keys in sorted order, its highly likely that keys have the same prefix for many keys in a
             // row. Especially for FSO buckets, its expensive to construct the path for each key. So, we construct the
@@ -1233,13 +1237,18 @@ public class OMDBInsightEndpoint {
             if (prevParentID != keyEntityInfo.getParentId()) {
               prevParentID = keyEntityInfo.getParentId();
               keyPrefix = ReconUtils.constructFullPathPrefix(keyEntityInfo.getParentId(),
-                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager,
-                  omMetadataManager);
+                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), reconNamespaceSummaryManager);
               keyPrefixLength = keyPrefix.length();
             }
             keyPrefix.setLength(keyPrefixLength);
             keyPrefix.append(keyEntityInfo.getKeyName());
-            keyEntityInfo.setPath(keyPrefix.toString());
+            String keyPrefixFullPath = keyPrefix.toString();
+            if (keyPrefixFullPath.isEmpty()) {
+              LOG.warn("Full path is empty for volume: {}, bucket: {}, key: {}",
+                  keyEntityInfo.getVolumeName(), keyEntityInfo.getBucketName(), keyEntityInfo.getKeyName());
+              continue;
+            }
+            keyEntityInfo.setPath(keyPrefixFullPath);
           }
 
           results.add(keyEntityInfo);
@@ -1286,7 +1295,8 @@ public class OMDBInsightEndpoint {
     KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
     keyEntityInfo.setKey(dbKey); // Set the DB key
     keyEntityInfo.setIsKey(keyInfo.isFile());
-    keyEntityInfo.setPath(ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager, omMetadataManager));
+    String fullKeyPath = ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager);
+    keyEntityInfo.setPath(fullKeyPath.isEmpty() ? keyInfo.getKeyName() : fullKeyPath);
     keyEntityInfo.setSize(keyInfo.getDataSize());
     keyEntityInfo.setCreationTime(keyInfo.getCreationTime());
     keyEntityInfo.setModificationTime(keyInfo.getModificationTime());
