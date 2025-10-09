@@ -67,7 +67,7 @@ public class ContainerReplicaPendingOps {
   /**
    * Creates a ContainerReplicaPendingOps with all parameters.
    * This is the single constructor that should be used for all cases.
-   * 
+   *
    * @param clock the clock to use for timing operations
    * @param rmConf the replication manager configuration (can be null)
    */
