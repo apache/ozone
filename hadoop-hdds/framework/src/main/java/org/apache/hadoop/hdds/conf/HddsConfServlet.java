@@ -82,9 +82,12 @@ public class HddsConfServlet extends HttpServlet {
     ResponseFormat format = parseAcceptHeader(request);
     switch (format) {
     case JSON:
-      response.setContentType("text/xml; charset=utf-8");
-    case XML:
       response.setContentType("application/json; charset=utf-8");
+      break;
+    case XML:
+    default:
+      response.setContentType("text/xml; charset=utf-8");
+      break;
     }
 
     String name = request.getParameter("name");
@@ -135,8 +138,11 @@ public class HddsConfServlet extends HttpServlet {
     switch (format) {
     case JSON:
       OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
+      break;
     case XML:
+    default:
       conf.writeXml(propertyName, out);
+      break;
     }
   }
 
@@ -154,8 +160,11 @@ public class HddsConfServlet extends HttpServlet {
       Map<String, String> errorMap = new HashMap<>();
       errorMap.put("error", errorMessage);
       out.write(JsonUtils.toJsonString(errorMap));
+      break;
     case XML:
+    default:
       writeXmlError(errorMessage, out);
+      break;
     }
   }
 
