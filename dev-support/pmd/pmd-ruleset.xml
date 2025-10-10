@@ -52,4 +52,5 @@
   </rule>
 
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
+  <exclude-pattern>.*/org/apache/hadoop/.*_/.*</exclude-pattern>
 </ruleset>

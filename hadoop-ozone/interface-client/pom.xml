@@ -108,7 +108,7 @@
         <artifactId>protobuf-maven-plugin</artifactId>
         <executions>
           <execution>
-            <id>compile-proto-${protobuf2.version}</id>
+            <id>compile-proto-${protobuf3.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
@@ -116,8 +116,8 @@
               <goal>test-compile-custom</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${protobuf2.version}:exe:${os.detected.classifier}</protocArtifact>
-              <outputDirectory>target/generated-sources/proto-java-protobuf-${protobuf2.version}</outputDirectory>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf3.version}:exe:${os.detected.classifier}</protocArtifact>
+              <outputDirectory>target/generated-sources/proto-java-protobuf-${protobuf3.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
               <pluginId>grpc-java</pluginId>
               <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
