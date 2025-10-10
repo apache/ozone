@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-import React, {useRef} from 'react';
+import React from 'react';
 import filesize from 'filesize';
 
-import { AxiosError } from 'axios';
 import { Popover, Table } from 'antd';
 import {
   ColumnsType,
@@ -29,7 +28,7 @@ import { CheckCircleOutlined, NodeIndexOutlined } from '@ant-design/icons';
 
 import {getFormattedTime} from '@/v2/utils/momentUtils';
 import {showDataFetchError} from '@/utils/common';
-import {AxiosGetHelper} from '@/utils/axiosRequestHelper';
+import {fetchData} from '@/v2/hooks/useAPIData.hook';
 import {
   Container,
   ContainerKeysResponse,
@@ -182,7 +181,6 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
   searchTerm = ''
 }) => {
 
-  const cancelSignal = useRef<AbortController>();
 
   function filterSelectedColumns() {
     const columnKeys = selectedColumns.map((column) => column.value);
@@ -191,15 +189,12 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
     );
   }
 
-  function loadRowData(containerID: number) {
-    const { request, controller } = AxiosGetHelper(
-      `/api/v1/containers/${containerID}/keys`,
-      cancelSignal.current
-    );
-    cancelSignal.current = controller;
-
-    request.then(response => {
-      const containerKeysResponse: ContainerKeysResponse = response.data;
+  async function loadRowData(containerID: number) {
+    try {
+      const containerKeysResponse = await fetchData<ContainerKeysResponse>(
+        `/api/v1/containers/${containerID}/keys`
+      );
+      
       expandedRowSetter({
         ...expandedRow,
         [containerID]: {
@@ -209,7 +204,7 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
           totalCount: containerKeysResponse.totalCount
         }
       });
-    }).catch(error => {
+    } catch (error) {
       expandedRowSetter({
         ...expandedRow,
         [containerID]: {
@@ -217,8 +212,8 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
           loading: false
         }
       });
-      showDataFetchError((error as AxiosError).toString());
-    });
+      showDataFetchError(error);
+    }
   }
 
   function getFilteredData(data: Container[]) {
@@ -235,9 +230,6 @@ const ContainerTable: React.FC<ContainerTableProps> = ({
   function onRowExpandClick(expanded: boolean, record: Container) {
     if (expanded) {
       loadRowData(record.containerID);
-    }
-    else {
-      cancelSignal.current && cancelSignal.current.abort();
     }
   }
 
