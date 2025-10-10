@@ -3796,6 +3796,13 @@
     <description>A timeout value of sst filtering service.
     </description>
   </property>
+  <property>
+    <name>ozone.snapshot.defrag.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE,OM</tag>
+    <description>Timeout value of a run of snapshot defragmentation service.
+    </description>
+  </property>
 
   <property>
     <name>ozone.filesystem.snapshot.enabled</name>
