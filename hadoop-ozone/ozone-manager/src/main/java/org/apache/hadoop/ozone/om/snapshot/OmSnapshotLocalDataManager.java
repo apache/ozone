@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import java.io.File;
@@ -26,8 +27,19 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.Stack;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
@@ -49,7 +61,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataManager.class);
 
   private final ObjectSerializer<OmSnapshotLocalData> snapshotLocalDataSerializer;
-  private final MutableGraph<VersionLocalDataNode> localDataGraph;
+  private final MutableGraph<LocalDataVersionNode> localDataGraph;
+  private final Map<UUID, Map<Integer, LocalDataVersionNode>> versionNodeMap;
   private final OMMetadataManager omMetadataManager;
 
   public OmSnapshotLocalDataManager(OMMetadataManager omMetadataManager) throws IOException {
@@ -63,7 +76,13 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         data.computeAndSetChecksum(yaml);
       }
     };
+    this.versionNodeMap = new HashMap<>();
     init();
+  }
+
+  @VisibleForTesting
+  Map<UUID, Map<Integer, LocalDataVersionNode>> getVersionNodeMap() {
+    return versionNodeMap;
   }
 
   /**
@@ -83,7 +102,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    * @return the path to the snapshot's local property YAML file
    */
   public String getSnapshotLocalPropertyYamlPath(SnapshotInfo snapshotInfo) {
-    Path snapshotPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotInfo);
+    return getSnapshotLocalPropertyYamlPath(snapshotInfo.getSnapshotId());
+  }
+
+  public String getSnapshotLocalPropertyYamlPath(UUID snapshotId) {
+    Path snapshotPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId);
     return getSnapshotLocalPropertyYamlPath(snapshotPath);
   }
 
@@ -102,25 +125,101 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   public OmSnapshotLocalData getOmSnapshotLocalData(SnapshotInfo snapshotInfo) throws IOException {
-    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(snapshotInfo));
-    return snapshotLocalDataSerializer.load(snapshotLocalDataPath.toFile());
+    return getOmSnapshotLocalData(snapshotInfo.getSnapshotId());
+  }
+
+  public OmSnapshotLocalData getOmSnapshotLocalData(UUID snapshotId) throws IOException {
+    Path snapshotLocalDataPath = Paths.get(getSnapshotLocalPropertyYamlPath(snapshotId));
+    OmSnapshotLocalData snapshotLocalData = snapshotLocalDataSerializer.load(snapshotLocalDataPath.toFile());
+    if (!Objects.equals(snapshotLocalData.getSnapshotId(), snapshotId)) {
+      throw new IOException("SnapshotId in path : " + snapshotLocalDataPath + " contains snapshotLocalData " +
+          "corresponding to snapshotId " + snapshotLocalData.getSnapshotId() + ". Expected snapshotId " + snapshotId);
+    }
+    return snapshotLocalData;
   }
 
   public OmSnapshotLocalData getOmSnapshotLocalData(File snapshotDataPath) throws IOException {
     return snapshotLocalDataSerializer.load(snapshotDataPath);
   }
 
+  private LocalDataVersionNode getVersionNode(UUID snapshotId, int version) {
+    return versionNodeMap.getOrDefault(snapshotId, Collections.emptyMap()).get(version);
+  }
+
+  private void addVersionNode(LocalDataVersionNode versionNode) throws IOException {
+    if (getVersionNode(versionNode.snapshotId, versionNode.version) == null) {
+      LocalDataVersionNode previousVersionNode = versionNode.previousSnapshotId == null ? null :
+          getVersionNode(versionNode.previousSnapshotId, versionNode.previousSnapshotVersion);
+      if (versionNode.previousSnapshotId != null && previousVersionNode == null) {
+        throw new IOException("Unable to add " + versionNode + " since previous snapshot with version hasn't been " +
+            "loaded");
+      }
+      localDataGraph.addNode(versionNode);
+      if (previousVersionNode != null) {
+        localDataGraph.putEdge(versionNode, previousVersionNode);
+      }
+      versionNodeMap.computeIfAbsent(versionNode.snapshotId, k -> new HashMap<>())
+          .put(versionNode.version, versionNode);
+    }
+  }
+
+  private List<LocalDataVersionNode> getVersionNodes(OmSnapshotLocalData snapshotLocalData) throws IOException {
+    UUID snapshotId = snapshotLocalData.getSnapshotId();
+    UUID previousSnapshotId = snapshotLocalData.getPreviousSnapshotId();
+    return snapshotLocalData.getVersionSstFileInfos().entrySet().stream()
+        .map(entry -> new LocalDataVersionNode(snapshotId, entry.getKey(),
+            previousSnapshotId, entry.getValue().getPreviousSnapshotVersion())).collect(Collectors.toList());
+  }
+
+  public void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
+    if (versionNodeMap.containsKey(snapshotLocalData.getSnapshotId())) {
+      return;
+    }
+    Set<UUID> visitedSnapshotIds = new HashSet<>();
+    Stack<Triple<UUID, UUID, List<LocalDataVersionNode>>> stack = new Stack<>();
+    stack.push(Triple.of(snapshotLocalData.getSnapshotId(), snapshotLocalData.getPreviousSnapshotId(),
+        getVersionNodes(snapshotLocalData)));
+    while (!stack.isEmpty()) {
+      Triple<UUID, UUID, List<LocalDataVersionNode>> versionNodeToProcess = stack.peek();
+      UUID snapId = versionNodeToProcess.getLeft();
+      UUID prevSnapId = versionNodeToProcess.getMiddle();
+      List<LocalDataVersionNode> versionNodes = versionNodeToProcess.getRight();
+      if (visitedSnapshotIds.contains(snapId)) {
+        for (LocalDataVersionNode versionNode : versionNodes) {
+          addVersionNode(versionNode);
+        }
+        stack.pop();
+      } else {
+        if (prevSnapId != null && !versionNodeMap.containsKey(prevSnapId)) {
+          OmSnapshotLocalData prevSnapshotLocalData = getOmSnapshotLocalData(prevSnapId);
+          stack.push(Triple.of(prevSnapshotLocalData.getSnapshotId(), prevSnapshotLocalData.getPreviousSnapshotId(),
+              getVersionNodes(prevSnapshotLocalData)));
+        }
+        visitedSnapshotIds.add(snapId);
+      }
+    }
+  }
+
   private void init() throws IOException {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
     File snapshotDir = new File(store.getSnapshotsParentDir());
-    File[] yamlFiles = snapshotDir.listFiles(
+    File[] localDataFiles = snapshotDir.listFiles(
         (dir, name) -> name.startsWith(checkpointPrefix) && name.endsWith(YAML_FILE_EXTENSION));
-    if (yamlFiles == null) {
+    if (localDataFiles == null) {
       throw new IOException("Error while listing yaml files inside directory: " + snapshotDir.getAbsolutePath());
     }
-    for (File yamlFile : yamlFiles) {
-      System.out.println(yamlFile.getAbsolutePath());
+    Arrays.sort(localDataFiles, Comparator.comparing(File::getName));
+    for (File localDataFile : localDataFiles) {
+      OmSnapshotLocalData snapshotLocalData = snapshotLocalDataSerializer.load(localDataFile);
+      File file = new File(getSnapshotLocalPropertyYamlPath(snapshotLocalData.getSnapshotId()));
+      String expectedPath = file.getAbsolutePath();
+      String actualPath = localDataFile.getAbsolutePath();
+      if (!expectedPath.equals(actualPath)) {
+        throw new IOException("Unexpected path for local data file with snapshotId:" + snapshotLocalData.getSnapshotId()
+            + " : " + actualPath + ". " + "Expected: " + expectedPath);
+      }
+      addVersionNodeWithDependents(snapshotLocalData);
     }
   }
 
@@ -135,13 +234,13 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  private static final class VersionLocalDataNode {
+  static final class LocalDataVersionNode {
     private UUID snapshotId;
     private int version;
     private UUID previousSnapshotId;
     private int previousSnapshotVersion;
 
-    private VersionLocalDataNode(UUID snapshotId, int version, UUID previousSnapshotId, int previousSnapshotVersion) {
+    private LocalDataVersionNode(UUID snapshotId, int version, UUID previousSnapshotId, int previousSnapshotVersion) {
       this.previousSnapshotId = previousSnapshotId;
       this.previousSnapshotVersion = previousSnapshotVersion;
       this.snapshotId = snapshotId;
@@ -150,11 +249,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
     @Override
     public boolean equals(Object o) {
-      if (!(o instanceof VersionLocalDataNode)) {
+      if (!(o instanceof LocalDataVersionNode)) {
         return false;
       }
 
-      VersionLocalDataNode that = (VersionLocalDataNode) o;
+      LocalDataVersionNode that = (LocalDataVersionNode) o;
       return version == that.version && previousSnapshotVersion == that.previousSnapshotVersion &&
           snapshotId.equals(that.snapshotId) && Objects.equals(previousSnapshotId, that.previousSnapshotId);
     }
@@ -164,5 +263,4 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return Objects.hash(snapshotId, version, previousSnapshotId, previousSnapshotVersion);
     }
   }
-
 }
