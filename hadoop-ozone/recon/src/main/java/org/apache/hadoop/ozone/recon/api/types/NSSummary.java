@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
 
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 
@@ -44,7 +44,7 @@ public class NSSummary {
 
   public NSSummary() {
     this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
-        new HashSet<>(), "", 0);
+        new LinkedHashSet<>(), "", 0);
   }
 
   public NSSummary(int numOfFiles,
