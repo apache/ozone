@@ -19,6 +19,12 @@
     <Package name="org.apache.hadoop.hdds.protocol.proto"/>
   </Match>
   <Match>
+    <Package name="org.apache.hadoop.ipc_"/>
+  </Match>
+  <Match>
+    <Package name="org.apache.hadoop.security_"/>
+  </Match>
+  <Match>
     <Class name="org.apache.hadoop.ozone.OzoneConsts"/>
     <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME" />
   </Match>
