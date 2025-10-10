@@ -120,6 +120,23 @@ public abstract class Handler {
     icrSender.send(container);
   }
 
+  /**
+   * This should be called when there is no state change.
+   * ICR will be deferred to next heartbeat.
+   *
+   * @param container Container for which deferred ICR has to be sent
+   */
+  protected void sendDeferredICR(final Container container)
+      throws StorageContainerException {
+    if (container
+        .getContainerState() == ContainerProtos.ContainerDataProto
+        .State.RECOVERING) {
+      // Ignoring the recovering containers reports for now.
+      return;
+    }
+    icrSender.sendDeferred(container);
+  }
+
   public abstract ContainerCommandResponseProto handle(
       ContainerCommandRequestProto msg, Container container,
       DispatcherContext dispatcherContext);
