@@ -503,6 +503,7 @@ public class KeyManagerImpl implements KeyManager {
    *
    * @return SnapshotDefragService instance, or null if not initialized
    */
+  @Override
   public SnapshotDefragService getSnapshotDefragService() {
     return snapshotDefragService;
   }
