@@ -68,9 +68,6 @@ public class SnapshotDefragService extends BackgroundService
   // Use only a single thread for snapshot defragmentation to avoid conflicts
   private static final int DEFRAG_CORE_POOL_SIZE = 1;
 
-  private static final String CHECKPOINT_STATE_DEFRAGGED_DIR = OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR;
-  private static final String TEMP_DIFF_DIR = "tempDiffSstFiles";  // TODO: Put this in OzoneConsts?
-
   private final OzoneManager ozoneManager;
   private SnapshotChainManager snapshotChainManager;
   private final AtomicLong runCount = new AtomicLong(0);
