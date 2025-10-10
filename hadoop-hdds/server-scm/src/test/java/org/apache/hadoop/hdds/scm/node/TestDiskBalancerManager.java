@@ -65,6 +65,12 @@ public class TestDiskBalancerManager {
 
   @Test
   public void testDatanodeDiskBalancerReport() throws IOException {
+    // Populate disk balancer reports for all datanodes to avoid Double.NaN comparison issues.
+    for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+      diskBalancerReportHandler.onMessage(
+          new DiskBalancerReportFromDatanode(dn, generateRandomReport()), null);
+    }
+
     List<HddsProtos.DatanodeDiskBalancerInfoProto> reportProtoList =
         diskBalancerManager.getDiskBalancerReport(2,
             ClientVersion.CURRENT_VERSION);
@@ -117,6 +123,7 @@ public class TestDiskBalancerManager {
     return DiskBalancerReportProto.newBuilder()
         .setIsRunning(random.nextBoolean())
         .setBalancedBytes(random.nextInt(10000))
+        .setVolumeDataDensity(random.nextDouble())
         .setDiskBalancerConf(
             HddsProtos.DiskBalancerConfigurationProto.newBuilder()
                 .setThreshold(random.nextInt(99))

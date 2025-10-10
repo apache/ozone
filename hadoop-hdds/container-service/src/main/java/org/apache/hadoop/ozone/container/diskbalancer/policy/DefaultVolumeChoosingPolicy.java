@@ -17,16 +17,17 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,12 +53,19 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
       double threshold, Map<HddsVolume, Long> deltaMap, long containerSize) {
     lock.lock();
     try {
-      double idealUsage = volumeSet.getIdealUsage();
+      // Create truly immutable snapshot of volumes to ensure consistency
+      ImmutableList<HddsVolume> allVolumes = DiskBalancerVolumeCalculation.getImmutableVolumeSet(volumeSet);
+
+      if (allVolumes.size() < 2) {
+        return null; // Can't balance with less than 2 volumes.
+      }
+      
+      // Calculate ideal usage using the same immutable volume
+      double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(allVolumes);
 
       // Threshold is given as a percentage
       double normalizedThreshold = threshold / 100;
-      List<HddsVolume> volumes = StorageVolumeUtil
-          .getHddsVolumesList(volumeSet.getVolumesList())
+      List<HddsVolume> volumes = allVolumes
           .stream()
           .filter(volume -> {
             SpaceUsageSource usage = volume.getCurrentUsage();

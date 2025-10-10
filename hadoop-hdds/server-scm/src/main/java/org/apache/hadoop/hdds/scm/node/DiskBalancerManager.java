@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAM
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +33,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -84,10 +82,9 @@ public class DiskBalancerManager {
 
     for (DatanodeDetails datanodeDetails: nodeManager.getNodes(IN_SERVICE,
         HddsProtos.NodeState.HEALTHY)) {
-      double volumeDensitySum =
-          getVolumeDataDensitySumForDatanodeDetails(datanodeDetails);
+      DiskBalancerStatus status = getStatus(datanodeDetails);
       reportList.add(HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
-          .setCurrentVolumeDensitySum(volumeDensitySum)
+          .setCurrentVolumeDensitySum(status.getVolumeDataDensity())
           .setNode(datanodeDetails.toProto(clientVersion))
           .build());
     }
@@ -267,14 +264,12 @@ public class DiskBalancerManager {
 
   private HddsProtos.DatanodeDiskBalancerInfoProto getInfoProto(
       DatanodeInfo dn, int clientVersion) {
-    double volumeDensitySum =
-        getVolumeDataDensitySumForDatanodeDetails(dn);
     DiskBalancerStatus status = getStatus(dn);
 
     HddsProtos.DatanodeDiskBalancerInfoProto.Builder builder =
         HddsProtos.DatanodeDiskBalancerInfoProto.newBuilder()
             .setNode(dn.toProto(clientVersion))
-            .setCurrentVolumeDensitySum(volumeDensitySum)
+            .setCurrentVolumeDensitySum(status.getVolumeDataDensity())
             .setRunningStatus(status.getRunningStatus())
             .setSuccessMoveCount(status.getSuccessMoveCount())
             .setFailureMoveCount(status.getFailureMoveCount())
@@ -287,45 +282,16 @@ public class DiskBalancerManager {
     return builder.build();
   }
 
-  /**
-   * Get volume density for a specific DatanodeDetails node.
-   *
-   * @param datanodeDetails DatanodeDetails
-   * @return DiskBalancer report.
-   */
-  private double getVolumeDataDensitySumForDatanodeDetails(
-      DatanodeDetails datanodeDetails) {
-    Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
-
-    DatanodeInfo datanodeInfo = (DatanodeInfo) datanodeDetails;
-
-    double totalCapacity = 0d, totalFree = 0d;
-    for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-      totalCapacity += reportProto.getCapacity();
-      totalFree += reportProto.getRemaining();
-    }
-
-    Preconditions.checkArgument(totalCapacity != 0);
-    double idealUsage = (totalCapacity - totalFree) / totalCapacity;
-
-    double volumeDensitySum = datanodeInfo.getStorageReports().stream()
-        .map(report ->
-            Math.abs(((double) (report.getCapacity() - report.getRemaining())) / report.getCapacity()
-                - idealUsage))
-        .mapToDouble(Double::valueOf).sum();
-
-    return volumeDensitySum;
-  }
-
   public DiskBalancerStatus getStatus(DatanodeDetails datanodeDetails) {
     return statusMap.computeIfAbsent(datanodeDetails,
-        dn -> new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN, new DiskBalancerConfiguration(), 0, 0, 0, 0));
+        dn -> new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN, new DiskBalancerConfiguration(),
+            0, 0, 0, 0, Double.NaN));
   }
 
   @VisibleForTesting
   public void addRunningDatanode(DatanodeDetails datanodeDetails) {
     statusMap.put(datanodeDetails, new DiskBalancerStatus(DiskBalancerRunningStatus.RUNNING,
-        new DiskBalancerConfiguration(), 0, 0, 0, 0));
+        new DiskBalancerConfiguration(), 0, 0, 0, 0, 0.0));
   }
 
   public void processDiskBalancerReport(DiskBalancerReportProto reportProto,
@@ -340,9 +306,12 @@ public class DiskBalancerManager {
     long failureMoveCount = reportProto.getFailureMoveCount();
     long bytesToMove = reportProto.getBytesToMove();
     long balancedBytes = reportProto.getBalancedBytes();
+    double volumeDataDensity = reportProto.getVolumeDataDensity();
+
     statusMap.put(dn, new DiskBalancerStatus(
         isRunning ? DiskBalancerRunningStatus.RUNNING : DiskBalancerRunningStatus.STOPPED,
-        diskBalancerConfiguration, successMoveCount, failureMoveCount, bytesToMove, balancedBytes));
+        diskBalancerConfiguration, successMoveCount, failureMoveCount, bytesToMove, balancedBytes,
+        volumeDataDensity));
     if (reportProto.hasBalancedBytes() && balancedBytesMap != null) {
       balancedBytesMap.put(dn, reportProto.getBalancedBytes());
     }
@@ -353,7 +322,7 @@ public class DiskBalancerManager {
     if (currentStatus != null &&
         currentStatus.getRunningStatus() != DiskBalancerRunningStatus.UNKNOWN) {
       DiskBalancerStatus unknownStatus = new DiskBalancerStatus(DiskBalancerRunningStatus.UNKNOWN,
-          new DiskBalancerConfiguration(), 0, 0, 0, 0);
+          new DiskBalancerConfiguration(), 0, 0, 0, 0, Double.NaN);
       statusMap.put(dn, unknownStatus);
     }
   }
