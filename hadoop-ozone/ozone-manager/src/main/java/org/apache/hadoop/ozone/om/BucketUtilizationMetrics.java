@@ -76,7 +76,7 @@ public class BucketUtilizationMetrics implements MetricsSource {
       if (quotaInBytes == -1) {
         availableSpace = quotaInBytes;
       } else {
-        availableSpace = Math.max(bucketInfo.getQuotaInBytes() - bucketInfo.getUsedBytes(), 0);
+        availableSpace = Math.max(bucketInfo.getQuotaInBytes() - bucketInfo.getTotalBucketSpace(), 0);
       }
 
       collector.addRecord(SOURCE)

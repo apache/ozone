@@ -317,7 +317,6 @@ class TestKeyDeletingService extends OzoneTestBase {
       bucketInfo = writeClient.getBucketInfo(volumeName, bucketName1);
       assertEquals(key1Size + key3Size, bucketInfo.getSnapshotUsedBytes());
       assertEquals(2, bucketInfo.getSnapshotUsedNamespace());
-      writeClient.getBucketInfo(volumeName, bucketName1);
       keyDeletingService.resume();
       // Run KeyDeletingService
       GenericTestUtils.waitFor(
