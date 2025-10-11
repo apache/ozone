@@ -94,6 +94,7 @@ services:
       - ./krb5.conf:/etc/krb5.conf
     ports:
       - 9878:9878
+      - 19878:19878
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","s3g", "-Dozone.om.transport.class=${OZONE_S3_OM_TRANSPORT:-org.apache.hadoop.ozone.om.protocolPB.GrpcOmTransportFactory}"]

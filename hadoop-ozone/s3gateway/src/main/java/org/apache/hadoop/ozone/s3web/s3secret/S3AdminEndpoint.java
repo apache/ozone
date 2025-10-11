@@ -15,28 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3secret;
+package org.apache.hadoop.ozone.s3web.s3secret;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import javax.ws.rs.NameBinding;
 
 /**
- * This class contains constants for configuration keys used
- * in S3 secret endpoint.
+ * Annotation to only allow admin users to access the endpoint.
  */
-public final class S3SecretConfigKeys {
-  public static final String OZONE_S3G_SECRET_HTTP_ENABLED_KEY =
-      "ozone.s3g.secret.http.enabled";
-  public static final boolean OZONE_S3G_SECRET_HTTP_ENABLED_KEY_DEFAULT =
-      false;
-  public static final String OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX =
-      "ozone.s3g.secret.http.auth.";
-  public static final String OZONE_S3G_SECRET_HTTP_AUTH_TYPE_KEY =
-      OZONE_S3G_SECRET_HTTP_AUTH_CONFIG_PREFIX + "type";
-  public static final String OZONE_S3G_SECRET_HTTP_AUTH_TYPE_DEFAULT =
-      "kerberos";
-
-  /**
-   * Never constructed.
-   */
-  private S3SecretConfigKeys() {
-
-  }
+@NameBinding
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface S3AdminEndpoint {
 }
