@@ -165,7 +165,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     checkKeyDeepList("a1/b2", "a1", expectedKeys, fsoOzoneBucket);
 
     // case-2: Same prefixKey and startKey, but with an ending slash
-    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/", legacyOzoneBucket, true);
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/", legacyOzoneBucket, false);
     /**
      * a1/b2/d1/
      * a1/b2/d1/d11.tx
