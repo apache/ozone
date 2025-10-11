@@ -129,7 +129,6 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     OmConfig omConfig = cluster().getOzoneManager().getConfig();
     omConfig.setFileSystemPathEnabled(originalFileSystemPathEnabled);
     omConfig.setMaxListSize(originalMaxListSize);
-    cluster().close();
   }
 
   private void initFSNameSpace() throws Exception {
