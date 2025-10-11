@@ -257,6 +257,15 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     if (considerUnhealthy) {
       result += " +considerUnhealthy";
     }
+
+    if (isUnderReplicated()) {
+      result += " [UNDER_REPLICATED: need " + additionalReplicaNeeded() + " more]";
+    } else if (isOverReplicated()) {
+      result += " [OVER_REPLICATED: excess " + getExcessRedundancy(true) + " replica(s)]";
+    } else {
+      result += " [HEALTHY_REPLICATION]";
+    }
+    
     return result;
   }
 
