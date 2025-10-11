@@ -215,8 +215,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     }
 
     boolean shouldContinue = true;
-
-    Map<String, String> hardLinkFileMap = new HashMap<>();
     try (ArchiveOutputStream<TarArchiveEntry> archiveOutputStream = tar(destination)) {
       if (includeSnapshotData) {
         // Process each snapshot db path and write it to archive
@@ -225,18 +223,18 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             break;
           }
           shouldContinue = writeDBToArchive(sstFilesToExclude, snapshotDbPath,
-              maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, true);
+              maxTotalSstSize, archiveOutputStream, tmpdir, null, true);
         }
 
 
         if (shouldContinue) {
           shouldContinue = writeDBToArchive(sstFilesToExclude, getSstBackupDir(),
-              maxTotalSstSize, archiveOutputStream,  tmpdir, hardLinkFileMap, true);
+              maxTotalSstSize, archiveOutputStream,  tmpdir, null, true);
         }
 
         if (shouldContinue) {
           shouldContinue = writeDBToArchive(sstFilesToExclude, getCompactionLogDir(),
-              maxTotalSstSize, archiveOutputStream,  tmpdir, hardLinkFileMap, true);
+              maxTotalSstSize, archiveOutputStream,  tmpdir, null, true);
         }
       }
 
@@ -247,6 +245,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         // unlimited files as we want the Active DB contents to be transferred in a single batch
         maxTotalSstSize.set(Long.MAX_VALUE);
         Path checkpointDir = checkpoint.getCheckpointLocation();
+        Map<String, String> hardLinkFileMap = new HashMap<>();
         writeDBToArchive(sstFilesToExclude, checkpointDir,
             maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap, false);
         if (includeSnapshotData) {
@@ -443,7 +442,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           if (path.contains(OM_CHECKPOINT_DIR)) {
             path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
           }
-          hardLinkFileMap.put(path, fileId);
+          if (hardLinkFileMap != null) {
+            hardLinkFileMap.put(path, fileId);
+          }
           if (!sstFilesToExclude.contains(fileId)) {
             long fileSize = Files.size(dbFile);
             if (maxTotalSstSize.get() - fileSize <= 0) {
