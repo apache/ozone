@@ -167,8 +167,8 @@ public class TestRatisReplicationCheckHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 0, 0, 0);
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(new ContainerReplicaOp(
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container)
         .setPendingOps(pending);
@@ -192,8 +192,8 @@ public class TestRatisReplicationCheckHandler {
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), 0, 0);
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
     requestBuilder.setContainerReplicas(replicas)
         .setPendingOps(pending)
         .setContainerInfo(container);
@@ -275,8 +275,8 @@ public class TestRatisReplicationCheckHandler {
         Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
         Pair.of(DECOMMISSIONED, 0));
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setPendingOps(pending)
@@ -303,8 +303,8 @@ public class TestRatisReplicationCheckHandler {
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 0), Pair.of(DECOMMISSIONED, 0));
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setPendingOps(pending)
@@ -453,10 +453,10 @@ public class TestRatisReplicationCheckHandler {
         Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
-    pending.add(ContainerReplicaOp.create(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(new ContainerReplicaOp(
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setPendingOps(pending)
@@ -667,8 +667,8 @@ public class TestRatisReplicationCheckHandler {
         Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(new ContainerReplicaOp(
+        DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setPendingOps(pending)
@@ -825,10 +825,10 @@ public class TestRatisReplicationCheckHandler {
         = createReplicas(container.containerID(), 0, 0);
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container)
@@ -896,10 +896,10 @@ public class TestRatisReplicationCheckHandler {
         = createReplicas(container.containerID(), 0, 0, 0);
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container)

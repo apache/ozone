@@ -621,7 +621,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                                 DatanodeDetails target, int replicaIndex) {
     replicaCount.addPendingOp(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.ADD, target, replicaIndex, null,
-        Long.MAX_VALUE));
+        Long.MAX_VALUE, 0));
   }
 
   static ByteString integers2ByteString(List<Integer> src) {

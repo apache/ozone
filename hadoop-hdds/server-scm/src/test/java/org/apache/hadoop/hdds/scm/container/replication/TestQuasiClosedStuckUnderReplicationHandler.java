@@ -132,8 +132,8 @@ public class TestQuasiClosedStuckUnderReplicationHandler {
         Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE),
         Pair.of(origin, HddsProtos.NodeOperationalState.IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
-    pendingOps.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pendingOps.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, MockDatanodeDetails.randomDatanodeDetails(), 0, null, Long.MAX_VALUE, 0));
 
     int count = handler.processAndSendCommands(replicas, pendingOps, getUnderReplicatedHealthResult(), 1);
     assertEquals(0, count);

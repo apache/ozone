@@ -138,7 +138,7 @@ public class TestIncrementalContainerReportHandler {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())))
+            Clock.system(ZoneId.systemDefault()), null))
         .build();
 
     this.publisher = mock(EventPublisher.class);

@@ -64,14 +64,17 @@ public class ContainerReplicaPendingOps {
   private final ConcurrentHashMap<DatanodeID, SizeAndTime> containerSizeScheduled = new ConcurrentHashMap<>();
   private ReplicationManager.ReplicationManagerConfiguration rmConf;
 
-  public ContainerReplicaPendingOps(Clock clock) {
-    this.clock = clock;
-    resetCounters();
-  }
-
+  /**
+   * Creates a ContainerReplicaPendingOps with all parameters.
+   * This is the single constructor that should be used for all cases.
+   *
+   * @param clock the clock to use for timing operations
+   * @param rmConf the replication manager configuration (can be null)
+   */
   public ContainerReplicaPendingOps(Clock clock, ReplicationManager.ReplicationManagerConfiguration rmConf) {
-    this(clock);
+    this.clock = clock;
     this.rmConf = rmConf;
+    resetCounters();
   }
 
   /**
