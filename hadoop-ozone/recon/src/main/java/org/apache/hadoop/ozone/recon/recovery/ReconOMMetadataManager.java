@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,11 +20,14 @@ package org.apache.hadoop.ozone.recon.recovery;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 
 /**
  * Interface for the OM Metadata Manager + DB store maintained by
@@ -36,9 +38,11 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
   /**
    * Refresh the DB instance to point to a new location. Get rid of the old
    * DB instance.
-   * @param dbLocation New location of the OM Snapshot DB.
+   *
+   * @param dbLocation      New location of the OM Snapshot DB.
+   * @param addCacheMetrics
    */
-  void updateOmDB(File dbLocation) throws IOException;
+  void updateOmDB(File dbLocation, boolean addCacheMetrics) throws IOException;
 
   /**
    * Get the most recent sequence number from the Ozone Manager Metadata
@@ -109,8 +113,27 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
 
   /**
    * Return the OzoneConfiguration instance used by Recon.
-   * @return
+   * @return OzoneConfiguration
    */
   OzoneConfiguration getOzoneConfiguration();
+
+  /**
+   * A lighter weight version of the getKeyTable method that only returns the ReconBasicOmKeyInfo wrapper object. This
+   * avoids creating a full OMKeyInfo object for each key if it is not needed.
+   * @param bucketLayout The Bucket layout to use for the key table.
+   * @return A table of keys and their metadata.
+   * @throws IOException
+   */
+  Table<String, ReconBasicOmKeyInfo> getKeyTableBasic(BucketLayout bucketLayout) throws IOException;
+
+  /**
+   * Create a ReconOMMetadataManager instance given an OM DB checkpoint.
+   * @param conf - OzoneConfiguration
+   * @param checkpoint - DBCheckpoint
+   * @return ReconOMMetadataManager instance
+   * @throws IOException
+   */
+  ReconOMMetadataManager createCheckpointReconMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException;
 
 }

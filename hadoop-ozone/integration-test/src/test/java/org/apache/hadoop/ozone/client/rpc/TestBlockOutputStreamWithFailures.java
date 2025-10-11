@@ -1,35 +1,21 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.XceiverClientRatis;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.io.KeyOutputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.ozone.test.tag.Flaky;
+package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.hdds.scm.client.HddsClientUtils.checkForException;
 import static org.apache.hadoop.ozone.client.rpc.TestBlockOutputStream.BLOCK_SIZE;
@@ -49,40 +35,67 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientRatis;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
+import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
+@Flaky("HDDS-11849")
 class TestBlockOutputStreamWithFailures {
 
   private MiniOzoneCluster cluster;
 
-  @BeforeEach
+  @BeforeAll
   void init() throws Exception {
-    cluster = createCluster();
+    cluster = createCluster(25);
   }
 
-  @AfterEach
+  @AfterAll
   void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
+  private static Stream<Arguments> clientParameters() {
+    return Stream.of(
+        Arguments.of(true, true),
+        Arguments.of(true, false),
+        Arguments.of(false, true),
+        Arguments.of(false, false)
+    );
+  }
+
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testContainerClose(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testContainerClose(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       testWatchForCommitWithCloseContainerException(client);
       testWatchForCommitWithSingleNodeRatis(client);
@@ -96,7 +109,7 @@ class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(client, keyName);
     int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -174,15 +187,14 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  @Flaky("HDDS-6113")
-  void testWatchForCommitDatanodeFailure(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testWatchForCommitDatanodeFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes at least putBlock for first flushSize worth of data
@@ -234,7 +246,7 @@ class TestBlockOutputStreamWithFailures {
           (XceiverClientRatis) blockOutputStream.getXceiverClient();
       assertEquals(3, raftClient.getCommitInfoMap().size());
       Pipeline pipeline = raftClient.getPipeline();
-      cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
+      stopAndRemove(pipeline.getNodes().get(0));
 
       // again write data with more than max buffer limit. This will call
       // watchForCommit again. Since the commit will happen 2 way, the
@@ -259,14 +271,14 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void test2DatanodesFailure(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void test2DatanodesFailure(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key = createKey(client, keyName);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes atleast putBlock for first flushSize worth of data
@@ -316,8 +328,8 @@ class TestBlockOutputStreamWithFailures {
           (XceiverClientRatis) blockOutputStream.getXceiverClient();
       assertEquals(3, raftClient.getCommitInfoMap().size());
       Pipeline pipeline = raftClient.getPipeline();
-      cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
-      cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
+      stopAndRemove(pipeline.getNodes().get(0));
+      stopAndRemove(pipeline.getNodes().get(1));
       // again write data with more than max buffer limit. This will call
       // watchForCommit again. Since the commit will happen 2 way, the
       // commitInfoMap will get updated for servers which are alive
@@ -362,7 +374,7 @@ class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(client, keyName);
     int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -373,7 +385,8 @@ class TestBlockOutputStreamWithFailures {
         assertInstanceOf(RatisBlockOutputStream.class,
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(400, blockOutputStream.getTotalDataFlushedLength());
@@ -418,7 +431,7 @@ class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(client, keyName);
     int dataLength = 167;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -429,7 +442,8 @@ class TestBlockOutputStreamWithFailures {
         assertInstanceOf(RatisBlockOutputStream.class,
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
-    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(2);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
@@ -442,7 +456,8 @@ class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(2);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
@@ -481,7 +496,7 @@ class TestBlockOutputStreamWithFailures {
     OzoneOutputStream key =
         createKey(client, keyName, 0, ReplicationFactor.ONE);
     int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-    byte[] data1 = RandomUtils.nextBytes(dataLength);
+    byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
     key.write(data1);
 
     KeyOutputStream keyOutputStream =
@@ -493,9 +508,10 @@ class TestBlockOutputStreamWithFailures {
             keyOutputStream.getStreamEntries().get(0).getOutputStream());
 
     // we have just written data more than flush Size(2 chunks), at this time
-    // buffer pool will have 4 buffers allocated worth of chunk size
+    // buffer pool will have up to 4 buffers allocated worth of chunk size
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     // writtenDataLength as well flushedDataLength will be updated here
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
@@ -518,7 +534,8 @@ class TestBlockOutputStreamWithFailures {
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
 
-    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertThat(blockOutputStream.getBufferPool().getSize())
+        .isLessThanOrEqualTo(4);
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
@@ -560,16 +577,15 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  @Flaky("HDDS-6113")
-  void testDatanodeFailureWithSingleNode(boolean flushDelay) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+  @MethodSource("clientParameters")
+  void testDatanodeFailureWithSingleNode(boolean flushDelay, boolean enablePiggybacking) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key =
           createKey(client, keyName, 0, ReplicationFactor.ONE);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes at least putBlock for first flushSize worth of data
@@ -650,17 +666,17 @@ class TestBlockOutputStreamWithFailures {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testDatanodeFailureWithPreAllocation(boolean flushDelay)
+  @MethodSource("clientParameters")
+  void testDatanodeFailureWithPreAllocation(boolean flushDelay, boolean enablePiggybacking)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, enablePiggybacking);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       OzoneOutputStream key =
           createKey(client, keyName, 3 * BLOCK_SIZE,
               ReplicationFactor.ONE);
       int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
-      byte[] data1 = RandomUtils.nextBytes(dataLength);
+      byte[] data1 = RandomUtils.secure().randomBytes(dataLength);
       key.write(data1);
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes at least putBlock for first flushSize worth of data
@@ -741,6 +757,12 @@ class TestBlockOutputStreamWithFailures {
       byte[] bytes = ArrayUtils.addAll(data1, data1);
       validateData(keyName, bytes, client.getObjectStore(), VOLUME, BUCKET);
     }
+  }
+
+  private void stopAndRemove(DatanodeDetails dn) throws IOException {
+    HddsDatanodeService datanode = cluster.getHddsDatanodes().remove(cluster.getHddsDatanodeIndex(dn));
+    datanode.stop();
+    datanode.join();
   }
 
 }

@@ -1,25 +1,32 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+
 import com.google.common.base.CaseFormat;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -32,13 +39,6 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
-
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 
 /**
  * Class contains metrics related to ReplicationManager.
@@ -66,7 +66,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "InflightDeletionSkipped",
       "Tracked inflight container deletion requests skipped" +
           " due to the configured limit.");
-
 
   private static final MetricsInfo INFLIGHT_MOVE = Interns.info(
       "InflightMove",
@@ -163,8 +162,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   private final ReplicationManager replicationManager;
 
-  private final boolean legacyReplicationManager;
-
   //EC Metrics
   @Metric("Number of EC Replication commands sent.")
   private MutableCounterLong ecReplicationCmdsSentTotal;
@@ -227,11 +224,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       + "to the pending commands on all source datanodes")
   private MutableCounterLong replicateContainerCmdsDeferredTotal;
 
-
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.replicationManager = manager;
-    legacyReplicationManager = replicationManager.getConfig().isLegacyEnabled();
   }
 
   public static ReplicationManagerMetrics create(ReplicationManager manager) {
@@ -254,24 +249,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
         .addGauge(INFLIGHT_EC_REPLICATION, getEcReplication())
         .addGauge(INFLIGHT_EC_DELETION, getEcDeletion());
 
-    if (legacyReplicationManager) {
-      // For non-legacy RM, we don't need to expose these metrics as the timeout
-      // metrics below replace them.
-      builder
-          .addGauge(INFLIGHT_REPLICATION_SKIPPED,
-              getInflightReplicationSkipped())
-          .addGauge(INFLIGHT_DELETION_SKIPPED, getInflightDeletionSkipped())
-          // If not using Legacy RM, move manager should expose its own metrics
-          // and therefore we don't need IN_FLIGHT_MOVE here.
-          .addGauge(INFLIGHT_MOVE, getInflightMove());
-    }
-    if (!legacyReplicationManager) {
-      builder
-          .addGauge(UNDER_REPLICATED_QUEUE,
-              replicationManager.getQueue().underReplicatedQueueSize())
+    builder.addGauge(UNDER_REPLICATED_QUEUE,
+                    replicationManager.getQueue().underReplicatedQueueSize())
           .addGauge(OVER_REPLICATED_QUEUE,
               replicationManager.getQueue().overReplicatedQueueSize());
-    }
 
     ReplicationManagerReport report = replicationManager.getContainerReport();
     for (Map.Entry<HddsProtos.LifeCycleState, MetricsInfo> e :
@@ -289,15 +270,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     deletionCmdsSentTotal.snapshot(builder, all);
     replicasDeletedTotal.snapshot(builder, all);
     replicaDeleteTimeoutTotal.snapshot(builder, all);
-    if (legacyReplicationManager) {
-      // As things stand, the new RM does not track bytes sent / completed
-      replicationBytesTotal.snapshot(builder, all);
-      replicationBytesCompletedTotal.snapshot(builder, all);
-      deletionBytesTotal.snapshot(builder, all);
-      deletionBytesCompletedTotal.snapshot(builder, all);
-      replicationTime.snapshot(builder, all);
-      deletionTime.snapshot(builder, all);
-    }
     ecReplicationCmdsSentTotal.snapshot(builder, all);
     ecDeletionCmdsSentTotal.snapshot(builder, all);
     ecReplicasCreatedTotal.snapshot(builder, all);
@@ -385,14 +357,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public long getInflightReplication() {
-    if (legacyReplicationManager) {
-      return replicationManager.getLegacyReplicationManager()
-          .getInflightCount(InflightType.REPLICATION);
-    } else {
-      return replicationManager.getContainerReplicaPendingOps()
+    return replicationManager.getContainerReplicaPendingOps()
           .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD,
               ReplicationType.RATIS);
-    }
   }
 
   public long getInflightReplicationSkipped() {
@@ -400,22 +367,13 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public long getInflightDeletion() {
-    if (legacyReplicationManager) {
-      return replicationManager.getLegacyReplicationManager()
-          .getInflightCount(InflightType.DELETION);
-    } else {
-      return replicationManager.getContainerReplicaPendingOps()
-          .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE,
+    return replicationManager.getContainerReplicaPendingOps()
+            .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE,
               ReplicationType.RATIS);
-    }
   }
 
   public long getInflightDeletionSkipped() {
     return this.inflightDeletionSkippedTotal.value();
-  }
-
-  public long getInflightMove() {
-    return replicationManager.getInflightMove().size();
   }
 
   public long getReplicationCmdsSentTotal() {

@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,22 +14,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.net;
+
+import static org.apache.hadoop.hdds.scm.net.NetConstants.BYTE_STRING_ROOT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 
 /**
  * A thread safe class that implements interface Node.
  */
 public class NodeImpl implements Node {
   // host:port#
-  private String name;
+  private StringWithByteString name;
   // string representation of this node's location, such as /dc1/rack1
-  private String location;
+  private StringWithByteString location;
   // location + "/" + name
   private String path;
   // which level of the tree the node resides, start from 1 for root
@@ -46,16 +47,20 @@ public class NodeImpl implements Node {
    * {@link NetConstants#PATH_SEPARATOR})
    * @param location this node's location
    */
-  public NodeImpl(String name, String location, int cost) {
-    if (name != null && name.contains(PATH_SEPARATOR_STR)) {
+  public NodeImpl(StringWithByteString name, StringWithByteString location, int cost) {
+    if (name != null && name.getString().contains(PATH_SEPARATOR_STR)) {
       throw new IllegalArgumentException(
           "Network location name:" + name + " should not contain " +
               PATH_SEPARATOR_STR);
     }
-    this.name = (name == null) ? ROOT : name;
-    this.location = NetUtils.normalize(location);
+    this.name = name == null ? BYTE_STRING_ROOT : name;
+    this.location = location;
     this.path = getPath();
     this.cost = cost;
+  }
+
+  public NodeImpl(String name, String location, int cost) {
+    this(StringWithByteString.valueOf(name), StringWithByteString.valueOf(NetUtils.normalize(location)), cost);
   }
 
   /**
@@ -75,11 +80,25 @@ public class NodeImpl implements Node {
     this.level = level;
   }
 
+  public NodeImpl(StringWithByteString name, StringWithByteString location, InnerNode parent, int level,
+      int cost) {
+    this(name, location, cost);
+    this.parent = parent;
+    this.level = level;
+  }
+
   /**
    * @return this node's name
    */
   @Override
   public String getNetworkName() {
+    return name.getString();
+  }
+
+  /**
+   * @return this node's name
+   */
+  public StringWithByteString getNetworkNameAsByteString() {
     return name;
   }
 
@@ -89,6 +108,15 @@ public class NodeImpl implements Node {
    */
   @Override
   public void setNetworkName(String networkName) {
+    this.name = StringWithByteString.valueOf(networkName);
+    this.path = getPath();
+  }
+
+  /**
+   * Set this node's name, can be hostname or Ipaddress.
+   * @param networkName it's network name
+   */
+  public void setNetworkName(StringWithByteString networkName) {
     this.name = networkName;
     this.path = getPath();
   }
@@ -98,6 +126,13 @@ public class NodeImpl implements Node {
    */
   @Override
   public String getNetworkLocation() {
+    return location.getString();
+  }
+
+  /**
+   * @return this node's network location
+   */
+  public StringWithByteString getNetworkLocationAsByteString() {
     return location;
   }
 
@@ -107,7 +142,7 @@ public class NodeImpl implements Node {
    */
   @Override
   public void setNetworkLocation(String networkLocation) {
-    this.location = networkLocation;
+    this.location = StringWithByteString.valueOf(networkLocation);
     this.path = getPath();
   }
 
@@ -213,6 +248,7 @@ public class NodeImpl implements Node {
         NetUtils.addSuffix(nodePath).startsWith(
             NetUtils.addSuffix(this.getNetworkFullPath()));
   }
+
   @Override
   public boolean isDescendant(Node node) {
     if (node == null) {
@@ -269,8 +305,8 @@ public class NodeImpl implements Node {
   }
 
   private String getPath() {
-    return this.location.equals(PATH_SEPARATOR_STR) ?
-        this.location + this.name :
+    return this.location.getString().equals(PATH_SEPARATOR_STR) ?
+        this.location + this.name.getString() :
         this.location + PATH_SEPARATOR_STR + this.name;
   }
 }

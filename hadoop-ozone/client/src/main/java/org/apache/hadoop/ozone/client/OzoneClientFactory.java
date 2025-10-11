@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,14 +17,20 @@
 
 package org.apache.hadoop.ozone.client;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
+import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.LeakDetector;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -33,11 +38,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
-
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.StringUtils;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,11 +50,20 @@ public final class OzoneClientFactory {
   private static final Logger LOG = LoggerFactory.getLogger(
       OzoneClientFactory.class);
 
+  private static final LeakDetector OZONE_CLIENT_LEAK_DETECTOR = new LeakDetector("OzoneClientObject");
+
   /**
    * Private constructor, class is not meant to be initialized.
    */
   private OzoneClientFactory() { }
 
+  public static UncheckedAutoCloseable track(AutoCloseable object) {
+    final Class<?> clazz = object.getClass();
+    final StackTraceElement[] stackTrace = HddsUtils.getStackTrace(LOG);
+    return OZONE_CLIENT_LEAK_DETECTOR.track(object,
+        () -> HddsUtils.reportLeak(clazz,
+            HddsUtils.formatStackTrace(stackTrace, 4), LOG));
+  }
 
   /**
    * Constructs and return an OzoneClient with default configuration.
@@ -170,7 +180,7 @@ public final class OzoneClientFactory {
    * Create OzoneClient for token renew/cancel operations.
    * @param conf Configuration to be used for OzoneCient creation
    * @param token ozone token is involved
-   * @return
+   * @return OzoneClient
    * @throws IOException
    */
   public static OzoneClient getOzoneClient(Configuration conf,

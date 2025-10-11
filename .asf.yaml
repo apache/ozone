@@ -12,8 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# Enable the next-gen .asf.yaml parser
+meta:
+  nextgen: true
+
 github:
-  description: "Scalable, redundant, and distributed object store for Apache Hadoop"
+  description: "Scalable, reliable, distributed storage system optimized for data analytics and object store workloads."
   homepage: https://ozone.apache.org
   labels:
     - hadoop
@@ -29,5 +34,6 @@ github:
     - RATIS
   enabled_merge_buttons:
     squash:  true
+    squash_commit_message: PR_TITLE
     merge:   false
     rebase:  false

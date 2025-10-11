@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,15 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.net;
+
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DEFAULT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.SCOPE_REVERSE_STR;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import org.apache.commons.collections.CollectionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,11 +36,10 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
-
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.SCOPE_REVERSE_STR;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DEFAULT;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The class represents a cluster of computers with a tree hierarchical
@@ -49,7 +48,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DE
  * manages traffic in/out of data centers or racks.
  */
 public class NetworkTopologyImpl implements NetworkTopology {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(NetworkTopologyImpl.class);
 
   /** The Inner node crate factory. */
@@ -789,6 +788,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
       List<N> shuffledNodes =
           new ArrayList<>(nodes.subList(0, activeLen));
       shuffleOperation.accept(shuffledNodes);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Sorted datanodes {}, result: {}", nodes, shuffledNodes);
+      }
       return shuffledNodes;
     }
     // Sort weights for the nodes array
@@ -815,6 +817,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
 
     Preconditions.checkState(ret.size() == activeLen,
         "Wrong number of nodes sorted!");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes, reader, ret);
+    }
     return ret;
   }
 
@@ -888,18 +893,18 @@ public class NetworkTopologyImpl implements NetworkTopology {
     StringBuilder tree = new StringBuilder();
     tree.append("Level: ");
     tree.append(maxLevel);
-    tree.append("\n");
+    tree.append('\n');
     netlock.readLock().lock();
     try {
       // print the number of leaves
       int numOfLeaves = clusterTree.getNumOfLeaves();
       tree.append("Number of leaves:");
       tree.append(numOfLeaves);
-      tree.append("\n");
+      tree.append('\n');
       // print all nodes
       for (int i = 0; i < numOfLeaves; i++) {
         tree.append(clusterTree.getLeaf(i).getNetworkFullPath());
-        tree.append("\n");
+        tree.append('\n');
       }
     } finally {
       netlock.readLock().unlock();

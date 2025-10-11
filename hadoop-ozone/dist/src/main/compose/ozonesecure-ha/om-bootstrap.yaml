@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
-
 x-OM-Ratis-config:
   &common-env-file
   env_file:
@@ -24,6 +22,16 @@ x-OM-Ratis-config:
 
 x-om3-setup:
   &om3-setup
+  environment:
+    WAITFOR:
+    # Skip initialising the OM, so that the container doesn't have any data.
+    ENSURE_OM_INITIALIZED:
+    OZONE_OPTS:
+  # This command produces the same behavior as sleeping indefinitely.
+  command: [ "tail","-f","/dev/null" ]
+
+x-om4-setup:
+  &om4-setup
   environment:
     WAITFOR:
     # Skip initialising the OM, so that the container doesn't have any data.
@@ -49,6 +57,8 @@ services:
     <<: *common-env-file
   om3:
     <<: [*om3-setup, *common-env-file]
+  om4:
+    <<: [*om4-setup, *common-env-file]
   httpfs:
     <<: *common-env-file
   s3g:

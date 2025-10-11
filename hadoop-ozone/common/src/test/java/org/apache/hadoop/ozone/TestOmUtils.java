@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,20 +16,6 @@
  */
 
 package org.apache.hadoop.ozone;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.nio.file.Path;
-import java.util.Set;
-import java.util.TreeSet;
 
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toSet;
@@ -41,17 +26,28 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.util.Set;
+import java.util.TreeSet;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
 /**
  * Unit tests for {@link OmUtils}.
  */
-@Timeout(60)
 public class TestOmUtils {
 
   @TempDir
@@ -221,6 +217,45 @@ public class TestOmUtils {
     InetSocketAddress addr = OmUtils.getOmAddress(conf);
     assertEquals("0.0.0.0", addr.getHostString());
     assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT, addr.getPort());
+  }
+
+  @Test
+  public void testGetListenerOMNodeIdsUnion() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    String serviceId = "om-service-test1";
+    conf.set(org.apache.hadoop.ozone.ha.ConfUtils.addKeySuffixes(
+        org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,
+        serviceId), "s1,s2");
+
+    java.util.Collection<String> result = OmUtils.getListenerOMNodeIds(conf, serviceId);
+    java.util.Set<String> expected = new java.util.HashSet<>();
+    expected.add("s1");
+    expected.add("s2");
+
+    assertEquals(expected.size(), result.size());
+    assertTrue(result.containsAll(expected));
+  }
+
+  @Test
+  public void testGetActiveNonListenerOMNodeIdsFiltering() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String serviceId = "om-service-test1";
+
+    conf.set(org.apache.hadoop.ozone.ha.ConfUtils.addKeySuffixes(
+        org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY, serviceId),
+        "n1,n2,n3");
+    conf.set(org.apache.hadoop.ozone.ha.ConfUtils.addKeySuffixes(
+        org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,
+        serviceId), "n2");
+
+    java.util.Collection<String> result = OmUtils.getActiveNonListenerOMNodeIds(conf, serviceId);
+    java.util.Set<String> expected = new java.util.HashSet<>();
+    expected.add("n1");
+    expected.add("n3");
+
+    assertEquals(expected.size(), result.size());
+    assertTrue(result.containsAll(expected));
   }
 }
 

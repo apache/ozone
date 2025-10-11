@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,24 +17,25 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
-import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.io.Text;
@@ -44,11 +44,11 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -66,7 +66,7 @@ public class TestOMDBUpdatesHandler {
 
   private OMMetadataManager omMetadataManager;
   private OMMetadataManager reconOmMetadataManager;
-  private OMDBDefinition omdbDefinition = new OMDBDefinition();
+  private final OMDBDefinition omdbDefinition = OMDBDefinition.get();
   private Random random = new Random();
 
   private OzoneConfiguration createNewTestPath(String folderName)
@@ -284,6 +284,71 @@ public class TestOMDBUpdatesHandler {
     assertNotNull(keyPut2.getOldValue());
     assertEquals("key_new2",
         ((OmKeyInfo)keyPut2.getOldValue()).getKeyName());
+  }
+
+  /**
+   * Test to verify that events with duplicate keys in different tables
+   * (FileTable and DirectoryTable) are handled correctly without causing
+   * ClassCastException or event conflicts.
+   *
+   * This test simulates creating a file, deleting the file, and then creating
+   * a directory with the same name under the same parent ID in different tables.
+   * It ensures that the events are correctly processed and stored in the
+   * `omdbLatestUpdateEvents` map without causing any type mismatches or
+   * exceptions.
+   *
+   * @throws Exception if any error occurs during the test execution.
+   */
+  @Test
+  public void testEventsHavingDuplicateRocksDBKey() throws Exception {
+    // Step 1: Create a file with the name "sameName" in the fileTable
+    OmKeyInfo fileKeyInfo = getOmKeyInfo("sampleVol", "bucketOne", "sameName");
+    omMetadataManager.getFileTable().put("/sampleVol/bucketOne/parentId/sameName", fileKeyInfo);
+
+    // Step 2: Delete the file by adding its information to the deletedTable
+    RepeatedOmKeyInfo repeatedKeyInfo = new RepeatedOmKeyInfo(fileKeyInfo, 0);
+    omMetadataManager.getDeletedTable().put("/sampleVol/bucketOne/parentId/sameName", repeatedKeyInfo);
+
+    // Step 3: Create a directory with the same name "sameName" in the directoryTable
+    OmDirectoryInfo dirInfo = OmDirectoryInfo.newBuilder()
+        .setName("sameName")
+        .setParentObjectID(fileKeyInfo.getParentObjectID())
+        .setObjectID(fileKeyInfo.getObjectID())
+        .setCreationTime(System.currentTimeMillis())
+        .setModificationTime(System.currentTimeMillis())
+        .build();
+    omMetadataManager.getDirectoryTable().put("/sampleVol/bucketOne/parentId/sameName", dirInfo);
+
+    // Capture the events from the OM Metadata Manager
+    List<byte[]> writeBatches = getBytesFromOmMetaManager(0);
+    OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
+
+    // Retrieve the captured events and assert the correct number of events
+    List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
+    // Verify no events were discarded
+    assertEquals(3, events.size());
+
+    // Validate the file creation event
+    OMDBUpdateEvent filePutEvent = events.get(0);
+    assertEquals(PUT, filePutEvent.getAction());
+    assertEquals("/sampleVol/bucketOne/parentId/sameName", filePutEvent.getKey());
+    assertEquals("sameName", ((OmKeyInfo) filePutEvent.getValue()).getKeyName());
+    assertNull(filePutEvent.getOldValue());
+
+    // Validate the file deletion event
+    OMDBUpdateEvent fileDeleteEvent = events.get(1);
+    assertEquals(PUT, fileDeleteEvent.getAction());
+    assertEquals("/sampleVol/bucketOne/parentId/sameName", fileDeleteEvent.getKey());
+    assertEquals("sameName",
+        ((RepeatedOmKeyInfo) fileDeleteEvent.getValue()).getOmKeyInfoList().get(0).getKeyName());
+
+    // Validate the directory creation event
+    OMDBUpdateEvent dirPutEvent = events.get(2);
+    assertEquals(PUT, dirPutEvent.getAction());
+    assertEquals("/sampleVol/bucketOne/parentId/sameName", dirPutEvent.getKey());
+    assertEquals("sameName", ((OmDirectoryInfo) dirPutEvent.getValue()).getName());
+    // There will be no old value as the key was not present in the directoryTable before
+    assertNull(dirPutEvent.getOldValue());
   }
 
   @Test

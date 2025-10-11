@@ -1,46 +1,45 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
- *
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.states;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSortedSet;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Collections;
-import java.util.Map;
-import java.util.NavigableSet;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
-
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_CHANGE_CONTAINER_STATE;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.NavigableMap;
+import java.util.Objects;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Each Attribute that we manage for a container is maintained as a map.
  * <p>
  * Currently we manage the following attributes for a container.
  * <p>
- * 1. StateMap - LifeCycleState -> Set of ContainerIDs
- * 2. TypeMap  - ReplicationType -> Set of ContainerIDs
- * 3. OwnerMap - OwnerNames -> Set of ContainerIDs
- * 4. FactorMap - ReplicationFactor -> Set of ContainerIDs
+ * 1. StateMap - LifeCycleState -&gt; Set of ContainerIDs
+ * 2. TypeMap  - ReplicationType -&gt; Set of ContainerIDs
  * <p>
  * This means that for a cluster size of 750 PB -- we will have around 150
  * Million containers, if we assume 5GB average container size.
@@ -58,82 +57,34 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAI
  * are going to rely on ContainerStateMap locks to maintain consistency of
  * data in these classes too, since ContainerAttribute is only used by
  * ContainerStateMap class.
+ *
+ * @param <T> Attribute type
  */
-public class ContainerAttribute<T> {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerAttribute.class);
-
-  private final Map<T, NavigableSet<ContainerID>> attributeMap;
-  private static final NavigableSet<ContainerID> EMPTY_SET =  Collections
-      .unmodifiableNavigableSet(new ConcurrentSkipListSet<>());
-
-  /**
-   * Creates a Container Attribute map from an existing Map.
-   *
-   * @param attributeMap - AttributeMap
-   */
-  public ContainerAttribute(Map<T, NavigableSet<ContainerID>> attributeMap) {
-    this.attributeMap = attributeMap;
-  }
+public class ContainerAttribute<T extends Enum<T>> {
+  private final Class<T> attributeClass;
+  private final ImmutableMap<T, NavigableMap<ContainerID, ContainerInfo>> attributeMap;
 
   /**
    * Create an empty Container Attribute map.
    */
-  public ContainerAttribute() {
-    this.attributeMap = new ConcurrentHashMap<>();
+  public ContainerAttribute(Class<T> attributeClass) {
+    this.attributeClass = attributeClass;
+
+    final EnumMap<T, NavigableMap<ContainerID, ContainerInfo>> map = new EnumMap<>(attributeClass);
+    for (T t : attributeClass.getEnumConstants()) {
+      map.put(t, new TreeMap<>());
+    }
+    this.attributeMap = Maps.immutableEnumMap(map);
   }
 
   /**
-   * Insert the value in the Attribute map, keep the original value if it exists
-   * already.
-   *
-   * @param key - The key to the set where the ContainerID should exist.
-   * @param value - Actual Container ID.
-   * @throws SCMException - on Error
+   * Add the given non-existing {@link ContainerInfo} to this attribute.
+   * @throws IllegalStateException if it already exists.
    */
-  public boolean insert(T key, ContainerID value) throws SCMException {
-    Preconditions.checkNotNull(key);
-    Preconditions.checkNotNull(value);
-    attributeMap.computeIfAbsent(key, any ->
-        new ConcurrentSkipListSet<>()).add(value);
-    return true;
-  }
-
-  /**
-   * Returns true if have this bucket in the attribute map.
-   *
-   * @param key - Key to lookup
-   * @return true if we have the key
-   */
-  public boolean hasKey(T key) {
-    Preconditions.checkNotNull(key);
-    return this.attributeMap.containsKey(key);
-  }
-
-  /**
-   * Returns true if we have the key and the containerID in the bucket.
-   *
-   * @param key - Key to the bucket
-   * @param id - container ID that we want to lookup
-   * @return true or false
-   */
-  public boolean hasContainerID(T key, ContainerID id) {
-    Preconditions.checkNotNull(key);
-    Preconditions.checkNotNull(id);
-
-    return this.attributeMap.containsKey(key) &&
-        this.attributeMap.get(key).contains(id);
-  }
-
-  /**
-   * Returns true if we have the key and the containerID in the bucket.
-   *
-   * @param key - Key to the bucket
-   * @param id - container ID that we want to lookup
-   * @return true or false
-   */
-  public boolean hasContainerID(T key, int id) {
-    return hasContainerID(key, ContainerID.valueOf(id));
+  public void addNonExisting(T key, ContainerInfo info) {
+    Objects.requireNonNull(info, "value == null");
+    final ContainerInfo previous = get(key).put(info.containerID(), info);
+    Preconditions.assertNull(previous, "previous");
   }
 
   /**
@@ -142,42 +93,34 @@ public class ContainerAttribute<T> {
    * @param key - Key that identifies the Set.
    */
   public void clearSet(T key) {
-    Preconditions.checkNotNull(key);
-
-    if (attributeMap.containsKey(key)) {
-      attributeMap.get(key).clear();
-    } else {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("key: {} does not exist in the attributeMap", key);
-      }
-    }
+    get(key).clear();
   }
 
   /**
-   * Removes a container ID from the set pointed by the key.
-   *
-   * @param key - key to identify the set.
-   * @param value - Container ID
+   * Remove a container for the given id.
+   * @return the info if there was a mapping for the id; otherwise, return null
    */
-  public boolean remove(T key, ContainerID value) {
-    Preconditions.checkNotNull(key);
-    Preconditions.checkNotNull(value);
+  public ContainerInfo remove(T key, ContainerID id) {
+    Objects.requireNonNull(id, "id == null");
+    return get(key).remove(id);
+  }
 
-    if (attributeMap.containsKey(key)) {
-      if (!attributeMap.get(key).remove(value)) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("ContainerID: {} does not exist in the set pointed by " +
-              "key:{}", value, key);
-        }
-        return false;
-      }
-      return true;
-    } else {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("key: {} does not exist in the attributeMap", key);
-      }
-      return false;
+  /** Remove an existing {@link ContainerInfo}. */
+  public void removeExisting(T key, ContainerInfo existing) {
+    Objects.requireNonNull(existing, "existing == null");
+    final ContainerInfo removed = remove(key, existing.containerID());
+    Preconditions.assertSame(existing, removed, "removed");
+  }
+
+  NavigableMap<ContainerID, ContainerInfo> get(T attribute) {
+    Objects.requireNonNull(attribute, "attribute == null");
+
+    final NavigableMap<ContainerID, ContainerInfo> map = attributeMap.get(attribute);
+    if (map == null) {
+      throw new IllegalStateException("Attribute not found: " + attribute
+          + " (" + attributeClass.getSimpleName() + ")");
     }
+    return map;
   }
 
   /**
@@ -186,16 +129,17 @@ public class ContainerAttribute<T> {
    * @param key - Key to the bucket.
    * @return Underlying Set in immutable form.
    */
-  public NavigableSet<ContainerID> getCollection(T key) {
-    Preconditions.checkNotNull(key);
+  public List<ContainerInfo> getCollection(T key) {
+    return new ArrayList<>(get(key).values());
+  }
 
-    if (this.attributeMap.containsKey(key)) {
-      return ImmutableSortedSet.copyOf(this.attributeMap.get(key));
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("No such Key. Key {}", key);
-    }
-    return EMPTY_SET;
+  public SortedMap<ContainerID, ContainerInfo> tailMap(T key, ContainerID start) {
+    Objects.requireNonNull(start, "start == null");
+    return get(key).tailMap(start);
+  }
+
+  public int count(T key) {
+    return get(key).size();
   }
 
   /**
@@ -208,31 +152,18 @@ public class ContainerAttribute<T> {
    */
   public void update(T currentKey, T newKey, ContainerID value)
       throws SCMException {
-    Preconditions.checkNotNull(currentKey);
-    Preconditions.checkNotNull(newKey);
-    // Return if container attribute not changed
-    if (currentKey == newKey) {
+    if (currentKey == newKey) { // use == for enum
       return;
     }
-    boolean removed = false;
-    try {
-      removed = remove(currentKey, value);
-      if (!removed) {
-        throw new SCMException("Unable to find key in the current key bucket",
-            FAILED_TO_CHANGE_CONTAINER_STATE);
-      }
-      insert(newKey, value);
-    } catch (SCMException ex) {
-      // if we removed the key, insert it back to original bucket, since the
-      // next insert failed.
-      LOG.error("error in update.", ex);
-      if (removed) {
-        insert(currentKey, value);
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("reinserted the removed key. {}", currentKey);
-        }
-      }
-      throw ex;
+
+    Objects.requireNonNull(newKey, "newKey == null");
+    final ContainerInfo removed = remove(currentKey, value);
+    if (removed == null) {
+      throw new SCMException("Failed to update Container " + value + " from " + currentKey + " to " + newKey
+          + ": Container " + value + " not found in attribute " + currentKey,
+          FAILED_TO_CHANGE_CONTAINER_STATE);
     }
+
+    addNonExisting(newKey, removed);
   }
 }

@@ -1,22 +1,52 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
+import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.framework;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.protobuf.ServiceException;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -51,48 +81,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
-import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
-import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.framework;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests Ozone Manager Multi-Tenancy feature Background Sync with Apache Ranger.
  * Marking it as Ignore because it needs Ranger access point.
  */
 @Unhealthy("Requires a Ranger endpoint")
-@Timeout(180)
 public class TestRangerBGSyncService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRangerBGSyncService.class);
@@ -105,6 +103,8 @@ public class TestRangerBGSyncService {
 
   @TempDir
   private Path folder;
+  @TempDir
+  private String path;
 
   private MultiTenantAccessController accessController;
   private OMRangerBGSyncService bgSync;
@@ -120,16 +120,12 @@ public class TestRangerBGSyncService {
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
-  private OMMultiTenantManager omMultiTenantManager;
-  private AuditLogger auditLogger;
 
-  private Tenant tenant;
   private static final String TENANT_ID = "tenant1";
 
   // UGI-related vars
   private static final String USER_ALICE = "alice@EXAMPLE.COM";
   private static final String USER_ALICE_SHORT = "alice";
-  private UserGroupInformation ugiAlice;
   private static final String USER_BOB_SHORT = "bob";
   private RangerUserRequest rangerUserRequest;
 
@@ -154,10 +150,8 @@ public class TestRangerBGSyncService {
     conf = new OzoneConfiguration();
     simulateOzoneSiteXmlConfig();
 
-    GenericTestUtils.setLogLevel(OMRangerBGSyncService.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(
-        LoggerFactory.getLogger(RangerClientMultiTenantAccessController.class),
-        Level.INFO);
+    GenericTestUtils.setLogLevel(OMRangerBGSyncService.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(RangerClientMultiTenantAccessController.class, Level.INFO);
   }
 
   @AfterAll
@@ -172,7 +166,7 @@ public class TestRangerBGSyncService {
         "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
             "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
             "DEFAULT");
-    ugiAlice = UserGroupInformation.createRemoteUser(USER_ALICE);
+    UserGroupInformation ugiAlice = UserGroupInformation.createRemoteUser(USER_ALICE);
     assertEquals(USER_ALICE_SHORT, ugiAlice.getShortUserName());
 
     ozoneManager = mock(OzoneManager.class);
@@ -180,8 +174,6 @@ public class TestRangerBGSyncService {
     // Run as alice, so that Server.getRemoteUser() won't return null.
     mockRemoteUser(ugiAlice);
 
-    String omID = UUID.randomUUID().toString();
-    final String path = GenericTestUtils.getTempPath(omID);
     Path metaDirPath = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
 
@@ -193,14 +185,13 @@ public class TestRangerBGSyncService {
     omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
-    auditLogger = mock(AuditLogger.class);
+    AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     // Multi-tenant related initializations
-    omMultiTenantManager = mock(OMMultiTenantManager.class);
-    tenant = mock(Tenant.class);
+    OMMultiTenantManager omMultiTenantManager = mock(OMMultiTenantManager.class);
+    Tenant tenant = mock(Tenant.class);
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     when(ozoneManager.isLeaderReady()).thenReturn(true);
@@ -233,7 +224,7 @@ public class TestRangerBGSyncService {
         ozoneManager.getMetadataManager().getMetaTable().put(
             OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY, String.valueOf(v));
         return null;
-      }).when(omRatisServer).submitRequest(any(), any());
+      }).when(omRatisServer).submitRequest(any(), any(), anyLong());
     } catch (ServiceException e) {
       throw new RuntimeException(e);
     }

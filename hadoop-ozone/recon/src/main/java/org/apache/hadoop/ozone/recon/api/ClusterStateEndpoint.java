@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +17,24 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
+
+import java.util.List;
+import java.util.Optional;
+import javax.inject.Inject;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -31,27 +47,12 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.inject.Inject;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 
 /**
  * Endpoint to fetch current state of ozone cluster.
@@ -68,14 +69,15 @@ public class ClusterStateEndpoint {
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
   private GlobalStatsDao globalStatsDao;
-
+  private OzoneConfiguration ozoneConfiguration;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
   @Inject
   ClusterStateEndpoint(OzoneStorageContainerManager reconSCM,
                        GlobalStatsDao globalStatsDao,
                        ContainerHealthSchemaManager
-                           containerHealthSchemaManager) {
+                           containerHealthSchemaManager,
+                       OzoneConfiguration ozoneConfiguration) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
@@ -83,6 +85,7 @@ public class ClusterStateEndpoint {
         (ReconContainerManager) reconSCM.getContainerManager();
     this.globalStatsDao = globalStatsDao;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
+    this.ozoneConfiguration = ozoneConfiguration;
   }
 
   /**
@@ -92,14 +95,12 @@ public class ClusterStateEndpoint {
   @GET
   public Response getClusterState() {
     ContainerStateCounts containerStateCounts = new ContainerStateCounts();
-    List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
-
     int pipelines = this.pipelineManager.getPipelines().size();
 
     List<UnhealthyContainers> missingContainers = containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
-            0, MISSING_CONTAINER_COUNT_LIMIT);
+            0L, Optional.empty(), MISSING_CONTAINER_COUNT_LIMIT);
 
     containerStateCounts.setMissingContainerCount(
         missingContainers.size() == MISSING_CONTAINER_COUNT_LIMIT ?
@@ -178,10 +179,12 @@ public class ClusterStateEndpoint {
         .setPipelines(pipelines)
         .setContainers(containerStateCounts.getTotalContainerCount())
         .setMissingContainers(containerStateCounts.getMissingContainerCount())
-        .setTotalDatanodes(datanodeDetails.size())
+        .setTotalDatanodes(nodeManager.getAllNodeCount())
         .setHealthyDatanodes(healthyDatanodes)
         .setOpenContainers(containerStateCounts.getOpenContainersCount())
         .setDeletedContainers(containerStateCounts.getDeletedContainersCount())
+        .setScmServiceId(ozoneConfiguration.get(OZONE_SCM_SERVICE_IDS_KEY))
+        .setOmServiceId(ozoneConfiguration.get(OZONE_OM_SERVICE_IDS_KEY))
         .build();
     return Response.ok(response).build();
   }

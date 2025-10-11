@@ -1,24 +1,38 @@
-package org.apache.hadoop.ozone.om.helpers;
-
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.om.helpers;
+
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_SEPARATOR;
+
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -29,76 +43,21 @@ import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
 
-import com.google.common.base.Preconditions;
-
-import java.time.format.DateTimeFormatter;
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.time.ZoneId;
-
-import java.util.Objects;
-import java.util.UUID;
-import java.util.Map;
-import java.util.LinkedHashMap;
-
-import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
-import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-
 /**
  * This class is used for storing info related to Snapshots.
  *
  * Each snapshot created has an associated SnapshotInfo entry
  * containing the snapshotId, snapshot path,
  * snapshot checkpoint directory, previous snapshotId
- * for the snapshot path & global amongst other necessary fields.
+ * for the snapshot path and global amongst other necessary fields.
  */
 public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private static final Codec<SnapshotInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(
-          OzoneManagerProtocolProtos.SnapshotInfo.getDefaultInstance()),
+      Proto2Codec.get(OzoneManagerProtocolProtos.SnapshotInfo.getDefaultInstance()),
       SnapshotInfo::getFromProtobuf,
-      SnapshotInfo::getProtobuf);
+      SnapshotInfo::getProtobuf,
+      SnapshotInfo.class);
 
-  public static Codec<SnapshotInfo> getCodec() {
-    return CODEC;
-  }
-
-  /**
-   * SnapshotStatus enum composed of active and deleted statuses.
-   */
-  public enum SnapshotStatus {
-    SNAPSHOT_ACTIVE,
-    SNAPSHOT_DELETED;
-
-    public static final SnapshotStatus DEFAULT = SNAPSHOT_ACTIVE;
-
-    public SnapshotStatusProto toProto() {
-      switch (this) {
-      case SNAPSHOT_ACTIVE:
-        return SnapshotStatusProto.SNAPSHOT_ACTIVE;
-      case SNAPSHOT_DELETED:
-        return SnapshotStatusProto.SNAPSHOT_DELETED;
-      default:
-        throw new IllegalStateException(
-            "BUG: missing valid SnapshotStatus, found status=" + this);
-      }
-    }
-
-    public static SnapshotStatus valueOf(SnapshotStatusProto status) {
-      switch (status) {
-      case SNAPSHOT_ACTIVE:
-        return SNAPSHOT_ACTIVE;
-      case SNAPSHOT_DELETED:
-        return SNAPSHOT_DELETED;
-      default:
-        throw new IllegalStateException(
-            "BUG: missing valid SnapshotStatus, found status=" + status);
-      }
-    }
-  }
-
-  private static final String SEPARATOR = "-";
   private static final long INVALID_TIMESTAMP = -1;
   private static final UUID INITIAL_SNAPSHOT_ID = UUID.randomUUID();
 
@@ -123,7 +82,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private long referencedReplicatedSize;
   private long exclusiveSize;
   private long exclusiveReplicatedSize;
+  private long exclusiveSizeDeltaFromDirDeepCleaning;
+  private long exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
   private boolean deepCleanedDeletedDir;
+  private ByteString createTransactionInfo;
+  private ByteString lastTransactionInfo;
 
   private SnapshotInfo(Builder b) {
     this.snapshotId = b.snapshotId;
@@ -144,7 +107,15 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.referencedReplicatedSize = b.referencedReplicatedSize;
     this.exclusiveSize = b.exclusiveSize;
     this.exclusiveReplicatedSize = b.exclusiveReplicatedSize;
+    this.exclusiveSizeDeltaFromDirDeepCleaning = b.exclusiveSizeDeltaFromDirDeepCleaning;
+    this.exclusiveReplicatedSizeDeltaFromDirDeepCleaning = b.exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
     this.deepCleanedDeletedDir = b.deepCleanedDeletedDir;
+    this.lastTransactionInfo = b.lastTransactionInfo;
+    this.createTransactionInfo = b.createTransactionInfo;
+  }
+
+  public static Codec<SnapshotInfo> getCodec() {
+    return CODEC;
   }
 
   public void setName(String name) {
@@ -183,7 +154,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.checkpointDir = checkpointDir;
   }
 
-  public boolean getDeepClean() {
+  public boolean isDeepCleaned() {
     return deepClean;
   }
 
@@ -261,13 +232,18 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setGlobalPreviousSnapshotId(globalPreviousSnapshotId)
         .setSnapshotPath(snapshotPath)
         .setCheckpointDir(checkpointDir)
+        .setDbTxSequenceNumber(dbTxSequenceNumber)
         .setDeepClean(deepClean)
         .setSstFiltered(sstFiltered)
         .setReferencedSize(referencedSize)
         .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
         .setExclusiveReplicatedSize(exclusiveReplicatedSize)
-        .setDeepCleanedDeletedDir(deepCleanedDeletedDir);
+        .setExclusiveSizeDeltaFromDirDeepCleaning(exclusiveSizeDeltaFromDirDeepCleaning)
+        .setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(exclusiveReplicatedSizeDeltaFromDirDeepCleaning)
+        .setDeepCleanedDeletedDir(deepCleanedDeletedDir)
+        .setLastTransactionInfo(lastTransactionInfo)
+        .setCreateTransactionInfo(createTransactionInfo);
   }
 
   /**
@@ -292,7 +268,11 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private long referencedReplicatedSize;
     private long exclusiveSize;
     private long exclusiveReplicatedSize;
+    private long exclusiveSizeDeltaFromDirDeepCleaning;
+    private long exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
     private boolean deepCleanedDeletedDir;
+    private ByteString createTransactionInfo;
+    private ByteString lastTransactionInfo;
 
     public Builder() {
       // default values
@@ -406,8 +386,31 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
+    /** @param exclusiveSizeDeltaFromDirDeepCleaning - Snapshot exclusive size. */
+    public Builder setExclusiveSizeDeltaFromDirDeepCleaning(long exclusiveSizeDeltaFromDirDeepCleaning) {
+      this.exclusiveSizeDeltaFromDirDeepCleaning = exclusiveSizeDeltaFromDirDeepCleaning;
+      return this;
+    }
+
+    /** @param exclusiveReplicatedSizeDeltaFromDirDeepCleaning - Snapshot exclusive size w/ replication. */
+    public Builder setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(
+        long exclusiveReplicatedSizeDeltaFromDirDeepCleaning) {
+      this.exclusiveReplicatedSizeDeltaFromDirDeepCleaning = exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
+      return this;
+    }
+
     public Builder setDeepCleanedDeletedDir(boolean deepCleanedDeletedDir) {
       this.deepCleanedDeletedDir = deepCleanedDeletedDir;
+      return this;
+    }
+
+    public Builder setCreateTransactionInfo(ByteString createTransactionInfo) {
+      this.createTransactionInfo = createTransactionInfo;
+      return this;
+    }
+
+    public Builder setLastTransactionInfo(ByteString lastTransactionInfo) {
+      this.lastTransactionInfo = lastTransactionInfo;
       return this;
     }
 
@@ -435,6 +438,8 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
             .setReferencedReplicatedSize(referencedReplicatedSize)
             .setExclusiveSize(exclusiveSize)
             .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+            .setExclusiveSizeDeltaFromDirDeepCleaning(exclusiveSizeDeltaFromDirDeepCleaning)
+            .setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(exclusiveReplicatedSizeDeltaFromDirDeepCleaning)
             .setDeepCleanedDeletedDir(deepCleanedDeletedDir);
 
     if (pathPreviousSnapshotId != null) {
@@ -443,6 +448,14 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
 
     if (globalPreviousSnapshotId != null) {
       sib.setGlobalPreviousSnapshotID(toProtobuf(globalPreviousSnapshotId));
+    }
+
+    if (lastTransactionInfo != null) {
+      sib.setLastTransactionInfo(lastTransactionInfo);
+    }
+
+    if (createTransactionInfo != null) {
+      sib.setCreateTransactionInfo(createTransactionInfo);
     }
 
     sib.setSnapshotPath(snapshotPath)
@@ -508,9 +521,26 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
           snapshotInfoProto.getExclusiveReplicatedSize());
     }
 
+    if (snapshotInfoProto.hasExclusiveSizeDeltaFromDirDeepCleaning()) {
+      osib.setExclusiveSizeDeltaFromDirDeepCleaning(snapshotInfoProto.getExclusiveSizeDeltaFromDirDeepCleaning());
+    }
+
+    if (snapshotInfoProto.hasExclusiveReplicatedSizeDeltaFromDirDeepCleaning()) {
+      osib.setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(
+          snapshotInfoProto.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning());
+    }
+
     if (snapshotInfoProto.hasDeepCleanedDeletedDir()) {
       osib.setDeepCleanedDeletedDir(
           snapshotInfoProto.getDeepCleanedDeletedDir());
+    }
+
+    if (snapshotInfoProto.hasLastTransactionInfo()) {
+      osib.setLastTransactionInfo(snapshotInfoProto.getLastTransactionInfo());
+    }
+
+    if (snapshotInfoProto.hasCreateTransactionInfo()) {
+      osib.setCreateTransactionInfo(snapshotInfoProto.getCreateTransactionInfo());
     }
 
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
@@ -535,8 +565,9 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   public static String getCheckpointDirName(UUID snapshotId) {
     Objects.requireNonNull(snapshotId,
         "SnapshotId is needed to create checkpoint directory");
-    return SEPARATOR + snapshotId;
+    return OM_SNAPSHOT_SEPARATOR + snapshotId;
   }
+
   /**
    * Get the name of the checkpoint directory, (non-static).
    */
@@ -589,20 +620,52 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return exclusiveSize;
   }
 
+  public void setExclusiveSizeDeltaFromDirDeepCleaning(long exclusiveSizeDeltaFromDirDeepCleaning) {
+    this.exclusiveSizeDeltaFromDirDeepCleaning = exclusiveSizeDeltaFromDirDeepCleaning;
+  }
+
+  public long getExclusiveSizeDeltaFromDirDeepCleaning() {
+    return exclusiveSizeDeltaFromDirDeepCleaning;
+  }
+
   public void setExclusiveReplicatedSize(long exclusiveReplicatedSize) {
     this.exclusiveReplicatedSize = exclusiveReplicatedSize;
+  }
+
+  public void setExclusiveReplicatedSizeDeltaFromDirDeepCleaning(long exclusiveReplicatedSizeDeltaFromDirDeepCleaning) {
+    this.exclusiveReplicatedSizeDeltaFromDirDeepCleaning = exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
+  }
+
+  public long getExclusiveReplicatedSizeDeltaFromDirDeepCleaning() {
+    return exclusiveReplicatedSizeDeltaFromDirDeepCleaning;
   }
 
   public long getExclusiveReplicatedSize() {
     return exclusiveReplicatedSize;
   }
 
-  public boolean getDeepCleanedDeletedDir() {
+  public boolean isDeepCleanedDeletedDir() {
     return deepCleanedDeletedDir;
   }
 
   public void setDeepCleanedDeletedDir(boolean deepCleanedDeletedDir) {
     this.deepCleanedDeletedDir = deepCleanedDeletedDir;
+  }
+
+  public ByteString getLastTransactionInfo() {
+    return lastTransactionInfo;
+  }
+
+  public ByteString getCreateTransactionInfo() {
+    return createTransactionInfo;
+  }
+
+  public void setCreateTransactionInfo(ByteString createTransactionInfo) {
+    this.createTransactionInfo = createTransactionInfo;
+  }
+
+  public void setLastTransactionInfo(ByteString lastTransactionInfo) {
+    this.lastTransactionInfo = lastTransactionInfo;
   }
 
   /**
@@ -673,7 +736,9 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         referencedReplicatedSize == that.referencedReplicatedSize &&
         exclusiveSize == that.exclusiveSize &&
         exclusiveReplicatedSize == that.exclusiveReplicatedSize &&
-        deepCleanedDeletedDir == that.deepCleanedDeletedDir;
+        deepCleanedDeletedDir == that.deepCleanedDeletedDir &&
+        Objects.equals(lastTransactionInfo, that.lastTransactionInfo) &&
+        Objects.equals(createTransactionInfo, that.createTransactionInfo);
   }
 
   @Override
@@ -684,7 +749,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         globalPreviousSnapshotId, snapshotPath, checkpointDir,
         deepClean, sstFiltered,
         referencedSize, referencedReplicatedSize,
-        exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir);
+        exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir, lastTransactionInfo, createTransactionInfo);
   }
 
   /**
@@ -692,27 +757,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
    */
   @Override
   public SnapshotInfo copyObject() {
-    return new Builder()
-        .setSnapshotId(snapshotId)
-        .setName(name)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setSnapshotStatus(snapshotStatus)
-        .setCreationTime(creationTime)
-        .setDeletionTime(deletionTime)
-        .setPathPreviousSnapshotId(pathPreviousSnapshotId)
-        .setGlobalPreviousSnapshotId(globalPreviousSnapshotId)
-        .setSnapshotPath(snapshotPath)
-        .setCheckpointDir(checkpointDir)
-        .setDbTxSequenceNumber(dbTxSequenceNumber)
-        .setDeepClean(deepClean)
-        .setSstFiltered(sstFiltered)
-        .setReferencedSize(referencedSize)
-        .setReferencedReplicatedSize(referencedReplicatedSize)
-        .setExclusiveSize(exclusiveSize)
-        .setExclusiveReplicatedSize(exclusiveReplicatedSize)
-        .setDeepCleanedDeletedDir(deepCleanedDeletedDir)
-        .build();
+    return this.toBuilder().build();
   }
 
   @Override
@@ -736,7 +781,45 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         ", referencedReplicatedSize: '" + referencedReplicatedSize + '\'' +
         ", exclusiveSize: '" + exclusiveSize + '\'' +
         ", exclusiveReplicatedSize: '" + exclusiveReplicatedSize + '\'' +
-        ", deepCleanedDeletedDir: '" + deepCleanedDeletedDir + '\'' +
+        ", exclusiveSizeDeltaFromDirDeepCleaning: '" + exclusiveSizeDeltaFromDirDeepCleaning + '\'' +
+        ", exclusiveReplicatedSizeDeltaFromDirDeepCleaning: '" + exclusiveReplicatedSizeDeltaFromDirDeepCleaning +
+        "', deepCleanedDeletedDir: '" + deepCleanedDeletedDir + '\'' +
+        ", lastTransactionInfo: '" + lastTransactionInfo + '\'' +
+        ", createTransactionInfo: '" + createTransactionInfo + '\'' +
         '}';
+  }
+
+  /**
+   * SnapshotStatus enum composed of active and deleted statuses.
+   */
+  public enum SnapshotStatus {
+    SNAPSHOT_ACTIVE,
+    SNAPSHOT_DELETED;
+
+    public static final SnapshotStatus DEFAULT = SNAPSHOT_ACTIVE;
+
+    public SnapshotStatusProto toProto() {
+      switch (this) {
+      case SNAPSHOT_ACTIVE:
+        return SnapshotStatusProto.SNAPSHOT_ACTIVE;
+      case SNAPSHOT_DELETED:
+        return SnapshotStatusProto.SNAPSHOT_DELETED;
+      default:
+        throw new IllegalStateException(
+            "BUG: missing valid SnapshotStatus, found status=" + this);
+      }
+    }
+
+    public static SnapshotStatus valueOf(SnapshotStatusProto status) {
+      switch (status) {
+      case SNAPSHOT_ACTIVE:
+        return SNAPSHOT_ACTIVE;
+      case SNAPSHOT_DELETED:
+        return SNAPSHOT_DELETED;
+      default:
+        throw new IllegalStateException(
+            "BUG: missing valid SnapshotStatus, found status=" + status);
+      }
+    }
   }
 }

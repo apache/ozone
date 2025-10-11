@@ -1,30 +1,30 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.UUID;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.UuidCodec;
-
-import java.util.UUID;
+import org.apache.ratis.util.MemoizedSupplier;
 
 /**
  * ID for the pipeline, the ID is based on UUID.
@@ -34,16 +34,18 @@ import java.util.UUID;
 public final class PipelineID {
   private static final Codec<PipelineID> CODEC = new DelegatedCodec<>(
       UuidCodec.get(), PipelineID::valueOf, c -> c.id,
-      DelegatedCodec.CopyType.SHALLOW);
+      PipelineID.class, DelegatedCodec.CopyType.SHALLOW);
+
+  private final UUID id;
+  private final Supplier<HddsProtos.PipelineID> protoSupplier;
 
   public static Codec<PipelineID> getCodec() {
     return CODEC;
   }
 
-  private final UUID id;
-
   private PipelineID(UUID id) {
     this.id = id;
+    this.protoSupplier = MemoizedSupplier.valueOf(() -> buildProtobuf(id));
   }
 
   public static PipelineID randomId() {
@@ -54,12 +56,20 @@ public final class PipelineID {
     return new PipelineID(id);
   }
 
+  public static PipelineID valueOf(String id) {
+    return valueOf(UUID.fromString(id));
+  }
+
   public UUID getId() {
     return id;
   }
 
   @JsonIgnore
   public HddsProtos.PipelineID getProtobuf() {
+    return protoSupplier.get();
+  }
+
+  static HddsProtos.PipelineID buildProtobuf(UUID id) {
     HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
         .setMostSigBits(id.getMostSignificantBits())
         .setLeastSigBits(id.getLeastSignificantBits())
@@ -84,7 +94,7 @@ public final class PipelineID {
 
   @Override
   public String toString() {
-    return "PipelineID=" + id.toString();
+    return "Pipeline-" + id;
   }
 
   @Override

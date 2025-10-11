@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,22 +13,26 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CERTIFICATE_ERROR;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.security.KeyPair;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -37,9 +40,6 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.util.Time;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -54,15 +54,13 @@ import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.CertIOException;
-import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * A Self Signed Certificate with CertificateServer basic constraint can be used
@@ -107,8 +105,7 @@ public final class SelfSignedCertificate {
     return new Builder();
   }
 
-  private X509CertificateHolder generateCertificate(BigInteger caCertSerialId)
-      throws OperatorCreationException, IOException {
+  private X509Certificate generateCertificate(BigInteger caCertSerialId) throws OperatorCreationException, IOException {
     byte[] encoded = key.getPublic().getEncoded();
     SubjectPublicKeyInfo publicKeyInfo =
         SubjectPublicKeyInfo.getInstance(encoded);
@@ -147,18 +144,21 @@ public final class SelfSignedCertificate {
       int keyUsageFlag = KeyUsage.keyCertSign | KeyUsage.cRLSign;
       KeyUsage keyUsage = new KeyUsage(keyUsageFlag);
       builder.addExtension(Extension.keyUsage, true, keyUsage);
-      if (altNames != null && altNames.size() >= 1) {
+      if (altNames != null && !altNames.isEmpty()) {
         builder.addExtension(new Extension(Extension.subjectAlternativeName,
             false, new GeneralNames(altNames.toArray(
                 new GeneralName[altNames.size()])).getEncoded()));
       }
     }
-    X509CertificateHolder certHolder = builder.build(contentSigner);
-    LOG.info("Certificate {} is issued by {} to {}, valid from {} to {}",
-        certHolder.getSerialNumber(), certHolder.getIssuer(),
-        certHolder.getSubject(), certHolder.getNotBefore(),
-        certHolder.getNotAfter());
-    return certHolder;
+    try {
+      //TODO: as part of HDDS-10743 ensure that converter is instantiated only once
+      X509Certificate cert = new JcaX509CertificateConverter().getCertificate(builder.build(contentSigner));
+      LOG.info("Certificate {} is issued by {} to {}, valid from {} to {}",
+          cert.getSerialNumber(), cert.getIssuerDN(), cert.getSubjectDN(), cert.getNotBefore(), cert.getNotAfter());
+      return cert;
+    } catch (java.security.cert.CertificateException e) {
+      throw new CertificateException("Could not create self-signed X509Certificate.", e, CERTIFICATE_ERROR);
+    }
   }
 
   /**
@@ -294,7 +294,7 @@ public final class SelfSignedCertificate {
           false, 0, new DERSequence(otherName));
     }
 
-    public X509CertificateHolder build()
+    public X509Certificate build()
         throws SCMSecurityException, IOException {
       Preconditions.checkNotNull(key, "Key cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(subject),

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import java.time.Duration;
-
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -40,14 +38,6 @@ public class ReconTaskConfig {
   )
   private Duration pipelineSyncTaskInterval = Duration.ofMinutes(5);
 
-  public Duration getPipelineSyncTaskInterval() {
-    return pipelineSyncTaskInterval;
-  }
-
-  public void setPipelineSyncTaskInterval(Duration interval) {
-    this.pipelineSyncTaskInterval = interval;
-  }
-
   @Config(key = "missingcontainer.interval",
       type = ConfigType.TIME,
       defaultValue = "300s",
@@ -57,14 +47,6 @@ public class ReconTaskConfig {
           "by Datanodes."
   )
   private Duration missingContainerTaskInterval = Duration.ofMinutes(5);
-
-  public Duration getMissingContainerTaskInterval() {
-    return missingContainerTaskInterval;
-  }
-
-  public void setMissingContainerTaskInterval(Duration interval) {
-    this.missingContainerTaskInterval = interval;
-  }
 
   @Config(key = "safemode.wait.threshold",
       type = ConfigType.TIME,
@@ -76,14 +58,6 @@ public class ReconTaskConfig {
   )
   private Duration safeModeWaitThreshold = Duration.ofMinutes(5);
 
-  public Duration getSafeModeWaitThreshold() {
-    return safeModeWaitThreshold;
-  }
-
-  public void setSafeModeWaitThreshold(Duration safeModeWaitThreshold) {
-    this.safeModeWaitThreshold = safeModeWaitThreshold;
-  }
-
   @Config(key = "containercounttask.interval",
       type = ConfigType.TIME,
       defaultValue = "60s",
@@ -92,6 +66,30 @@ public class ReconTaskConfig {
           "container count task."
   )
   private Duration containerSizeCountTaskInterval = Duration.ofMinutes(1);
+
+  public Duration getPipelineSyncTaskInterval() {
+    return pipelineSyncTaskInterval;
+  }
+
+  public void setPipelineSyncTaskInterval(Duration interval) {
+    this.pipelineSyncTaskInterval = interval;
+  }
+
+  public Duration getMissingContainerTaskInterval() {
+    return missingContainerTaskInterval;
+  }
+
+  public void setMissingContainerTaskInterval(Duration interval) {
+    this.missingContainerTaskInterval = interval;
+  }
+
+  public Duration getSafeModeWaitThreshold() {
+    return safeModeWaitThreshold;
+  }
+
+  public void setSafeModeWaitThreshold(Duration safeModeWaitThreshold) {
+    this.safeModeWaitThreshold = safeModeWaitThreshold;
+  }
 
   public Duration getContainerSizeCountTaskInterval() {
     return containerSizeCountTaskInterval;

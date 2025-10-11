@@ -1,36 +1,36 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
 /**
  * This class contains set of dns and containers which ozone client provides
@@ -38,28 +38,23 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ExcludeList {
 
-  private final Map<DatanodeDetails, Long> datanodes;
-  private final Set<ContainerID> containerIds;
-  private final Set<PipelineID> pipelineIds;
+  private final Map<DatanodeDetails, Long> datanodes = new ConcurrentHashMap<>();
+  private final Set<ContainerID> containerIds = new HashSet<>();
+  private final Set<PipelineID> pipelineIds = new HashSet<>();
   private long expiryTime = 0;
-  private java.time.Clock clock;
-
+  private final Clock clock;
 
   public ExcludeList() {
-    datanodes = new ConcurrentHashMap<>();
-    containerIds = new HashSet<>();
-    pipelineIds = new HashSet<>();
     clock = Clock.system(ZoneOffset.UTC);
   }
 
-  public ExcludeList(long autoExpiryTime, java.time.Clock clock) {
-    this();
+  public ExcludeList(long autoExpiryTime, Clock clock) {
     this.expiryTime = autoExpiryTime;
     this.clock = clock;
   }
 
   public Set<ContainerID> getContainerIds() {
-    return containerIds;
+    return Collections.unmodifiableSet(containerIds);
   }
 
   public Set<DatanodeDetails> getDatanodes() {
@@ -99,7 +94,7 @@ public class ExcludeList {
   }
 
   public Set<PipelineID> getPipelineIds() {
-    return pipelineIds;
+    return Collections.unmodifiableSet(pipelineIds);
   }
 
   public HddsProtos.ExcludeListProto getProtoBuf() {

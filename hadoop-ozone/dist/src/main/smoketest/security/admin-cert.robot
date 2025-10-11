@@ -32,11 +32,12 @@ Setup Test
 *** Test Cases ***
 List valid certificates
     ${output} =      Execute    ozone admin cert list
-                     Should Contain    ${output}    Type=VALID
+                     Should Contain    ${output}    Certificate list:(BatchSize=20,
 
+# Currently until we have revocation support, the output is expected to be the same as the simple list without -t.
 List revoked certificates
     ${output} =      Execute    ozone admin cert list -t revoked
-                     Should Contain    ${output}    Certificate list:(Type=REVOKED, BatchSize=20, CertCount=0)
+                     Should Contain    ${output}    Certificate list:(BatchSize=20,
 
 Info of the cert
     ${output} =      Execute   for id in $(ozone admin cert list -c 1|grep UTC|awk '{print $1}'); do ozone admin cert info $id; done

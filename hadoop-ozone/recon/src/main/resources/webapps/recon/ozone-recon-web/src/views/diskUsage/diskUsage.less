@@ -18,24 +18,28 @@
 
 .du-container {
 
-  .go-back-button {
-    display: inline-block;
+  .path-nav-container {
+    display: flex;
+    align-items: flex-end;
+
+    .go-back-button {
+      display: inline-block;
+    }
+    .input-bar {
+      display: inline-block;
+      margin-left: 25px;
+    }
   }
 
-  .dropdown-button {
-    display: inline-block;
-    margin-left: 100px;
-  }
-
-  .input-bar {
-    display: inline-block;
-    margin-left: 25px;
-  }
-
-  .metadata-button {
-    display: inline-block;
-    float: right;
-    margin-right: 25px;
+  .du-button-container{
+    display: flex;
+    .dropdown-button {
+      display: inline-block;
+    }
+  
+    .metadata-button {
+      margin-left: 10px;
+    }
   }
 
   .legendtext {

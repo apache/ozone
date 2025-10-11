@@ -23,54 +23,51 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${OM_URL}           http://om:9874
-${OM_DB_CHECKPOINT_URL}      ${OM_URL}/dbCheckpoint
-${OM_SERVICE_LIST_URL}       ${OM_URL}/serviceList
-
 ${SCM}              scm
-${SCM_URL}          http://${SCM}:9876
-${RECON_URL}        http://recon:9888
 
-${SCM_CONF_URL}     http://${SCM}:9876/conf
-${SCM_JMX_URL}      http://${SCM}:9876/jmx
-${SCM_STACKS_URL}   http://${SCM}:9876/stacks
+${OM_URL}           http://om:9874
+${RECON_URL}        http://recon:9888
+${S3G_URL}          http://s3g:19878
+${SCM_URL}          http://${SCM}:9876
+
+@{BASE_URLS}        ${OM_URL}    ${RECON_URL}    ${S3G_URL}    ${SCM_URL}
+@{COMMON_PATHS}     conf   jmx    logLevel    logs/    prom    stacks
+@{CUSTOM_ENDPOINTS}    ${OM_URL}/dbCheckpoint    ${OM_URL}/serviceList    ${SCM_URL}/dbCheckpoint
 
 
 *** Keywords ***
-Verify SPNEGO enabled URL
-    [arguments]                      ${url}
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Execute     kdestroy
-    ${result} =         Execute                             curl --negotiate -u : -v -s -I ${url}
-    Should contain      ${result}       401 Authentication required
-
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-    ${result} =         Execute                             curl --negotiate -u : -v -s -I ${url}
-    Should contain      ${result}       200 OK
-
-
+Verify SPNEGO URL
+    [arguments]         ${url}        ${expected_response}
+    ${result} =         Execute       curl --negotiate -u : --silent -o /dev/null -w '\%{http_code}' '${url}'
+    IF    '${result}' != '${expected_response}'
+        # repeat with verbose mode for debug
+        Execute       curl --negotiate -u : -vvv -o /dev/null '${url}'
+        Should Be Equal    '${result}'    '${expected_response}'
+    END
 
 *** Test Cases ***
-Test OM portal
-    Verify SPNEGO enabled URL       ${OM_URL}
+Verify SPNEGO URLs without auth
+    [setup]        Execute    kdestroy
+    [template]     Verify SPNEGO URL
 
-Test OM DB Checkpoint
-    Verify SPNEGO enabled URL       ${OM_DB_CHECKPOINT_URL}
+    FOR    ${BASE_URL}    IN    @{BASE_URLS}
+      FOR    ${PATH}    IN    @{COMMON_PATHS}
+          ${BASE_URL}/${PATH}    401
+      END
+    END
+    FOR    ${URL}    IN    @{CUSTOM_ENDPOINTS}
+        ${URL}    401
+    END
 
-Test OM Service List
-    Verify SPNEGO enabled URL       ${OM_SERVICE_LIST_URL}
+Verify SPNEGO URLs with auth
+    [setup]    Kinit test user     testuser    testuser.keytab
+    [template]     Verify SPNEGO URL
 
-Test SCM portal
-    Verify SPNEGO enabled URL       ${SCM_URL}
-
-Test SCM conf
-    Verify SPNEGO enabled URL       ${SCM_CONF_URL}
-
-Test SCM jmx
-    Verify SPNEGO enabled URL       ${SCM_JMX_URL}
-
-Test SCM stacks
-    Verify SPNEGO enabled URL       ${SCM_STACKS_URL}
-
-Test Recon portal
-    Verify SPNEGO enabled URL       ${RECON_URL}
-
+    FOR    ${BASE_URL}    IN    @{BASE_URLS}
+      FOR    ${PATH}    IN    @{COMMON_PATHS}
+          ${BASE_URL}/${PATH}    200
+      END
+    END
+    FOR    ${URL}    IN    @{CUSTOM_ENDPOINTS}
+        ${URL}    200
+    END

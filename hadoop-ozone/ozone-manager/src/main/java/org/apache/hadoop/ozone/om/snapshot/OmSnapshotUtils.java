@@ -1,26 +1,25 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -28,12 +27,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Manager Snapshot Utilities.
@@ -42,6 +44,8 @@ public final class OmSnapshotUtils {
 
   public static final String DATA_PREFIX = "data";
   public static final String DATA_SUFFIX = "txt";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmSnapshotUtils.class);
 
   private OmSnapshotUtils() { }
 
@@ -68,6 +72,26 @@ public final class OmSnapshotUtils {
   }
 
   /**
+   * Returns a string combining the inode (fileKey) and the last modification time (mtime) of the given file.
+   * <p>
+   * The returned string is formatted as "{inode}-{mtime}", where:
+   * <ul>
+   *   <li>{@code inode} is the unique file key obtained from the file system, typically representing
+   *   the inode on POSIX systems</li>
+   *   <li>{@code mtime} is the last modified time of the file in milliseconds since the epoch</li>
+   * </ul>
+   *
+   * @param file the {@link Path} to the file whose inode and modification time are to be retrieved
+   * @return a string in the format "{inode}-{mtime}"
+   * @throws IOException if an I/O error occurs
+   */
+  public static String getFileInodeAndLastModifiedTimeString(Path file) throws IOException {
+    Object inode = Files.readAttributes(file, BasicFileAttributes.class).fileKey();
+    FileTime mTime = Files.getLastModifiedTime(file);
+    return String.format("%s-%s", inode, mTime.toMillis());
+  }
+
+  /**
    * Create file of links to add to tarball.
    * Format of entries are either:
    * dir1/fileTo fileFrom
@@ -77,7 +101,7 @@ public final class OmSnapshotUtils {
    * sst compaction backup directory)
    *
    * @param truncateLength - Length of initial path to trim in file path.
-   * @param hardLinkFiles  - Map of link->file paths.
+   * @param hardLinkFiles  - Map of link-&gt;file paths.
    * @return Path to the file of links created.
    */
   public static Path createHardLinkList(int truncateLength,
@@ -94,8 +118,8 @@ public final class OmSnapshotUtils {
           fixedFile = f.toString();
         }
       }
-      sb.append(truncateFileName(truncateLength, entry.getKey())).append("\t")
-          .append(fixedFile).append("\n");
+      sb.append(truncateFileName(truncateLength, entry.getKey())).append('\t')
+          .append(fixedFile).append('\n');
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
     return data;
@@ -105,10 +129,12 @@ public final class OmSnapshotUtils {
    * Create hard links listed in OM_HARDLINK_FILE.
    *
    * @param dbPath Path to db to have links created.
+   * @param deleteSourceFiles - Whether to delete the source files after creating the links.
    */
-  public static void createHardLinks(Path dbPath) throws IOException {
+  public static void createHardLinks(Path dbPath, boolean deleteSourceFiles) throws IOException {
     File hardLinkFile =
         new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
+    List<Path> filesToDelete = new ArrayList<>();
     if (hardLinkFile.exists()) {
       // Read file.
       try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
@@ -116,9 +142,15 @@ public final class OmSnapshotUtils {
 
         // Create a link for each line.
         for (String l : lines) {
-          String from = l.split("\t")[1];
-          String to = l.split("\t")[0];
+          String[] parts = l.split("\t");
+          if (parts.length != 2) {
+            LOG.warn("Skipping malformed line in hardlink file: {}", l);
+            continue;
+          }
+          String from = parts[1];
+          String to = parts[0];
           Path fullFromPath = Paths.get(dbPath.toString(), from);
+          filesToDelete.add(fullFromPath);
           Path fullToPath = Paths.get(dbPath.toString(), to);
           // Make parent dir if it doesn't exist.
           Path parent = fullToPath.getParent();
@@ -132,6 +164,15 @@ public final class OmSnapshotUtils {
         }
         if (!hardLinkFile.delete()) {
           throw new IOException("Failed to delete: " + hardLinkFile);
+        }
+      }
+    }
+    if (deleteSourceFiles) {
+      for (Path fileToDelete : filesToDelete) {
+        try {
+          Files.deleteIfExists(fileToDelete);
+        } catch (IOException e) {
+          LOG.warn("Couldn't delete source file {} while unpacking the DB", fileToDelete, e);
         }
       }
     }

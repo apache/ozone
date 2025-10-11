@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+source ../compose_v2_compatibility.sh
+
 declare -i OZONE_DATANODES OZONE_REPLICATION_FACTOR OZONE_SAFEMODE_MIN_DATANODES
 
 ORIG_DATANODES="${OZONE_DATANODES:-}"

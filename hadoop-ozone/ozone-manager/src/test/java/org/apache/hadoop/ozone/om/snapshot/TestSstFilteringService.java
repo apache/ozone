@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,41 +13,22 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.utils.db.DBProfile;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
-import org.apache.hadoop.ozone.om.KeyManager;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OmSnapshot;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
-import org.apache.hadoop.ozone.om.OmTestManagers;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.SstFilteringService;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.ratis.util.ExitUtils;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.rocksdb.LiveFileMetaData;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
+import static org.apache.ozone.test.LambdaTestUtils.await;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -62,18 +42,38 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
-import static org.apache.ozone.test.LambdaTestUtils.await;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.utils.db.DBProfile;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.OmTestManagers;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SstFilteringService;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.io.TempDir;
+import org.rocksdb.LiveFileMetaData;
 
 /**
  * Test SST Filtering Service.
@@ -162,10 +162,10 @@ public class TestSstFilteringService {
     }
 
     createKeys(volumeName, bucketName1, keyCount / 2);
-    activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+    activeDbStore.getDb().flush(KEY_TABLE);
 
     createKeys(volumeName, bucketName1, keyCount / 2);
-    activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+    activeDbStore.getDb().flush(KEY_TABLE);
 
     int level0FilesCount = 0;
     int totalFileCount = 0;
@@ -180,7 +180,7 @@ public class TestSstFilteringService {
 
     assertEquals(totalFileCount - totalFileCountDiff, level0FilesCount - level0FilesCountDiff);
 
-    activeDbStore.getDb().compactRange(OmMetadataManagerImpl.KEY_TABLE);
+    activeDbStore.getDb().compactRange(KEY_TABLE);
 
     int nonLevel0FilesCountAfterCompact = 0;
 
@@ -199,13 +199,13 @@ public class TestSstFilteringService {
     addBucketToVolume(volumeName, bucketName2);
     createKeys(volumeName, bucketName2, keyCount);
 
-    activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
+    activeDbStore.getDb().flush(KEY_TABLE);
     List<LiveFileMetaData> allFiles = activeDbStore.getDb().getSstFileList();
     String snapshotName1 = "snapshot1";
     createSnapshot(volumeName, bucketName2, snapshotName1);
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
-    assertFalse(snapshotInfo.isSstFiltered());
+    assertFalse(SstFilteringService.isSstFiltered(om.getConfiguration(), snapshotInfo));
     waitForSnapshotsAtLeast(filteringService, countExistingSnapshots + 1);
     assertEquals(countExistingSnapshots + 1, filteringService.getSnapshotFilteredCount().get());
 
@@ -237,8 +237,9 @@ public class TestSstFilteringService {
 
     // Need to read the sstFiltered flag which is set in background process and
     // hence snapshotInfo.isSstFiltered() may not work sometimes.
-    assertTrue(om.getMetadataManager().getSnapshotInfoTable().get(SnapshotInfo
-        .getTableKey(volumeName, bucketName2, snapshotName1)).isSstFiltered());
+    assertTrue(SstFilteringService.isSstFiltered(om.getConfiguration(),
+        om.getMetadataManager().getSnapshotInfoTable().get(SnapshotInfo
+            .getTableKey(volumeName, bucketName2, snapshotName1))));
 
     String snapshotName2 = "snapshot2";
     final long count;
@@ -275,13 +276,12 @@ public class TestSstFilteringService {
     // Write 25 keys in each bucket, 2 sst files would be generated each for
     // keys in a single bucket
     int keyCount = 25;
-    for (int bucketIdx = 0; bucketIdx < bucketNames.size(); bucketIdx++) {
+    for (String bucketName : bucketNames) {
       for (int i = 1; i <= keyCount; i++) {
-        createKey(writeClient, volumeName, bucketNames.get(bucketIdx),
-            "key" + i);
+        createKey(writeClient, volumeName, bucketName, "key" + i);
       }
-      activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
-      activeDbStore.getDb().compactRange(OmMetadataManagerImpl.KEY_TABLE);
+      activeDbStore.getDb().flush(KEY_TABLE);
+      activeDbStore.getDb().compactRange(KEY_TABLE);
     }
 
     SstFilteringService sstFilteringService =
@@ -312,7 +312,7 @@ public class TestSstFilteringService {
         .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
 
     // delete snap1
-    writeClient.deleteSnapshot(volumeName, bucketNames.get(0), "snap1");
+    deleteSnapshot(volumeName, bucketNames.get(0), "snap1");
     sstFilteringService.resume();
     // Filtering service will only act on snap2 as it is an active snaphot
     waitForSnapshotsAtLeast(sstFilteringService, countTotalSnapshots);
@@ -336,7 +336,7 @@ public class TestSstFilteringService {
                           int keyCount)
       throws IOException {
     for (int x = 0; x < keyCount; x++) {
-      String keyName = "key-" + RandomStringUtils.randomAlphanumeric(5);
+      String keyName = "key-" + RandomStringUtils.secure().nextAlphanumeric(5);
       createKey(writeClient, volumeName, bucketName, keyName);
     }
   }
@@ -375,6 +375,8 @@ public class TestSstFilteringService {
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.ONE))
             .setLocationInfoList(new ArrayList<>())
+            .setOwnerName(
+                UserGroupInformation.getCurrentUser().getShortUserName())
             .build();
     //Open and Commit the Key in the Key Manager.
     OpenKeySession session = managerProtocol.openKey(keyArg);
@@ -427,8 +429,8 @@ public class TestSstFilteringService {
       }
       createKey(writeClient, volumeName, bucketName, keyName);
       if (i % 50 == 0) {
-        activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
-        activeDbStore.getDb().compactRange(OmMetadataManagerImpl.KEY_TABLE);
+        activeDbStore.getDb().flush(KEY_TABLE);
+        activeDbStore.getDb().compactRange(KEY_TABLE);
       }
     }
 
@@ -488,7 +490,7 @@ public class TestSstFilteringService {
                                           String snapshot) throws IOException {
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volume, bucket, snapshot));
-    try (ReferenceCounted<OmSnapshot> snapshotMetadataReader =
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshotMetadataReader =
              om.getOmSnapshotManager().getActiveSnapshot(
                  snapshotInfo.getVolumeName(),
                  snapshotInfo.getBucketName(),
@@ -501,5 +503,10 @@ public class TestSstFilteringService {
   private void createSnapshot(String volumeName, String bucketName, String snapshotName) throws IOException {
     writeClient.createSnapshot(volumeName, bucketName, snapshotName);
     countTotalSnapshots++;
+  }
+
+  private void deleteSnapshot(String volumeName, String bucketName, String snapshotName) throws IOException {
+    writeClient.deleteSnapshot(volumeName, bucketName, snapshotName);
+    countTotalSnapshots--;
   }
 }

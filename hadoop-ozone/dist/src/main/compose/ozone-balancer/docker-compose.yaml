@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
-
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-common-config:
   &common-config
@@ -41,6 +39,8 @@ services:
       volumes:
          - tmpfs1:/data
          - ../..:/opt/hadoop
+      deploy:
+         replicas: ${DATANODE1_REPLICA:-1}
    datanode2:
       <<: *common-config
       ports:
@@ -52,6 +52,8 @@ services:
       volumes:
          - tmpfs2:/data
          - ../..:/opt/hadoop
+      deploy:
+         replicas: ${DATANODE2_REPLICA:-1}
    datanode3:
       <<: *common-config
       ports:
@@ -63,6 +65,8 @@ services:
       volumes:
          - tmpfs3:/data
          - ../..:/opt/hadoop
+      deploy:
+         replicas: ${DATANODE3_REPLICA:-1}
    datanode4:
       <<: *common-config
       ports:
@@ -74,6 +78,34 @@ services:
       volumes:
          - tmpfs4:/data
          - ../..:/opt/hadoop
+      deploy:
+         replicas: ${DATANODE4_REPLICA:-1}
+   datanode5:
+      <<: *common-config
+      ports:
+         - 19864
+         - 9882
+      environment:
+         <<: *replication
+      command: [ "ozone","datanode" ]
+      volumes:
+         - tmpfs5:/data
+         - ../..:/opt/hadoop
+      deploy:
+         replicas: ${DATANODE5_REPLICA:-1}
+   datanode6:
+      <<: *common-config
+      ports:
+         - 19864
+         - 9882
+      environment:
+         <<: *replication
+      command: [ "ozone","datanode" ]
+      volumes:
+         - tmpfs6:/data
+         - ../..:/opt/hadoop
+      deploy:
+         replicas: ${DATANODE6_REPLICA:-1}
    om1:
       <<: *common-config
       environment:
@@ -156,24 +188,36 @@ volumes:
    tmpfs1:
       driver: local
       driver_opts:
-         o: "size=1g,uid=1000"
+         o: "size=2g,uid=1000"
          device: tmpfs
          type: tmpfs
    tmpfs2:
       driver: local
       driver_opts:
-         o: "size=1g,uid=2000"
+         o: "size=2g,uid=2000"
          device: tmpfs
          type: tmpfs
    tmpfs3:
       driver: local
       driver_opts:
-         o: "size=1g,uid=3000"
+         o: "size=2g,uid=3000"
          device: tmpfs
          type: tmpfs
    tmpfs4:
       driver: local
       driver_opts:
-         o: "size=1g,uid=4000"
+         o: "size=2g,uid=4000"
+         device: tmpfs
+         type: tmpfs
+   tmpfs5:
+      driver: local
+      driver_opts:
+         o: "size=2g,uid=5000"
+         device: tmpfs
+         type: tmpfs
+   tmpfs6:
+      driver: local
+      driver_opts:
+         o: "size=2g,uid=6000"
          device: tmpfs
          type: tmpfs

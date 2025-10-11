@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,69 +14,66 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.mockito.Mockito.mock;
+
 import com.google.common.collect.ImmutableMap;
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.StaticMapping;
-
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OmTestManagers;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import java.io.File;
-import java.util.List;
-import java.util.Map;
-import java.util.ArrayList;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
-import static org.mockito.Mockito.mock;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * {@link org.apache.hadoop.hdds.scm.server.TestSCMBlockProtocolServer}
  * sortDatanodes tests for
  * {@link org.apache.hadoop.ozone.om.KeyManagerImpl#sortDatanodes(List, String)}.
  */
-@Timeout(300)
 public class TestOMSortDatanodes {
 
+  @TempDir
+  private static File dir;
   private static OzoneConfiguration config;
   private static StorageContainerManager scm;
   private static NodeManager nodeManager;
   private static KeyManagerImpl keyManager;
-  private static StorageContainerLocationProtocol mockScmContainerClient;
   private static OzoneManager om;
-  private static File dir;
   private static final int NODE_COUNT = 10;
   private static final Map<String, String> EDGE_NODES = ImmutableMap.of(
       "edge0", "/rack0",
       "edge1", "/rack1"
   );
 
+  private static OzoneClient ozoneClient;
+
   @BeforeAll
   public static void setup() throws Exception {
     config = new OzoneConfiguration();
-    dir = GenericTestUtils.getRandomizedTestDir();
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     config.set(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class.getName());
@@ -103,17 +99,20 @@ public class TestOMSortDatanodes {
     scm.exitSafeMode();
     nodeManager = scm.getScmNodeManager();
     datanodes.forEach(dn -> nodeManager.register(dn, null, null));
-    mockScmContainerClient =
-        mock(StorageContainerLocationProtocol.class);
+    StorageContainerLocationProtocol mockScmContainerClient = mock(StorageContainerLocationProtocol.class);
     OmTestManagers omTestManagers
         = new OmTestManagers(config, scm.getBlockProtocolServer(),
         mockScmContainerClient);
     om = omTestManagers.getOzoneManager();
+    ozoneClient = omTestManagers.getRpcClient();
     keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
   }
 
   @AfterAll
   public static void cleanup() throws Exception {
+    if (ozoneClient != null) {
+      ozoneClient.close();
+    }
     if (scm != null) {
       scm.stop();
       scm.join();
@@ -121,14 +120,13 @@ public class TestOMSortDatanodes {
     if (om != null) {
       om.stop();
     }
-    FileUtils.deleteDirectory(dir);
   }
 
   @Test
   public void sortDatanodesRelativeToDatanode() {
     for (DatanodeDetails dn : nodeManager.getAllNodes()) {
       assertEquals(ROOT_LEVEL + 2, dn.getLevel());
-      List<DatanodeDetails> sorted =
+      List<? extends DatanodeDetails> sorted =
           keyManager.sortDatanodes(nodeManager.getAllNodes(), nodeAddress(dn));
       assertEquals(dn, sorted.get(0),
           "Source node should be sorted very first");
@@ -146,12 +144,12 @@ public class TestOMSortDatanodes {
 
   @Test
   public void testSortDatanodes() {
-    List<DatanodeDetails> nodes = nodeManager.getAllNodes();
+    List<? extends DatanodeDetails> nodes = nodeManager.getAllNodes();
 
     // sort normal datanodes
     String client;
     client = nodeManager.getAllNodes().get(0).getIpAddress();
-    List<DatanodeDetails> datanodeDetails =
+    List<? extends DatanodeDetails> datanodeDetails =
         keyManager.sortDatanodes(nodes, client);
     assertEquals(NODE_COUNT, datanodeDetails.size());
 
@@ -166,7 +164,7 @@ public class TestOMSortDatanodes {
     assertEquals(NODE_COUNT, datanodeDetails.size());
   }
 
-  private static void assertRackOrder(String rack, List<DatanodeDetails> list) {
+  private static void assertRackOrder(String rack, List<? extends DatanodeDetails> list) {
     int size = list.size();
     for (int i = 0; i < size / 2; i++) {
       assertEquals(rack, list.get(i).getNetworkLocation(),
@@ -180,8 +178,8 @@ public class TestOMSortDatanodes {
 
   private String nodeAddress(DatanodeDetails dn) {
     boolean useHostname = config.getBoolean(
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+        HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     return useHostname ? dn.getHostName() : dn.getIpAddress();
   }
 }

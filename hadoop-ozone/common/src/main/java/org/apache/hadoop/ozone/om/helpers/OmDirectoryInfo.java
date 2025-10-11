@@ -1,34 +1,33 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
-import org.apache.hadoop.hdds.utils.db.CopyObject;
-import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
+package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
 
 /**
  * This class represents the directory information by keeping each component
@@ -40,13 +39,11 @@ public class OmDirectoryInfo extends WithParentObjectId
   private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(DirectoryInfo.getDefaultInstance()),
       OmDirectoryInfo::getFromProtobuf,
-      OmDirectoryInfo::getProtobuf);
-
-  public static Codec<OmDirectoryInfo> getCodec() {
-    return CODEC;
-  }
+      OmDirectoryInfo::getProtobuf,
+      OmDirectoryInfo.class);
 
   private final String name; // directory name
+  private String owner;
 
   private final long creationTime;
   private final long modificationTime;
@@ -56,9 +53,14 @@ public class OmDirectoryInfo extends WithParentObjectId
   public OmDirectoryInfo(Builder builder) {
     super(builder);
     this.name = builder.name;
+    this.owner = builder.owner;
     this.acls = builder.acls;
     this.creationTime = builder.creationTime;
     this.modificationTime = builder.modificationTime;
+  }
+
+  public static Codec<OmDirectoryInfo> getCodec() {
+    return CODEC;
   }
 
   /**
@@ -75,6 +77,7 @@ public class OmDirectoryInfo extends WithParentObjectId
    */
   public static class Builder extends WithParentObjectId.Builder {
     private String name;
+    private String owner;
 
     private long creationTime;
     private long modificationTime;
@@ -106,6 +109,11 @@ public class OmDirectoryInfo extends WithParentObjectId
 
     public Builder setName(String dirName) {
       this.name = dirName;
+      return this;
+    }
+
+    public Builder setOwner(String ownerName) {
+      this.owner = ownerName;
       return this;
     }
 
@@ -163,6 +171,10 @@ public class OmDirectoryInfo extends WithParentObjectId
     return name;
   }
 
+  public String getOwner() {
+    return owner;
+  }
+
   public long getCreationTime() {
     return creationTime;
   }
@@ -187,6 +199,9 @@ public class OmDirectoryInfo extends WithParentObjectId
                     .setObjectID(getObjectID())
                     .setUpdateID(getUpdateID())
                     .setParentID(getParentObjectID());
+    if (owner != null) {
+      pib.setOwnerName(owner);
+    }
     if (acls != null) {
       pib.addAllAcls(OzoneAclUtil.toProtobuf(acls));
     }
@@ -217,6 +232,9 @@ public class OmDirectoryInfo extends WithParentObjectId
     if (dirInfo.hasUpdateID()) {
       opib.setUpdateID(dirInfo.getUpdateID());
     }
+    if (dirInfo.hasOwnerName()) {
+      opib.setOwner(dirInfo.getOwnerName());
+    }
     return opib.build();
   }
 
@@ -232,6 +250,7 @@ public class OmDirectoryInfo extends WithParentObjectId
     return creationTime == omDirInfo.creationTime &&
             modificationTime == omDirInfo.modificationTime &&
             name.equals(omDirInfo.name) &&
+            Objects.equals(owner, omDirInfo.owner) &&
             Objects.equals(getMetadata(), omDirInfo.getMetadata()) &&
             Objects.equals(acls, omDirInfo.acls) &&
             getObjectID() == omDirInfo.getObjectID() &&
@@ -251,6 +270,7 @@ public class OmDirectoryInfo extends WithParentObjectId
   public OmDirectoryInfo copyObject() {
     OmDirectoryInfo.Builder builder = new Builder()
             .setName(name)
+            .setOwner(owner)
             .setCreationTime(creationTime)
             .setModificationTime(modificationTime)
             .setAcls(acls)

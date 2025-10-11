@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -102,6 +102,12 @@ public final class ClusterStateResponse {
   @JsonProperty
   private long deletedDirs;
 
+  @JsonProperty("scmServiceId")
+  private String scmServiceId;
+
+  @JsonProperty("omServiceId")
+  private String omServiceId;
+
   /**
    * Returns new builder class that builds a ClusterStateResponse.
    *
@@ -125,12 +131,13 @@ public final class ClusterStateResponse {
     this.keysPendingDeletion = b.keysPendingDeletion;
     this.deletedDirs = b.deletedDirs;
     this.deletedContainers = b.deletedContainers;
+    this.scmServiceId = b.scmServiceId;
+    this.omServiceId = b.omServiceId;
   }
 
   /**
    * Builder for ClusterStateResponse.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private int pipelines;
     private int totalDatanodes;
@@ -145,6 +152,8 @@ public final class ClusterStateResponse {
     private long keys;
     private long keysPendingDeletion;
     private long deletedDirs;
+    private String scmServiceId;
+    private String omServiceId;
 
     public Builder() {
       // Default values
@@ -225,6 +234,16 @@ public final class ClusterStateResponse {
       return this;
     }
 
+    public Builder setScmServiceId(String scmServiceId) {
+      this.scmServiceId = scmServiceId;
+      return this;
+    }
+
+    public Builder setOmServiceId(String omServiceId) {
+      this.omServiceId = omServiceId;
+      return this;
+    }
+
     public ClusterStateResponse build() {
       Preconditions.checkNotNull(this.storageReport);
 
@@ -283,4 +302,13 @@ public final class ClusterStateResponse {
   public long getDeletedDirs() {
     return deletedDirs;
   }
+
+  public String getScmServiceId() {
+    return scmServiceId;
+  }
+
+  public String getOmServiceId() {
+    return omServiceId;
+  }
+
 }

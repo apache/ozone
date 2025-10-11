@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,40 +18,42 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
-import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
-
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
 
 /**
  * Wrapper class for Ozone prefix path info, currently mainly target for ACL but
  * can be extended for other OzFS optimizations in future.
  */
 // TODO: support Auditable interface
-public final class OmPrefixInfo extends WithObjectID {
+public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPrefixInfo> {
   private static final Codec<OmPrefixInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(PersistedPrefixInfo.getDefaultInstance()),
       OmPrefixInfo::getFromProtobuf,
-      OmPrefixInfo::getProtobuf);
-
-  public static Codec<OmPrefixInfo> getCodec() {
-    return CODEC;
-  }
+      OmPrefixInfo::getProtobuf,
+      OmPrefixInfo.class);
 
   private final String name;
-  private final List<OzoneAcl> acls;
+  private final CopyOnWriteArrayList<OzoneAcl> acls;
 
   private OmPrefixInfo(Builder b) {
     super(b);
     name = b.name;
-    acls = new ArrayList<>(b.acls);
+    acls = new CopyOnWriteArrayList<>(b.acls);
+  }
+
+  public static Codec<OmPrefixInfo> getCodec() {
+    return CODEC;
   }
 
   /**
@@ -230,9 +231,7 @@ public final class OmPrefixInfo extends WithObjectID {
         '}';
   }
 
-  /**
-   * Return a new copy of the object.
-   */
+  @Override
   public OmPrefixInfo copyObject() {
     return toBuilder().build();
   }

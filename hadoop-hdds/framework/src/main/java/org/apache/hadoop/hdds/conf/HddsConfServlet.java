@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,28 +14,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.conf;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.core.HttpHeaders;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-
-import com.google.common.base.Strings;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.gson.Gson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A servlet to print out the running configuration data.
@@ -52,9 +47,6 @@ public class HddsConfServlet extends HttpServlet {
   private static final String COMMAND = "cmd";
   private static final OzoneConfiguration OZONE_CONFIG =
       new OzoneConfiguration();
-  private static final transient Logger LOG =
-      LoggerFactory.getLogger(HddsConfServlet.class);
-
 
   /**
    * Return the Configuration of the daemon hosting this servlet.
@@ -145,16 +137,15 @@ public class HddsConfServlet extends HttpServlet {
 
   private void processConfigTagRequest(HttpServletRequest request, String cmd,
       Writer out) throws IOException {
-    Gson gson = new Gson();
     OzoneConfiguration config = getOzoneConfig();
 
     switch (cmd) {
     case "getOzoneTags":
-      out.write(gson.toJson(OzoneConfiguration.TAGS));
+      out.write(JsonUtils.toJsonString(OzoneConfiguration.TAGS));
       break;
     case "getPropertyByTag":
       String tags = request.getParameter("tags");
-      if (Strings.isNullOrEmpty(tags)) {
+      if (tags == null || tags.isEmpty()) {
         throw new IllegalArgumentException("The tags parameter should be set" +
                 " when using the getPropertyByTag command.");
       }
@@ -164,13 +155,9 @@ public class HddsConfServlet extends HttpServlet {
         if (config.isPropertyTag(tag)) {
           Properties properties = config.getAllPropertiesByTag(tag);
           propMap.put(tag, properties);
-        } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Not a valid tag {}", tag);
-          }
         }
       }
-      out.write(gson.toJsonTree(propMap).toString());
+      out.write(JsonUtils.toJsonString(propMap));
       break;
     default:
       throw new IllegalArgumentException(cmd + " is not a valid command.");

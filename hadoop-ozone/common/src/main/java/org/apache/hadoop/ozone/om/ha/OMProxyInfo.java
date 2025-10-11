@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,19 +17,17 @@
 
 package org.apache.hadoop.ozone.om.ha;
 
+import java.net.InetSocketAddress;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetSocketAddress;
-
 /**
  * Class to store OM proxy information.
  */
 public class OMProxyInfo {
-  private String serviceId;
   private String nodeId;
   private String rpcAddrStr;
   private InetSocketAddress rpcAddr;
@@ -40,7 +37,6 @@ public class OMProxyInfo {
       LoggerFactory.getLogger(OMProxyInfo.class);
 
   OMProxyInfo(String serviceID, String nodeID, String rpcAddress) {
-    this.serviceId = serviceID;
     this.nodeId = nodeID;
     this.rpcAddrStr = rpcAddress;
     this.rpcAddr = NetUtils.createSocketAddr(rpcAddrStr);
@@ -48,7 +44,7 @@ public class OMProxyInfo {
       LOG.warn("OzoneManager address {} for serviceID {} remains unresolved " +
               "for node ID {} Check your ozone-site.xml file to ensure ozone " +
               "manager addresses are configured properly.",
-          rpcAddress, serviceId, nodeId);
+          rpcAddress, serviceID, nodeId);
       this.dtService = null;
     } else {
 

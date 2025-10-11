@@ -1,48 +1,48 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.helpers;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.client.BlockID;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
-import org.apache.hadoop.hdds.utils.db.Proto3Codec;
-
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.ArrayList;
+import java.util.function.Function;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto3Codec;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 
 /**
  * Helper class to convert Protobuf to Java classes.
  */
 public class BlockData {
   private static final Codec<BlockData> CODEC = new DelegatedCodec<>(
-      Proto3Codec.get(ContainerProtos.BlockData.getDefaultInstance()),
+      // allow InvalidProtocolBufferException for backward compatibility with Schema One
+      Proto3Codec.get(ContainerProtos.BlockData.getDefaultInstance(), true),
       BlockData::getFromProtoBuf,
-      BlockData::getProtoBufMessage);
-
-  public static Codec<BlockData> getCodec() {
-    return CODEC;
-  }
+      BlockData::getProtoBufMessage,
+      BlockData.class);
 
   private final BlockID blockID;
   private final Map<String, String> metadata;
@@ -78,6 +78,10 @@ public class BlockData {
     this.size = 0;
   }
 
+  public static Codec<BlockData> getCodec() {
+    return CODEC;
+  }
+
   public long getBlockCommitSequenceId() {
     return blockID.getBlockCommitSequenceId();
   }
@@ -91,19 +95,22 @@ public class BlockData {
    *
    * @param data - Protobuf data.
    * @return - BlockData
-   * @throws IOException
    */
-  public static BlockData getFromProtoBuf(ContainerProtos.BlockData data) throws
-      IOException {
+  public static BlockData getFromProtoBuf(ContainerProtos.BlockData data) throws CodecException {
+    if (data == null) {
+      return null;
+    }
     BlockData blockData = new BlockData(
         BlockID.getFromProtobuf(data.getBlockID()));
     for (int x = 0; x < data.getMetadataCount(); x++) {
-      blockData.addMetadata(data.getMetadata(x).getKey(),
-          data.getMetadata(x).getValue());
+      final ContainerProtos.KeyValue meta = data.getMetadata(x);
+      blockData.addMetadata(meta.getKey(), meta.getValue(), CodecException::new);
     }
     blockData.setChunks(data.getChunksList());
-    if (data.hasSize()) {
-      Preconditions.checkArgument(data.getSize() == blockData.getSize());
+    if (data.hasSize() && data.getSize() != blockData.getSize()) {
+      throw new CodecException("Size mismatch: size (=" + data.getSize()
+          + ") != sum of chunks (=" + blockData.getSize()
+          + "), proto: " + TextFormat.shortDebugString(data));
     }
     return blockData;
   }
@@ -112,7 +119,14 @@ public class BlockData {
    * Returns a Protobuf message from BlockData.
    * @return Proto Buf Message.
    */
-  public ContainerProtos.BlockData getProtoBufMessage() {
+  public ContainerProtos.BlockData getProtoBufMessage() throws CodecException {
+    final long sum = computeSize(getChunks());
+    if (sum != getSize()) {
+      throw new CodecException("Size mismatch: size (=" + getSize()
+          + ") != sum of chunks (=" + sum
+          + "), chunks: " + chunkList);
+    }
+
     ContainerProtos.BlockData.Builder builder =
         ContainerProtos.BlockData.newBuilder();
     builder.setBlockID(this.blockID.getDatanodeBlockIDProtobuf());
@@ -134,10 +148,14 @@ public class BlockData {
    * @param value - Value
    * @throws IOException
    */
-  public synchronized void addMetadata(String key, String value) throws
-      IOException {
+  public void addMetadata(String key, String value) throws IOException {
+    addMetadata(key, value, IOException::new);
+  }
+
+  private synchronized <E extends IOException> void addMetadata(String key, String value,
+      Function<String, E> constructor) throws E {
     if (this.metadata.containsKey(key)) {
-      throw new IOException("This key already exists. Key " + key);
+      throw constructor.apply("Key already exists: " + key + " (value: " + value + ")");
     }
     metadata.put(key, value);
   }
@@ -252,11 +270,15 @@ public class BlockData {
         size = singleChunk.getLen();
       } else {
         chunkList = chunks;
-        size = chunks.parallelStream()
-            .mapToLong(ContainerProtos.ChunkInfo::getLen)
-            .sum();
+        size = computeSize(chunks);
       }
     }
+  }
+
+  static long computeSize(List<ContainerProtos.ChunkInfo> chunks) {
+    return chunks.stream()
+        .mapToLong(ContainerProtos.ChunkInfo::getLen)
+        .sum();
   }
 
   /**
@@ -278,6 +300,16 @@ public class BlockData {
     sb.append("[blockId=");
     blockID.appendTo(sb);
     sb.append(", size=").append(size);
-    sb.append("]");
+    sb.append(']');
+  }
+
+  public long getBlockGroupLength() {
+    String lenStr = getMetadata()
+        .get(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK);
+    // If we don't have the length, then it indicates a problem with the stripe.
+    // All replica should carry the length, so if it is not there, we return 0,
+    // which will cause us to set the length of the block to zero and not
+    // attempt to reconstruct it.
+    return (lenStr == null) ? 0 : Long.parseLong(lenStr);
   }
 }

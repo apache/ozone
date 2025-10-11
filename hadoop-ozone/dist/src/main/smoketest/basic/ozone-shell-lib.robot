@@ -17,10 +17,13 @@
 Documentation       Test ozone shell CLI usage
 Library             OperatingSystem
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/shell.robot
+Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${prefix}    generated
 ${SCM}       scm
+${TMP_JSON}  ${TEMP_DIR}/bb1.json
 
 *** Keywords ***
 
@@ -44,18 +47,18 @@ Test ozone shell
                     Should Be Equal     ${result}       10995116277760
     ${result} =     Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1 --space-quota 10TB --namespace-quota 100
                     Should Be Empty     ${result}
-                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > bb1.json
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .storageType' bb1.json
+                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > ${TMP_JSON}
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .storageType' ${TMP_JSON}
                     Should Be Equal     ${result}       DISK
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' ${TMP_JSON}
                     Should Be Equal     ${result}       10995116277760
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' ${TMP_JSON}
                     Should Be Equal     ${result}       100
                     Execute             ozone sh bucket setquota ${protocol}${server}/${volume}/bb1 --space-quota 1TB --namespace-quota 1000
-                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > bb1.json
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' bb1.json
+                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > ${TMP_JSON}
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' ${TMP_JSON}
                     Should Be Equal     ${result}       1099511627776
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' ${TMP_JSON}
                     Should Be Equal     ${result}       1000
     ${result} =     Execute             ozone sh bucket list ${protocol}${server}/${volume}/ | jq -r '.[] | select(.name=="bb1") | .volumeName'
                     Should Be Equal     ${result}       ${volume}
@@ -75,96 +78,126 @@ Test ozone shell
                     Execute             ozone sh bucket delete -r --yes ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
                     Execute             ozone sh volume create ${protocol}${server}/${volume}
-                    Execute             ozone sh volume info ${protocol}${server}/${volume} > volume.json
-    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInBytes' volume.json
+                    Execute             ozone sh volume info ${protocol}${server}/${volume} > ${TMP_JSON}
+    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInBytes' ${TMP_JSON}
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInNamespace' volume.json
+    ${result} =     Execute             jq -r '. | select(.name=="${volume}") | .quotaInNamespace' ${TMP_JSON}
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1
-                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > bb1.json
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' bb1.json
+                    Execute             ozone sh bucket info ${protocol}${server}/${volume}/bb1 > ${TMP_JSON}
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInBytes' ${TMP_JSON}
                     Should Be Equal     ${result}       -1
-    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' bb1.json
+    ${result} =     Execute             jq -r '. | select(.name=="bb1") | .quotaInNamespace' ${TMP_JSON}
                     Should Be Equal     ${result}       -1
                     Execute             ozone sh bucket delete ${protocol}${server}/${volume}/bb1
                     Execute             ozone sh volume delete ${protocol}${server}/${volume}
 
 Test ozone shell errors
     [arguments]     ${protocol}         ${server}       ${volume}
-    ${result} =     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume} --space-quota invalid      255
-                    Should contain      ${result}       invalid
+    ${result} =     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume} --space-quota 1.5GB      255
+                    Should contain      ${result}       1.5GB is invalid
+    ${result} =     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume} --namespace-quota 1.5      255
+                    Should contain      ${result}       1.5 is invalid
                     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume}                            0
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket_1                   255
                     Should contain      ${result}       INVALID_BUCKET_NAME
+    ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --space-quota 1.5GB    255
+                    Should contain      ${result}       1.5GB is invalid
+    ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --namespace-quota 1.5    255
+                    Should contain      ${result}       1.5 is invalid
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1 --layout Invalid   2
                     Should contain      ${result}       Usage
                     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1                    0
     ${result} =     Execute and checkrc    ozone sh key info ${protocol}${server}/${volume}/bucket1/non-existing           255
                     Should contain      ${result}       KEY_NOT_FOUND
     ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/bucket1/key1 unexisting --type invalid    2
+    ${result} =     Execute and checkrc    ozone sh bucket setquota ${volume}/bucket1 --space-quota 1.5                     255
+                    Should contain      ${result}       1.5 is invalid
+    ${result} =     Execute and checkrc    ozone sh bucket setquota ${volume}/bucket1 --namespace-quota 1.5                 255
+                    Should contain      ${result}       1.5 is invalid
+    ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1.5                             255
+                    Should contain      ${result}       1.5 is invalid
+    ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --namespace-quota 1.5                         255
+                    Should contain      ${result}       1.5 is invalid
+                    Execute and checkrc    ozone sh bucket setquota ${volume}/bucket1 --space-quota 2KB                     0
+    ${result} =     Execute and checkrc    ozone sh key put ${volume}/bucket1/key1 /opt/hadoop/NOTICE.txt                   255
+                    Should contain      ${result}       QUOTA_EXCEEDED
+    ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1KB                             255
+                    Should contain      ${result}       QUOTA_EXCEEDED
+                    Execute and checkrc    ozone sh bucket clrquota ${volume}/bucket1 --space-quota                         0
+    ${result} =     Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1GB                             255
+                    Should contain      ${result}       QUOTA_ERROR
                     Execute and checkrc    ozone sh bucket delete ${protocol}${server}/${volume}/bucket1                    0
+                    Execute and checkrc    ozone sh volume setquota ${volume} --space-quota 1GB                             0
+    ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket1                    255
+                    Should contain      ${result}       QUOTA_ERROR
                     Execute and checkrc    ozone sh volume delete ${protocol}${server}/${volume}                            0
-
-
 
 Test Volume Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh volume create ${protocol}${server}/${volume}
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \".*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Not Be Empty    ${acl_check}
     ${result} =     Execute             ozone sh volume addacl ${protocol}${server}/${volume} -a user:superuser1:rwxy[DEFAULT]
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh volume removeacl ${protocol}${server}/${volume} -a user:superuser1:xy
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh volume setacl ${protocol}${server}/${volume} -al user:superuser1:rwxy[DEFAULT],group:superuser1:a,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
     ${result} =     Execute             ozone sh volume getacl ${protocol}${server}/${volume}
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\" .
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
 
 Test Bucket Acls
     [arguments]     ${protocol}         ${server}       ${volume}
-    Execute             ozone sh bucket create ${protocol}${server}/${volume}/bb1
+    Execute         ozone sh bucket create ${protocol}${server}/${volume}/bb1
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \".*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Not Be Empty    ${acl_check}
     ${result} =     Execute             ozone sh bucket addacl ${protocol}${server}/${volume}/bb1 -a user:superuser1:rwxy
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh bucket removeacl ${protocol}${server}/${volume}/bb1 -a user:superuser1:xy
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh bucket setacl ${protocol}${server}/${volume}/bb1 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc,group:superuser1:a[DEFAULT]
     ${result} =     Execute             ozone sh bucket getacl ${protocol}${server}/${volume}/bb1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
-
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
 
 Test key handling
     [arguments]     ${protocol}         ${server}       ${volume}
-                    Execute             ozone sh key put ${protocol}${server}/${volume}/bb1/key1 /opt/hadoop/NOTICE.txt
-                    Execute             rm -f /tmp/NOTICE.txt.1
-                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
+                    Execute             rm -f /tmp/NOTICE.txt.1 /tmp/key1_RATIS /tmp/key1-copy
+                    Ozone Shell Batch   key put ${protocol}${server}/${volume}/bb1/key1 /opt/hadoop/NOTICE.txt
+                    ...                 key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
+                    ...                 key put -t RATIS ${protocol}${server}/${volume}/bb1/key1_RATIS /opt/hadoop/NOTICE.txt
+                    ...                 key get ${protocol}${server}/${volume}/bb1/key1_RATIS /tmp/key1_RATIS
+                    ...                 key cp ${protocol}${server}/${volume}/bb1 key1 key1-copy
+                    ...                 key get ${protocol}${server}/${volume}/bb1/key1-copy /tmp/key1-copy
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/NOTICE.txt.1
-
-                    Execute             ozone sh key put -t RATIS ${protocol}${server}/${volume}/bb1/key1_RATIS /opt/hadoop/NOTICE.txt
-                    Execute             rm -f /tmp/key1_RATIS
-                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1_RATIS /tmp/key1_RATIS
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1_RATIS
+
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1_RATIS | jq -r '. | select(.name=="key1_RATIS")'
                     Should contain      ${result}       RATIS
-                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key1_RATIS
 
-                    Execute             ozone sh key cp ${protocol}${server}/${volume}/bb1 key1 key1-copy
-                    Execute             rm -f /tmp/key1-copy
-                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1-copy /tmp/key1-copy
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1-copy
-                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key1-copy
 
     ${result} =     Execute And Ignore Error    ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Contain      ${result}       NOTICE.txt.1 exists
     ${result} =     Execute             ozone sh key get --force ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Not Contain  ${result}       NOTICE.txt.1 exists
+    ${result} =     Execute and checkrc    ozone sh key put ${protocol}${server}/${volume}/bb1/key1 sample.txt          255
+                    Should Contain         ${result}       File not found: sample.txt
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
                     Should not contain  ${result}       ETag
@@ -173,40 +206,53 @@ Test key handling
                     Execute             ozone sh key rename ${protocol}${server}/${volume}/bb1 key1 key2
     ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '.[] | select(.name=="key2") | .name'
                     Should Be Equal     ${result}       key2
-                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key2
+                    Ozone Shell Batch   key delete ${protocol}${server}/${volume}/bb1/key2
+                    ...                 key delete ${protocol}${server}/${volume}/bb1/key1_RATIS
+                    ...                 key delete ${protocol}${server}/${volume}/bb1/key1-copy
 
 Test key Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh key put ${protocol}${server}/${volume}/bb1/key2 /opt/hadoop/NOTICE.txt
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \".*\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Not Be Empty    ${acl_check}
     ${result} =     Execute             ozone sh key addacl ${protocol}${server}/${volume}/bb1/key2 -a user:superuser1:rwxy
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh key removeacl ${protocol}${server}/${volume}/bb1/key2 -a user:superuser1:xy
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh key setacl ${protocol}${server}/${volume}/bb1/key2 -al user:superuser1:rwxy,group:superuser1:a,user:testuser:rwxyc
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/key2
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
 
 Test prefix Acls
     [arguments]     ${protocol}         ${server}       ${volume}
     Execute         ozone sh prefix addacl ${protocol}${server}/${volume}/bb1/prefix1/ -a user:superuser1:rwxy[DEFAULT]
     ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh prefix removeacl ${protocol}${server}/${volume}/bb1/prefix1/ -a user:superuser1:xy
     ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\"
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     ${result} =     Execute             ozone sh prefix setacl ${protocol}${server}/${volume}/bb1/prefix1/ -al user:superuser1:rwxy[DEFAULT],group:superuser1:a[DEFAULT],user:testuser:rwxyc
     ${result} =     Execute             ozone sh prefix getacl ${protocol}${server}/${volume}/bb1/prefix1/
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"DEFAULT\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="DEFAULT" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
     Execute         ozone sh key put ${protocol}${server}/${volume}/bb1/prefix1/key1 /opt/hadoop/NOTICE.txt
     ${result} =     Execute             ozone sh key getacl ${protocol}${server}/${volume}/bb1/prefix1/key1
-    Should Match Regexp                 ${result}       \"type\" : \"USER\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"READ\", \"WRITE\", \"READ_ACL\", \"WRITE_ACL\"
-    Should Match Regexp                 ${result}       \"type\" : \"GROUP\",\n.*\"name\" : \"superuser1\",\n.*\"aclScope\" : \"ACCESS\",\n.*\"aclList\" : . \"ALL\" .
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="USER" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["READ", "WRITE", "READ_ACL", "WRITE_ACL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
+    ${acl_check} =  Execute             echo '${result}' | jq -r '.[] | select(.type=="GROUP" and .name=="superuser1" and .aclScope=="ACCESS" and (.aclList | contains(["ALL"]))) | .name'
+    Should Be Equal    ${acl_check}    superuser1
 
 Test native authorizer
     [arguments]     ${protocol}         ${server}       ${volume}
@@ -248,18 +294,18 @@ Test native authorizer
 
 Test Delete key with Trash
     [arguments]    ${protocol}         ${server}       ${volume}
-                   Execute               ozone sh volume create ${protocol}${server}/${volume}
-                   Execute               ozone sh bucket create ${protocol}${server}/${volume}/bfso --layout FILE_SYSTEM_OPTIMIZED
-                   Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/bfso/key3 /opt/hadoop/NOTICE.txt
-                   Execute               ozone sh key delete ${protocol}${server}/${volume}/bfso/key3
+                   Ozone Shell Batch     volume create ${protocol}${server}/${volume}
+                   ...                   bucket create ${protocol}${server}/${volume}/bfso --layout FILE_SYSTEM_OPTIMIZED
+                   ...                   key put -t RATIS ${protocol}${server}/${volume}/bfso/key3 /opt/hadoop/NOTICE.txt
+                   ...                   key delete ${protocol}${server}/${volume}/bfso/key3
     ${fsokey} =    Execute               ozone sh key list ${protocol}${server}/${volume}/bfso
     ${result} =    Execute               echo '${fsokey}' | jq -r '.[] | select(.name | startswith(".Trash")) | .name'
                    Should Contain Any    ${result}    .Trash/hadoop    .Trash/testuser    .Trash/root
                    Should contain        ${result}    key3
     ${result} =    Execute               echo '${fsokey}' | jq -r '.[] | select(.name | startswith(".Trash") | not) | .name'
                    Should Not contain    ${result}    key3
-                   Execute               ozone sh bucket create ${protocol}${server}/${volume}/obsbkt --layout OBJECT_STORE
-                   Execute               ozone sh key put -t RATIS ${protocol}${server}/${volume}/obsbkt/key2 /opt/hadoop/NOTICE.txt
-                   Execute               ozone sh key delete ${protocol}${server}/${volume}/obsbkt/key2
+                   Ozone Shell Batch     bucket create ${protocol}${server}/${volume}/obsbkt --layout OBJECT_STORE
+                   ...                   key put -t RATIS ${protocol}${server}/${volume}/obsbkt/key2 /opt/hadoop/NOTICE.txt
+                   ...                   key delete ${protocol}${server}/${volume}/obsbkt/key2
     ${result} =    Execute               ozone sh key list ${protocol}${server}/${volume}/obsbkt
                    Should not contain    ${result}    key2

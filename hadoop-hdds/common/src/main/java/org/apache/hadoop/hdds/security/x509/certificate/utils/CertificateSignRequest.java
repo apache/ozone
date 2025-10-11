@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +13,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.INVALID_CSR;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
+
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
@@ -26,14 +29,11 @@ import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
@@ -64,9 +64,6 @@ import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.INVALID_CSR;
-import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * A certificate sign request object that wraps operations to build a
@@ -157,34 +154,43 @@ public final class CertificateSignRequest {
     throw new CertificateException("No PKCS#9 extension found in CSR");
   }
 
-  private PKCS10CertificationRequest generateCSR() throws
-      OperatorCreationException {
-    X500Name dnName = getDistinguishedName(subject, scmID, clusterID);
-    PKCS10CertificationRequestBuilder p10Builder =
-        new JcaPKCS10CertificationRequestBuilder(dnName, keyPair.getPublic());
-
-    ContentSigner contentSigner =
-        new JcaContentSignerBuilder(config.getSignatureAlgo())
-            .setProvider(config.getProvider())
-            .build(keyPair.getPrivate());
-
-    if (extensions != null) {
-      p10Builder.addAttribute(
-          PKCSObjectIdentifiers.pkcs_9_at_extensionRequest, extensions);
-    }
-    return p10Builder.build(contentSigner);
-  }
-  public static String getEncodedString(PKCS10CertificationRequest request)
-      throws IOException {
-    PemObject pemObject =
-        new PemObject("CERTIFICATE REQUEST", request.getEncoded());
+  /**
+   * Encodes this CertificateSignRequest to a String representation, that can be transferred over the wire to
+   * the CA server for signing.
+   *
+   * @return the Certificate Sign Request encoded to a String
+   * @throws IOException if an error occurs during encoding.
+   */
+  public String toEncodedFormat() throws IOException {
     StringWriter str = new StringWriter();
     try (JcaPEMWriter pemWriter = new JcaPEMWriter(str)) {
+      PemObject pemObject = new PemObject("CERTIFICATE REQUEST", generateCSR().getEncoded());
       pemWriter.writeObject(pemObject);
     }
     return str.toString();
   }
 
+  //TODO: this should be private once the server side of removing PKCS10CertReq class is done.
+  public PKCS10CertificationRequest generateCSR() throws IOException {
+    X500Name dnName = getDistinguishedName(subject, scmID, clusterID);
+    PKCS10CertificationRequestBuilder p10Builder =
+        new JcaPKCS10CertificationRequestBuilder(dnName, keyPair.getPublic());
+
+    try {
+      ContentSigner contentSigner =
+          new JcaContentSignerBuilder(config.getSignatureAlgo())
+              .setProvider(config.getProvider())
+              .build(keyPair.getPrivate());
+
+      if (extensions != null) {
+        p10Builder.addAttribute(
+            PKCSObjectIdentifiers.pkcs_9_at_extensionRequest, extensions);
+      }
+      return p10Builder.build(contentSigner);
+    } catch (OperatorCreationException e) {
+      throw new IOException(e);
+    }
+  }
 
   /**
    * Gets a CertificateRequest Object from PEM encoded CSR.
@@ -381,7 +387,7 @@ public final class CertificateSignRequest {
       if (altNames != null) {
         return Optional.of(new Extension(Extension.subjectAlternativeName,
             false, new DEROctetString(new GeneralNames(
-            altNames.toArray(new GeneralName[altNames.size()])))));
+            altNames.toArray(new GeneralName[0])))));
       }
       return Optional.empty();
     }
@@ -405,15 +411,13 @@ public final class CertificateSignRequest {
 
       // Add subject alternate name extension
       Optional<Extension> san = getSubjectAltNameExtension();
-      if (san.isPresent()) {
-        extensions.add(san.get());
-      }
+      san.ifPresent(extensions::add);
 
       return new Extensions(
-          extensions.toArray(new Extension[extensions.size()]));
+          extensions.toArray(new Extension[0]));
     }
 
-    public PKCS10CertificationRequest build() throws SCMSecurityException {
+    public CertificateSignRequest build() throws SCMSecurityException {
       Preconditions.checkNotNull(key, "KeyPair cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(subject), "Subject " +
           "cannot be blank");
@@ -421,15 +425,11 @@ public final class CertificateSignRequest {
       try {
         CertificateSignRequest csr = new CertificateSignRequest(subject, scmID,
             clusterID, key, config, createExtensions());
-        return csr.generateCSR();
+        return csr;
       } catch (IOException ioe) {
         throw new CertificateException(String.format("Unable to create " +
             "extension for certificate sign request for %s.",
             getDistinguishedName(subject, scmID, clusterID)), ioe.getCause());
-      } catch (OperatorCreationException ex) {
-        throw new CertificateException(String.format("Unable to create " +
-            "certificate sign request for %s.",
-            getDistinguishedName(subject, scmID, clusterID)), ex.getCause());
       }
     }
   }

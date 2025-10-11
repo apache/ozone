@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,20 +13,18 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.bouncycastle.cert.X509CertificateHolder;
-import org.bouncycastle.operator.OperatorCreationException;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-
 import java.io.IOException;
 import java.security.PrivateKey;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 /**
  * Certificate Approver interface is used to inspectCSR a certificate.
@@ -37,20 +34,9 @@ public interface CertificateApprover {
    * Approves a Certificate Request based on the policies of this approver.
    *
    * @param csr - Certificate Signing Request.
-   * @return - Future that will be contain the certificate or exception.
+   * @return - Future that will contain Void if the certificate is considered valid otherwise an exception.
    */
-  CompletableFuture<X509CertificateHolder>
-      inspectCSR(PKCS10CertificationRequest csr);
-
-  /**
-   * Approves a Certificate Request based on the policies of this approver.
-   *
-   * @param csr - Certificate Signing Request.
-   * @return - Future that will be contain the certificate or exception.
-   * @throws IOException - On Error.
-   */
-  CompletableFuture<X509CertificateHolder>
-      inspectCSR(String csr) throws IOException;
+  CompletableFuture<Void> inspectCSR(PKCS10CertificationRequest csr);
 
   /**
    * Sign function signs a Certificate.
@@ -65,21 +51,20 @@ public interface CertificateApprover {
    * @param certSerialId - the new certificate id.
    * @return Signed Certificate.
    * @throws IOException - On Error
-   * @throws OperatorCreationException - on Error.
+   * @throws CertificateException - on Error.
    */
   @SuppressWarnings("ParameterNumber")
-  X509CertificateHolder sign(
+  X509Certificate sign(
       SecurityConfig config,
       PrivateKey caPrivate,
-      X509CertificateHolder caCertificate,
+      X509Certificate caCertificate,
       Date validFrom,
       Date validTill,
       PKCS10CertificationRequest certificationRequest,
       String scmId,
       String clusterId,
       String certSerialId)
-      throws IOException, OperatorCreationException;
-
+      throws IOException, CertificateException;
 
   /**
    * Approval Types for a certificate request.

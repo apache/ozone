@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -44,12 +43,8 @@ public final class HddsVersionInfo {
     System.out.println(
         "Source code repository " + HDDS_VERSION_INFO.getUrl() + " -r " +
             HDDS_VERSION_INFO.getRevision());
-    System.out.println("Compiled by " + HDDS_VERSION_INFO.getUser() + " on "
-        + HDDS_VERSION_INFO.getDate());
     System.out.println(
-        "Compiled with protoc " + HDDS_VERSION_INFO.getHadoopProtoc2Version() +
-            ", " + HDDS_VERSION_INFO.getGrpcProtocVersion() +
-            " and " + HDDS_VERSION_INFO.getHadoopProtoc3Version());
+        "Compiled with protoc " + HDDS_VERSION_INFO.getProtoVersions());
     System.out.println(
         "From source with checksum " + HDDS_VERSION_INFO.getSrcChecksum());
     System.out.println(

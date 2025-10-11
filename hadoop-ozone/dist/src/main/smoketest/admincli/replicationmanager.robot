@@ -17,7 +17,7 @@
 Documentation       Test ozone admin replicationmanager command
 Library             BuiltIn
 Resource            ../commonlib.robot
-Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Suite Setup         Kinit test user     testuser     testuser.keytab
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -46,7 +46,7 @@ Start replicationmanager
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin replicationmanager
-                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   Missing required subcommand
                         Should contain   ${output}   start
                         Should contain   ${output}   stop
                         Should contain   ${output}   status

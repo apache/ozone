@@ -37,7 +37,7 @@ Wait for safemode exit
 
 Incomplete command
     ${output} =         Execute And Ignore Error     ozone admin safemode
-                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   Missing required subcommand
                         Should contain   ${output}   status
                         Should contain   ${output}   exit
                         Should contain   ${output}   wait

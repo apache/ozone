@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -15,10 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils.db;
 
 import jakarta.annotation.Nonnull;
-import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Codec interface to serialize/deserialize objects to/from bytes.
@@ -29,6 +29,9 @@ import java.io.IOException;
  */
 public interface Codec<T> {
   byte[] EMPTY_BYTE_ARRAY = {};
+
+  /** @return the class of the {@link T}. */
+  Class<T> getTypeClass();
 
   /**
    * Does this {@link Codec} support the {@link CodecBuffer} methods?
@@ -49,8 +52,7 @@ public interface Codec<T> {
    * @param allocator To allocate a buffer.
    * @return a buffer storing the serialized bytes.
    */
-  default CodecBuffer toCodecBuffer(@Nonnull T object,
-      CodecBuffer.Allocator allocator) throws IOException {
+  default CodecBuffer toCodecBuffer(@Nonnull T object, CodecBuffer.Allocator allocator) throws CodecException {
     throw new UnsupportedOperationException();
   }
 
@@ -60,8 +62,7 @@ public interface Codec<T> {
    * @param object The object to be serialized.
    * @return a direct buffer storing the serialized bytes.
    */
-  default CodecBuffer toDirectCodecBuffer(@Nonnull T object)
-      throws IOException {
+  default CodecBuffer toDirectCodecBuffer(@Nonnull T object) throws CodecException {
     return toCodecBuffer(object, CodecBuffer.Allocator.getDirect());
   }
 
@@ -71,8 +72,7 @@ public interface Codec<T> {
    * @param object The object to be serialized.
    * @return a heap buffer storing the serialized bytes.
    */
-  default CodecBuffer toHeapCodecBuffer(@Nonnull T object)
-      throws IOException {
+  default CodecBuffer toHeapCodecBuffer(@Nonnull T object) throws CodecException {
     return toCodecBuffer(object, CodecBuffer.Allocator.getHeap());
   }
 
@@ -82,7 +82,7 @@ public interface Codec<T> {
    * @param buffer Storing the serialized bytes of an object.
    * @return the deserialized object.
    */
-  default T fromCodecBuffer(@Nonnull CodecBuffer buffer) throws IOException {
+  default T fromCodecBuffer(@Nonnull CodecBuffer buffer) throws CodecException {
     throw new UnsupportedOperationException();
   }
 
@@ -90,14 +90,46 @@ public interface Codec<T> {
    * Convert object to raw persisted format.
    * @param object The original java object. Should not be null.
    */
-  byte[] toPersistedFormat(T object) throws IOException;
+  default byte[] toPersistedFormat(T object) throws CodecException {
+    Objects.requireNonNull(object, "object == null");
+    try {
+      return toPersistedFormatImpl(object);
+    } catch (Exception e) {
+      throw new CodecException("Failed to serialize " + object
+          + " for " + object.getClass(), e);
+    }
+  }
+
+  /**
+   * The same as {@link #toPersistedFormat} except that this method throws {@link Exception}.
+   * A subclass must implement either {@link #toPersistedFormat} or this method.
+   */
+  default byte[] toPersistedFormatImpl(T object) throws Exception {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Convert object from raw persisted format.
    *
    * @param rawData Byte array from the key/value store. Should not be null.
    */
-  T fromPersistedFormat(byte[] rawData) throws IOException;
+  default T fromPersistedFormat(byte[] rawData) throws CodecException {
+    Objects.requireNonNull(rawData, "rawData == null");
+    try {
+      return fromPersistedFormatImpl(rawData);
+    } catch (Exception e) {
+      throw new CodecException("Failed to deserialize rawData (length=" + rawData.length
+          + ") for " + getTypeClass(), e);
+    }
+  }
+
+  /**
+   * The same as {@link #fromPersistedFormat} except that this method throws {@link Exception}.
+   * A subclass must implement either {@link #fromPersistedFormat} or this method.
+   */
+  default T fromPersistedFormatImpl(byte[] rawData) throws Exception {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Copy the given object.

@@ -1,26 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -37,14 +43,6 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Tests for TestXceiverClientGrpc, to ensure topology aware reads work
@@ -87,32 +85,30 @@ public class TestXceiverClientGrpc {
   }
 
   @Test
-  @Timeout(5)
-  public void testRandomFirstNodeIsCommandTarget() throws IOException {
-    final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
+  public void testLeaderNodeIsCommandTarget() throws IOException {
+    final Set<DatanodeDetails> seenDN = new HashSet<>();
     conf.setBoolean(
             OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, false);
-    // Using a new Xceiver Client, call it repeatedly until all DNs in the
-    // pipeline have been the target of the command, indicating it is shuffling
-    // the DNs on each call with a new client. This test will timeout if this
-    // is not happening.
-    while (allDNs.size() > 0) {
+    // Using a new Xceiver Client, make 100 calls and ensure leader node is used
+    // each time. The logic should always use the leader node, so we can check
+    // only a single DN is ever seen after 100 calls.
+    for (int i = 0; i < 100; i++) {
       try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
             ContainerProtos.ContainerCommandRequestProto request,
             DatanodeDetails dn) {
-          allDNs.remove(dn);
+          seenDN.add(dn);
           return buildValidResponse();
         }
       }) {
         invokeXceiverClientGetBlock(client);
       }
     }
+    assertEquals(1, seenDN.size());
   }
 
   @Test
-  @Timeout(5)
   public void testGetBlockRetryAlNodes() {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
     assertThat(allDNs.size()).isGreaterThan(1);
@@ -133,7 +129,6 @@ public class TestXceiverClientGrpc {
   }
 
   @Test
-  @Timeout(5)
   public void testReadChunkRetryAllNodes() {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
     assertThat(allDNs.size()).isGreaterThan(1);
@@ -190,9 +185,11 @@ public class TestXceiverClientGrpc {
           node -> assertEquals(NodeOperationalState.IN_SERVICE, node.getPersistedOpState()));
 
       randomPipeline.getNodes().get(
-          RandomUtils.nextInt(0, nodeCount)).setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
+          RandomUtils.secure().randomInt(0, nodeCount)).
+          setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
       randomPipeline.getNodes().get(
-          RandomUtils.nextInt(0, nodeCount)).setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
+          RandomUtils.secure().randomInt(0, nodeCount)).
+          setPersistedOpState(NodeOperationalState.IN_MAINTENANCE);
       try (XceiverClientGrpc client = new XceiverClientGrpc(randomPipeline, conf) {
         @Override
         public XceiverClientReply sendCommandAsync(
@@ -238,11 +235,11 @@ public class TestXceiverClientGrpc {
   private void invokeXceiverClientGetBlock(XceiverClientSpi client)
       throws IOException {
     ContainerProtocolCalls.getBlock(client,
-        ContainerProtos.DatanodeBlockID.newBuilder()
+        BlockID.getFromProtobuf(ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(1)
             .setLocalID(1)
             .setBlockCommitSequenceId(1)
-            .build(), null);
+            .build()), null, client.getPipeline().getReplicaIndexes());
   }
 
   private void invokeXceiverClientReadChunk(XceiverClientSpi client)
@@ -259,7 +256,7 @@ public class TestXceiverClientGrpc {
             .setLen(-1)
             .setOffset(0)
             .build(),
-        bid,
+        bid.getDatanodeBlockIDProtobuf(),
         null, null);
   }
 

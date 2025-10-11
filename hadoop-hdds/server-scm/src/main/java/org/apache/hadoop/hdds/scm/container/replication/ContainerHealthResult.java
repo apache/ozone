@@ -1,46 +1,35 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container.replication;
 
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+package org.apache.hadoop.hdds.scm.container.replication;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 /**
  * Class used to represent the Health States of containers.
  */
 public class ContainerHealthResult {
 
-  /**
-   * All possible container health states.
-   */
-  public enum HealthState {
-    HEALTHY,
-    UNHEALTHY,
-    UNDER_REPLICATED,
-    OVER_REPLICATED,
-    MIS_REPLICATED
-  }
-
   private final ContainerInfo containerInfo;
   private final HealthState healthState;
-  private final List<SCMCommand> commands = new ArrayList<>();
+  private final List<SCMCommand<?>> commands = new ArrayList<>();
 
   public ContainerHealthResult(ContainerInfo containerInfo,
       HealthState healthState) {
@@ -52,11 +41,11 @@ public class ContainerHealthResult {
     return healthState;
   }
 
-  public void addCommand(SCMCommand command) {
+  public void addCommand(SCMCommand<?> command) {
     commands.add(command);
   }
 
-  public List<SCMCommand> getCommands() {
+  public List<SCMCommand<?>> getCommands() {
     return commands;
   }
 
@@ -222,6 +211,7 @@ public class ContainerHealthResult {
     public void setHasUnReplicatedOfflineIndexes(boolean val) {
       hasUnReplicatedOfflineIndexes = val;
     }
+
     /**
      * Indicates whether a container has some indexes which are only on nodes
      * which are DECOMMISSIONING or ENTERING_MAINTENANCE. These containers may
@@ -248,7 +238,6 @@ public class ContainerHealthResult {
     /**
      * Returns true if a container has under-replication caused by offline
      * indexes, but it is corrected by a pending add.
-     * @return
      */
     public boolean offlineIndexesOkAfterPending() {
       return offlineIndexesOkAfterPending;
@@ -305,7 +294,7 @@ public class ContainerHealthResult {
       if (requeueCount > 0) {
         sb.append(" requeued:").append(requeueCount);
       }
-      return sb.append("}").toString();
+      return sb.append('}').toString();
     }
   }
 
@@ -401,5 +390,16 @@ public class ContainerHealthResult {
     public void setIsSafelyOverReplicated(boolean isSafelyOverReplicated) {
       this.isSafelyOverReplicated = isSafelyOverReplicated;
     }
+  }
+
+  /**
+   * All possible container health states.
+   */
+  public enum HealthState {
+    HEALTHY,
+    UNHEALTHY,
+    UNDER_REPLICATED,
+    OVER_REPLICATED,
+    MIS_REPLICATED
   }
 }

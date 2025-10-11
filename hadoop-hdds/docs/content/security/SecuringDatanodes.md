@@ -1,6 +1,6 @@
 ---
 title: "Securing Datanodes"
-date: "2019-April-03"
+date: "2019-04-03"
 weight: 3
 menu:
    main:

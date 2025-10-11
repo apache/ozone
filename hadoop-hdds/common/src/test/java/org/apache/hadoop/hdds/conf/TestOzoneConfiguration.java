@@ -1,36 +1,48 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.conf;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -40,18 +52,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test class for OzoneConfiguration.
@@ -84,7 +84,7 @@ public class TestOzoneConfiguration {
       throws Exception {
     File coreDefault = new File(tempDir, "core-default-test.xml");
     File coreSite = new File(tempDir, "core-site-test.xml");
-    FileOutputStream coreDefaultStream = new FileOutputStream(coreDefault);
+    OutputStream coreDefaultStream = Files.newOutputStream(coreDefault.toPath());
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         coreDefaultStream, StandardCharsets.UTF_8))) {
       startConfig(out);
@@ -103,7 +103,7 @@ public class TestOzoneConfiguration {
           .getProperty("dfs.random.key"));
     }
 
-    FileOutputStream coreSiteStream = new FileOutputStream(coreSite);
+    OutputStream coreSiteStream = Files.newOutputStream(coreSite.toPath());
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         coreSiteStream, StandardCharsets.UTF_8))) {
       startConfig(out);
@@ -149,6 +149,67 @@ public class TestOzoneConfiguration {
     assertSame(Integer.class, configuration.getMyClass());
     assertEquals(10.5, configuration.getThreshold());
     assertEquals(Duration.ofSeconds(3), configuration.getDuration());
+  }
+
+  @Test
+  public void testRestrictedComplianceModeWithOzoneConf() {
+    Configuration config = new Configuration();
+    config.set("ozone.security.crypto.compliance.mode", "restricted");
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration(config);
+
+    // Set it to an allowed config value
+    ozoneConfig.set("hdds.x509.signature.algorithm", "SHA512withDCA");
+    ozoneConfig.set("hdds.x509.signature.algorithm.restricted.whitelist", "SHA512withRSA,SHA512withDCA");
+
+    assertEquals("restricted", ozoneConfig.get("ozone.security.crypto.compliance.mode"));
+    assertEquals("SHA512withRSA,SHA512withDCA", ozoneConfig.get("hdds.x509.signature.algorithm.restricted.whitelist"));
+    assertEquals("SHA512withDCA", ozoneConfig.get("hdds.x509.signature.algorithm"));
+
+    // Set it to a disallowed config value
+    ozoneConfig.set("hdds.x509.signature.algorithm", "SHA256withRSA");
+
+    assertThrows(ConfigurationException.class, () -> ozoneConfig.get("hdds.x509.signature.algorithm"));
+
+    // Check it with a Hadoop Configuration
+    Configuration hadoopConfig =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(ozoneConfig);
+    assertThrows(ConfigurationException.class, () -> hadoopConfig.get("hdds.x509.signature.algorithm"));
+  }
+
+  @Test
+  public void testRestrictedComplianceModeWithLegacyHadoopConf() {
+    Configuration config = new Configuration();
+    config.addResource("ozone-default.xml");
+    config.set("ozone.security.crypto.compliance.mode", "restricted");
+    LegacyHadoopConfigurationSource legacyHadoopConf = new LegacyHadoopConfigurationSource(config);
+
+    // Set it to an allowed config value
+    legacyHadoopConf.set("hdds.x509.signature.algorithm", "SHA512withDCA");
+    legacyHadoopConf.set("hdds.x509.signature.algorithm.restricted.whitelist", "SHA512withRSA,SHA512withDCA");
+
+    assertEquals("restricted", legacyHadoopConf.get("ozone.security.crypto.compliance.mode"));
+    assertEquals("SHA512withRSA,SHA512withDCA",
+        legacyHadoopConf.get("hdds.x509.signature.algorithm.restricted.whitelist"));
+    assertEquals("SHA512withDCA", legacyHadoopConf.get("hdds.x509.signature.algorithm"));
+
+    // Set it to a disallowed config value
+    legacyHadoopConf.set("hdds.x509.signature.algorithm", "SHA256withRSA");
+
+    assertThrows(ConfigurationException.class, () -> legacyHadoopConf.get("hdds.x509.signature.algorithm"));
+
+    // Check it with a Hadoop Configuration
+    Configuration legacyConf = LegacyHadoopConfigurationSource.asHadoopConfiguration(legacyHadoopConf);
+    assertThrows(ConfigurationException.class, () -> legacyConf.get("hdds.x509.signature.algorithm"));
+  }
+
+  @Test
+  public void testUnrestrictedComplianceMode() {
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
+    ozoneConfig.set("hdds.x509.signature.algorithm", "SHA256");
+    ozoneConfig.set("hdds.x509.signature.algorithm.unrestricted.whitelist", "SHA512withRSA");
+
+    assertEquals(ozoneConfig.get("hdds.x509.signature.algorithm"), "SHA256");
+    assertEquals(ozoneConfig.get("ozone.security.crypto.compliance.mode"), "unrestricted");
   }
 
   @Test
@@ -226,7 +287,7 @@ public class TestOzoneConfiguration {
     Configuration configuration = new Configuration(true);
 
     File ozoneSite = new File(tempDir, "ozone-site.xml");
-    FileOutputStream ozoneSiteStream = new FileOutputStream(ozoneSite);
+    OutputStream ozoneSiteStream = Files.newOutputStream(ozoneSite.toPath());
     try (BufferedWriter out = new BufferedWriter(new OutputStreamWriter(
         ozoneSiteStream, StandardCharsets.UTF_8))) {
       startConfig(out);

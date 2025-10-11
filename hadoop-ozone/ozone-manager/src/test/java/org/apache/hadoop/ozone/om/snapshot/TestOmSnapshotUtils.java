@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,26 +17,20 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 /**
  * Class to test snapshot utilities.
  */
@@ -82,42 +75,4 @@ public class TestOmSnapshotUtils {
 
     assertEquals(tree1Files, tree2Files);
   }
-
-
-  private static Stream<Arguments> testCasesForIgnoreSnapshotGc() {
-    SnapshotInfo filteredSnapshot =
-        SnapshotInfo.newBuilder().setSstFiltered(true).setName("snap1").build();
-    SnapshotInfo unFilteredSnapshot =
-        SnapshotInfo.newBuilder().setSstFiltered(false).setName("snap1")
-            .build();
-    // {IsSnapshotFiltered,isSnapshotDeleted,IsSstServiceEnabled = ShouldIgnore}
-    return Stream.of(Arguments.of(filteredSnapshot,
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, true, false),
-        Arguments.of(filteredSnapshot,
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true, true),
-        Arguments.of(unFilteredSnapshot,
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, true, true),
-        Arguments.of(unFilteredSnapshot,
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, true, true),
-        Arguments.of(filteredSnapshot,
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false, false),
-        Arguments.of(unFilteredSnapshot,
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED, false, false),
-        Arguments.of(unFilteredSnapshot,
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, false, true),
-        Arguments.of(filteredSnapshot,
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE, false, true));
-  }
-
-  @ParameterizedTest
-  @MethodSource("testCasesForIgnoreSnapshotGc")
-  public void testProcessSnapshotLogicInSDS(SnapshotInfo snapshotInfo,
-      SnapshotInfo.SnapshotStatus status, boolean isSstFilteringSvcEnabled,
-      boolean expectedOutcome) {
-    snapshotInfo.setSnapshotStatus(status);
-    assertEquals(expectedOutcome,
-        SnapshotDeletingService.shouldIgnoreSnapshot(snapshotInfo,
-            isSstFilteringSvcEnabled));
-  }
-
 }

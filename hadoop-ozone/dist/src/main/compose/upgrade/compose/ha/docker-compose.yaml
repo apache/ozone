@@ -14,15 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
-
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-common-config:
   &common-config
   env_file:
     - docker-config
     - ../../../common/security.conf
-  image: ${OZONE_IMAGE}
+  image: ${OZONE_TEST_IMAGE}
+  dns_search: .
 
 x-environment:
   &environment
@@ -68,7 +67,7 @@ x-volumes:
 
 services:
   kdc:
-    command: ["krb5kdc","-n"]
+    command: ["/opt/hadoop/compose/common/init-kdc.sh"]
     hostname: kdc
     image: ${OZONE_TESTKRB5_IMAGE}
     networks:
@@ -84,7 +83,7 @@ services:
       - docker-config
     environment:
       HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     networks:
       net:
         ipv4_address: 10.9.0.3

@@ -1,30 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.snapshot;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -34,13 +36,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test class for FSODirectoryPathResolver.
@@ -58,22 +56,10 @@ public class TestFSODirectoryPathResolver {
           Iterator<? extends Table.KeyValue<String, OmDirectoryInfo>> iterator =
               dirMap
               .getOrDefault(dirId, Collections.emptyList()).stream()
-              .map(children -> new Table.KeyValue<String, OmDirectoryInfo>() {
-                  @Override
-                  public String getKey() {
-                    return prefix + children + OM_KEY_PREFIX + "dir" + children;
-                  }
-
-                  @Override
-                  public OmDirectoryInfo getValue() {
-                    return OmDirectoryInfo.newBuilder()
-                        .setName("dir" + children).setObjectID(children)
-                        .build();
-                  }
-              })
+              .map(children -> Table.newKeyValue(prefix + children + OM_KEY_PREFIX + "dir" + children,
+                  OmDirectoryInfo.newBuilder().setName("dir" + children).setObjectID(children).build()))
               .iterator();
-          return new TableIterator<String,
-              Table.KeyValue<String, OmDirectoryInfo>>() {
+          return new Table.KeyValueIterator<String, OmDirectoryInfo>() {
 
             @Override
             public boolean hasNext() {
@@ -133,15 +119,23 @@ public class TestFSODirectoryPathResolver {
     Map<Long, Path> absolutePathMap = fsoDirectoryPathResolver
         .getAbsolutePathForObjectIDs(Optional.of(objIds));
 
-    assertEquals(ImmutableMap.of(
-        17L, Paths.get("/dir3/dir14/dir17"),
-        9L, Paths.get("/dir2/dir9"),
-        10L, Paths.get("/dir2/dir10"),
-        15L, Paths.get("/dir3/dir15"),
-        4L, Paths.get("/dir4"),
-        3L, Paths.get("/dir3"),
-        1L, Paths.get("/")
-    ), absolutePathMap);
+    Map<Long, String> pathMapping = ImmutableMap.<Long, String>builder()
+        .put(17L, "/dir3/dir14/dir17")
+        .put(9L, "/dir2/dir9")
+        .put(10L, "/dir2/dir10")
+        .put(15L, "/dir3/dir15")
+        .put(4L, "/dir4")
+        .put(3L, "/dir3")
+        .put(1L, "/")
+        .build();
+
+    Map<Long, Path> expectedPaths = pathMapping.entrySet().stream()
+        .collect(ImmutableMap.toImmutableMap(
+            Map.Entry::getKey,
+            e -> Paths.get(e.getValue())
+        ));
+
+    assertEquals(expectedPaths, absolutePathMap);
     assertEquals(objIds.size(), absolutePathMap.size());
     // Invalid Obj Id 19 with dirInfo dir19 which is not present in the bucket.
     assertThrows(IllegalArgumentException.class,

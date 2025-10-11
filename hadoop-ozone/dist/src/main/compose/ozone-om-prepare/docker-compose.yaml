@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
-
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-common-config:
   &common-config
@@ -51,6 +49,7 @@ x-om:
 services:
   dn1:
     <<: *datanode
+    hostname: dn1
     networks:
      net:
        ipv4_address: 10.9.0.11
@@ -59,6 +58,7 @@ services:
       - ../..:${OZONE_DIR}
   dn2:
     <<: *datanode
+    hostname: dn2
     networks:
      net:
        ipv4_address: 10.9.0.12
@@ -67,6 +67,7 @@ services:
       - ../..:${OZONE_DIR}
   dn3:
     <<: *datanode
+    hostname: dn3
     networks:
      net:
        ipv4_address: 10.9.0.13

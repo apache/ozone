@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,10 +22,13 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -34,11 +36,11 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.UUID;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -48,9 +50,11 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
+import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,18 +71,20 @@ public class TestReconNodeManager {
 
   private OzoneConfiguration conf;
   private DBStore store;
-  private ReconStorageConfig reconStorageConfig;
   private HDDSLayoutVersionManager versionManager;
+  private ReconContext reconContext;
 
   @BeforeEach
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, temporaryFolder.toAbsolutePath().toString());
     conf.set(OZONE_SCM_NAMES, "localhost");
-    reconStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
+    ReconUtils reconUtils = new ReconUtils();
+    ReconStorageConfig reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
     versionManager = new HDDSLayoutVersionManager(
         reconStorageConfig.getLayoutVersion());
-    store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+    store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
+    reconContext = new ReconContext(conf, reconUtils);
   }
 
   @AfterEach
@@ -87,45 +93,72 @@ public class TestReconNodeManager {
   }
 
   @Test
+  public void testReconNodeManagerInitWithInvalidNetworkTopology() throws IOException {
+    ReconUtils reconUtils = new ReconUtils();
+    ReconStorageConfig scmStorageConfig =
+        new ReconStorageConfig(conf, reconUtils);
+    EventQueue eventQueue = new EventQueue();
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
+    ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
+    assertThat(reconNodeManager.getAllNodes()).isEmpty();
+
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    // Updating the node's topology depth to make it invalid.
+    datanodeDetails.setNetworkLocation("/default-rack/xyz/");
+
+    // Register a random datanode.
+    RegisteredCommand register = reconNodeManager.register(datanodeDetails, null, null);
+    assertNotNull(register);
+    assertEquals(StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted,
+        register.getError());
+    assertEquals(reconContext.getClusterId(), register.getClusterID());
+    assertFalse(reconContext.isHealthy().get());
+    assertTrue(reconContext.getErrors().get(0).equals(ReconContext.ErrorCode.INVALID_NETWORK_TOPOLOGY));
+
+    assertEquals(0, reconNodeManager.getAllNodes().size());
+    assertNull(reconNodeManager.getNode(datanodeDetails.getID()));
+  }
+
+  @Test
   public void testReconNodeDB() throws IOException, NodeNotFoundException {
     ReconStorageConfig scmStorageConfig =
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertThat(reconNodeManager.getAllNodes()).isEmpty();
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
-    String uuidString = datanodeDetails.getUuidString();
+    final DatanodeID datanodeID = datanodeDetails.getID();
 
     // Register a random datanode.
     reconNodeManager.register(datanodeDetails, null, null);
-    reconNewNodeHandler.onMessage(reconNodeManager.getNodeByUuid(uuidString),
+    reconNewNodeHandler.onMessage(reconNodeManager.getNode(datanodeID),
         null);
 
     assertEquals(1, reconNodeManager.getAllNodes().size());
-    assertNotNull(reconNodeManager.getNodeByUuid(uuidString));
+    assertNotNull(reconNodeManager.getNode(datanodeID));
 
     // If any commands are added to the eventQueue without using the onMessage
     // interface, then they should be filtered out and not returned to the DN
     // when it heartbeats.
     // This command should never be returned by Recon
-    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getID(),
         new SetNodeOperationalStateCommand(1234,
         DECOMMISSIONING, 0));
 
     // This one should be returned
-    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getID(),
         new ReregisterCommand());
 
     // OperationalState sanity check
-    final DatanodeDetails dnDetails =
-        reconNodeManager.getNodeByUuid(datanodeDetails.getUuidString());
+    final DatanodeDetails dnDetails = reconNodeManager.getNode(datanodeID);
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         dnDetails.getPersistedOpState());
     assertEquals(dnDetails.getPersistedOpState(),
@@ -136,7 +169,7 @@ public class TestReconNodeManager {
             .getOpStateExpiryEpochSeconds());
 
     // Upon processing the heartbeat, the illegal command should be filtered out
-    List<SCMCommand> returnedCmds =
+    List<SCMCommand<?>> returnedCmds =
         reconNodeManager.processHeartbeat(datanodeDetails);
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,
@@ -162,12 +195,11 @@ public class TestReconNodeManager {
     eventQueue.close();
     reconNodeManager.close();
     reconNodeManager = new ReconNodeManager(conf, scmStorageConfig, eventQueue,
-        clusterMap, nodeTable, versionManager);
+        clusterMap, nodeTable, versionManager, reconContext);
 
     // Verify that the node information was persisted and loaded back.
     assertEquals(1, reconNodeManager.getAllNodes().size());
-    assertNotNull(
-        reconNodeManager.getNodeByUuid(datanodeDetails.getUuidString()));
+    assertNotNull(reconNodeManager.getNode(datanodeDetails.getID()));
   }
 
   @Test
@@ -176,10 +208,9 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
 
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
@@ -191,13 +222,13 @@ public class TestReconNodeManager {
 
     reconNodeManager.register(datanodeDetails, null, null);
     assertEquals(IN_SERVICE, reconNodeManager
-        .getNodeByUuid(datanodeDetails.getUuidString()).getPersistedOpState());
+        .getNode(datanodeDetails.getID()).getPersistedOpState());
 
     when(node.getNodeOperationalStates(eq(0)))
         .thenReturn(DECOMMISSIONING);
     reconNodeManager.updateNodeOperationalStateFromScm(node, datanodeDetails);
     assertEquals(DECOMMISSIONING, reconNodeManager
-        .getNodeByUuid(datanodeDetails.getUuidString()).getPersistedOpState());
+        .getNode(datanodeDetails.getID()).getPersistedOpState());
     List<DatanodeDetails> nodes =
         reconNodeManager.getNodes(DECOMMISSIONING, null);
     assertEquals(1, nodes.size());
@@ -210,31 +241,30 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertThat(reconNodeManager.getAllNodes()).isEmpty();
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     datanodeDetails.setHostName("hostname1");
-    String uuidString = datanodeDetails.getUuidString();
+    final DatanodeID datanodeID = datanodeDetails.getID();
 
     // Register "hostname1" datanode.
     reconNodeManager.register(datanodeDetails, null, null);
-    reconNewNodeHandler.onMessage(reconNodeManager.getNodeByUuid(uuidString),
+    reconNewNodeHandler.onMessage(reconNodeManager.getNode(datanodeID),
         null);
 
     assertEquals(1, reconNodeManager.getAllNodes().size());
-    assertNotNull(reconNodeManager.getNodeByUuid(uuidString));
+    assertNotNull(reconNodeManager.getNode(datanodeID));
     assertEquals("hostname1",
-        reconNodeManager.getNodeByUuid(uuidString).getHostName());
+        reconNodeManager.getNode(datanodeID).getHostName());
 
     datanodeDetails.setHostName("hostname2");
     // Upon processing the heartbeat, the illegal command should be filtered out
-    List<SCMCommand> returnedCmds =
+    List<SCMCommand<?>> returnedCmds =
         reconNodeManager.processHeartbeat(datanodeDetails);
     assertEquals(1, returnedCmds.size());
     assertEquals(SCMCommandProto.Type.reregisterCommand,

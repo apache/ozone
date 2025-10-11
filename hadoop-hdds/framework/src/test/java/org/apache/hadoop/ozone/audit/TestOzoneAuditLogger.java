@@ -1,22 +1,31 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.audit;
 
+import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
+import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.AfterAll;
@@ -24,17 +33,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
-import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
-import static org.assertj.core.api.Assertions.assertThat;
-
 
 /**
  * Test Ozone Audit Logger.
@@ -179,7 +177,7 @@ public class TestOzoneAuditLogger {
     assertThat(message).contains(USER);
     assertThat(message).contains(IP_ADDRESS);
     assertThat(message).contains(DummyAction.CREATE_VOLUME.name());
-    assertThat(message).contains(PARAMS.toString());
+    assertThat(message).contains(PARAMS.values());
     assertThat(message).contains(FAILURE.getStatus());
   }
 
@@ -216,7 +214,7 @@ public class TestOzoneAuditLogger {
     verifyLog(
         "ERROR | OMAudit | ? | user=john | "
             + "ip=192.168.0.1 | op=CREATE_VOLUME "
-            + "{key1=value1, key2=value2} | ret=FAILURE",
+            + "{\"key1\":\"value1\",\"key2\":\"value2\"} | ret=FAILURE",
         "org.apache.hadoop.ozone.audit."
             + "TestOzoneAuditLogger$TestException: Dummy exception message",
         "at org.apache.hadoop.ozone.audit.TestOzoneAuditLogger"

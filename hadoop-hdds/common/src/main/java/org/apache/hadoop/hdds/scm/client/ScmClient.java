@@ -1,40 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.client;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
-import org.apache.hadoop.hdds.scm.DatanodeAdminError;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+package org.apache.hadoop.hdds.scm.client;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -42,6 +23,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerListResult;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 
 /**
  * The interface to call into underlying container layer.
@@ -121,10 +120,11 @@ public interface ScmClient extends Closeable {
    * @param startContainerID start containerID.
    * @param count count must be {@literal >} 0.
    *
-   * @return a list of pipeline.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID,
+  ContainerListResult listContainer(long startContainerID,
       int count) throws IOException;
 
   /**
@@ -134,10 +134,11 @@ public interface ScmClient extends Closeable {
    * @param count count must be {@literal >} 0.
    * @param state Container of this state will be returned.
    * @param replicationConfig container replication Config.
-   * @return a list of pipeline.
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  List<ContainerInfo> listContainer(long startContainerID, int count,
+  ContainerListResult listContainer(long startContainerID, int count,
       HddsProtos.LifeCycleState state,
       HddsProtos.ReplicationType replicationType,
       ReplicationConfig replicationConfig)
@@ -177,9 +178,12 @@ public interface ScmClient extends Closeable {
    * @return ContainerInfo
    * @throws IOException - in case of error.
    */
+  @Deprecated
   ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor replicationFactor,
       String owner) throws IOException;
+
+  ContainerWithPipeline createContainer(ReplicationConfig replicationConfig, String owner) throws IOException;
 
   /**
    * Gets the list of underReplicated and unClosed containers on a decommissioning node.
@@ -384,16 +388,17 @@ public interface ScmClient extends Closeable {
    */
   boolean getContainerBalancerStatus() throws IOException;
 
+  ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo() throws IOException;
+
   /**
-   * returns the list of ratis peer roles. Currently only include peer address.
+   * returns the list of SCM peer roles. Currently only include peer address.
    */
-  List<String> getScmRatisRoles() throws IOException;
+  List<String> getScmRoles() throws IOException;
 
   /**
    * Force generates new secret keys (rotate).
    *
    * @param force boolean flag that forcefully rotates the key on demand
-   * @return
    * @throws IOException
    */
   boolean rotateSecretKeys(boolean force) throws IOException;
@@ -405,26 +410,6 @@ public interface ScmClient extends Closeable {
    * @throws IOException
    */
   void transferLeadership(String newLeaderId) throws IOException;
-
-  /**
-   * Return the failed transactions of the Deleted blocks. A transaction is
-   * considered to be failed if it has been sent more than MAX_RETRY limit
-   * and its count is reset to -1.
-   *
-   * @param count Maximum num of returned transactions, if < 0. return all.
-   * @param startTxId The least transaction id to start with.
-   * @return a list of failed deleted block transactions.
-   * @throws IOException
-   */
-  List<DeletedBlocksTransactionInfo> getFailedDeletedBlockTxn(int count,
-      long startTxId) throws IOException;
-
-  /**
-   * Reset the failed deleted block retry count.
-   * @param txIDs transactionId list to be reset
-   * @throws IOException
-   */
-  int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
 
   /**
    * Get usage information of datanode by address or uuid.
@@ -462,4 +447,12 @@ public interface ScmClient extends Closeable {
       String scmId) throws IOException;
 
   String getMetrics(String query) throws IOException;
+
+  /**
+   * Trigger a reconcile command to datanodes for a container ID.
+   *
+   * @param containerID The ID of the container to reconcile.
+   * @throws IOException On error
+   */
+  void reconcileContainer(long containerID) throws IOException;
 }

@@ -19,16 +19,25 @@ kind: ConfigMap
 metadata:
   name: config
 data:
+  CORE-SITE.XML_fs.defaultFS: ofs://om/
+  CORE-SITE.XML_fs.trash.interval: "1"
+  CORE-SITE.XML_hadoop.proxyuser.hadoop.groups: '*'
+  CORE-SITE.XML_hadoop.proxyuser.hadoop.hosts: '*'
+  HTTPFS-SITE.XML_httpfs.hadoop.config.dir: /opt/hadoop/etc/config
+  HTTPFS-SITE.XML_httpfs.proxyuser.hadoop.groups: '*'
+  HTTPFS-SITE.XML_httpfs.proxyuser.hadoop.hosts: '*'
+  OZONE-SITE.XML_hdds.datanode.use.datanode.hostname: "true"
   OZONE-SITE.XML_hdds.datanode.dir: /data/storage
-  OZONE-SITE.XML_ozone.scm.datanode.id.dir: /data
-  OZONE-SITE.XML_ozone.metadata.dirs: /data/metadata
-  OZONE-SITE.XML_ozone.scm.block.client.address: scm-0.scm
-  OZONE-SITE.XML_ozone.om.address: om-0.om
-  OZONE-SITE.XML_ozone.scm.client.address: scm-0.scm
-  OZONE-SITE.XML_ozone.scm.names: scm-0.scm
   OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "3"
   OZONE-SITE.XML_ozone.datanode.pipeline.limit: "1"
-  OZONE-SITE.XML_dfs.datanode.use.datanode.hostname: "true"
+  OZONE-SITE.XML_hdds.datanode.volume.min.free.space: "1GB"
+  OZONE-SITE.XML_ozone.metadata.dirs: /data/metadata
+  OZONE-SITE.XML_ozone.om.address: om-0.om
+  OZONE-SITE.XML_ozone.recon.address: recon-0.recon
+  OZONE-SITE.XML_ozone.scm.block.client.address: scm-0.scm
+  OZONE-SITE.XML_ozone.scm.client.address: scm-0.scm
+  OZONE-SITE.XML_ozone.scm.datanode.id.dir: /data/metadata
+  OZONE-SITE.XML_ozone.scm.names: scm-0.scm
   LOG4J.PROPERTIES_log4j.rootLogger: INFO, stdout
   LOG4J.PROPERTIES_log4j.appender.stdout: org.apache.log4j.ConsoleAppender
   LOG4J.PROPERTIES_log4j.appender.stdout.layout: org.apache.log4j.PatternLayout

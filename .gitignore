@@ -10,6 +10,7 @@
 *.vcxproj.user
 *.patch
 .idea
+.vscode
 .svn
 .classpath
 .project
@@ -39,3 +40,4 @@ dev-support/ci/bats-assert
 dev-support/ci/bats-support
 
 .mvn/.gradle-enterprise/
+.mvn/.develocity/

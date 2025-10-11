@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,49 +16,6 @@
  */
 
 package org.apache.hadoop.ozone.om.ratis;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Queue;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicLong;
-
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.audit.AuditLogger;
-import org.apache.hadoop.ozone.audit.AuditMessage;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
-import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
-import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteBucketResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
-import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.hadoop.util.Daemon;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
@@ -75,6 +31,47 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Queue;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
+import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
+import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
+import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
+import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Daemon;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
 /**
  * This class tests OzoneManagerDouble Buffer with actual OMResponse classes.
  */
@@ -83,8 +80,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private static final int MAX_VOLUMES = 1000;
 
   private OzoneManager ozoneManager;
-  private OMMetrics omMetrics;
-  private AuditLogger auditLogger;
   private OMMetadataManager omMetadataManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
@@ -96,7 +91,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   @BeforeEach
   public void setup() throws IOException {
     ozoneManager = mock(OzoneManager.class, withSettings().stubOnly());
-    omMetrics = OMMetrics.create();
+    OMMetrics omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
@@ -105,13 +100,14 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
-    auditLogger = mock(AuditLogger.class);
+    AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
         .setMaxUnFlushedTransactionCount(100000)
-        .enableRatis(true)
         .build()
         .start();
   }
@@ -314,7 +310,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         new OMBucketDeleteRequest(omRequest);
 
     final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
-    OMClientResponse omClientResponse = omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
+    OMClientResponse omClientResponse = omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, context);
     doubleBuffer.add(omClientResponse, termIndex);
     return omClientResponse;
   }
@@ -450,9 +447,15 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(omRequest);
+    try {
+      omVolumeCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
 
     final TermIndex termIndex = TransactionInfo.getTermIndex(transactionId);
-    OMClientResponse omClientResponse = omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
+    OMClientResponse omClientResponse = omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, context);
     doubleBuffer.add(omClientResponse, termIndex);
     return omClientResponse;
   }
@@ -462,34 +465,26 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
    * @return OMBucketCreateResponse
    */
   private OMBucketCreateResponse createBucket(String volumeName,
-      String bucketName, long transactionID)  {
+      String bucketName, long transactionID) {
 
     BucketInfo.Builder bucketInfo =
         newBucketInfoBuilder(bucketName, volumeName)
-            .setStorageType(OzoneManagerProtocolProtos.StorageTypeProto.DISK);
+            .setStorageType(StorageTypeProto.DISK);
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OMRequestTestUtils.newCreateBucketRequest(bucketInfo).build();
 
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);
+    try {
+      omBucketCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
+    } catch (IOException e) {
+    }
 
     final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
-    OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
+    OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, context);
     doubleBuffer.add(omClientResponse, termIndex);
     return (OMBucketCreateResponse) omClientResponse;
-  }
-
-  /**
-   * Create OMBucketDeleteResponse for specified volume and bucket.
-   * @return OMBucketDeleteResponse
-   */
-  private OMBucketDeleteResponse deleteBucket(String volumeName,
-      String bucketName) {
-    return new OMBucketDeleteResponse(OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setDeleteBucketResponse(DeleteBucketResponse.newBuilder().build())
-        .build(), volumeName, bucketName);
   }
 }
 

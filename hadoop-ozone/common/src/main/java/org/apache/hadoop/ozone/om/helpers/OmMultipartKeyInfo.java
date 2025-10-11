@@ -1,28 +1,21 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
-import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,16 +25,54 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 
 /**
  * This class represents multipart upload information for a key, which holds
  * upload part information of the key.
  */
-public final class OmMultipartKeyInfo extends WithObjectID {
+public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject<OmMultipartKeyInfo> {
   private static final Codec<OmMultipartKeyInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(MultipartKeyInfo.getDefaultInstance()),
       OmMultipartKeyInfo::getFromProto,
-      OmMultipartKeyInfo::getProto);
+      OmMultipartKeyInfo::getProto,
+      OmMultipartKeyInfo.class);
+
+  private final String uploadID;
+  private final long creationTime;
+  private final ReplicationConfig replicationConfig;
+  private PartKeyInfoMap partKeyInfoMap;
+
+  /**
+   * A pointer to parent directory used for path traversal. ParentID will be
+   * used only when the multipart key is created into a FileSystemOptimized(FSO)
+   * bucket.
+   * <p>
+   * For example, if a key "a/b/multiKey1" created into a FSOBucket then each
+   * path component will be assigned an ObjectId and linked to its parent path
+   * component using parent's objectID.
+   * <p>
+   * Say, Bucket's ObjectID = 512, which is the parent for its immediate child
+   * element.
+   * <p>
+   * ------------------------------------------|
+   * PathComponent |   ObjectID   |   ParentID |
+   * ------------------------------------------|
+   *      a        |     1024     |     512    |
+   * ------------------------------------------|
+   *      b        |     1025     |     1024   |
+   * ------------------------------------------|
+   *   multiKey1   |     1026     |     1025   |
+   * ------------------------------------------|
+   */
+  private final long parentID;
 
   public static Codec<OmMultipartKeyInfo> getCodec() {
     return CODEC;
@@ -60,6 +91,8 @@ public final class OmMultipartKeyInfo extends WithObjectID {
           ((PartKeyInfo) o2).getPartNumber() : (int) o2;
       return Integer.compare(partNumber1, partNumber2);
     };
+
+    private final List<PartKeyInfo> sorted;
 
     /**
      * Adds a PartKeyInfo to sortedPartKeyInfoList.
@@ -90,8 +123,6 @@ public final class OmMultipartKeyInfo extends WithObjectID {
       put(partKeyInfo, list);
       return new PartKeyInfoMap(list);
     }
-
-    private final List<PartKeyInfo> sorted;
 
     PartKeyInfoMap(List<PartKeyInfo> sorted) {
       this.sorted = Collections.unmodifiableList(sorted);
@@ -128,35 +159,6 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     }
   }
 
-  private final String uploadID;
-  private final long creationTime;
-  private final ReplicationConfig replicationConfig;
-  private PartKeyInfoMap partKeyInfoMap;
-
-  /**
-   * A pointer to parent directory used for path traversal. ParentID will be
-   * used only when the multipart key is created into a FileSystemOptimized(FSO)
-   * bucket.
-   * <p>
-   * For example, if a key "a/b/multiKey1" created into a FSOBucket then each
-   * path component will be assigned an ObjectId and linked to its parent path
-   * component using parent's objectID.
-   * <p>
-   * Say, Bucket's ObjectID = 512, which is the parent for its immediate child
-   * element.
-   * <p>
-   * ------------------------------------------|
-   * PathComponent |   ObjectID   |   ParentID |
-   * ------------------------------------------|
-   *      a        |     1024     |     512    |
-   * ------------------------------------------|
-   *      b        |     1025     |     1024   |
-   * ------------------------------------------|
-   *   multiKey1   |     1026     |     1025   |
-   * ------------------------------------------|
-   */
-  private final long parentID;
-
   /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
    * information for a key.
@@ -172,6 +174,7 @@ public final class OmMultipartKeyInfo extends WithObjectID {
 
   /** Copy constructor. */
   private OmMultipartKeyInfo(OmMultipartKeyInfo b) {
+    super(b);
     this.uploadID = b.uploadID;
     this.creationTime = b.creationTime;
     this.replicationConfig = b.replicationConfig;
@@ -179,8 +182,6 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     // is added, it returns a new shallow copy of the PartKeyInfoMap Object
     // so here we can directly pass in partKeyInfoMap
     this.partKeyInfoMap = b.partKeyInfoMap;
-    setObjectID(b.getObjectID());
-    setUpdateID(b.getUpdateID());
     this.parentID = b.parentID;
   }
 
@@ -264,11 +265,13 @@ public final class OmMultipartKeyInfo extends WithObjectID {
       return this;
     }
 
+    @Override
     public Builder setObjectID(long obId) {
       super.setObjectID(obId);
       return this;
     }
 
+    @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
       return this;
@@ -355,6 +358,7 @@ public final class OmMultipartKeyInfo extends WithObjectID {
     return uploadID.hashCode();
   }
 
+  @Override
   public OmMultipartKeyInfo copyObject() {
     return new OmMultipartKeyInfo(this);
   }

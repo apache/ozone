@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
-
 x-monitoring-config:
   &monitoring-config
   env_file:
@@ -23,11 +21,11 @@ x-monitoring-config:
 
 services:
   jaeger:
-    image: jaegertracing/all-in-one:latest
-    environment:
-      COLLECTOR_ZIPKIN_HTTP_PORT: 9411
+    image: jaegertracing/jaeger:latest
     ports:
       - 16686:16686
+      - 4317:4317
+      - 4318:4318
   prometheus:
     image: prom/prometheus
     volumes:

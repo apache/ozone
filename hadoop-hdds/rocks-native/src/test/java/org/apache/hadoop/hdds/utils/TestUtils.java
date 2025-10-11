@@ -1,21 +1,24 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils;
+
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyLowerString;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -33,22 +36,10 @@ public final class TestUtils {
   private TestUtils() {
   }
 
-  public static String getLexicographicallyLowerString(String val) {
-    char[] charVal = val.toCharArray();
-    charVal[charVal.length - 1] -= 1;
-    return String.valueOf(charVal);
-  }
-
-  public static String getLexicographicallyHigherString(String val) {
-    char[] charVal = val.toCharArray();
-    charVal[charVal.length - 1] += 1;
-    return String.valueOf(charVal);
-  }
-
   public static List<Optional<String>> getTestingBounds(
       SortedMap<String, Integer> keys) {
     Set<String> boundary = new HashSet<>();
-    if (keys.size() > 0) {
+    if (!keys.isEmpty()) {
       List<String> sortedKeys = new ArrayList<>(keys.keySet());
       boundary.add(getLexicographicallyLowerString(keys.firstKey()));
       boundary.add(keys.firstKey());

@@ -14,14 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
-
 # reusable fragments (see https://docs.docker.com/compose/compose-file/#extension-fields)
 x-common-config:
   &common-config
   env_file:
     - docker-config
-  image: ${OZONE_IMAGE}
+  image: ${OZONE_TEST_IMAGE}
 
 x-environment:
   &environment

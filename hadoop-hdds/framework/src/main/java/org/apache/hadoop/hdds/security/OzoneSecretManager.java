@@ -1,23 +1,33 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.security;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.SignatureException;
+import java.security.cert.X509Certificate;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
@@ -29,17 +39,6 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.slf4j.Logger;
-
-import java.io.IOException;
-import java.security.InvalidKeyException;
-import java.security.KeyPair;
-import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.Signature;
-import java.security.SignatureException;
-import java.security.cert.X509Certificate;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * SecretManager for Ozone Master. Responsible for signing identifiers with
@@ -86,7 +85,6 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
     this.logger = logger;
     this.currentKey = new AtomicReference<>();
   }
-
 
   /**
    * Compute HMAC of the identifier using the private key and return the output
@@ -140,6 +138,7 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
    */
   public abstract long renewToken(Token<T> token, String renewer)
       throws IOException;
+
   /**
    * Cancel a token by removing it from store and cache.
    *
@@ -172,17 +171,17 @@ public abstract class OzoneSecretManager<T extends TokenIdentifier>
    */
   private OzoneSecretKey updateCurrentKey(KeyPair keyPair,
       X509Certificate certificate) {
-    logger.info("Updating current master key for generating tokens. Cert id {}",
-        certificate.getSerialNumber().toString());
-
     int newCurrentId = incrementCurrentKeyId();
     OzoneSecretKey newKey = new OzoneSecretKey(newCurrentId,
         certificate.getNotAfter().getTime(), keyPair,
         certificate.getSerialNumber().toString());
     currentKey.set(newKey);
+    logger.info("Updated current master key for generating tokens. Cert id {}, Master key id {}",
+        certificate.getSerialNumber().toString(), newKey.getKeyId());
     return newKey;
   }
 
+  @Override
   public void notifyCertificateRenewed(CertificateClient client,
       String oldCertId, String newCertId) {
     if (!oldCertId.equals(getCertSerialId())) {

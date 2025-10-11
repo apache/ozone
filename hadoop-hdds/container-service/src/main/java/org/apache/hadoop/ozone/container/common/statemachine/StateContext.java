@@ -1,32 +1,49 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine;
 
+import static java.lang.Math.min;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getInitialReconHeartbeatInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconHeartbeatInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmInitialHeartbeatInterval;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.Message;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -41,11 +58,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.Descriptors.Descriptor;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -53,24 +68,17 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-
-import com.google.common.base.Preconditions;
-import com.google.protobuf.Message;
-import static java.lang.Math.min;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconHeartbeatInterval;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
-
-import org.apache.commons.collections.CollectionUtils;
-
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,13 +103,10 @@ public class StateContext {
   @VisibleForTesting
   static final String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
       IncrementalContainerReportProto.getDescriptor().getFullName();
-  @VisibleForTesting
-  static final String CRL_STATUS_REPORT_PROTO_NAME =
-      CRLStatusReport.getDescriptor().getFullName();
 
   static final Logger LOG =
       LoggerFactory.getLogger(StateContext.class);
-  private final Queue<SCMCommand> commandQueue;
+  private final Queue<SCMCommand<?>> commandQueue;
   private final Map<Long, CommandStatus> cmdStatusMap;
   private final Lock lock;
   private final DatanodeStateMachine parentDatanodeStateMachine;
@@ -112,12 +117,11 @@ public class StateContext {
   private final AtomicReference<Message> containerReports;
   private final AtomicReference<Message> nodeReport;
   private final AtomicReference<Message> pipelineReports;
-  private final AtomicReference<Message> crlStatusReport;
   // Incremental reports are queued in the map below
   private final Map<InetSocketAddress, List<Message>>
       incrementalReportsQueue;
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
-  private final Map<InetSocketAddress, Queue<PipelineAction>> pipelineActions;
+  private final Map<InetSocketAddress, PipelineActionMap> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
@@ -149,13 +153,15 @@ public class StateContext {
    * real HB frequency after scm registration. With this method the
    * initial registration could be significant faster.
    */
-  private final AtomicLong heartbeatFrequency = new AtomicLong(2000);
+  private final AtomicLong heartbeatFrequency;
 
-  private final AtomicLong reconHeartbeatFrequency = new AtomicLong(2000);
+  private final AtomicLong reconHeartbeatFrequency;
 
   private final int maxCommandQueueLimit;
 
   private final String threadNamePrefix;
+
+  private RunningDatanodeState runningDatanodeState;
 
   /**
    * Constructs a StateContext.
@@ -179,10 +185,9 @@ public class StateContext {
     containerReports = new AtomicReference<>();
     nodeReport = new AtomicReference<>();
     pipelineReports = new AtomicReference<>();
-    crlStatusReport = new AtomicReference<>(); // Certificate Revocation List
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
-    pipelineActions = new HashMap<>();
+    pipelineActions = new ConcurrentHashMap<>();
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
     threadPoolNotAvailableCount = new AtomicLong(0);
@@ -191,6 +196,8 @@ public class StateContext {
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
     this.threadNamePrefix = threadNamePrefix;
+    heartbeatFrequency = new AtomicLong(getScmInitialHeartbeatInterval(conf));
+    reconHeartbeatFrequency = new AtomicLong(getInitialReconHeartbeatInterval(conf));
     initReportTypeCollection();
   }
 
@@ -204,8 +211,6 @@ public class StateContext {
     type2Reports.put(NODE_REPORT_PROTO_NAME, nodeReport);
     fullReportTypeList.add(PIPELINE_REPORTS_PROTO_NAME);
     type2Reports.put(PIPELINE_REPORTS_PROTO_NAME, pipelineReports);
-    fullReportTypeList.add(CRL_STATUS_REPORT_PROTO_NAME);
-    type2Reports.put(CRL_STATUS_REPORT_PROTO_NAME, crlStatusReport);
   }
 
   /**
@@ -525,47 +530,18 @@ public class StateContext {
   }
 
   /**
-   * Helper function for addPipelineActionIfAbsent that check if inputs are the
-   * same close pipeline action.
-   *
-   * Important Note: Make sure to double check for correctness before using this
-   * helper function for other purposes!
-   *
-   * @return true if a1 and a2 are the same close pipeline action,
-   *         false otherwise
-   */
-  boolean isSameClosePipelineAction(PipelineAction a1, PipelineAction a2) {
-    return a1.getAction() == a2.getAction()
-        && a1.hasClosePipeline()
-        && a2.hasClosePipeline()
-        && a1.getClosePipeline().getPipelineID()
-        .equals(a2.getClosePipeline().getPipelineID());
-  }
-
-  /**
    * Add PipelineAction to PipelineAction queue if it's not present.
    *
    * @param pipelineAction PipelineAction to be added
    */
-  public void addPipelineActionIfAbsent(PipelineAction pipelineAction) {
-    synchronized (pipelineActions) {
-      /**
-       * If pipelineAction queue already contains entry for the pipeline id
-       * with same action, we should just return.
-       * Note: We should not use pipelineActions.contains(pipelineAction) here
-       * as, pipelineAction has a msg string. So even if two msgs differ though
-       * action remains same on the given pipeline, it will end up adding it
-       * multiple times here.
-       */
-      for (InetSocketAddress endpoint : endpoints) {
-        final Queue<PipelineAction> actionsForEndpoint =
-            pipelineActions.get(endpoint);
-        if (actionsForEndpoint.stream().noneMatch(
-            action -> isSameClosePipelineAction(action, pipelineAction))) {
-          actionsForEndpoint.add(pipelineAction);
-        }
-      }
+  public boolean addPipelineActionIfAbsent(PipelineAction pipelineAction) {
+    // Put only if the pipeline id with the same action is absent.
+    final PipelineKey key = new PipelineKey(pipelineAction);
+    boolean added = false;
+    for (InetSocketAddress endpoint : endpoints) {
+      added = pipelineActions.get(endpoint).putIfAbsent(key, pipelineAction) || added;
     }
+    return added;
   }
 
   /**
@@ -577,34 +553,17 @@ public class StateContext {
   public List<PipelineAction> getPendingPipelineAction(
       InetSocketAddress endpoint,
       int maxLimit) {
-    List<PipelineAction> pipelineActionList = new ArrayList<>();
-    List<PipelineAction> persistPipelineAction = new ArrayList<>();
-    synchronized (pipelineActions) {
-      if (!pipelineActions.isEmpty() &&
-          CollectionUtils.isNotEmpty(pipelineActions.get(endpoint))) {
-        Queue<PipelineAction> actionsForEndpoint =
-            this.pipelineActions.get(endpoint);
-        int size = actionsForEndpoint.size();
-        int limit = size > maxLimit ? maxLimit : size;
-        for (int count = 0; count < limit; count++) {
-          // Add closePipeline back to the pipelineAction queue until
-          // pipeline is closed and removed from the DN.
-          PipelineAction action = actionsForEndpoint.poll();
-          if (action.hasClosePipeline()) {
-            if (parentDatanodeStateMachine.getContainer().getPipelineReport()
-                .getPipelineReportList().stream().noneMatch(
-                    report -> action.getClosePipeline().getPipelineID()
-                        .equals(report.getPipelineID()))) {
-              continue;
-            }
-            persistPipelineAction.add(action);
-          }
-          pipelineActionList.add(action);
-        }
-        actionsForEndpoint.addAll(persistPipelineAction);
-      }
-      return pipelineActionList;
+    final PipelineActionMap map = pipelineActions.get(endpoint);
+    if (map == null) {
+      return Collections.emptyList();
     }
+    final OzoneContainer ozoneContainer = parentDatanodeStateMachine.
+        getContainer();
+    if (ozoneContainer == null) {
+      return Collections.emptyList();
+    }
+    final PipelineReportsProto reports = ozoneContainer.getPipelineReport();
+    return map.getActions(reports.getPipelineReportList(), maxLimit);
   }
 
   /**
@@ -620,9 +579,11 @@ public class StateContext {
           parentDatanodeStateMachine.getConnectionManager(),
           this);
     case RUNNING:
-      return new RunningDatanodeState(this.conf,
-          parentDatanodeStateMachine.getConnectionManager(),
-          this);
+      if (runningDatanodeState == null) {
+        runningDatanodeState = new RunningDatanodeState(this.conf,
+            parentDatanodeStateMachine.getConnectionManager(), this);
+      }
+      return runningDatanodeState;
     case SHUTDOWN:
       return null;
     default:
@@ -637,7 +598,7 @@ public class StateContext {
     }
 
     ThreadPoolExecutor ex = (ThreadPoolExecutor) executor;
-    if (ex.getQueue().size() == 0) {
+    if (ex.getQueue().isEmpty()) {
       return true;
     }
 
@@ -662,7 +623,11 @@ public class StateContext {
     // Adding not null check, in a case where datanode is still starting up, but
     // we called stop DatanodeStateMachine, this sets state to SHUTDOWN, and
     // there is a chance of getting task as null.
-    if (task != null) {
+    if (task == null) {
+      return;
+    }
+
+    try {
       if (this.isEntering()) {
         task.onEnter();
       }
@@ -699,6 +664,8 @@ public class StateContext {
         // that we can terminate the datanode.
         setShutdownOnError();
       }
+    } finally {
+      task.clear();
     }
   }
 
@@ -779,7 +746,7 @@ public class StateContext {
    *
    * @return SCMCommand or Null.
    */
-  public SCMCommand getNextCommand() {
+  public SCMCommand<?> getNextCommand() {
     lock.lock();
     try {
       initTermOfLeaderSCM();
@@ -813,7 +780,7 @@ public class StateContext {
    *
    * @param command - SCMCommand.
    */
-  public void addCommand(SCMCommand command) {
+  public void addCommand(SCMCommand<?> command) {
     lock.lock();
     try {
       if (commandQueue.size() >= maxCommandQueueLimit) {
@@ -833,13 +800,19 @@ public class StateContext {
     Map<SCMCommandProto.Type, Integer> summary = new HashMap<>();
     lock.lock();
     try {
-      for (SCMCommand cmd : commandQueue) {
+      for (SCMCommand<?> cmd : commandQueue) {
         summary.put(cmd.getType(), summary.getOrDefault(cmd.getType(), 0) + 1);
       }
     } finally {
       lock.unlock();
     }
     return summary;
+  }
+
+  public boolean isPipelineCloseInProgress(UUID pipelineID) {
+    ClosePipelineCommandHandler handler = parentDatanodeStateMachine.getCommandDispatcher()
+        .getClosePipelineCommandHandler();
+    return handler.isPipelineCloseInProgress(pipelineID);
   }
 
   /**
@@ -873,7 +846,7 @@ public class StateContext {
    *
    * @param cmd - {@link SCMCommand}.
    */
-  public void addCmdStatus(SCMCommand cmd) {
+  public void addCmdStatus(SCMCommand<?> cmd) {
     if (cmd.getType() == SCMCommandProto.Type.deleteBlocksCommand) {
       addCmdStatus(cmd.getId(),
           DeleteBlockCommandStatusBuilder.newBuilder()
@@ -925,7 +898,7 @@ public class StateContext {
     if (!endpoints.contains(endpoint)) {
       this.endpoints.add(endpoint);
       this.containerActions.put(endpoint, new LinkedList<>());
-      this.pipelineActions.put(endpoint, new LinkedList<>());
+      this.pipelineActions.put(endpoint, new PipelineActionMap());
       this.incrementalReportsQueue.put(endpoint, new LinkedList<>());
       Map<String, AtomicBoolean> mp = new HashMap<>();
       fullReportTypeList.forEach(e -> {
@@ -951,11 +924,6 @@ public class StateContext {
   @VisibleForTesting
   public Message getPipelineReports() {
     return pipelineReports.get();
-  }
-
-  @VisibleForTesting
-  public Message getCRLStatusReport() {
-    return crlStatusReport.get();
   }
 
   public void configureReconHeartbeatFrequency() {
@@ -990,5 +958,80 @@ public class StateContext {
 
   public String getThreadNamePrefix() {
     return threadNamePrefix;
+  }
+
+  static class PipelineActionMap {
+    private final LinkedHashMap<PipelineKey, PipelineAction> map =
+        new LinkedHashMap<>();
+
+    synchronized int size() {
+      return map.size();
+    }
+
+    synchronized boolean putIfAbsent(PipelineKey key,
+        PipelineAction pipelineAction) {
+      return map.putIfAbsent(key, pipelineAction) == null;
+    }
+
+    synchronized List<PipelineAction> getActions(List<PipelineReport> reports,
+        int max) {
+      if (map.isEmpty()) {
+        return Collections.emptyList();
+      }
+      final List<PipelineAction> pipelineActionList = new ArrayList<>();
+      final int limit = Math.min(map.size(), max);
+      final Iterator<Map.Entry<PipelineKey, PipelineAction>> i =
+          map.entrySet().iterator();
+      for (int count = 0; count < limit && i.hasNext(); count++) {
+        final Map.Entry<PipelineKey, PipelineAction> entry = i.next();
+        final PipelineAction action = entry.getValue();
+        // Add closePipeline back to the pipelineAction queue until
+        // pipeline is closed and removed from the DN.
+        if (action.hasClosePipeline()) {
+          if (reports.stream().noneMatch(entry.getKey()::equalsId)) {
+            // pipeline is removed from the DN, this action is no longer needed.
+            i.remove();
+            continue;
+          }
+          // pipeline is closed but not yet removed from the DN.
+        } else {
+          i.remove();
+        }
+        pipelineActionList.add(action);
+      }
+      // add all
+      return pipelineActionList;
+    }
+  }
+
+  static class PipelineKey {
+    private final HddsProtos.PipelineID pipelineID;
+    private final PipelineAction.Action action;
+
+    PipelineKey(PipelineAction p) {
+      this.pipelineID = p.getClosePipeline().getPipelineID();
+      this.action = p.getAction();
+    }
+
+    boolean equalsId(PipelineReport report) {
+      return pipelineID.equals(report.getPipelineID());
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(pipelineID);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      } else if (!(obj instanceof PipelineKey)) {
+        return false;
+      }
+      final PipelineKey that = (PipelineKey) obj;
+      return Objects.equals(this.action, that.action)
+          && Objects.equals(this.pipelineID, that.pipelineID);
+    }
   }
 }

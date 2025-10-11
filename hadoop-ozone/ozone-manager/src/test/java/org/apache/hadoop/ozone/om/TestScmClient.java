@@ -1,21 +1,42 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
+import static com.google.common.collect.Sets.newHashSet;
+import static java.util.Arrays.asList;
+import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,41 +53,18 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import static com.google.common.collect.Sets.newHashSet;
-import static java.util.Arrays.asList;
-import static org.apache.commons.lang.RandomStringUtils.randomAlphabetic;
-import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 /**
  * ScmClient test-cases.
  */
 public class TestScmClient {
-  private ScmBlockLocationProtocol scmBlockLocationProtocol;
   private StorageContainerLocationProtocol containerLocationProtocol;
-  private OzoneConfiguration conf;
   private ScmClient scmClient;
 
   @BeforeEach
   public void setUp() {
-    scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
+    ScmBlockLocationProtocol scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     containerLocationProtocol = mock(StorageContainerLocationProtocol.class);
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     scmClient = new ScmClient(scmBlockLocationProtocol,
         containerLocationProtocol, conf);
   }
@@ -97,6 +95,7 @@ public class TestScmClient {
             true, newHashSet(1L, 3L, 4L))
     );
   }
+
   @ParameterizedTest
   @MethodSource("getContainerLocationsTestCases")
   public void testGetContainerLocations(String testCaseName,
@@ -184,8 +183,8 @@ public class TestScmClient {
   private DatanodeDetails randomDatanode() {
     return DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
-        .setHostName(randomAlphabetic(5))
-        .setIpAddress(randomAlphabetic(5))
+        .setHostName(RandomStringUtils.secure().nextAlphabetic(5))
+        .setIpAddress(RandomStringUtils.secure().nextAlphabetic(5))
         .build();
   }
 

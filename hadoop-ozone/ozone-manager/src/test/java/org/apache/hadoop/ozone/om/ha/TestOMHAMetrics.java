@@ -1,22 +1,24 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.ha;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.junit.jupiter.api.AfterEach;
@@ -30,9 +32,7 @@ public class TestOMHAMetrics {
   private static final MetricsCollectorImpl METRICS_COLLECTOR =
       new MetricsCollectorImpl();
   private static final String NODE_ID =
-      "om" + RandomStringUtils.randomNumeric(5);
-  private OMHAMetrics omhaMetrics;
-  private String leaderId;
+      "om" + RandomStringUtils.secure().nextNumeric(5);
 
   @AfterEach
   public void cleanUp() {
@@ -41,8 +41,7 @@ public class TestOMHAMetrics {
 
   @Test
   public void testGetMetricsWithLeader() {
-    leaderId = NODE_ID;
-    omhaMetrics = OMHAMetrics.create(NODE_ID, leaderId);
+    OMHAMetrics omhaMetrics = OMHAMetrics.create(NODE_ID, NODE_ID);
 
     omhaMetrics.getMetrics(METRICS_COLLECTOR, true);
     assertEquals(1, omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
@@ -50,8 +49,8 @@ public class TestOMHAMetrics {
 
   @Test
   public void testGetMetricsWithFollower() {
-    leaderId = "om" + RandomStringUtils.randomNumeric(5);
-    omhaMetrics = OMHAMetrics.create(NODE_ID, leaderId);
+    String leaderId = "om" + RandomStringUtils.secure().nextNumeric(5);
+    OMHAMetrics omhaMetrics = OMHAMetrics.create(NODE_ID, leaderId);
 
     omhaMetrics.getMetrics(METRICS_COLLECTOR, true);
     assertEquals(0, omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());

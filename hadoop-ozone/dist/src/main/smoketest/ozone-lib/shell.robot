@@ -19,6 +19,11 @@ Library     String
 
 
 *** Keywords ***
+Ozone Shell Batch
+    [arguments]    @{commands}
+    ${cmd} =    Catenate    SEPARATOR=' --execute '    @{commands}
+    Run Keyword And Return    Execute and checkrc    ozone sh --execute '${cmd}'    0
+
 Bucket Exists
     [arguments]    ${bucket}
     ${rc}    ${output} =      Run And Return Rc And Output             timeout 15 ozone sh bucket info ${bucket}
@@ -28,10 +33,10 @@ Bucket Exists
     [Return]                  ${TRUE}
 
 Compare Key With Local File
-    [arguments]    ${key}    ${file}
+    [arguments]    ${key}    ${file}    ${cmd}=sh key get
     ${postfix} =   Generate Random String  5  [NUMBERS]
     ${tmpfile} =   Set Variable    /tmp/tempkey-${postfix}
-    Execute        ozone sh key get ${key} ${tmpfile}
+    Execute        ozone ${cmd} ${key} ${tmpfile}
     ${rc} =        Run And Return Rc    diff -q ${file} ${tmpfile}
     Execute        rm -f ${tmpfile}
     ${result} =    Set Variable If    ${rc} == 0    ${TRUE}   ${FALSE}
@@ -40,6 +45,11 @@ Compare Key With Local File
 Key Should Match Local File
     [arguments]    ${key}    ${file}
     ${matches} =   Compare Key With Local File    ${key}    ${file}
+    Should Be True    ${matches}
+
+File Should Match Local File
+    [arguments]    ${key}    ${file}
+    ${matches} =   Compare Key With Local File    ${key}    ${file}    fs -get
     Should Be True    ${matches}
 
 Verify ACL
@@ -53,14 +63,27 @@ Create Random Volume
     [return]       vol-${random}
 
 Find Jars Dir
-    ${dir} =    Execute    ozone envvars | grep 'HDDS_LIB_JARS_DIR' | cut -f2 -d= | sed -e "s/'//g" -e 's/"//g'
-    Set Environment Variable    HDDS_LIB_JARS_DIR    ${dir}
+    [arguments]    ${ozone_dir}=${OZONE_DIR}
+    ${dir} =    Execute    ${ozone_dir}/bin/ozone envvars | grep 'HDDS_LIB_JARS_DIR' | cut -f2 -d= | sed -e "s/'//g" -e 's/"//g'
+    [return]    ${dir}
+
+Create bucket with layout
+    [Arguments]          ${volume}    ${layout}
+    ${postfix} =         Generate Random String    10    [LOWER]
+    ${bucket} =          Set Variable    bucket-${postfix}
+    ${result} =          Execute         ozone sh bucket create --layout ${layout} ${volume}/${bucket}
+    [Return]             ${bucket}
 
 Create Key
     [arguments]    ${key}    ${file}    ${args}=${EMPTY}
     ${output} =    Execute          ozone sh key put ${args} ${key} ${file}
                    Should not contain  ${output}       Failed
     Log            Uploaded ${file} to ${key}
+
+Assert Unsupported
+    [arguments]    ${cmd}
+    ${result} =     Execute and checkrc         ${cmd}       255
+                    Should Contain  ${result}   NOT_SUPPORTED_OPERATION
 
 Verify Bucket Empty Replication Config
     [arguments]    ${bucket}

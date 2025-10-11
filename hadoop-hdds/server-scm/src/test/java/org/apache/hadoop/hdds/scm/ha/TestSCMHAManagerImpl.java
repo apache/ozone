@@ -1,25 +1,38 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -40,8 +53,10 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.DivisionInfo;
@@ -54,18 +69,6 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assumptions.assumeThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-
 /**
  * Test cases to verify {@link org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl}.
  */
@@ -73,6 +76,8 @@ import static org.mockito.Mockito.when;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class TestSCMHAManagerImpl {
 
+  private static final String LEADER_SCM_ID = "leader";
+  private static final int LEADER_PORT = 9894;
   private static final String FOLLOWER_SCM_ID = "follower";
 
   private Path storageBaseDir;
@@ -85,18 +90,17 @@ class TestSCMHAManagerImpl {
       TimeoutException {
     storageBaseDir = tempDir;
     clusterID = UUID.randomUUID().toString();
-    OzoneConfiguration conf = getConfig("scm1", 9894);
-    final StorageContainerManager scm = getMockStorageContainerManager(conf);
-    SCMRatisServerImpl.initialize(clusterID, scm.getScmId(),
-        scm.getScmNodeDetails(), conf);
+    final StorageContainerManager scm = getMockStorageContainerManager(LEADER_SCM_ID, LEADER_PORT);
+    SCMRatisServerImpl.initialize(clusterID, LEADER_SCM_ID, scm.getScmNodeDetails(), scm.getConfiguration());
     primarySCMHAManager = scm.getScmHAManager();
     primarySCMHAManager.start();
     final DivisionInfo ratisDivision = primarySCMHAManager.getRatisServer()
         .getDivision().getInfo();
     // Wait for Ratis Server to be ready
     waitForSCMToBeReady(ratisDivision);
-    follower = getMockStorageContainerManager(getConfig(FOLLOWER_SCM_ID, 9898))
-        .getScmHAManager().getRatisServer();
+    StorageContainerManager followerSCM = getMockStorageContainerManager(FOLLOWER_SCM_ID, 9898);
+    follower = followerSCM.getScmHAManager()
+        .getRatisServer();
   }
 
   private OzoneConfiguration getConfig(String scmId, int ratisPort) {
@@ -150,10 +154,16 @@ class TestSCMHAManagerImpl {
         .getDivision().getGroup().getPeers().size();
   }
 
+  private String getRaftServerAddress(SCMRatisServer ratisServer) {
+    return "localhost:" + ratisServer.getDivision()
+        .getRaftServer()
+        .getServerRpc()
+        .getInetSocketAddress()
+        .getPort();
+  }
+
   private String getFollowerAddress() {
-    return "localhost:" +
-        follower.getDivision()
-            .getRaftServer().getServerRpc().getInetSocketAddress().getPort();
+    return getRaftServerAddress(follower);
   }
 
   @Test
@@ -186,9 +196,8 @@ class TestSCMHAManagerImpl {
     }
   }
 
-  private StorageContainerManager getMockStorageContainerManager(
-      OzoneConfiguration conf) throws IOException {
-    final String scmID =  UUID.randomUUID().toString();
+  private StorageContainerManager getMockStorageContainerManager(String scmID, int port) throws IOException {
+    OzoneConfiguration conf = getConfig(scmID, port);
 
     final DBStore dbStore = mock(DBStore.class);
     final SCMContext scmContext = mock(SCMContext.class);
@@ -213,6 +222,7 @@ class TestSCMHAManagerImpl {
         mock(SCMDatanodeProtocolServer.class);
 
     when(scm.getClusterId()).thenReturn(clusterID);
+    when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getScmId()).thenReturn(scmID);
     when(scm.getScmMetadataStore()).thenReturn(metadataStore);
     when(scm.getScmNodeDetails()).thenReturn(nodeDetails);
@@ -231,12 +241,33 @@ class TestSCMHAManagerImpl {
     when(scmHANodeDetails.getLocalNodeDetails()).thenReturn(nodeDetails);
     when(blockManager.getDeletedBlockLog()).thenReturn(deletedBlockLog);
     when(dbStore.initBatchOperation()).thenReturn(batchOperation);
-    when(nodeDetails.getRatisHostPortStr()).thenReturn("localhost:" +
-        conf.get(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY));
+    when(nodeDetails.getRatisHostPortStr()).thenReturn("localhost:" + port);
     when(scm.getSystemClock()).thenReturn(Clock.system(ZoneOffset.UTC));
 
+    if (FOLLOWER_SCM_ID.equals(scmID)) {
+      final SCMNodeDetails leaderNodeDetails = mock(SCMNodeDetails.class);
+      final List<SCMNodeDetails> peerNodeDetails = singletonList(leaderNodeDetails);
+      when(scmHANodeDetails.getPeerNodeDetails()).thenReturn(peerNodeDetails);
+      when(leaderNodeDetails.getNodeId()).thenReturn(LEADER_SCM_ID);
+      when(leaderNodeDetails.getGrpcPort()).thenReturn(LEADER_PORT);
+      when(leaderNodeDetails.getRatisHostPortStr()).thenReturn("localhost:" + LEADER_PORT);
+      InetSocketAddress rpcAddress = NetUtils.createSocketAddr("localhost", LEADER_PORT);
+      when(leaderNodeDetails.getRpcAddress()).thenReturn(rpcAddress);
+      when(leaderNodeDetails.getInetAddress()).thenReturn(rpcAddress.getAddress());
+    }
+
+    DBCheckpoint checkpoint = mock(DBCheckpoint.class);
+    SCMSnapshotProvider scmSnapshotProvider = mock(SCMSnapshotProvider.class);
+    when(scmSnapshotProvider.getSCMDBSnapshot(LEADER_SCM_ID))
+        .thenReturn(checkpoint);
+
     final SCMHAManager manager = new SCMHAManagerImpl(conf,
-        new SecurityConfig(conf), scm);
+        new SecurityConfig(conf), scm) {
+      @Override
+      protected SCMSnapshotProvider newScmSnapshotProvider(StorageContainerManager storageContainerManager) {
+        return scmSnapshotProvider;
+      }
+    };
     when(scm.getScmHAManager()).thenReturn(manager);
     return scm;
   }

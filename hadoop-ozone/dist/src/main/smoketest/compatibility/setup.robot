@@ -19,10 +19,7 @@ Library             OperatingSystem
 Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
-${SUFFIX}    ${EMPTY}
-
-
-*** Keywords ***
-Create Local Test File
-    Set Suite Variable    ${TESTFILE}    /tmp/test-data-${SUFFIX}.txt
-    Create File    ${TESTFILE}    Compatibility Test
+${EC_VERSION}     1.3.0
+${FSO_VERSION}    1.3.0
+${HSYNC_VERSION}  2.0.0
+${TESTFILE}       ${TEST_DATA_DIR}/small

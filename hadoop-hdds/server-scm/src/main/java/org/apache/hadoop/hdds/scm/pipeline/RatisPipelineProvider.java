@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,18 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -37,7 +36,6 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelinePlacementPolicy.DnWithPipelines;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
@@ -103,32 +101,32 @@ public class RatisPipelineProvider
     }
   }
 
-  private boolean exceedPipelineNumberLimit(
-      RatisReplicationConfig replicationConfig) {
+  private boolean exceedPipelineNumberLimit(RatisReplicationConfig replicationConfig) {
+    // Apply limits only for replication factor THREE
     if (replicationConfig.getReplicationFactor() != ReplicationFactor.THREE) {
-      // Only put limits for Factor THREE pipelines.
       return false;
     }
-    // Per datanode limit
+
+    PipelineStateManager pipelineStateManager = getPipelineStateManager();
+    int totalActivePipelines = pipelineStateManager.getPipelines(replicationConfig).size();
+    int closedPipelines = pipelineStateManager.getPipelines(replicationConfig, PipelineState.CLOSED).size();
+    int openPipelines = totalActivePipelines - closedPipelines;
+    // Check per-datanode pipeline limit
     if (maxPipelinePerDatanode > 0) {
-      return (getPipelineStateManager().getPipelines(replicationConfig).size() -
-          getPipelineStateManager().getPipelines(replicationConfig,
-              PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
-          getNodeManager().getNodeCount(NodeStatus.inServiceHealthy()) /
-          replicationConfig.getRequiredNodes();
+      int healthyNodeCount = getNodeManager()
+          .getNodeCount(NodeStatus.inServiceHealthy());
+      int allowedOpenPipelines = (maxPipelinePerDatanode * healthyNodeCount)
+          / replicationConfig.getRequiredNodes();
+      return openPipelines >= allowedOpenPipelines;
     }
-
-    // Global limit
+    // Check global pipeline limit
     if (pipelineNumberLimit > 0) {
-      return (getPipelineStateManager().getPipelines(replicationConfig).size() -
-          getPipelineStateManager().getPipelines(
-              replicationConfig, PipelineState.CLOSED).size()) >
-          (pipelineNumberLimit - getPipelineStateManager()
-              .getPipelines(RatisReplicationConfig
-                  .getInstance(ReplicationFactor.ONE))
-              .size());
+      int factorOnePipelineCount = pipelineStateManager
+          .getPipelines(RatisReplicationConfig.getInstance(ReplicationFactor.ONE)).size();
+      int allowedOpenPipelines = pipelineNumberLimit - factorOnePipelineCount;
+      return openPipelines >= allowedOpenPipelines;
     }
-
+    // No limits are set
     return false;
   }
 
@@ -149,10 +147,15 @@ public class RatisPipelineProvider
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     if (exceedPipelineNumberLimit(replicationConfig)) {
-      throw new SCMException("Ratis pipeline number meets the limit: " +
-          pipelineNumberLimit + " replicationConfig : " +
-          replicationConfig,
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+      String limitInfo = (maxPipelinePerDatanode > 0)
+          ? String.format("per datanode: %d", maxPipelinePerDatanode)
+          : String.format(": %d", pipelineNumberLimit);
+
+      throw new SCMException(
+          String.format("Cannot create pipeline as it would exceed the limit %s replicationConfig: %s",
+              limitInfo, replicationConfig),
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE
+      );
     }
 
     List<DatanodeDetails> dns;
@@ -166,8 +169,8 @@ public class RatisPipelineProvider
       break;
     case THREE:
       List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
-      if (excludeDueToEngagement.size() > 0) {
-        if (excludedNodes.size() == 0) {
+      if (!excludeDueToEngagement.isEmpty()) {
+        if (excludedNodes.isEmpty()) {
           excludedNodes = excludeDueToEngagement;
         } else {
           excludedNodes.addAll(excludeDueToEngagement);
@@ -189,7 +192,7 @@ public class RatisPipelineProvider
         .setReplicationConfig(RatisReplicationConfig.getInstance(factor))
         .setNodes(dns)
         .setSuggestedLeaderId(
-            suggestedLeader != null ? suggestedLeader.getUuid() : null)
+            suggestedLeader != null ? suggestedLeader.getID() : null)
         .build();
 
     // Send command to datanodes to create pipeline
@@ -203,9 +206,9 @@ public class RatisPipelineProvider
 
     dns.forEach(node -> {
       LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
-          pipeline.getId(), node.getUuidString());
+          pipeline.getId(), node);
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-          new CommandForDatanode<>(node.getUuid(), createCommand));
+          new CommandForDatanode<>(node, createCommand));
     });
 
     return pipeline;
@@ -266,7 +269,7 @@ public class RatisPipelineProvider
     closeCommand.setTerm(scmContext.getTermOfLeader());
     pipeline.getNodes().forEach(node -> {
       final CommandForDatanode<?> datanodeCommand =
-          new CommandForDatanode<>(node.getUuid(), closeCommand);
+          new CommandForDatanode<>(node, closeCommand);
       LOG.info("Send pipeline:{} close command to datanode {}",
           pipeline.getId(), datanodeCommand.getDatanodeId());
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);

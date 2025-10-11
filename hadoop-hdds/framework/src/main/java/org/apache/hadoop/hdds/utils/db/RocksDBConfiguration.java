@@ -1,30 +1,29 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigType;
-
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigType;
 
 /**
  * Holds configuration items for OM RocksDB.
@@ -45,6 +44,20 @@ public class RocksDBConfiguration {
       tags = {OM, SCM, DATANODE},
       description = "OM RocksDB logging level (INFO/DEBUG/WARN/ERROR/FATAL)")
   private String rocksdbLogLevel;
+
+  @Config(key = "rocksdb.max.log.file.size",
+      type = ConfigType.SIZE,
+      defaultValue = "100MB",
+      tags = {OM, SCM, DATANODE},
+      description = "Maximum size of RocksDB application log file.")
+  private long rocksdbMaxLogFileSize = 100 * 1024 * 1024;
+
+  @Config(key = "rocksdb.keep.log.file.num",
+      type = ConfigType.INT,
+      defaultValue = "10",
+      tags = {OM, SCM, DATANODE},
+      description = "Maximum number of RocksDB application log files.")
+  private int rocksdbKeepLogFileNum = 10;
 
   @Config(key = "rocksdb.writeoption.sync",
       type = ConfigType.BOOLEAN,
@@ -109,5 +122,21 @@ public class RocksDBConfiguration {
 
   public long getWalSizeLimit() {
     return walSizeLimit;
+  }
+
+  public void setMaxLogFileSize(long fileSize) {
+    rocksdbMaxLogFileSize = fileSize;
+  }
+
+  public long getMaxLogFileSize() {
+    return rocksdbMaxLogFileSize;
+  }
+
+  public void setKeepLogFileNum(int fileNum) {
+    rocksdbKeepLogFileNum = fileNum;
+  }
+
+  public int getKeepLogFileNum() {
+    return rocksdbKeepLogFileNum;
   }
 }

@@ -17,10 +17,11 @@
 Documentation       Smoke test for creating data needed for om bootstrap load test.
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Variables ***
-${TMP_FILE}         tmp.txt
+${TMP_FILE}    ${TEMP_DIR}/tmp.txt
 ${VOLUME}
 ${BUCKET}
 ${SNAP_1}
@@ -36,19 +37,6 @@ Create volume and bucket
                         Should Be Empty     ${vol_res}
     ${bucket_res} =     Execute             ozone sh bucket create /${volume}/${bucket}
                         Should Be Empty     ${bucket_res}
-
-Create tmp file
-    [arguments]         ${file_name}
-    ${create_res} =     Execute             touch ${file_name}
-                        Should Be Empty     ${create_res}
-    ${ls_grep_res} =    Execute             ls -lah | grep '${file_name}'
-                        Should contain      ${ls_grep_res}      ${file_name}
-
-Delete tmp file
-    [arguments]         ${file_name}
-    Execute             rm ${file_name}
-    ${file_exists} =    Execute             [[ -f ${file_name} ]] && echo "File exists" || echo "File doesn't exist"
-                        Should contain      ${file_exists}      File doesn't exist
 
 Create a key and set contents same as the keyName
     [arguments]         ${volume}           ${bucket}      ${key_prefix}       ${key_name}         ${tmp_file}
@@ -83,14 +71,9 @@ Create 100 metadata keys under /${VOLUME}/${BUCKET}
 Create snapshot '${SNAP_1}'
     Create snapshot         ${VOLUME}               ${BUCKET}       ${SNAP_1}
 
-Create tmp file to be used for key creation
-    Create tmp file         ${TMP_FILE}
-
 Create 2 actual keys with prefix '${KEY_PREFIX}', key contents the same as the key name
     Create actual keys      ${VOLUME}               ${BUCKET}       ${KEY_PREFIX}       ${KEY_1}        ${KEY_2}        ${TMP_FILE}
+    [teardown]    Remove File    ${TMP_FILE}
 
 Create snapshot '${SNAP_2}'
     Create snapshot         ${VOLUME}               ${BUCKET}       ${SNAP_2}
-
-Cleanup tmp file
-    Delete tmp file         ${TMP_FILE}

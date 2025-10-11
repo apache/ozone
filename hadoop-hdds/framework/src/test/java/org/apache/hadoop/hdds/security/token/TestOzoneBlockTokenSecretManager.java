@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,31 +16,6 @@
  */
 
 package org.apache.hadoop.hdds.security.token;
-
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
-import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
-import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
-import org.apache.hadoop.hdds.security.symmetric.SecretKeyTestUtil;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.security.token.Token;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.File;
-import java.security.NoSuchAlgorithmException;
-import java.util.EnumSet;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import static java.time.Duration.ofDays;
 import static java.time.Instant.now;
@@ -56,6 +30,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.File;
+import java.security.NoSuchAlgorithmException;
+import java.util.EnumSet;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyTestUtil;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
+import org.apache.hadoop.security.token.Token;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test class for {@link OzoneBlockTokenSecretManager}.
@@ -152,7 +150,7 @@ public class TestOzoneBlockTokenSecretManager {
         .build();
 
     // THEN
-    tokenVerifier.verify("testUser", token, putBlockCommand);
+    tokenVerifier.verify(token, putBlockCommand);
   }
 
   @Test
@@ -172,7 +170,7 @@ public class TestOzoneBlockTokenSecretManager {
 
     // THEN
     BlockTokenException e = assertThrows(BlockTokenException.class,
-        () -> tokenVerifier.verify("testUser", token, writeChunkRequest));
+        () -> tokenVerifier.verify(token, writeChunkRequest));
 
     assertThat(e.getMessage()).contains("Token for ID: " +
         OzoneBlockTokenIdentifier.getTokenService(blockID) +
@@ -200,12 +198,12 @@ public class TestOzoneBlockTokenSecretManager {
         pipeline, putBlockCommand.getPutBlock());
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
-        () -> tokenVerifier.verify(testUser1, token, putBlockCommand));
+        () -> tokenVerifier.verify(token, putBlockCommand));
 
     assertThat(e.getMessage())
         .contains("doesn't have WRITE permission");
 
-    tokenVerifier.verify(testUser1, token, getBlockCommand);
+    tokenVerifier.verify(token, getBlockCommand);
   }
 
   @Test
@@ -223,10 +221,10 @@ public class TestOzoneBlockTokenSecretManager {
     ContainerCommandRequestProto readChunkRequest =
         getReadChunkRequest(pipeline, writeChunkRequest.getWriteChunk());
 
-    tokenVerifier.verify(testUser2, token, writeChunkRequest);
+    tokenVerifier.verify(token, writeChunkRequest);
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
-        () -> tokenVerifier.verify(testUser2, token, readChunkRequest));
+        () -> tokenVerifier.verify(token, readChunkRequest));
     assertThat(e.getMessage())
         .contains("doesn't have READ permission");
   }
@@ -243,14 +241,14 @@ public class TestOzoneBlockTokenSecretManager {
         .setEncodedToken(token.encodeToUrlString())
         .build();
 
-    tokenVerifier.verify("testUser", token, writeChunkRequest);
+    tokenVerifier.verify(token, writeChunkRequest);
 
     // Mock client with an expired cert
     ManagedSecretKey expiredSecretKey = generateExpiredSecretKey();
     when(secretKeyClient.getSecretKey(any())).thenReturn(expiredSecretKey);
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
-        () -> tokenVerifier.verify(user, token, writeChunkRequest));
+        () -> tokenVerifier.verify(token, writeChunkRequest));
     assertThat(e.getMessage())
         .contains("Token can't be verified due to expired secret key");
   }

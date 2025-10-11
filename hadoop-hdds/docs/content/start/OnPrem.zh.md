@@ -59,9 +59,9 @@ ozone genconf <path>
   
   {{< highlight xml >}}
     <property>
-        <name>ozone.scm.names</name>
-      <value>scm.hadoop.apache.org</value>
-      </property>
+       <name>ozone.scm.names</name>
+       <value>scm.hadoop.apache.org</value>
+    </property>
   {{< /highlight >}}
   
  * **ozone.scm.datanode.id.dir** 每个 Datanode 会生成一个唯一 ID，叫做 Datanode ID。Datanode ID 会被写入此参数所指定路径下名为 datanode.id
