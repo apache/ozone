@@ -243,7 +243,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     OMRequest omRequest = doPreExecute(createDeleteOpenKeyRequest(allKeys));
     OMOpenKeysDeleteRequest openKeyDeleteRequest =
         new OMOpenKeysDeleteRequest(omRequest, getBucketLayout());
-
     OMClientResponse omClientResponse =
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, transactionId);
 
@@ -323,7 +322,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse =
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
-
     assertEquals(Status.OK,
         omClientResponse.getOMResponse().getStatus());
     for (OmKeyInfo openKey : openKeys.stream().map(Pair::getRight).collect(Collectors.toList())) {
