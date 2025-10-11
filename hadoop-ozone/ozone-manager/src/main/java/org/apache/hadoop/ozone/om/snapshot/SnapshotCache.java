@@ -148,7 +148,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   public void invalidate(UUID key) {
     dbMap.compute(key, (k, v) -> {
       if (v == null) {
-        LOG.warn("SnapshotId: '{}' does not exist in snapshot cache.", k);
+        LOG.debug("SnapshotId: '{}' does not exist in snapshot cache.", k);
       } else {
         try {
           v.get().getMetadataManager().getStore().flushDB();
