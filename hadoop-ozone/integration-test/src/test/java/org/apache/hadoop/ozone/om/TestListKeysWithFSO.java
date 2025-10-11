@@ -160,11 +160,11 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     // So, will return EmptyList
     // a1/b2 < a1/b2Invalid
     List<String> expectedKeys =
-        getExpectedKeyList("a1/b2", "a1", legacyOzoneBucket);
-    checkKeyList("a1/b2", "a1", expectedKeys, fsoOzoneBucket);
+        getExpectedKeyDeepList("a1/b2", "a1", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1", expectedKeys, fsoOzoneBucket);
 
     // case-2: Same prefixKey and startKey, but with an ending slash
-    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/", legacyOzoneBucket);
+    expectedKeys = getExpectedKeyList("a1/b2", "a1/b2/", legacyOzoneBucket, true);
     /**
      * a1/b2/d1/
      * a1/b2/d1/d11.tx
@@ -174,7 +174,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
      * a1/b2/d3/
      * a1/b2/d3/d31.tx
      */
-    checkKeyList("a1/b2", "a1/b2/", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/", expectedKeys, fsoOzoneBucket);
 
     // case-3: Same prefixKey and startKey, but without an ending slash.
     //  StartKey(dir) to be included in the finalList, if its a
@@ -190,14 +190,14 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
      * a1/b2/d3/
      * a1/b2/d3/d31.tx
      */
-    checkKeyList("a1/b2", "a1/b2", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2", expectedKeys, fsoOzoneBucket);
 
     // case-4: StartKey is a file with an ending slash.
     //  StartKey(file) with or without an ending slash
     //  to be excluded in the finalList.
     expectedKeys =
             getExpectedKeyDeepList("a1/b2/d2", "a1/b2/d2/d22.tx/", legacyOzoneBucket);
-    checkKeyList("a1/b2/d2", "a1/b2/d2/d22.tx/", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2/d2", "a1/b2/d2/d22.tx/", expectedKeys, fsoOzoneBucket);
 
     // case-5:
     // StartKey "a1/b2/d2/d22.tx" is a file and get all the keys lexographically
@@ -208,7 +208,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
      1 = "a1/b2/d3/"
      2 = "a1/b2/d3/d31.tx"
      */
-    checkKeyList("a1/b2", "a1/b2/d2/d22.tx", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/d2/d22.tx", expectedKeys, fsoOzoneBucket);
 
     // case-6:
     // StartKey "a1/b2/d2" is a dir and get all the keys lexographically
@@ -220,7 +220,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
      3 = "a1/b2/d3/"
      4 = "a1/b2/d3/d31.tx"
      */
-    checkKeyList("a1/b2", "a1/b2/d2/", expectedKeys, fsoOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/d2/", expectedKeys, fsoOzoneBucket);
 
     // case-7: In below case, the startKey is a directory which is included
     // in the finalList. So, should we include startKey file in the finalList ?
@@ -257,12 +257,12 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
     // case-9: Reached Last Element, return EmptyList
     expectedKeys =
-            getExpectedKeyDeepList("a1", "a1/b3/e3/e31.tx", legacyOzoneBucket);
+        getExpectedKeyDeepList("a1", "a1/b3/e3/e31.tx", legacyOzoneBucket);
     checkKeyDeepList("a1", "a1/b3/e3/e31.tx", expectedKeys, fsoOzoneBucket);
 
     // case-10: keyPrefix corresponds an exist file
     expectedKeys =
-            getExpectedKeyDeepList("a1/b3/e3/e31.tx", "", legacyOzoneBucket);
+        getExpectedKeyDeepList("a1/b3/e3/e31.tx", "", legacyOzoneBucket);
     checkKeyDeepList("a1/b3/e3/e31.tx", "", expectedKeys, fsoOzoneBucket);
 
     expectedKeys =
@@ -276,7 +276,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
 
   @Test
   public void testListKeysWithAndWithoutTrailingSlashInPrefix()
-          throws Exception {
+      throws Exception {
     List<String> expectedKeys = new ArrayList<>();
     expectedKeys.add("a1/b2/d2/d21.tx");
     // With trailing slash
@@ -714,7 +714,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     return keys;
   }
 
-  private static List<String> getExpectedKeyList(String keyPrefix,
+  private static List<String> getExpectedKeyDeepList(String keyPrefix,
       String startKey, OzoneBucket legacyBucket)
       throws Exception {
     return getExpectedKeyList(keyPrefix, startKey, legacyBucket, false);
