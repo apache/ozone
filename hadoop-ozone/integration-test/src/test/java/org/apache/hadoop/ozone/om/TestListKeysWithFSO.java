@@ -129,6 +129,7 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     OmConfig omConfig = cluster().getOzoneManager().getConfig();
     omConfig.setFileSystemPathEnabled(originalFileSystemPathEnabled);
     omConfig.setMaxListSize(originalMaxListSize);
+    cluster().close();
   }
 
   private void initFSNameSpace() throws Exception {
@@ -578,26 +579,26 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
         getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
     checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
 
-//    // Case-6: StartKey is invalid (less than last element)
-//    keyPrefix = "a1/b1/c1";
-//    startKey = "a1/b1/c1/c0invalid";
-//    expectedKeys =
-//            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
-//    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
-//
-//    // Case-7: StartKey reaches last element
-//    keyPrefix = "a1/b1/c1";
-//    startKey = "a1/b1/c1/c2.tx";
-//    expectedKeys =
-//            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
-//    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
-//
-//    // Case-8: StartKey is invalid (greater than last element)
-//    keyPrefix = "a1/b1/c1";
-//    startKey = "a1/b1/c1/c2invalid";
-//    expectedKeys =
-//            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
-//    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+    // Case-6: StartKey is invalid (less than last element)
+    keyPrefix = "a1/b1/c1";
+    startKey = "a1/b1/c1/c0invalid";
+    expectedKeys =
+            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-7: StartKey reaches last element
+    keyPrefix = "a1/b1/c1";
+    startKey = "a1/b1/c1/c2.tx";
+    expectedKeys =
+            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-8: StartKey is invalid (greater than last element)
+    keyPrefix = "a1/b1/c1";
+    startKey = "a1/b1/c1/c2invalid";
+    expectedKeys =
+            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
 
     // Case-9:
     keyPrefix = "a1/b1/c12";
