@@ -196,7 +196,8 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
 
   public OmSnapshotManager(OzoneManager ozoneManager) throws IOException {
-    this.snapshotLocalDataManager = new OmSnapshotLocalDataManager(ozoneManager.getMetadataManager());
+    this.snapshotLocalDataManager = new OmSnapshotLocalDataManager(ozoneManager.getMetadataManager(),
+        ozoneManager.getConfiguration());
     boolean isFilesystemSnapshotEnabled =
         ozoneManager.isFilesystemSnapshotEnabled();
     LOG.info("Ozone filesystem snapshot feature is {}.",
