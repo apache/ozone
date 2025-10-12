@@ -149,6 +149,13 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return snapshotLocalData;
   }
 
+  public ReadableOmSnapshotLocalDataProvider getOmSnapshotLocalData(UUID snapshotId, UUID previousSnapshotID)
+      throws IOException {
+    ReadableOmSnapshotLocalDataProvider snapshotLocalData = new ReadableOmSnapshotLocalDataProvider(snapshotId,
+        previousSnapshotID);
+    return snapshotLocalData;
+  }
+
   public WritableOmSnapshotLocalDataProvider getWritableOmSnapshotLocalData(SnapshotInfo snapshotInfo)
       throws IOException {
     return getWritableOmSnapshotLocalData(snapshotInfo.getSnapshotId(), snapshotInfo.getPathPreviousSnapshotId());
@@ -359,6 +366,10 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
     protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId) throws IOException {
       this(snapshotId, locks.get(snapshotId).readLock());
+    }
+
+    protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId, UUID snapIdToResolve) throws IOException {
+      this(snapshotId, locks.get(snapshotId).readLock(), null, snapIdToResolve);
     }
 
     protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId, Lock lock) throws IOException {
