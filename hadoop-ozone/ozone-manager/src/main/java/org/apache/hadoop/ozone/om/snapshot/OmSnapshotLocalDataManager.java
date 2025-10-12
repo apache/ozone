@@ -145,15 +145,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   public ReadableOmSnapshotLocalDataProvider getOmSnapshotLocalData(UUID snapshotId) throws IOException {
-    ReadableOmSnapshotLocalDataProvider snapshotLocalData = new ReadableOmSnapshotLocalDataProvider(snapshotId);
-    return snapshotLocalData;
+    return new ReadableOmSnapshotLocalDataProvider(snapshotId);
   }
 
   public ReadableOmSnapshotLocalDataProvider getOmSnapshotLocalData(UUID snapshotId, UUID previousSnapshotID)
       throws IOException {
-    ReadableOmSnapshotLocalDataProvider snapshotLocalData = new ReadableOmSnapshotLocalDataProvider(snapshotId,
-        previousSnapshotID);
-    return snapshotLocalData;
+    return new ReadableOmSnapshotLocalDataProvider(snapshotId, previousSnapshotID);
   }
 
   public WritableOmSnapshotLocalDataProvider getWritableOmSnapshotLocalData(SnapshotInfo snapshotInfo)
