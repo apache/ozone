@@ -113,7 +113,7 @@ public class DiskBalancerManager {
             try {
               NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
               if (nodeStatus != NodeStatus.inServiceHealthy()) {
-                LOG.warn("Datanode {} is not in optimal state for disk balancing." +
+                LOG.warn("Datanode {} is not in healthy state for disk balancing." +
                     " NodeStatus: {}", dn.getHostName(), nodeStatus);
                 return false;
               }
@@ -167,7 +167,7 @@ public class DiskBalancerManager {
     List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
-        if (!isDatanodeInOptimalState(dn, errors)) {
+        if (!isDatanodeInHealthyState(dn, errors)) {
           continue;
         }
         // If command doesn't have configuration change, then we reuse the
@@ -203,7 +203,7 @@ public class DiskBalancerManager {
     List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
-        if (!isDatanodeInOptimalState(dn, errors)) {
+        if (!isDatanodeInHealthyState(dn, errors)) {
           continue;
         }
         DiskBalancerCommand command = new DiskBalancerCommand(
@@ -241,7 +241,7 @@ public class DiskBalancerManager {
     List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
-        if (!isDatanodeInOptimalState(dn, errors)) {
+        if (!isDatanodeInHealthyState(dn, errors)) {
           continue;
         }
         // If command doesn't have configuration change, then we reuse the
@@ -259,8 +259,8 @@ public class DiskBalancerManager {
   }
 
   /**
-   * Checks if the datanode is in an optimal state for disk balancing operations.
-   * A datanode is considered to be in optimal state when it has both:
+   * Checks if the datanode is in healthy state for disk balancing operations.
+   * A datanode is considered to be in heathy state when it has both:
    * - NodeOperationalState.IN_SERVICE(not decommissioning, decommissioned, or in maintenance)
    * - NodeState.HEALTHY(not stale, dead, or readonly)
    *
@@ -268,12 +268,12 @@ public class DiskBalancerManager {
    * @param errors list to add any error messages if the datanode is not in optimal state
    * @return true if the datanode is in optimal state (IN_SERVICE and HEALTHY), false otherwise
    */
-  private boolean isDatanodeInOptimalState(DatanodeDetails dn,
+  private boolean isDatanodeInHealthyState(DatanodeDetails dn,
       List<DatanodeAdminError> errors) throws NodeNotFoundException {
     NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
     if (!nodeStatus.equals(NodeStatus.inServiceHealthy())) {
       errors.add(new DatanodeAdminError(dn.getHostName(),
-          "Datanode is not in an optimal state for disk balancing. " +
+          "Datanode is not in healthy state for disk balancing. " +
               "NodeStatus: " + nodeStatus));
       return false;
     }
