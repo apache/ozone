@@ -79,7 +79,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   private final Map<UUID, SnapshotVersionsMeta> versionNodeMap;
   private final OMMetadataManager omMetadataManager;
   // Used for acquiring locks on the entire data structure.
-  private static ReadWriteLock fullLock;
+  private final ReadWriteLock fullLock;
   // Locks should be always acquired by iterating through the snapshot chain to avoid deadlocks.
   private Striped<ReadWriteLock> locks;
 
