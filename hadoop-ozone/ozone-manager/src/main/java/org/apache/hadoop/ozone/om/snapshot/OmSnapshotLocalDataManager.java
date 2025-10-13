@@ -589,8 +589,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       Map<Integer, Set<LocalDataVersionNode>> predecessors = new HashMap<>();
       // Track all predecessors of the existing versions and remove the node from the graph.
       for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
-        predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersions.get(existingVersion)));
-        localDataGraph.removeNode(existingVersion.getValue());
+        LocalDataVersionNode existingVersionNode = existingVersion.getValue();
+        predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersionNode));
+        localDataGraph.removeNode(existingVersionNode);
       }
       // Add the nodes to be added in the graph and map.
       addSnapshotVersionMeta(snapshotId, snapshotVersions);
