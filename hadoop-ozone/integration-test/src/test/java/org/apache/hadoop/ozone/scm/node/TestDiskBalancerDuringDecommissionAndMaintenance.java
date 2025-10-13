@@ -262,7 +262,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // Verify disk balancer stop command is not sent to decommissioning DN
     assertEquals(1, dnErrors.size());
     assertTrue(dnErrors.get(0).getError()
-        .contains("Datanode is not in an optimal state for disk balancing"));
+        .contains("Datanode is not in healthy state for disk balancing"));
 
     //Recommission the node
     scmClient.recommissionNodes(dnAddressList);
@@ -312,7 +312,7 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
     // Verify disk balancer start command is not sent to decommissioning DN
     assertEquals(1, dnErrors.size());
     assertTrue(dnErrors.get(0).getError()
-        .contains("Datanode is not in an optimal state for disk balancing"));
+        .contains("Datanode is not in healthy state for disk balancing"));
 
     //Recommission the node
     scmClient.recommissionNodes(dnAddressList);
