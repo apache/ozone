@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -86,7 +87,6 @@ public class TestOmSnapshotLocalDataManager {
   private AutoCloseable mocks;
 
   private File snapshotsDir;
-  private File dbLocation;
 
   @BeforeAll
   public static void setupClass() {
@@ -115,10 +115,11 @@ public class TestOmSnapshotLocalDataManager {
 
     this.snapshotsDir = tempDir.resolve("snapshots").toFile();
     FileUtils.deleteDirectory(snapshotsDir);
-    snapshotsDir.mkdirs();
-    dbLocation = tempDir.resolve("db").toFile();
+    assertTrue(snapshotsDir.exists() || snapshotsDir.mkdirs());
+    File dbLocation = tempDir.resolve("db").toFile();
     FileUtils.deleteDirectory(dbLocation);
-    dbLocation.mkdirs();
+    assertTrue(dbLocation.exists() || dbLocation.mkdirs());
+
     
     when(rdbStore.getSnapshotsParentDir()).thenReturn(snapshotsDir.getAbsolutePath());
     when(rdbStore.getDbLocation()).thenReturn(dbLocation);
@@ -161,7 +162,8 @@ public class TestOmSnapshotLocalDataManager {
     
     // Setup snapshot store mock
     File snapshotDbLocation = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotId).toFile();
-    snapshotDbLocation.mkdirs();
+    assertTrue(snapshotDbLocation.exists() || snapshotDbLocation.mkdirs());
+
     List<LiveFileMetaData> sstFiles = new ArrayList<>();
     sstFiles.add(createMockLiveFileMetaData("file1.sst", KEY_TABLE, "key1", "key7"));
     sstFiles.add(createMockLiveFileMetaData("file2.sst", KEY_TABLE, "key3", "key9"));
