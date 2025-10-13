@@ -299,7 +299,7 @@ public class TestOmSnapshotLocalDataManager {
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, conf);
     
     assertNotNull(localDataManager);
-    Map<UUID, Map<Integer, OmSnapshotLocalDataManager.LocalDataVersionNode>> versionMap =
+    Map<UUID, OmSnapshotLocalDataManager.SnapshotVersionsMeta> versionMap =
         localDataManager.getVersionNodeMap();
     assertEquals(2, versionMap.size());
     assertEquals(versionMap.keySet(), new HashSet<>(versionIds));
