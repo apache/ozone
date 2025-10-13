@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAP
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,7 +42,8 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.snapshot.MultiSnapshotLocks;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +79,8 @@ public class SnapshotDefragService extends BackgroundService
   private final AtomicLong snapshotsDefraggedCount;
   private final AtomicBoolean running;
 
+  private final MultiSnapshotLocks snapshotIdLocks;
+
   private final BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock();
 
   public SnapshotDefragService(long interval, TimeUnit unit, long serviceTimeout,
@@ -89,6 +93,8 @@ public class SnapshotDefragService extends BackgroundService
             SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT);
     snapshotsDefraggedCount = new AtomicLong(0);
     running = new AtomicBoolean(false);
+    IOzoneManagerLock omLock = ozoneManager.getMetadataManager().getLock();
+    this.snapshotIdLocks = new MultiSnapshotLocks(omLock, SNAPSHOT_GC_LOCK, true);
   }
 
   @Override
@@ -236,15 +242,11 @@ public class SnapshotDefragService extends BackgroundService
       LOG.info("Will defrag snapshot: {} (ID: {})",
           snapshotToDefrag.getName(), snapshotToDefrag.getSnapshotId());
 
-      // Acquire SNAPSHOT_GC_LOCK
-      OMLockDetails gcLockDetails = ozoneManager.getMetadataManager().getLock()
-          .acquireWriteLock(SNAPSHOT_GC_LOCK, snapshotToDefrag.getSnapshotId().toString());
-      LOG.debug("Acquired SNAPSHOT_GC_LOCK for snapshot: {}, ID: {}",
-          snapshotToDefrag.getName(), snapshotToDefrag.getSnapshotId());
-
-      if (!gcLockDetails.isLockAcquired()) {
-        LOG.warn("Failed to acquire SNAPSHOT_GC_LOCK for snapshot: {}",
-            snapshotToDefrag.getName());
+      // Acquire MultiSnapshotLocks
+      if (!snapshotIdLocks.acquireLock(Collections.singletonList(snapshotToDefrag.getSnapshotId()))
+          .isLockAcquired()) {
+        LOG.error("Abort. Failed to acquire lock on snapshot: {} (ID: {})",
+            snapshotToDefrag.getName(), snapshotToDefrag.getSnapshotId());
         break;
       }
 
@@ -310,11 +312,11 @@ public class SnapshotDefragService extends BackgroundService
             snapshotToDefrag.getName(), e);
         return false;
       } finally {
-        // Release SNAPSHOT_GC_LOCK
-        ozoneManager.getMetadataManager().getLock()
-            .releaseWriteLock(SNAPSHOT_GC_LOCK, snapshotToDefrag.getSnapshotId().toString());
-        LOG.debug("Released SNAPSHOT_GC_LOCK for snapshot: {}, ID: {}",
+        // Release lock MultiSnapshotLocks
+        snapshotIdLocks.releaseLock();
+        LOG.debug("Released MultiSnapshotLocks on snapshot: {} (ID: {})",
             snapshotToDefrag.getName(), snapshotToDefrag.getSnapshotId());
+
       }
     }
 
