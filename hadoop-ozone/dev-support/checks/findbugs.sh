@@ -30,7 +30,7 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/findbugs"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-MAVEN_OPTIONS='-B -fae -DskipRecon --no-transfer-progress'
+MAVEN_OPTIONS='-B -fae -DskipRecon -DskipShade --no-transfer-progress'
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
