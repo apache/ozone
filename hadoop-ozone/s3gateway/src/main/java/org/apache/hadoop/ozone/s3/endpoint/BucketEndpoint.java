@@ -130,7 +130,7 @@ public class BucketEndpoint extends EndpointBase {
     try {
       // Handle ACL requests
       if (aclMarker != null) {
-        return handleAclRequest(bucketName, startNanos);
+        return handleGetBucketAcl(bucketName, startNanos);
       }
 
       // Handle multipart uploads requests
@@ -282,9 +282,11 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   /**
-   * Handle ACL request.
+   * Handle GetBucketAcl request.
+   * Implements the GetBucketAcl API operation.
+   * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html">GetBucketAcl</a>
    */
-  Response handleAclRequest(String bucketName, long startNanos) 
+  Response handleGetBucketAcl(String bucketName, long startNanos) 
       throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.GET_ACL;
     S3BucketAcl result = getAcl(bucketName);
@@ -302,6 +304,10 @@ public class BucketEndpoint extends EndpointBase {
       String bucketName, String delimiter, String encodingType, String marker,
       int maxKeys, String prefix, String continueToken, String startAfter)
       throws OS3Exception, IOException {
+    
+    // If you specify the encoding-type request parameter, should return encoded key name values 
+    // in the following response elements: Delimiter, Prefix, Key, and StartAfter.
+    // For detail refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html#AmazonS3-ListObjectsV2-response-EncodingType
     
     // Validate encoding type
     if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
