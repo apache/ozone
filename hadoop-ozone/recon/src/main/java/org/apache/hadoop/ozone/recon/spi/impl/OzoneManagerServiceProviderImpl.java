@@ -506,7 +506,6 @@ public class OzoneManagerServiceProviderImpl
     DBCheckpoint dbSnapshot = getOzoneManagerDBSnapshot();
     long fullDBLatency = Time.monotonicNow() - startTime;
 
-    metrics.updateSnapshotRequestLatency(fullDBLatency);
     reconSyncMetrics.updateFullDBRequestLatency(fullDBLatency);
 
     if (dbSnapshot == null) {
