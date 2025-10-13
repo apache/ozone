@@ -308,7 +308,14 @@ public class BucketEndpoint extends EndpointBase {
     if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
       throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, encodingType);
     }
-
+    // If you specify the encoding-type request parameter,should return
+    // encoded key name values in the following response elements:
+    //   Delimiter, Prefix, Key, and StartAfter.
+    //
+    // For detail refer:
+    // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
+    // #AmazonS3-ListObjectsV2-response-EncodingType
+    //
     maxKeys = validateMaxKeys(maxKeys);
 
     if (prefix == null) {
