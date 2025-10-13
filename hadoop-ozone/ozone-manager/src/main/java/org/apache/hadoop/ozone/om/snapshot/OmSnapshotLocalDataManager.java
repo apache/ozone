@@ -253,6 +253,13 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
+  /**
+   * Acquires a write lock and provides an auto-closeable supplier for specifying details
+   * of the lock acquisition. The lock is released when the returned supplier is closed.
+   *
+   * @return an instance of {@code UncheckedAutoCloseableSupplier<OMLockDetails>} representing
+   *         the acquired lock details, where the lock will automatically be released on close.
+   */
   public UncheckedAutoCloseableSupplier<OMLockDetails> lock() {
     this.fullLock.writeLock().lock();
     return new UncheckedAutoCloseableSupplier<OMLockDetails>() {
@@ -283,43 +290,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     if (versionNode.previousSnapshotId != null && previousVersionNode == null) {
       throw new IOException("Unable to add " + versionNode + " since previous snapshot with version hasn't been " +
           "loaded");
-    }
-  }
-
-  private SnapshotVersionsMeta validateModification(OmSnapshotLocalData snapshotLocalData)
-      throws IOException {
-    SnapshotVersionsMeta versionsToBeAdded = new SnapshotVersionsMeta(snapshotLocalData);
-    for (LocalDataVersionNode node : versionsToBeAdded.getSnapshotVersions().values()) {
-      validateVersionAddition(node);
-    }
-    UUID snapshotId = snapshotLocalData.getSnapshotId();
-    Map<Integer, LocalDataVersionNode> existingVersions = getVersionNodeMap().containsKey(snapshotId) ?
-        getVersionNodeMap().get(snapshotId).getSnapshotVersions() : Collections.emptyMap();
-    for (Map.Entry<Integer, LocalDataVersionNode> entry : existingVersions.entrySet()) {
-      if (!versionsToBeAdded.getSnapshotVersions().containsKey(entry.getKey())) {
-        validateVersionRemoval(snapshotId, entry.getKey());
-      }
-    }
-    return versionsToBeAdded;
-  }
-
-  private void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
-    SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
-    Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
-        existingSnapVersions.getSnapshotVersions();
-    Map<Integer, Set<LocalDataVersionNode>> predecessors = new HashMap<>();
-    // Track all predecessors of the existing versions and remove the node from the graph.
-    for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
-      predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersions.get(existingVersion)));
-      localDataGraph.removeNode(existingVersion.getValue());
-    }
-    // Add the nodes to be added in the graph and map.
-    addSnapshotVersionMeta(snapshotId, snapshotVersions);
-    // Reconnect all the predecessors for existing nodes.
-    for (Map.Entry<Integer, LocalDataVersionNode> entry : snapshotVersions.getSnapshotVersions().entrySet()) {
-      for (LocalDataVersionNode predecessor : predecessors.getOrDefault(entry.getKey(), Collections.emptySet())) {
-        localDataGraph.putEdge(predecessor, entry.getValue());
-      }
     }
   }
 
@@ -593,6 +563,43 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier) throws IOException {
       super(snapshotId, locks.get(snapshotId).writeLock(), snapshotLocalDataSupplier, null);
       fullLock.readLock().lock();
+    }
+
+    private SnapshotVersionsMeta validateModification(OmSnapshotLocalData snapshotLocalData)
+        throws IOException {
+      SnapshotVersionsMeta versionsToBeAdded = new SnapshotVersionsMeta(snapshotLocalData);
+      for (LocalDataVersionNode node : versionsToBeAdded.getSnapshotVersions().values()) {
+        validateVersionAddition(node);
+      }
+      UUID snapshotId = snapshotLocalData.getSnapshotId();
+      Map<Integer, LocalDataVersionNode> existingVersions = getVersionNodeMap().containsKey(snapshotId) ?
+          getVersionNodeMap().get(snapshotId).getSnapshotVersions() : Collections.emptyMap();
+      for (Map.Entry<Integer, LocalDataVersionNode> entry : existingVersions.entrySet()) {
+        if (!versionsToBeAdded.getSnapshotVersions().containsKey(entry.getKey())) {
+          validateVersionRemoval(snapshotId, entry.getKey());
+        }
+      }
+      return versionsToBeAdded;
+    }
+
+    private void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
+      SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
+      Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
+          existingSnapVersions.getSnapshotVersions();
+      Map<Integer, Set<LocalDataVersionNode>> predecessors = new HashMap<>();
+      // Track all predecessors of the existing versions and remove the node from the graph.
+      for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
+        predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersions.get(existingVersion)));
+        localDataGraph.removeNode(existingVersion.getValue());
+      }
+      // Add the nodes to be added in the graph and map.
+      addSnapshotVersionMeta(snapshotId, snapshotVersions);
+      // Reconnect all the predecessors for existing nodes.
+      for (Map.Entry<Integer, LocalDataVersionNode> entry : snapshotVersions.getSnapshotVersions().entrySet()) {
+        for (LocalDataVersionNode predecessor : predecessors.getOrDefault(entry.getKey(), Collections.emptySet())) {
+          localDataGraph.putEdge(predecessor, entry.getValue());
+        }
+      }
     }
 
     public synchronized void commit() throws IOException {
