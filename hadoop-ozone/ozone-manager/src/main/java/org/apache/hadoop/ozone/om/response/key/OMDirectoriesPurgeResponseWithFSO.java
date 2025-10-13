@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
@@ -185,5 +186,10 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         }
       }
     }
+  }
+
+  @VisibleForTesting
+  public Map<Pair<String, String>, OmBucketInfo> getVolBucketInfoMap() {
+    return volBucketInfoMap;
   }
 }
