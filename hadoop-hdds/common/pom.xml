@@ -183,6 +183,17 @@
 
     <!-- Test dependencies -->
     <dependency>
+      <groupId>ch.qos.reload4j</groupId>
+      <artifactId>reload4j</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
       <type>test-jar</type>
@@ -284,6 +295,15 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <configuration>
+          <ignoredUsedUndeclaredDependencies>
+            <ignoredUnusedDeclaredDependency>jdk.tools:*</ignoredUnusedDeclaredDependency>
+          </ignoredUsedUndeclaredDependencies>
+        </configuration>
       </plugin>
     </plugins>
     <extensions>
