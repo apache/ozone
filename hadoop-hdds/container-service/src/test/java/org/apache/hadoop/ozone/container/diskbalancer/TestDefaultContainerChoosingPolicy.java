@@ -79,12 +79,14 @@ public class TestDefaultContainerChoosingPolicy {
   private HddsVolume destVolume1;
   private HddsVolume destVolume2;
   private Set<ContainerID> inProgressContainerIDs;
+  private Map<HddsVolume, Long> deltaMap;
 
   @BeforeEach
   public void setup() throws Exception {
     policy = new DefaultContainerChoosingPolicy();
     setupVolumesAndContainer();
     inProgressContainerIDs = new HashSet<>();
+    deltaMap = new HashMap<>();
   }
 
   /**
@@ -157,6 +159,7 @@ public class TestDefaultContainerChoosingPolicy {
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
     containerData.setState(ContainerDataProto.State.CLOSED);
     containerData.setVolume(vol);
+    containerData.getStatistics().setBlockBytesForTesting(size);
     KeyValueContainer container = new KeyValueContainer(containerData, CONF);
     containerSet.addContainer(container);
   }
@@ -174,7 +177,7 @@ public class TestDefaultContainerChoosingPolicy {
     // The policy iterates by container ID, so it will find and return C1.
 
     ContainerData chosenContainer = policy.chooseContainer(ozoneContainer,
-        sourceVolume, destVolume1, inProgressContainerIDs, THRESHOLD, volumeSet);
+        sourceVolume, destVolume1, inProgressContainerIDs, THRESHOLD, volumeSet, deltaMap);
 
     // first container should be chosen
     assertNotNull(chosenContainer);
@@ -192,7 +195,7 @@ public class TestDefaultContainerChoosingPolicy {
     // than 166.75MB. Therefore, no container should be chosen.
 
     ContainerData chosenContainer = policy.chooseContainer(ozoneContainer,
-        sourceVolume, destVolume2, inProgressContainerIDs, THRESHOLD, volumeSet);
+        sourceVolume, destVolume2, inProgressContainerIDs, THRESHOLD, volumeSet, deltaMap);
 
     // No containers should not be chosen
     assertNull(chosenContainer);

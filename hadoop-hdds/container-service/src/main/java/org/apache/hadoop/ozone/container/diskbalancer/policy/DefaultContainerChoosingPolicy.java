@@ -22,7 +22,9 @@ import static java.util.concurrent.TimeUnit.HOURS;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.ImmutableList;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
@@ -31,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +56,8 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public ContainerData chooseContainer(OzoneContainer ozoneContainer,
       HddsVolume srcVolume, HddsVolume destVolume,
       Set<ContainerID> inProgressContainerIDs,
-      Double threshold, MutableVolumeSet volumeSet) {
+      Double threshold, MutableVolumeSet volumeSet,
+      Map<HddsVolume, Long> deltaMap) {
     Iterator<Container<?>> itr;
     try {
       itr = CACHE.get().get(srcVolume,
@@ -64,7 +68,8 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     }
 
     // Calculate maxAllowedUtilization
-    double idealUsage = volumeSet.getIdealUsage();
+    ImmutableList<HddsVolume> immutableVolumeSet = DiskBalancerVolumeCalculation.getImmutableVolumeSet(volumeSet);
+    double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(immutableVolumeSet, deltaMap);
     double maxAllowedUtilization = idealUsage + (threshold / 100.0);
 
     while (itr.hasNext()) {

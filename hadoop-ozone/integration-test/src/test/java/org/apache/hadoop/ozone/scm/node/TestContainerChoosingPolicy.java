@@ -153,14 +153,14 @@ public class TestContainerChoosingPolicy {
     inProgressContainerIDs.clear();
 
     ContainerData container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume, destVolume,
-        inProgressContainerIDs, THRESHOLD, volumeSet);
+        inProgressContainerIDs, THRESHOLD, volumeSet, null);
     assertNotNull(container);
     assertEquals(containerList.get(0).getContainerData().getContainerID(), container.getContainerID());
 
     ozoneContainer.getContainerSet().removeContainer(containerList.get(1).getContainerData().getContainerID());
     inProgressContainerIDs.add(ContainerID.valueOf(container.getContainerID()));
     container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume,
-        destVolume, inProgressContainerIDs, THRESHOLD, volumeSet);
+        destVolume, inProgressContainerIDs, THRESHOLD, volumeSet, null);
     assertEquals(containerList.get(1).getContainerData().getContainerID(), container.getContainerID());
   }
 
@@ -195,7 +195,7 @@ public class TestContainerChoosingPolicy {
           for (int j = 0; j < NUM_ITERATIONS; j++) {
             try {
               ContainerData c = policy.chooseContainer(ozoneContainer, srcVolume,
-                  destVolume, inProgressContainerIDs, THRESHOLD, volumeSet);
+                  destVolume, inProgressContainerIDs, THRESHOLD, volumeSet, null);
               if (c == null) {
                 containerNotChosen++;
               } else {
