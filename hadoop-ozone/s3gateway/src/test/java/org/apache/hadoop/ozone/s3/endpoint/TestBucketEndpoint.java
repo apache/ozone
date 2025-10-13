@@ -22,9 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,22 +31,21 @@ import org.junit.jupiter.api.Test;
 /**
  * Simple unit tests for the refactored BucketEndpoint methods.
  */
-public class TestBucketEndpointRefactoredSimple {
+public class TestBucketEndpoint {
 
+  private static final String TEST_BUCKET_NAME = "test-bucket";
   private BucketEndpoint bucketEndpoint;
 
   @BeforeEach
   public void setUp() throws IOException {
-    bucketEndpoint = new BucketEndpoint();
     OzoneClientStub client = new OzoneClientStub();
     
-    bucketEndpoint.setClient(client);
-    bucketEndpoint.setRequestIdentifier(new RequestIdentifier());
-    bucketEndpoint.setOzoneConfiguration(new OzoneConfiguration());
-    bucketEndpoint.init();
+    bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
     
     // Create a test bucket
-    client.getObjectStore().createS3Bucket("test-bucket");
+    client.getObjectStore().createS3Bucket(TEST_BUCKET_NAME);
   }
 
   // Note: validateMaxKeys is a private helper and is covered indirectly by
@@ -58,7 +55,7 @@ public class TestBucketEndpointRefactoredSimple {
   @Test
   public void testBucketListingContextCreation() throws OS3Exception, IOException {
     // Test basic context creation
-    String bucketName = "test-bucket";
+    String bucketName = TEST_BUCKET_NAME;
     String delimiter = "/";
     String encodingType = null;
     String marker = null;
@@ -81,7 +78,7 @@ public class TestBucketEndpointRefactoredSimple {
   @Test
   public void testInitializeListObjectResponse() {
     // Test response initialization
-    String bucketName = "test-bucket";
+    String bucketName = TEST_BUCKET_NAME;
     String delimiter = "/";
     String encodingType = "url";
     String marker = "test-marker";
@@ -102,7 +99,7 @@ public class TestBucketEndpointRefactoredSimple {
   @Test
   public void testValidateAndPrepareParametersWithInvalidEncodingType() {
     // Test invalid encoding type
-    String bucketName = "test-bucket";
+    String bucketName = TEST_BUCKET_NAME;
     String delimiter = "/";
     String encodingType = "invalid";
     String marker = null;
