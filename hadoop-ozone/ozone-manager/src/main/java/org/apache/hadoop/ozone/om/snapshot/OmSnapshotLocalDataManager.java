@@ -44,6 +44,7 @@ import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.stream.Collectors;
+import jnr.ffi.annotations.In;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -177,13 +178,10 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return versionNodeMap.get(snapshotId).getVersionNode(version);
   }
 
-  private boolean addSnapshotVersionMeta(UUID snapshotId, SnapshotVersionsMeta snapshotVersionsMeta)
+  private void addSnapshotVersionMeta(UUID snapshotId, SnapshotVersionsMeta snapshotVersionsMeta)
       throws IOException {
     if (!versionNodeMap.containsKey(snapshotId)) {
       for (LocalDataVersionNode versionNode : snapshotVersionsMeta.getSnapshotVersions().values()) {
-        if (getVersionNode(versionNode.snapshotId, versionNode.version) != null) {
-          throw new IOException("Unable to add " + versionNode + " since it already exists");
-        }
         validateVersionAddition(versionNode);
         LocalDataVersionNode previousVersionNode = versionNode.previousSnapshotId == null ? null :
             getVersionNode(versionNode.previousSnapshotId, versionNode.previousSnapshotVersion);
@@ -193,9 +191,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         }
       }
       versionNodeMap.put(snapshotId, snapshotVersionsMeta);
-      return true;
     }
-    return false;
   }
 
   public void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
@@ -290,21 +286,20 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
     Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
         existingSnapVersions.getSnapshotVersions();
-    if (!addSnapshotVersionMeta(snapshotId, snapshotVersions)) {
-      throw new IOException("Unable to upsert " + snapshotVersions + " since it already exists");
+    Map<Integer, Set<LocalDataVersionNode>> predecessors = new HashMap<>();
+    // Track all predecessors of the existing versions and remove the node from the graph.
+    for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
+      predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersions.get(existingVersion)));
+      localDataGraph.removeNode(existingVersion.getValue());
     }
-
+    // Add the nodes to be added in the graph and map.
+    addSnapshotVersionMeta(snapshotId, snapshotVersions);
+    // Reconnect all the predecessors for existing nodes.
     for (Map.Entry<Integer, LocalDataVersionNode> entry : snapshotVersions.getSnapshotVersions().entrySet()) {
-      if (existingVersions.containsKey(entry.getKey())) {
-        for (LocalDataVersionNode predecessor : localDataGraph.predecessors(existingVersions.get(entry.getKey()))) {
-          localDataGraph.putEdge(predecessor, entry.getValue());
-        }
+      for (LocalDataVersionNode predecessor : predecessors.getOrDefault(entry.getKey(), Collections.emptySet())) {
+        localDataGraph.putEdge(predecessor, entry.getValue());
       }
     }
-    for (LocalDataVersionNode localDataVersionNode : existingVersions.values()) {
-      localDataGraph.removeNode(localDataVersionNode);
-    }
-    getVersionNodeMap().put(snapshotId, snapshotVersions);
   }
 
   @Override
@@ -401,10 +396,15 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return previousSnapshotLocalData;
     }
 
+    /**
+     * Intializer the snapshot local data by acquiring the lock on the snapshot and also acquires a read lock on the
+     * snapshotId to be resolved by iterating through the chain of previous snapshot ids.
+     */
     private Pair<OmSnapshotLocalData, UUID> initialize(Lock snapIdLock, UUID snapId, UUID toResolveSnapshotId,
         CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier)
         throws IOException {
       snapIdLock.lock();
+      // Get the Lock instance for the snapshot id and track it.
       ReadWriteLock lockIdAcquired = locks.get(snapId);
       ReadWriteLock previousReadLockAcquired = null;
       boolean haspreviousReadLockAcquiredAcquired = false;
@@ -420,7 +420,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           throw new IOException("SnapshotId in path : " + loadPath + " contains snapshotLocalData corresponding " +
               "to snapshotId " + ssLocalData.getSnapshotId() + ". Expected snapshotId " + snapId);
         }
-
+        // Get previous snapshotId and acquire read lock on the id. We need to do this outside the loop instead of a
+        // do while loop since the nodes that may be added may not be present in the graph so it may not be possible
+        // to iterate through the chain.
         UUID previousSnapshotId = ssLocalData.getPreviousSnapshotId();
         if (previousSnapshotId != null) {
           if (versionNodeMap.containsKey(previousSnapshotId)) {
@@ -430,6 +432,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           toResolveSnapshotId = toResolveSnapshotId == null ? ssLocalData.getPreviousSnapshotId() :
               toResolveSnapshotId;
           previousReadLockAcquired = locks.get(previousSnapshotId);
+          // Stripe lock could return the same lock object for multiple snapshotIds so in case a write lock is
+          // acquired previously on the same lock then this could cause a deadlock. If the same lock instance is
+          // returned then acquiring this read lock is unnecessary.
           if (lockIdAcquired == previousReadLockAcquired) {
             previousReadLockAcquired = null;
           }
@@ -440,7 +445,10 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           Map<Integer, LocalDataVersionNode> previousVersionNodeMap = versionNodeMap.get(previousSnapshotId)
               .getSnapshotVersions();
           UUID currentIteratedSnapshotId = previousSnapshotId;
+          // Iterate through the chain of previous snapshot ids until the snapshot id to be resolved is found.
           while (!Objects.equals(currentIteratedSnapshotId, toResolveSnapshotId)) {
+            // All versions for the snapshot should point to the same previous snapshot id. Otherwise this is a sign
+            // of corruption.
             Set<UUID> previousIds =
                 previousVersionNodeMap.values().stream().map(LocalDataVersionNode::getPreviousSnapshotId)
                 .collect(Collectors.toSet());
@@ -455,27 +463,42 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             }
             UUID previousId = previousIds.iterator().next();
             ReadWriteLock lockToBeAcquired = locks.get(previousId);
+            // If stripe lock returns the same lock object corresponding to snapshot id then no read lock needs to be
+            // acquired.
             if (lockToBeAcquired == lockIdAcquired) {
               lockToBeAcquired = null;
             }
             if (lockToBeAcquired != null) {
+              // If a read lock has already been acquired on the same lock based on the previous iteration snapshot id
+              // then no need to acquire another read lock on the same lock and this lock could just piggyback on the
+              // same lock.
               if (lockToBeAcquired != previousReadLockAcquired) {
                 lockToBeAcquired.readLock().lock();
                 haspreviousReadLockAcquiredAcquired =  true;
               } else {
+                // Set the previous read lock to null since the same lock instance is going to be used for current
+                // iteration lock as well.
                 previousReadLockAcquired = null;
               }
             }
             try {
+              // Get the version node for the snapshot and update the version node to the successor to point to the
+              // previous node.
               for (Map.Entry<Integer, LocalDataVersionNode> entry : previousVersionNodeMap.entrySet()) {
                 Set<LocalDataVersionNode> versionNode = localDataGraph.successors(entry.getValue());
                 if (versionNode.size() > 1) {
                   throw new IOException(String.format("Snapshot %s version %d has multiple successors %s",
                       currentIteratedSnapshotId, entry.getValue(), versionNode));
                 }
+                if (versionNode.isEmpty()) {
+                  throw new IOException(String.format("Snapshot %s version %d doesn't have successor",
+                      currentIteratedSnapshotId, entry.getValue()));
+                }
                 entry.setValue(versionNode.iterator().next());
               }
             } finally {
+              // Release the read lock acquired on the previous snapshot id if it was acquired. Now that the instance
+              // is no longer needed we can release the read lock for the snapshot iterated in the previous snapshot.
               if (previousReadLockAcquired != null) {
                 previousReadLockAcquired.readLock().unlock();
               }
@@ -500,6 +523,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         }
         return Pair.of(ssLocalData, toResolveSnapshotId);
       } catch (IOException e) {
+        // Release all the locks in case of an exception and rethrow the exception.
         if (previousReadLockAcquired != null && haspreviousReadLockAcquiredAcquired) {
           previousReadLockAcquired.readLock().unlock();
         }
