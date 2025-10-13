@@ -165,38 +165,6 @@ public class SnapshotDefragService extends BackgroundService
     // TODO: Implement incremental defragmentation
   }
 
-  /**
-   * Updates snapshot metadata to point to the new defragmented DB location.
-   */
-  private void updateSnapshotMetadata(SnapshotInfo snapshotInfo) throws IOException {
-    String snapshotPath = OmSnapshotManager.getSnapshotPath(
-        ozoneManager.getConfiguration(), snapshotInfo);
-
-    LOG.info("Updating snapshot metadata for: {} at path: {}",
-        snapshotInfo.getName(), snapshotPath);
-
-    try {
-      // Read current YAML data using the correct API
-      File yamlFile = new File(snapshotPath + ".yaml");
-      OmSnapshotLocalDataYaml yamlData =
-          OmSnapshotLocalDataYaml.getFromYamlFile(ozoneManager.getOmSnapshotManager(), yamlFile);
-
-      // Mark as defragmented by setting needsDefrag to false
-      yamlData.setNeedsDefrag(false);
-
-      // Write updated YAML data
-      yamlData.writeToYaml(ozoneManager.getOmSnapshotManager(), yamlFile);
-
-      LOG.info("Successfully updated metadata for snapshot: {}, " +
-              "marked as defragmented (needsDefrag=false)",
-          snapshotInfo.getName());
-
-    } catch (IOException e) {
-      LOG.error("Failed to update metadata for snapshot: {}", snapshotInfo.getName(), e);
-      throw e;
-    }
-  }
-
   private final class SnapshotDefragTask implements BackgroundTask {
 
     @Override
@@ -286,10 +254,7 @@ public class SnapshotDefragService extends BackgroundService
 
         // Get snapshot through SnapshotCache for proper locking
         try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshotSupplier =
-                 snapshotManager.get().getActiveSnapshot(
-                     snapshotToDefrag.getVolumeName(),
-                     snapshotToDefrag.getBucketName(),
-                     snapshotToDefrag.getName())) {
+                 snapshotManager.get().getSnapshot(snapshotTableKey, false)) {
 
           OmSnapshot omSnapshot = snapshotSupplier.get();
 
@@ -320,8 +285,7 @@ public class SnapshotDefragService extends BackgroundService
                 previousDefraggedSnapshot, omSnapshot);
           }
 
-          // Update snapshot metadata
-          updateSnapshotMetadata(snapshotToDefrag);
+          // TODO: Update snapshot metadata here?
 
           // Close and evict the original snapshot DB from SnapshotCache
           // TODO: Implement proper eviction from SnapshotCache
@@ -360,6 +324,7 @@ public class SnapshotDefragService extends BackgroundService
   @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
+    // TODO: Can be parallelized for different buckets
     queue.add(new SnapshotDefragTask());
     return queue;
   }

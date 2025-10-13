@@ -727,7 +727,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     return getSnapshot(snapshotTableKey, skipActiveCheck);
   }
 
-  private UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(String snapshotTableKey, boolean skipActiveCheck)
+  UncheckedAutoCloseableSupplier<OmSnapshot> getSnapshot(String snapshotTableKey, boolean skipActiveCheck)
       throws IOException {
     SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(ozoneManager, snapshotTableKey);
     // Block FS API reads when snapshot is not active.
