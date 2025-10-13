@@ -146,48 +146,6 @@ public class SnapshotDefragService extends BackgroundService
   }
 
   /**
-   * Finds the first active snapshot in the chain that needs defragmentation.
-   */
-  private SnapshotInfo findFirstSnapshotNeedingDefrag(
-      Table<String, SnapshotInfo> snapshotInfoTable) throws IOException {
-
-    LOG.debug("Searching for first snapshot needing defragmentation in active chain");
-
-    // Use iterator(false) to iterate forward through the snapshot chain
-    Iterator<UUID> snapshotIterator = snapshotChainManager.iterator(false);
-
-    while (snapshotIterator.hasNext()) {
-      UUID snapshotId = snapshotIterator.next();
-      String snapshotTableKey = snapshotChainManager.getTableKey(snapshotId);
-      SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotTableKey);
-
-      if (snapshotInfo == null) {
-        LOG.warn("Snapshot with ID '{}' not found in snapshot info table", snapshotId);
-        continue;
-      }
-
-      // Skip deleted snapshots
-      if (snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
-        LOG.debug("Skipping deleted snapshot: {}", snapshotInfo.getName());
-        continue;
-      }
-
-      // Check if this snapshot needs defragmentation
-      if (needsDefragmentation(snapshotInfo)) {
-        LOG.info("Found snapshot needing defragmentation: {} (ID: {})",
-            snapshotInfo.getName(), snapshotInfo.getSnapshotId());
-        return snapshotInfo;
-      }
-
-      LOG.debug("Snapshot {} already defragmented, continuing search",
-          snapshotInfo.getName());
-    }
-
-    LOG.debug("No snapshots found needing defragmentation");
-    return null;
-  }
-
-  /**
    * Performs full defragmentation for the first snapshot in the chain.
    * This is a simplified implementation that demonstrates the concept.
    */
@@ -278,16 +236,37 @@ public class SnapshotDefragService extends BackgroundService
     final Table<String, SnapshotInfo> snapshotInfoTable =
         ozoneManager.getMetadataManager().getSnapshotInfoTable();
 
+    // Use iterator(false) to iterate forward through the snapshot chain
+    Iterator<UUID> snapshotIterator = snapshotChainManager.iterator(false);
+
     long snapshotLimit = snapshotLimitPerTask;
 
-    while (snapshotLimit > 0 && running.get()) {
-      // Find the first snapshot needing defragmentation
-      SnapshotInfo snapshotToDefrag = findFirstSnapshotNeedingDefrag(snapshotInfoTable);
-
+    while (snapshotLimit > 0 && running.get() && snapshotIterator.hasNext()) {
+      // Get SnapshotInfo for the current snapshot in the chain
+      UUID snapshotId = snapshotIterator.next();
+      String snapshotTableKey = snapshotChainManager.getTableKey(snapshotId);
+      SnapshotInfo snapshotToDefrag = snapshotInfoTable.get(snapshotTableKey);
       if (snapshotToDefrag == null) {
-        LOG.info("No snapshots found needing defragmentation");
-        break;
+        LOG.warn("Snapshot with ID '{}' not found in snapshot info table", snapshotId);
+        continue;
       }
+
+      // Skip deleted snapshots
+      if (snapshotToDefrag.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED) {
+        LOG.debug("Skipping deleted snapshot: {} (ID: {})",
+            snapshotToDefrag.getName(), snapshotToDefrag.getSnapshotId());
+        continue;
+      }
+
+      // Check if this snapshot needs defragmentation
+      if (!needsDefragmentation(snapshotToDefrag)) {
+        LOG.debug("Skipping already defragged snapshot: {} (ID: {})",
+            snapshotToDefrag.getName(), snapshotToDefrag.getSnapshotId());
+        continue;
+      }
+
+      LOG.info("Will defrag snapshot: {} (ID: {})",
+          snapshotToDefrag.getName(), snapshotToDefrag.getSnapshotId());
 
       // Acquire SNAPSHOT_GC_LOCK
       OMLockDetails gcLockDetails = ozoneManager.getMetadataManager().getLock()
