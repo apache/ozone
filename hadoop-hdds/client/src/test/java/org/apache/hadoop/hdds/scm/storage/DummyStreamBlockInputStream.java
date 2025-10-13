@@ -82,7 +82,6 @@ class DummyStreamBlockInputStream extends StreamBlockInputStream {
     // no-op
   }
 
-  @Override
   protected long readData(long offset, long len) {
     int chunkIndex = Arrays.binarySearch(chunkOffsets, offset);
     if (chunkIndex < 0) {
@@ -133,7 +132,6 @@ class DummyStreamBlockInputStream extends StreamBlockInputStream {
       chunkOffset = 0;
       chunkIndex++;
     }
-    setBuffers(BufferUtils.getReadOnlyByteBuffers(readByteBuffers));
     return bufferOffsetWrtBlockDataData;
   }
 

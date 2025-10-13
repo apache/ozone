@@ -941,9 +941,7 @@ public class TestKeyValueHandler {
                     ContainerProtos.DatanodeBlockID.newBuilder()
                         .setContainerID(DUMMY_CONTAINER_ID)
                         .setLocalID(LOCAL_ID))
-                .setOffset(offset)
-                .setLen(length)
-                .setVerifyChecksum(true))
+                .setOffset(offset))
         .setContainerID(DUMMY_CONTAINER_ID)
         .setDatanodeUuid(UUID.randomUUID().toString())
         .build();
