@@ -401,12 +401,12 @@ message ListBlockResponseProto {
 message ReadBlockRequestProto {
   required DatanodeBlockID blockID = 1;
   required uint64 offset = 2;
-  required uint64 len = 3;
-  required bool verifyChecksum = 4;
 }
 
 message ReadBlockResponseProto {
-  repeated ReadChunkResponseProto readChunk = 1;
+  required ChecksumData checksumData = 1;
+  required uint64 offset = 2;
+  required bytes data = 3;
 }
 
 message EchoRequestProto {
