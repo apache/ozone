@@ -64,10 +64,11 @@ public class ContainerMerkleTreeWriter {
     id2Block = new TreeMap<>();
     for (ContainerProtos.BlockMerkleTree blockTree: fromTree.getBlockMerkleTreeList()) {
       long blockID = blockTree.getBlockID();
+      long bcsID = blockTree.hasBlockCommitSequenceId() ? blockTree.getBlockCommitSequenceId() : 0;
       if (blockTree.getDeleted()) {
         setDeletedBlock(blockID, blockTree.getDataChecksum());
       } else {
-        addBlock(blockID);
+        addBlock(blockID, bcsID);
         for (ContainerProtos.ChunkMerkleTree chunkTree: blockTree.getChunkMerkleTreeList()) {
           addChunks(blockID, new ChunkMerkleTreeWriter(chunkTree));
         }
@@ -97,17 +98,22 @@ public class ContainerMerkleTreeWriter {
   }
 
   private void addChunks(long blockID, ChunkMerkleTreeWriter chunkWriter) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new).addChunks(chunkWriter);
+    BlockMerkleTreeWriter blockWriter = id2Block.get(blockID);
+    if (blockWriter == null) {
+      throw new IllegalStateException("Block " + blockID + " must be added before adding chunks to it");
+    }
+    blockWriter.addChunks(chunkWriter);
   }
 
   /**
-   * Adds an empty block to the tree. This method is not a pre-requisite to {@code addChunks}.
+   * Adds an empty block to the tree with the specified BCSID. This method is not a pre-requisite to {@code addChunks}.
    * If the block entry already exists, it will not be modified.
    *
    * @param blockID The ID of the empty block to add to the tree
+   * @param bcsid The block commit sequence ID for this block
    */
-  public void addBlock(long blockID) {
-    id2Block.computeIfAbsent(blockID, BlockMerkleTreeWriter::new);
+  public void addBlock(long blockID, long bcsid) {
+    id2Block.computeIfAbsent(blockID, id -> new BlockMerkleTreeWriter(id, bcsid));
   }
 
   /**
@@ -229,9 +235,18 @@ public class ContainerMerkleTreeWriter {
     private final long blockID;
     private boolean deleted;
     private Long dataChecksum;
+    private final long blockCommitSequenceId;
 
     BlockMerkleTreeWriter(long blockID) {
       this.blockID = blockID;
+      this.blockCommitSequenceId = 0;
+      this.offset2Chunk = new TreeMap<>();
+      this.deleted = false;
+    }
+
+    BlockMerkleTreeWriter(long blockID, long blockCommitSequenceId) {
+      this.blockID = blockID;
+      this.blockCommitSequenceId = blockCommitSequenceId;
       this.offset2Chunk = new TreeMap<>();
       this.deleted = false;
     }
@@ -282,6 +297,7 @@ public class ContainerMerkleTreeWriter {
       return blockTreeBuilder
           .setBlockID(blockID)
           .setDeleted(deleted)
+          .setBlockCommitSequenceId(blockCommitSequenceId)
           .build();
     }
 
