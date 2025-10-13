@@ -43,6 +43,7 @@ import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -55,9 +56,11 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ratis.util.function.CheckedSupplier;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -75,6 +78,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   private final MutableGraph<LocalDataVersionNode> localDataGraph;
   private final Map<UUID, SnapshotVersionsMeta> versionNodeMap;
   private final OMMetadataManager omMetadataManager;
+  // Used for acquiring locks on the entire data structure.
+  private static ReadWriteLock fullLock;
+  // Locks should be always acquired by iterating through the snapshot chain to avoid deadlocks.
   private Striped<ReadWriteLock> locks;
 
   public OmSnapshotLocalDataManager(OMMetadataManager omMetadataManager,
@@ -90,6 +96,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       }
     };
     this.versionNodeMap = new HashMap<>();
+    this.fullLock = new ReentrantReadWriteLock();
     init(configuration);
   }
 
@@ -244,6 +251,21 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       }
       addVersionNodeWithDependents(snapshotLocalData);
     }
+  }
+
+  public UncheckedAutoCloseableSupplier<OMLockDetails> lock() {
+    this.fullLock.writeLock().lock();
+    return new UncheckedAutoCloseableSupplier<OMLockDetails>() {
+      @Override
+      public OMLockDetails get() {
+        return OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
+      }
+
+      @Override
+      public void close() {
+        fullLock.writeLock().unlock();
+      }
+    };
   }
 
   private void validateVersionRemoval(UUID snapshotId, int version) throws IOException {
@@ -559,15 +581,18 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId) throws IOException {
       super(snapshotId, locks.get(snapshotId).writeLock());
+      fullLock.readLock().lock();
     }
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId, UUID snapshotIdToBeResolved) throws IOException {
       super(snapshotId, locks.get(snapshotId).writeLock(), null, snapshotIdToBeResolved);
+      fullLock.readLock().lock();
     }
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId,
         CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier) throws IOException {
       super(snapshotId, locks.get(snapshotId).writeLock(), snapshotLocalDataSupplier, null);
+      fullLock.readLock().lock();
     }
 
     public synchronized void commit() throws IOException {
@@ -582,7 +607,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       FileUtils.moveFile(tmpFile, new File(filePath), StandardCopyOption.ATOMIC_MOVE,
           StandardCopyOption.REPLACE_EXISTING);
       upsertNode(super.snapshotId, localDataVersionNodes);
+    }
 
+    @Override
+    public void close() {
+      super.close();
+      fullLock.readLock().unlock();
     }
   }
 
