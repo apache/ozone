@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -44,14 +43,11 @@ import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
@@ -219,7 +215,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       } else {
         UUID prevSnapId = snapshotVersionsMeta.getPreviousSnapshotId();
         if (prevSnapId != null && !versionNodeMap.containsKey(prevSnapId)) {
-          OmSnapshotLocalData prevSnapshotLocalData = getOmSnapshotLocalData(prevSnapId);
+          File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(prevSnapId));
+          OmSnapshotLocalData prevSnapshotLocalData = snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
           stack.push(Pair.of(prevSnapshotLocalData.getSnapshotId(), new SnapshotVersionsMeta(prevSnapshotLocalData)));
         }
         visitedSnapshotIds.add(snapId);
@@ -272,31 +269,34 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  private Map<Integer, LocalDataVersionNode> validateModification(OmSnapshotLocalData snapshotLocalData)
+  private SnapshotVersionsMeta validateModification(OmSnapshotLocalData snapshotLocalData)
       throws IOException {
-    Map<Integer, LocalDataVersionNode> versionNodes = getVersionNodes(snapshotLocalData);
-    for (LocalDataVersionNode node : versionNodes.values()) {
+    SnapshotVersionsMeta versionsToBeAdded = new SnapshotVersionsMeta(snapshotLocalData);
+    for (LocalDataVersionNode node : versionsToBeAdded.getSnapshotVersions().values()) {
       validateVersionAddition(node);
     }
-    Map<Integer, LocalDataVersionNode> snapVersionNodeMap =
-        getVersionNodeMap().getOrDefault(snapshotLocalData.getSnapshotId(), Collections.emptyMap());
-    for (Map.Entry<Integer, LocalDataVersionNode> entry : snapVersionNodeMap.entrySet()) {
-      if (!versionNodes.containsKey(entry.getKey())) {
-        validateVersionRemoval(snapshotLocalData.getSnapshotId(), entry.getKey());
+    UUID snapshotId = snapshotLocalData.getSnapshotId();
+    Map<Integer, LocalDataVersionNode> existingVersions = getVersionNodeMap().containsKey(snapshotId) ?
+        getVersionNodeMap().get(snapshotId).getSnapshotVersions() : Collections.emptyMap();
+    for (Map.Entry<Integer, LocalDataVersionNode> entry : existingVersions.entrySet()) {
+      if (!versionsToBeAdded.getSnapshotVersions().containsKey(entry.getKey())) {
+        validateVersionRemoval(snapshotId, entry.getKey());
       }
     }
-    return versionNodes;
+    return versionsToBeAdded;
   }
 
-  private void upsertNode(UUID snapshotId, Map<Integer, LocalDataVersionNode> versionNodes) throws IOException {
-    Map<Integer, LocalDataVersionNode> existingVersions = getVersionNodeMap().getOrDefault(snapshotId,
-        Collections.emptyMap());
-    getVersionNodeMap().remove(snapshotId);
-    for (Map.Entry<Integer, LocalDataVersionNode> entry : versionNodes.entrySet()) {
-      addVersionNode(entry.getValue());
+  private void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
+    SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
+    Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
+        existingSnapVersions.getSnapshotVersions();
+    if (!addSnapshotVersionMeta(snapshotId, snapshotVersions)) {
+      throw new IOException("Unable to upsert " + snapshotVersions + " since it already exists");
+    }
+
+    for (Map.Entry<Integer, LocalDataVersionNode> entry : snapshotVersions.getSnapshotVersions().entrySet()) {
       if (existingVersions.containsKey(entry.getKey())) {
-        for (LocalDataVersionNode predecessor :
-            localDataGraph.predecessors(existingVersions.get(entry.getKey()))) {
+        for (LocalDataVersionNode predecessor : localDataGraph.predecessors(existingVersions.get(entry.getKey()))) {
           localDataGraph.putEdge(predecessor, entry.getValue());
         }
       }
@@ -304,7 +304,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     for (LocalDataVersionNode localDataVersionNode : existingVersions.values()) {
       localDataGraph.removeNode(localDataVersionNode);
     }
-    getVersionNodeMap().put(snapshotId, versionNodes);
+    getVersionNodeMap().put(snapshotId, snapshotVersions);
   }
 
   @Override
@@ -437,7 +437,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             previousReadLockAcquired.readLock().lock();
             haspreviousReadLockAcquiredAcquired = true;
           }
-          Map<Integer, LocalDataVersionNode> previousVersionNodeMap = versionNodeMap.get(previousSnapshotId);
+          Map<Integer, LocalDataVersionNode> previousVersionNodeMap = versionNodeMap.get(previousSnapshotId)
+              .getSnapshotVersions();
           UUID currentIteratedSnapshotId = previousSnapshotId;
           while (!Objects.equals(currentIteratedSnapshotId, toResolveSnapshotId)) {
             Set<UUID> previousIds =
@@ -547,7 +548,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     public synchronized void commit() throws IOException {
-      Map<Integer, LocalDataVersionNode> localDataVersionNodes = validateModification(super.snapshotLocalData);
+      SnapshotVersionsMeta localDataVersionNodes = validateModification(super.snapshotLocalData);
       String filePath = getSnapshotLocalPropertyYamlPath(super.snapshotId);
       String tmpFilePath = filePath + ".tmp";
       File tmpFile = new File(tmpFilePath);
