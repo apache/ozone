@@ -50,11 +50,9 @@ spec:
           value: scm-0.scm:9876
         - name: ENSURE_OM_INITIALIZED
           value: /data/metadata/om/current/VERSION
-        - name: JAEGER_SAMPLER_TYPE
-          value: probabilistic
-        - name: JAEGER_SAMPLER_PARAM
+        - name: OTEL_TRACES_SAMPLER_ARG
           value: "0.01"
-        - name: JAEGER_AGENT_HOST
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: jaeger-0.jaeger
         livenessProbe:
           tcpSocket:

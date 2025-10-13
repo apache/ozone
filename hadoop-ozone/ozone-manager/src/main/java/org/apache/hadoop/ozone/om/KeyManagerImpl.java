@@ -80,7 +80,7 @@ import static org.apache.hadoop.util.Time.monotonicNow;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -138,6 +138,7 @@ import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -161,6 +162,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
@@ -741,9 +743,8 @@ public class KeyManagerImpl implements KeyManager {
       String volume, String bucket, String startKey,
       CheckedFunction<KeyValue<String, OmKeyInfo>, Boolean, IOException> filter,
       int count) throws IOException {
-    List<BlockGroup> keyBlocksList = Lists.newArrayList();
+    Map<String, PurgedKey> purgedKeys = Maps.newHashMap();
     Map<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
-    Map<String, Long> keyBlockReplicatedSize = new HashMap<>();
     int notReclaimableKeyCount = 0;
 
     // Bucket prefix would be empty if volume is empty i.e. either null or "".
@@ -759,12 +760,14 @@ public class KeyManagerImpl implements KeyManager {
       }
       int currentCount = 0;
       while (delKeyIter.hasNext() && currentCount < count) {
-        RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo();
         KeyValue<String, RepeatedOmKeyInfo> kv = delKeyIter.next();
         if (kv != null) {
-          List<BlockGroup> blockGroupList = Lists.newArrayList();
+          RepeatedOmKeyInfo notReclaimableKeyInfo = new RepeatedOmKeyInfo(kv.getValue().getBucketId());
+          Map<String, PurgedKey> reclaimableKeys = Maps.newHashMap();
           // Multiple keys with the same path can be queued in one DB entry
           RepeatedOmKeyInfo infoList = kv.getValue();
+          long bucketId = infoList.getBucketId();
+          int reclaimableKeyCount = 0;
           for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
 
             // Skip the key if the filter doesn't allow the file to be deleted.
@@ -772,10 +775,12 @@ public class KeyManagerImpl implements KeyManager {
               List<BlockID> blockIDS = info.getKeyLocationVersions().stream()
                   .flatMap(versionLocations -> versionLocations.getLocationList().stream()
                       .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))).collect(Collectors.toList());
-              BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(kv.getKey())
+              String blockGroupName = kv.getKey() + "/" + reclaimableKeyCount++;
+              BlockGroup keyBlocks = BlockGroup.newBuilder().setKeyName(blockGroupName)
                   .addAllBlockIDs(blockIDS).build();
-              keyBlockReplicatedSize.put(keyBlocks.getGroupID(), info.getReplicatedSize());
-              blockGroupList.add(keyBlocks);
+              reclaimableKeys.put(blockGroupName,
+                  new PurgedKey(info.getVolumeName(), info.getBucketName(), bucketId,
+                  keyBlocks, kv.getKey(), OMKeyRequest.sumBlockLengths(info), info.isDeletedKeyCommitted()));
               currentCount++;
             } else {
               notReclaimableKeyInfo.addOmKeyInfo(info);
@@ -789,12 +794,12 @@ public class KeyManagerImpl implements KeyManager {
               notReclaimableKeyInfoList.size() != infoList.getOmKeyInfoList().size()) {
             keysToModify.put(kv.getKey(), notReclaimableKeyInfo);
           }
-          keyBlocksList.addAll(blockGroupList);
+          purgedKeys.putAll(reclaimableKeys);
           notReclaimableKeyCount += notReclaimableKeyInfoList.size();
         }
       }
     }
-    return new PendingKeysDeletion(keyBlocksList, keysToModify, keyBlockReplicatedSize, notReclaimableKeyCount);
+    return new PendingKeysDeletion(purgedKeys, keysToModify, notReclaimableKeyCount);
   }
 
   private <V, R> List<KeyValue<String, R>> getTableEntries(String startKey,
@@ -2209,20 +2214,12 @@ public class KeyManagerImpl implements KeyManager {
     String seekFileInDB = metadataManager.getOzonePathKey(volumeId, bucketId,
         parentInfo.getObjectID(), "");
     long consumedSize = 0;
-    boolean processedSubPaths = false;
     try (TableIterator<String, ? extends KeyValue<String, T>> iterator = table.iterator(seekFileInDB)) {
       while (iterator.hasNext() && remainingBufLimit > 0) {
         KeyValue<String, T> entry = iterator.next();
-        T withParentObjectId = entry.getValue();
         final long objectSerializedSize = entry.getValueByteSize();
-        if (!OMFileRequest.isImmediateChild(withParentObjectId.getParentObjectID(),
-            parentInfo.getObjectID())) {
-          processedSubPaths = true;
-          break;
-        }
-        if (!table.isExist(entry.getKey())) {
-          continue;
-        }
+        // No need to check the table again as the value in cache and iterator would be same when directory
+        // deleting service runs.
         if (remainingBufLimit - objectSerializedSize < 0) {
           break;
         }
@@ -2233,8 +2230,7 @@ public class KeyManagerImpl implements KeyManager {
           consumedSize += objectSerializedSize;
         }
       }
-      processedSubPaths = processedSubPaths || (!iterator.hasNext());
-      return new DeleteKeysResult(keyInfos, consumedSize, processedSubPaths);
+      return new DeleteKeysResult(keyInfos, consumedSize, !iterator.hasNext());
     }
   }
 

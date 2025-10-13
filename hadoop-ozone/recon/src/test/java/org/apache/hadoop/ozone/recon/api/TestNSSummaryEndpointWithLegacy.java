@@ -704,7 +704,7 @@ public class TestNSSummaryEndpointWithLegacy {
         .build();
     // Call constructFullPath and verify the result
     String fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     String expectedPath = "vol/bucket1/dir1/dir2/file2";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -716,7 +716,7 @@ public class TestNSSummaryEndpointWithLegacy {
         .setObjectID(DIR_TWO_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol/bucket1/dir1/dir2/";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -728,7 +728,7 @@ public class TestNSSummaryEndpointWithLegacy {
         .setObjectID(KEY_SIX_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol/bucket1/dir1/dir4/file6";
     Assertions.assertEquals(expectedPath, fullPath);
   }

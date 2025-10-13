@@ -15,5 +15,7 @@
  * limitations under the License.
  */
 
-/** SCM protocol related interfaces. */
-package org.apache.hadoop.hdds.scm.protocol;
+/**
+ * Customizations for Hadoop FS CLI.
+ */
+package org.apache.hadoop.fs.ozone;

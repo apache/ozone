@@ -23,13 +23,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import org.apache.ratis.util.AtomicFileOutputStream;
 import org.slf4j.Logger;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.inspector.TagInspector;
-import org.yaml.snakeyaml.inspector.TrustedPrefixesTagInspector;
 
 /**
  * YAML utilities.
@@ -47,8 +45,8 @@ public final class YamlUtils {
   }
 
   private static Yaml getYamlForLoad() {
-    TagInspector tags = new TrustedPrefixesTagInspector(Arrays.asList(
-        "org.apache.hadoop.ozone.", "org.apache.hadoop.hdds."));
+    TagInspector tags = tag -> tag.getClassName().startsWith("org.apache.hadoop.hdds.")
+        || tag.getClassName().startsWith("org.apache.hadoop.ozone.");
     LoaderOptions loaderOptions = new LoaderOptions();
     loaderOptions.setTagInspector(tags);
     return new Yaml(loaderOptions);

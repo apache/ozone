@@ -20,31 +20,26 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
-import static org.jooq.impl.DSL.currentTimestamp;
-import static org.jooq.impl.DSL.select;
-import static org.jooq.impl.DSL.using;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
 import java.io.IOException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.commons.lang3.tuple.Triple;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
-import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,8 +51,7 @@ public class OmTableInsightTask implements ReconOmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmTableInsightTask.class);
 
-  private GlobalStatsDao globalStatsDao;
-  private Configuration sqlConfiguration;
+  private ReconGlobalStatsManager reconGlobalStatsManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private Map<String, OmTableHandler> tableHandlers;
   private Collection<String> tables;
@@ -66,11 +60,9 @@ public class OmTableInsightTask implements ReconOmTask {
   private Map<String, Long> replicatedSizeMap;
 
   @Inject
-  public OmTableInsightTask(GlobalStatsDao globalStatsDao,
-                             Configuration sqlConfiguration,
-                             ReconOMMetadataManager reconOMMetadataManager) {
-    this.globalStatsDao = globalStatsDao;
-    this.sqlConfiguration = sqlConfiguration;
+  public OmTableInsightTask(ReconGlobalStatsManager reconGlobalStatsManager,
+                             ReconOMMetadataManager reconOMMetadataManager) throws IOException {
+    this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
 
     // Initialize table handlers
@@ -78,6 +70,14 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
+  }
+
+  @Override
+  public ReconOmTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    ReconGlobalStatsManager stagedGlobalStatsManager =
+        reconGlobalStatsManager.getStagedReconGlobalStatsManager(stagedReconDbStore);
+    return new OmTableInsightTask(stagedGlobalStatsManager, stagedOmMetadataManager);
   }
 
   /**
@@ -167,6 +167,11 @@ public class OmTableInsightTask implements ReconOmTask {
   @Override
   public TaskResult process(OMUpdateEventBatch events,
                             Map<String, Integer> subTaskSeekPosMap) {
+    // Initialize tables if not already initialized
+    if (tables == null || tables.isEmpty()) {
+      init();
+    }
+
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
 
     String tableName;
@@ -266,26 +271,17 @@ public class OmTableInsightTask implements ReconOmTask {
    * @param dataMap Map containing the updated count and size information.
    */
   private void writeDataToDB(Map<String, Long> dataMap) {
-    List<GlobalStats> insertGlobalStats = new ArrayList<>();
-    List<GlobalStats> updateGlobalStats = new ArrayList<>();
-
-    for (Entry<String, Long> entry : dataMap.entrySet()) {
-      Timestamp now =
-          using(sqlConfiguration).fetchValue(select(currentTimestamp()));
-      GlobalStats record = globalStatsDao.fetchOneByKey(entry.getKey());
-      GlobalStats newRecord
-          = new GlobalStats(entry.getKey(), entry.getValue(), now);
-
-      // Insert a new record for key if it does not exist
-      if (record == null) {
-        insertGlobalStats.add(newRecord);
-      } else {
-        updateGlobalStats.add(newRecord);
+    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      for (Entry<String, Long> entry : dataMap.entrySet()) {
+        String key = entry.getKey();
+        Long value = entry.getValue();
+        GlobalStatsValue globalStatsValue = new GlobalStatsValue(value);
+        reconGlobalStatsManager.batchStoreGlobalStats(rdbBatchOperation, key, globalStatsValue);
       }
+      reconGlobalStatsManager.commitBatchOperation(rdbBatchOperation);
+    } catch (IOException e) {
+      LOG.error("Failed to write data to RocksDB GlobalStats table", e);
     }
-
-    globalStatsDao.insert(insertGlobalStats);
-    globalStatsDao.update(updateGlobalStats);
   }
 
   /**
@@ -343,9 +339,13 @@ public class OmTableInsightTask implements ReconOmTask {
    * @return The value associated with the key
    */
   private long getValueForKey(String key) {
-    GlobalStats record = globalStatsDao.fetchOneByKey(key);
-
-    return (record == null) ? 0L : record.getValue();
+    try {
+      GlobalStatsValue globalStatsValue = reconGlobalStatsManager.getGlobalStatsValue(key);
+      return (globalStatsValue == null) ? 0L : globalStatsValue.getValue();
+    } catch (IOException e) {
+      LOG.error("Failed to get value for key {} from RocksDB GlobalStats table", key, e);
+      return 0L;
+    }
   }
 
   @VisibleForTesting

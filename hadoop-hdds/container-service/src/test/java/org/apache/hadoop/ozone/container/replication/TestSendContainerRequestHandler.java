@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUti
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -51,6 +53,9 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test for {@link SendContainerRequestHandler}.
@@ -87,6 +92,18 @@ public class TestSendContainerRequestHandler {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
+  /**
+   * Provides stream of different container sizes for tests.
+   */
+  public static Stream<Arguments> sizeProvider() {
+    return Stream.of(
+        Arguments.of("Null replicate size (fallback to default)", null),
+        Arguments.of("Zero Size", 0L),
+        Arguments.of("Normal 2GB", 2L * 1024L * 1024L * 1024L),
+        Arguments.of("Overallocated 20GB", 20L * 1024L * 1024L * 1024L)
+    );
+  }
+
   @Test
   void testReceiveDataForExistingContainer() throws Exception {
     long containerId = 1;
@@ -104,36 +121,27 @@ public class TestSendContainerRequestHandler {
           ((StorageContainerException) arg).getResult());
       return null;
     }).when(responseObserver).onError(any());
-    ByteString data = ByteString.copyFromUtf8("test");
-    ContainerProtos.SendContainerRequest request
-        = ContainerProtos.SendContainerRequest.newBuilder()
-        .setContainerID(containerId)
-        .setData(data)
-        .setOffset(0)
-        .setCompression(NO_COMPRESSION.toProto())
-        .build();
-    sendContainerRequestHandler.onNext(request);
+
+    sendContainerRequestHandler.onNext(createRequest(containerId,
+        ByteString.copyFromUtf8("test"), 0, null));
   }
 
-  @Test
-  public void testSpaceReservedAndReleasedWhenRequestCompleted() throws Exception {
+  @ParameterizedTest(name = "for {0}")
+  @MethodSource("sizeProvider")
+  public void testSpaceReservedAndReleasedWhenRequestCompleted(String testName, Long size) throws Exception {
     long containerId = 1;
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
+    long expectedReservedSpace = size != null ?
+        importer.getRequiredReplicationSpace(size) :
+        importer.getDefaultReplicationSpace();
 
-    // Create request
-    ContainerProtos.SendContainerRequest request = ContainerProtos.SendContainerRequest.newBuilder()
-        .setContainerID(containerId)
-        .setData(ByteString.EMPTY)
-        .setOffset(0)
-        .setCompression(CopyContainerCompression.NO_COMPRESSION.toProto())
-        .build();
-
-    // Execute request
-    sendContainerRequestHandler.onNext(request);
+    // Create and execute the first request to reserve space
+    sendContainerRequestHandler.onNext(
+        createRequest(containerId, ByteString.EMPTY, 0, size));
 
     // Verify commit space is reserved
-    assertEquals(volume.getCommittedBytes(), initialCommittedBytes + 2 * containerMaxSize);
+    assertEquals(volume.getCommittedBytes(), initialCommittedBytes + expectedReservedSpace);
 
     // complete the request
     sendContainerRequestHandler.onCompleted();
@@ -142,44 +150,50 @@ public class TestSendContainerRequestHandler {
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes);
   }
 
-  @Test
-  public void testSpaceReservedAndReleasedWhenOnNextFails() throws Exception {
+  @ParameterizedTest(name = "for {0}")
+  @MethodSource("sizeProvider")
+  public void testSpaceReservedAndReleasedWhenOnNextFails(String testName, Long size) throws Exception {
     long containerId = 1;
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
+    long expectedReservedSpace = size != null ?
+        importer.getRequiredReplicationSpace(size) :
+        importer.getDefaultReplicationSpace();
 
-    // Create request
-    ContainerProtos.SendContainerRequest request = createRequest(containerId, ByteString.copyFromUtf8("test"), 0);
-
-    // Execute request
-    sendContainerRequestHandler.onNext(request);
+    ByteString data = ByteString.copyFromUtf8("test");
+    // Execute first request to reserve space
+    sendContainerRequestHandler.onNext(
+        createRequest(containerId, data, 0, size));
 
     // Verify commit space is reserved
-    assertEquals(volume.getCommittedBytes(), initialCommittedBytes + 2 * containerMaxSize);
+    assertEquals(volume.getCommittedBytes(), initialCommittedBytes + expectedReservedSpace);
 
     // mock the importer is not allowed to import this container
     when(importer.isAllowedContainerImport(containerId)).thenReturn(false);
     
-    sendContainerRequestHandler.onNext(request);
+    sendContainerRequestHandler.onNext(createRequest(containerId, data, 0,
+        size));
 
     // Verify commit space is released
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes);
   }
 
-  @Test
-  public void testSpaceReservedAndReleasedWhenOnCompletedFails() throws Exception {
+  @ParameterizedTest(name = "for {0}")
+  @MethodSource("sizeProvider")
+  public void testSpaceReservedAndReleasedWhenOnCompletedFails(String testName, Long size) throws Exception {
     long containerId = 1;
     HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
     long initialCommittedBytes = volume.getCommittedBytes();
-
-    // Create request
-    ContainerProtos.SendContainerRequest request = createRequest(containerId, ByteString.copyFromUtf8("test"), 0);
+    long expectedReservedSpace = size != null ?
+        importer.getRequiredReplicationSpace(size) :
+        importer.getDefaultReplicationSpace();
 
     // Execute request
-    sendContainerRequestHandler.onNext(request);
+    sendContainerRequestHandler.onNext(createRequest(containerId,
+        ByteString.copyFromUtf8("test"), 0, size));
 
     // Verify commit space is reserved
-    assertEquals(volume.getCommittedBytes(), initialCommittedBytes + 2 * containerMaxSize);
+    assertEquals(volume.getCommittedBytes(), initialCommittedBytes + expectedReservedSpace);
 
     doThrow(new IOException("Failed")).when(importer).importContainer(anyLong(), any(), any(), any());
 
@@ -189,12 +203,51 @@ public class TestSendContainerRequestHandler {
     assertEquals(volume.getCommittedBytes(), initialCommittedBytes);
   }
 
-  private ContainerProtos.SendContainerRequest createRequest(long containerId, ByteString data, int offset) {
-    return ContainerProtos.SendContainerRequest.newBuilder()
-        .setContainerID(containerId)
-        .setData(data)
-        .setOffset(offset)
-        .setCompression(CopyContainerCompression.NO_COMPRESSION.toProto())
-        .build();
+  /**
+   * Test that verifies the actual space calculation difference between
+   * overallocated containers and default containers.
+   */
+  @Test
+  public void testOverAllocatedReservesMoreSpace() {
+    long containerId1 = 1;
+    long containerId2 = 2;
+    long overallocatedSize = containerMaxSize * 2; // 10GB
+    HddsVolume volume = (HddsVolume) volumeSet.getVolumesList().get(0);
+    long initialCommittedBytes = volume.getCommittedBytes();
+    // Test overallocated container (10GB)
+    SendContainerRequestHandler handler1 = new SendContainerRequestHandler(importer, responseObserver, null);
+    handler1.onNext(createRequest(containerId1, ByteString.EMPTY, 0, overallocatedSize));
+
+    long overallocatedReservation = volume.getCommittedBytes() - initialCommittedBytes;
+    handler1.onCompleted(); // Release space
+
+    // Test default container (null size)
+    SendContainerRequestHandler handler2 = new SendContainerRequestHandler(importer, responseObserver, null);
+    handler2.onNext(createRequest(containerId2, ByteString.EMPTY, 0, null));
+
+    long defaultReservation = volume.getCommittedBytes() - initialCommittedBytes;
+    handler2.onCompleted(); // Release space
+
+    // Verify overallocated container reserves more space
+    assertTrue(overallocatedReservation > defaultReservation);
+
+    // Verify specific calculations
+    assertEquals(2 * overallocatedSize, overallocatedReservation);
+    assertEquals(2 * containerMaxSize, defaultReservation);
+  }
+
+  private ContainerProtos.SendContainerRequest createRequest(
+      long containerId, ByteString data, int offset, Long size) {
+    ContainerProtos.SendContainerRequest.Builder builder =
+        ContainerProtos.SendContainerRequest.newBuilder()
+            .setContainerID(containerId)
+            .setData(data)
+            .setOffset(offset)
+            .setCompression(NO_COMPRESSION.toProto());
+
+    if (size != null) {
+      builder.setSize(size);
+    }
+    return builder.build();
   }
 }

@@ -24,6 +24,9 @@
   <packaging>jar</packaging>
   <name>Apache Ozone Storage Interface</name>
   <description>Apache Ozone Storage Interface</description>
+  <properties>
+    <protobuf.version>${protobuf2.version}</protobuf.version>
+  </properties>
   <dependencies>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -93,18 +96,15 @@
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
-        <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc</id>
+            <id>compile-proto-${protobuf.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-              <protocArtifact>com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
             </configuration>
           </execution>
         </executions>

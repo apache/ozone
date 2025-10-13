@@ -70,8 +70,8 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
   /**
    * Creates a new OmSnapshotLocalDataYaml with default values.
    */
-  public OmSnapshotLocalDataYaml(List<LiveFileMetaData> liveFileMetaDatas, UUID previousSnapshotId) {
-    super(liveFileMetaDatas, previousSnapshotId);
+  public OmSnapshotLocalDataYaml(UUID snapshotId, List<LiveFileMetaData> liveFileMetaDatas, UUID previousSnapshotId) {
+    super(snapshotId, liveFileMetaDatas, previousSnapshotId);
   }
 
   /**
@@ -227,8 +227,10 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
+        UUID snapId = UUID.fromString((String) nodes.get(OzoneConsts.OM_SLD_SNAP_ID));
         UUID prevSnapId = UUID.fromString((String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID));
-        OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml(Collections.emptyList(), prevSnapId);
+        OmSnapshotLocalDataYaml snapshotLocalData = new OmSnapshotLocalDataYaml(snapId, Collections.emptyList(),
+            prevSnapId);
 
         // Set version from YAML
         Integer version = (Integer) nodes.get(OzoneConsts.OM_SLD_VERSION);
@@ -238,17 +240,17 @@ public final class OmSnapshotLocalDataYaml extends OmSnapshotLocalData {
         snapshotLocalData.setSstFiltered((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_IS_SST_FILTERED, false));
 
         // Handle potential Integer/Long type mismatch from YAML parsing
-        Object lastCompactionTimeObj = nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_COMPACTION_TIME, -1L);
-        long lastCompactionTime;
-        if (lastCompactionTimeObj instanceof Number) {
-          lastCompactionTime = ((Number) lastCompactionTimeObj).longValue();
+        Object lastDefragTimeObj = nodes.getOrDefault(OzoneConsts.OM_SLD_LAST_DEFRAG_TIME, -1L);
+        long lastDefragTime;
+        if (lastDefragTimeObj instanceof Number) {
+          lastDefragTime = ((Number) lastDefragTimeObj).longValue();
         } else {
-          throw new IllegalArgumentException("Invalid type for lastCompactionTime: " +
-              lastCompactionTimeObj.getClass().getName() + ". Expected Number type.");
+          throw new IllegalArgumentException("Invalid type for lastDefragTime: " +
+              lastDefragTimeObj.getClass().getName() + ". Expected Number type.");
         }
-        snapshotLocalData.setLastCompactionTime(lastCompactionTime);
+        snapshotLocalData.setLastDefragTime(lastDefragTime);
 
-        snapshotLocalData.setNeedsCompaction((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_COMPACTION, false));
+        snapshotLocalData.setNeedsDefrag((Boolean) nodes.getOrDefault(OzoneConsts.OM_SLD_NEEDS_DEFRAG, false));
         Map<Integer, VersionMeta> versionMetaMap =
             (Map<Integer, VersionMeta>) nodes.get(OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO);
         if (versionMetaMap != null) {
