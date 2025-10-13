@@ -265,8 +265,8 @@ public class DiskBalancerManager {
    * - NodeState.HEALTHY(not stale, dead, or readonly)
    *
    * @param dn the DatanodeDetails to check
-   * @param errors list to add any error messages if the datanode is not in optimal state
-   * @return true if the datanode is in optimal state (IN_SERVICE and HEALTHY), false otherwise
+   * @param errors list to add any error messages if the datanode is not in healthy state
+   * @return true if the datanode is in healthy state (IN_SERVICE and HEALTHY), false otherwise
    */
   private boolean isDatanodeInHealthyState(DatanodeDetails dn,
       List<DatanodeAdminError> errors) throws NodeNotFoundException {
