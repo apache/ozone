@@ -62,7 +62,7 @@ explicitly setting the context in the target thread using
 context.makeCurrent().
 
 **Inter-process Transfer**: Context needs to be retrieved and set to
-headers for HTTP or message body in gRpc to transfer.Further details are
+headers for HTTP or message body in gRpc to transfer. Further details are
 provided in **[Trace Propagation](#216-trace-propagation)**.
 
 ### 2.1.2. Span
