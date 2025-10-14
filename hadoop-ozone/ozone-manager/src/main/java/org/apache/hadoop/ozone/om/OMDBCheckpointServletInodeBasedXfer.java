@@ -258,7 +258,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         // this is the last step where we transfer the active om.db contents
         Map<String, String> hardLinkFileMap = new HashMap<>();
         SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
-        // lock is null when includeSnapshotData=false, no snapshot consistency needed
+        /*
+         * When includeSnapshotData is false, lock is set to null and no locking is performed.
+         * In this case, the try-with-resources block does not call close() on any resource,
+         * which is intentional because snapshot consistency is not required.
+         * This pattern is safe in Java: try-with-resources will simply skip closing if the resource is null.
+         */
         try (UncheckedAutoCloseableSupplier<OMLockDetails> lock = includeSnapshotData ? snapshotCache.lock() : null) {
           // get the list of sst files of the checkpoint.
           checkpoint = createAndPrepareCheckpoint(true);
