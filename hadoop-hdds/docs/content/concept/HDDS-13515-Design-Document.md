@@ -25,12 +25,11 @@ summary: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
 -->
 
 ## Document Information
+- **Title**: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
+- **Summary**: Staged reprocessing of Recon Task for data consistency shown over Recon UI
+- **Date**: 2025-07-30
 - **JIRA**: HDDS-13515
-- **Component**: Apache Ozone - Recon
-- **Type**: Design Document
-- **Author**: [Devesh Singh]
-- **Date**: [Current Date]
-- **Status**: Draft
+- **Status**: Implemented
 
 ## 1. Executive Summary
 
@@ -372,54 +371,12 @@ REPROCESS_STAGING will be a new task to track staging operations:
 ReconTaskStatusUpdater reprocessTaskStatus = taskStatusUpdaterManager.getTaskStatusUpdater(REPROCESS_STAGING);
 ```
 
-### 6.2 Administrative APIs
-
-#### Staging Control APIs
-```java
-@RestController
-@RequestMapping("/admin/staging")
-public class StagingAdminController {
-    
-    @GetMapping("/status")
-    public StagingStatusResponse getStagingStatus() {
-        return StagingStatusResponse.builder()
-            .state(stagingManager.getStagingState())
-            .progress(stagingManager.getProgressDetails())
-            .startTime(stagingManager.getStartTime())
-            .estimatedCompletion(stagingManager.getEstimatedCompletion())
-            .taskProgress(stagingManager.getTaskProgress())
-            .build();
-    }
-    
-    @PostMapping("/cancel")
-    public ResponseEntity<String> cancelStaging() {
-        try {
-            boolean cancelled = stagingManager.cancelCurrentOperation();
-            return cancelled ? 
-                ResponseEntity.ok("Staging operation cancelled") :
-                ResponseEntity.badRequest().body("No staging operation to cancel");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Failed to cancel: " + e.getMessage());
-        }
-    }
-    
-    @PostMapping("/retry")
-    public ResponseEntity<String> retryStaging() {
-        try {
-            stagingManager.retryLastFailedOperation();
-            return ResponseEntity.ok("Staging retry initiated");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Retry failed: " + e.getMessage());
-        }
-    }
-}
-```
 
 ---
 
-## 7. Testing Strategy
+## 6. Testing Strategy
 
-### 7.1 Unit Testing
+### 6.1 Unit Testing
 
 #### Component Tests
 - **StagingManager**: Mock storage interfaces, test state transitions
@@ -428,27 +385,23 @@ public class StagingAdminController {
 
 #### Mock-based Testing
 ```java
-@Test
-public void testStagingReprocessSuccess() {
-    
-}
+TestNSSummaryTaskControllerIntegration.java
+TestNSSummaryTaskControllerIntegration.java
+TestOMUpdateEventBuffer.java
+TestReconTaskControllerImpl.java
+TestReconOmMetadataManagerImpl.java
+TestOzoneManagerServiceProviderImpl.java
+TestEventBufferOverflow.java
 ```
 
 ### 7.2 Integration Testing
 
 #### End-to-End Staging Tests
 ```java
-@IntegrationTest
-public class StagingIntegrationTest {
-    
-    @Test
-    public void testFullStagingCycle() {
-    }
-    
-    @Test
-    public void testStagingRollback() {
-    }
-}
+TestReconInsightsForDeletedDirectories.java
+TestReconWithOzoneManagerFSO.java
+TestReconContainerEndpoint.java
+TestReconWithOzoneManagerHA.java
 ```
 
 ### 7.3 Performance Testing
@@ -458,17 +411,6 @@ public class StagingIntegrationTest {
 2. **Concurrent API Load**: High API traffic during staging
 3. **Resource Constraint Testing**: Limited memory/disk scenarios
 4. **Failure Recovery**: Performance after rollback operations
-
-#### Performance Benchmarks
-```java
-@PerformanceTest
-public class StagingPerformanceTest {
-    
-    @Test
-    public void benchmarkStagingVsDirectReprocess() {
-    }
-}
-```
 
 ---
 ## 8. Conclusion
