@@ -373,16 +373,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return snapshotLocalData;
     }
 
-    public OmSnapshotLocalData getPreviousSnapshotLocalData() throws IOException {
+    public synchronized OmSnapshotLocalData getPreviousSnapshotLocalData() throws IOException {
       if (!isPreviousSnapshotLoaded) {
-        synchronized (this) {
-          if (!isPreviousSnapshotLoaded) {
-            File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(resolvedPreviousSnapshotId));
-            this.previousSnapshotLocalData = resolvedPreviousSnapshotId == null ? null :
-                snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
-            this.isPreviousSnapshotLoaded = true;
-          }
-        }
+        File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(resolvedPreviousSnapshotId));
+        this.previousSnapshotLocalData = resolvedPreviousSnapshotId == null ? null :
+            snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+        this.isPreviousSnapshotLoaded = true;
       }
       return previousSnapshotLocalData;
     }
@@ -608,8 +604,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       String filePath = getSnapshotLocalPropertyYamlPath(super.snapshotId);
       String tmpFilePath = filePath + ".tmp";
       File tmpFile = new File(tmpFilePath);
-      if (tmpFile.exists()) {
-        tmpFile.delete();
+      boolean tmpFileExists = tmpFile.exists();
+      if (tmpFileExists) {
+        tmpFileExists = !tmpFile.delete();
+      }
+      if (!tmpFileExists) {
+        throw new IOException("Unable to delete tmp file " + tmpFilePath);
       }
       snapshotLocalDataSerializer.save(new File(tmpFilePath), super.snapshotLocalData);
       FileUtils.moveFile(tmpFile, new File(filePath), StandardCopyOption.ATOMIC_MOVE,
