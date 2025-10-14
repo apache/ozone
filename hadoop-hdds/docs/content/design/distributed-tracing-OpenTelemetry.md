@@ -1,5 +1,5 @@
 ---
-title: Distributed Tracing (OpenTelemetry)
+title: Distributed Tracing using OpenTelemetry for Ozone
 summary: Use of OpenTelemetry for distributed tracing in Ozone.
 date: 2025-09-19
 jira: HDDS-13679
@@ -41,7 +41,7 @@ within Ozone.
 
 ### 2.1.1. Context
 
-Context in OpenTelementry keeps span and other information in the
+Context in OpenTelemetry keeps span and other information in the
 context. Context is set to thread-local using `context.makeCurrent()`. And
 the same can be retrieved using `context.current()`.
 
@@ -54,7 +54,7 @@ the same can be retrieved using `context.current()`.
 ```
 // Manual trace context creation
 Context rootContext = Context.root();
-Context newContextFromRoot = rootContext.with(myKey, \"anotherValue\");
+Context newContextFromRoot = rootContext.with(myKey, "anotherValue");
 ```
 
 **Inter-thread Transfer:** Context can be transferred between threads by
@@ -94,7 +94,7 @@ spans, it must be set to the current context using `span.makeCurrent()`.
 | start_time | Timestamp when the span began.
 | end_time   | Timestamp when the span ended.
 | attributes | Key-value pairs providing additional details about the span.
-| events  | An array of events that occurred during the span\'s lifetime. Each event has a name, timestamp, and optional attributes.
+| events  | An array of events that occurred during the span's lifetime. Each event has a name, timestamp, and optional attributes.
 
 Upon completion (`end()`), span information is transmitted to the
 OpenTelemetry Collector. This transmission occurs in batches for
@@ -129,7 +129,7 @@ performance optimization.
 
 ### 2.1.3. Scope
 
-Scope in OpenTelemetry defines which span is considered \"active\"
+Scope in OpenTelemetry defines which span is considered "active"
 within a given thread or execution context.
 
 -   `context.makeCurrent()` returns a Scope object, setting the context as thread-local. This context can be retrieved via `Context.current()`.
@@ -191,7 +191,7 @@ applications.
 ### 2.1.5. Events
 
 Events are timestamped messages that provide a more granular view of
-what happened within a span\'s lifetime. They can be used to mark
+what happened within a span's lifetime. They can be used to mark
 significant moments, record errors, or capture specific data points
 during an operation.
 
@@ -199,7 +199,7 @@ during an operation.
 
 -   **Timestamped:** Every event is associated with a specific timestamp, indicating when it occurred within the span.
 
--   **Name:** Each event has a descriptive name that summarizes what happened (e.g., \"Cache hit,\" \"Database query started,\" \"Error\").
+-   **Name:** Each event has a descriptive name that summarizes what happened (e.g., "Cache hit," "Database query started," "Error").
 
 -   **Attributes (Optional):** Events can also include key-value attributes to provide additional context, similar to span attributes.
 
@@ -248,20 +248,20 @@ Context.taskWrapping(Executors.newFixedThreadPool(1));
 for transmission over a network, typically using HTTP headers. This can be used to write to StringBuilder or other output.
 
 -   **gRPC Integration for Ozone:** For gRPC communications in Ozone, trace context can be encoded into a string and embedded within a
-Proto field (e.g., \"traceId\"). The receiving server can then decode this string back into a `Context` object to continue the
+Proto field (e.g., "traceId"). The receiving server can then decode this string back into a `Context` object to continue the
 trace using `W3CTraceContextPropagator`.
 
 ### 2.1.7. Trace Failure Handling
 
 Failures within a traced operation can be recorded within the span by
 setting its status. The `SpanStatus` enum provides predefined states like
-`OK`, `ERROR`, and `UNSET`. Setting the status explicitly marks the span\'s
+`OK`, `ERROR`, and `UNSET`. Setting the status explicitly marks the span's
 outcome, which is critical for quick identification of issues in tracing
 UIs. `UNSET` status is treated as success.
 
 Normally below can be done to report failure:
 
-1.  **Adding Events:** `span.addEvent(\"Failure has occurred\" + ex.getMessage)` can be used to log a specific failure
+1.  **Adding Events:** `span.addEvent("Failure has occurred" + ex.getMessage)` can be used to log a specific failure
 event with a descriptive message. This is timestamped information when failure occurred.
 
 2.  **Setting Status:** `span.setStatus(StatusCode.ERROR)` explicitly marks the span as having encountered an error.
@@ -334,7 +334,7 @@ span1.end() → Sends span information to Collector (2)
 The current tracing implementation in Ozone initiates traces for:
 
 -   Every remote call from the Ozone client and shell.
--   Ozone Manager\'s `get blocks` calls to SCM.
+-   Ozone Manager's `get blocks` calls to SCM.
 -   Remote calls from the Ozone client to DataNode for put block.
 
 This approach often results in disjoint traces or limited hierarchical
@@ -427,18 +427,18 @@ These `ozone.tracing` configurations can be dynamically updated for Ozone Manage
 # 6. Tracing Support for Client
 
 The Ozone client needs the flexibility to either initiate a new span or continue an existing application-level trace by creating a child span.
-A specific scenario arises when the Ozone client should only trace if it\'s explicitly enabled to continue an application\'s existing trace.
+A specific scenario arises when the Ozone client should only trace if it's explicitly enabled to continue an application's existing trace.
 
 -   **Application with Active Trace:**
-    -   The Ozone client checks for an active span from the application\'s context.
-    -   If an active span is found, the Ozone client continues that trace as a child span, using the application\'s existing trace context.
+    -   The Ozone client checks for an active span from the application's context.
+    -   If an active span is found, the Ozone client continues that trace as a child span, using the application's existing trace context.
 -   **Application Without Active Trace:**
     -   If the application has not initiated a trace, the Ozone client will not create a new trace independently when `ozone.tracing.enabled` is false.
 
 Typically, `ozone.tracing.enabled` is `false`, indicating that no tracing should occur by default. However, for Ozone clients, dynamically
-updating this configuration based on the application\'s implementation is often not feasible.
+updating this configuration based on the application's implementation is often not feasible.
 
-To address this, the Ozone client will leverage the application\'s tracer to continue tracing as a child span.
+To address this, the Ozone client will leverage the application's tracer to continue tracing as a child span.
 This specific behavior will be controlled by an additional flag:
 
 -   `ozone.tracing.client.application-aware` (default: true)
