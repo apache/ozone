@@ -30,13 +30,17 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FL
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
@@ -47,6 +51,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.Sets;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -223,6 +228,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .transferSnapshotData(anySet(), any(), anySet(), any(), any(), anyMap());
+    doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(any(), anyBoolean());
   }
 
   @ParameterizedTest
@@ -436,6 +444,53 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         assertTrue(containsNonSstFile, "SST File is not expected");
       }
     }
+  }
+
+
+  /**
+   * SCENARIO:
+   * 1. Initially: S1->S2->S3 snapshots exist, snapshotPaths = {S1, S2, S3}
+   * 2. S3 gets purged (deleted from live OM metadata)
+   * 3. Checkpoint is created (locked point-in-time state without S3)
+   * 4. Problem: Old code uses stale snapshotPaths {S1, S2, S3} from step 1
+   * 5. Solution: Re-read snapshotPaths from checkpoint = {S1, S2} (no S3)
+   * This test verifies that checkpoint metadata manager (post-fix) excludes
+   * purged snapshots, while live metadata manager (pre-fix) would include them.
+   */
+  @Test
+  public void testSnapshotPathsReReadFromCheckpointAfterPurge() throws Exception {
+    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
+    // Create test snapshot paths
+    Path s1Path = Paths.get("snapshots").resolve("s1");
+    Path s2Path = Paths.get("snapshots").resolve("s2");
+    Path s3Path = Paths.get("snapshots").resolve("s3");
+    // Mock live metadata manager - includes S3 (before purge)
+    OMMetadataManager liveMetadataManager = mock(OMMetadataManager.class);
+    Set<Path> liveSnapshotPaths = Sets.newHashSet(s1Path, s2Path, s3Path);
+    // Mock checkpoint metadata manager - S3 purged
+    OmMetadataManagerImpl checkpointMetadataManager = mock(OmMetadataManagerImpl.class);
+    Set<Path> checkpointSnapshotPaths = Sets.newHashSet(s1Path, s2Path); // No S3!
+    OMDBCheckpointServletInodeBasedXfer spy = spy(servlet);
+    // Mock getSnapshotDirs to return different results based on metadata manager type
+    doAnswer(invocation -> {
+      OMMetadataManager manager = invocation.getArgument(0);
+      if (manager == liveMetadataManager) {
+        return liveSnapshotPaths;  // Live manager sees S3
+      } else {
+        return checkpointSnapshotPaths;  // Checkpoint manager doesn't see S3
+      }
+    }).when(spy).getSnapshotDirs(any(OMMetadataManager.class));
+
+    Set<Path> liveResult = spy.getSnapshotDirs(liveMetadataManager);
+    assertEquals(3, liveResult.size());
+    assertTrue(liveResult.contains(s3Path), "Live manager should see S3");
+    Set<Path> checkpointResult = spy.getSnapshotDirs(checkpointMetadataManager);
+    assertEquals(2, checkpointResult.size());
+    assertTrue(checkpointResult.contains(s1Path), "Checkpoint should include S1");
+    assertTrue(checkpointResult.contains(s2Path), "Checkpoint should include S2");
+    assertFalse(checkpointResult.contains(s3Path), "Checkpoint should NOT include S3 (purged)");
+    assertNotEquals(liveResult.size(), checkpointResult.size(),
+        "Checkpoint and live snapshot paths should differ");
   }
 
   private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
