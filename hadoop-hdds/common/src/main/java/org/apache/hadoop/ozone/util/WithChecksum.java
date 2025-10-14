@@ -15,24 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.common.report;
+package org.apache.hadoop.ozone.util;
 
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 
 /**
- * IncrementalReportSender is an interface to send ICRs.
- * @param <T>
+ * Represents a generic interface for objects capable of generating or providing
+ * a checksum value.
  */
-public interface IncrementalReportSender<T> {
-  /**
-   * Send ICR immediately (triggers heartbeat).
-   */
-  void send(T t) throws StorageContainerException;
-  
-  /**
-   * Send deferred ICR to next scheduled heartbeat (no immediate trigger).
-   */
-  default void sendDeferred(T t) throws StorageContainerException {
-    send(t);
-  }
+public interface WithChecksum<T extends WithChecksum<T>> extends CopyObject<T> {
+  String getChecksum();
 }
