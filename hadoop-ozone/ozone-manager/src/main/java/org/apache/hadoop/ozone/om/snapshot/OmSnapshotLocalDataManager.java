@@ -147,7 +147,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return versionNodeMap.get(snapshotId).getVersionNode(version);
   }
 
-  private boolean addSnapshotVersionMeta(UUID snapshotId, SnapshotVersionsMeta snapshotVersionsMeta)
+  private void addSnapshotVersionMeta(UUID snapshotId, SnapshotVersionsMeta snapshotVersionsMeta)
       throws IOException {
     if (!versionNodeMap.containsKey(snapshotId)) {
       for (LocalDataVersionNode versionNode : snapshotVersionsMeta.getSnapshotVersions().values()) {
@@ -166,9 +166,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         }
       }
       versionNodeMap.put(snapshotId, snapshotVersionsMeta);
-      return true;
     }
-    return false;
   }
 
   public void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
@@ -231,10 +229,10 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   static final class LocalDataVersionNode {
-    private UUID snapshotId;
-    private int version;
-    private UUID previousSnapshotId;
-    private int previousSnapshotVersion;
+    private final UUID snapshotId;
+    private final int version;
+    private final UUID previousSnapshotId;
+    private final int previousSnapshotVersion;
 
     private LocalDataVersionNode(UUID snapshotId, int version, UUID previousSnapshotId, int previousSnapshotVersion) {
       this.previousSnapshotId = previousSnapshotId;
@@ -248,7 +246,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       if (!(o instanceof LocalDataVersionNode)) {
         return false;
       }
-
       LocalDataVersionNode that = (LocalDataVersionNode) o;
       return version == that.version && previousSnapshotVersion == that.previousSnapshotVersion &&
           snapshotId.equals(that.snapshotId) && Objects.equals(previousSnapshotId, that.previousSnapshotId);
