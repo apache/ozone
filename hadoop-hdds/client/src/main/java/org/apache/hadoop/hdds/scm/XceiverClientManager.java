@@ -247,7 +247,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   public static class ScmClientConfig {
 
     @Config(key = "max.size",
-        defaultValue = "256",
+        defaultValue = "4096",
         tags = {OZONE, PERFORMANCE},
         description =
             "Controls the maximum number of connections that are cached via"
