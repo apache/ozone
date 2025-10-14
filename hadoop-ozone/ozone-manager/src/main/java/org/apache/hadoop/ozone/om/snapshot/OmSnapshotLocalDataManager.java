@@ -365,12 +365,17 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   @Override
-  public void close() {
-    if (snapshotLocalDataSerializer != null) {
-      try {
-        snapshotLocalDataSerializer.close();
-      } catch (IOException e) {
-        LOG.error("Failed to close snapshot local data serializer", e);
+  public synchronized void close() {
+    if (!closed) {
+      if (snapshotLocalDataSerializer != null) {
+        try {
+          snapshotLocalDataSerializer.close();
+        } catch (IOException e) {
+          LOG.error("Failed to close snapshot local data serializer", e);
+        }
+      }
+      if (scheduler != null) {
+        scheduler.close();
       }
     }
   }
