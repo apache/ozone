@@ -18,9 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc.read;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -33,8 +31,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.om.TestBucket;
 import org.junit.jupiter.api.Test;
 
@@ -46,6 +42,12 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
    * Run the tests as a single test method to avoid needing a new mini-cluster
    * for each test.
    */
+
+  private String keyName = getNewKeyName();
+  private int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
+  byte[] inputData;
+  private TestBucket bucket;
+
  // @ContainerLayoutTestInfo.ContainerTest
   @Test
   void testAll() throws Exception {
@@ -58,10 +60,10 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       OzoneConfiguration copy = new OzoneConfiguration(conf);
       copy.setFromObject(clientConfig);
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
-        //updateConfig(layout);
-        TestBucket bucket = TestBucket.newBuilder(client).build();
-
-        testReadKeyFully(bucket);
+        bucket = TestBucket.newBuilder(client).build();
+        inputData = bucket.writeRandomBytes(keyName, dataLength);
+        testReadKeyFully();
+        testSeek();
       //  testBufferRelease(bucket);
       //  testCloseReleasesBuffers(bucket);
       //  testReadEmptyBlock(bucket);
@@ -73,11 +75,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
    * Test to verify that data read from blocks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
    */
-  private void testReadKeyFully(TestBucket bucket) throws Exception {
-    String keyName = getNewKeyName();
-    int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
-    byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);
-
+  private void testReadKeyFully() throws Exception {
     // Read the data fully into a large enough byte array
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
       byte[] readData = new byte[dataLength];
@@ -106,6 +104,28 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
         assertEquals(inputData[i], readBuf.get(),
             "Read data is not same as written data at index " + i);
       }
+    }
+  }
+
+  private void testSeek() throws IOException {
+    java.util.Random random = new java.util.Random();
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
+      for (int i = 0; i < 100; i++) {
+        int position = random.nextInt(dataLength);
+        keyInputStream.seek(position);
+        int b = keyInputStream.read();
+        assertEquals(inputData[position], (byte) b, "Read data is not same as written data at index " + position);
+      }
+      StreamBlockInputStream blockStream = (StreamBlockInputStream) keyInputStream.getPartStreams().get(0);
+      long length = blockStream.getLength();
+      blockStream.seek(10);
+      long position = blockStream.getPos();
+      assertThrows(IOException.class, () -> blockStream.seek(length + 1),
+          "Seek beyond block length should throw exception");
+      assertThrows(IOException.class, () -> blockStream.seek(-1),
+          "Seeking to a negative position should throw exception");
+      assertEquals(position, blockStream.getPos(),
+          "Position should not change after failed seek attempts");
     }
   }
 

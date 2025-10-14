@@ -510,7 +510,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   // TODO This is currently not doing retries or timeouts
   @Override
-  public void streamRead(ContainerCommandRequestProto request,
+  public ClientCallStreamObserver<ContainerCommandRequestProto> streamRead(ContainerCommandRequestProto request,
       StreamObserver<ContainerCommandResponseProto> streamObserver) throws IOException {
 
     DatanodeDetails dn = topologyAwareRead ?
@@ -532,6 +532,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       StreamObserver<ContainerCommandRequestProto> requestObserver =  stub.send(streamObserver);
       requestObserver.onNext(request);
       requestObserver.onCompleted();
+      return (ClientCallStreamObserver<ContainerCommandRequestProto>) requestObserver;
     } catch (Exception e) {
       LOG.error("Failed to start streaming read to DataNode {}", dn, e);
       throw new IOException("Streaming read failed", e);

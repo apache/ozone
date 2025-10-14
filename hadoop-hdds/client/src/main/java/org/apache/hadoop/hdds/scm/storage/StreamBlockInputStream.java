@@ -27,7 +27,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
@@ -52,6 +51,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +64,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     implements Seekable, CanUnbuffer, ByteBufferReadable {
   private static final Logger LOG = LoggerFactory.getLogger(StreamBlockInputStream.class);
   private static final int EOF = -1;
+  private static final Throwable CANCELLED_EXCEPTION = new Throwable("Cancelled by client");
 
   private final BlockID blockID;
   private final long blockLength;
@@ -147,7 +148,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   }
 
   private boolean dataAvailableToRead() throws IOException {
-    // TODO - closed stream here? The stream should be closed automatically when the last chunk is read.
     if (position >= blockLength) {
       return false;
     }
@@ -166,18 +166,38 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   @Override
   public synchronized void seek(long pos) throws IOException {
-    throw new NotImplementedException("seek is not implemented.");
+    if (pos < 0) {
+      throw new IOException("Cannot seek to negative offset");
+    }
+    if (pos > blockLength) {
+      throw new IOException("Cannot seek after the end of the block");
+    }
+    if (pos == position) {
+      return;
+    }
+    closeStream();
+    position = pos;
   }
 
   @Override
+  // The seekable interface indicates that seekToNewSource should seek to a new source of the data,
+  // ie a different datanode. This is not supported for now.
   public synchronized boolean seekToNewSource(long l) throws IOException {
     return false;
   }
 
   @Override
   public synchronized void unbuffer() {
-    // TODO
     releaseClient();
+  }
+
+  private void closeStream() {
+    if (streamingReader != null) {
+      streamingReader.cancel();
+      streamingReader = null;
+    }
+    initialized = false;
+    buffer = null;
   }
 
   private void setPipeline(Pipeline pipeline) throws IOException {
@@ -223,20 +243,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-  private void reinitialize() throws IOException {
-    // TODO: close streaming reader
-    //       set initialized false
-    //       call initialize()
-  }
-
   private void initialize() throws IOException {
     if (initialized) {
       return;
     }
     acquireClient();
     streamingReader = new StreamingReader();
-    ContainerProtocolCalls.readBlock(
-        xceiverClient, position, blockID, tokenRef.get(), pipelineRef.get().getReplicaIndexes(), streamingReader);
+    ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver =
+        ContainerProtocolCalls.readBlock(xceiverClient, position, blockID, tokenRef.get(),
+            pipelineRef.get().getReplicaIndexes(), streamingReader);
+    streamingReader.setRequestObserver(requestObserver);
     initialized = true;
   }
 
@@ -250,6 +266,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   protected synchronized void releaseClient() {
     if (xceiverClientFactory != null && xceiverClient != null) {
+      closeStream();
       xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
       xceiverClient = null;
     }
@@ -307,7 +324,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   @Override
   public synchronized void close() throws IOException {
-    LOG.info("+++ Closing StreamBlockInputStream for block {}", blockID);
     releaseClient();
     xceiverClientFactory = null;
   }
@@ -340,6 +356,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     private final AtomicBoolean completed = new AtomicBoolean(false);
     private final AtomicBoolean failed = new AtomicBoolean(false);
     private final AtomicReference<Throwable> error = new AtomicReference<>();
+    private ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
 
     // TODO: Semaphore in XceiverClient which count open stream?
     public boolean hasNext() {
@@ -385,43 +402,69 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       }
       if (position > readBlock.getOffset()) {
         int offset = (int)(position - readBlock.getOffset());
-        buffer.position(offset);
+        buf.position(offset);
       }
       return buf;
+    }
+
+    public void setRequestObserver(
+        ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver) {
+      this.requestObserver = requestObserver;
+    }
+
+    /**
+     * By calling cancel, the client will send a cancel signal to the server, which will stop sending more data and
+     * cause the onError() to be called in this observer with a CANCELLED exception.
+     */
+    public void cancel() {
+      if (requestObserver != null) {
+        requestObserver.cancel("Cancelled by client", CANCELLED_EXCEPTION);
+        completed.set(true);
+      }
     }
 
     @Override
     public synchronized void onNext(ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto) {
       try {
-        LOG.info("+++ Called onNext");
         ReadBlockResponseProto readBlock = containerCommandResponseProto.getReadBlock();
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
           ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
           Checksum.verifyChecksum(data, checksumData, 0);
         }
-        responseQueue.put(readBlock);
-        LOG.info("+++ Processed {} read responses for block {}", processed, blockID);
+        offerToQueue(readBlock);
       } catch (OzoneChecksumException e) {
         // Calling onError will cancel the stream on the server side and also set the failure state.
-        onError(e);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
         onError(e);
       }
     }
 
     @Override
     public synchronized void onError(Throwable throwable) {
-      LOG.info("+++ Called onError");
-      failed.set(true);
-      error.set(throwable);
+      if (throwable == CANCELLED_EXCEPTION) {
+        completed.set(true);
+      } else {
+        failed.set(true);
+        error.set(throwable);
+      }
     }
 
     @Override
     public synchronized void onCompleted() {
-      LOG.info("+++ Called onCompleted");
       completed.set(true);
+    }
+
+    private void offerToQueue(ReadBlockResponseProto item) {
+      while (!completed.get() && !failed.get()) {
+        try {
+          if (responseQueue.offer(item, 100, TimeUnit.MILLISECONDS)) {
+            return;
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return;
+        }
+      }
     }
   }
 
