@@ -377,6 +377,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     }
     Path snapshotDbDir = Paths.get(newDbDir.toPath().toString(), OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
+    deleteWalFiles(snapshotDbDir);
     assertTrue(Files.exists(snapshotDbDir));
     String value = getValueFromSnapshotDeleteTable(dummyKey, snapshotDbDir.toString());
     assertNotNull(value);
@@ -433,6 +434,16 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
       if (!expectOnlySstFiles) {
         assertTrue(containsNonSstFile, "SST File is not expected");
+      }
+    }
+  }
+
+  private static void deleteWalFiles(Path snapshotDbDir) throws IOException {
+    try (Stream<Path> filesInTarball = Files.list(snapshotDbDir)) {
+      List<Path> files = filesInTarball.filter(p -> p.toString().contains(".log"))
+          .collect(Collectors.toList());
+      for (Path p : files) {
+        Files.delete(p);
       }
     }
   }
