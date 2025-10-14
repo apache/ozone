@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
@@ -917,7 +918,7 @@ public final class ContainerProtocolCalls  {
    * @throws IOException if there is an I/O error while performing the call
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  public static void readBlock(
+  public static ClientCallStreamObserver<ContainerCommandRequestProto> readBlock(
       XceiverClientSpi xceiverClient, long offset, BlockID blockID, Token<? extends TokenIdentifier> token,
       Map<DatanodeDetails, Integer> replicaIndexes, StreamObserver<ContainerCommandResponseProto> streamObserver)
       throws IOException {
@@ -931,7 +932,7 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-    readBlock(xceiverClient, blockID, builder, readBlockRequest, xceiverClient.getPipeline().getFirstNode(),
+    return readBlock(xceiverClient, blockID, builder, readBlockRequest, xceiverClient.getPipeline().getFirstNode(),
         replicaIndexes, streamObserver);
    // tryEachDatanode(xceiverClient.getPipeline(),
    //     d -> readBlock(xceiverClient,
@@ -939,8 +940,8 @@ public final class ContainerProtocolCalls  {
    //     d -> toErrorMessage(blockID, d));
   }
 
-  private static void readBlock(XceiverClientSpi xceiverClient, BlockID blockID,
-      ContainerCommandRequestProto.Builder builder, ReadBlockRequestProto.Builder readBlockBuilder,
+  private static ClientCallStreamObserver<ContainerCommandRequestProto> readBlock(XceiverClientSpi xceiverClient,
+      BlockID blockID, ContainerCommandRequestProto.Builder builder, ReadBlockRequestProto.Builder readBlockBuilder,
       DatanodeDetails datanode, Map<DatanodeDetails, Integer> replicaIndexes,
       StreamObserver<ContainerCommandResponseProto> streamObserver) throws IOException {
     final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
@@ -952,6 +953,6 @@ public final class ContainerProtocolCalls  {
     final ContainerCommandRequestProto request = builder
         .setDatanodeUuid(datanode.getUuidString())
         .setReadBlock(readBlockBuilder).build();
-    xceiverClient.streamRead(request, streamObserver);
+    return xceiverClient.streamRead(request, streamObserver);
   }
 }
