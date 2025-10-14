@@ -164,10 +164,11 @@ public final class OmSnapshotLocalDataYaml {
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
         Map<Object, Object> nodes = constructMapping(mnode);
-        UUID snapId = UUID.fromString((String) nodes.get(OzoneConsts.OM_SLD_SNAP_ID));
-        UUID prevSnapId = UUID.fromString((String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID));
-        OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapId, Collections.emptyList(),
-            prevSnapId);
+        final String snapIdStr = (String) nodes.get(OzoneConsts.OM_SLD_SNAP_ID);
+        UUID snapId = UUID.fromString(snapIdStr);
+        final String prevSnapIdStr = (String) nodes.get(OzoneConsts.OM_SLD_PREV_SNAP_ID);
+        UUID prevSnapId = prevSnapIdStr != null ? UUID.fromString(prevSnapIdStr) : null;
+        OmSnapshotLocalData snapshotLocalData = new OmSnapshotLocalData(snapId, Collections.emptyList(), prevSnapId);
 
         // Set version from YAML
         Integer version = (Integer) nodes.get(OzoneConsts.OM_SLD_VERSION);
