@@ -288,6 +288,8 @@ public class OzoneManagerServiceProviderImpl
     // lastUpdatedSeqNumber number for any of the OM task, then just run reprocess for such tasks.
     ReconTaskStatusUpdater deltaTaskStatusUpdater =
         taskStatusUpdaterManager.getTaskStatusUpdater(OmSnapshotTaskName.OmDeltaRequest.name());
+    ReconTaskStatusUpdater fullSnapshotReconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(
+        OmSnapshotTaskName.OmSnapshotRequest.name());
 
     Map<String, ReconOmTask> reconOmTaskMap = reconTaskController.getRegisteredTasks()
         .entrySet()
@@ -315,7 +317,21 @@ public class OzoneManagerServiceProviderImpl
           });
       LOG.info("Re-initializing all tasks again (not just above failed delta tasks) based on updated OM DB snapshot " +
           "and last updated sequence number because fresh staging DB needs to be created for all tasks.");
-      reconTaskController.reInitializeTasks(omMetadataManager, null);
+      // Reinitialize tasks that are listening.
+      LOG.info("Queueing async reinitialization event instead of blocking call at startup.");
+      ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
+          ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+      if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
+        LOG.error(
+            "Failed to queue reinitialization event for manual trigger at startup (result: {}), " +
+                "failing the snapshot operation", result);
+        metrics.incrNumSnapshotRequestsFailed();
+        fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+        fullSnapshotReconTaskUpdater.recordRunCompletion();
+        reconContext.updateHealthStatus(new AtomicBoolean(false));
+        reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+        throw new RuntimeException("Failed to queue reinitialization event for manual trigger at startup");
+      }
     }
     startSyncDataFromOM(initialDelay);
     LOG.info("Ozone Manager Service Provider is started.");
@@ -882,9 +898,11 @@ public class OzoneManagerServiceProviderImpl
         metrics.incrNumSnapshotRequestsFailed();
         fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
         fullSnapshotReconTaskUpdater.recordRunCompletion();
+        reconContext.updateHealthStatus(new AtomicBoolean(false));
+        reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
         return;
       }
-      
+
       // Update health status in ReconContext
       reconContext.updateHealthStatus(new AtomicBoolean(true));
       reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
