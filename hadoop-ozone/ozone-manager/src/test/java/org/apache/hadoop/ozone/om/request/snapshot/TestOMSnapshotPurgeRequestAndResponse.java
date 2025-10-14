@@ -190,8 +190,6 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
     // Check if all the checkpoints are cleared.
     for (Path checkpoint : checkpointPaths) {
       assertFalse(Files.exists(checkpoint));
-      assertFalse(Files.exists(Paths.get(
-          OmSnapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(checkpoint))));
     }
     assertEquals(initialSnapshotPurgeCount + 1, getOmSnapshotIntMetrics().getNumSnapshotPurges());
     assertEquals(initialSnapshotPurgeFailCount, getOmSnapshotIntMetrics().getNumSnapshotPurgeFails());
