@@ -70,7 +70,6 @@ public class SnapshotDefragService extends BackgroundService
   private static final int DEFRAG_CORE_POOL_SIZE = 1;
 
   private final OzoneManager ozoneManager;
-  private SnapshotChainManager snapshotChainManager;
   private final AtomicLong runCount = new AtomicLong(0);
 
   // Number of snapshots to be processed in a single iteration
@@ -204,8 +203,8 @@ public class SnapshotDefragService extends BackgroundService
     }
 
     // Get the SnapshotChainManager to iterate through the global snapshot chain
-    // Set this each time the task runs just in case OmMetadataManager is restarted
-    snapshotChainManager = ((OmMetadataManagerImpl) ozoneManager.getMetadataManager()).getSnapshotChainManager();
+    final SnapshotChainManager snapshotChainManager =
+        ((OmMetadataManagerImpl) ozoneManager.getMetadataManager()).getSnapshotChainManager();
 
     final Table<String, SnapshotInfo> snapshotInfoTable =
         ozoneManager.getMetadataManager().getSnapshotInfoTable();
@@ -256,7 +255,7 @@ public class SnapshotDefragService extends BackgroundService
 
         // Get snapshot through SnapshotCache for proper locking
         try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshotSupplier =
-                 snapshotManager.get().getSnapshot(snapshotTableKey, false)) {
+                 snapshotManager.get().getSnapshot(snapshotToDefrag.getSnapshotId())) {
 
           OmSnapshot omSnapshot = snapshotSupplier.get();
 
