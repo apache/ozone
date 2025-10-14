@@ -47,6 +47,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -340,6 +341,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     private final UUID snapshotId;
     private final Lock lock;
     private final OmSnapshotLocalData snapshotLocalData;
+    private final Lock previousLock;
     private OmSnapshotLocalData previousSnapshotLocalData;
     private volatile boolean isPreviousSnapshotLoaded = false;
     private final UUID resolvedPreviousSnapshotId;
@@ -361,10 +363,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         UUID snapshotIdToBeResolved) throws IOException {
       this.snapshotId = snapshotId;
       this.lock = lock;
-      Pair<OmSnapshotLocalData, UUID> pair = initialize(lock, snapshotId, snapshotIdToBeResolved,
+      Triple<OmSnapshotLocalData, Lock, UUID> pair = initialize(lock, snapshotId, snapshotIdToBeResolved,
           snapshotLocalDataSupplier);
-      this.snapshotLocalData = pair.getKey();
-      this.resolvedPreviousSnapshotId = pair.getValue();
+      this.snapshotLocalData = pair.getLeft();
+      this.previousLock = pair.getMiddle();
+      this.resolvedPreviousSnapshotId = pair.getRight();
       this.previousSnapshotLocalData = null;
       this.isPreviousSnapshotLoaded = false;
     }
@@ -387,7 +390,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
      * Intializer the snapshot local data by acquiring the lock on the snapshot and also acquires a read lock on the
      * snapshotId to be resolved by iterating through the chain of previous snapshot ids.
      */
-    private Pair<OmSnapshotLocalData, UUID> initialize(Lock snapIdLock, UUID snapId, UUID toResolveSnapshotId,
+    private Triple<OmSnapshotLocalData, Lock, UUID> initialize(Lock snapIdLock, UUID snapId, UUID toResolveSnapshotId,
         CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier)
         throws IOException {
       snapIdLock.lock();
@@ -408,7 +411,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
               "to snapshotId " + ssLocalData.getSnapshotId() + ". Expected snapshotId " + snapId);
         }
         // Get previous snapshotId and acquire read lock on the id. We need to do this outside the loop instead of a
-        // do while loop since the nodes that may be added may not be present in the graph so it may not be possible
+        // do while loop since the nodes that need be added may not be present in the graph so it may not be possible
         // to iterate through the chain.
         UUID previousSnapshotId = ssLocalData.getPreviousSnapshotId();
         if (previousSnapshotId != null) {
@@ -508,7 +511,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         } else {
           toResolveSnapshotId = null;
         }
-        return Pair.of(ssLocalData, toResolveSnapshotId);
+        return Triple.of(ssLocalData,
+            previousReadLockAcquired != null ? previousReadLockAcquired.readLock() : null ,
+            toResolveSnapshotId);
       } catch (IOException e) {
         // Release all the locks in case of an exception and rethrow the exception.
         if (previousReadLockAcquired != null && haspreviousReadLockAcquiredAcquired) {
@@ -521,8 +526,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
     @Override
     public void close() {
-      if (resolvedPreviousSnapshotId != null) {
-        locks.get(resolvedPreviousSnapshotId).readLock().unlock();
+      if (previousLock != null) {
+        previousLock.unlock();
       }
       lock.unlock();
     }
@@ -608,7 +613,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       if (tmpFileExists) {
         tmpFileExists = !tmpFile.delete();
       }
-      if (!tmpFileExists) {
+      if (tmpFileExists) {
         throw new IOException("Unable to delete tmp file " + tmpFilePath);
       }
       snapshotLocalDataSerializer.save(new File(tmpFilePath), super.snapshotLocalData);
