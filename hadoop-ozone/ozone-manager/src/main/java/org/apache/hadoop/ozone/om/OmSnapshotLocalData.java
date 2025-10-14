@@ -190,6 +190,10 @@ public class OmSnapshotLocalData implements Checksum<OmSnapshotLocalData> {
     this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles));
   }
 
+  public void removeVersionSSTFileInfos(int snapshotVersion) {
+    this.versionSstFileInfos.remove(snapshotVersion);
+  }
+
   /**
    * Returns the checksum of the YAML representation.
    * @return checksum

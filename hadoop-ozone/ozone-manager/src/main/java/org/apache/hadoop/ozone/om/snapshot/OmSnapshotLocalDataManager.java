@@ -21,6 +21,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -41,6 +43,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -48,6 +52,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -55,6 +60,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData.VersionMeta;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
@@ -73,6 +79,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataManager.class);
   private static final String SNAPSHOT_LOCAL_DATA_LOCK_RESOURCE_NAME = "snapshot_local_data_lock";
+  private static final String LOCAL_DATA_MANAGER_SERVICE_NAME = "OmSnapshotLocalDataManagerService";
 
   private final ObjectSerializer<OmSnapshotLocalData> snapshotLocalDataSerializer;
   private final MutableGraph<LocalDataVersionNode> localDataGraph;
@@ -82,8 +89,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   private final ReadWriteLock fullLock;
   // Locks should be always acquired by iterating through the snapshot chain to avoid deadlocks.
   private Striped<ReadWriteLock> locks;
+  private Map<UUID, Integer> snapshotToBeCheckedForOrphans;
+  private Scheduler scheduler;
+  private volatile boolean closed;
 
   public OmSnapshotLocalDataManager(OMMetadataManager omMetadataManager,
+      SnapshotChainManager snapshotChainManager,
       OzoneConfiguration configuration) throws IOException {
     this.localDataGraph = GraphBuilder.directed().build();
     this.omMetadataManager = omMetadataManager;
@@ -97,7 +108,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     };
     this.versionNodeMap = new HashMap<>();
     this.fullLock = new ReentrantReadWriteLock();
-    init(configuration);
+    init(configuration, snapshotChainManager);
   }
 
   @VisibleForTesting
@@ -186,7 +197,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
   private void addSnapshotVersionMeta(UUID snapshotId, SnapshotVersionsMeta snapshotVersionsMeta)
       throws IOException {
-    if (!versionNodeMap.containsKey(snapshotId)) {
+    if (!versionNodeMap.containsKey(snapshotId) && !snapshotVersionsMeta.getSnapshotVersions().isEmpty()) {
       for (LocalDataVersionNode versionNode : snapshotVersionsMeta.getSnapshotVersions().values()) {
         validateVersionAddition(versionNode);
         LocalDataVersionNode previousVersionNode = versionNode.previousSnapshotId == null ? null :
@@ -226,10 +237,28 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  private void init(OzoneConfiguration configuration) throws IOException {
+  private void increamentOrphanCheckCount(UUID snapshotId) {
+    this.snapshotToBeCheckedForOrphans.compute(snapshotId, (k, v) -> v == null ? 1 : v + 1);
+  }
+
+  private void decreamentOrphanCheckCount(UUID snapshotId, int decrementBy) {
+    this.snapshotToBeCheckedForOrphans.compute(snapshotId, (k, v) -> {
+      if (v == null) {
+        return null;
+      }
+      int newValue = v - decrementBy;
+      if (newValue <= 0) {
+        return null;
+      }
+      return newValue;
+    });
+  }
+
+  private void init(OzoneConfiguration configuration, SnapshotChainManager snapshotChainManager) throws IOException {
     boolean fair = configuration.getBoolean(OZONE_MANAGER_FAIR_LOCK, OZONE_MANAGER_FAIR_LOCK_DEFAULT);
     String stripeSizeKey = OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX + SNAPSHOT_LOCAL_DATA_LOCK_RESOURCE_NAME;
     int size = configuration.getInt(stripeSizeKey, OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT);
+    this.snapshotToBeCheckedForOrphans = new ConcurrentHashMap<>();
     this.locks = SimpleStriped.readWriteLock(size, fair);
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
@@ -250,6 +279,48 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             + " : " + actualPath + ". " + "Expected: " + expectedPath);
       }
       addVersionNodeWithDependents(snapshotLocalData);
+    }
+    for (UUID snapshotId : versionNodeMap.keySet()) {
+      increamentOrphanCheckCount(snapshotId);
+    }
+    this.scheduler = new Scheduler(LOCAL_DATA_MANAGER_SERVICE_NAME, true, 1);
+    long snapshotLocalDataManagerServiceInterval = configuration.getTimeDuration(
+        OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL, OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    this.scheduler.scheduleWithFixedDelay(
+        () -> {
+          try {
+            checkOrphanSnapshotVersions(omMetadataManager, snapshotChainManager);
+          } catch (IOException e) {
+            LOG.error("Exception while checking orphan snapshot versions", e);
+          }
+        }, snapshotLocalDataManagerServiceInterval, snapshotLocalDataManagerServiceInterval, TimeUnit.MILLISECONDS);
+  }
+
+  private void checkOrphanSnapshotVersions(OMMetadataManager metadataManager, SnapshotChainManager chainManager)
+      throws IOException {
+    for (Map.Entry<UUID, Integer> entry : snapshotToBeCheckedForOrphans.entrySet()) {
+      UUID snapshotId = entry.getKey();
+      int countBeforeCheck = entry.getValue();
+      try (WritableOmSnapshotLocalDataProvider snapshotLocalDataProvider =
+               new WritableOmSnapshotLocalDataProvider(snapshotId)) {
+        OmSnapshotLocalData snapshotLocalData = snapshotLocalDataProvider.getSnapshotLocalData();
+        boolean isSnapshotPurged = SnapshotUtils.isSnapshotPurged(chainManager, metadataManager, snapshotId);
+        for (Map.Entry<Integer, LocalDataVersionNode> integerLocalDataVersionNodeEntry : getVersionNodeMap().get(
+            snapshotId).getSnapshotVersions().entrySet()) {
+          LocalDataVersionNode versionEntry = integerLocalDataVersionNodeEntry.getValue();
+          // remove the version entry if it is not referenced by any other snapshot version node. For version node 0
+          // a newly created snapshot version could point to a version with indegree 0 in such a scenario a version 0
+          // node can be only deleted if the snapshot is also purged.
+          boolean toRemove = localDataGraph.inDegree(versionEntry) == 0
+              && (versionEntry.getVersion() != 0 || isSnapshotPurged);
+          if (toRemove) {
+            snapshotLocalData.removeVersionSSTFileInfos(versionEntry.getVersion());
+          }
+        }
+        snapshotLocalDataProvider.commit();
+      }
+      decreamentOrphanCheckCount(snapshotId, countBeforeCheck);
     }
   }
 
@@ -373,16 +444,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return snapshotLocalData;
     }
 
-    public OmSnapshotLocalData getPreviousSnapshotLocalData() throws IOException {
+    public synchronized OmSnapshotLocalData getPreviousSnapshotLocalData() throws IOException {
       if (!isPreviousSnapshotLoaded) {
-        synchronized (this) {
-          if (!isPreviousSnapshotLoaded) {
-            File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(resolvedPreviousSnapshotId));
-            this.previousSnapshotLocalData = resolvedPreviousSnapshotId == null ? null :
-                snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
-            this.isPreviousSnapshotLoaded = true;
-          }
-        }
+        File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(resolvedPreviousSnapshotId));
+        this.previousSnapshotLocalData = resolvedPreviousSnapshotId == null ? null :
+            snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+        this.isPreviousSnapshotLoaded = true;
       }
       return previousSnapshotLocalData;
     }
@@ -593,6 +660,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersionNode));
         localDataGraph.removeNode(existingVersionNode);
       }
+
       // Add the nodes to be added in the graph and map.
       addSnapshotVersionMeta(snapshotId, snapshotVersions);
       // Reconnect all the predecessors for existing nodes.
@@ -601,19 +669,36 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           localDataGraph.putEdge(predecessor, entry.getValue());
         }
       }
+      // The previous snapshotId could have become an orphan entry or could have orphan versions.
+      if (existingSnapVersions != null) {
+        increamentOrphanCheckCount(existingSnapVersions.getPreviousSnapshotId());
+      }
     }
 
     public synchronized void commit() throws IOException {
       SnapshotVersionsMeta localDataVersionNodes = validateModification(super.snapshotLocalData);
       String filePath = getSnapshotLocalPropertyYamlPath(super.snapshotId);
-      String tmpFilePath = filePath + ".tmp";
-      File tmpFile = new File(tmpFilePath);
-      if (tmpFile.exists()) {
-        tmpFile.delete();
+      File snapshotLocalDataFile = new File(filePath);
+      if (!localDataVersionNodes.getSnapshotVersions().isEmpty()) {
+        String tmpFilePath = filePath + ".tmp";
+        File tmpFile = new File(tmpFilePath);
+        boolean tmpFileExists = tmpFile.exists();
+        if (tmpFileExists) {
+          tmpFileExists = !tmpFile.delete();
+        }
+        if (!tmpFileExists) {
+          throw new IOException("Unable to delete tmp file " + tmpFilePath);
+        }
+        snapshotLocalDataSerializer.save(new File(tmpFilePath), super.snapshotLocalData);
+        FileUtils.moveFile(tmpFile, new File(filePath), StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
+      } else if (snapshotLocalDataFile.exists()) {
+        LOG.info("Deleting Yaml file corresponding to snapshotId: {} in path : {}",
+             super.snapshotId, snapshotLocalDataFile.getAbsolutePath());
+        if (snapshotLocalDataFile.delete()) {
+          throw new IOException("Unable to delete file " + snapshotLocalDataFile.getAbsolutePath());
+        }
       }
-      snapshotLocalDataSerializer.save(new File(tmpFilePath), super.snapshotLocalData);
-      FileUtils.moveFile(tmpFile, new File(filePath), StandardCopyOption.ATOMIC_MOVE,
-          StandardCopyOption.REPLACE_EXISTING);
       upsertNode(super.snapshotId, localDataVersionNodes);
     }
 

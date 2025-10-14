@@ -631,6 +631,11 @@ public final class OzoneConfigKeys {
       OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT =
       TimeUnit.DAYS.toMillis(30);
 
+  public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL =
+      "ozone.om.snapshot.local.data.manager.service.interval";
+
+  public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL_DEFAULT = "5m";
+
   public static final String
       OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL =
       "ozone.om.snapshot.compaction.dag.prune.daemon.run.interval";
