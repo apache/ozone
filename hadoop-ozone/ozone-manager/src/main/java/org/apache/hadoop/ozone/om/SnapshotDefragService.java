@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_GC_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
@@ -132,13 +131,13 @@ public class SnapshotDefragService extends BackgroundService
         ozoneManager.getConfiguration(), snapshotInfo);
 
     try {
-      // Read YAML metadata using the correct API
-      File yamlFile = new File(snapshotPath + ".yaml");
-      OmSnapshotLocalDataYaml yamlData =
-          OmSnapshotLocalDataYaml.getFromYamlFile(ozoneManager.getOmSnapshotManager(), yamlFile);
+      // Read snapshot local metadata from YAML
+      OmSnapshotLocalData snapshotLocalData = ozoneManager.getOmSnapshotManager()
+          .getSnapshotLocalDataManager()
+          .getOmSnapshotLocalData(snapshotInfo);
 
       // Check if snapshot needs compaction (defragmentation)
-      boolean needsDefrag = yamlData.getNeedsDefrag();
+      boolean needsDefrag = snapshotLocalData.getNeedsDefrag();
       LOG.debug("Snapshot {} needsDefragmentation field value: {}",
           snapshotInfo.getName(), needsDefrag);
 
