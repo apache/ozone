@@ -437,8 +437,9 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     OmBucketInfo updatedBucketInfo = purgeDirectory || numberOfSubEntries > 0 ?
         omMetadataManager.getBucketTable().getSkipCache(bucketKey) : omMetadataManager.getBucketTable().get(bucketKey);
     long currentSnapshotUsedNamespace = updatedBucketInfo.getSnapshotUsedNamespace();
-    assertEquals(purgeUsedNamespaceCountBeforePurge - (purgeDirectory ? 1 : 0) + 2 * numberOfSubEntries,
-        currentSnapshotUsedNamespace);
+
+    assertEquals(purgeUsedNamespaceCountBeforePurge - (purgeDirectory ? 1 : 0) +
+            (2 * (long)numberOfSubEntries), currentSnapshotUsedNamespace);
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = fromSnapshot ? ozoneManager.getOmSnapshotManager()
         .getSnapshot(snapshotInfo.getSnapshotId()) : null) {
       OMMetadataManager metadataManager = fromSnapshot ? snapshot.get().getMetadataManager() :
