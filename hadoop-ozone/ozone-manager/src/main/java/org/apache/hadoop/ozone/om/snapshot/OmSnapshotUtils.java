@@ -47,6 +47,7 @@ public final class OmSnapshotUtils {
   public static final String DATA_SUFFIX = "txt";
   private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotUtils.class);
+  public static final String PATH_SEPARATOR = "/";
 
   private OmSnapshotUtils() { }
 
@@ -150,7 +151,7 @@ public final class OmSnapshotUtils {
           }
           String from = parts[1];
           String to = parts[0];
-          String omDbPrefix = OM_DB_NAME + "/";
+          String omDbPrefix = OM_DB_NAME + PATH_SEPARATOR;
           if (to.startsWith(omDbPrefix)) {
             to = to.substring(omDbPrefix.length());
           }
