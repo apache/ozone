@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-import React, {useRef, useState} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import moment from 'moment';
-import axios, {AxiosError} from 'axios';
 import {Table} from 'antd';
 
-import {AxiosGetHelper, cancelRequests, PromiseAllSettledGetHelper} from '@/utils/axiosRequestHelper';
-import {byteToSize, checkResponseError, removeDuplicatesAndMerge, showDataFetchError} from '@/utils/common';
+import {byteToSize, removeDuplicatesAndMerge, showDataFetchError} from '@/utils/common';
+import {useApiData, fetchData} from '@/v2/hooks/useAPIData.hook';
 
 import {Acl} from '@/v2/types/acl.types';
 
@@ -124,12 +123,30 @@ type MetadataState = {
 const NUMetadata: React.FC<MetadataProps> = ({
   path = '/'
 }) => {
-  const [loading, setLoading] = useState<boolean>(false);
   const [state, setState] = useState<MetadataState>([]);
-  const keyMetadataSummarySignal = useRef<AbortController>();
-  const cancelMetadataSignal = useRef<AbortController>();
+  const [isProcessingData, setIsProcessingData] = useState<boolean>(false);
+  // Individual API calls that resolve together
+  const summaryAPI = useApiData<SummaryResponse>(
+    `/api/v1/namespace/summary?path=${path}`,
+    {} as SummaryResponse,
+    {
+      retryAttempts: 2,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+  
+  const quotaAPI = useApiData<any>(
+    `/api/v1/namespace/quota?path=${path}`,
+    {},
+    {
+      retryAttempts: 2,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+  
+  const loading = summaryAPI.loading || quotaAPI.loading || isProcessingData;
 
-  const getObjectInfoMapping = React.useCallback((summaryResponse) => {
+  const getObjectInfoMapping = useCallback((summaryResponse) => {
     const data: MetadataState = [];
     /**
      * We are creating a specific set of keys under Object Info response
@@ -230,25 +247,15 @@ const NUMetadata: React.FC<MetadataProps> = ({
     return data;
   }, [path]);
 
-  function loadData(path: string) {
-    const { requests, controller } = PromiseAllSettledGetHelper([
-      `/api/v1/namespace/summary?path=${path}`,
-      `/api/v1/namespace/quota?path=${path}`
-    ], cancelMetadataSignal.current);
-    cancelMetadataSignal.current = controller;
-
-    requests.then(axios.spread((
-      nsSummaryResponse: Awaited<Promise<any>>,
-      quotaApiResponse: Awaited<Promise<any>>,
-    ) => {
-      checkResponseError([nsSummaryResponse, quotaApiResponse]);
-      const summaryResponse: SummaryResponse = nsSummaryResponse.value?.data ?? {};
-      const quotaResponse = quotaApiResponse.value?.data ?? {};
+  // Process data when both APIs complete
+  const processMetadata = useCallback(async (summaryResponse: SummaryResponse, quotaResponse: any) => {
+    setIsProcessingData(true);
+    try {
       let data: MetadataState = [];
       let summaryResponsePresent = true;
       let quotaResponsePresent = true;
 
-      // Error checks
+      // Error checks for summary response
       if (summaryResponse.status === 'INITIALIZING') {
         summaryResponsePresent = false;
         showDataFetchError(`The metadata is currently initializing. Please wait a moment and try again later`);
@@ -269,30 +276,27 @@ const NUMetadata: React.FC<MetadataProps> = ({
 
         // If the entity is a Key then fetch the Key metadata only
         if (summaryResponse.type === 'KEY') {
-          const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(
-            `/api/v1/namespace/usage?path=${path}&replica=true`,
-            keyMetadataSummarySignal.current
-          );
-          keyMetadataSummarySignal.current = metadataNewController;
-          metadataRequest.then(response => {
+          try {
+            const usageResponse: any = await fetchData(`/api/v1/namespace/usage?path=${path}&replica=true`);
             data.push(...[{
               key: 'File Size',
-              value: byteToSize(response.data.size, 3)
+              value: byteToSize(usageResponse.size, 3)
             }, {
               key: 'File Size With Replication',
-              value: byteToSize(response.data.sizeWithReplica, 3)
+              value: byteToSize(usageResponse.sizeWithReplica, 3)
             }, {
               key: 'Creation Time',
               value: moment(summaryResponse.objectInfo.creationTime).format('ll LTS')
             }, {
               key: 'Modification Time',
               value: moment(summaryResponse.objectInfo.modificationTime).format('ll LTS')
-            }])
+            }]);
             setState(data);
-          }).catch(error => {
-            showDataFetchError(error.toString());
-          });
-          return;
+            return;
+          } catch (error) {
+            showDataFetchError(error);
+            return;
+          }
         }
 
         data = removeDuplicatesAndMerge(data, getObjectInfoMapping(summaryResponse), 'key');
@@ -307,7 +311,7 @@ const NUMetadata: React.FC<MetadataProps> = ({
           numBucket: 'Buckets',
           numDir: 'Total Directories',
           numKey: 'Total Keys'
-        }
+        };
         Object.keys(countStats).forEach((key: string) => {
           if (countStats[key as keyof CountStats] !== undefined
             && countStats[key as keyof CountStats] !== -1) {
@@ -316,9 +320,10 @@ const NUMetadata: React.FC<MetadataProps> = ({
               value: countStats[key as keyof CountStats]
             });
           }
-        })
+        });
       }
 
+      // Error checks for quota response
       if (quotaResponse.state === 'INITIALIZING') {
         quotaResponsePresent = false;
         showDataFetchError(`The quota is currently initializing. Please wait a moment and try again later`);
@@ -342,26 +347,27 @@ const NUMetadata: React.FC<MetadataProps> = ({
           data.push({
             key: 'Quota Used',
             value: byteToSize(quotaResponse.used, 3)
-          })
+          });
         }
       }
+      
       setState(data);
-    })).catch(error => {
-      showDataFetchError((error as AxiosError).toString());
-    });
-  }
+    } catch (error) {
+      showDataFetchError(error);
+    } finally {
+      setIsProcessingData(false);
+    }
+  }, [path, getObjectInfoMapping]);
 
-  React.useEffect(() => {
-    setLoading(true);
-    loadData(path);
-    setLoading(false);
-
-    return (() => {
-      cancelRequests([
-        cancelMetadataSignal.current!,
-      ]);
-    })
-  }, [path]);
+  // Coordinate API calls - process data when both calls complete
+  useEffect(() => {
+    if (!summaryAPI.loading && !quotaAPI.loading && 
+        summaryAPI.data && quotaAPI.data &&
+        summaryAPI.lastUpdated && quotaAPI.lastUpdated) {
+      processMetadata(summaryAPI.data, quotaAPI.data);
+    }
+  }, [summaryAPI.loading, quotaAPI.loading, summaryAPI.data, quotaAPI.data, 
+      summaryAPI.lastUpdated, quotaAPI.lastUpdated, processMetadata]);
 
   return (
     <Table

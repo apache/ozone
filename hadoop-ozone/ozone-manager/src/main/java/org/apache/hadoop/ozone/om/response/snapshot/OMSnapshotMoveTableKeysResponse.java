@@ -45,6 +45,7 @@ import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
 
+  private long bucketId;
   private SnapshotInfo fromSnapshot;
   private SnapshotInfo nextSnapshot;
   private List<SnapshotMoveKeyInfos> deletedKeys;
@@ -53,6 +54,7 @@ public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
 
   public OMSnapshotMoveTableKeysResponse(OMResponse omResponse,
                                          @Nonnull SnapshotInfo fromSnapshot, SnapshotInfo nextSnapshot,
+                                         long bucketId,
                                          List<SnapshotMoveKeyInfos> deletedKeys,
                                          List<SnapshotMoveKeyInfos> deletedDirs,
                                          List<HddsProtos.KeyValue> renamedKeys) {
@@ -62,6 +64,7 @@ public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
     this.deletedKeys = deletedKeys;
     this.renameKeysList = renamedKeys;
     this.deletedDirs = deletedDirs;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -146,7 +149,7 @@ public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
     }
     // Add deleted keys to the next snapshot or active DB.
     for (SnapshotMoveKeyInfos deletedKeyInfo : deletedKeys) {
-      RepeatedOmKeyInfo omKeyInfos = createMergedRepeatedOmKeyInfoFromDeletedTableEntry(deletedKeyInfo,
+      RepeatedOmKeyInfo omKeyInfos = createMergedRepeatedOmKeyInfoFromDeletedTableEntry(deletedKeyInfo, bucketId,
           metadataManager);
       metadataManager.getDeletedTable().putWithBatch(batchOp, deletedKeyInfo.getKey(), omKeyInfos);
     }

@@ -393,13 +393,14 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     String bucket1Name = getBucketName();
     String bucket2Name = getBucketName() + "0";
     String volumeName = getVolumeName();
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket2Name, getOmMetadataManager());
+    OmBucketInfo bucketInfo = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket2Name,
+        getOmMetadataManager());
 
     // 2. Add and delete keys from both buckets
     OmKeyInfo key1 = addKeyInBucket(volumeName, bucket1Name, "key1", 100L);
     OmKeyInfo key2 = addKeyInBucket(volumeName, bucket2Name, "key2", 200L);
-    deleteKey(key1);
-    deleteKey(key2);
+    deleteKey(key1, bucketInfo.getObjectID());
+    deleteKey(key2, bucketInfo.getObjectID());
 
     // 3. Verify deletedTable contains both deleted keys (2 rows)
     assertEquals(2, getOmMetadataManager().countRowsInTable(deletedTable));
@@ -467,10 +468,10 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     getOmMetadataManager().getStore().commitBatchOperation(getBatchOperation());
   }
 
-  private void deleteKey(OmKeyInfo keyInfo) throws IOException {
+  private void deleteKey(OmKeyInfo keyInfo, long bucketId) throws IOException {
     String ozoneKey = getOmMetadataManager().getOzoneKey(keyInfo.getVolumeName(),
         keyInfo.getBucketName(), keyInfo.getKeyName());
-    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(keyInfo);
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(keyInfo, bucketId);
     getOmMetadataManager().getDeletedTable().putWithBatch(getBatchOperation(),
         ozoneKey, repeatedOmKeyInfo);
     getOmMetadataManager().getStore().commitBatchOperation(getBatchOperation());

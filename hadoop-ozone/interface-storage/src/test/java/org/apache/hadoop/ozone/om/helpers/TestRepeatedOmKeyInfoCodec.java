@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -95,12 +96,14 @@ public class TestRepeatedOmKeyInfoCodec
   public void testWithoutPipeline(int chunkNum) throws IOException {
     final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getCodec(true);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
-    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey);
+    long bucketId = Time.now();
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey, bucketId);
 
     byte[] rawData = codec.toPersistedFormat(repeatedOmKeyInfo);
     RepeatedOmKeyInfo key = codec.fromPersistedFormat(rawData);
     assertNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
         .getLocationList().get(0).getPipeline());
+    assertEquals(bucketId, key.getBucketId());
   }
 
   public void testCompatibility(int chunkNum) throws IOException {
@@ -109,16 +112,19 @@ public class TestRepeatedOmKeyInfoCodec
     final Codec<RepeatedOmKeyInfo> codecWithPipeline
         = RepeatedOmKeyInfo.getCodec(false);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
-    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey);
+    long bucketId = Time.now();
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey, bucketId);
     byte[] rawData = codecWithPipeline.toPersistedFormat(repeatedOmKeyInfo);
     RepeatedOmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
     assertNotNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
         .getLocationList().get(0).getPipeline());
+    assertEquals(bucketId, key.getBucketId());
   }
 
   public void threadSafety() throws InterruptedException {
     final OmKeyInfo key = getKeyInfo(1);
-    final RepeatedOmKeyInfo subject = new RepeatedOmKeyInfo(key);
+    long bucketId = Time.now();
+    final RepeatedOmKeyInfo subject = new RepeatedOmKeyInfo(key, bucketId);
     final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getCodec(true);
     final AtomicBoolean failed = new AtomicBoolean();
     ThreadFactory threadFactory = new ThreadFactoryBuilder().setDaemon(true)

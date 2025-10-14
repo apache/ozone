@@ -25,7 +25,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -43,9 +42,6 @@ public final class OzoneManagerSyncMetrics {
 
   @Metric(about = "Number of OM snapshot requests that failed.")
   private MutableCounterLong numSnapshotRequestsFailed;
-
-  @Metric(about = "OM snapshot request latency")
-  private MutableRate snapshotRequestLatency;
 
   @Metric(about = "Number of OM delta requests made by Recon that had " +
       "at least 1 update in the response.")
@@ -86,10 +82,6 @@ public final class OzoneManagerSyncMetrics {
     this.numSnapshotRequestsFailed.incr();
   }
 
-  public void updateSnapshotRequestLatency(long time) {
-    this.snapshotRequestLatency.add(time);
-  }
-
   public void incrNumDeltaRequestsFailed() {
     this.numSnapshotRequestsFailed.incr();
   }
@@ -112,10 +104,6 @@ public final class OzoneManagerSyncMetrics {
 
   public long getNumSnapshotRequestsFailed() {
     return numSnapshotRequestsFailed.value();
-  }
-
-  MutableRate getSnapshotRequestLatency() {
-    return snapshotRequestLatency;
   }
 
   public long getNumDeltaRequestsFailed() {

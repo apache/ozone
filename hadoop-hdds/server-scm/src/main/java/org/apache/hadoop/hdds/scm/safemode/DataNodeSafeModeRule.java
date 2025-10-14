@@ -36,8 +36,6 @@ import org.apache.hadoop.hdds.server.events.TypedEvent;
 public class DataNodeSafeModeRule extends
     SafeModeExitRule<NodeRegistrationContainerReport> {
 
-  private static final String NAME = "DataNodeSafeModeRule";
-
   // Min DataNodes required to exit safe mode.
   private int requiredDns;
   private int registeredDns = 0;
@@ -49,7 +47,7 @@ public class DataNodeSafeModeRule extends
       ConfigurationSource conf,
       NodeManager nodeManager,
       SCMSafeModeManager manager) {
-    super(manager, NAME, eventQueue);
+    super(manager, eventQueue);
     requiredDns = conf.getInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);

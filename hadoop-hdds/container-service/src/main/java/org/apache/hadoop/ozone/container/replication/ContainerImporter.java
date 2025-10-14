@@ -60,7 +60,7 @@ public class ContainerImporter {
   private final ContainerController controller;
   private final MutableVolumeSet volumeSet;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
-  private final long containerSize;
+  private final long defaultContainerSize;
 
   private final Set<Long> importContainerProgress
       = Collections.synchronizedSet(new HashSet<>());
@@ -76,7 +76,7 @@ public class ContainerImporter {
     this.controller = controller;
     this.volumeSet = volumeSet;
     this.volumeChoosingPolicy = volumeChoosingPolicy;
-    containerSize = (long) conf.getStorageSize(
+    defaultContainerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     this.conf = conf;
@@ -146,11 +146,12 @@ public class ContainerImporter {
     }
   }
 
-  HddsVolume chooseNextVolume() throws IOException {
+  HddsVolume chooseNextVolume(long spaceToReserve) throws IOException {
     // Choose volume that can hold both container in tmp and dest directory
+    LOG.debug("Choosing volume to reserve space : {}", spaceToReserve);
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        getDefaultReplicationSpace());
+        spaceToReserve);
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)
@@ -174,6 +175,33 @@ public class ContainerImporter {
   }
 
   public long getDefaultReplicationSpace() {
-    return HddsServerUtil.requiredReplicationSpace(containerSize);
+    return HddsServerUtil.requiredReplicationSpace(defaultContainerSize);
+  }
+
+  /**
+   * Calculate required replication space based on actual container size.
+   *
+   * @param actualContainerSize the actual size of the container in bytes
+   * @return required space for replication (2 * actualContainerSize)
+   */
+  public long getRequiredReplicationSpace(long actualContainerSize) {
+    return HddsServerUtil.requiredReplicationSpace(actualContainerSize);
+  }
+
+  /**
+   * Get space to reserve for replication. If replicateSize is provided,
+   * calculate required space based on that, otherwise return default
+   * replication space.
+   *
+   * @param replicateSize the size of the container to replicate in bytes
+   *                      (can be null)
+   * @return space to reserve for replication
+   */
+  public long getSpaceToReserve(Long replicateSize) {
+    if (replicateSize != null) {
+      return getRequiredReplicationSpace(replicateSize);
+    } else {
+      return getDefaultReplicationSpace();
+    }
   }
 }

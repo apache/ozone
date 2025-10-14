@@ -49,7 +49,7 @@ public class ListLimitOptions {
     private int limit;
 
     @CommandLine.Option(names = {"--all", "-a"},
-        description = "List all results",
+        description = "List all results (without pagination limit)",
         defaultValue = "false")
     private boolean all;
   }

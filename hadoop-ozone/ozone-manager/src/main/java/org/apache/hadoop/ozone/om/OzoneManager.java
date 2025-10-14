@@ -362,6 +362,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static final AuditLogger SYSTEMAUDIT = new AuditLogger(
       AuditLoggerType.OMSYSTEMLOGGER);
 
+  private static final String AUDIT_PARAM_LEADER_ID = "leaderId";
+  private static final String AUDIT_PARAM_TERM = "term";
+  private static final String AUDIT_PARAM_LAST_APPLIED_INDEX = "lastAppliedIndex";
+
   private static final String OM_DAEMON = "om";
   private static final String NO_LEADER_ERROR_MESSAGE =
           "There is no leader among the Ozone Manager servers. If this message " +
@@ -3011,6 +3015,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setQuotaInBytes(realBucket.getQuotaInBytes())
             .setQuotaInNamespace(realBucket.getQuotaInNamespace())
             .setUsedBytes(realBucket.getUsedBytes())
+            .setSnapshotUsedBytes(realBucket.getSnapshotUsedBytes())
+            .setSnapshotUsedNamespace(realBucket.getSnapshotUsedNamespace())
             .setUsedNamespace(realBucket.getUsedNamespace())
             .addAllMetadata(realBucket.getMetadata())
             .setBucketLayout(realBucket.getBucketLayout())
@@ -4134,6 +4140,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         exitManager.exitSystem(1, errorMsg, e, LOG);
       }
     }
+    buildDBCheckpointInstallAuditLog(leaderId, term, lastAppliedIndex);
 
     // Delete the backup DB
     try {
@@ -4158,6 +4165,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
         (Time.monotonicNow() - startTime));
     return newTermIndex;
+  }
+
+  private void buildDBCheckpointInstallAuditLog(String leaderId, long term, long lastAppliedIndex) {
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(AUDIT_PARAM_LEADER_ID, leaderId);
+    auditMap.put(AUDIT_PARAM_TERM, String.valueOf(term));
+    auditMap.put(AUDIT_PARAM_LAST_APPLIED_INDEX, String.valueOf(lastAppliedIndex));
+    SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.DB_CHECKPOINT_INSTALL, auditMap));
   }
 
   private void stopTrashEmptier() {

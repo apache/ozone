@@ -19,7 +19,6 @@ package org.apache.ozone.erasurecode.rawcoder;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.ozone.erasurecode.rawcoder.util.DumpUtil;
@@ -60,7 +59,7 @@ public class RSRawDecoder extends RawErasureDecoder {
 
     int numAllUnits = getNumAllUnits();
     if (getNumAllUnits() >= RSUtil.GF.getFieldSize()) {
-      throw new HadoopIllegalArgumentException(
+      throw new IllegalArgumentException(
               "Invalid getNumDataUnits() and numParityUnits");
     }
 

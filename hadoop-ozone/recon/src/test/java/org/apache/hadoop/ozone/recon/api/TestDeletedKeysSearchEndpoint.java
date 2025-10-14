@@ -519,7 +519,7 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
     omKeyInfos.add(omKeyInfo);
 
     // Create a RepeatedOmKeyInfo object with the list of OmKeyInfo
-    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(omKeyInfos);
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(omKeyInfos, 1);
 
     // Write the deleted key information to the OM metadata manager
     writeDeletedKeysToOm(reconOMMetadataManager, deletedKey, repeatedOmKeyInfo);

@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import java.io.IOException;
 import java.io.OutputStream;
 import org.apache.hadoop.fs.Syncable;
@@ -50,8 +48,7 @@ public class OzoneFSOutputStream extends OutputStream
   public void write(byte[] b, int off, int len) throws IOException {
     TracingUtil.executeInNewSpan("OzoneFSOutputStream.write",
         () -> {
-          Span span = GlobalTracer.get().activeSpan();
-          span.setTag("length", len);
+          TracingUtil.getActiveSpan().setAttribute("length", len);
           outputStream.write(b, off, len);
         });
   }

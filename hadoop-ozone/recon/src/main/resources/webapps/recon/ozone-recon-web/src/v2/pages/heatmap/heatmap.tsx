@@ -15,15 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import React, { ChangeEvent, useRef, useState } from 'react';
+import React, { ChangeEvent, useState, useEffect, useCallback } from 'react';
 import moment, { Moment } from 'moment';
 import { Button, Menu, Input, Dropdown, DatePicker, Form, Result, Spin } from 'antd';
 import { MenuProps } from 'antd/es/menu';
 import { DownOutlined } from '@ant-design/icons';
 
-
 import { showDataFetchError } from '@/utils/common';
-import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import * as CONSTANTS from '@/v2/constants/heatmap.constants';
 import { HeatmapChild, HeatmapResponse, HeatmapState, InputPathState, InputPathValidTypes, IResponseError } from '@/v2/types/heatmap.types';
 import HeatmapPlot from '@/v2/components/plots/heatmapPlot';
@@ -34,17 +33,22 @@ import { useLocation } from 'react-router-dom';
 let minSize = Infinity;
 let maxSize = 0;
 
-const Heatmap: React.FC<{}> = () => {
+const DEFAULT_HEATMAP_RESPONSE: HeatmapResponse = {
+  label: '',
+  path: '',
+  children: [],
+  size: 0,
+  maxAccessCount: 0,
+  minAccessCount: 0
+};
 
+const DEFAULT_DISABLED_FEATURES_RESPONSE = {
+  data: []
+};
+
+const Heatmap: React.FC<{}> = () => {
   const [state, setState] = useState<HeatmapState>({
-    heatmapResponse: {
-      label: '',
-      path: '',
-      children: [],
-      size: 0,
-      maxAccessCount: 0,
-      minAccessCount: 0
-    },
+    heatmapResponse: DEFAULT_HEATMAP_RESPONSE,
     entityType: CONSTANTS.ENTITY_TYPES[0],
     date: CONSTANTS.TIME_PERIODS[0]
   });
@@ -55,15 +59,64 @@ const Heatmap: React.FC<{}> = () => {
     helpMessage: ''
   });
 
-  const [isLoading, setLoading] = useState<boolean>(false);
+  const [searchPath, setSearchPath] = useState<string>(CONSTANTS.ROOT_PATH);
   const [treeEndpointFailed, setTreeEndpointFailed] = useState<boolean>(false);
 
   const location = useLocation();
-  const cancelSignal = useRef<AbortController>();
-  const cancelDisabledFeatureSignal = useRef<AbortController>();
+  const [isHeatmapEnabled, setIsHeatmapEnabled] = useState<boolean>((location?.state as any)?.isHeatmapEnabled);
 
-  const [isHeatmapEnabled, setIsHeatmapEnabled] = useState<boolean>(location?.state?.isHeatmapEnabled);
+  // Use the modern hooks pattern for heatmap data - only trigger on searchPath change
+  const heatmapData = useApiData<HeatmapResponse>(
+    isHeatmapEnabled && state.date && searchPath && state.entityType
+      ? `/api/v1/heatmap/readaccess?startDate=${state.date}&path=${searchPath}&entityType=${state.entityType}`
+      : '',
+    DEFAULT_HEATMAP_RESPONSE,
+    {
+      retryAttempts: 2,
+      onError: (error: any) => {
+        if (error.response?.status !== 404) {
+          showDataFetchError(error.message.toString());
+        }
+        setTreeEndpointFailed(true);
+        setInputPathState(prevState => ({
+          ...prevState,
+          inputPath: CONSTANTS.ROOT_PATH
+        }));
+        setSearchPath(CONSTANTS.ROOT_PATH);
+      }
+    }
+  );
 
+  // Use the modern hooks pattern for disabled features
+  const disabledFeaturesData = useApiData<{ data: string[] }>(
+    '/api/v1/features/disabledFeatures',
+    DEFAULT_DISABLED_FEATURES_RESPONSE,
+    {
+      retryAttempts: 2,
+      onError: (error: any) => showDataFetchError(error)
+    }
+  );
+
+  // Process heatmap data when it changes
+  useEffect(() => {
+    if (heatmapData.data && heatmapData.data.label !== '') {
+      minSize = heatmapData.data.minAccessCount;
+      maxSize = heatmapData.data.maxAccessCount;
+      const heatmapResponse: HeatmapResponse = updateSize(heatmapData.data);
+      setState(prevState => ({
+        ...prevState,
+        heatmapResponse: heatmapResponse
+      }));
+      setTreeEndpointFailed(false);
+    }
+  }, [heatmapData.data]);
+
+  // Process disabled features data when it changes
+  useEffect(() => {
+    if (disabledFeaturesData.data && disabledFeaturesData.data.data) {
+      setIsHeatmapEnabled(!disabledFeaturesData.data.data.includes('HEATMAP'));
+    }
+  }, [disabledFeaturesData.data]);
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
@@ -84,7 +137,9 @@ const Heatmap: React.FC<{}> = () => {
   }
 
   function handleSubmit() {
-    updateHeatmap(inputPathState.inputPath, state.entityType, state.date);
+    if (isHeatmapEnabled && state.date && inputPathState.inputPath && state.entityType) {
+      setSearchPath(inputPathState.inputPath);
+    }
   }
 
   const normalize = (min: number, max: number, size: number) => {
@@ -117,17 +172,17 @@ const Heatmap: React.FC<{}> = () => {
 
       // hide block at key,volume,bucket level if size accessCount and maxAccessCount are zero apply normalized size only for leaf level
       if ((obj as HeatmapChild)?.size === 0 && (obj as HeatmapChild)?.accessCount === 0) {
-        obj['normalizedSize'] = 0;
+        (obj as any)['normalizedSize'] = 0;
       } else if ((obj as HeatmapResponse)?.size === 0 && (obj as HeatmapResponse)?.maxAccessCount === 0) {
-        obj['normalizedSize'] = 0;
+        (obj as any)['normalizedSize'] = 0;
       }
       else if (obj?.size === 0 && ((obj as HeatmapChild)?.accessCount >= 0 || (obj as HeatmapResponse).maxAccessCount >= 0)) {
-        obj['normalizedSize'] = 1;
+        (obj as any)['normalizedSize'] = 1;
         obj.size = 0;
       }
       else {
         const newSize = normalize(minSize, maxSize, obj.size);
-        obj['normalizedSize'] = newSize;
+        (obj as any)['normalizedSize'] = newSize;
       }
     }
 
@@ -137,88 +192,17 @@ const Heatmap: React.FC<{}> = () => {
     return obj as HeatmapResponse;
   };
 
-  const updateHeatmap = (path: string, entityType: string, date: string | number) => {
-    // Only perform requests if the heatmap is enabled
-    if (isHeatmapEnabled) {
-      setLoading(true);
-      // We want to ensure these are not empty as they will be passed as path params
-      if (date && path && entityType) {
-        const { request, controller } = AxiosGetHelper(
-          `/api/v1/heatmap/readaccess?startDate=${date}&path=${path}&entityType=${entityType}`,
-          cancelSignal.current
-        );
-        cancelSignal.current = controller;
-
-        request.then(response => {
-          if (response?.status === 200) {
-            minSize = response.data.minAccessCount;
-            maxSize = response.data.maxAccessCount;
-            const heatmapResponse: HeatmapResponse = updateSize(response.data);
-            setLoading(false);
-            setState(prevState => ({
-              ...prevState,
-              heatmapResponse: heatmapResponse
-            }));
-          } else {
-            const error = new Error((response.status).toString()) as IResponseError;
-            error.status = response.status;
-            error.message = `Failed to fetch Heatmap Response with status ${error.status}`
-            throw error;
-          }
-        }).catch(error => {
-          setLoading(false);
-          setInputPathState(prevState => ({
-            ...prevState,
-            inputPath: CONSTANTS.ROOT_PATH
-          }));
-          setTreeEndpointFailed(true);
-          if (error.response.status !== 404) {
-            showDataFetchError(error.message.toString());
-          }
-        });
-      } else {
-        setLoading(false);
-      }
-
-    }
-  }
-
   const updateHeatmapParent = (path: string) => {
     setInputPathState(prevState => ({
       ...prevState,
       inputPath: path
     }));
+    setSearchPath(path);
   }
 
   function isDateDisabled(current: Moment) {
     return current > moment() || current < moment().subtract(90, 'day');
   }
-
-  function getIsHeatmapEnabled() {
-    const disabledfeaturesEndpoint = `/api/v1/features/disabledFeatures`;
-    const { request, controller } = AxiosGetHelper(
-      disabledfeaturesEndpoint,
-      cancelDisabledFeatureSignal.current
-    )
-    cancelDisabledFeatureSignal.current = controller;
-    request.then(response => {
-      setIsHeatmapEnabled(!response?.data?.includes('HEATMAP'));
-    }).catch(error => {
-      showDataFetchError((error as Error).toString());
-    });
-  }
-
-  React.useEffect(() => {
-    // We do not know if heatmap is enabled or not, so set it
-    if (isHeatmapEnabled === undefined) {
-      getIsHeatmapEnabled();
-    }
-    updateHeatmap(inputPathState.inputPath, state.entityType, state.date);
-
-    return (() => {
-      cancelSignal.current && cancelSignal.current.abort();
-    })
-  }, [isHeatmapEnabled, state.entityType, state.date]);
 
   const handleDatePickerChange = (date: moment.MomentInput) => {
     setState(prevState => ({
@@ -249,6 +233,7 @@ const Heatmap: React.FC<{}> = () => {
 
   const { date, entityType, heatmapResponse } = state;
   const { inputPath, helpMessage, isInputPathValid } = inputPathState;
+  const loading = heatmapData.loading || disabledFeaturesData.loading;
 
   const menuCalendar = (
     <Menu
@@ -363,7 +348,7 @@ const Heatmap: React.FC<{}> = () => {
                   </div>
                 </div>
               </div>
-              {isLoading
+              {loading
                 ? <Spin size='large' />
                 : (Object.keys(heatmapResponse).length > 0 && (heatmapResponse.label !== null || heatmapResponse.path !== null))
                   ? <div id="heatmap-plot-container">

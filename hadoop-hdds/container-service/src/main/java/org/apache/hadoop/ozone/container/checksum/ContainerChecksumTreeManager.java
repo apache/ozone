@@ -32,20 +32,15 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.SimpleStriped;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -64,92 +59,20 @@ public class ContainerChecksumTreeManager {
   // Used to coordinate writes to each container's checksum file.
   // Each container ID is mapped to a stripe.
   // The file is atomically renamed into place, so readers do not need coordination.
-  private final Striped<Lock> fileLock;
+  private final Striped<Lock> fileLocks;
   private final ContainerMerkleTreeMetrics metrics;
 
   /**
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
   public ContainerChecksumTreeManager(ConfigurationSource conf) {
-    fileLock = SimpleStriped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
+    fileLocks = SimpleStriped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
         () -> new ReentrantLock(true));
     metrics = ContainerMerkleTreeMetrics.create();
   }
 
   public void stop() {
     ContainerMerkleTreeMetrics.unregister();
-  }
-
-  /**
-   * Writes the specified container merkle tree to the specified container's checksum file.
-   * The data merkle tree within the file is replaced with the {@code tree} parameter, but all other content of the
-   * file remains unchanged.
-   * Concurrent writes to the same file are coordinated internally.
-   */
-  public ContainerProtos.ContainerChecksumInfo writeContainerDataTree(ContainerData data,
-      ContainerMerkleTreeWriter tree) throws IOException {
-    long containerID = data.getContainerID();
-    ContainerProtos.ContainerChecksumInfo checksumInfo = null;
-    Lock writeLock = getLock(containerID);
-    writeLock.lock();
-    try {
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
-
-      ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
-          tree::toProto);
-      checksumInfoBuilder
-          .setContainerID(containerID)
-          .setContainerMerkleTree(treeProto);
-      checksumInfo = checksumInfoBuilder.build();
-      write(data, checksumInfo);
-      LOG.debug("Data merkle tree for container {} updated with container checksum {}", containerID,
-          checksumToString(treeProto.getDataChecksum()));
-    } finally {
-      writeLock.unlock();
-    }
-    return checksumInfo;
-  }
-
-  /**
-   * Adds the specified blocks to the list of deleted blocks specified in the container's checksum file.
-   * All other content of the file remains unchanged.
-   * Concurrent writes to the same file are coordinated internally.
-   */
-  public void markBlocksAsDeleted(KeyValueContainerData data, Collection<Long> deletedBlockIDs) throws IOException {
-    long containerID = data.getContainerID();
-    Lock writeLock = getLock(containerID);
-    writeLock.lock();
-    try {
-      ContainerProtos.ContainerChecksumInfo.Builder checksumInfoBuilder = readOrCreate(data).toBuilder();
-
-      // Although the persisted block list should already be sorted, we will sort it here to make sure.
-      // This will automatically fix any bugs in the persisted order that may show up.
-      // TODO HDDS-13245 this conversion logic will be replaced and block checksums will be populated.
-      // Create BlockMerkleTree to wrap each input block ID.
-      List<ContainerProtos.BlockMerkleTree> deletedBlocks = deletedBlockIDs.stream()
-          .map(blockID ->
-              ContainerProtos.BlockMerkleTree.newBuilder().setBlockID(blockID).build())
-          .collect(Collectors.toList());
-      // Add the original blocks to the list.
-      deletedBlocks.addAll(checksumInfoBuilder.getDeletedBlocksList());
-      // Sort and deduplicate the list.
-      Map<Long, ContainerProtos.BlockMerkleTree> sortedDeletedBlocks = deletedBlocks.stream()
-          .collect(Collectors.toMap(ContainerProtos.BlockMerkleTree::getBlockID,
-              Function.identity(),
-              (a, b) -> a,
-              TreeMap::new));
-
-      checksumInfoBuilder
-          .setContainerID(containerID)
-          .clearDeletedBlocks()
-          .addAllDeletedBlocks(sortedDeletedBlocks.values());
-
-      write(data, checksumInfoBuilder.build());
-      LOG.debug("Deleted block list for container {} updated with {} new blocks", data.getContainerID(),
-          sortedDeletedBlocks.size());
-    } finally {
-      writeLock.unlock();
-    }
   }
 
   /**
@@ -163,15 +86,14 @@ public class ContainerChecksumTreeManager {
 
     ContainerDiffReport report = new ContainerDiffReport(thisChecksumInfo.getContainerID());
     try {
+      Preconditions.assertNotNull(thisChecksumInfo, "Datanode's checksum info is null.");
+      Preconditions.assertNotNull(peerChecksumInfo, "Peer checksum info is null.");
+      if (thisChecksumInfo.getContainerID() != peerChecksumInfo.getContainerID()) {
+        throw new StorageContainerException("Container ID does not match. Local container ID "
+            + thisChecksumInfo.getContainerID() + " , Peer container ID " + peerChecksumInfo.getContainerID(),
+            ContainerProtos.Result.CONTAINER_ID_MISMATCH);
+      }
       captureLatencyNs(metrics.getMerkleTreeDiffLatencyNS(), () -> {
-        Preconditions.assertNotNull(thisChecksumInfo, "Datanode's checksum info is null.");
-        Preconditions.assertNotNull(peerChecksumInfo, "Peer checksum info is null.");
-        if (thisChecksumInfo.getContainerID() != peerChecksumInfo.getContainerID()) {
-          throw new StorageContainerException("Container ID does not match. Local container ID "
-              + thisChecksumInfo.getContainerID() + " , Peer container ID " + peerChecksumInfo.getContainerID(),
-              ContainerProtos.Result.CONTAINER_ID_MISMATCH);
-        }
-
         compareContainerMerkleTree(thisChecksumInfo, peerChecksumInfo, report);
       });
     } catch (IOException ex) {
@@ -186,6 +108,7 @@ public class ContainerChecksumTreeManager {
       metrics.incrementCorruptChunksIdentified(report.getNumCorruptChunks());
       metrics.incrementMissingBlocksIdentified(report.getNumMissingBlocks());
       metrics.incrementMissingChunksIdentified(report.getNumMissingChunks());
+      metrics.incrementDivergedDeletedBlocksIdentified(report.getNumdivergedDeletedBlocks());
     } else {
       metrics.incrementNoRepairContainerDiffs();
     }
@@ -197,8 +120,6 @@ public class ContainerChecksumTreeManager {
                                           ContainerDiffReport report) {
     ContainerProtos.ContainerMerkleTree thisMerkleTree = thisChecksumInfo.getContainerMerkleTree();
     ContainerProtos.ContainerMerkleTree peerMerkleTree = peerChecksumInfo.getContainerMerkleTree();
-    Set<Long> thisDeletedBlockSet = getDeletedBlockIDs(thisChecksumInfo);
-    Set<Long> peerDeletedBlockSet = getDeletedBlockIDs(peerChecksumInfo);
 
     if (thisMerkleTree.getDataChecksum() == peerMerkleTree.getDataChecksum()) {
       return;
@@ -214,16 +135,7 @@ public class ContainerChecksumTreeManager {
       ContainerProtos.BlockMerkleTree peerBlockMerkleTree = peerBlockMerkleTreeList.get(peerIdx);
 
       if (thisBlockMerkleTree.getBlockID() == peerBlockMerkleTree.getBlockID()) {
-        // Matching block ID; check if the block is deleted and handle the cases;
-        // 1) If the block is deleted in both the block merkle tree, We can ignore comparing them.
-        // 2) If the block is only deleted in our merkle tree, The BG service should have deleted our
-        //    block and the peer's BG service hasn't run yet. We can ignore comparing them.
-        // 3) If the block is only deleted in peer merkle tree, we can't reconcile for this block. It might be
-        //    deleted by peer's BG service. We can ignore comparing them.
-        // TODO: HDDS-11765 - Handle missed block deletions from the deleted block ids.
-        if (!thisDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
-            !peerDeletedBlockSet.contains(thisBlockMerkleTree.getBlockID()) &&
-            thisBlockMerkleTree.getDataChecksum() != peerBlockMerkleTree.getDataChecksum()) {
+        if (thisBlockMerkleTree.getDataChecksum() != peerBlockMerkleTree.getDataChecksum()) {
           compareBlockMerkleTree(thisBlockMerkleTree, peerBlockMerkleTree, report);
         }
         thisIdx++;
@@ -233,9 +145,11 @@ public class ContainerChecksumTreeManager {
         // doesn't have. We can skip these, the peer will pick up these block when it reconciles with our merkle tree.
         thisIdx++;
       } else {
-        // Peer block's ID is smaller; record missing block if peerDeletedBlockSet doesn't contain the blockId
+        // Peer block's ID is smaller, so we do not have this block. Add it to the corresponding list of missing blocks
         // and advance peerIdx
-        if (!peerDeletedBlockSet.contains(peerBlockMerkleTree.getBlockID())) {
+        if (peerBlockMerkleTree.getDeleted()) {
+          report.addDivergedDeletedBlock(peerBlockMerkleTree);
+        } else {
           report.addMissingBlock(peerBlockMerkleTree);
         }
         peerIdx++;
@@ -245,7 +159,9 @@ public class ContainerChecksumTreeManager {
     // Step 2: Process remaining blocks in the peer list
     while (peerIdx < peerBlockMerkleTreeList.size()) {
       ContainerProtos.BlockMerkleTree peerBlockMerkleTree = peerBlockMerkleTreeList.get(peerIdx);
-      if (!peerDeletedBlockSet.contains(peerBlockMerkleTree.getBlockID())) {
+      if (peerBlockMerkleTree.getDeleted()) {
+        report.addDivergedDeletedBlock(peerBlockMerkleTree);
+      } else {
         report.addMissingBlock(peerBlockMerkleTree);
       }
       peerIdx++;
@@ -255,7 +171,48 @@ public class ContainerChecksumTreeManager {
     // us when they reconcile.
   }
 
+  /**
+   * When comparing blocks, resolve checksum conflicts using the following function:
+   * - If both blocks are live: compute the checksum from a union of the blocks' chunks
+   * - If one block is live and one is deleted: overwrite the live block with the deleted block using the checksum of
+   * the deleted block
+   * - If both blocks are deleted: use the largest checksum
+   * This should be commutative, associative, and idempotent, so that all replicas converge after a single round of
+   * reconciliation when all peers have communicated.
+   */
   private void compareBlockMerkleTree(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
+      ContainerProtos.BlockMerkleTree peerBlockMerkleTree, ContainerDiffReport report) {
+
+    boolean thisBlockDeleted = thisBlockMerkleTree.getDeleted();
+    boolean peerBlockDeleted = peerBlockMerkleTree.getDeleted();
+
+    if (thisBlockDeleted) {
+      // Our block has been deleted.
+      if (peerBlockDeleted && thisBlockMerkleTree.getDataChecksum() < peerBlockMerkleTree.getDataChecksum()) {
+        // If the peer's block is also deleted, use the largest checksum value as the winner so that the values converge
+        // since there is no data corresponding to this block.
+        report.addDivergedDeletedBlock(peerBlockMerkleTree);
+      }
+      // Else, either the peer has not deleted the block or they have a lower checksum for their deleted block.
+      // In these cases the peer needs to update their block.
+      // If the peer's block is deleted and its checksum matches ours, no update is required.
+    } else {
+      if (peerBlockDeleted) {
+        // Our block has not yet been deleted, but peer's block has been.
+        // Mark our block as deleted to bring it in sync with the peer.
+        // Our block deleting service will eventually catch up.
+        // Our container scanner will not update this deleted block in the merkle tree further even if it is still on
+        // disk so that we remain in sync with the peer.
+        // TODO HDDS-11765 Add support for deleting blocks from our replica when a peer has already deleted the block.
+        report.addDivergedDeletedBlock(peerBlockMerkleTree);
+      } else {
+        // Neither our nor peer's block is deleted. Walk the chunk list to find differences.
+        compareChunkMerkleTrees(thisBlockMerkleTree, peerBlockMerkleTree, report);
+      }
+    }
+  }
+
+  private void compareChunkMerkleTrees(ContainerProtos.BlockMerkleTree thisBlockMerkleTree,
                                       ContainerProtos.BlockMerkleTree peerBlockMerkleTree,
                                       ContainerDiffReport report) {
 
@@ -324,13 +281,24 @@ public class ContainerChecksumTreeManager {
     return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION);
   }
 
+  /**
+   * Returns true if the {@link ContainerProtos.ContainerChecksumInfo} provided is not null, and its merkle tree has a
+   * data checksum field present. Returns false otherwise, indicating a scan of the data in this container has not yet
+   * been done.
+   */
+  public static boolean hasDataChecksum(ContainerProtos.ContainerChecksumInfo checksumInfo) {
+    return checksumInfo != null &&
+        checksumInfo.hasContainerMerkleTree() &&
+        checksumInfo.getContainerMerkleTree().hasDataChecksum();
+  }
+
   @VisibleForTesting
   public static File getTmpContainerChecksumFile(ContainerData data) {
     return new File(data.getMetadataPath(), data.getContainerID() + CONTAINER_DATA_CHECKSUM_EXTENSION + ".tmp");
   }
 
   private Lock getLock(long containerID) {
-    return fileLock.get(containerID);
+    return fileLocks.get(containerID);
   }
 
   /**
@@ -349,6 +317,33 @@ public class ContainerChecksumTreeManager {
   }
 
   /**
+   * Called by the container scanner and reconciliation to update the merkle tree persisted to disk.
+   * For live (non-deleted) blocks, only those in the incoming treeWriter parameter are used.
+   * For deleted blocks, those in the incoming treeWriter are merged with those on disk.
+   */
+  public ContainerProtos.ContainerChecksumInfo updateTree(ContainerData data, ContainerMerkleTreeWriter treeWriter)
+      throws IOException {
+    return write(data, treeWriter::update);
+  }
+
+  /**
+   * Called by block deletion to update the merkle tree persisted to disk with more deleted blocks.
+   * If a block with the same ID already exists in the tree, it is overwritten as deleted with the checksum computed
+   * from the chunk checksums in the BlockData.
+   *
+   * The top level container data checksum is only updated if the existing tree on disk already has this value present.
+   * This lets the block deleting service add blocks to the tree before the scanner has reached the container, and that
+   * list of deleted blocks will not be mistaken for the list of all blocks seen in the container.
+   * See {@link #hasDataChecksum(ContainerProtos.ContainerChecksumInfo)}.
+   */
+  public void addDeletedBlocks(ContainerData data, Collection<BlockData> blocks) throws IOException {
+    write(data, existingTree -> {
+      ContainerMerkleTreeWriter treeWriter = new ContainerMerkleTreeWriter(existingTree);
+      return treeWriter.addDeletedBlocks(blocks, existingTree.hasDataChecksum());
+    });
+  }
+
+  /**
    * Reads the checksum info of the specified container. If the tree file with the information does not exist, or there
    * is an exception trying to read the file, an empty instance is returned.
    */
@@ -364,35 +359,53 @@ public class ContainerChecksumTreeManager {
   }
 
   /**
-   * Callers should have acquired the write lock before calling this method.
+   * Performs a read-modify-write cycle on the container's checksum file.
+   * 1. The lock is taken
+   * 2. The file's contents are read into memory
+   * 3. A new set of file contents are created using the specified merge function
+   * 4. The new contents are written back to the file
+   * 5. The lock is released
    */
-  private void write(ContainerData data, ContainerProtos.ContainerChecksumInfo checksumInfo) throws IOException {
-    // Make sure callers filled in required fields before writing.
-    Preconditions.assertTrue(checksumInfo.hasContainerID());
+  private ContainerProtos.ContainerChecksumInfo write(ContainerData data, Function<ContainerProtos.ContainerMerkleTree,
+      ContainerProtos.ContainerMerkleTree> mergeFunction) throws IOException {
+    long containerID = data.getContainerID();
+    Lock fileLock = getLock(containerID);
+    fileLock.lock();
+    try {
+      ContainerProtos.ContainerChecksumInfo currentChecksumInfo = readOrCreate(data);
+      ContainerProtos.ContainerChecksumInfo.Builder newChecksumInfoBuilder = currentChecksumInfo.toBuilder();
 
-    File checksumFile = getContainerChecksumFile(data);
-    File tmpChecksumFile = getTmpContainerChecksumFile(data);
+      // Merge the incoming merkle tree with the content already on the disk.
+      ContainerProtos.ContainerMerkleTree treeProto = captureLatencyNs(metrics.getCreateMerkleTreeLatencyNS(),
+          () -> mergeFunction.apply(currentChecksumInfo.getContainerMerkleTree()));
+      ContainerProtos.ContainerChecksumInfo newChecksumInfo = newChecksumInfoBuilder
+          .setContainerMerkleTree(treeProto)
+          .setContainerID(containerID)
+          .build();
 
-    try (OutputStream tmpOutputStream = Files.newOutputStream(tmpChecksumFile.toPath())) {
-      // Write to a tmp file and rename it into place.
-      captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(), () -> {
-        checksumInfo.writeTo(tmpOutputStream);
-        Files.move(tmpChecksumFile.toPath(), checksumFile.toPath(), ATOMIC_MOVE);
-      });
-    } catch (IOException ex) {
-      // If the move failed and left behind the tmp file, the tmp file will be overwritten on the next successful write.
-      // Nothing reads directly from the tmp file.
-      metrics.incrementMerkleTreeWriteFailures();
-      throw new IOException("Error occurred when writing container merkle tree for containerID "
-          + data.getContainerID(), ex);
+      // Write the updated merkle tree to the file.
+      File checksumFile = getContainerChecksumFile(data);
+      File tmpChecksumFile = getTmpContainerChecksumFile(data);
+
+      try (OutputStream tmpOutputStream = Files.newOutputStream(tmpChecksumFile.toPath())) {
+        // Write to a tmp file and rename it into place.
+        captureLatencyNs(metrics.getWriteContainerMerkleTreeLatencyNS(), () -> {
+          newChecksumInfo.writeTo(tmpOutputStream);
+          Files.move(tmpChecksumFile.toPath(), checksumFile.toPath(), ATOMIC_MOVE);
+        });
+        LOG.debug("Merkle tree for container {} updated with container data checksum {}", containerID,
+            checksumToString(treeProto.getDataChecksum()));
+      } catch (IOException ex) {
+        // If the move failed and left behind the tmp file, the tmp file will be overwritten on the next successful
+        // write. Nothing reads directly from the tmp file.
+        metrics.incrementMerkleTreeWriteFailures();
+        throw new IOException("Error occurred when writing container merkle tree for containerID "
+            + data.getContainerID(), ex);
+      }
+      return newChecksumInfo;
+    } finally {
+      fileLock.unlock();
     }
-  }
-
-  // TODO HDDS-13245 This method will no longer be required.
-  private SortedSet<Long> getDeletedBlockIDs(ContainerProtos.ContainerChecksumInfoOrBuilder checksumInfo) {
-    return checksumInfo.getDeletedBlocksList().stream()
-        .map(ContainerProtos.BlockMerkleTree::getBlockID)
-        .collect(Collectors.toCollection(TreeSet::new));
   }
 
   /**

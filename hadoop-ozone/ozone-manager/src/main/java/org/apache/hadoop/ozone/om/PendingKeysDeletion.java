@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -35,18 +34,15 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
  */
 public class PendingKeysDeletion {
 
-  private Map<String, RepeatedOmKeyInfo> keysToModify;
-  private List<BlockGroup> keyBlocksList;
-  private Map<String, Long> keyBlockReplicatedSize;
+  private final Map<String, RepeatedOmKeyInfo> keysToModify;
+  private final Map<String, PurgedKey> purgedKeys;
   private int notReclaimableKeyCount;
 
-  public PendingKeysDeletion(List<BlockGroup> keyBlocksList,
-       Map<String, RepeatedOmKeyInfo> keysToModify,
-       Map<String, Long> keyBlockReplicatedSize,
-       int notReclaimableKeyCount) {
+  public PendingKeysDeletion(Map<String, PurgedKey> purgedKeys,
+      Map<String, RepeatedOmKeyInfo> keysToModify,
+      int notReclaimableKeyCount) {
     this.keysToModify = keysToModify;
-    this.keyBlocksList = keyBlocksList;
-    this.keyBlockReplicatedSize = keyBlockReplicatedSize;
+    this.purgedKeys = purgedKeys;
     this.notReclaimableKeyCount = notReclaimableKeyCount;
   }
 
@@ -54,12 +50,77 @@ public class PendingKeysDeletion {
     return keysToModify;
   }
 
-  public List<BlockGroup> getKeyBlocksList() {
-    return keyBlocksList;
+  public Map<String, PurgedKey> getPurgedKeys() {
+    return purgedKeys;
   }
 
-  public Map<String, Long> getKeyBlockReplicatedSize() {
-    return keyBlockReplicatedSize;
+  /**
+   * Represents metadata for a key that has been purged.
+   *
+   * This class holds information about a specific purged key,
+   * including its volume, bucket, associated block group,
+   * and the amount of data purged in bytes.
+   */
+  public static class PurgedKey {
+    private final String volume;
+    private final String bucket;
+    private final long bucketId;
+    private final BlockGroup blockGroup;
+    private final long purgedBytes;
+    private final boolean isCommittedKey;
+    private final String deleteKeyName;
+
+    public PurgedKey(String volume, String bucket, long bucketId, BlockGroup group, String deleteKeyName,
+        long purgedBytes, boolean isCommittedKey) {
+      this.volume = volume;
+      this.bucket = bucket;
+      this.bucketId = bucketId;
+      this.blockGroup = group;
+      this.purgedBytes = purgedBytes;
+      this.isCommittedKey = isCommittedKey;
+      this.deleteKeyName = deleteKeyName;
+    }
+
+    public BlockGroup getBlockGroup() {
+      return blockGroup;
+    }
+
+    public long getPurgedBytes() {
+      return purgedBytes;
+    }
+
+    public String getVolume() {
+      return volume;
+    }
+
+    public String getBucket() {
+      return bucket;
+    }
+
+    public long getBucketId() {
+      return bucketId;
+    }
+
+    public boolean isCommittedKey() {
+      return isCommittedKey;
+    }
+
+    public String getDeleteKeyName() {
+      return deleteKeyName;
+    }
+
+    @Override
+    public String toString() {
+      return "PurgedKey{" +
+          "blockGroup=" + blockGroup +
+          ", volume='" + volume + '\'' +
+          ", bucket='" + bucket + '\'' +
+          ", bucketId=" + bucketId +
+          ", purgedBytes=" + purgedBytes +
+          ", isCommittedKey=" + isCommittedKey +
+          ", deleteKeyName='" + deleteKeyName + '\'' +
+          '}';
+    }
   }
 
   public int getNotReclaimableKeyCount() {

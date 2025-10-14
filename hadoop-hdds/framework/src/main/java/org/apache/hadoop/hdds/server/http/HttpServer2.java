@@ -59,7 +59,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -509,7 +508,7 @@ public final class HttpServer2 implements FilterContainer {
           connector = createHttpsChannelConnector(server.webServer,
               httpConfig);
         } else {
-          throw new HadoopIllegalArgumentException(
+          throw new IllegalArgumentException(
               "unknown scheme for endpoint:" + ep);
         }
         connector.setHost(ep.getHost());

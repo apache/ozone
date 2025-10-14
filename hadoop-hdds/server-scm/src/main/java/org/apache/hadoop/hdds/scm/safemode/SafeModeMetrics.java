@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -72,12 +73,17 @@ public class SafeModeMetrics {
     this.currentPipelinesWithAtleastOneReplicaReportedCount.incr();
   }
 
-  public void setNumContainerWithOneReplicaReportedThreshold(long val) {
-    this.numContainerWithOneReplicaReportedThreshold.set(val);
-  }
-
-  public void setNumContainerWithECDataReplicaReportedThreshold(long val) {
-    this.numContainerWithECDataReplicaReportedThreshold.set(val);
+  public void setNumContainerReportedThreshold(HddsProtos.ReplicationType type, long val) {
+    switch (type) {
+    case RATIS:
+      this.numContainerWithOneReplicaReportedThreshold.set(val);
+      break;
+    case EC:
+      this.numContainerWithECDataReplicaReportedThreshold.set(val);
+      break;
+    default:
+      throw new IllegalArgumentException("Unsupported replication type: " + type);
+    }
   }
 
   public void incCurrentContainersWithOneReplicaReportedCount() {

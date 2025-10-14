@@ -55,6 +55,15 @@ public final class ReplicationManagerUtil {
   private ReplicationManagerUtil() {
   }
 
+  private static String formatDatanodeDetails(List<DatanodeDetails> dns) {
+    if (dns == null) {
+      return "[]";
+    }
+    return dns.stream()
+        .map(dn -> String.format("%s[%s]", dn, dn.getPersistedOpState()))
+        .collect(Collectors.toList()).toString();
+  }
+
   /**
    * Using the passed placement policy attempt to select a list of datanodes to
    * use as new targets. If the placement policy is unable to select enough
@@ -102,8 +111,9 @@ public final class ReplicationManagerUtil {
       }
     }
     throw new SCMException(String.format("Placement Policy: %s did not return"
-            + " any nodes. Number of required Nodes %d, Data size Required: %d",
-        policy.getClass(), requiredNodes, dataSizeRequired),
+            + " any nodes. Number of required Nodes %d, Data size Required: %d. Container: %s, Used Nodes %s, " +
+            "Excluded Nodes: %s.", policy.getClass(), requiredNodes, dataSizeRequired, container,
+        formatDatanodeDetails(usedNodes), formatDatanodeDetails(excludedNodes)),
         SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
 
@@ -176,6 +186,17 @@ public final class ReplicationManagerUtil {
           // be considered used (handled in the catch all at the end of the loop
           // ).
           excludedNodes.add(r.getDatanodeDetails());
+          continue;
+        }
+        if (nodeStatus.isMaintenance() && nodeStatus.isDead()) {
+          // Dead maintenance nodes are removed from the network topology, so the topology logic can't find
+          // out their location and hence can't consider them for figuring out rack placement. So, we don't add them
+          // to the used nodes list. We also don't add them to excluded nodes, as the placement policy logic won't
+          // consider a node that's not in the topology anyway. In fact, adding it to excluded nodes will cause a
+          // problem if total nodes (in topology) + required nodes becomes less than excluded + used nodes.
+
+          // TODO: In the future, can the policy logic be changed to use the DatanodeDetails network location to figure
+          //  out  the rack?
           continue;
         }
       } catch (NodeNotFoundException e) {

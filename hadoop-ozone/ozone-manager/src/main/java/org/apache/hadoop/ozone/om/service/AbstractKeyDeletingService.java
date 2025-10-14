@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -75,6 +77,19 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
       return true;
     }
     return !suspended.get() && getOzoneManager().isLeaderReady();
+  }
+
+  boolean isPreviousPurgeTransactionFlushed() throws IOException {
+    TransactionInfo lastAOSTransactionId = metrics.getLastAOSTransactionInfo();
+    TransactionInfo flushedTransactionId = TransactionInfo.readTransactionInfo(
+        getOzoneManager().getMetadataManager());
+    if (flushedTransactionId != null && lastAOSTransactionId.compareTo(flushedTransactionId) > 0) {
+      LOG.info("Skipping AOS processing since changes to deleted space of AOS have not been flushed to disk " +
+              "last Purge Transaction: {}, Flushed Disk Transaction: {}", lastAOSTransactionId,
+          flushedTransactionId);
+      return false;
+    }
+    return true;
   }
 
   /**

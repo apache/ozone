@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,33 +53,25 @@ public class OzoneFSInputStream extends FSInputStream
 
   @Override
   public int read() throws IOException {
-    Span span = GlobalTracer.get()
-        .buildSpan("OzoneFSInputStream.read").start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("OzoneFSInputStream.read")) {
       int byteRead = inputStream.read();
       if (statistics != null && byteRead >= 0) {
         statistics.incrementBytesRead(1);
       }
       return byteRead;
-    } finally {
-      span.finish();
     }
   }
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
-    Span span = GlobalTracer.get()
-        .buildSpan("OzoneFSInputStream.read").start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
-      span.setTag("offset", off)
-          .setTag("length", len);
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("OzoneFSInputStream.read")) {
+      TracingUtil.getActiveSpan().setAttribute("offset", off)
+          .setAttribute("length", len);
       int bytesRead = inputStream.read(b, off, len);
       if (statistics != null && bytesRead >= 0) {
         statistics.incrementBytesRead(bytesRead);
       }
       return bytesRead;
-    } finally {
-      span.finish();
     }
   }
 

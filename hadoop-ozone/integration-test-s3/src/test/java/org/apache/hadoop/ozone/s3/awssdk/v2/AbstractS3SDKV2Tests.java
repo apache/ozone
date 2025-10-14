@@ -1228,6 +1228,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
         ListMultipartUploadsRequest correctRequest = ListMultipartUploadsRequest.builder()
             .bucket(DEFAULT_BUCKET_NAME)
             .expectedBucketOwner(correctOwner)
+            .maxUploads(5000)
             .build();
         verifyPassBucketOwnershipVerification(() -> s3Client.listMultipartUploads(correctRequest));
 

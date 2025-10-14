@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
+import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -57,6 +58,12 @@ public final class OmKeyInfo extends WithParentObjectId
 
   private static final Codec<OmKeyInfo> CODEC_TRUE = newCodec(true);
   private static final Codec<OmKeyInfo> CODEC_FALSE = newCodec(false);
+  /**
+   * Metadata key flag to indicate whether a deleted key was a committed key.
+   * The flag is set when a committed key is deleted from AOS but still held in
+   * a snapshot to help with accurate bucket quota usage calculation.
+   */
+  private static final String COMMITTED_KEY_DELETED_FLAG = "CKDEL";
 
   private final String volumeName;
   private final String bucketName;
@@ -69,6 +76,7 @@ public final class OmKeyInfo extends WithParentObjectId
   private ReplicationConfig replicationConfig;
   private FileEncryptionInfo encInfo;
   private final FileChecksum fileChecksum;
+
   /**
    * Support OFS use-case to identify if the key is a file or a directory.
    */
@@ -183,6 +191,18 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public String getOwnerName() {
     return ownerName;
+  }
+
+  public void setCommittedKeyDeletedFlag(boolean val) {
+    if (val) {
+      this.getMetadata().put(COMMITTED_KEY_DELETED_FLAG, "true");
+    } else {
+      this.getMetadata().remove(COMMITTED_KEY_DELETED_FLAG);
+    }
+  }
+
+  public boolean isDeletedKeyCommitted() {
+    return Boolean.parseBoolean(getMetadata().get(COMMITTED_KEY_DELETED_FLAG));
   }
 
   /**
@@ -926,5 +946,21 @@ public final class OmKeyInfo extends WithParentObjectId
       return getKeyName();
     }
     return getParentObjectID() + OzoneConsts.OM_KEY_PREFIX + getFileName();
+  }
+
+  public boolean hasBlocks() {
+    for (OmKeyLocationInfoGroup keyLocationList : getKeyLocationVersions()) {
+      if (keyLocationList.getLocationListCount() != 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public static boolean isKeyEmpty(@Nullable OmKeyInfo keyInfo) {
+    if (keyInfo == null) {
+      return true;
+    }
+    return !keyInfo.hasBlocks();
   }
 }

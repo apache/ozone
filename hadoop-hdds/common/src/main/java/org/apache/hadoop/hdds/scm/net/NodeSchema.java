@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import java.util.List;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 
 /**
  * Network topology schema to housekeeper relevant information.
@@ -66,7 +65,7 @@ public final class NodeSchema {
 
     public NodeSchema build() {
       if (type == null) {
-        throw new HadoopIllegalArgumentException("Type is mandatory for a " +
+        throw new IllegalArgumentException("Type is mandatory for a " +
             "network topology node layer definition");
       }
       if (cost == -1) {

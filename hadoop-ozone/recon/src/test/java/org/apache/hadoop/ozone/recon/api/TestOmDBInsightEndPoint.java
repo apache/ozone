@@ -1173,15 +1173,15 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         reconOMMetadataManager.getKeyTable(getBucketLayout())
             .get("/sampleVol/bucketOne/key_one");
     assertEquals("key_one", omKeyInfoCopy.getKeyName());
-    RepeatedOmKeyInfo repeatedOmKeyInfo1 = new RepeatedOmKeyInfo(omKeyInfoCopy);
+    RepeatedOmKeyInfo repeatedOmKeyInfo1 = new RepeatedOmKeyInfo(omKeyInfoCopy, 1);
 
     reconOMMetadataManager.getDeletedTable()
         .put("/sampleVol/bucketOne/key_one", repeatedOmKeyInfo1);
     assertEquals("key_one",
         repeatedOmKeyInfo1.getOmKeyInfoList().get(0).getKeyName());
 
-    RepeatedOmKeyInfo repeatedOmKeyInfo2 = new RepeatedOmKeyInfo(omKeyInfo2);
-    RepeatedOmKeyInfo repeatedOmKeyInfo3 = new RepeatedOmKeyInfo(omKeyInfo2);
+    RepeatedOmKeyInfo repeatedOmKeyInfo2 = new RepeatedOmKeyInfo(omKeyInfo2, 1);
+    RepeatedOmKeyInfo repeatedOmKeyInfo3 = new RepeatedOmKeyInfo(omKeyInfo2, 1);
     reconOMMetadataManager.getDeletedTable()
         .put("/sampleVol/bucketOne/key_two", repeatedOmKeyInfo2);
     reconOMMetadataManager.getDeletedTable()
@@ -1207,9 +1207,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     OmKeyInfo omKeyInfo3 =
         getOmKeyInfo("sampleVol", "bucketOne", "key_three", true);
 
-    RepeatedOmKeyInfo repeatedOmKeyInfo1 = new RepeatedOmKeyInfo(omKeyInfo1);
-    RepeatedOmKeyInfo repeatedOmKeyInfo2 = new RepeatedOmKeyInfo(omKeyInfo2);
-    RepeatedOmKeyInfo repeatedOmKeyInfo3 = new RepeatedOmKeyInfo(omKeyInfo3);
+    RepeatedOmKeyInfo repeatedOmKeyInfo1 = new RepeatedOmKeyInfo(omKeyInfo1, 1);
+    RepeatedOmKeyInfo repeatedOmKeyInfo2 = new RepeatedOmKeyInfo(omKeyInfo2, 1);
+    RepeatedOmKeyInfo repeatedOmKeyInfo3 = new RepeatedOmKeyInfo(omKeyInfo3, 1);
 
     reconOMMetadataManager.getDeletedTable()
         .put("/sampleVol/bucketOne/key_one", repeatedOmKeyInfo1);
@@ -1245,7 +1245,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     OmKeyInfo omKeyInfo1 = reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one");
     assertEquals("key_one", omKeyInfo1.getKeyName());
-    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(omKeyInfo);
+    RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(omKeyInfo, 1);
     reconOMMetadataManager.getDeletedTable()
         .put("/sampleVol/bucketOne/key_one", repeatedOmKeyInfo);
     RepeatedOmKeyInfo repeatedOmKeyInfo1 =
@@ -1271,7 +1271,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
           getOmKeyInfo("sampleVol", "bucketOne", "deleted_key_" + i, true);
       reconOMMetadataManager.getDeletedTable()
           .put("/sampleVol/bucketOne/deleted_key_" + i,
-              new RepeatedOmKeyInfo(omKeyInfo));
+              new RepeatedOmKeyInfo(omKeyInfo, 1));
     }
 
     // Case 1: prevKey provided, startPrefix empty
@@ -1297,7 +1297,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
       OmKeyInfo omKeyInfo =
           getOmKeyInfo("sampleVol", "bucketOne", "deleted_key_" + i, true);
       reconOMMetadataManager.getDeletedTable()
-          .put("/sampleVol/bucketOne/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+          .put("/sampleVol/bucketOne/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo, 1));
     }
 
     // Case 2: prevKey empty, startPrefix empty
@@ -1323,13 +1323,13 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
       OmKeyInfo omKeyInfo =
           getOmKeyInfo("sampleVol", "bucketOne", "deleted_key_" + i, true);
       reconOMMetadataManager.getDeletedTable()
-          .put("/sampleVol/bucketOne/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+          .put("/sampleVol/bucketOne/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo, 1));
     }
     for (int i = 5; i < 10; i++) {
       OmKeyInfo omKeyInfo =
           getOmKeyInfo("sampleVol", "bucketTwo", "deleted_key_" + i, true);
       reconOMMetadataManager.getDeletedTable()
-          .put("/sampleVol/bucketTwo/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+          .put("/sampleVol/bucketTwo/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo, 1));
     }
 
     // Case 3: startPrefix provided, prevKey empty
@@ -1356,13 +1356,13 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
       OmKeyInfo omKeyInfo =
           getOmKeyInfo("sampleVol", "bucketOne", "deleted_key_" + i, true);
       reconOMMetadataManager.getDeletedTable()
-          .put("/sampleVol/bucketOne/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+          .put("/sampleVol/bucketOne/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo, 1));
     }
     for (int i = 10; i < 15; i++) {
       OmKeyInfo omKeyInfo =
           getOmKeyInfo("sampleVol", "bucketTwo", "deleted_key_" + i, true);
       reconOMMetadataManager.getDeletedTable()
-          .put("/sampleVol/bucketTwo/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo));
+          .put("/sampleVol/bucketTwo/deleted_key_" + i, new RepeatedOmKeyInfo(omKeyInfo, 1));
     }
 
     // Case 4: startPrefix and prevKey provided
@@ -1921,8 +1921,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         omdbInsightEndpoint.listKeys("RATIS", "", 0, FSO_BUCKET_TWO_PATH,
             "", 1000);
     ListKeysResponse listKeysResponse = (ListKeysResponse) bucketResponse.getEntity();
-    assertEquals(ResponseStatus.INITIALIZING, listKeysResponse.getStatus());
-    assertEquals(Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), bucketResponse.getStatus());
+    assertEquals(ResponseStatus.OK, listKeysResponse.getStatus());
+    assertEquals(Response.Status.OK.getStatusCode(), bucketResponse.getStatus());
   }
 
   @Test

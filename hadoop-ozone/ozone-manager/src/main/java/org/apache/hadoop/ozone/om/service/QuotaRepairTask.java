@@ -255,8 +255,8 @@ public class QuotaRepairTask {
     String bucketNameKey = buildNamePath(bucketInfo.getVolumeName(),
         bucketInfo.getBucketName());
     oriBucketInfoMap.put(bucketNameKey, bucketInfo.copyObject());
-    bucketInfo.incrUsedNamespace(-bucketInfo.getUsedNamespace());
-    bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes());
+    bucketInfo.decrUsedBytes(bucketInfo.getUsedBytes(), false);
+    bucketInfo.decrUsedNamespace(bucketInfo.getUsedNamespace(), false);
     nameBucketInfoMap.put(bucketNameKey, bucketInfo);
     idBucketInfoMap.put(buildIdPath(metadataManager.getVolumeId(bucketInfo.getVolumeName()),
             bucketInfo.getObjectID()), bucketInfo);

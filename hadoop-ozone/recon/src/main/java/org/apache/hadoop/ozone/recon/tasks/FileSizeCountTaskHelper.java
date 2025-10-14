@@ -17,14 +17,11 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.ozone.recon.schema.generated.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
-
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -32,11 +29,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
-import org.jooq.DSLContext;
-import org.jooq.Record3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,217 +39,9 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class FileSizeCountTaskHelper {
   protected static final Logger LOG = LoggerFactory.getLogger(FileSizeCountTaskHelper.class);
-
-  // Static lock to guard table truncation.
+  
+  // Static lock object for table truncation synchronization
   private static final Object TRUNCATE_LOCK = new Object();
-
-  /**
-   * Truncates the FILE_COUNT_BY_SIZE table if it has not been truncated yet.
-   * This method synchronizes on a static lock to ensure only one task truncates at a time.
-   * If an error occurs, the flag is reset to allow retrying the truncation.
-   *
-   * @param dslContext DSLContext for executing DB commands.
-   */
-  public static void truncateTableIfNeeded(DSLContext dslContext) {
-    synchronized (TRUNCATE_LOCK) {
-      if (ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.compareAndSet(false, true)) {
-        try {
-          int execute = dslContext.delete(FILE_COUNT_BY_SIZE).execute();
-          LOG.info("Deleted {} records from {}", execute, FILE_COUNT_BY_SIZE);
-        } catch (Exception e) {
-          // Reset the flag so that truncation can be retried
-          ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
-          LOG.error("Error while truncating FILE_COUNT_BY_SIZE table, resetting flag.", e);
-          throw new RuntimeException("Table truncation failed", e);  // Propagate upwards
-        }
-      } else {
-        LOG.info("Table already truncated by another task; waiting for truncation to complete.");
-      }
-    }
-  }
-
-  /**
-   * Executes the reprocess method for the given task.
-   *
-   * @param omMetadataManager  OM metadata manager.
-   * @param dslContext         DSLContext for DB operations.
-   * @param fileCountBySizeDao DAO for file count table.
-   * @param bucketLayout       The bucket layout to process.
-   * @param taskName           The name of the task for logging.
-   * @return A Pair of task name and boolean indicating success.
-   */
-  public static ReconOmTask.TaskResult reprocess(OMMetadataManager omMetadataManager,
-                                                 DSLContext dslContext,
-                                                 FileCountBySizeDao fileCountBySizeDao,
-                                                 BucketLayout bucketLayout,
-                                                 String taskName) {
-    LOG.info("Starting Reprocess for {}", taskName);
-    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
-    long startTime = Time.monotonicNow();
-    truncateTableIfNeeded(dslContext);
-    boolean status = reprocessBucketLayout(
-        bucketLayout, omMetadataManager, fileSizeCountMap, dslContext, fileCountBySizeDao, taskName);
-    if (!status) {
-      return buildTaskResult(taskName, false);
-    }
-    writeCountsToDB(fileSizeCountMap, dslContext, fileCountBySizeDao);
-    long endTime = Time.monotonicNow();
-    LOG.info("{} completed Reprocess in {} ms.", taskName, (endTime - startTime));
-    return buildTaskResult(taskName, true);
-  }
-
-  /**
-   * Iterates over the OM DB keys for the given bucket layout and updates the fileSizeCountMap.
-   *
-   * @param bucketLayout       The bucket layout to use.
-   * @param omMetadataManager  OM metadata manager.
-   * @param fileSizeCountMap   Map accumulating file size counts.
-   * @param dslContext         DSLContext for DB operations.
-   * @param fileCountBySizeDao DAO for file count table.
-   * @param taskName           The name of the task for logging.
-   * @return true if processing succeeds, false otherwise.
-   */
-  public static boolean reprocessBucketLayout(BucketLayout bucketLayout,
-                                              OMMetadataManager omMetadataManager,
-                                              Map<FileSizeCountKey, Long> fileSizeCountMap,
-                                              DSLContext dslContext,
-                                              FileCountBySizeDao fileCountBySizeDao,
-                                              String taskName) {
-    Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
-    int totalKeysProcessed = 0;
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter =
-             omKeyInfoTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
-        totalKeysProcessed++;
-
-        // Flush to DB periodically.
-        if (fileSizeCountMap.size() >= 100000) {
-          writeCountsToDB(fileSizeCountMap, dslContext, fileCountBySizeDao);
-          fileSizeCountMap.clear();
-        }
-      }
-    } catch (IOException ioEx) {
-      LOG.error("Unable to populate File Size Count for {} in Recon DB.", taskName, ioEx);
-      return false;
-    }
-    LOG.info("Reprocessed {} keys for bucket layout {}.", totalKeysProcessed, bucketLayout);
-    return true;
-  }
-
-  /**
-   * Processes a batch of OM update events.
-   *
-   * @param events             OM update event batch.
-   * @param tableName       The bucket layout for which either keyTable or fileTable is fetched
-   * @param dslContext         DSLContext for DB operations.
-   * @param fileCountBySizeDao DAO for file count table.
-   * @param taskName           The name of the task for logging.
-   * @return A Pair of task name and boolean indicating success.
-   */
-  public static ReconOmTask.TaskResult processEvents(OMUpdateEventBatch events,
-                                                     String tableName,
-                                                     DSLContext dslContext,
-                                                     FileCountBySizeDao fileCountBySizeDao,
-                                                     String taskName) {
-    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
-    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
-    long startTime = Time.monotonicNow();
-    while (eventIterator.hasNext()) {
-      OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
-      if (!tableName.equals(omdbUpdateEvent.getTable())) {
-        continue;
-      }
-      String updatedKey = omdbUpdateEvent.getKey();
-      Object value = omdbUpdateEvent.getValue();
-      Object oldValue = omdbUpdateEvent.getOldValue();
-      if (value instanceof OmKeyInfo) {
-        OmKeyInfo omKeyInfo = (OmKeyInfo) value;
-        OmKeyInfo omKeyInfoOld = (OmKeyInfo) oldValue;
-        try {
-          switch (omdbUpdateEvent.getAction()) {
-          case PUT:
-            handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
-            break;
-          case DELETE:
-            handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
-            break;
-          case UPDATE:
-            if (omKeyInfoOld != null) {
-              handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
-              handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
-            } else {
-              LOG.warn("Update event does not have the old keyInfo for {}.", updatedKey);
-            }
-            break;
-          default:
-            LOG.trace("Skipping DB update event: {}", omdbUpdateEvent.getAction());
-          }
-        } catch (Exception e) {
-          LOG.error("Unexpected exception while processing key {}.", updatedKey, e);
-          return buildTaskResult(taskName, false);
-        }
-      } else {
-        LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
-            value.getClass().getName(), updatedKey);
-      }
-    }
-    writeCountsToDB(fileSizeCountMap, dslContext, fileCountBySizeDao);
-    LOG.debug("{} successfully processed in {} milliseconds", taskName,
-        (Time.monotonicNow() - startTime));
-    return buildTaskResult(taskName, true);
-  }
-
-  /**
-   * Writes the accumulated file size counts to the DB.
-   *
-   * @param fileSizeCountMap   Map of file size counts.
-   * @param dslContext         DSLContext for DB operations.
-   * @param fileCountBySizeDao DAO for file count table.
-   */
-  public static void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap,
-                                     DSLContext dslContext,
-                                     FileCountBySizeDao fileCountBySizeDao) {
-
-    List<FileCountBySize> insertToDb = new ArrayList<>();
-    List<FileCountBySize> updateInDb = new ArrayList<>();
-    boolean isDbTruncated = isFileCountBySizeTableEmpty(dslContext); // Check if table is empty
-
-    fileSizeCountMap.keySet().forEach((FileSizeCountKey key) -> {
-      FileCountBySize newRecord = new FileCountBySize();
-      newRecord.setVolume(key.volume);
-      newRecord.setBucket(key.bucket);
-      newRecord.setFileSize(key.fileSizeUpperBound);
-      newRecord.setCount(fileSizeCountMap.get(key));
-      if (!isDbTruncated) {
-        // Get the current count from database and update
-        Record3<String, String, Long> recordToFind =
-            dslContext.newRecord(
-                    FILE_COUNT_BY_SIZE.VOLUME,
-                    FILE_COUNT_BY_SIZE.BUCKET,
-                    FILE_COUNT_BY_SIZE.FILE_SIZE)
-                .value1(key.volume)
-                .value2(key.bucket)
-                .value3(key.fileSizeUpperBound);
-        FileCountBySize fileCountRecord =
-            fileCountBySizeDao.findById(recordToFind);
-        if (fileCountRecord == null && newRecord.getCount() > 0L) {
-          // insert new row only for non-zero counts.
-          insertToDb.add(newRecord);
-        } else if (fileCountRecord != null) {
-          newRecord.setCount(fileCountRecord.getCount() +
-              fileSizeCountMap.get(key));
-          updateInDb.add(newRecord);
-        }
-      } else if (newRecord.getCount() > 0) {
-        // insert new row only for non-zero counts.
-        insertToDb.add(newRecord);
-      }
-    });
-    fileCountBySizeDao.insert(insertToDb);
-    fileCountBySizeDao.update(updateInDb);
-  }
 
   /**
    * Increments the count for a given key on a PUT event.
@@ -291,40 +77,219 @@ public abstract class FileSizeCountTaskHelper {
   }
 
   /**
-   * Checks if the FILE_COUNT_BY_SIZE table is empty.
+   * Truncates the file count table if needed during reprocess.
+   * Uses a flag to ensure the table is truncated only once across all tasks.
    */
-  public static boolean isFileCountBySizeTableEmpty(DSLContext dslContext) {
-    return dslContext.fetchCount(FILE_COUNT_BY_SIZE) == 0;
+  public static void truncateFileCountTableIfNeeded(ReconFileMetadataManager reconFileMetadataManager,
+                                                    String taskName) {
+    synchronized (TRUNCATE_LOCK) {
+      if (ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.compareAndSet(false, true)) {
+        try {
+          reconFileMetadataManager.clearFileCountTable();
+          LOG.info("Successfully truncated file count table for reprocess by task: {}", taskName);
+        } catch (Exception e) {
+          LOG.error("Failed to truncate file count table for task: {}", taskName, e);
+          // Reset flag on failure so another task can try
+          ReconConstants.FILE_SIZE_COUNT_TABLE_TRUNCATED.set(false);
+          throw new RuntimeException("Failed to truncate file count table", e);
+        }
+      } else {
+        LOG.debug("File count table already truncated by another task, skipping for task: {}", taskName);
+      }
+    }
   }
 
   /**
-   * Helper key class used for grouping file size counts.
+   * Executes the reprocess method using RocksDB for the given task.
    */
-  public static class FileSizeCountKey {
-    private final String volume;
-    private final String bucket;
-    private final Long fileSizeUpperBound;
-
-    public FileSizeCountKey(String volume, String bucket, Long fileSizeUpperBound) {
-      this.volume = volume;
-      this.bucket = bucket;
-      this.fileSizeUpperBound = fileSizeUpperBound;
+  public static ReconOmTask.TaskResult reprocess(OMMetadataManager omMetadataManager,
+                                                 ReconFileMetadataManager reconFileMetadataManager,
+                                                 BucketLayout bucketLayout,
+                                                 String taskName) {
+    LOG.info("Starting RocksDB Reprocess for {}", taskName);
+    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
+    long startTime = Time.monotonicNow();
+    
+    // Ensure the file count table is truncated only once during reprocess
+    truncateFileCountTableIfNeeded(reconFileMetadataManager, taskName);
+    
+    boolean status = reprocessBucketLayout(
+        bucketLayout, omMetadataManager, fileSizeCountMap, reconFileMetadataManager, taskName);
+    if (!status) {
+      return buildTaskResult(taskName, false);
     }
+    
+    writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+    
+    long endTime = Time.monotonicNow();
+    LOG.info("{} completed RocksDB Reprocess in {} ms.", taskName, (endTime - startTime));
+    
+    return buildTaskResult(taskName, true);
+  }
 
-    @Override
-    public boolean equals(Object obj) {
-      if (obj instanceof FileSizeCountKey) {
-        FileSizeCountKey other = (FileSizeCountKey) obj;
-        return volume.equals(other.volume) &&
-            bucket.equals(other.bucket) &&
-            fileSizeUpperBound.equals(other.fileSizeUpperBound);
+  /**
+   * Iterates over the OM DB keys for the given bucket layout and updates the fileSizeCountMap (RocksDB version).
+   */
+  public static boolean reprocessBucketLayout(BucketLayout bucketLayout,
+                                              OMMetadataManager omMetadataManager,
+                                              Map<FileSizeCountKey, Long> fileSizeCountMap,
+                                              ReconFileMetadataManager reconFileMetadataManager,
+                                              String taskName) {
+    Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable(bucketLayout);
+    int totalKeysProcessed = 0;
+    
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIter =
+             omKeyInfoTable.iterator()) {
+      while (keyIter.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
+        handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
+        totalKeysProcessed++;
+
+        // Flush to RocksDB periodically.
+        if (fileSizeCountMap.size() >= 100000) {
+          // For reprocess, we don't need to check existing values since table was truncated
+          LOG.debug("Flushing {} accumulated counts to RocksDB for {}", fileSizeCountMap.size(), taskName);
+          writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+          fileSizeCountMap.clear();
+        }
       }
+    } catch (IOException ioEx) {
+      LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ioEx);
       return false;
     }
+    
+    LOG.info("Reprocessed {} keys for bucket layout {} using RocksDB.", totalKeysProcessed, bucketLayout);
+    return true;
+  }
 
-    @Override
-    public int hashCode() {
-      return (volume + bucket + fileSizeUpperBound).hashCode();
+  /**
+   * Processes a batch of OM update events using RocksDB.
+   */
+  public static ReconOmTask.TaskResult processEvents(OMUpdateEventBatch events,
+                                                     String tableName,
+                                                     ReconFileMetadataManager reconFileMetadataManager,
+                                                     String taskName) {
+    Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
+    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
+    long startTime = Time.monotonicNow();
+    
+    while (eventIterator.hasNext()) {
+      OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
+      if (!tableName.equals(omdbUpdateEvent.getTable())) {
+        continue;
+      }
+      
+      String updatedKey = omdbUpdateEvent.getKey();
+      Object value = omdbUpdateEvent.getValue();
+      Object oldValue = omdbUpdateEvent.getOldValue();
+      
+      if (value instanceof OmKeyInfo) {
+        OmKeyInfo omKeyInfo = (OmKeyInfo) value;
+        OmKeyInfo omKeyInfoOld = (OmKeyInfo) oldValue;
+        
+        try {
+          switch (omdbUpdateEvent.getAction()) {
+          case PUT:
+            handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            break;
+          case DELETE:
+            handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
+            break;
+          case UPDATE:
+            if (omKeyInfoOld != null) {
+              handleDeleteKeyEvent(updatedKey, omKeyInfoOld, fileSizeCountMap);
+              handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
+            } else {
+              LOG.warn("Update event does not have the old keyInfo for {}.", updatedKey);
+            }
+            break;
+          default:
+            LOG.trace("Skipping DB update event: {}", omdbUpdateEvent.getAction());
+          }
+        } catch (Exception e) {
+          LOG.error("Unexpected exception while processing key {}.", updatedKey, e);
+          return buildTaskResult(taskName, false);
+        }
+      } else {
+        LOG.warn("Unexpected value type {} for key {}. Skipping processing.",
+            value.getClass().getName(), updatedKey);
+      }
+    }
+    
+    writeCountsToDB(fileSizeCountMap, reconFileMetadataManager);
+    
+    LOG.debug("{} successfully processed using RocksDB in {} milliseconds", taskName,
+        (Time.monotonicNow() - startTime));
+    return buildTaskResult(taskName, true);
+  }
+
+  /**
+   * Writes the accumulated file size counts to RocksDB using ReconFileMetadataManager.
+   */
+  /**
+   * Checks if the file count table is empty by trying to get the first entry.
+   * This mimics the SQL Derby behavior of isFileCountBySizeTableEmpty().
+   */
+  private static boolean isFileCountTableEmpty(ReconFileMetadataManager reconFileMetadataManager) {
+    try (TableIterator<FileSizeCountKey, ? extends Table.KeyValue<FileSizeCountKey, Long>> iterator = 
+         reconFileMetadataManager.getFileCountTable().iterator()) {
+      return !iterator.hasNext();
+    } catch (Exception e) {
+      LOG.warn("Error checking if file count table is empty, assuming not empty", e);
+      return false;
+    }
+  }
+
+  public static void writeCountsToDB(Map<FileSizeCountKey, Long> fileSizeCountMap,
+                                     ReconFileMetadataManager reconFileMetadataManager) {
+    if (fileSizeCountMap.isEmpty()) {
+      return;
+    }
+    
+    boolean isTableEmpty = isFileCountTableEmpty(reconFileMetadataManager);
+    
+    LOG.debug("writeCountsToDB: processing {} entries, isTableEmpty={}", 
+        fileSizeCountMap.size(), isTableEmpty);
+
+    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      for (Map.Entry<FileSizeCountKey, Long> entry : fileSizeCountMap.entrySet()) {
+        FileSizeCountKey key = entry.getKey();
+        Long deltaCount = entry.getValue();
+        
+        LOG.debug("Processing key: {}, deltaCount: {}", key, deltaCount);
+        
+        if (isTableEmpty) {
+          // Direct insert when table is empty (like SQL Derby reprocess behavior)
+          LOG.debug("Direct insert (table empty): key={}, deltaCount={}", key, deltaCount);
+          if (deltaCount > 0L) {
+            reconFileMetadataManager.batchStoreFileSizeCount(rdbBatchOperation, key, deltaCount);
+            LOG.debug("Storing key={} with deltaCount={}", key, deltaCount);
+          }
+        } else {
+          // Incremental update when table has data (like SQL Derby incremental behavior)
+          Long existingCount = reconFileMetadataManager.getFileSizeCount(key);
+          Long newCount = (existingCount != null ? existingCount : 0L) + deltaCount;
+          
+          LOG.debug("Incremental update: key={}, existingCount={}, deltaCount={}, newCount={}", 
+              key, existingCount, deltaCount, newCount);
+          
+          if (newCount > 0L) {
+            reconFileMetadataManager.batchStoreFileSizeCount(rdbBatchOperation, key, newCount);
+            LOG.debug("Storing key={} with newCount={}", key, newCount);
+          } else if (existingCount != null) {
+            // Delete key if count becomes 0 or negative
+            reconFileMetadataManager.batchDeleteFileSizeCount(rdbBatchOperation, key);
+            LOG.debug("Deleting key={} as newCount={} <= 0", key, newCount);
+          }
+        }
+      }
+      
+      LOG.debug("Committing batch operation with {} operations", fileSizeCountMap.size());
+      reconFileMetadataManager.commitBatchOperation(rdbBatchOperation);
+      LOG.debug("Batch operation committed successfully");
+    } catch (Exception e) {
+      LOG.error("Error writing file size counts to RocksDB", e);
+      throw new RuntimeException("Failed to write to RocksDB", e);
     }
   }
 

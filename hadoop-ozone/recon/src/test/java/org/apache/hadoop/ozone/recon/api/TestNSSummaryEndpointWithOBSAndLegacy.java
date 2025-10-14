@@ -901,7 +901,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setObjectID(KEY_TWO_OBJECT_ID)
         .build();
     String fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     String expectedPath = "vol/bucket1/" + KEY_TWO;
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -912,7 +912,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setObjectID(KEY_FIVE_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol/bucket2/" + KEY_FIVE;
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -923,7 +923,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setObjectID(KEY_EIGHT_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol2/bucket3/" + KEY_EIGHT;
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -935,7 +935,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy {
         .setObjectID(KEY_ELEVEN_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol2/bucket4/" + KEY_ELEVEN;
     Assertions.assertEquals(expectedPath, fullPath);
   }

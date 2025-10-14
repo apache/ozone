@@ -2751,6 +2751,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.db.config.path</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE</tag>
+    <description>
+      Path to an ini configuration file for RocksDB on datanode component.
+    </description>
+  </property>
+  <property>
     <name>hdds.priv.key.file.name</name>
     <value>private.pem</value>
     <tag>X509, SECURITY</tag>

@@ -24,10 +24,14 @@
   <packaging>jar</packaging>
   <name>Apache Ozone Distribution</name>
   <properties>
-    <!-- suffix appended to Ozone version to get Docker image version -->
+    <!-- Hadoop Docker image for current version; multi-arch Hadoop 3.4.2-lean only available from ghcr.io currently -->
+    <docker.hadoop.image>ghcr.io/apache/hadoop</docker.hadoop.image>
+    <!-- suffix appended to Hadoop version to get Docker image version -->
+    <docker.hadoop.image.flavor>-lean</docker.hadoop.image.flavor>
     <docker.ozone-runner.version>20250625-2-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
     <docker.ozone.image>apache/ozone</docker.ozone.image>
+    <!-- suffix appended to Ozone version to get Docker image version; only used in xcompat test, to avoid old centos-based images -->
     <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor>
     <downloadSources>true</downloadSources>
     <file.encoding>UTF-8</file.encoding>

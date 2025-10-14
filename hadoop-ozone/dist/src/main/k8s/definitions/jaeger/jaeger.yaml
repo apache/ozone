@@ -45,10 +45,9 @@ spec:
     spec:
       containers:
         - name: jaeger
-          image: jaegertracing/all-in-one:latest
+          image: jaegertracing/jaeger:latest
           ports:
             - containerPort: 16686
               name: web
-          env:
-            - name: COLLECTOR_ZIPKIN_HTTP_PORT
-              value: "9411"
+            - containerPort: 4317
+              name: otlp-grpc

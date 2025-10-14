@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.processFile;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
@@ -81,6 +82,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.SstFileInfo;
@@ -106,6 +108,7 @@ class TestOmSnapshotManager {
   private SnapshotChainManager snapshotChainManager;
   private OmMetadataManagerImpl omMetadataManager;
   private OmSnapshotManager omSnapshotManager;
+  private OmSnapshotLocalDataManager snapshotLocalDataManager;
   private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
       SNAPSHOT_CANDIDATE_DIR;
   private File leaderDir;
@@ -138,6 +141,7 @@ class TestOmSnapshotManager {
     om = omTestManagers.getOzoneManager();
     omMetadataManager = (OmMetadataManagerImpl) om.getMetadataManager();
     omSnapshotManager = om.getOmSnapshotManager();
+    snapshotLocalDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
     snapshotChainManager = omMetadataManager.getSnapshotChainManager();
   }
 
@@ -157,8 +161,8 @@ class TestOmSnapshotManager {
       SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotInfoKey);
       snapshotChainManager.deleteSnapshot(snapshotInfo);
       snapshotInfoTable.delete(snapshotInfoKey);
-      Path snapshotYaml = Paths.get(OmSnapshotManager.getSnapshotLocalPropertyYamlPath(
-          om.getMetadataManager(), snapshotInfo));
+
+      Path snapshotYaml = Paths.get(snapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo));
       Files.deleteIfExists(snapshotYaml);
     }
     omSnapshotManager.invalidateCache();
@@ -281,20 +285,20 @@ class TestOmSnapshotManager {
   public void testCreateNewSnapshotLocalYaml() throws IOException {
     SnapshotInfo snapshotInfo = createSnapshotInfo("vol1", "buck1");
 
-    Map<String, List<String>> expUncompactedSSTFileList = new TreeMap<>();
-    OmSnapshotLocalData.VersionMeta uncompactedVersionMeta = new OmSnapshotLocalData.VersionMeta(0,
+    Map<String, List<String>> expNotDefraggedSSTFileList = new TreeMap<>();
+    OmSnapshotLocalData.VersionMeta notDefraggedVersionMeta = new OmSnapshotLocalData.VersionMeta(0,
         ImmutableList.of(new SstFileInfo("dt1.sst", "k1", "k2", DIRECTORY_TABLE),
             new SstFileInfo("dt2.sst", "k1", "k2", DIRECTORY_TABLE),
             new SstFileInfo("ft1.sst", "k1", "k2", FILE_TABLE),
             new SstFileInfo("ft2.sst", "k1", "k2", FILE_TABLE),
             new SstFileInfo("kt1.sst", "k1", "k2", KEY_TABLE),
             new SstFileInfo("kt2.sst", "k1", "k2", KEY_TABLE)));
-    expUncompactedSSTFileList.put(KEY_TABLE, Stream.of("kt1.sst", "kt2.sst").collect(Collectors.toList()));
-    expUncompactedSSTFileList.put(FILE_TABLE, Stream.of("ft1.sst", "ft2.sst").collect(Collectors.toList()));
-    expUncompactedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1.sst", "dt2.sst").collect(Collectors.toList()));
+    expNotDefraggedSSTFileList.put(KEY_TABLE, Stream.of("kt1.sst", "kt2.sst").collect(Collectors.toList()));
+    expNotDefraggedSSTFileList.put(FILE_TABLE, Stream.of("ft1.sst", "ft2.sst").collect(Collectors.toList()));
+    expNotDefraggedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1.sst", "dt2.sst").collect(Collectors.toList()));
 
     List<LiveFileMetaData> mockedLiveFiles = new ArrayList<>();
-    for (Map.Entry<String, List<String>> entry : expUncompactedSSTFileList.entrySet()) {
+    for (Map.Entry<String, List<String>> entry : expNotDefraggedSSTFileList.entrySet()) {
       String cfname = entry.getKey();
       for (String fname : entry.getValue()) {
         mockedLiveFiles.add(createMockLiveFileMetadata(cfname, fname));
@@ -309,25 +313,24 @@ class TestOmSnapshotManager {
     when(mockedStore.getDb()).thenReturn(mockedDb);
     when(mockedDb.getLiveFilesMetaData()).thenReturn(mockedLiveFiles);
 
-    Path snapshotYaml = Paths.get(OmSnapshotManager.getSnapshotLocalPropertyYamlPath(
-        omMetadataManager, snapshotInfo));
-
+    Path snapshotYaml = Paths.get(snapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo));
+    when(mockedStore.getDbLocation()).thenReturn(getSnapshotPath(omMetadataManager, snapshotInfo).toFile());
     // Create an existing YAML file for the snapshot
     assertTrue(snapshotYaml.toFile().createNewFile());
     assertEquals(0, Files.size(snapshotYaml));
     // Create a new YAML file for the snapshot
-    OmSnapshotManager.createNewOmSnapshotLocalDataFile(omSnapshotManager, omMetadataManager, snapshotInfo, mockedStore);
+    snapshotLocalDataManager.createNewOmSnapshotLocalDataFile(mockedStore, snapshotInfo);
     // Verify that previous file was overwritten
     assertTrue(Files.exists(snapshotYaml));
     assertTrue(Files.size(snapshotYaml) > 0);
     // Verify the contents of the YAML file
-    OmSnapshotLocalData localData = OmSnapshotLocalDataYaml.getFromYamlFile(omSnapshotManager, snapshotYaml.toFile());
+    OmSnapshotLocalData localData = snapshotLocalDataManager.getOmSnapshotLocalData(snapshotYaml.toFile());
     assertNotNull(localData);
     assertEquals(0, localData.getVersion());
-    assertEquals(uncompactedVersionMeta, localData.getVersionSstFileInfos().get(0));
+    assertEquals(notDefraggedVersionMeta, localData.getVersionSstFileInfos().get(0));
     assertFalse(localData.getSstFiltered());
-    assertEquals(0L, localData.getLastCompactionTime());
-    assertFalse(localData.getNeedsCompaction());
+    assertEquals(0L, localData.getLastDefragTime());
+    assertFalse(localData.getNeedsDefrag());
     assertEquals(1, localData.getVersionSstFileInfos().size());
 
     // Cleanup
