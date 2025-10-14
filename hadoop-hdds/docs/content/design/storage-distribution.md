@@ -110,7 +110,8 @@ Additionally, Recon already possesses a comprehensive physical and logical capac
 - **Enhancement**:
   - Compute block sizes during deletion
 - **Responsibilities**:
-  - Expose logical storage metrics: committed keys, open keys, namespace usage
+  - Expose logical storage metrics — committed keys, open keys, and namespace usage.(All calculations will be performed in Recon using the synchronized OM database.)
+
 
 #### **Recon**
 
@@ -122,7 +123,12 @@ Additionally, Recon already possesses a comprehensive physical and logical capac
 - **Data Sources**:
   - OM DB (via Insight Sync)
   - SCM Client API
-  - DN BlockDeletingService metrics
+  - DN BlockDeletingService metrics (This is done via scrapping jmx metrics from DN in Recon)
+
+#### **Upgrade Path for Data Distribution Feature**
+
+A new SCM upgrade action (ScmOnFinalizeActionForDataDistribution) is introduced. 
+This action is part of the finalization process for the DATA_DISTRIBUTION layout feature, which enables the new block size tracking capabilities.
 
 ---
 ## Approach 2: CLI-based (Not Proceeding)
@@ -149,9 +155,9 @@ To enable this, components should expose metrics that can be scraped by Promethe
   - In every OM db syncing, we can update these metrics values.
 
 - **Storage Container Manager (SCM)**
-  - Block sizes associated with deletion requests and its caching in scm. 
-  - This can be accessed by Recon using scmClient and can be exposed as metrics.
-  - This can also be updated along with OM db syncing so that we will get proper time series data.
+  - The DeletedBlockLogStateManager is enhanced to aggregate these block sizes in-memory, providing a DeletedBlocksTransactionSummary that includes total transaction count, total block count, total block size, and total replicated block size for pending deletions. 
+  - This summary is rebuilt from persisted transaction data upon SCM startup or leader election.
+  - New metrics are introduced in ScmBlockDeletingServiceMetrics to expose the aggregated deletion statistics (transaction count, block count, total size, total replicated size). This provides better operational visibility into the SCM's block deletion queue.
 
 - **DataNodes (DN)**
   - Pending deletion bytes per node. This can be exposed as metrics in BlockDeletingService of DataNode
