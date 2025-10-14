@@ -434,15 +434,15 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             continue;
           }
           String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
-          String path = dbFile.toFile().getAbsolutePath();
-          if (destDir != null) {
-            path = destDir.resolve(dbFile.getFileName()).toString();
-          }
-          // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
-          if (path.contains(OM_CHECKPOINT_DIR)) {
-            path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
-          }
           if (hardLinkFileMap != null) {
+            String path = dbFile.toFile().getAbsolutePath();
+            if (destDir != null) {
+              path = destDir.resolve(dbFile.getFileName()).toString();
+            }
+            // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
+            if (path.contains(OM_CHECKPOINT_DIR)) {
+              path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
+            }
             hardLinkFileMap.put(path, fileId);
           }
           if (!sstFilesToExclude.contains(fileId)) {
