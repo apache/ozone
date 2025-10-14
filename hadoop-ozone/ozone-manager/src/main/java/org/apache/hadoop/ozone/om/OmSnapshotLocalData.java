@@ -31,7 +31,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
-import org.apache.hadoop.ozone.util.Checksum;
+import org.apache.hadoop.ozone.util.WithChecksum;
 import org.apache.ozone.compaction.log.SstFileInfo;
 import org.rocksdb.LiveFileMetaData;
 import org.yaml.snakeyaml.Yaml;
@@ -40,8 +40,7 @@ import org.yaml.snakeyaml.Yaml;
  * OmSnapshotLocalData is the in-memory representation of snapshot local metadata.
  * Inspired by org.apache.hadoop.ozone.container.common.impl.ContainerData
  */
-public class OmSnapshotLocalData implements Checksum<OmSnapshotLocalData> {
-
+public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
   // Unique identifier for the snapshot. This is used to identify the snapshot.
   private UUID snapshotId;
 

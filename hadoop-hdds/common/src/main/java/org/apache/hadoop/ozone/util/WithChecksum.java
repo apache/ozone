@@ -15,25 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.audit;
+package org.apache.hadoop.ozone.util;
+
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 
 /**
- * Enum to define Audit Action types for system audit in OzoneManager. This will in addition to OMAction
- * as present for request.
+ * Represents a generic interface for objects capable of generating or providing
+ * a checksum value.
  */
-public enum OMSystemAction implements AuditAction {
-  STARTUP,
-  LEADER_CHANGE,
-  OPEN_KEY_CLEANUP,
-  DB_CHECKPOINT_INSTALL,
-  DIRECTORY_DELETION,
-  KEY_DELETION,
-  SNAPSHOT_MOVE_TABLE_KEYS,
-  SNAPSHOT_PURGE,
-  SNAPSHOT_SET_PROPERTY;
-
-  @Override
-  public String getAction() {
-    return this.toString();
-  }
+public interface WithChecksum<T extends WithChecksum<T>> extends CopyObject<T> {
+  String getChecksum();
 }

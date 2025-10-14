@@ -24,13 +24,13 @@ import java.io.InputStream;
 
 /**
  * Represents a generic interface for serialization and deserialization
- * operations of objects that extend the {@link Checksum} interface.
+ * operations of objects that extend the {@link WithChecksum} interface.
  * This interface provides functionality for loading and saving objects
  * from/to files or input streams, as well as verifying checksum integrity.
  *
  * @param <T> the type of the object handled by the serializer, must extend {@code Checksum}
  */
-public interface ObjectSerializer<T extends Checksum> extends Closeable {
+public interface ObjectSerializer<T extends WithChecksum> extends Closeable {
 
   /**
    * Loads an object of type T from the specified file.
