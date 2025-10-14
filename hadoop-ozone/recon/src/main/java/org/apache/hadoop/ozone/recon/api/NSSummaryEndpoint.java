@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask;
 
 /**
  * REST APIs for namespace metadata summary.
@@ -119,6 +120,12 @@ public class NSSummaryEndpoint {
 
     DUResponse duResponse = new DUResponse();
     if (!ReconUtils.isInitializationComplete(omMetadataManager)) {
+      duResponse.setStatus(ResponseStatus.INITIALIZING);
+      return Response.ok(duResponse).build();
+    }
+
+    NSSummaryTask.RebuildState rebuildState = ReconUtils.getNSSummaryRebuildState();
+    if (rebuildState == NSSummaryTask.RebuildState.RUNNING) {
       duResponse.setStatus(ResponseStatus.INITIALIZING);
       return Response.ok(duResponse).build();
     }

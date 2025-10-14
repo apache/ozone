@@ -593,6 +593,68 @@ public class TestNSSummaryEndpointWithFSO {
         replicaDUResponse.getDuData().get(0).getSizeWithReplica());
   }
 
+  @Test
+  public void testReplicatedSizePropagationUpwards() throws IOException {
+    // Test that replicated size propagates correctly from files up through the directory hierarchy
+
+    // Get disk usage for individual files first to establish baseline
+    DUResponse file2Response = getDiskUsageResponse(DIR_TWO_PATH + "/file2");
+    DUResponse file3Response = getDiskUsageResponse(DIR_THREE_PATH + "/file3");
+    DUResponse file6Response = getDiskUsageResponse(DIR_FOUR_PATH + "/file6");
+    DUResponse file7Response = getDiskUsageResponse(DIR_ONE_PATH + "/file7");
+
+    // Verify individual file replicated sizes
+    assertEquals(FILE2_SIZE_WITH_REPLICA, file2Response.getSizeWithReplica());
+    assertEquals(FILE3_SIZE_WITH_REPLICA, file3Response.getSizeWithReplica());
+    assertEquals(FILE6_SIZE_WITH_REPLICA, file6Response.getSizeWithReplica());
+    assertEquals(FILE7_SIZE_WITH_REPLICA, file7Response.getSizeWithReplica());
+
+    // Test dir2 (contains only file2)
+    DUResponse dir2Response = getDiskUsageResponse(DIR_TWO_PATH);
+    assertEquals(FILE2_SIZE_WITH_REPLICA, dir2Response.getSizeWithReplica());
+
+    // Test dir3 (contains only file3)
+    DUResponse dir3Response = getDiskUsageResponse(DIR_THREE_PATH);
+    assertEquals(FILE3_SIZE_WITH_REPLICA, dir3Response.getSizeWithReplica());
+
+    // Test dir4 (contains only file6)
+    DUResponse dir4Response = getDiskUsageResponse(DIR_FOUR_PATH);
+    assertEquals(FILE6_SIZE_WITH_REPLICA, dir4Response.getSizeWithReplica());
+
+    // Test dir1 (contains file7 directly + dir2, dir3, dir4 contents)
+    DUResponse dir1Response = getDiskUsageResponse(DIR_ONE_PATH);
+    long expectedDir1ReplicatedSize = FILE2_SIZE_WITH_REPLICA + FILE3_SIZE_WITH_REPLICA +
+        FILE6_SIZE_WITH_REPLICA + FILE7_SIZE_WITH_REPLICA;
+    assertEquals(expectedDir1ReplicatedSize, dir1Response.getSizeWithReplica());
+
+    // Test bucket1 (contains file1 directly + all dir1 contents)
+    DUResponse bucket1Response = getDiskUsageResponse(BUCKET_ONE_PATH);
+    long expectedBucket1ReplicatedSize = FILE1_SIZE_WITH_REPLICA + expectedDir1ReplicatedSize;
+    assertEquals(expectedBucket1ReplicatedSize, bucket1Response.getSizeWithReplica());
+
+    // Test bucket2 (contains file4 and file5)
+    DUResponse bucket2Response = getDiskUsageResponse(BUCKET_TWO_PATH);
+    long expectedBucket2ReplicatedSize = FILE4_SIZE_WITH_REPLICA + FILE5_SIZE_WITH_REPLICA;
+    assertEquals(expectedBucket2ReplicatedSize, bucket2Response.getSizeWithReplica());
+
+    // Test vol (contains bucket1 + bucket2)
+    DUResponse volResponse = getDiskUsageResponse(VOL_PATH);
+    long expectedVolReplicatedSize = expectedBucket1ReplicatedSize + expectedBucket2ReplicatedSize;
+    assertEquals(expectedVolReplicatedSize, volResponse.getSizeWithReplica());
+
+    // Test root (contains vol + vol2)
+    DUResponse rootResponse = getDiskUsageResponse(ROOT_PATH);
+    long expectedVol2ReplicatedSize = FILE8_SIZE_WITH_REPLICA + FILE9_SIZE_WITH_REPLICA +
+        FILE10_SIZE_WITH_REPLICA + FILE11_SIZE_WITH_REPLICA;
+    long expectedRootReplicatedSize = expectedVolReplicatedSize + expectedVol2ReplicatedSize;
+    assertEquals(expectedRootReplicatedSize, rootResponse.getSizeWithReplica());
+  }
+
+  private DUResponse getDiskUsageResponse(String path) throws IOException {
+    Response response = nsSummaryEndpoint.getDiskUsage(path, false, true, false);
+    return (DUResponse) response.getEntity();
+  }
+
   /**
    * When calculating DU under dir1
    * there are 3 keys, file2, file3, file6.
