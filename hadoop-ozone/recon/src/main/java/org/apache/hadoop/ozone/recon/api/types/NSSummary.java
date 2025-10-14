@@ -153,6 +153,7 @@ public class NSSummary {
         ", childDir=" + childDir +
         ", numOfFiles=" + numOfFiles +
         ", sizeOfFiles=" + sizeOfFiles +
+        ", replicatedSizeOfFiles=" + replicatedSizeOfFiles +
         ", fileSizeBucket=" + Arrays.toString(fileSizeBucket) +
         '}';
   }

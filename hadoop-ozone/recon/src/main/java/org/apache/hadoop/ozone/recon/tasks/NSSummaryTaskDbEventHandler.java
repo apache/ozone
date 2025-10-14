@@ -98,8 +98,8 @@ public class NSSummaryTaskDbEventHandler {
       nsSummary = new NSSummary();
     }
     int[] fileBucket = nsSummary.getFileSizeBucket();
-    
-    // Update immediate parent's totals (these fields now represent totals)
+
+    // Update immediate parent's totals (includes all descendant files)
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
     nsSummary.setReplicatedSizeOfFiles(nsSummary.getReplicatedSizeOfFiles() + keyInfo.getReplicatedSize());
