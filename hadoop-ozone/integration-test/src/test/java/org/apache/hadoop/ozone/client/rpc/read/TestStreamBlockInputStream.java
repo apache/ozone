@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -43,7 +44,6 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
    * for each test.
    */
 
-  private String keyName = getNewKeyName();
   private int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
   byte[] inputData;
   private TestBucket bucket;
@@ -59,14 +59,21 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       clientConfig.setStreamReadBlock(true);
       OzoneConfiguration copy = new OzoneConfiguration(conf);
       copy.setFromObject(clientConfig);
+      String keyName = getNewKeyName();
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
         bucket = TestBucket.newBuilder(client).build();
         inputData = bucket.writeRandomBytes(keyName, dataLength);
-        testReadKeyFully();
-        testSeek();
-      //  testBufferRelease(bucket);
-      //  testCloseReleasesBuffers(bucket);
-      //  testReadEmptyBlock(bucket);
+        testReadKeyFully(keyName);
+        testSeek(keyName);
+      }
+      keyName = getNewKeyName();
+      clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
+      copy.setFromObject(clientConfig);
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
+        bucket = TestBucket.newBuilder(client).build();
+        inputData = bucket.writeRandomBytes(keyName, dataLength);
+        testReadKeyFully(keyName);
+        testSeek(keyName);
       }
     }
   }
@@ -75,9 +82,9 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
    * Test to verify that data read from blocks is stored in a list of buffers
    * with max capacity equal to the bytes per checksum.
    */
-  private void testReadKeyFully() throws Exception {
+  private void testReadKeyFully(String key) throws Exception {
     // Read the data fully into a large enough byte array
-    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
       byte[] readData = new byte[dataLength];
       int totalRead = keyInputStream.read(readData, 0, dataLength);
       assertEquals(dataLength, totalRead);
@@ -87,7 +94,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       }
     }
     // Read the data 1 byte at a time
-    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
       for (int i = 0; i < dataLength; i++) {
         int b = keyInputStream.read();
         assertEquals(inputData[i], (byte) b,
@@ -95,7 +102,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       }
     }
     // Read the data into a large enough ByteBuffer
-    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
       ByteBuffer readBuf = ByteBuffer.allocate(dataLength);
       int totalRead = keyInputStream.read(readBuf);
       assertEquals(dataLength, totalRead);
@@ -107,9 +114,9 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
     }
   }
 
-  private void testSeek() throws IOException {
+  private void testSeek(String key) throws IOException {
     java.util.Random random = new java.util.Random();
-    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
       for (int i = 0; i < 100; i++) {
         int position = random.nextInt(dataLength);
         keyInputStream.seek(position);
