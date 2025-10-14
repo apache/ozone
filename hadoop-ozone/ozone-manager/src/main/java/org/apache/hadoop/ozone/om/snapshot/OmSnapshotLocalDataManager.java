@@ -651,6 +651,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           validateVersionRemoval(snapshotId, entry.getKey());
         }
       }
+      SnapshotVersionsMeta existingVersionMeta = getVersionNodeMap().get(snapshotId);
+      // Set the needsDefrag if the new previous snapshotId is different from the existing one or if this is a new
+      // snapshot yaml file.
+      snapshotLocalData.setNeedsDefrag(existingVersionMeta == null
+          || !Objects.equals(existingVersionMeta.getPreviousSnapshotId(), snapshotLocalData.getPreviousSnapshotId()));
       return versionsToBeAdded;
     }
 
