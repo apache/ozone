@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
@@ -109,10 +110,12 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     ContainerHealthSchemaManager containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
+    ReconGlobalStatsManager reconGlobalStatsManager = 
+        reconTestInjector.getInstance(ReconGlobalStatsManager.class);
     conf = mock(OzoneConfiguration.class);
     clusterStateEndpoint =
-        new ClusterStateEndpoint(ozoneStorageContainerManager, globalStatsDao,
-            containerHealthSchemaManager, conf);
+        new ClusterStateEndpoint(ozoneStorageContainerManager, globalStatsDao, 
+            reconGlobalStatsManager, containerHealthSchemaManager, conf);
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);

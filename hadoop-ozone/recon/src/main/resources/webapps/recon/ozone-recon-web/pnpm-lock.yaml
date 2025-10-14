@@ -21,8 +21,8 @@ dependencies:
     specifier: ~4.10.3
     version: 4.10.3(react-dom@16.14.0)(react@16.14.0)
   axios:
-    specifier: ^0.30.2
-    version: 0.30.2
+    specifier: ~1.9.0
+    version: 1.9.0
   classnames:
     specifier: ^2.3.2
     version: 2.5.1
@@ -1908,8 +1908,8 @@ packages:
     resolution: {integrity: sha512-lHe62zvbTB5eEABUVi/AwVh0ZKY9rMMDhmm+eeyuuUQbQ3+J+fONVQOZyj+DdrvD4BY33uYniyRJ4UJIaSKAfw==}
     dev: true
 
-  /axios@0.30.2:
-    resolution: {integrity: sha512-0pE4RQ4UQi1jKY6p7u6i1Tkzqmu+d+/tHS7Q7rKunWLB9WyilBTpHHpXzPNMDj5hTbK0B0PTLSz07yqMBiF6xg==}
+  /axios@1.9.0:
+    resolution: {integrity: sha512-re4CqKTJaURpzbLHtIi6XpDv20/CnpXOtjRY5/CU32L8gU8ek9UIivcfvSWvmKEngmVbrUtPpdDwWDWL7DNHvg==}
     dependencies:
       follow-redirects: 1.15.11
       form-data: 4.0.4
