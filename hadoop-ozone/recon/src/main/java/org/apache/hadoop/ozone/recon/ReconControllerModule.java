@@ -51,12 +51,14 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerSizeMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerSizeMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconFileMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconGlobalStatsManagerImpl;
@@ -109,6 +111,8 @@ public class ReconControllerModule extends AbstractModule {
         .to(ReconFileMetadataManagerImpl.class).in(Singleton.class);
     bind(ReconGlobalStatsManager.class)
         .to(ReconGlobalStatsManagerImpl.class).in(Singleton.class);
+    bind(ReconContainerSizeMetadataManager.class)
+        .to(ReconContainerSizeMetadataManagerImpl.class).in(Singleton.class);
     bind(ReconNamespaceSummaryManager.class)
         .to(ReconNamespaceSummaryManagerImpl.class).in(Singleton.class);
     bind(OzoneManagerServiceProvider.class)

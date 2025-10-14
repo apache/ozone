@@ -117,12 +117,11 @@ import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.fsck.ReconSafeModeMgrTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerSizeMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
-import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -165,7 +164,6 @@ public class ReconStorageContainerManagerFacade
   private ReconSafeModeManager safeModeManager;
   private ReconSafeModeMgrTask reconSafeModeMgrTask;
   private ContainerSizeCountTask containerSizeCountTask;
-  private ContainerCountBySizeDao containerCountBySizeDao;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
@@ -175,8 +173,7 @@ public class ReconStorageContainerManagerFacade
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
                                             StorageContainerServiceProvider scmServiceProvider,
-                                            ContainerCountBySizeDao containerCountBySizeDao,
-                                            UtilizationSchemaDefinition utilizationSchemaDefinition,
+                                            ReconContainerSizeMetadataManager reconContainerSizeMetadataManager,
                                             ContainerHealthSchemaManager containerHealthSchemaManager,
                                             ReconContainerMetadataManager reconContainerMetadataManager,
                                             ReconUtils reconUtils,
@@ -249,7 +246,6 @@ public class ReconStorageContainerManagerFacade
         scmhaManager, sequenceIdGen, pendingOps);
     this.scmServiceProvider = scmServiceProvider;
     this.isSyncDataFromSCMRunning = new AtomicBoolean();
-    this.containerCountBySizeDao = containerCountBySizeDao;
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
 
@@ -270,7 +266,7 @@ public class ReconStorageContainerManagerFacade
         reconTaskConfig, reconContainerMetadataManager, conf, taskStatusUpdaterManager);
 
     this.containerSizeCountTask = new ContainerSizeCountTask(containerManager,
-        reconTaskConfig, containerCountBySizeDao, utilizationSchemaDefinition, taskStatusUpdaterManager);
+        reconTaskConfig, reconContainerSizeMetadataManager, taskStatusUpdaterManager);
 
     this.dataSource = dataSource;
 
@@ -713,11 +709,6 @@ public class ReconStorageContainerManagerFacade
   @VisibleForTesting
   public ContainerHealthTask getContainerHealthTask() {
     return containerHealthTask;
-  }
-
-  @VisibleForTesting
-  public ContainerCountBySizeDao getContainerCountBySizeDao() {
-    return containerCountBySizeDao;
   }
 
   public ReconContext getReconContext() {
