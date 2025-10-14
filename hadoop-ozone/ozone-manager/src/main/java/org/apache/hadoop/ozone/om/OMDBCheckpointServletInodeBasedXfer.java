@@ -94,6 +94,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   protected static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServletInodeBasedXfer.class);
   private static final long serialVersionUID = 1L;
+  private transient BootstrapStateHandler.Lock lock;
 
   @Override
   public void init() throws ServletException {
@@ -124,6 +125,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
+    lock = new OMDBCheckpointServlet.Lock(om);
+  }
+
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
   }
 
   @Override
