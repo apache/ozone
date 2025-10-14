@@ -246,7 +246,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         // we finished transferring files from snapshot DB's by now and
         // this is the last step where we transfer the active om.db contents
         SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
-        // lock is null when includeSnapshotData=false, no snapshot consistency needed
+        /*
+         * When includeSnapshotData is false, lock is set to null and no locking is performed.
+         * In this case, the try-with-resources block does not call close() on any resource,
+         * which is intentional because snapshot consistency is not required.
+         * This pattern is safe in Java: try-with-resources will simply skip closing if the resource is null.
+         */
         try (UncheckedAutoCloseableSupplier<OMLockDetails> lock = includeSnapshotData ? snapshotCache.lock() : null) {
           checkpoint = createAndPrepareCheckpoint(tmpdir, true);
           // unlimited files as we want the Active DB contents to be transferred in a single batch
@@ -296,8 +301,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
     for (Path snapshotDir : snapshotPaths) {
       String snapshotId = OmSnapshotManager.extractSnapshotIDFromCheckpointDirName(snapshotDir.toString());
-      // invalidate closes the snapshot DB
-      om.getOmSnapshotManager().invalidateCacheEntry(UUID.fromString(snapshotId));
       writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir, hardLinkFileMap,
           false);
       Path snapshotLocalPropertyYaml = Paths.get(OmSnapshotManager.getSnapshotLocalPropertyYamlPath(snapshotDir));
