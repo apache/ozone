@@ -40,6 +40,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
+import org.apache.hadoop.hdds.utils.HttpServletUtils;
 import org.apache.hadoop.util.XMLUtils;
 import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,27 +64,8 @@ public class TestHddsConfServlet {
     TEST_PROPERTIES.put("test.key1", "value1");
     TEST_PROPERTIES.put("test.key2", "value2");
     TEST_PROPERTIES.put("test.key3", "value3");
-    TEST_FORMATS.put(HddsConfServlet.ResponseFormat.XML.toString(), "application/xml");
-    TEST_FORMATS.put(HddsConfServlet.ResponseFormat.JSON.toString(), "application/json");
-  }
-
-  @Test
-  public void testParseHeaders() throws Exception {
-    HashMap<String, HddsConfServlet.ResponseFormat> verifyMap = new HashMap<>();
-    verifyMap.put("text/plain", HddsConfServlet.ResponseFormat.XML);
-    verifyMap.put(null, HddsConfServlet.ResponseFormat.XML);
-    verifyMap.put("text/xml", HddsConfServlet.ResponseFormat.XML);
-    verifyMap.put("application/xml", HddsConfServlet.ResponseFormat.XML);
-    verifyMap.put("application/json", HddsConfServlet.ResponseFormat.JSON);
-
-    HttpServletRequest request = mock(HttpServletRequest.class);
-    for (Map.Entry<String, HddsConfServlet.ResponseFormat> entry : verifyMap.entrySet()) {
-      HddsConfServlet.ResponseFormat contenTypeActual = entry.getValue();
-      when(request.getHeader(HttpHeaders.ACCEPT))
-          .thenReturn(entry.getKey());
-      assertEquals(contenTypeActual,
-          HddsConfServlet.parseAcceptHeader(request));
-    }
+    TEST_FORMATS.put(HttpServletUtils.ResponseFormat.XML.toString(), "application/xml");
+    TEST_FORMATS.put(HttpServletUtils.ResponseFormat.JSON.toString(), "application/json");
   }
 
   @Test
@@ -124,7 +106,7 @@ public class TestHddsConfServlet {
   @SuppressWarnings("unchecked")
   public void testWriteJson() throws Exception {
     StringWriter sw = new StringWriter();
-    HddsConfServlet.writeResponse(getTestConf(), sw, HddsConfServlet.ResponseFormat.JSON, null);
+    HttpServletUtils.writeResponse(getTestConf(), sw, HttpServletUtils.ResponseFormat.JSON, null);
     String json = sw.toString();
     boolean foundSetting = false;
     Object parsed = JSON.parse(json);
@@ -145,7 +127,7 @@ public class TestHddsConfServlet {
   @Test
   public void testWriteXml() throws Exception {
     StringWriter sw = new StringWriter();
-    HddsConfServlet.writeResponse(getTestConf(), sw, HddsConfServlet.ResponseFormat.XML, null);
+    HttpServletUtils.writeResponse(getTestConf(), sw, HttpServletUtils.ResponseFormat.XML, null);
     String xml = sw.toString();
 
     DocumentBuilderFactory docBuilderFactory =
