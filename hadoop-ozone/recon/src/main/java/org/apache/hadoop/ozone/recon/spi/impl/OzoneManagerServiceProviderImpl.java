@@ -318,7 +318,7 @@ public class OzoneManagerServiceProviderImpl
       LOG.info("Re-initializing all tasks again (not just above failed delta tasks) based on updated OM DB snapshot " +
           "and last updated sequence number because fresh staging DB needs to be created for all tasks.");
       // Reinitialize tasks that are listening.
-      LOG.info("Queueing async reinitialization event instead of blocking call at startup.");
+      LOG.info("Queueing async reinitialization events during startup.");
       ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
           ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
       if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
