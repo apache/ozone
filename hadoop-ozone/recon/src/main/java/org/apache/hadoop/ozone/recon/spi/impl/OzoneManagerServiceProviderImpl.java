@@ -92,6 +92,7 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.TarExtractor;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
+import org.apache.hadoop.ozone.recon.metrics.ReconSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
@@ -130,6 +131,7 @@ public class OzoneManagerServiceProviderImpl
   private ReconTaskController reconTaskController;
   private ReconUtils reconUtils;
   private OzoneManagerSyncMetrics metrics;
+  private ReconSyncMetrics reconSyncMetrics;
 
   private final long deltaUpdateLimit;
   private final long omDBLagThreshold;
@@ -219,6 +221,7 @@ public class OzoneManagerServiceProviderImpl
     this.ozoneManagerClient = ozoneManagerClient;
     this.configuration = configuration;
     this.metrics = OzoneManagerSyncMetrics.create();
+    this.reconSyncMetrics = ReconSyncMetrics.create();
     this.deltaUpdateLimit = deltaUpdateLimits;
     this.isSyncDataFromOMRunning = new AtomicBoolean();
     this.threadNamePrefix =
@@ -374,6 +377,7 @@ public class OzoneManagerServiceProviderImpl
     scheduler.shutdownNow();
     tarExtractor.stop();
     metrics.unRegister();
+    reconSyncMetrics.unRegister();
     connectionFactory.destroy();
   }
 
@@ -492,32 +496,50 @@ public class OzoneManagerServiceProviderImpl
   boolean updateReconOmDBWithNewSnapshot() throws IOException {
     // Check permissions of the Recon DB directory
     checkAndValidateReconDbPermissions();
+
+    // Track full DB fetch request
+    reconSyncMetrics.incrFullDBFetchRequests();
+
     // Obtain the current DB snapshot from OM and
     // update the in house OM metadata managed DB instance.
     long startTime = Time.monotonicNow();
     DBCheckpoint dbSnapshot = getOzoneManagerDBSnapshot();
-    metrics.updateSnapshotRequestLatency(Time.monotonicNow() - startTime);
+    long fullDBLatency = Time.monotonicNow() - startTime;
+
+    reconSyncMetrics.updateFullDBRequestLatency(fullDBLatency);
 
     if (dbSnapshot == null) {
       LOG.error("Failed to obtain a valid DB snapshot from Ozone Manager. This could be due to " +
           "missing SST files or other fetch issues.");
+      reconSyncMetrics.incrSnapshotDownloadFailures();
       return false;
     }
 
     if (dbSnapshot.getCheckpointLocation() == null) {
       LOG.error("Snapshot checkpoint location is null, indicating a failure to properly fetch or " +
           "store the snapshot.");
+      reconSyncMetrics.incrSnapshotDownloadFailures();
       return false;
     }
 
     LOG.info("Attempting to update Recon OM DB with new snapshot located at: {}",
         dbSnapshot.getCheckpointLocation());
     try {
-      omMetadataManager.updateOmDB(dbSnapshot.getCheckpointLocation().toFile(), true);
+      // Calculate snapshot size
+      File snapshotDir = dbSnapshot.getCheckpointLocation().toFile();
+      long snapshotSize = FileUtils.sizeOfDirectory(snapshotDir);
+      reconSyncMetrics.incrSnapshotSizeBytes(snapshotSize);
+
+      omMetadataManager.updateOmDB(snapshotDir, true);
+
+      // Track successful snapshot download
+      reconSyncMetrics.incrSnapshotDownloadSuccess();
+
       LOG.info("Successfully updated Recon OM DB with new snapshot.");
       return true;
     } catch (IOException e) {
       LOG.error("Unable to refresh Recon OM DB Snapshot.", e);
+      reconSyncMetrics.incrSnapshotDownloadFailures();
       return false;
     }
   }
@@ -565,34 +587,70 @@ public class OzoneManagerServiceProviderImpl
   ImmutablePair<Boolean, Long> innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
                                                                   OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
+    // Track delta fetch operation
+    long deltaFetchStartTime = Time.monotonicNow();
+
     DBUpdatesRequest dbUpdatesRequest = DBUpdatesRequest.newBuilder()
         .setSequenceNumber(fromSequenceNumber)
         .setLimitCount(deltaUpdateLimit)
         .build();
     DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
+
+    // Update delta fetch duration
+    long deltaFetchDuration = Time.monotonicNow() - deltaFetchStartTime;
+    reconSyncMetrics.updateDeltaFetchDuration(deltaFetchDuration);
+
     int numUpdates = 0;
     long latestSequenceNumberOfOM = -1L;
     if (null != dbUpdates && dbUpdates.getCurrentSequenceNumber() != -1) {
+      // Delta fetch succeeded
+      reconSyncMetrics.incrDeltaFetchSuccess();
+
       latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
       final RocksDatabase rocksDB = rocksDBStore.getDb();
       numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
+
+        // Track delta data fetch size
+        long totalDataSize = 0;
+        for (byte[] data : dbUpdates.getData()) {
+          totalDataSize += data.length;
+        }
+        reconSyncMetrics.incrDeltaDataFetchSize(totalDataSize);
       }
-      for (byte[] data : dbUpdates.getData()) {
-        try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
-          // Events gets populated in events list in OMDBUpdatesHandler with call back for put/delete/update
-          writeBatch.iterate(omdbUpdatesHandler);
-          // Commit the OM DB transactions in recon rocks DB and sync here.
-          try (RDBBatchOperation rdbBatchOperation =
-                   new RDBBatchOperation(writeBatch)) {
-            try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
-              rdbBatchOperation.commit(rocksDB, wOpts);
+
+      // Track delta apply (conversion + DB apply combined)
+      long deltaApplyStartTime = Time.monotonicNow();
+
+      try {
+        for (byte[] data : dbUpdates.getData()) {
+          try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
+            // Events gets populated in events list in OMDBUpdatesHandler with call back for put/delete/update
+            writeBatch.iterate(omdbUpdatesHandler);
+            // Commit the OM DB transactions in recon rocks DB and sync here.
+            try (RDBBatchOperation rdbBatchOperation =
+                     new RDBBatchOperation(writeBatch)) {
+              try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
+                rdbBatchOperation.commit(rocksDB, wOpts);
+              }
             }
           }
         }
+
+        // Update delta apply duration (successful)
+        long deltaApplyDuration = Time.monotonicNow() - deltaApplyStartTime;
+        reconSyncMetrics.updateDeltaApplyDuration(deltaApplyDuration);
+
+      } catch (RocksDBException | IOException e) {
+        // Track delta apply failures
+        reconSyncMetrics.incrDeltaApplyFailures();
+        throw e;
       }
+    } else {
+      // Delta fetch failed
+      reconSyncMetrics.incrDeltaFetchFailures();
     }
     long lag = latestSequenceNumberOfOM == -1 ? 0 :
         latestSequenceNumberOfOM - getCurrentOMDBSequenceNumber();

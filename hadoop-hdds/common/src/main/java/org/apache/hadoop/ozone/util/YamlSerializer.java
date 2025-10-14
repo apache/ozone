@@ -31,11 +31,11 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * An abstract serializer for objects that extend the {@link Checksum} interface.
+ * An abstract serializer for objects that extend the {@link WithChecksum} interface.
  * This class provides mechanisms for serializing and deserializing objects
  * in a YAML format.
  */
-public abstract class YamlSerializer<T extends Checksum<T>> implements ObjectSerializer<T> {
+public abstract class YamlSerializer<T extends WithChecksum<T>> implements ObjectSerializer<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(YamlSerializer.class);
 
