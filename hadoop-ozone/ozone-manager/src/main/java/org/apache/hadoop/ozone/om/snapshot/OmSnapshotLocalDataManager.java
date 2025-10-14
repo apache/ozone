@@ -637,20 +637,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       this.version = version;
     }
 
-    private int getVersion() {
-      return version;
-    }
-
-    private UUID getSnapshotId() {
-      return snapshotId;
-    }
-
     private UUID getPreviousSnapshotId() {
       return previousSnapshotId;
-    }
-
-    private int getPreviousSnapshotVersion() {
-      return previousSnapshotVersion;
     }
 
     @Override
