@@ -47,22 +47,22 @@ public class HttpServletUtils implements Serializable {
         ResponseFormat.JSON : ResponseFormat.XML;
   }
 
-    /**
-     * Guts of the servlet - extracted for easy testing.
-     */
-    public static void writeResponse(OzoneConfiguration conf,
-                                     Writer out, ResponseFormat format, String propertyName)
-            throws IOException, IllegalArgumentException {
-        switch (format) {
-            case JSON:
-                OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
-                break;
-            case XML:
-            default:
-                conf.writeXml(propertyName, out);
-                break;
-        }
+  /**
+   * Guts of the servlet - extracted for easy testing.
+   */
+  public static void writeResponse(OzoneConfiguration conf,
+                                   Writer out, ResponseFormat format, String propertyName)
+      throws IOException, IllegalArgumentException {
+    switch (format) {
+    case JSON:
+      OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
+      break;
+    case XML:
+    default:
+      conf.writeXml(propertyName, out);
+      break;
     }
+  }
 
   /**
    * Write error response according to the specified format.
