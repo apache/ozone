@@ -414,6 +414,10 @@ public class OzoneDelegationTokenSecretManager
     if (StringUtils.isNotEmpty(secretKeyId)) {
       try {
         ManagedSecretKey verifyKey = secretKeyClient.getSecretKey(UUID.fromString(secretKeyId));
+        if (verifyKey == null) {
+          throw new SCMSecurityException("Secret verify key " + UUID.fromString(secretKeyId) +
+              " not found for token " + formatTokenId(identifier));
+        }
         return verifyKey.isValidSignature(identifier.getBytes(), password);
       } catch (SCMSecurityException e) {
         LOG.error("verifySignature for identifier {} failed", identifier, e);
@@ -480,7 +484,7 @@ public class OzoneDelegationTokenSecretManager
       awsSecret = s3SecretManager.getSecretString(identifier
           .getAwsAccessId());
     } catch (IOException e) {
-      LOG.error("Error while validating S3 identifier:{}",
+      LOG.warn("S3 identifier validation failed:{}",
           identifier, e);
       throw new InvalidToken("No S3 secret found for S3 identifier:"
           + identifier);

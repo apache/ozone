@@ -32,6 +32,7 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotPurgeResponse;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotPurgeRequest;
@@ -157,6 +159,14 @@ public class TestOMSnapshotPurgeRequestAndResponse extends TestSnapshotRequestAn
 
     List<String> snapshotDbKeysToPurge = createSnapshots(10);
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
+
+    // Check if all the checkpoints are created.
+    for (Path checkpoint : checkpointPaths) {
+      assertTrue(Files.exists(checkpoint));
+      assertTrue(Files.exists(Paths.get(
+          OmSnapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(checkpoint))));
+    }
+
     OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
         snapshotDbKeysToPurge);
 

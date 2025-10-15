@@ -52,14 +52,17 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   private List<SnapshotMoveKeyInfos> reclaimKeysList;
   private List<HddsProtos.KeyValue> renamedKeysList;
   private List<String> movedDirs;
+  private long bucketId;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
       @Nonnull SnapshotInfo fromSnapshot,
       SnapshotInfo nextSnapshot,
       List<SnapshotMoveKeyInfos> nextDBKeysList,
       List<SnapshotMoveKeyInfos> reclaimKeysList,
       List<HddsProtos.KeyValue> renamedKeysList,
-      List<String> movedDirs) {
+      List<String> movedDirs,
+      long bucketId) {
     super(omResponse);
     this.fromSnapshot = fromSnapshot;
     this.nextSnapshot = nextSnapshot;
@@ -67,6 +70,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     this.reclaimKeysList = reclaimKeysList;
     this.renamedKeysList = renamedKeysList;
     this.movedDirs = movedDirs;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -155,8 +159,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
                                   OMMetadataManager metadataManager)
       throws IOException {
     for (SnapshotMoveKeyInfos dBKey : reclaimKeysList) {
-      RepeatedOmKeyInfo omKeyInfos =
-          createRepeatedOmKeyInfo(dBKey.getKeyInfosList());
+      RepeatedOmKeyInfo omKeyInfos = createRepeatedOmKeyInfo(dBKey.getKeyInfosList(), bucketId);
       // omKeyInfos can be null, because everything from RepeatedOmKeyInfo
       // is moved to next snapshot which means this key can be deleted in
       // the current snapshot processed by SDS. The reclaim key here indicates
@@ -198,7 +201,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
 
     for (SnapshotMoveKeyInfos dBKey : nextDBKeysList) {
-      RepeatedOmKeyInfo omKeyInfos = createMergedRepeatedOmKeyInfoFromDeletedTableEntry(dBKey, metadataManager);
+      RepeatedOmKeyInfo omKeyInfos = createMergedRepeatedOmKeyInfoFromDeletedTableEntry(dBKey, bucketId,
+          metadataManager);
       if (omKeyInfos == null) {
         continue;
       }
@@ -208,12 +212,12 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   }
 
   public static RepeatedOmKeyInfo createRepeatedOmKeyInfo(
-      List<KeyInfo> keyInfoList) throws IOException {
+      List<KeyInfo> keyInfoList, long bucketId) throws IOException {
     RepeatedOmKeyInfo result = null;
 
     for (KeyInfo keyInfo: keyInfoList) {
       if (result == null) {
-        result = new RepeatedOmKeyInfo(OmKeyInfo.getFromProtobuf(keyInfo));
+        result = new RepeatedOmKeyInfo(OmKeyInfo.getFromProtobuf(keyInfo), bucketId);
       } else {
         result.addOmKeyInfo(OmKeyInfo.getFromProtobuf(keyInfo));
       }

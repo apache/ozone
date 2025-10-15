@@ -772,6 +772,8 @@ message BucketInfo {
     optional BucketLayoutProto bucketLayout = 18;
     optional string owner = 19;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
+    optional uint64 snapshotUsedBytes = 21;
+    optional uint64 snapshotUsedNamespace = 22;
 }
 
 enum BucketLayoutProto {
@@ -896,6 +898,7 @@ message SnapshotInfo {
   optional uint64 exclusiveSizeDeltaFromDirDeepCleaning = 21;
   // snapshot exclusive size after replication
   optional uint64 exclusiveReplicatedSizeDeltaFromDirDeepCleaning = 22;
+  optional bytes createTransactionInfo = 23;
 }
 
 message SnapshotDiffJobProto {
@@ -1172,6 +1175,25 @@ message KeyInfo {
     optional uint64 expectedDataGeneration = 22;
 }
 
+// KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
+// selected fields only, while maintaining the same field indices as KeyInfo
+// for compatibility and consistency.
+message KeyInfoProtoLight {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  required string keyName = 3;
+  required uint64 dataSize = 4;
+  required hadoop.hdds.ReplicationType type = 5;
+  optional hadoop.hdds.ReplicationFactor factor = 6;
+  required uint64 creationTime = 8;
+  required uint64 modificationTime = 9;
+  optional uint64 objectID = 14;
+  optional uint64 updateID = 15;
+  optional uint64 parentID = 16;
+  optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
+  optional bool isFile = 19;
+}
+
 message BasicKeyInfo {
     optional string keyName = 1;
     optional uint64 dataSize = 2;
@@ -1182,6 +1204,7 @@ message BasicKeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
     optional string eTag = 8;
     optional string ownerName = 9;
+    optional bool isEncrypted = 10;
 }
 
 message DirectoryInfo {
@@ -1198,6 +1221,7 @@ message DirectoryInfo {
 
 message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
+    optional uint64 bucketId = 2;
 }
 
 message OzoneFileStatusProto {
@@ -1393,6 +1417,13 @@ message PurgeKeysRequest {
     // previous snapshotID can also be null & this field would be absent in older requests.
     optional NullableUUID expectedPreviousSnapshotID = 4;
     repeated string renamedKeys = 5;
+    repeated BucketPurgeKeysSize bucketPurgeKeysSize = 6;
+}
+
+message BucketPurgeKeysSize {
+  optional BucketNameInfo bucketNameInfo = 1;
+  optional uint64 purgedBytes = 2;
+  optional uint64 purgedNamespace = 3;
 }
 
 message PurgeKeysResponse {
@@ -1417,6 +1448,14 @@ message PurgeDirectoriesRequest {
   optional string snapshotTableKey = 2;
   // previous snapshotID can also be null & this field would be absent in older requests.
   optional NullableUUID expectedPreviousSnapshotID = 3;
+  repeated BucketNameInfo bucketNameInfos = 4;
+}
+
+message BucketNameInfo {
+  optional uint64 volumeId = 1;
+  optional uint64 bucketId = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
 }
 
 message NullableUUID {
@@ -2021,6 +2060,7 @@ message SnapshotMoveTableKeysRequest {
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
+  optional uint64 bucketId = 3;
 }
 
 message SnapshotPurgeRequest {

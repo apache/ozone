@@ -120,6 +120,9 @@ public final class HddsConfigKeys {
   // metadata locations must be configured explicitly.
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
 
+  public static final String DATANODE_DB_CONFIG_PATH = "hdds.datanode.db.config.path";
+  public static final String DATANODE_DB_CONFIG_PATH_DEFAULT = "";
+
   public static final String HDDS_PROMETHEUS_ENABLED =
       "hdds.prometheus.endpoint.enabled";
 
@@ -255,7 +258,7 @@ public final class HddsConfigKeys {
 
   public static final String HDDS_SECRET_KEY_EXPIRY_DURATION =
       "hdds.secret.key.expiry.duration";
-  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "7d";
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "9d";
 
   public static final String HDDS_SECRET_KEY_ROTATE_DURATION =
       "hdds.secret.key.rotate.duration";

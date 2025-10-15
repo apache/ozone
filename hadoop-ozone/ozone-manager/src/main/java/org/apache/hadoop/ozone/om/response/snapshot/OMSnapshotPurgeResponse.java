@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,7 +97,9 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
           .removeFromSnapshotIdToTable(snapshotInfo.getSnapshotId());
       // Delete Snapshot checkpoint directory.
-      deleteCheckpointDirectory(omMetadataManager, snapshotInfo);
+      OmSnapshotLocalDataManager snapshotLocalDataManager = ((OmMetadataManagerImpl) omMetadataManager)
+          .getOzoneManager().getOmSnapshotManager().getSnapshotLocalDataManager();
+      deleteCheckpointDirectory(snapshotLocalDataManager, omMetadataManager, snapshotInfo);
       // Delete snapshotInfo from the table.
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
     }
@@ -115,8 +118,8 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
   /**
    * Deletes the checkpoint directory for a snapshot.
    */
-  private void deleteCheckpointDirectory(OMMetadataManager omMetadataManager,
-                                         SnapshotInfo snapshotInfo) {
+  private void deleteCheckpointDirectory(OmSnapshotLocalDataManager snapshotLocalDataManager,
+      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) {
     // Acquiring write lock to avoid race condition with sst filtering service which creates a sst filtered file
     // inside the snapshot directory. Any operation apart which doesn't create/delete files under this snapshot
     // directory can run in parallel along with this operation.

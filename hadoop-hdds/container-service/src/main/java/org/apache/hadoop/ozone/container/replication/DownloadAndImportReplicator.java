@@ -73,7 +73,9 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     HddsVolume targetVolume = null;
 
     try {
-      targetVolume = containerImporter.chooseNextVolume();
+      targetVolume = containerImporter.chooseNextVolume(
+          containerImporter.getDefaultReplicationSpace());
+
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.
       Path tarFilePath =

@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURAT
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
-import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -65,6 +64,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
@@ -131,7 +131,7 @@ public final class HAUtils {
       OzoneConfiguration conf) {
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
         new ScmBlockLocationProtocolClientSideTranslatorPB(
-            new SCMBlockLocationFailoverProxyProvider(conf));
+            new SCMBlockLocationFailoverProxyProvider(conf), conf);
     return TracingUtil
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
@@ -318,28 +318,24 @@ public final class HAUtils {
   }
 
   /**
-   * Scan the DB dir and return the existing SST files,
-   * including omSnapshot sst files.
-   * SSTs could be used for avoiding repeated download.
+   * Scan the DB dir and return the existing files,
+   * including omSnapshot files.
    *
    * @param db the file representing the DB to be scanned
-   * @return the list of SST file name. If db not exist, will return empty list
+   * @return the list of file names. If db not exist, will return empty list
    */
-  public static List<String> getExistingSstFiles(File db) throws IOException {
+  public static List<String> getExistingFiles(File db) throws IOException {
     List<String> sstList = new ArrayList<>();
     if (!db.exists()) {
       return sstList;
     }
-
-    int truncateLength = db.toString().length() + 1;
     // Walk the db dir and get all sst files including omSnapshot files.
     try (Stream<Path> files = Files.walk(db.toPath())) {
-      sstList =
-          files.filter(path -> path.toString().endsWith(ROCKSDB_SST_SUFFIX)).
-              map(p -> p.toString().substring(truncateLength)).
+      sstList = files.filter(p -> p.toFile().isFile())
+          .map(p -> p.getFileName().toString()).
               collect(Collectors.toList());
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Scanned SST files {} in {}.", sstList, db.getAbsolutePath());
+        LOG.debug("Scanned files {} in {}.", sstList, db.getAbsolutePath());
       }
     }
     return sstList;
@@ -347,21 +343,45 @@ public final class HAUtils {
 
   /**
    * Retry forever until CA list matches expected count.
+   * Fails fast on authentication exceptions.
    * @param task - task to get CA list.
    * @return CA list.
    */
   private static List<String> getCAListWithRetry(Callable<List<String>> task,
       long waitDuration) throws IOException {
-    RetryPolicy retryPolicy = RetryPolicies.retryForeverWithFixedSleep(
-        waitDuration, TimeUnit.SECONDS);
-    RetriableTask<List<String>> retriableTask =
-        new RetriableTask<>(retryPolicy, "getCAList", task);
+    RetryPolicy retryPolicy = new RetryPolicy() {
+      private final RetryPolicy defaultPolicy = RetryPolicies.retryForeverWithFixedSleep(
+          waitDuration, TimeUnit.SECONDS);
+
+      @Override
+      public RetryAction shouldRetry(Exception e, int retries, int failovers, boolean isIdempotent) throws Exception {
+        if (containsAccessControlException(e)) {
+          LOG.warn("AccessControlException encountered during getCAList; failing fast without retry.");
+          return new RetryAction(RetryAction.RetryDecision.FAIL);
+        }
+        return defaultPolicy.shouldRetry(e, retries, failovers, isIdempotent);
+      }
+    };
+
+    RetriableTask<List<String>> retriableTask = new RetriableTask<>(retryPolicy, "getCAList", task);
     try {
       return retriableTask.call();
     } catch (Exception ex) {
-      throw new SCMSecurityException("Unable to obtain complete CA " +
-          "list", ex);
+      if (containsAccessControlException(ex)) {
+        throw new AccessControlException();
+      }
+      throw new SCMSecurityException("Unable to obtain complete CA list", ex);
     }
+  }
+
+  private static boolean containsAccessControlException(Throwable e) {
+    while (e != null) {
+      if (e instanceof AccessControlException) {
+        return true;
+      }
+      e = e.getCause();
+    }
+    return false;
   }
 
   private static List<String> waitForCACerts(

@@ -31,11 +31,19 @@ public class ContainerDiffReport {
   private final List<ContainerProtos.BlockMerkleTree> missingBlocks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> missingChunks;
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks;
+  private final List<DeletedBlock> divergedDeletedBlocks;
+  private final long containerID;
 
-  public ContainerDiffReport() {
+  public ContainerDiffReport(long containerID) {
     this.missingBlocks = new ArrayList<>();
     this.missingChunks = new HashMap<>();
     this.corruptChunks = new HashMap<>();
+    this.divergedDeletedBlocks = new ArrayList<>();
+    this.containerID = containerID;
+  }
+
+  public long getContainerID() {
+    return containerID;
   }
 
   /**
@@ -61,6 +69,10 @@ public class ContainerDiffReport {
     this.corruptChunks.computeIfAbsent(blockId, any -> new ArrayList<>()).add(corruptChunk);
   }
 
+  public void addDivergedDeletedBlock(ContainerProtos.BlockMerkleTree blockMerkleTree) {
+    this.divergedDeletedBlocks.add(new DeletedBlock(blockMerkleTree.getBlockID(), blockMerkleTree.getDataChecksum()));
+  }
+
   /**
    * @return A list of BlockMerkleTree objects that were reported as missing.
    */
@@ -82,13 +94,18 @@ public class ContainerDiffReport {
     return corruptChunks;
   }
 
+  public List<DeletedBlock> getDivergedDeletedBlocks() {
+    return divergedDeletedBlocks;
+  }
+
   /**
    * If needRepair is true, It means current replica needs blocks/chunks from the peer to repair
    * its container replica. The peer replica still may have corruption, which it will fix when
    * it reconciles with other peers.
    */
   public boolean needsRepair() {
-    return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty();
+    return !missingBlocks.isEmpty() || !missingChunks.isEmpty() || !corruptChunks.isEmpty() ||
+        !divergedDeletedBlocks.isEmpty();
   }
 
   public long getNumCorruptChunks() {
@@ -103,11 +120,38 @@ public class ContainerDiffReport {
     return missingBlocks.size();
   }
 
+  public long getNumdivergedDeletedBlocks() {
+    return divergedDeletedBlocks.size();
+  }
+
   @Override
   public String toString() {
-    return "ContainerDiffReport:" +
+    return "Diff report for container " + containerID + ":" +
         " Missing Blocks: " + getNumMissingBlocks() +
         " Missing Chunks: " + getNumMissingChunks() + " chunks from " + missingChunks.size() + " blocks" +
-        " Corrupt Chunks: " + getNumCorruptChunks() + " chunks from " + corruptChunks.size() + " blocks";
+        " Corrupt Chunks: " + getNumCorruptChunks() + " chunks from " + corruptChunks.size() + " blocks" +
+        " Diverged Deleted Blocks: " + getNumdivergedDeletedBlocks();
+  }
+
+  /**
+   * Represents a block that has been deleted in a peer whose metadata we need to add to our container replica's
+   * merkle tree.
+   */
+  public static class DeletedBlock {
+    private final long blockID;
+    private final long dataChecksum;
+
+    public DeletedBlock(long blockID, long dataChecksum) {
+      this.blockID = blockID;
+      this.dataChecksum = dataChecksum;
+    }
+
+    public long getBlockID() {
+      return blockID;
+    }
+
+    public long getDataChecksum() {
+      return dataChecksum;
+    }
   }
 }

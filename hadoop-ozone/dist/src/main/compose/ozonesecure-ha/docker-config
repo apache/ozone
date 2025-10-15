@@ -68,7 +68,7 @@ OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true
 OZONE-SITE.XML_ozone.acl.authorizer.class=org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
-OZONE-SITE.XML_ozone.administrators="testuser,recon,om"
+OZONE-SITE.XML_ozone.administrators="testuser,recon,om,hdfs"
 OZONE-SITE.XML_ozone.s3.administrators="testuser,s3g"
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
@@ -164,6 +164,8 @@ OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
 
+OM_SERVICE_ID=omservice
+
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 
@@ -171,3 +173,6 @@ OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 OZONE-SITE.XML_hdds.secret.key.rotate.duration=5m
 OZONE-SITE.XML_hdds.secret.key.rotate.check.duration=1m
 OZONE-SITE.XML_hdds.secret.key.expiry.duration=1h
+OZONE-SITE.XML_ozone.manager.delegation.token.max-lifetime=30m
+OZONE-SITE.XML_ozone.manager.delegation.token.renew-interval=5m
+OZONE-SITE.XML_ozone.manager.delegation.remover.scan.interval=1m

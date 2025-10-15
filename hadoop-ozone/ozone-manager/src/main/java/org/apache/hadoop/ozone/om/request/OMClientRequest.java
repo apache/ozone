@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class OMClientRequest implements RequestAuditor {
 
-  private static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(OMClientRequest.class);
 
   private OMRequest omRequest;
@@ -134,8 +134,12 @@ public abstract class OMClientRequest implements RequestAuditor {
    * Validate the OMRequest and update the cache.
    * This step should verify that the request can be executed, perform
    * any authorization steps and update the in-memory cache.
-
+   *
    * This step does not persist the changes to the database.
+   *
+   * To coders and reviewers, CAUTION: Do NOT bring external dependencies into this method, doing so could potentially
+   * cause divergence in OM DB states in HA. If you have to, be extremely careful.
+   * e.g. Do NOT invoke ACL check inside validateAndUpdateCache, which can use Ranger plugin that relies on external DB.
    *
    * @return the response that will be returned to the client.
    */
@@ -521,6 +525,20 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
+  /**
+   * Normalizes the key path based on the bucket layout.  This should be used for existing keys. 
+   * For new key creation, please see {@link #validateAndNormalizeKey(boolean, String, BucketLayout)}
+   *
+   * @return normalized key path
+   */
+  public static String normalizeKeyPath(boolean enableFileSystemPaths,
+      String keyPath, BucketLayout bucketLayout) throws OMException {
+    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
+      keyPath = OmUtils.normalizeKey(keyPath, false);
+    }
+    return keyPath;
+  }
+  
   public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
       String keyPath, BucketLayout bucketLayout) throws OMException {
     LOG.debug("Bucket Layout: {}", bucketLayout);

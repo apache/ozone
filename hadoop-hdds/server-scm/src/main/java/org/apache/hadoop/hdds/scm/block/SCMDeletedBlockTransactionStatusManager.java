@@ -34,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -365,37 +366,10 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
   }
 
-  public void incrementRetryCount(List<Long> txIDs, long maxRetry)
-      throws IOException {
-    ArrayList<Long> txIDsToUpdate = new ArrayList<>();
-    for (Long txID : txIDs) {
-      int currentCount =
-          transactionToRetryCountMap.getOrDefault(txID, 0);
-      if (currentCount > maxRetry) {
-        continue;
-      } else {
-        currentCount += 1;
-        if (currentCount > maxRetry) {
-          txIDsToUpdate.add(txID);
-        }
-        transactionToRetryCountMap.put(txID, currentCount);
-      }
-    }
-
-    if (!txIDsToUpdate.isEmpty()) {
-      deletedBlockLogStateManager
-          .increaseRetryCountOfTransactionInDB(txIDsToUpdate);
-    }
-  }
-
-  public void resetRetryCount(List<Long> txIDs) throws IOException {
-    for (Long txID: txIDs) {
-      transactionToRetryCountMap.computeIfPresent(txID, (key, value) -> 0);
-    }
-  }
-
-  int getRetryCount(long txID) {
-    return transactionToRetryCountMap.getOrDefault(txID, 0);
+  public void incrementRetryCount(List<Long> txIDs) {
+    CompletableFuture.runAsync(() ->
+        txIDs.forEach(tx ->
+            transactionToRetryCountMap.compute(tx, (k, v) -> (v == null) ? 1 : v + 1)));
   }
 
   public void onSent(DatanodeDetails dnId, SCMCommand<?> scmCommand) {

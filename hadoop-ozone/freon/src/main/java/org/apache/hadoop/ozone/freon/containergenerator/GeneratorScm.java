@@ -48,8 +48,6 @@ import picocli.CommandLine.Command;
 @MetaInfServices(FreonSubcommand.class)
 public class GeneratorScm extends BaseGenerator {
 
-  private DBStore scmDb;
-
   private Table<ContainerID, ContainerInfo> containerStore;
 
   private Timer timer;
@@ -60,7 +58,7 @@ public class GeneratorScm extends BaseGenerator {
 
     ConfigurationSource config = createOzoneConfiguration();
 
-    scmDb = DBStoreBuilder.createDBStore(config, SCMDBDefinition.get());
+    DBStore scmDb = DBStoreBuilder.createDBStore(config, SCMDBDefinition.get());
 
     containerStore = CONTAINERS.getTable(scmDb);
 

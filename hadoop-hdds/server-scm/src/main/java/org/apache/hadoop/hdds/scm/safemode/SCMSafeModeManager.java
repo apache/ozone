@@ -90,10 +90,10 @@ public class SCMSafeModeManager implements SafeModeManager {
     this.scmContext = scmContext;
     this.safeModeMetrics = SafeModeMetrics.create();
 
-    // TODO: Remove the cyclic ("this") dependency (HDDS-11797)
-    SafeModeRuleFactory.initialize(conf, scmContext, eventQueue, this,
+    SafeModeRuleFactory.initialize(conf, scmContext, eventQueue,
         pipelineManager, containerManager, nodeManager);
     SafeModeRuleFactory factory = SafeModeRuleFactory.getInstance();
+    factory.addSafeModeManager(this);
     factory.getSafeModeRules().forEach(rule -> exitRules.put(rule.getRuleName(), rule));
     factory.getPreCheckRules().forEach(rule -> preCheckRules.add(rule.getRuleName()));
 

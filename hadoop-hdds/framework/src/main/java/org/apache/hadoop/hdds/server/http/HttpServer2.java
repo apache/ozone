@@ -59,7 +59,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -69,11 +68,11 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.hdds.utils.LogLevel;
 import org.apache.hadoop.http.FilterContainer;
 import org.apache.hadoop.http.FilterInitializer;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.jmx.JMXJsonServlet;
-import org.apache.hadoop.log.LogLevel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
@@ -509,7 +508,7 @@ public final class HttpServer2 implements FilterContainer {
           connector = createHttpsChannelConnector(server.webServer,
               httpConfig);
         } else {
-          throw new HadoopIllegalArgumentException(
+          throw new IllegalArgumentException(
               "unknown scheme for endpoint:" + ep);
         }
         connector.setHost(ep.getHost());
@@ -645,13 +644,12 @@ public final class HttpServer2 implements FilterContainer {
           LegacyHadoopConfigurationSource.asHadoopConfiguration(builder.conf);
       Map<String, String> filterConfig = getFilterConfigMap(hadoopConf,
           builder.authFilterConfigurationPrefix);
+      // create copy of the config with each <prefix>.<key> also added as hadoop.http.authentication.<key>
+      // (getFilterConfigMap removes prefix)
+      OzoneConfiguration copy = new OzoneConfiguration(hadoopConf);
+      filterConfig.forEach((k, v) -> copy.set("hadoop.http.authentication." + k, v));
       for (FilterInitializer c : initializers) {
-        if ((c instanceof AuthenticationFilterInitializer) && builder.securityEnabled) {
-          addFilter("authentication",
-              AuthenticationFilter.class.getName(), filterConfig);
-        } else {
-          c.initFilter(this, hadoopConf);
-        }
+        c.initFilter(this, copy);
       }
     }
 

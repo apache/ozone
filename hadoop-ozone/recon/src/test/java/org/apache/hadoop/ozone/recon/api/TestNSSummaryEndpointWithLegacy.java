@@ -117,7 +117,6 @@ public class TestNSSummaryEndpointWithLegacy {
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private OzoneConfiguration conf;
   private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
@@ -356,7 +355,7 @@ public class TestNSSummaryEndpointWithLegacy {
 
   @BeforeEach
   public void setUp() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
         Files.createDirectory(temporaryFolder.resolve(
             "JunitOmDBDir")).toFile(), conf);
@@ -705,7 +704,7 @@ public class TestNSSummaryEndpointWithLegacy {
         .build();
     // Call constructFullPath and verify the result
     String fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     String expectedPath = "vol/bucket1/dir1/dir2/file2";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -717,7 +716,7 @@ public class TestNSSummaryEndpointWithLegacy {
         .setObjectID(DIR_TWO_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol/bucket1/dir1/dir2/";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -729,7 +728,7 @@ public class TestNSSummaryEndpointWithLegacy {
         .setObjectID(KEY_SIX_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol/bucket1/dir1/dir4/file6";
     Assertions.assertEquals(expectedPath, fullPath);
   }

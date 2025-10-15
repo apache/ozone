@@ -199,6 +199,19 @@ jobs:
       sha: ${{ needs.build-info.outputs.sha }}
       timeout-minutes: 15
 
+  javadoc:
+    needs:
+      - build-info
+      - build
+    uses: ./.github/workflows/check.yml
+    secrets: inherit
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: true
+      script: javadoc
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 30
+
   repro:
     needs:
       - build-info

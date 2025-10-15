@@ -72,7 +72,6 @@ import org.slf4j.LoggerFactory;
 public class TestContainerReplicationEndToEnd {
 
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
   private static OzoneClient client;
   private static ObjectStore objectStore;
   private static String volumeName;
@@ -87,7 +86,7 @@ public class TestContainerReplicationEndToEnd {
    */
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     containerReportInterval = 2000;
 

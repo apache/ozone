@@ -32,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
@@ -49,7 +48,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -59,7 +57,6 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -1184,7 +1181,7 @@ public class TestBlockDeletingService {
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
-  private void assertDeletionsInChecksumFile(ContainerData data, int numBlocks) {
+  private void assertDeletionsInChecksumFile(ContainerData data, int expectedNumBlocks) {
     ContainerProtos.ContainerChecksumInfo checksumInfo = null;
     try {
       checksumInfo = readChecksumFile(data);
@@ -1193,16 +1190,9 @@ public class TestBlockDeletingService {
     }
     assertNotNull(checksumInfo);
 
-    List<ContainerProtos.BlockMerkleTree> deletedBlocks = checksumInfo.getDeletedBlocksList();
-    assertEquals(numBlocks, deletedBlocks.size());
-    // Create a sorted copy of the list to check the order written to the file.
-    List<ContainerProtos.BlockMerkleTree> sortedDeletedBlocks = checksumInfo.getDeletedBlocksList().stream()
-        .sorted(Comparator.comparingLong(ContainerProtos.BlockMerkleTree::getBlockID))
-        .collect(Collectors.toList());
-    assertNotSame(sortedDeletedBlocks, deletedBlocks);
-    assertEquals(sortedDeletedBlocks, deletedBlocks);
-
-    // Each block in the list should be unique.
-    assertEquals(new HashSet<>(deletedBlocks).size(), deletedBlocks.size());
+    long numDeletedBlocks = checksumInfo.getContainerMerkleTree().getBlockMerkleTreeList().stream()
+        .filter(ContainerProtos.BlockMerkleTree::getDeleted)
+        .count();
+    assertEquals(expectedNumBlocks, numDeletedBlocks);
   }
 }

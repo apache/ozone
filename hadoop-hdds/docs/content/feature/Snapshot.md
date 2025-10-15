@@ -154,16 +154,15 @@ Handle exceptions for privilege or non-existent snapshot issues.
 
 ## System Administration How-To
 
-This section covers key configurations and monitoring for Ozone snapshots. Tune these in **ozone-site.xml**.
+This section covers key configurations and monitoring for Ozone snapshots.
 
-**Snapshot-Related Configuration Parameters:**
+### Configuration Properties
 
-*   **`ozone.om.fs.snapshot.max.limit`**: Max snapshots per bucket (Default: 10000). Safety limit.
-*   **`ozone.om.snapshot.compaction.dag.max.time.allowed`**: Window for efficient SnapshotDiff (Default: 30 days). Older diffs may be slower.
-*   **`ozone.om.snapshot.diff.db.dir`**: Directory for SnapshotDiff job data. Defaults to OM metadata dir. Use a spacious location for large diffs.
-*   **`ozone.om.snapshot.rocksdb.metrics.enabled`**: Enable detailed RocksDB metrics for snapshots (Default: false). Use for debugging/monitoring.
-*   **`ozone.om.snapshot.load.native.lib`**: Use native RocksDB library for snapshot operations (Default: true). Set to false as a workaround for native library issues.
-*   **`ozone.om.snapshot.diff.concurrent.max`**: Max concurrent SnapshotDiff jobs per OM (Default: 10). Increase if OM resources allow.
+See [Snapshot Configuration Properties]({{< ref "Snapshot-Configuration-Properties.md" >}}).
+
+Note: Snapshot configuration may change over time. Check `ozone-default.xml` for the most up-to-date settings.
+
+### Monitoring
 
 Monitor OM heap usage with many snapshots or large diffs. Enable Ozone Native ACLs or Ranger for access control.
 

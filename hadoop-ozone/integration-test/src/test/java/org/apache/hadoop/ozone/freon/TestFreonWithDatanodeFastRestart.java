@@ -40,7 +40,6 @@ import picocli.CommandLine;
  */
 public class TestFreonWithDatanodeFastRestart {
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -50,7 +49,7 @@ public class TestFreonWithDatanodeFastRestart {
    */
   @BeforeAll
   public static void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000, TimeUnit.MILLISECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setNumDatanodes(3)

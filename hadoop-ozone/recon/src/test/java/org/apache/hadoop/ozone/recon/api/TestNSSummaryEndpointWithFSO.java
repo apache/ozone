@@ -28,10 +28,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyT
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -88,8 +85,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
-import org.slf4j.Logger;
 
 /**
  * Test for NSSummary REST APIs with FSO.
@@ -121,7 +116,6 @@ public class TestNSSummaryEndpointWithFSO {
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private OzoneConfiguration ozoneConfiguration;
   private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
@@ -358,7 +352,7 @@ public class TestNSSummaryEndpointWithFSO {
 
   @BeforeEach
   public void setUp() throws Exception {
-    ozoneConfiguration = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setLong(OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         10);
     OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(
@@ -712,7 +706,7 @@ public class TestNSSummaryEndpointWithFSO {
         .build();
     // Call constructFullPath and verify the result
     String fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     String expectedPath = "vol/bucket1/dir1/dir2/file2";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -725,7 +719,7 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(DIR_THREE_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol/bucket1/dir1/dir3/file3";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -738,7 +732,7 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(DIR_FOUR_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol/bucket1/dir1/dir4/file6";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -751,7 +745,7 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(BUCKET_ONE_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol/bucket1/file1";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -764,7 +758,7 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(DIR_FIVE_OBJECT_ID)
         .build();
     fullPath = ReconUtils.constructFullPath(keyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager);
+        reconNamespaceSummaryManager);
     expectedPath = "vol2/bucket3/dir5/file9";
     Assertions.assertEquals(expectedPath, fullPath);
 
@@ -786,10 +780,9 @@ public class TestNSSummaryEndpointWithFSO {
         .setObjectID(KEY_TWO_OBJECT_ID)
         .setParentObjectID(DIR_TWO_OBJECT_ID)
         .build();
-    // Call constructFullPath and verify the result
-    OmKeyInfo finalKeyInfo = keyInfo;
-    assertThrows(ServiceNotReadyException.class, () -> ReconUtils.constructFullPath(finalKeyInfo,
-        reconNamespaceSummaryManager, reconOMMetadataManager));
+    // Call constructFullPath and verify the result - should return empty string when NSSummary parent is invalid
+    fullPath = ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager);
+    Assertions.assertEquals("", fullPath, "Should return empty string when NSSummary tree is being rebuilt");
   }
 
   @Test
@@ -797,7 +790,6 @@ public class TestNSSummaryEndpointWithFSO {
     // Setup
     long dirOneObjectId = 1L; // Sample object ID for the directory
     ReconNamespaceSummaryManager mockSummaryManager = mock(ReconNamespaceSummaryManager.class);
-    ReconOMMetadataManager mockMetadataManager = mock(ReconOMMetadataManager.class);
     NSSummary dir1Summary = new NSSummary();
     dir1Summary.setParentId(-1); // Simulate directory at the top of the tree
     when(mockSummaryManager.getNSSummary(dirOneObjectId)).thenReturn(dir1Summary);
@@ -810,41 +802,9 @@ public class TestNSSummaryEndpointWithFSO {
         .setParentObjectID(dirOneObjectId)
         .build();
 
-    assertThrows(ServiceNotReadyException.class, () ->
-        ReconUtils.constructFullPath(keyInfo, mockSummaryManager, mockMetadataManager));
-  }
-
-  @Test
-  public void testLoggingWhenParentIdIsNegative() throws IOException {
-    ReconNamespaceSummaryManager mockManager =
-        mock(ReconNamespaceSummaryManager.class);
-    Logger mockLogger = mock(Logger.class);
-    ReconUtils.setLogger(mockLogger);
-
-    NSSummary mockSummary = new NSSummary();
-    mockSummary.setParentId(-1);
-    when(mockManager.getNSSummary(anyLong())).thenReturn(mockSummary);
-
-    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
-        .setKeyName("testKey")
-        .setVolumeName("vol")
-        .setBucketName("bucket")
-        .setObjectID(1L)
-        .setParentObjectID(1L)
-        .build();
-
-    assertThrows(ServiceNotReadyException.class, () ->
-        ReconUtils.constructFullPath(keyInfo, mockManager, null));
-
-    // Assert
-    ArgumentCaptor<String> logCaptor = ArgumentCaptor.forClass(String.class);
-    verify(mockLogger).warn(logCaptor.capture());
-    String loggedMessage = logCaptor.getValue();
-
-    // Here we can assert the exact message we expect to see in the logs.
-    assertEquals(
-        "NSSummary tree is currently being rebuilt, returning empty string " +
-            "for path construction.", loggedMessage);
+    // Should return empty string when NSSummary has invalid parentId
+    String fullPath = ReconUtils.constructFullPath(keyInfo, mockSummaryManager);
+    Assertions.assertEquals("", fullPath, "Should return empty string when NSSummary has negative parentId");
   }
 
   /**

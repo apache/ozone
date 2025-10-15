@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -37,6 +38,8 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -235,6 +238,10 @@ public class ContainerReader implements Runnable {
         return;
       }
 
+      if (!isMatchedLastLoadedECContainer(kvContainer, containerSet.getContainerMetadataStore())) {
+        return;
+      }
+
       try {
         containerSet.addContainer(kvContainer);
         // this should be the last step of this block
@@ -259,6 +266,30 @@ public class ContainerReader implements Runnable {
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
     }
+  }
+
+  private boolean isMatchedLastLoadedECContainer(
+      KeyValueContainer kvContainer, WitnessedContainerMetadataStore containerMetadataStore) throws IOException {
+    if (null != containerMetadataStore && kvContainer.getContainerData().getReplicaIndex() != 0) {
+      ContainerCreateInfo containerCreateInfo = containerMetadataStore.getContainerCreateInfoTable()
+          .get(ContainerID.valueOf(kvContainer.getContainerData().getContainerID()));
+      // check for EC container replica index matching if db entry is present for container as last loaded,
+      // and ignore loading container if not matched.
+      // Ignore matching container replica index -1 in db as no previous replica index
+      if (null != containerCreateInfo
+          && containerCreateInfo.getReplicaIndex() != ContainerCreateInfo.INVALID_REPLICA_INDEX
+          && containerCreateInfo.getReplicaIndex() != kvContainer.getContainerData().getReplicaIndex()) {
+        LOG.info("EC Container {} with replica index {} present at path {} is not matched with DB replica index {}," +
+                " ignoring the load of the container.",
+            kvContainer.getContainerData().getContainerID(),
+            kvContainer.getContainerData().getReplicaIndex(),
+            kvContainer.getContainerData().getContainerPath(),
+            containerCreateInfo.getReplicaIndex());
+        return false;
+      }
+    }
+    // return true if not an EC container or entry not present in db or matching replica index
+    return true;
   }
 
   /**
