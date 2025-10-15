@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock.Resource;
+
 /**
  * Flat Resource defined in Ozone. Locks can be acquired on a resource independent of one another.
  */
