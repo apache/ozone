@@ -17,22 +17,40 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
+import java.io.Closeable;
+import java.io.IOException;
+
 /**
  * Interface for Hierachical Resource Lock where the lock order acquired on resource is going to be deterministic and
  * there is no cyclic lock ordering on resources.
  * Typically, this can be used for locking elements which form a DAG like structure.(E.g. FSO tree, Snapshot chain etc.)
  */
-public interface HierachicalResourceLockManager {
+public interface HierachicalResourceLockManager extends AutoCloseable {
 
-  HierarchicalResourceLock acquireLock(Resource resource, String key);
+  /**
+   * Acquires a read lock on the specified resource using the provided key.
+   *
+   * @param resource the resource on which the read lock is to be acquired
+   * @param key a unique identifier used for managing the lock
+   * @return a {@code HierarchicalResourceLock} interface to manage the lifecycle of the acquired lock
+   * @throws IOException if an I/O error occurs during the process of acquiring the lock
+   */
+  HierarchicalResourceLock acquireReadLock(FlatResource resource, String key) throws IOException;
+
+  /**
+   * Acquires a write lock on the specified resource using the provided key.
+   *
+   * @param resource the resource on which the write lock is to be acquired
+   * @param key a unique identifier used for managing the lock
+   * @return a {@code HierarchicalResourceLock} interface to manage the lifecycle of the acquired lock
+   * @throws IOException if an I/O error occurs during the process of acquiring the lock
+   */
+  HierarchicalResourceLock acquireWriteLock(FlatResource resource, String key) throws IOException;
 
   /**
    * Interface for managing the lock lifecycle corresponding to a Hierarchical Resource.
    */
-  interface HierarchicalResourceLock extends AutoCloseable {
+  interface HierarchicalResourceLock extends Closeable {
     boolean isLockAcquired();
-
-    @Override
-    void close();
   }
 }
