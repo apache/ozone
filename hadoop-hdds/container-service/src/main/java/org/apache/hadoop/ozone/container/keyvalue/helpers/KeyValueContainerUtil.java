@@ -402,7 +402,7 @@ public final class KeyValueContainerUtil {
     if (pendingDeletionBlockBytes != null) {
       return new PendingDelete(pendingDeleteBlockCount, pendingDeletionBlockBytes);
     } else {
-      LOG.warn("Missing pendingDeleteBlocksize from {}: recalculate them from delete txn tables",
+      LOG.warn("Missing pendingDeleteBlockSize from {}: recalculate them from delete txn tables",
           metadataTable.getName());
       PendingDelete pendingDeletions = getAggregatePendingDelete(
           store, kvContainerData, kvContainerData.getSchemaVersion());

@@ -224,7 +224,8 @@ public class TestDNDataDistributionFinalization {
    */
   @Test
   public void testMissingPendingDeleteMetadataRecalculation() throws Exception {
-    init(new OzoneConfiguration(), null, true);
+    init(new OzoneConfiguration(), null, false);
+
 
     // Create and delete keys to generate some pending deletion data
     String keyName = "testKeyForRecalc";
@@ -234,7 +235,15 @@ public class TestDNDataDistributionFinalization {
       out.write(data);
     }
     bucket.deleteKey(keyName);
-
+    finalizationFuture = Executors.newSingleThreadExecutor().submit(
+        () -> {
+          try {
+            scmClient.finalizeScmUpgrade(CLIENT_ID);
+          } catch (IOException ex) {
+            LOG.info("finalization client failed. This may be expected if the" +
+                " test injected failures.", ex);
+          }
+        });
     // Wait for finalization
     finalizationFuture.get();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);

@@ -401,7 +401,9 @@ public class KeyValueContainerData extends ContainerData {
     // Reset the metadata on disk.
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
     metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
-    metadataTable.put(getPendingDeleteBlockBytesKey(), 0L);
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION)) {
+      metadataTable.put(getPendingDeleteBlockBytesKey(), 0L);
+    }
   }
 
   // NOTE: Below are some helper functions to format keys according

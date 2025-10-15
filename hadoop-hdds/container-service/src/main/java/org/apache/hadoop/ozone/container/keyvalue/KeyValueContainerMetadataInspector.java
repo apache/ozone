@@ -239,8 +239,10 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         metadataTable.get(containerData.getBytesUsedKey()));
     dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
         metadataTable.get(containerData.getPendingDeleteBlockCountKey()));
-    dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
-        metadataTable.get(containerData.getPendingDeleteBlockBytesKey()));
+    if (metadataTable.get(containerData.getPendingDeleteBlockBytesKey()) != null) {
+      dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_BYTES,
+          metadataTable.get(containerData.getPendingDeleteBlockBytesKey()));
+    }
     dBMetadata.put(OzoneConsts.DELETE_TRANSACTION_KEY,
         metadataTable.get(containerData.getLatestDeleteTxnKey()));
     dBMetadata.put(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID,
