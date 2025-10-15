@@ -49,7 +49,8 @@ class TestHttpServletUtils {
     StringWriter sw = new StringWriter();
     HttpServletResponse response = mock(HttpServletResponse.class);
     when(response.getWriter()).thenReturn(new PrintWriter(sw));
-    HttpServletUtils.writeErrorResponse("example error", HttpServletUtils.ResponseFormat.JSON, response);
+    HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "example error",
+        HttpServletUtils.ResponseFormat.JSON, response);
     assertEquals("{\"error\":\"example error\"}", sw.toString());
   }
 
@@ -58,7 +59,9 @@ class TestHttpServletUtils {
     StringWriter sw = new StringWriter();
     HttpServletResponse response = mock(HttpServletResponse.class);
     when(response.getWriter()).thenReturn(new PrintWriter(sw));
-    HttpServletUtils.writeErrorResponse("example error", HttpServletUtils.ResponseFormat.XML, response);
-    assertEquals("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><error>example error</error>", sw.toString());
+    HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "example error",
+        HttpServletUtils.ResponseFormat.XML, response);
+    assertEquals("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><error>example error</error>",
+        sw.toString());
   }
 }
