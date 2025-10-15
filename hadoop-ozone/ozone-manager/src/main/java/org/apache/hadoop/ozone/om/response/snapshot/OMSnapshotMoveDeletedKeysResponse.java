@@ -54,23 +54,15 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   private List<String> movedDirs;
   private long bucketId;
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  public OMSnapshotMoveDeletedKeysResponse(OMResponse omResponse,
-      @Nonnull SnapshotInfo fromSnapshot,
-      SnapshotInfo nextSnapshot,
-      List<SnapshotMoveKeyInfos> nextDBKeysList,
-      List<SnapshotMoveKeyInfos> reclaimKeysList,
-      List<HddsProtos.KeyValue> renamedKeysList,
-      List<String> movedDirs,
-      long bucketId) {
-    super(omResponse);
-    this.fromSnapshot = fromSnapshot;
-    this.nextSnapshot = nextSnapshot;
-    this.nextDBKeysList = nextDBKeysList;
-    this.reclaimKeysList = reclaimKeysList;
-    this.renamedKeysList = renamedKeysList;
-    this.movedDirs = movedDirs;
-    this.bucketId = bucketId;
+  public OMSnapshotMoveDeletedKeysResponse(Builder builder) {
+    super(builder.omResponse);
+    this.fromSnapshot = builder.fromSnapshot;
+    this.nextSnapshot = builder.nextSnapshot;
+    this.nextDBKeysList = builder.nextDBKeysList;
+    this.reclaimKeysList = builder.reclaimKeysList;
+    this.renamedKeysList = builder.renamedKeysList;
+    this.movedDirs = builder.movedDirs;
+    this.bucketId = builder.bucketId;
   }
 
   /**
@@ -224,6 +216,65 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
 
     return result;
+  }
+
+  /**
+   *
+   * builder for OMSnapshotMoveDeletedKeysResponse
+   */
+  public static class Builder {
+    private OMResponse omResponse;
+    private SnapshotInfo fromSnapshot;
+    private SnapshotInfo nextSnapshot;
+    private List<SnapshotMoveKeyInfos> nextDBKeysList;
+    private List<SnapshotMoveKeyInfos> reclaimKeysList;
+    private List<HddsProtos.KeyValue> renamedKeysList;
+    private List<String> movedDirs;
+    private long bucketId;
+
+    public Builder setOmResponse(OMResponse omResponse) {
+      this.omResponse = omResponse;
+      return this;
+    }
+
+    public Builder setFromSnapshot(SnapshotInfo fromSnapshot) {
+      this.fromSnapshot = fromSnapshot;
+      return this;
+    }
+
+    public Builder setNextSnapshot(SnapshotInfo nextSnapshot) {
+      this.nextSnapshot = nextSnapshot;
+      return this;
+    }
+
+    public Builder setNextDBKeysList(List<SnapshotMoveKeyInfos> nextDBKeysList) {
+      this.nextDBKeysList = nextDBKeysList;
+      return this;
+    }
+
+    public Builder setReclaimKeysList(List<SnapshotMoveKeyInfos> reclaimKeysList) {
+      this.reclaimKeysList = reclaimKeysList;
+      return this;
+    }
+
+    public Builder setRenamedKeysList(List<HddsProtos.KeyValue> renamedKeysList) {
+      this.renamedKeysList = renamedKeysList;
+      return this;
+    }
+
+    public Builder setMovedDirs(List<String> movedDirs) {
+      this.movedDirs = movedDirs;
+      return this;
+    }
+
+    public Builder setBucketId(long bucketId) {
+      this.bucketId = bucketId;
+      return this;
+    }
+
+    public OMSnapshotMoveDeletedKeysResponse build() {
+      return new OMSnapshotMoveDeletedKeysResponse(this);
+    }
   }
 }
 
