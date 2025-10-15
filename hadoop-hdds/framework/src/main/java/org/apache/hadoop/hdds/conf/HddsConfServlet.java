@@ -91,12 +91,25 @@ public class HddsConfServlet extends HttpServlet {
       throws IOException {
     try {
       if (cmd == null) {
-        HttpServletUtils.writeResponse(getConfFromContext(), out, format, name);
+        dumpConfiguration(format, out, name);
       } else {
         processConfigTagRequest(request, cmd, out);
       }
     } catch (IllegalArgumentException iae) {
       HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_NOT_FOUND, iae.getMessage(), format, response);
+    }
+  }
+
+  private void dumpConfiguration(HttpServletUtils.ResponseFormat format, Writer out, String name) throws IOException {
+    OzoneConfiguration conf = getConfFromContext();
+    switch (format) {
+    case JSON:
+      OzoneConfiguration.dumpConfiguration(conf, name, out);
+      break;
+    case XML:
+    default:
+      conf.writeXml(name, out);
+      break;
     }
   }
 
