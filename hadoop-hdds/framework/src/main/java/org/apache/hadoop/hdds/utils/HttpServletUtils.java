@@ -35,10 +35,14 @@ public class HttpServletUtils implements Serializable {
      * @see HttpHeaders#ACCEPT
      */
     @VisibleForTesting
-    public static ResponseFormat parseAcceptHeader(HttpServletRequest request) {
+    public static ResponseFormat parseAcceptHeader(HttpServletRequest request) throws IllegalArgumentException {
+        // FIXME: parseAcceptHeader not related to ResponseFormat (name not match)
+        // this contains specic logic of HddsConfServlet: use xml as default
         String format = request.getHeader(HttpHeaders.ACCEPT);
-        MediaType mediaType = MediaType.valueOf(format);
-        return format != null && format.contains(ResponseFormat.JSON.getValue()) ?
+        if (format == null) {
+          throw new IllegalArgumentException("invalid accept-header format");
+        }
+        return format.contains(ResponseFormat.JSON.getValue()) ?
                 ResponseFormat.JSON : ResponseFormat.XML;
     }
 
