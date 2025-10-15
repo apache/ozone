@@ -103,9 +103,12 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.om.lock.HierachicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.PoolBasedHierarchicalResourceLockManager;
+import org.apache.hadoop.ozone.om.lock.ReadOnlyHierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
@@ -133,6 +136,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private DBStore store;
 
   private final IOzoneManagerLock lock;
+  private final HierachicalResourceLockManager hierarchicalLockManager;
 
   private TypedTable<String, PersistedUserVolumeInfo> userTable;
   private TypedTable<String, OmVolumeArgs> volumeTable;
@@ -197,6 +201,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       this.perfMetrics = this.ozoneManager.getPerfMetrics();
     }
     this.lock = new OzoneManagerLock(conf);
+    this.hierarchicalLockManager = new PoolBasedHierarchicalResourceLockManager(conf);
     this.omEpoch = OmUtils.getOMEpoch();
     start(conf);
   }
@@ -207,6 +212,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   protected OmMetadataManagerImpl() {
     OzoneConfiguration conf = new OzoneConfiguration();
     this.lock = new OzoneManagerLock(conf);
+    this.hierarchicalLockManager = new PoolBasedHierarchicalResourceLockManager(conf);
     this.omEpoch = 0;
     perfMetrics = null;
   }
@@ -239,6 +245,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   protected OmMetadataManagerImpl(OzoneConfiguration conf, File dir, String name)
       throws IOException {
     lock = new OmReadOnlyLock();
+    hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
     omEpoch = 0;
     int maxOpenFiles = conf.getInt(OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES, OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT);
 
@@ -258,6 +265,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   OmMetadataManagerImpl(OzoneConfiguration conf, String snapshotDirName, int maxOpenFiles) throws IOException {
     try {
       lock = new OmReadOnlyLock();
+      hierarchicalLockManager = new ReadOnlyHierarchicalResourceLockManager();
       omEpoch = 0;
       String snapshotDir = OMStorage.getOmDbDir(conf) +
           OM_KEY_PREFIX + OM_SNAPSHOT_CHECKPOINT_DIR;
@@ -642,6 +650,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public IOzoneManagerLock getLock() {
     return lock;
+  }
+
+  @Override
+  public HierachicalResourceLockManager getHierarchicalLockManager() {
+    return hierarchicalLockManager;
   }
 
   @Override
