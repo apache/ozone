@@ -17,249 +17,189 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
 
-import com.google.common.primitives.Bytes;
-import java.io.EOFException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumData;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.invocation.InvocationOnMock;
 
 /**
  * Tests for {@link TestStreamBlockInputStream}'s functionality.
  */
 public class TestStreamBlockInputStream {
-  private int blockSize;
-  private static final int CHUNK_SIZE = 100;
-  private static final int BYTES_PER_CHECKSUM = 20;
-  private static final Random RANDOM = new Random();
-  private DummyStreamBlockInputStream blockStream;
-  private byte[] blockData;
-  private List<ChunkInfo> chunks;
-  private Map<String, byte[]> chunkDataMap;
-  private Checksum checksum;
+  private static final int BYTES_PER_CHECKSUM = 1024;
+  private static final int BLOCK_SIZE = 1024;
+  private StreamBlockInputStream blockStream;
   private BlockID blockID;
-  private static final String CHUNK_NAME = "chunk-";
   private OzoneConfiguration conf = new OzoneConfiguration();
+  private XceiverClientFactory xceiverClientFactory;
+  private XceiverClientGrpc xceiverClient;
+  private Pipeline pipeline;
+  private Checksum checksum;
+  private ChecksumData checksumData;
+  private byte[] data;
+  ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
 
   @BeforeEach
   public void setup() throws Exception {
+    Token<OzoneBlockTokenIdentifier> token = mock(Token.class);
+    when(token.encodeToUrlString()).thenReturn("url");
+    pipeline = MockPipeline.createSingleNodePipeline();
+    xceiverClient = mock(XceiverClientGrpc.class);
+    when(xceiverClient.getPipeline()).thenReturn(pipeline);
+    xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any()))
+        .thenReturn(xceiverClient);
+    requestObserver = mock(ClientCallStreamObserver.class);
+
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setStreamReadBlock(true);
     Function<BlockID, BlockLocationInfo> refreshFunction = mock(Function.class);
     blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
-    createChunkList(5);
-
-    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-    blockStream = new DummyStreamBlockInputStream(blockID, blockSize, pipeline,
-        null, null, refreshFunction, clientConfig, chunks, chunkDataMap);
+    createDataAndChecksum();
+    blockStream = new StreamBlockInputStream(blockID, BLOCK_SIZE, pipeline,
+        token, xceiverClientFactory, refreshFunction, clientConfig);
   }
 
-  /**
-   * Create a mock list of chunks. The first n-1 chunks of length CHUNK_SIZE
-   * and the last chunk with length CHUNK_SIZE/2.
-   */
-  private void createChunkList(int numChunks)
-      throws Exception {
-
-    chunks = new ArrayList<>(numChunks);
-    chunkDataMap = new HashMap<>();
-    blockData = new byte[0];
-    int i, chunkLen;
-    byte[] byteData;
-    String chunkName;
-
-    for (i = 0; i < numChunks; i++) {
-      chunkName = CHUNK_NAME + i;
-      chunkLen = CHUNK_SIZE;
-      if (i == numChunks - 1) {
-        chunkLen = CHUNK_SIZE / 2;
+  @AfterEach
+  public void teardown() {
+    if (blockStream != null) {
+      try {
+        blockStream.close();
+      } catch (IOException e) {
+        // ignore
       }
-      byteData = generateRandomData(chunkLen);
-      ChunkInfo chunkInfo = ChunkInfo.newBuilder()
-          .setChunkName(chunkName)
-          .setOffset(0)
-          .setLen(chunkLen)
-          .setChecksumData(checksum.computeChecksum(
-              byteData, 0, chunkLen).getProtoBufMessage())
-          .build();
-
-      chunkDataMap.put(chunkName, byteData);
-      chunks.add(chunkInfo);
-
-      blockSize += chunkLen;
-      blockData = Bytes.concat(blockData, byteData);
     }
   }
 
-  static byte[] generateRandomData(int length) {
-    byte[] bytes = new byte[length];
-    RANDOM.nextBytes(bytes);
-    return bytes;
-  }
-
-  /**
-   * Match readData with the chunkData byte-wise.
-   * @param readData Data read through ChunkInputStream
-   * @param inputDataStartIndex first index (inclusive) in chunkData to compare
-   *                            with read data
-   * @param length the number of bytes of data to match starting from
-   *               inputDataStartIndex
-   */
-  private void matchWithInputData(byte[] readData, int inputDataStartIndex,
-                                  int length) {
-    for (int i = inputDataStartIndex; i < inputDataStartIndex + length; i++) {
-      assertEquals(blockData[i], readData[i - inputDataStartIndex], "i: " + i);
-    }
-  }
-
-  private void matchWithInputData(List<ByteString> byteStrings,
-                                  int inputDataStartIndex, int length) {
-    int offset = inputDataStartIndex;
-    int totalBufferLen = 0;
-    for (ByteString byteString : byteStrings) {
-      int bufferLen = byteString.size();
-      matchWithInputData(byteString.toByteArray(), offset, bufferLen);
-      offset += bufferLen;
-      totalBufferLen += bufferLen;
-    }
-    assertEquals(length, totalBufferLen);
-  }
-
-  /**
-   * Seek to a position and verify through getPos().
-   */
-  private void seekAndVerify(int pos) throws Exception {
-    blockStream.seek(pos);
-    assertEquals(pos, blockStream.getPos(),
-        "Current position of buffer does not match with the sought position");
+  @Test
+  public void testCloseStreamReleasesResources() throws IOException {
+    setupSuccessfulRead();
+    assertEquals(data[0], blockStream.read());
+    blockStream.close();
+    // Verify that cancel() was called on the requestObserver mock
+    org.mockito.Mockito.verify(requestObserver).cancel(any(), any());
+    // Verify that release() was called on the xceiverClient mock
+    org.mockito.Mockito.verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
   }
 
   @Test
-  public void testFullChunkRead() throws Exception {
-    byte[] b = new byte[blockSize];
-    int numBytesRead = blockStream.read(b, 0, blockSize);
-    assertEquals(blockSize, numBytesRead);
-    matchWithInputData(b, 0, blockSize);
-  }
-
-  @Test
-  public void testPartialChunkRead() throws Exception {
-    int len = blockSize / 2;
-    byte[] b = new byte[len];
-
-    int numBytesRead = blockStream.read(b, 0, len);
-    assertEquals(len, numBytesRead);
-    matchWithInputData(b, 0, len);
-
-    // To read block data from index 0 to 225 (len = 225), we need to read
-    // chunk from offset 0 to 240 as the checksum boundary is at every 20
-    // bytes. Verify that 60 bytes of chunk data are read and stored in the
-    // buffers. Since checksum boundary is at every 20 bytes, there should be
-    // 240/20 number of buffers.
-    matchWithInputData(blockStream.getReadByteBuffers(), 0, 240);
-  }
-
-  @Test
-  public void testSeek() throws Exception {
-    seekAndVerify(0);
-    EOFException eofException = assertThrows(EOFException.class, () ->  seekAndVerify(blockSize + 1));
-    assertThat(eofException).hasMessage("EOF encountered at pos: " + (blockSize + 1) + " for block: " + blockID);
-
-    // Seek before read should update the BlockInputStream#blockPosition
-    seekAndVerify(25);
-
-    // Read from the sought position.
-    // Reading from index 25 to 54 should result in the BlockInputStream
-    // copying chunk data from index 20 to 59 into the buffers (checksum
-    // boundaries).
-    byte[] b = new byte[30];
-    int numBytesRead = blockStream.read(b, 0, 30);
-    assertEquals(30, numBytesRead);
-    matchWithInputData(b, 25, 30);
-    matchWithInputData(blockStream.getReadByteBuffers(), 20, 40);
-
-    // After read, the position of the blockStream is evaluated from the
-    // buffers and the chunkPosition should be reset to -1.
-
-    // Only the last BYTES_PER_CHECKSUM will be cached in the buffers as
-    // buffers are released after each checksum boundary is read. So the
-    // buffers should contain data from index 40 to 59.
-    // Seek to a position within the cached buffers. BlockPosition should
-    // still not be used to set the position.
-    seekAndVerify(45);
-
-    // Seek to a position outside the current cached buffers. In this case, the
-    // chunkPosition should be updated to the seeked position.
-    seekAndVerify(75);
-
-    // Read upto checksum boundary should result in all the buffers being
-    // released and hence chunkPosition updated with current position of chunk.
-    seekAndVerify(25);
-    b = new byte[15];
-    numBytesRead = blockStream.read(b, 0, 15);
-    assertEquals(15, numBytesRead);
-    matchWithInputData(b, 25, 15);
-  }
-
-  @Test
-  public void testSeekAndRead() throws Exception {
-    // Seek to a position and read data
-    seekAndVerify(50);
-    byte[] b1 = new byte[20];
-    int numBytesRead = blockStream.read(b1, 0, 20);
-    assertEquals(20, numBytesRead);
-    matchWithInputData(b1, 50, 20);
-
-    // Next read should start from the position of the last read + 1 i.e. 70
-    byte[] b2 = new byte[20];
-    numBytesRead = blockStream.read(b2, 0, 20);
-    assertEquals(20, numBytesRead);
-    matchWithInputData(b2, 70, 20);
-
-    byte[] b3 = new byte[20];
-    seekAndVerify(80);
-    numBytesRead = blockStream.read(b3, 0, 20);
-    assertEquals(20, numBytesRead);
-    matchWithInputData(b3, 80, 20);
-  }
-
-  @Test
-  public void testUnbuffered() throws Exception {
-    byte[] b1 = new byte[20];
-    int numBytesRead = blockStream.read(b1, 0, 20);
-    assertEquals(20, numBytesRead);
-    matchWithInputData(b1, 0, 20);
-
+  public void testUnbufferReleasesResourcesAndResumesFromLastPosition() throws IOException {
+    setupSuccessfulRead();
+    assertEquals(data[0], blockStream.read());
+    assertEquals(1, blockStream.getPos());
     blockStream.unbuffer();
+    // Verify that cancel() was called on the requestObserver mock
+    org.mockito.Mockito.verify(requestObserver).cancel(any(), any());
+    // Verify that release() was called on the xceiverClient mock
+    org.mockito.Mockito.verify(xceiverClientFactory).releaseClientForReadData(xceiverClient, false);
+    // The next read should "rebuffer" and continue from the last position
+    assertEquals(data[1], blockStream.read());
+    assertEquals(2, blockStream.getPos());
+  }
 
-  //  assertFalse(blockStream.buffersAllocated());
+  @Test
+  public void testSeekReleasesTheStreamAndStartsFromNewPosition() throws IOException {
+    setupSuccessfulRead();
+    assertEquals(data[0], blockStream.read());
+    blockStream.seek(100);
+    assertEquals(100, blockStream.getPos());
+    // Verify that cancel() was called on the requestObserver mock
+    org.mockito.Mockito.verify(requestObserver).cancel(any(), any());
+    // The xceiverClient should not be released
+    org.mockito.Mockito.verify(xceiverClientFactory, never())
+        .releaseClientForReadData(xceiverClient, false);
 
-    // Next read should start from the position of the last read + 1 i.e. 20
-    byte[] b2 = new byte[20];
-    numBytesRead = blockStream.read(b2, 0, 20);
-    assertEquals(20, numBytesRead);
-    matchWithInputData(b2, 20, 20);
+    assertEquals(data[100], blockStream.read());
+    assertEquals(101, blockStream.getPos());
+  }
+
+  @Test
+  public void testErrorThrownIfStreamReturnsError() throws IOException {
+    // Note the error will only be thrown when the buffer needs to be refilled. I think case, as its the first
+    // read it will try to fill the buffer and encounter the error, but a reader could continue reading until the
+    // buffer is exhausted before seeing the error.
+    when(xceiverClient.streamRead(any(), any())).thenAnswer((InvocationOnMock invocation) -> {
+      StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
+      streamObserver.onError(new IOException("Test induced error"));
+      return requestObserver;
+    });
+    assertThrows(IOException.class, () -> blockStream.read());
+  }
+
+  @Test
+  public void seekOutOfBounds() throws IOException {
+    setupSuccessfulRead();
+    assertThrows(IOException.class, () -> blockStream.seek(-1));
+    assertThrows(IOException.class, () -> blockStream.seek(BLOCK_SIZE + 1));
+  }
+
+  @Test
+  public void readPastEOFReturnsEOF() throws IOException {
+    setupSuccessfulRead();
+    blockStream.seek(BLOCK_SIZE);
+    // Ensure the stream is at EOF even after two attempts to read
+    assertEquals(-1, blockStream.read());
+    assertEquals(-1, blockStream.read());
+    assertEquals(BLOCK_SIZE, blockStream.getPos());
+  }
+
+
+  private void createDataAndChecksum() throws OzoneChecksumException {
+    data = new byte[BLOCK_SIZE];
+    new SecureRandom().nextBytes(data);
+    checksumData = checksum.computeChecksum(data);
+  }
+
+  private void setupSuccessfulRead() throws IOException {
+    when(xceiverClient.streamRead(any(), any())).thenAnswer((InvocationOnMock invocation) -> {
+      StreamObserver<ContainerProtos.ContainerCommandResponseProto> streamObserver = invocation.getArgument(1);
+      streamObserver.onNext(createChunkResponse());
+      streamObserver.onCompleted();
+      return requestObserver;
+    });
+  }
+
+  private ContainerProtos.ContainerCommandResponseProto createChunkResponse() {
+    ContainerProtos.ReadBlockResponseProto response = ContainerProtos.ReadBlockResponseProto.newBuilder()
+        .setChecksumData(checksumData.getProtoBufMessage())
+        .setData(ByteString.copyFrom(data))
+        .setOffset(0)
+        .build();
+
+    return ContainerProtos.ContainerCommandResponseProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.ReadBlock)
+        .setReadBlock(response)
+        .setResult(ContainerProtos.Result.SUCCESS)
+        .build();
   }
 
 }
