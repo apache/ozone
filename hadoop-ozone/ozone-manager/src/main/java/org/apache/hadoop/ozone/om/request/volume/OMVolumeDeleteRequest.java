@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
-import static org.apache.hadoop.ozone.om.lock.LeveledResource.USER_LOCK;
-import static org.apache.hadoop.ozone.om.lock.LeveledResource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
