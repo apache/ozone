@@ -120,6 +120,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     if (!dataAvailableToRead()) {
       return EOF;
     }
+    position++;
     return buffer.get();
   }
 
@@ -360,7 +361,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
     // TODO: Semaphore in XceiverClient which count open stream?
     public boolean hasNext() {
-      return !responseQueue.isEmpty() || (!completed.get() && !failed.get());
+      return !responseQueue.isEmpty() || !completed.get();
     }
 
     public ByteBuffer readNext() throws IOException {
