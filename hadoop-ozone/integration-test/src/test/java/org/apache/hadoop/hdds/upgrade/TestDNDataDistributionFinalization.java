@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -54,7 +53,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfigurati
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -84,12 +82,10 @@ public class TestDNDataDistributionFinalization {
     }
   }
 
-  public void init(OzoneConfiguration conf,
-                   UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
-                   boolean doFinalize) throws Exception {
+  public void init(OzoneConfiguration conf) throws Exception {
 
     SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setUpgradeFinalizationExecutor(executor);
+    configurator.setUpgradeFinalizationExecutor(null);
 
     conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
@@ -134,22 +130,6 @@ public class TestDNDataDistributionFinalization {
       volume.createBucket(bucketName, builder.build());
       bucket = volume.getBucket(bucketName);
     }
-
-    // Launch finalization from the client. In the current implementation,
-    // this call will block until finalization completes. If the test
-    // involves restarts or leader changes the client may be disconnected,
-    // but finalization should still proceed.
-    if (doFinalize) {
-      Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(
-          () -> {
-            try {
-              scmClient.finalizeScmUpgrade(CLIENT_ID);
-            } catch (IOException ex) {
-              LOG.info("finalization client failed. This may be expected if the" +
-                  " test injected failures.", ex);
-            }
-          });
-    }
   }
 
   /**
@@ -161,7 +141,7 @@ public class TestDNDataDistributionFinalization {
    */
   @Test
   public void testDataDistributionUpgradeScenario() throws Exception {
-    init(new OzoneConfiguration(), null, false);
+    init(new OzoneConfiguration());
 
     // Verify initial state - DATA_DISTRIBUTION should not be finalized yet
     assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(),
@@ -223,7 +203,7 @@ public class TestDNDataDistributionFinalization {
    */
   @Test
   public void testMissingPendingDeleteMetadataRecalculation() throws Exception {
-    init(new OzoneConfiguration(), null, false);
+    init(new OzoneConfiguration());
 
 
     // Create and delete keys to generate some pending deletion data
