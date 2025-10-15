@@ -195,7 +195,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private int fsSnapshotMaxLimit;
   private final AtomicInteger inFlightSnapshotCount = new AtomicInteger(0);
 
-  public OmSnapshotManager(OzoneManager ozoneManager) {
+  public OmSnapshotManager(OzoneManager ozoneManager) throws IOException {
     this.snapshotLocalDataManager = new OmSnapshotLocalDataManager(ozoneManager.getMetadataManager());
     boolean isFilesystemSnapshotEnabled =
         ozoneManager.isFilesystemSnapshotEnabled();
@@ -801,6 +801,13 @@ public final class OmSnapshotManager implements AutoCloseable {
     String checkpointPrefix = store.getDbLocation().getName();
     return Paths.get(store.getSnapshotsParentDir(),
         checkpointPrefix + snapshotInfo.getCheckpointDir());
+  }
+
+  public static Path getSnapshotPath(OMMetadataManager omMetadataManager, UUID snapshotId) {
+    RDBStore store = (RDBStore) omMetadataManager.getStore();
+    String checkpointPrefix = store.getDbLocation().getName();
+    return Paths.get(store.getSnapshotsParentDir(),
+        checkpointPrefix + SnapshotInfo.getCheckpointDirName(snapshotId));
   }
 
   public static String getSnapshotPath(OzoneConfiguration conf,
