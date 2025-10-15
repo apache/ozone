@@ -66,18 +66,14 @@ public class HddsConfServlet extends HttpServlet {
       return;
     }
 
-    HttpServletUtils.ResponseFormat format;
-    try {
-      format = HttpServletUtils.parseAcceptHeader(request);
-    } catch (IllegalArgumentException iae) {
-      format = HttpServletUtils.ResponseFormat.XML;
-    }
+    HttpServletUtils.ResponseFormat format = HttpServletUtils.getResponseFormat(request);
     // TODO: set content type should be in HttpServletUtils
     switch (format) {
     case JSON:
       response.setContentType("application/json; charset=utf-8");
       break;
     case XML:
+    case UNSPECIFIED:
     default:
       response.setContentType("text/xml; charset=utf-8");
       break;

@@ -19,29 +19,25 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 class TestHttpServletUtils {
 
-  public static Stream<Arguments> provideParseHeadersTestCases() {
+  public static Stream<Arguments> provideGetResponseFormatTestCases() {
     return Stream.of(
-        Arguments.of("text/plain", HttpServletUtils.ResponseFormat.XML, null),
-        // if content type is null, an IllegalArgumentException is expected to be thrown.
-        Arguments.of(null, null,  IllegalArgumentException.class),
-        Arguments.of("text/xml", HttpServletUtils.ResponseFormat.XML, null),
-        Arguments.of("application/xml", HttpServletUtils.ResponseFormat.XML,null),
-        Arguments.of("application/json", HttpServletUtils.ResponseFormat.JSON, null)
+        Arguments.of("text/plain", HttpServletUtils.ResponseFormat.XML),
+        Arguments.of(null, HttpServletUtils.ResponseFormat.UNSPECIFIED),
+        Arguments.of("text/xml", HttpServletUtils.ResponseFormat.XML),
+        Arguments.of("application/xml", HttpServletUtils.ResponseFormat.XML),
+        Arguments.of("application/json", HttpServletUtils.ResponseFormat.JSON)
     );
   }
 
   @ParameterizedTest
-  @MethodSource("provideParseHeadersTestCases")
-  public void testParseHeaders(@Nullable String contentType, HttpServletUtils.ResponseFormat expectResponseFormat, Class<? extends Throwable> expectedException) {
+  @MethodSource("provideGetResponseFormatTestCases")
+  public void testGetResponseFormat(@Nullable String contentType,
+                                    HttpServletUtils.ResponseFormat expectResponseFormat) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getHeader(HttpHeaders.ACCEPT))
         .thenReturn(contentType);
-    if (expectedException == null) {
-      assertEquals(expectResponseFormat,
-          HttpServletUtils.parseAcceptHeader(request));
-    } else {
-      assertThrows(expectedException, () -> HttpServletUtils.parseAcceptHeader(request));
-    }
+    assertEquals(expectResponseFormat,
+        HttpServletUtils.getResponseFormat(request));
   }
 
   @Test

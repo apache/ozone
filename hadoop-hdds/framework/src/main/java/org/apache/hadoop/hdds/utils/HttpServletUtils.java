@@ -8,8 +8,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -20,31 +20,32 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.Writer;
 import java.util.HashMap;
 import java.util.Map;
 
 public class HttpServletUtils implements Serializable {
-    /**
-     * Parse the Accept header to determine response format.
-     *
-     * @param request the HTTP servlet request
-     * @return {@link ResponseFormat#JSON} if Accept header contains "application/json",
-     * otherwise {@link ResponseFormat#XML} (default for backwards compatibility)
-     * @see HttpHeaders#ACCEPT
-     */
-    @VisibleForTesting
-    public static ResponseFormat parseAcceptHeader(HttpServletRequest request) throws IllegalArgumentException {
-        // FIXME: parseAcceptHeader not related to ResponseFormat (name not match)
-        // this contains specic logic of HddsConfServlet: use xml as default
-        String format = request.getHeader(HttpHeaders.ACCEPT);
-        if (format == null) {
-          throw new IllegalArgumentException("invalid accept-header format");
-        }
-        return format.contains(ResponseFormat.JSON.getValue()) ?
-                ResponseFormat.JSON : ResponseFormat.XML;
+  /**
+   * Get the response format from request header.
+   *
+   * @param request the HTTP servlet request
+   * @return {@link ResponseFormat#JSON} if Accept header contains "application/json",
+   * otherwise {@link ResponseFormat#XML} (default for backwards compatibility)
+   * @see HttpHeaders#ACCEPT
+   */
+  @VisibleForTesting
+  public static ResponseFormat getResponseFormat(HttpServletRequest request) throws IllegalArgumentException {
+    // FIXME: parseAcceptHeader not related to ResponseFormat (name not match)
+    // this contains specic logic of HddsConfServlet: use xml as default
+    String format = request.getHeader(HttpHeaders.ACCEPT);
+    if (format == null) {
+      return ResponseFormat.UNSPECIFIED;
     }
+    return format.contains(ResponseFormat.JSON.getValue()) ?
+        ResponseFormat.JSON : ResponseFormat.XML;
+  }
 
     /**
      * Guts of the servlet - extracted for easy testing.
@@ -63,68 +64,71 @@ public class HttpServletUtils implements Serializable {
         }
     }
 
-    /**
-     * Write error response according to the specified format.
-     *
-     * @param errorMessage the error message
-     * @param format       the response format
-     * @param response     the response
-     */
-    public static void writeErrorResponse(String errorMessage, ResponseFormat format, HttpServletResponse response)
-            throws IOException {
-      PrintWriter writer = response.getWriter();
-      switch (format) {
-            case JSON:
-                Map<String, String> errorMap = new HashMap<String, String>();
-                errorMap.put("error", errorMessage);
-                writer.write(JsonUtils.toJsonString(errorMap));
-                break;
-            case XML:
-            default:
-                writeXmlError(errorMessage, writer);
-                break;
-        }
+  /**
+   * Write error response according to the specified format.
+   *
+   * @param errorMessage the error message
+   * @param format       the response format
+   * @param response     the response
+   */
+  public static void writeErrorResponse(int status, String errorMessage, ResponseFormat format,
+                                        HttpServletResponse response)
+      throws IOException {
+    response.setStatus(status);
+    PrintWriter writer = response.getWriter();
+    switch (format) {
+    case JSON:
+      Map<String, String> errorMap = new HashMap<String, String>();
+      errorMap.put("error", errorMessage);
+      writer.write(JsonUtils.toJsonString(errorMap));
+      break;
+    case XML:
+    default:
+      writeXmlError(errorMessage, writer);
+      break;
+    }
+  }
+
+  private static void writeXmlError(String errorMessage, Writer out) throws IOException {
+    try {
+      DocumentBuilderFactory factory = XMLUtils.newSecureDocumentBuilderFactory();
+      DocumentBuilder builder = factory.newDocumentBuilder();
+      Document doc = builder.newDocument();
+
+      Element root = doc.createElement("error");
+      root.setTextContent(errorMessage);
+      doc.appendChild(root);
+
+      TransformerFactory transformerFactory = TransformerFactory.newInstance();
+      Transformer transformer = transformerFactory.newTransformer();
+      transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+      transformer.setOutputProperty(OutputKeys.STANDALONE, "no");
+
+      DOMSource source = new DOMSource(doc);
+      StreamResult result = new StreamResult(out);
+      transformer.transform(source, result);
+    } catch (ParserConfigurationException | TransformerException e) {
+      throw new IOException("Failed to write XML error response", e);
+    }
+  }
+
+  public enum ResponseFormat {
+    UNSPECIFIED("unspecified"),
+    JSON("json"),
+    XML("xml");
+    private final String value;
+
+    ResponseFormat(String value) {
+      this.value = value;
     }
 
-    public static void writeXmlError(String errorMessage, Writer out) throws IOException {
-        try {
-            DocumentBuilderFactory factory = XMLUtils.newSecureDocumentBuilderFactory();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.newDocument();
-
-            Element root = doc.createElement("error");
-            root.setTextContent(errorMessage);
-            doc.appendChild(root);
-
-            TransformerFactory transformerFactory = TransformerFactory.newInstance();
-            Transformer transformer = transformerFactory.newTransformer();
-            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
-            transformer.setOutputProperty(OutputKeys.STANDALONE, "no");
-
-            DOMSource source = new DOMSource(doc);
-            StreamResult result = new StreamResult(out);
-            transformer.transform(source, result);
-        } catch (ParserConfigurationException | TransformerException e) {
-            throw new IOException("Failed to write XML error response", e);
-        }
+    public String getValue() {
+      return value;
     }
 
-    public enum ResponseFormat {
-        JSON("json"),
-        XML("xml");
-        private final String value;
-
-        ResponseFormat(String value) {
-            this.value = value;
-        }
-
-        public String getValue() {
-            return value;
-        }
-
-        @Override
-        public String toString() {
-            return value;
-        }
+    @Override
+    public String toString() {
+      return value;
     }
+  }
 }
