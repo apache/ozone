@@ -152,7 +152,7 @@ public class TestOmSnapshotLocalDataManager {
     SnapshotInfo snapshotInfo = createMockSnapshotInfo(snapshotId, null);
     
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, conf);
-    
+
     File yamlPath = new File(localDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo));
     assertNotNull(yamlPath);
     Path expectedYamlPath = Paths.get(snapshotsDir.getAbsolutePath(), "db" + OM_SNAPSHOT_SEPARATOR + snapshotId
@@ -183,7 +183,7 @@ public class TestOmSnapshotLocalDataManager {
     when(snapshotStore.getDb()).thenReturn(rocksDatabase);
     when(rocksDatabase.getLiveFilesMetaData()).thenReturn(sstFiles);
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, conf);
-    
+
     localDataManager.createNewOmSnapshotLocalDataFile(snapshotStore, snapshotInfo);
     
     // Verify file was created
@@ -206,7 +206,7 @@ public class TestOmSnapshotLocalDataManager {
     OmSnapshotLocalData localData = createMockLocalData(snapshotId, null);
     
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, conf);
-    
+
     // Write the file manually for testing
     Path yamlPath = Paths.get(localDataManager.getSnapshotLocalPropertyYamlPath(snapshotInfo.getSnapshotId()));
     writeLocalDataToFile(localData, yamlPath);
@@ -227,7 +227,7 @@ public class TestOmSnapshotLocalDataManager {
     OmSnapshotLocalData localData = createMockLocalData(wrongSnapshotId, null);
     
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, conf);
-    
+
     Path yamlPath = Paths.get(localDataManager.getSnapshotLocalPropertyYamlPath(snapshotId));
     writeLocalDataToFile(localData, yamlPath);
     // Should throw IOException due to mismatched IDs
@@ -243,7 +243,7 @@ public class TestOmSnapshotLocalDataManager {
     OmSnapshotLocalData localData = createMockLocalData(snapshotId, null);
     
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, conf);
-    
+
     Path yamlPath = tempDir.resolve("test-snapshot.yaml");
     writeLocalDataToFile(localData, yamlPath);
     
@@ -277,7 +277,7 @@ public class TestOmSnapshotLocalDataManager {
     createSnapshotLocalDataFile(snapshotId, null);
     
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, conf);
-    
+
     OmSnapshotLocalData localData = createMockLocalData(snapshotId, null);
     
     // First addition
@@ -299,7 +299,7 @@ public class TestOmSnapshotLocalDataManager {
     
     // Initialize - should load existing files
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, conf);
-    
+
     assertNotNull(localDataManager);
     Map<UUID, OmSnapshotLocalDataManager.SnapshotVersionsMeta> versionMap =
         localDataManager.getVersionNodeMap();
@@ -325,7 +325,7 @@ public class TestOmSnapshotLocalDataManager {
   @Test
   public void testClose() throws IOException {
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, conf);
-    
+
     // Should not throw exception
     localDataManager.close();
   }
