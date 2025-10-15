@@ -22,6 +22,8 @@ import static org.apache.hadoop.fs.ozone.OzoneTrashPolicy.CURRENT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
@@ -44,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import jakarta.annotation.Nullable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -99,6 +102,7 @@ public class KeyLifecycleService extends BackgroundService {
   private final OzoneManager ozoneManager;
   private int keyDeleteBatchSize;
   private int listMaxSize;
+  private long cachedDirMaxCount;
   private final AtomicBoolean suspended;
   private KeyLifecycleServiceMetrics metrics;
   private boolean isServiceEnabled;
@@ -123,6 +127,8 @@ public class KeyLifecycleService extends BackgroundService {
     Preconditions.checkArgument(keyDeleteBatchSize > 0,
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE + " should be a positive value.");
     this.listMaxSize = keyDeleteBatchSize >= 10000 ? keyDeleteBatchSize : 10000;
+    this.cachedDirMaxCount = conf.getLong(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT,
+        OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT);
     this.suspended = new AtomicBoolean(false);
     this.metrics = KeyLifecycleServiceMetrics.create();
     this.isServiceEnabled = conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
@@ -324,19 +330,11 @@ public class KeyLifecycleService extends BackgroundService {
         // If trash is enabled, move files to trash, instead of send delete requests.
         // OBS bucket doesn't support trash.
         if (bucket.getBucketLayout() == OBJECT_STORE) {
-          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-              expiredKeyList, false);
-        } else if (ozoneTrash != null) {
-          // move directories and keys to trash
-          if (!expiredDirList.isEmpty()) {
-            moveToTrash(bucket, expiredDirList, true);
-          }
-          moveToTrash(bucket, expiredKeyList, false);
-        } else {
           sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList, false);
-          if (!expiredDirList.isEmpty()) {
-            sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredDirList, true);
-          }
+        } else {
+          // handle keys first, then directories
+          handleAndClearFullList(bucket, expiredKeyList, false);
+          handleAndClearFullList(bucket, expiredDirList, true);
         }
         onSuccess(bucketKey);
       }
@@ -376,17 +374,17 @@ public class KeyLifecycleService extends BackgroundService {
         OmDirectoryInfo lastDir = null;
         if (!dirList.isEmpty()) {
           lastDir = dirList.get(dirList.size() - 1);
-          if (lastDir != null && !lastDir.getName().equals(TRASH_PREFIX)) {
-            for (int i = 0; i < dirList.size(); i++) {
-              lastDirPath.append(dirList.get(i).getName());
-              if (i != dirList.size() - 1) {
-                lastDirPath.append(OM_KEY_PREFIX);
-              }
+          for (int i = 0; i < dirList.size(); i++) {
+            lastDirPath.append(dirList.get(i).getName());
+            if (i != dirList.size() - 1) {
+              lastDirPath.append(OM_KEY_PREFIX);
             }
+          }
+          if (lastDirPath.toString().startsWith(TRASH_PREFIX)) {
+            LOG.info("Skip evaluate trash directory {}", lastDirPath);
+          } else {
             evaluateKeyAndDirTable(bucket, volume.getObjectID(), keyTable, lastDirPath.toString(), lastDir,
                 Arrays.asList(rule), expiredKeyList, expiredDirList);
-          } else {
-            LOG.info("Skip evaluate trash directory {}", TRASH_PREFIX);
           }
 
           if (!rule.getEffectivePrefix().endsWith(OM_KEY_PREFIX)) {
@@ -416,8 +414,8 @@ public class KeyLifecycleService extends BackgroundService {
               objPath = "";
             }
             try {
-              List<OmDirectoryInfo> subDirList = getSubDirectory(objID, objPrefix, omMetadataManager);
-              for (OmDirectoryInfo subDir : subDirList) {
+              SubDirectorySummary subDirSummary = getSubDirectory(objID, objPrefix, omMetadataManager);
+              for (OmDirectoryInfo subDir : subDirSummary.getSubDirList()) {
                 String subDirPath = objPath.isEmpty() ? subDir.getName() : objPath + OM_KEY_PREFIX + subDir.getName();
                 if (!subDir.getName().equals(TRASH_PREFIX) && subDirPath.startsWith(rule.getEffectivePrefix()) &&
                     (lastDir == null || subDir.getObjectID() != lastDir.getObjectID())) {
@@ -446,18 +444,24 @@ public class KeyLifecycleService extends BackgroundService {
 
     @SuppressWarnings("checkstyle:parameternumber")
     private void evaluateKeyAndDirTable(OmBucketInfo bucket, long volumeObjId, Table<String, OmKeyInfo> keyTable,
-        String directoryPath, OmDirectoryInfo dir, List<OmLCRule> ruleList, LimitedExpiredObjectList keyList,
+        String directoryPath, @Nullable OmDirectoryInfo dir, List<OmLCRule> ruleList, LimitedExpiredObjectList keyList,
         LimitedExpiredObjectList dirList) {
       String volumeName = bucket.getVolumeName();
       String bucketName = bucket.getBucketName();
-      Deque<PendingEvaluateDirectory> stack = new ArrayDeque<>();
-      if (dir != null) {
-        stack.push(new PendingEvaluateDirectory(dir, directoryPath));
-      } else {
-        // put a placeholder PendingEvaluateDirectory to stack for bucket
-        stack.push(new PendingEvaluateDirectory(null, ""));
+      LimitedSizeStack stack = new LimitedSizeStack(cachedDirMaxCount);
+      try {
+        if (dir != null) {
+          stack.push(new PendingEvaluateDirectory(dir, directoryPath, null));
+        } else {
+          // put a placeholder PendingEvaluateDirectory to stack for bucket
+          stack.push(new PendingEvaluateDirectory(null, "", null));
+        }
+      } catch (CapacityFullException e) {
+        LOG.warn("Abort evaluate {}/{} at {}", volumeName, bucketName, directoryPath != null ? directoryPath : "", e);
+        return;
       }
 
+      List<Long> deletedDirList = new ArrayList<>();
       while (!stack.isEmpty()) {
         PendingEvaluateDirectory item = stack.pop();
         OmDirectoryInfo currentDir = item.getDirectoryInfo();
@@ -467,25 +471,96 @@ public class KeyLifecycleService extends BackgroundService {
         // use current directory's object ID to iterate the keys and directories under it
         String prefix =
             OM_KEY_PREFIX + volumeObjId + OM_KEY_PREFIX + bucket.getObjectID() + OM_KEY_PREFIX + currentDirObjID;
-        LOG.info("Prefix {} for {}/{}", prefix, bucket.getVolumeName(), bucket.getBucketName());
+        LOG.debug("Prefix {} for {}/{}", prefix, bucket.getVolumeName(), bucket.getBucketName());
 
         // get direct sub directories
-        List<OmDirectoryInfo> subDirList;
-        try {
-          subDirList = getSubDirectory(currentDirObjID, prefix, omMetadataManager);
-        } catch (IOException e) {
-          // log failure, continue to process other directories in stack
-          LOG.warn("Failed to get sub directories of {} under {}/{}", currentDirPath, volumeName, bucketName, e);
+        SubDirectorySummary subDirSummary = item.getSubDirSummary();
+        boolean newSubDirPushed = false;
+        long deletedDirCount = 0;
+        if (subDirSummary == null) {
+          try {
+            subDirSummary = getSubDirectory(currentDirObjID, prefix, omMetadataManager);
+          } catch (IOException e) {
+            // log failure, continue to process other directories in stack
+            LOG.warn("Failed to get sub directories of {} under {}/{}", currentDirPath, volumeName, bucketName, e);
+            continue;
+          }
+
+          // filter sub directory list
+          if (subDirSummary.getSubDirCount() > 0) {
+            Iterator<OmDirectoryInfo> iterator = subDirSummary.getSubDirList().iterator();
+            while (iterator.hasNext()) {
+              OmDirectoryInfo subDir = iterator.next();
+              String subDirPath = currentDirPath.isEmpty() ? subDir.getName() :
+                  currentDirPath + OM_KEY_PREFIX + subDir.getName();
+              if (subDirPath.startsWith(TRASH_PREFIX)) {
+                iterator.remove();
+              }
+              boolean matched = false;
+              for (OmLCRule rule : ruleList) {
+                if (rule.getEffectivePrefix() != null && subDirPath.startsWith(rule.getEffectivePrefix())) {
+                  matched = true;
+                  break;
+                }
+              }
+              if (!matched) {
+                iterator.remove();
+              }
+            }
+          }
+
+          if (subDirSummary.getSubDirList().size() > 0) {
+            item.setSubDirSummary(subDirSummary);
+            try {
+              stack.push(item);
+            } catch (CapacityFullException e) {
+              LOG.warn("Abort evaluate {}/{} at {}", volumeName, bucketName, currentDirPath, e);
+              return;
+            }
+
+            // depth first evaluation, push subDirs into stack
+            for (OmDirectoryInfo subDir : subDirSummary.getSubDirList()) {
+              String subDirPath = currentDirPath.isEmpty() ? subDir.getName() :
+                  currentDirPath + OM_KEY_PREFIX + subDir.getName();
+              try {
+                stack.push(new PendingEvaluateDirectory(subDir, subDirPath, null));
+              } catch (CapacityFullException e) {
+                LOG.warn("Abort evaluate {}/{} at {}", volumeName, bucketName, subDirPath, e);
+                return;
+              }
+            }
+            newSubDirPushed = true;
+          }
+        } else {
+          // this item is a parent directory, check how many sub directories are deleted.
+          for (OmDirectoryInfo subDir : subDirSummary.getSubDirList()) {
+              if (deletedDirList.contains(subDir.getObjectID())) {
+                deletedDirCount++;
+                deletedDirList.remove(subDir.getObjectID());
+              }
+          }
+        }
+
+        if (newSubDirPushed) {
           continue;
         }
 
         // evaluate direct files, first check cache, then check table
+        // there are three cases:
+        // a. key is deleted in cache, while it's not deleted in table yet
+        // b. key is new added in cache, not in table yet
+        // c. key is updated in cache(rename), but not updated in table yet
+        //    in this case, the fromKey is a deleted key in cache, and the toKey is a newly added key in cache,
+        //    and fromKey is also in table
         long numKeysUnderDir = 0;
+        long numKeysExpired = 0;
+        List<String> deletedKeyList = new ArrayList();
         Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter = keyTable.cacheIterator();
         while (cacheIter.hasNext()) {
           Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry = cacheIter.next();
           OmKeyInfo key = entry.getValue().getCacheValue();
           if (key == null) {
+            deletedKeyList.add(entry.getKey().getCacheKey());
             continue;
           }
           numKeysUnderDir++;
@@ -495,10 +570,11 @@ public class KeyLifecycleService extends BackgroundService {
             if (key.getParentObjectID() == currentDirObjID && rule.match(key, keyPath)) {
               // mark key as expired, check next key
               if (keyList.isFull()) {
-                // if keyList is full, send delete request for pending deletion keys
-                sendDeleteKeysRequestAndClearList(volumeName, bucketName, keyList, false);
+                // if keyList is full, send delete/rename request for expired keys
+                handleAndClearFullList(bucket, keyList, false);
               }
               keyList.add(keyPath, key.getReplicatedSize(), key.getUpdateID());
+              numKeysExpired++;
             }
           }
         }
@@ -511,15 +587,19 @@ public class KeyLifecycleService extends BackgroundService {
             String keyPath = currentDirPath.isEmpty() ? key.getKeyName() :
                 currentDirPath + OM_KEY_PREFIX + key.getKeyName();
             numKeyIterated++;
+            if (deletedKeyList.contains(keyValue.getKey())) {
+              continue;
+            }
             numKeysUnderDir++;
             for (OmLCRule rule : ruleList) {
               if (key.getParentObjectID() == currentDirObjID && rule.match(key, keyPath)) {
                 // mark key as expired, check next key
                 if (keyList.isFull()) {
                   // if keyList is full, send delete request for pending deletion keys
-                  sendDeleteKeysRequestAndClearList(volumeName, bucketName, keyList, false);
+                  handleAndClearFullList(bucket, keyList, false);
                 }
                 keyList.add(keyPath, key.getReplicatedSize(), key.getUpdateID());
+                numKeysExpired++;
               }
             }
           }
@@ -529,55 +609,46 @@ public class KeyLifecycleService extends BackgroundService {
           continue;
         }
 
-        // this directory is empty, evaluate itself
-        if (numKeysUnderDir == 0 && subDirList.isEmpty()) {
+        // if this directory is empty or all files/subDirs are expired, evaluate itself
+        if ((numKeysUnderDir == 0 && subDirSummary.getSubDirCount() == 0 ) ||
+            (numKeysUnderDir == numKeysExpired && deletedDirCount == subDirSummary.getSubDirCount())) {
           for (OmLCRule rule : ruleList) {
-            String path = rule.getEffectivePrefix().endsWith(OM_KEY_PREFIX) ?
+            String path = (rule.getEffectivePrefix() != null && rule.getEffectivePrefix().endsWith(OM_KEY_PREFIX)) ?
                 currentDirPath + OM_KEY_PREFIX : currentDirPath;
             if (currentDir != null && rule.match(currentDir, path)) {
               if (dirList.isFull()) {
                 // if expiredDirList is full, send delete request for pending deletion directories
-                sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
-                    dirList, true);
+                handleAndClearFullList(bucket, dirList, true);
               }
               dirList.add(currentDirPath, 0, currentDir.getUpdateID());
-            }
-          }
-        }
-
-        // evaluate sub directories recursively by push them to stack
-        for (OmDirectoryInfo subDir : subDirList) {
-          String subDirPath = currentDirPath.isEmpty() ? subDir.getName() :
-              currentDirPath + OM_KEY_PREFIX + subDir.getName();
-          if (subDir.getName().equals(TRASH_PREFIX)) {
-            continue;
-          }
-          for (OmLCRule rule : ruleList) {
-            if (subDirPath.startsWith(rule.getEffectivePrefix())) {
-              stack.push(new PendingEvaluateDirectory(subDir, subDirPath));
+              deletedDirList.add(currentDir.getObjectID());
             }
           }
         }
       }
     }
 
-    private List<OmDirectoryInfo> getSubDirectory(long dirObjID, String prefix, OMMetadataManager metaMgr)
+    private SubDirectorySummary getSubDirectory(long dirObjID, String prefix, OMMetadataManager metaMgr)
         throws IOException {
-      List<OmDirectoryInfo> subDirList = new ArrayList<>();
+      SubDirectorySummary subDirList = new SubDirectorySummary();
+
       // Check all dirTable cache for any sub paths.
       Table dirTable = metaMgr.getDirectoryTable();
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
           cacheIter = dirTable.cacheIterator();
 
+      List<String> deletedKeyList = new ArrayList();
       while (cacheIter.hasNext()) {
         Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
             cacheIter.next();
+        numDirIterated++;
         OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
         if (cacheOmDirInfo == null) {
+          deletedKeyList.add(entry.getKey().getCacheKey());
           continue;
         }
         if (cacheOmDirInfo.getParentObjectID() == dirObjID) {
-          subDirList.add(cacheOmDirInfo);
+          subDirList.addSubDir(cacheOmDirInfo);
         }
       }
 
@@ -588,8 +659,11 @@ public class KeyLifecycleService extends BackgroundService {
           numDirIterated++;
           Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
           OmDirectoryInfo dir = entry.getValue();
+          if (deletedKeyList.contains(entry.getKey())) {
+            continue;
+          }
           if (dir.getParentObjectID() == dirObjID) {
-            subDirList.add(dir);
+            subDirList.addSubDir(dir);
           }
         }
       }
@@ -927,13 +1001,15 @@ public class KeyLifecycleService extends BackgroundService {
                 throw new IOException("Failed to create trash directory " + dirPath);
               }
             }
+            LOG.info("Created directory {}/{}/{}", bucket.getVolumeName(), bucket.getBucketName(), dirPath);
           } catch (InterruptedException | IOException e1) {
             LOG.error("Failed to send CreateDirectoryRequest for {}", dirPath, e1);
             throw new IOException("Failed to send CreateDirectoryRequest request for " + dirPath);
           }
+        } else {
+          LOG.error("Failed to get trash current directory {} status", dirPath, e);
+          throw e;
         }
-        LOG.error("Failed to get trash current directory {} status", dirPath, e);
-        throw e;
       }
     }
   }
@@ -1090,10 +1166,12 @@ public class KeyLifecycleService extends BackgroundService {
   public static class PendingEvaluateDirectory {
     private final OmDirectoryInfo directoryInfo;
     private final String dirPath;
+    private SubDirectorySummary subDirSummary;
 
-    public PendingEvaluateDirectory(OmDirectoryInfo dir, String path) {
+    public PendingEvaluateDirectory(OmDirectoryInfo dir, String path, SubDirectorySummary summary) {
       this.directoryInfo = dir;
       this.dirPath = path;
+      this.subDirSummary = summary;
     }
 
     public String getDirPath() {
@@ -1102,6 +1180,77 @@ public class KeyLifecycleService extends BackgroundService {
 
     public OmDirectoryInfo getDirectoryInfo() {
       return directoryInfo;
+    }
+
+    public SubDirectorySummary getSubDirSummary() {
+      return subDirSummary;
+    }
+
+    public void setSubDirSummary(SubDirectorySummary summary) {
+      subDirSummary = summary;
+    }
+  }
+
+  /**
+   * An in-memory class to hold sub directory summary.
+   */
+  public static class SubDirectorySummary {
+    private final List<OmDirectoryInfo> subDirList;
+    private long subDirCount;
+
+    public SubDirectorySummary() {
+      this.subDirList = new ArrayList<>();
+      this.subDirCount = 0;
+    }
+
+    public long getSubDirCount() {
+      return subDirCount;
+    }
+
+    public List<OmDirectoryInfo> getSubDirList() {
+      return subDirList;
+    }
+
+    public void addSubDir(OmDirectoryInfo dir) {
+      subDirList.add(dir);
+      subDirCount++;
+    }
+  }
+
+  /**
+   * An in-memory stack with a maximum size. This class is not thread safe.
+   */
+  public static class LimitedSizeStack {
+    private final Deque<PendingEvaluateDirectory> stack;
+    private final long maxSize;
+
+    public LimitedSizeStack(long maxSize) {
+      this.maxSize = maxSize;
+      this.stack = new ArrayDeque<>();
+    }
+
+    public boolean isEmpty() {
+      return stack.isEmpty();
+    }
+
+    public void push(PendingEvaluateDirectory e) throws CapacityFullException {
+      if (stack.size() >= maxSize) {
+        throw new CapacityFullException("LimitedSizeStack has reached maximum size " + maxSize);
+      }
+      stack.push(e);
+    }
+
+    public PendingEvaluateDirectory pop() {
+      return stack.pop();
+    }
+  }
+
+  /**
+   * An exception which indicates the collection is full.
+   */
+  public static class CapacityFullException extends Exception {
+    public CapacityFullException(String message) {
+      super(message);
     }
   }
 }
