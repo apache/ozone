@@ -184,9 +184,10 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Adds an entry to the defragged SST file list.
    * @param sstFiles SST file name
    */
-  public void addVersionSSTFileInfos(List<SstFileInfo> sstFiles, int previousSnapshotVersion) {
+  public void addVersionSSTFileInfos(List<LiveFileMetaData> sstFiles, int previousSnapshotVersion) {
     version++;
-    this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles));
+    this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles.stream()
+        .map(SstFileInfo::new).collect(Collectors.toList())));
   }
 
   /**

@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -62,6 +63,7 @@ import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -601,6 +603,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           localDataGraph.putEdge(predecessor, entry.getValue());
         }
       }
+    }
+
+    public void addSnapshotVersion(RDBStore snapshotStore) throws IOException {
+      List<LiveFileMetaData> sstFiles = OmSnapshotManager.getSnapshotSSTFileList(snapshotStore);
+      this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles, getPreviousSnapshotLocalData().getVersion());
     }
 
     public synchronized void commit() throws IOException {

@@ -26,9 +26,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import com.google.common.util.concurrent.Striped;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -39,12 +45,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.SimpleStriped;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -61,7 +70,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.MockitoAnnotations;
 import org.rocksdb.LiveFileMetaData;
 import org.yaml.snakeyaml.Yaml;
@@ -91,6 +102,11 @@ public class TestOmSnapshotLocalDataManager {
   private AutoCloseable mocks;
 
   private File snapshotsDir;
+
+  private static final String READ_LOCK_MESSAGE_ACQUIRE = "readLock acquire";
+  private static final String READ_LOCK_MESSAGE_UNLOCK = "readLock unlock";
+  private static final String WRITE_LOCK_MESSAGE_ACQUIRE = "writeLock acquire";
+  private static final String WRITE_LOCK_MESSAGE_UNLOCK = "writeLock unlock";
 
   @BeforeAll
   public static void setupClass() {
@@ -138,6 +154,89 @@ public class TestOmSnapshotLocalDataManager {
     if (mocks != null) {
       mocks.close();
     }
+  }
+
+  private String getReadLockMessageAcquire(int index) {
+    return READ_LOCK_MESSAGE_ACQUIRE + index;
+  }
+
+  private String getReadLockMessageUnlock(int index) {
+    return READ_LOCK_MESSAGE_UNLOCK + index;
+  }
+
+  private String getWriteLockMessageAcquire(int index) {
+    return WRITE_LOCK_MESSAGE_ACQUIRE + index;
+  }
+
+  private String getWriteLockMessageUnlock(int index) {
+    return WRITE_LOCK_MESSAGE_UNLOCK + index;
+  }
+
+  private MockedStatic<SimpleStriped> mockStripedLock(Map<UUID, Integer> lockMap, int numLocks,
+      List<String> messageCaptorer) {
+    MockedStatic<SimpleStriped> mockedStatic = mockStatic(SimpleStriped.class);
+    Striped<ReadWriteLock> stripedLock = mock(Striped.class);
+
+    List<ReadWriteLock> readWriteLocks = new ArrayList<>();
+    for (int idx = 0; idx < numLocks; idx++) {
+      final int lockIndex = idx;
+      ReadWriteLock readWriteLock = mock(ReadWriteLock.class);
+      Lock readLock = mock(Lock.class);
+      Lock writeLock = mock(Lock.class);
+      when(readWriteLock.readLock()).thenReturn(readLock);
+      when(readWriteLock.writeLock()).thenReturn(writeLock);
+      doAnswer(invocationOnMock -> {
+        messageCaptorer.add(getReadLockMessageAcquire(lockIndex));
+        return null;
+      }).when(readLock).lock();
+      doAnswer(invocationOnMock -> {
+        messageCaptorer.add(getReadLockMessageUnlock(lockIndex));
+        return null;
+      }).when(readLock).unlock();
+
+      doAnswer(invocationOnMock -> {
+        messageCaptorer.add(getWriteLockMessageAcquire(lockIndex));
+        return null;
+      }).when(writeLock).lock();
+      doAnswer(invocationOnMock -> {
+        messageCaptorer.add(getWriteLockMessageUnlock(lockIndex));
+        return null;
+      }).when(writeLock).unlock();
+    }
+    when(stripedLock.get(any())).thenAnswer(i -> {
+      if (lockMap.containsKey(i.getArgument(0))) {
+        return readWriteLocks.get(lockMap.get(i.getArgument(0)));
+      }
+      return readWriteLocks.get(0);
+    });
+    mockedStatic.when(() -> SimpleStriped.readWriteLock(anyInt(), anyBoolean())).thenReturn(stripedLock);
+    return mockedStatic;
+  }
+
+  private List<OmSnapshotLocalData> createSnapshotLocalData(OmSnapshotLocalDataManager localDataManager,
+      int numberOfSnapshots) {
+    List<SnapshotInfo> snapshotInfos = new ArrayList<>();
+    SnapshotInfo previouseSnapshotInfo = null;
+
+    for (int i = 0; i < numberOfSnapshots; i++) {
+      java.util.UUID snapshotId = java.util.UUID.randomUUID();
+      SnapshotInfo snapshotInfo = createMockSnapshotInfo(snapshotId, previouseSnapshotInfo == null ? null
+          : previouseSnapshotInfo.getSnapshotId());
+      OmSnapshotLocalData localData = createMockLocalData(snapshotId, snapshotInfo.getPathPreviousSnapshotId());
+
+      snapshotInfos.add(snapshotInfo);
+      previouseSnapshotInfo = snapshotInfo;
+    }
+    return null;
+  }
+
+  /**
+   * Reading Snap1 against snap5
+   */
+  @Test
+  public void testLockOrderingWithOverLappingLocks() {
+
+
   }
 
   @Test
