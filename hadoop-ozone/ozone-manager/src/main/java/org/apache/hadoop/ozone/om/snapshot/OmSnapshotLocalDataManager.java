@@ -169,7 +169,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  public void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
+  void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
     if (versionNodeMap.containsKey(snapshotLocalData.getSnapshotId())) {
       return;
     }
