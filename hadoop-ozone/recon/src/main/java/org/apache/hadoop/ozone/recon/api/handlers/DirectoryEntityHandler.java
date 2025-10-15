@@ -141,6 +141,10 @@ public class DirectoryEntityHandler extends EntityHandler {
       diskUsage.setSize(dataSize);
       subdirDUData.add(diskUsage);
     }
+    if (listFile) {
+      getBucketHandler().handleDirectKeys(dirObjectId, withReplica,
+              listFile, subdirDUData, getNormalizedPath());
+    }
 
     duResponse.setCount(subdirDUData.size());
     duResponse.setSize(dirDataSize);

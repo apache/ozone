@@ -72,6 +72,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     ByteArrayOutputStream out = new ByteArrayOutputStream(resSize);
     out.write(integerCodec.toPersistedFormat(object.getNumOfFiles()));
     out.write(longCodec.toPersistedFormat(object.getSizeOfFiles()));
+    out.write(longCodec.toPersistedFormat(object.getReplicatedSizeOfFiles()));
     out.write(shortCodec.toPersistedFormat(
         (short) ReconConstants.NUM_OF_FILE_SIZE_BINS));
     int[] fileSizeBucket = object.getFileSizeBucket();
@@ -85,7 +86,6 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     out.write(integerCodec.toPersistedFormat(dirName.length));
     out.write(dirName);
     out.write(longCodec.toPersistedFormat(object.getParentId()));
-    out.write(longCodec.toPersistedFormat(object.getReplicatedSizeOfFiles()));
 
     return out.toByteArray();
   }
@@ -96,6 +96,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     NSSummary res = new NSSummary();
     res.setNumOfFiles(in.readInt());
     res.setSizeOfFiles(in.readLong());
+    res.setReplicatedSizeOfFiles(in.readLong());
     short len = in.readShort();
     assert (len == (short) ReconConstants.NUM_OF_FILE_SIZE_BINS);
     int[] fileSizeBucket = new int[len];
@@ -128,13 +129,6 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
     } else {
       // Set default parentId to -1 indicating it's from old format
       res.setParentId(-1);
-    }
-    if (in.available() >= Long.BYTES) {
-      long replicatedSizeOfFiles = in.readLong();
-      res.setReplicatedSizeOfFiles(replicatedSizeOfFiles);
-    } else {
-      // Set default replicatedSizeOfFiles to -1 indicating it's from old format
-      res.setReplicatedSizeOfFiles(-1);
     }
     return res;
   }

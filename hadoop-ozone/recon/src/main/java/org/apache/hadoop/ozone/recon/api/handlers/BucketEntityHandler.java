@@ -133,6 +133,10 @@ public class BucketEntityHandler extends EntityHandler {
       diskUsage.setSize(dataSize);
       dirDUData.add(diskUsage);
     }
+    if (listFile || withReplica) {
+      getBucketHandler().handleDirectKeys(bucketObjectId, withReplica,
+          listFile, dirDUData, getNormalizedPath());
+    }
     duResponse.setCount(dirDUData.size());
     duResponse.setSize(bucketDataSize);
 
