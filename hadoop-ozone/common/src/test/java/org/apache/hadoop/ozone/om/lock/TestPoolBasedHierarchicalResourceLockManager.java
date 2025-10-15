@@ -58,11 +58,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestPoolBasedHierarchicalResourceLockManager {
 
   private PoolBasedHierarchicalResourceLockManager lockManager;
-  private OzoneConfiguration conf;
 
   @BeforeEach
   public void setUp() {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     lockManager = new PoolBasedHierarchicalResourceLockManager(conf);
   }
 
