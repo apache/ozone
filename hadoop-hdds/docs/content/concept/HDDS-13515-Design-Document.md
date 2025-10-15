@@ -23,14 +23,13 @@ summary: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-
-## Document Information
-- **Title**: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
-- **Summary**: Staged reprocessing of Recon Task for data consistency shown over Recon UI
-- **Date**: 2025-07-30
-- **JIRA**: HDDS-13515
-- **Status**: Implemented
-
+---
+Title: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
+Summary: Staged reprocessing of Recon Task for data consistency shown over Recon UI
+Date: 2025-07-30
+JIRA: HDDS-13515
+Status: Implemented
+---
 ## 1. Executive Summary
 
 ### Problem Statement
