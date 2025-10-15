@@ -772,6 +772,8 @@ message BucketInfo {
     optional BucketLayoutProto bucketLayout = 18;
     optional string owner = 19;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
+    optional uint64 snapshotUsedBytes = 21;
+    optional uint64 snapshotUsedNamespace = 22;
 }
 
 enum BucketLayoutProto {
@@ -1415,6 +1417,13 @@ message PurgeKeysRequest {
     // previous snapshotID can also be null & this field would be absent in older requests.
     optional NullableUUID expectedPreviousSnapshotID = 4;
     repeated string renamedKeys = 5;
+    repeated BucketPurgeKeysSize bucketPurgeKeysSize = 6;
+}
+
+message BucketPurgeKeysSize {
+  optional BucketNameInfo bucketNameInfo = 1;
+  optional uint64 purgedBytes = 2;
+  optional uint64 purgedNamespace = 3;
 }
 
 message PurgeKeysResponse {

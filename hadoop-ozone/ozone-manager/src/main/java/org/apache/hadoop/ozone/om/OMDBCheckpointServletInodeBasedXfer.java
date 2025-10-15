@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
@@ -93,6 +94,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   protected static final Logger LOG =
       LoggerFactory.getLogger(OMDBCheckpointServletInodeBasedXfer.class);
   private static final long serialVersionUID = 1L;
+  private transient BootstrapStateHandler.Lock lock;
 
   @Override
   public void init() throws ServletException {
@@ -123,6 +125,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         allowedUsers,
         allowedGroups,
         om.isSpnegoEnabled());
+    lock = new OMDBCheckpointServlet.Lock(om);
+  }
+
+  @Override
+  public BootstrapStateHandler.Lock getBootstrapStateLock() {
+    return lock;
   }
 
   @Override
@@ -298,7 +306,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         writeDBToArchive(sstFilesToExclude, snapshotDir, maxTotalSstSize, archiveOutputStream, tmpdir,
             hardLinkFileMap, false);
         Path snapshotLocalPropertyYaml = Paths.get(
-            OmSnapshotManager.getSnapshotLocalPropertyYamlPath(snapshotDir));
+            OmSnapshotLocalDataManager.getSnapshotLocalPropertyYamlPath(snapshotDir));
         if (Files.exists(snapshotLocalPropertyYaml)) {
           File yamlFile = snapshotLocalPropertyYaml.toFile();
           hardLinkFileMap.put(yamlFile.getAbsolutePath(), yamlFile.getName());

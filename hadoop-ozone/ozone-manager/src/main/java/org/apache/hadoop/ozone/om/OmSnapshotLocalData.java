@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.ozone.util.WithChecksum;
 import org.apache.ozone.compaction.log.SstFileInfo;
 import org.rocksdb.LiveFileMetaData;
 import org.yaml.snakeyaml.Yaml;
@@ -39,7 +40,9 @@ import org.yaml.snakeyaml.Yaml;
  * OmSnapshotLocalData is the in-memory representation of snapshot local metadata.
  * Inspired by org.apache.hadoop.ozone.container.common.impl.ContainerData
  */
-public abstract class OmSnapshotLocalData {
+public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
+  // Unique identifier for the snapshot. This is used to identify the snapshot.
+  private UUID snapshotId;
 
   // Version of the snapshot local data. 0 indicates not defragged snapshot.
   // defragged snapshots will have version > 0.
@@ -70,7 +73,8 @@ public abstract class OmSnapshotLocalData {
   /**
    * Creates a OmSnapshotLocalData object with default values.
    */
-  public OmSnapshotLocalData(List<LiveFileMetaData> notDefraggedSSTFileList, UUID previousSnapshotId) {
+  public OmSnapshotLocalData(UUID snapshotId, List<LiveFileMetaData> notDefraggedSSTFileList, UUID previousSnapshotId) {
+    this.snapshotId = snapshotId;
     this.isSSTFiltered = false;
     this.lastDefragTime = 0L;
     this.needsDefrag = false;
@@ -93,6 +97,7 @@ public abstract class OmSnapshotLocalData {
     this.needsDefrag = source.needsDefrag;
     this.checksum = source.checksum;
     this.version = source.version;
+    this.snapshotId = source.snapshotId;
     this.previousSnapshotId = source.previousSnapshotId;
     this.versionSstFileInfos = new LinkedHashMap<>();
     setVersionSstFileInfos(source.versionSstFileInfos);
@@ -167,6 +172,10 @@ public abstract class OmSnapshotLocalData {
     return previousSnapshotId;
   }
 
+  public UUID getSnapshotId() {
+    return snapshotId;
+  }
+
   public void setPreviousSnapshotId(UUID previousSnapshotId) {
     this.previousSnapshotId = previousSnapshotId;
   }
@@ -184,6 +193,7 @@ public abstract class OmSnapshotLocalData {
    * Returns the checksum of the YAML representation.
    * @return checksum
    */
+  @Override
   public String getChecksum() {
     return checksum;
   }
@@ -247,6 +257,11 @@ public abstract class OmSnapshotLocalData {
    */
   public void setVersion(int version) {
     this.version = version;
+  }
+
+  @Override
+  public OmSnapshotLocalData copyObject() {
+    return new OmSnapshotLocalData(this);
   }
 
   /**

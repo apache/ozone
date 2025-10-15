@@ -187,17 +187,19 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         }
       }
 
-      long quotaReleased = 0;
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
       // Mark all keys which can be deleted, in cache as deleted.
-      quotaReleased =
+      Pair<Long, Integer> quotaReleasedEmptyKeys =
           markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
-              dirList, omMetadataManager, quotaReleased, openKeyInfoMap);
-      omBucketInfo.incrUsedBytes(-quotaReleased);
-      omBucketInfo.incrUsedNamespace(-1L * omKeyInfoList.size());
+              dirList, omMetadataManager, openKeyInfoMap);
+      omBucketInfo.decrUsedBytes(quotaReleasedEmptyKeys.getKey(), true);
+      // For empty keyInfos the quota should be released and not added to namespace.
+      omBucketInfo.decrUsedNamespace(omKeyInfoList.size() + dirList.size() -
+              quotaReleasedEmptyKeys.getValue(), true);
+      omBucketInfo.decrUsedNamespace(quotaReleasedEmptyKeys.getValue(), false);
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse =
@@ -300,10 +302,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  protected long markKeysAsDeletedInCache(OzoneManager ozoneManager,
+  protected Pair<Long, Integer> markKeysAsDeletedInCache(OzoneManager ozoneManager,
       long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
-      OMMetadataManager omMetadataManager, long quotaReleased, Map<String, OmKeyInfo> openKeyInfoMap)
+      OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap)
           throws IOException {
+    int emptyKeys = 0;
+    long quotaReleased = 0;
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       String volumeName = omKeyInfo.getVolumeName();
       String bucketName = omKeyInfo.getBucketName();
@@ -314,6 +318,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       omKeyInfo.setUpdateID(trxnLogIndex);
       quotaReleased += sumBlockLengths(omKeyInfo);
+      emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
@@ -331,7 +336,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         }
       }
     }
-    return quotaReleased;
+    return Pair.of(quotaReleased, emptyKeys);
   }
 
   protected void addKeyToAppropriateList(List<OmKeyInfo> omKeyInfoList,
