@@ -161,6 +161,12 @@ public class NSSummaryEndpoint {
       return Response.ok(quotaUsageResponse).build();
     }
 
+    NSSummaryTask.RebuildState rebuildState = ReconUtils.getNSSummaryRebuildState();
+    if (rebuildState == NSSummaryTask.RebuildState.RUNNING) {
+      quotaUsageResponse.setResponseCode(ResponseStatus.INITIALIZING);
+      return Response.ok(quotaUsageResponse).build();
+    }
+
     EntityHandler handler = EntityHandler.getEntityHandler(
             reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, path);
