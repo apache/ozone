@@ -79,6 +79,8 @@ Additionally, Recon already possesses a comprehensive physical and logical capac
 - **Reduced Overhead**: Avoids redundant calculations across services
 - **Code Reusability**: Built on top of existing Recon infrastructure and endpoints
 
+![](storage-distribution-design.jpg)
+
 ### Component-wise Enhancements
 
 #### **DataNodes (DN)**
