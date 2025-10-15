@@ -201,7 +201,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  public void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
+  void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
     if (versionNodeMap.containsKey(snapshotLocalData.getSnapshotId())) {
       return;
     }
@@ -583,7 +583,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return versionsToBeAdded;
     }
 
-    private void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
+    private synchronized void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
       SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
       Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
           existingSnapVersions.getSnapshotVersions();
