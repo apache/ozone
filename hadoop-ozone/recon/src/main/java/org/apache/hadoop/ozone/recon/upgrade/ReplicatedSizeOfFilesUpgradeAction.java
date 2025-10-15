@@ -39,7 +39,7 @@ public class ReplicatedSizeOfFilesUpgradeAction implements ReconUpgradeAction {
   @Override
   public void execute(DataSource dataSource) {
     try {
-      Injector injector = ReconGuiceServletContextListener.getStaticInjector();
+      Injector injector = ReconGuiceServletContextListener.getGlobalInjector();
       if (injector == null) {
         throw new IllegalStateException("Guice injector is not initialized. Cannot perform NSSummary rebuild.");
       }
@@ -53,11 +53,11 @@ public class ReplicatedSizeOfFilesUpgradeAction implements ReconUpgradeAction {
                 "during NSSummaryAggregatedTotalsUpgrade action, will be retried as part of syncDataFromOM " +
                 "scheduler task.", result);
       }
-      LOG.info("Completed full rebuild of NSSummary for REPLICATED_SIZE_OF_FILES upgrade.");
     } catch (Exception e) {
       LOG.error("Error during NSSummary rebuild for REPLICATED_SIZE_OF_FILES upgrade.", e);
       throw new RuntimeException("Failed to rebuild NSSummary during upgrade", e);
     }
+    LOG.info("Completed full rebuild of NSSummary for REPLICATED_SIZE_OF_FILES upgrade.");
   }
 
   @Override

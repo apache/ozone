@@ -67,7 +67,7 @@ public class TestReplicatedSizeOfFilesUpgradeAction {
   public void testExecuteSuccessfullyRebuildsNSSummary() {
     try (MockedStatic<ReconGuiceServletContextListener> mockStaticContext =
              mockStatic(ReconGuiceServletContextListener.class)) {
-      mockStaticContext.when(ReconGuiceServletContextListener::getStaticInjector).thenReturn(mockInjector);
+      mockStaticContext.when(ReconGuiceServletContextListener::getGlobalInjector).thenReturn(mockInjector);
       when(mockInjector.getInstance(ReconTaskController.class)).thenReturn(mocReconTaskController);
       upgradeAction.execute(mockDataSource);
 
@@ -80,7 +80,7 @@ public class TestReplicatedSizeOfFilesUpgradeAction {
   public void testExecuteThrowsRuntimeExceptionOnRebuildFailure() {
     try (MockedStatic<ReconGuiceServletContextListener> mockStaticContext =
              mockStatic(ReconGuiceServletContextListener.class)) {
-      mockStaticContext.when(ReconGuiceServletContextListener::getStaticInjector).thenReturn(mockInjector);
+      mockStaticContext.when(ReconGuiceServletContextListener::getGlobalInjector).thenReturn(mockInjector);
       when(mockInjector.getInstance(ReconTaskController.class)).thenReturn(mocReconTaskController);
 
       // Simulate a failure during the rebuild process

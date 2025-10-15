@@ -108,8 +108,10 @@ public class BucketEntityHandler extends EntityHandler {
     Set<Long> bucketSubdirs = bucketNSSummary.getChildDir();
     duResponse.setKeySize(bucketNSSummary.getSizeOfFiles());
     List<DUResponse.DiskUsage> dirDUData = new ArrayList<>();
-    long bucketDataSize = duResponse.getKeySize();
-    long bucketDataSizeWithReplica = 0L;
+    long bucketDataSize = bucketNSSummary.getSizeOfFiles();
+    if (withReplica) {
+      duResponse.setSizeWithReplica(bucketNSSummary.getReplicatedSizeOfFiles());
+    }
     for (long subdirObjectId: bucketSubdirs) {
       NSSummary subdirNSSummary = getReconNamespaceSummaryManager()
               .getNSSummary(subdirObjectId);
@@ -122,25 +124,14 @@ public class BucketEntityHandler extends EntityHandler {
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       diskUsage.setSubpath(subpath);
       long dataSize = getTotalSize(subdirObjectId);
-      bucketDataSize += dataSize;
 
       if (withReplica) {
         long dirDU = getBucketHandler()
             .calculateDUUnderObject(subdirObjectId);
         diskUsage.setSizeWithReplica(dirDU);
-        bucketDataSizeWithReplica += dirDU;
       }
       diskUsage.setSize(dataSize);
       dirDUData.add(diskUsage);
-    }
-    // Either listFile or withReplica is enabled, we need the directKeys info
-    if (listFile || withReplica) {
-      bucketDataSizeWithReplica += getBucketHandler()
-              .handleDirectKeys(bucketObjectId, withReplica,
-                  listFile, dirDUData, getNormalizedPath());
-    }
-    if (withReplica) {
-      duResponse.setSizeWithReplica(bucketDataSizeWithReplica);
     }
     duResponse.setCount(dirDUData.size());
     duResponse.setSize(bucketDataSize);

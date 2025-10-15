@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.helpers.QuotaUtil.getReplicatedSize;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
@@ -44,9 +45,11 @@ import java.util.List;
 import java.util.Set;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -63,6 +66,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -82,6 +86,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -107,6 +112,16 @@ import org.junit.jupiter.api.io.TempDir;
  *   file8     dir5      file11
  *            /    \
  *        file9    file10
+ *  ----------------------------------------
+ *                    vol3
+ *                     |
+ *                 bucket5
+ *                 /      \
+ *             file12     dir6
+ *                     /    \
+ *                 file13    dir7
+ *                          /
+ *                          file14
  * This is a test for the Rest APIs only. We have tested NSSummaryTask before,
  * so there is no need to test process() on DB's updates
  */
@@ -129,10 +144,12 @@ public class TestNSSummaryEndpointWithFSO {
   // Object names in FSO-enabled format
   private static final String VOL = "vol";
   private static final String VOL_TWO = "vol2";
+  private static final String VOL_THREE = "vol3";
   private static final String BUCKET_ONE = "bucket1";
   private static final String BUCKET_TWO = "bucket2";
   private static final String BUCKET_THREE = "bucket3";
   private static final String BUCKET_FOUR = "bucket4";
+  private static final String BUCKET_FIVE = "bucket5";
   private static final String KEY_ONE = "file1";
   private static final String KEY_TWO = "dir1/dir2/file2";
   private static final String KEY_THREE = "dir1/dir3/file3";
@@ -146,6 +163,9 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String KEY_ELEVEN = "file11";
   private static final String MULTI_BLOCK_KEY = "dir1/file7";
   private static final String MULTI_BLOCK_FILE = "file7";
+  private static final String KEY_TWELVE = "file12";
+  private static final String KEY_THIRTEEN = "dir6/file13";
+  private static final String KEY_FOURTEEN = "dir6/dir7/file14";
 
   private static final String FILE_ONE = "file1";
   private static final String FILE_TWO = "file2";
@@ -158,12 +178,17 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String FILE_NINE = "file9";
   private static final String FILE_TEN = "file10";
   private static final String FILE_ELEVEN = "file11";
+  private static final String FILE_TWELVE = "file12";
+  private static final String FILE_THIRTEEN = "file13";
+  private static final String FILE_FOURTEEN = "file14";
 
   private static final String DIR_ONE = "dir1";
   private static final String DIR_TWO = "dir2";
   private static final String DIR_THREE = "dir3";
   private static final String DIR_FOUR = "dir4";
   private static final String DIR_FIVE = "dir5";
+  private static final String DIR_SIX = "dir6";
+  private static final String DIR_SEVEN = "dir7";
   // objects IDs
   private static final long VOL_OBJECT_ID = 0L;
   private static final long BUCKET_ONE_OBJECT_ID = 1L;
@@ -188,6 +213,13 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long KEY_NINE_OBJECT_ID = 19L;
   private static final long KEY_TEN_OBJECT_ID = 20L;
   private static final long KEY_ELEVEN_OBJECT_ID = 21L;
+  private static final long VOL_THREE_OBJECT_ID = 22L;
+  private static final long DIR_SIX_OBJECT_ID = 23L;
+  private static final long DIR_SEVEN_OBJECT_ID = 24L;
+  private static final long FILE_TWELVE_OBJECT_ID = 25L;
+  private static final long FILE_THIRTEEN_OBJECT_ID = 26L;
+  private static final long FILE_FOURTEEN_OBJECT_ID = 27L;
+  private static final long BUCKET_FIVE_OBJECT_ID = 28L;
 
   // container IDs
   private static final long CONTAINER_ONE_ID = 1L;
@@ -225,6 +257,9 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long KEY_NINE_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_TEN_SIZE = 2 * OzoneConsts.KB + 1; // bin 2
   private static final long KEY_ELEVEN_SIZE = OzoneConsts.KB + 1; // bin 1
+  private static final long KEY_TWELVE_SIZE = OzoneConsts.KB;
+  private static final long KEY_THIRTEEN_SIZE = OzoneConsts.KB;
+  private static final long KEY_FOURTEEN_SIZE = OzoneConsts.KB;
 
   private static final long FILE1_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ONE_SIZE,
@@ -259,6 +294,12 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long FILE11_SIZE_WITH_REPLICA =
       getReplicatedSize(KEY_ELEVEN_SIZE,
               StandaloneReplicationConfig.getInstance(ONE));
+  private static final long FILE12_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_TWELVE_SIZE, RatisReplicationConfig.getInstance(THREE));
+  private static final long FILE13_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_THIRTEEN_SIZE, RatisReplicationConfig.getInstance(THREE));
+  private static final long FILE14_SIZE_WITH_REPLICA =
+      getReplicatedSize(KEY_FOURTEEN_SIZE, RatisReplicationConfig.getInstance(THREE));
   private static final long MULTI_BLOCK_KEY_SIZE_WITH_REPLICA
           = FILE7_SIZE_WITH_REPLICA;
   private static final long
@@ -273,7 +314,10 @@ public class TestNSSummaryEndpointWithFSO {
       + FILE8_SIZE_WITH_REPLICA
       + FILE9_SIZE_WITH_REPLICA
       + FILE10_SIZE_WITH_REPLICA
-      + FILE11_SIZE_WITH_REPLICA;
+      + FILE11_SIZE_WITH_REPLICA
+      + FILE12_SIZE_WITH_REPLICA
+      + FILE13_SIZE_WITH_REPLICA
+      + FILE14_SIZE_WITH_REPLICA;
 
   private static final long
       MULTI_BLOCK_TOTAL_SIZE_WITH_REPLICA_UNDER_VOL
@@ -312,10 +356,12 @@ public class TestNSSummaryEndpointWithFSO {
   private static final long ROOT_QUOTA = 2 * (2 * OzoneConsts.MB);
   private static final long VOL_QUOTA = 2 * OzoneConsts.MB;
   private static final long VOL_TWO_QUOTA = 2 * OzoneConsts.MB;
+  private static final long VOL_THREE_QUOTA = 2 * OzoneConsts.MB;
   private static final long BUCKET_ONE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_TWO_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_THREE_QUOTA = OzoneConsts.MB;
   private static final long BUCKET_FOUR_QUOTA = OzoneConsts.MB;
+  private static final long BUCKET_FIVE_QUOTA = OzoneConsts.MB;
 
   // mock client's path requests
   private static final String TEST_USER = "TestUser";
@@ -331,11 +377,14 @@ public class TestNSSummaryEndpointWithFSO {
   private static final String KEY_PATH = "/vol/bucket2/file4";
   private static final String MULTI_BLOCK_KEY_PATH = "/vol/bucket1/dir1/file7";
   private static final String INVALID_PATH = "/vol/path/not/found";
+  private static final String VOL_THREE_PATH = "/vol3";
 
   // some expected answers
   private static final long ROOT_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
       KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE + KEY_SEVEN_SIZE +
-      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE;
+      KEY_EIGHT_SIZE + KEY_NINE_SIZE + KEY_TEN_SIZE + KEY_ELEVEN_SIZE +
+      FILE12_SIZE_WITH_REPLICA + FILE13_SIZE_WITH_REPLICA + FILE14_SIZE_WITH_REPLICA;
+
   private static final long VOL_DATA_SIZE = KEY_ONE_SIZE + KEY_TWO_SIZE +
           KEY_THREE_SIZE + KEY_FOUR_SIZE + KEY_FIVE_SIZE + KEY_SIX_SIZE + KEY_SEVEN_SIZE;
 
@@ -382,6 +431,7 @@ public class TestNSSummaryEndpointWithFSO {
 
     // populate OM DB and reprocess into Recon RocksDB
     populateOMDB();
+    populateVolumeThree();
     setUpMultiBlockReplicatedKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
@@ -453,7 +503,7 @@ public class TestNSSummaryEndpointWithFSO {
     Response rootResponse = nsSummaryEndpoint.getDiskUsage(ROOT_PATH,
         false, false, false);
     DUResponse duRootRes = (DUResponse) rootResponse.getEntity();
-    assertEquals(2, duRootRes.getCount());
+    assertEquals(3, duRootRes.getCount());
     List<DUResponse.DiskUsage> duRootData = duRootRes.getDuData();
     // sort based on subpath
     Collections.sort(duRootData,
@@ -646,7 +696,8 @@ public class TestNSSummaryEndpointWithFSO {
     DUResponse rootResponse = getDiskUsageResponse(ROOT_PATH);
     long expectedVol2ReplicatedSize = FILE8_SIZE_WITH_REPLICA + FILE9_SIZE_WITH_REPLICA +
         FILE10_SIZE_WITH_REPLICA + FILE11_SIZE_WITH_REPLICA;
-    long expectedRootReplicatedSize = expectedVolReplicatedSize + expectedVol2ReplicatedSize;
+    long vol3TotalSize = FILE12_SIZE_WITH_REPLICA + FILE13_SIZE_WITH_REPLICA + FILE14_SIZE_WITH_REPLICA;
+    long expectedRootReplicatedSize = expectedVolReplicatedSize + expectedVol2ReplicatedSize + vol3TotalSize;
     assertEquals(expectedRootReplicatedSize, rootResponse.getSizeWithReplica());
   }
 
@@ -733,7 +784,7 @@ public class TestNSSummaryEndpointWithFSO {
 
   @Test
   public void testFileSizeDist() throws Exception {
-    checkFileSizeDist(ROOT_PATH, 2, 3, 4, 2);
+    checkFileSizeDist(ROOT_PATH, 5, 3, 4, 2);
     checkFileSizeDist(VOL_PATH, 2, 1, 2, 2);
     checkFileSizeDist(BUCKET_ONE_PATH, 1, 1, 1, 2);
     checkFileSizeDist(DIR_ONE_PATH, 0, 1, 1, 2);
@@ -865,6 +916,36 @@ public class TestNSSummaryEndpointWithFSO {
 
     assertThrows(ServiceNotReadyException.class, () ->
         ReconUtils.constructFullPath(keyInfo, mockSummaryManager, mockMetadataManager));
+  }
+
+  @Test
+  public void testDataSizeUnderVolumeWithRatisReplication()throws IOException {
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(VOL_THREE_PATH,
+        false, true, false);
+    DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    assertEquals(QuotaUtil.getReplicatedSize(replicaDUResponse.getSize(), RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE)), replicaDUResponse.getSizeWithReplica());
+  }
+
+  @Test
+  public void testDataSizeUnderBucketWithRatisReplication()throws IOException {
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(VOL_THREE_PATH + "/" + BUCKET_FIVE,
+        false, true, false);
+    DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    assertEquals(QuotaUtil.getReplicatedSize(replicaDUResponse.getSize(), RatisReplicationConfig.getInstance(
+        HddsProtos.ReplicationFactor.THREE)), replicaDUResponse.getSizeWithReplica());
+  }
+
+  @Test
+  public void testDataSizeUnderDirWithRatisReplication()throws IOException {
+    Response keyResponse = nsSummaryEndpoint.getDiskUsage(VOL_THREE_PATH + "/" + BUCKET_FIVE + "/" + DIR_SIX,
+        false, true, false);
+    DUResponse replicaDUResponse = (DUResponse) keyResponse.getEntity();
+    assertEquals(ResponseStatus.OK, replicaDUResponse.getStatus());
+    assertEquals(QuotaUtil.getReplicatedSize(replicaDUResponse.getSize(), RatisReplicationConfig.getInstance(
+        HddsProtos.ReplicationFactor.THREE)), replicaDUResponse.getSizeWithReplica());
   }
 
   /**
@@ -1000,6 +1081,57 @@ public class TestNSSummaryEndpointWithFSO {
           VOL_TWO_OBJECT_ID,
           KEY_ELEVEN_SIZE,
           getBucketLayout());
+
+  }
+
+  private void populateVolumeThree() throws IOException {
+
+    writeDirToOm(reconOMMetadataManager, DIR_SIX_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID, BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID, DIR_SIX);
+
+    writeDirToOm(reconOMMetadataManager, DIR_SEVEN_OBJECT_ID,
+        DIR_SIX_OBJECT_ID, BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID, DIR_SEVEN);
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_TWELVE,
+        BUCKET_FIVE,
+        VOL_THREE,
+        FILE_TWELVE,
+        FILE_TWELVE_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID,
+        KEY_TWELVE_SIZE,
+        getBucketLayout(), RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        Time.now(), true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_THIRTEEN,
+        BUCKET_FIVE,
+        VOL_THREE,
+        FILE_THIRTEEN,
+        FILE_THIRTEEN_OBJECT_ID,
+        DIR_SIX_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID,
+        KEY_THIRTEEN_SIZE,
+        getBucketLayout(), RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        Time.now(), true);
+
+    writeKeyToOm(reconOMMetadataManager,
+        KEY_FOURTEEN,
+        BUCKET_FIVE,
+        VOL_THREE,
+        FILE_FOURTEEN,
+        FILE_FOURTEEN_OBJECT_ID,
+        DIR_SEVEN_OBJECT_ID,
+        BUCKET_FIVE_OBJECT_ID,
+        VOL_THREE_OBJECT_ID,
+        KEY_FOURTEEN_SIZE,
+        getBucketLayout(), RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        Time.now(), true);
   }
 
   /**
@@ -1036,8 +1168,19 @@ public class TestNSSummaryEndpointWithFSO {
             .setQuotaInBytes(VOL_TWO_QUOTA)
             .build();
 
+    String volume3Key = omMetadataManager.getVolumeKey(VOL_THREE);
+    OmVolumeArgs args3 =
+        OmVolumeArgs.newBuilder()
+            .setObjectID(VOL_THREE_OBJECT_ID)
+            .setVolume(VOL_THREE)
+            .setAdminName(TEST_USER)
+            .setOwnerName(TEST_USER)
+            .setQuotaInBytes(VOL_THREE_QUOTA)
+            .build();
+
     omMetadataManager.getVolumeTable().put(volumeKey, args);
     omMetadataManager.getVolumeTable().put(volume2Key, args2);
+    omMetadataManager.getVolumeTable().put(volume3Key, args3);
 
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(VOL)
@@ -1071,6 +1214,14 @@ public class TestNSSummaryEndpointWithFSO {
         .setBucketLayout(getBucketLayout())
         .build();
 
+    OmBucketInfo bucketInfo5 = OmBucketInfo.newBuilder()
+        .setVolumeName(VOL_THREE)
+        .setBucketName(BUCKET_FIVE)
+        .setObjectID(BUCKET_FIVE_OBJECT_ID)
+        .setQuotaInBytes(BUCKET_FIVE_QUOTA)
+        .setBucketLayout(getBucketLayout())
+        .build();
+
     String bucketKey = omMetadataManager.getBucketKey(
             bucketInfo.getVolumeName(), bucketInfo.getBucketName());
     String bucketKey2 = omMetadataManager.getBucketKey(
@@ -1079,11 +1230,14 @@ public class TestNSSummaryEndpointWithFSO {
         bucketInfo3.getVolumeName(), bucketInfo3.getBucketName());
     String bucketKey4 = omMetadataManager.getBucketKey(
         bucketInfo4.getVolumeName(), bucketInfo4.getBucketName());
+    String bucketKey5 = omMetadataManager.getBucketKey(
+        bucketInfo5.getVolumeName(), bucketInfo5.getBucketName());
 
     omMetadataManager.getBucketTable().put(bucketKey, bucketInfo);
     omMetadataManager.getBucketTable().put(bucketKey2, bucketInfo2);
     omMetadataManager.getBucketTable().put(bucketKey3, bucketInfo3);
     omMetadataManager.getBucketTable().put(bucketKey4, bucketInfo4);
+    omMetadataManager.getBucketTable().put(bucketKey5, bucketInfo5);
 
     return omMetadataManager;
   }

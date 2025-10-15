@@ -100,7 +100,9 @@ public class DirectoryEntityHandler extends EntityHandler {
 
     duResponse.setKeySize(dirNSSummary.getSizeOfFiles());
     long dirDataSize = duResponse.getKeySize();
-    long dirDataSizeWithReplica = 0L;
+    if (withReplica) {
+      duResponse.setSizeWithReplica(dirNSSummary.getReplicatedSizeOfFiles());
+    }
     List<DUResponse.DiskUsage> subdirDUData = new ArrayList<>();
     // iterate all subdirectories to get disk usage data
     for (long subdirObjectId: subdirs) {
@@ -130,29 +132,16 @@ public class DirectoryEntityHandler extends EntityHandler {
       // reformat the response
       diskUsage.setSubpath(subpath);
       long dataSize = getTotalSize(subdirObjectId);
-      dirDataSize += dataSize;
-
       if (withReplica) {
         long subdirDU = getBucketHandler()
                 .calculateDUUnderObject(subdirObjectId);
         diskUsage.setSizeWithReplica(subdirDU);
-        dirDataSizeWithReplica += subdirDU;
       }
 
       diskUsage.setSize(dataSize);
       subdirDUData.add(diskUsage);
     }
 
-    // handle direct keys under directory
-    if (listFile || withReplica) {
-      dirDataSizeWithReplica += getBucketHandler()
-              .handleDirectKeys(dirObjectId, withReplica,
-                  listFile, subdirDUData, getNormalizedPath());
-    }
-
-    if (withReplica) {
-      duResponse.setSizeWithReplica(dirDataSizeWithReplica);
-    }
     duResponse.setCount(subdirDUData.size());
     duResponse.setSize(dirDataSize);
 
