@@ -91,7 +91,6 @@ import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
@@ -839,7 +838,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OMMetadataManager metadataManager, OmBucketInfo omBucketInfo,
       long allocateSize) throws IOException {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-      long usedBytes = omBucketInfo.getUsedBytes();
+      long usedBytes = omBucketInfo.getTotalBucketSpace();
       long quotaInBytes = omBucketInfo.getQuotaInBytes();
       if (quotaInBytes - usedBytes < allocateSize) {
         throw new OMException("The DiskSpace quota of bucket:"
@@ -857,7 +856,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected void checkBucketQuotaInNamespace(OmBucketInfo omBucketInfo,
       long allocatedNamespace) throws IOException {
     if (omBucketInfo.getQuotaInNamespace() > OzoneConsts.QUOTA_RESET) {
-      long usedNamespace = omBucketInfo.getUsedNamespace();
+      long usedNamespace = omBucketInfo.getTotalBucketNamespace();
       long quotaInNamespace = omBucketInfo.getQuotaInNamespace();
       long toUseNamespaceInTotal = usedNamespace + allocatedNamespace;
       if (quotaInNamespace < toUseNamespaceInTotal) {
@@ -890,7 +889,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * @return the number of bytes used by blocks pointed to by {@code omKeyInfo}.
+   * @return the number of bytes (replicated size) used by blocks pointed to by {@code omKeyInfo}.
    */
   public static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
@@ -898,22 +897,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
         bytesUsed += QuotaUtil.getReplicatedSize(
             locationInfo.getLength(), omKeyInfo.getReplicationConfig());
-      }
-    }
-
-    return bytesUsed;
-  }
-
-  /**
-   * @return the number of bytes used by blocks pointed to by {@code omKeyInfo}.
-   */
-  public static long sumBlockLengths(OzoneManagerProtocolProtos.KeyInfo keyInfo) {
-    long bytesUsed = 0;
-    ReplicationConfig replicationConfig = ReplicationConfig.fromProto(keyInfo.getType(), keyInfo.getFactor(),
-            keyInfo.getEcReplicationConfig());
-    for (OzoneManagerProtocolProtos.KeyLocationList group: keyInfo.getKeyLocationListList()) {
-      for (OzoneManagerProtocolProtos.KeyLocation locationInfo : group.getKeyLocationsList()) {
-        bytesUsed += QuotaUtil.getReplicatedSize(locationInfo.getLength(), replicationConfig);
       }
     }
 

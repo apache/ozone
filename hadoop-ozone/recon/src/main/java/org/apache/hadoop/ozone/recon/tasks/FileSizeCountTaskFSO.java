@@ -20,34 +20,42 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 
 import com.google.inject.Inject;
+import java.io.IOException;
 import java.util.Map;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
-import org.jooq.DSLContext;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
 
 /**
  * Task for FileSystemOptimized (FSO) which processes the FILE_TABLE.
  */
 public class FileSizeCountTaskFSO implements ReconOmTask {
 
-  private final FileCountBySizeDao fileCountBySizeDao;
-  private final DSLContext dslContext;
+  private final ReconFileMetadataManager reconFileMetadataManager;
+  private final OzoneConfiguration ozoneConfiguration;
 
   @Inject
-  public FileSizeCountTaskFSO(FileCountBySizeDao fileCountBySizeDao,
-                              UtilizationSchemaDefinition utilizationSchemaDefinition) {
-    this.fileCountBySizeDao = fileCountBySizeDao;
-    this.dslContext = utilizationSchemaDefinition.getDSLContext();
+  public FileSizeCountTaskFSO(ReconFileMetadataManager reconFileMetadataManager,
+                              OzoneConfiguration configuration) throws IOException {
+    this.reconFileMetadataManager = reconFileMetadataManager;
+    this.ozoneConfiguration = configuration;
+  }
+
+  @Override
+  public ReconOmTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    return new FileSizeCountTaskFSO(
+        reconFileMetadataManager.getStagedReconFileMetadataManager(stagedReconDbStore), ozoneConfiguration);
   }
 
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
     return FileSizeCountTaskHelper.reprocess(
         omMetadataManager,
-        dslContext,
-        fileCountBySizeDao,
+        reconFileMetadataManager,
         BucketLayout.FILE_SYSTEM_OPTIMIZED,
         getTaskName()
     );
@@ -59,8 +67,7 @@ public class FileSizeCountTaskFSO implements ReconOmTask {
     return FileSizeCountTaskHelper.processEvents(
         events,
         FILE_TABLE,
-        dslContext,
-        fileCountBySizeDao,
+        reconFileMetadataManager,
         getTaskName());
   }
 

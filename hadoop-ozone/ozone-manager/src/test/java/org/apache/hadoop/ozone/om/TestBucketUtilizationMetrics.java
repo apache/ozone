@@ -51,7 +51,7 @@ public class TestBucketUtilizationMetrics {
   private static final long USED_BYTES_2 = 200;
   private static final long SNAPSHOT_USED_BYTES_1 = 400;
   private static final long SNAPSHOT_USED_BYTES_2 = 800;
-  private static final long QUOTA_IN_BYTES_1 = 200;
+  private static final long QUOTA_IN_BYTES_1 = 600;
   private static final long QUOTA_IN_BYTES_2 = QUOTA_RESET;
   private static final long QUOTA_IN_NAMESPACE_1 = 1;
   private static final long QUOTA_IN_NAMESPACE_2 = 2;
@@ -97,7 +97,7 @@ public class TestBucketUtilizationMetrics {
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketQuotaBytes, QUOTA_IN_BYTES_1);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketQuotaNamespace, QUOTA_IN_NAMESPACE_1);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketAvailableBytes,
-        QUOTA_IN_BYTES_1 - USED_BYTES_1);
+        QUOTA_IN_BYTES_1 - USED_BYTES_1 - SNAPSHOT_USED_BYTES_1);
 
     verify(mb, times(1)).tag(BucketMetricsInfo.VolumeName, VOLUME_NAME_2);
     verify(mb, times(1)).tag(BucketMetricsInfo.BucketName, BUCKET_NAME_2);

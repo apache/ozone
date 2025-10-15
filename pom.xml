@@ -39,7 +39,7 @@
     <aspectj.version>1.9.7</aspectj.version>
     <assertj.version>3.27.6</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
-    <aws-java-sdk2.version>2.35.0</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.35.5</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.81</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
@@ -89,7 +89,7 @@
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
     <excluded-test-groups>unhealthy</excluded-test-groups>
-    <exec-maven-plugin.version>3.5.1</exec-maven-plugin.version>
+    <exec-maven-plugin.version>3.6.1</exec-maven-plugin.version>
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
     <gson.version>2.13.1</gson.version>
@@ -212,7 +212,7 @@
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
-    <snakeyaml.version>2.0</snakeyaml.version>
+    <snakeyaml.version>2.5</snakeyaml.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
