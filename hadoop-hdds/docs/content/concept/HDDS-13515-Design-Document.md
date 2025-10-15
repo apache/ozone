@@ -1,11 +1,9 @@
 ---
-title: "HDDS-13515: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery"
-date: "2025-07-30"
-weight: 8
-menu: 
-  main:
-     parent: Architecture
-summary: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
+Title: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
+Summary: Staged reprocessing of Recon Task for data consistency shown over Recon UI
+Date: 2025-07-30
+JIRA: HDDS-13515
+Status: Implemented
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -23,13 +21,7 @@ summary: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
----
-Title: Staged Reprocessing for Recon Task Data During Full Snapshot Recovery
-Summary: Staged reprocessing of Recon Task for data consistency shown over Recon UI
-Date: 2025-07-30
-JIRA: HDDS-13515
-Status: Implemented
----
+
 ## 1. Executive Summary
 
 ### Problem Statement
