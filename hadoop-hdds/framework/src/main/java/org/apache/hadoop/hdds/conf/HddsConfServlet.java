@@ -96,8 +96,7 @@ public class HddsConfServlet extends HttpServlet {
         processConfigTagRequest(request, cmd, out);
       }
     } catch (IllegalArgumentException iae) {
-      response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-      HttpServletUtils.writeErrorResponse(iae.getMessage(), format, response);
+      HttpServletUtils.writeErrorResponse(HttpServletResponse.SC_NOT_FOUND, iae.getMessage(), format, response);
     }
   }
 
