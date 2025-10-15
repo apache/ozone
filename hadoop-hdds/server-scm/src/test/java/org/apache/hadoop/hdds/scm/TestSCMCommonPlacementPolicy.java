@@ -541,7 +541,7 @@ public class TestSCMCommonPlacementPolicy {
     List<DatanodeDetails> allNodes = ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
         MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails(), maintenanceDn);
     Map<Integer, Integer> datanodeRackMap = new HashMap<>();
-    // dead, in-maintenance dn does not get any rack to simulate that it's removed from topology on dying
+    // dead, in-maintenance dn does not get any rack to simulate that it was removed from topology on dying
     datanodeRackMap.put(0, 0); // dn0 on rack 0
     datanodeRackMap.put(1, 0); // dn1 on rack 1
     datanodeRackMap.put(2, 1); // dn2 (extra) on rack 2
