@@ -105,18 +105,6 @@ public class HddsConfServlet extends HttpServlet {
     }
   }
 
-  /**
-   * Exception for signal bad content type.
-   */
-  public static class BadFormatException extends Exception {
-
-    private static final long serialVersionUID = 1L;
-
-    public BadFormatException(String msg) {
-      super(msg);
-    }
-  }
-
   private void processConfigTagRequest(HttpServletRequest request, String cmd, Writer out) throws IOException {
     OzoneConfiguration config = getOzoneConfig();
 
