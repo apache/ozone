@@ -1,33 +1,46 @@
 package org.apache.hadoop.hdds.utils;
 
-import org.junit.jupiter.api.Test;
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.core.HttpHeaders;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import jakarta.annotation.Nullable;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.stream.Stream;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.core.HttpHeaders;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
 class TestHttpServletUtils {
 
-  @Test
-  public void testParseHeaders() throws Exception {
-    HashMap<String, HttpServletUtils.ResponseFormat> verifyMap = new HashMap<>();
-    verifyMap.put("text/plain", HttpServletUtils.ResponseFormat.XML);
-    verifyMap.put(null, HttpServletUtils.ResponseFormat.XML);
-    verifyMap.put("text/xml", HttpServletUtils.ResponseFormat.XML);
-    verifyMap.put("application/xml", HttpServletUtils.ResponseFormat.XML);
-    verifyMap.put("application/json", HttpServletUtils.ResponseFormat.JSON);
+  public static Stream<Arguments> provideParseHeadersTestCases() {
+    return Stream.of(
+        Arguments.of("text/plain", HttpServletUtils.ResponseFormat.XML, null),
+        // if content type is null, an IllegalArgumentException is expected to be thrown.
+        Arguments.of(null, null,  IllegalArgumentException.class),
+        Arguments.of("text/xml", HttpServletUtils.ResponseFormat.XML, null),
+        Arguments.of("application/xml", HttpServletUtils.ResponseFormat.XML,null),
+        Arguments.of("application/json", HttpServletUtils.ResponseFormat.JSON, null)
+    );
+  }
 
+  @ParameterizedTest
+  @MethodSource("provideParseHeadersTestCases")
+  public void testParseHeaders(@Nullable String contentType, HttpServletUtils.ResponseFormat expectResponseFormat, Class<? extends Throwable> expectedException) {
     HttpServletRequest request = mock(HttpServletRequest.class);
-    for (Map.Entry<String, HttpServletUtils.ResponseFormat> entry : verifyMap.entrySet()) {
-      HttpServletUtils.ResponseFormat contenTypeActual = entry.getValue();
-      when(request.getHeader(HttpHeaders.ACCEPT))
-          .thenReturn(entry.getKey());
-      assertEquals(contenTypeActual,
+    when(request.getHeader(HttpHeaders.ACCEPT))
+        .thenReturn(contentType);
+    if (expectedException == null) {
+      assertEquals(expectResponseFormat,
           HttpServletUtils.parseAcceptHeader(request));
+    } else {
+      assertThrows(expectedException, () -> HttpServletUtils.parseAcceptHeader(request));
     }
   }
 
