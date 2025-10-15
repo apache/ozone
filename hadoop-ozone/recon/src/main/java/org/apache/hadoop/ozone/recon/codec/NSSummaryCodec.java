@@ -134,7 +134,7 @@ public final class NSSummaryCodec implements Codec<NSSummary> {
       res.setReplicatedSizeOfFiles(replicatedSizeOfFiles);
     } else {
       // Set default replicatedSizeOfFiles to -1 indicating it's from old format
-      res.setParentId(-1);
+      res.setReplicatedSizeOfFiles(-1);
     }
     return res;
   }
