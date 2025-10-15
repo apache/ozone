@@ -380,7 +380,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
       }
 
       // Wait for all threads to complete
-      latch.await(25, TimeUnit.SECONDS);
+      assertTrue(latch.await(25, TimeUnit.SECONDS));
 
       // Check for exceptions
       if (exception.get() != null) {
@@ -389,7 +389,9 @@ public class TestPoolBasedHierarchicalResourceLockManager {
 
       // Verify all operations succeeded
       assertEquals(numThreads * operationsPerThread, successCount.get());
-
+      for (CompletableFuture<Void> future : futures) {
+        future.get();
+      }
     } finally {
       executor.shutdown();
     }
@@ -444,7 +446,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
         }
 
         // Wait for all threads to complete
-        latch.await(15, TimeUnit.SECONDS);
+        assertTrue(latch.await(15, TimeUnit.SECONDS));
 
         // Check for exceptions
         if (exception.get() != null) {
