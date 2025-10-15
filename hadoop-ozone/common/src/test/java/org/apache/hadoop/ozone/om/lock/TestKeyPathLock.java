@@ -39,8 +39,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyPathLock.class);
 
-  private final OzoneManagerLock.LeveledResource resource =
-      OzoneManagerLock.LeveledResource.KEY_PATH_LOCK;
+  private final LeveledResource resource =
+      LeveledResource.KEY_PATH_LOCK;
 
   @Test
   void testKeyPathLockMultiThreading() throws Exception {
@@ -224,8 +224,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
 
   @Test
   void testAcquireWriteBucketLockWhileAcquiredWriteKeyPathLock() {
-    OzoneManagerLock.LeveledResource higherResource =
-        OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+    LeveledResource higherResource =
+        LeveledResource.BUCKET_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -246,8 +246,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
 
   @Test
   void testAcquireWriteBucketLockWhileAcquiredReadKeyPathLock() {
-    OzoneManagerLock.LeveledResource higherResource =
-        OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+    LeveledResource higherResource =
+        LeveledResource.BUCKET_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -268,8 +268,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
 
   @Test
   void testAcquireReadBucketLockWhileAcquiredReadKeyPathLock() {
-    OzoneManagerLock.LeveledResource higherResource =
-        OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+    LeveledResource higherResource =
+        LeveledResource.BUCKET_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -290,8 +290,8 @@ class TestKeyPathLock extends TestOzoneManagerLock {
 
   @Test
   void testAcquireReadBucketLockWhileAcquiredWriteKeyPathLock() {
-    OzoneManagerLock.LeveledResource higherResource =
-        OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+    LeveledResource higherResource =
+        LeveledResource.BUCKET_LOCK;
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
