@@ -511,8 +511,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         } else {
           toResolveSnapshotId = null;
         }
-        return Triple.of(ssLocalData,
-            previousReadLockAcquired != null ? previousReadLockAcquired.readLock() : null ,
+        return Triple.of(ssLocalData, previousReadLockAcquired != null ? previousReadLockAcquired.readLock() : null,
             toResolveSnapshotId);
       } catch (IOException e) {
         // Release all the locks in case of an exception and rethrow the exception.
