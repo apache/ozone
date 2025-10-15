@@ -30,4 +30,22 @@ class TestHttpServletUtils {
           HttpServletUtils.parseAcceptHeader(request));
     }
   }
+
+  @Test
+  public void testWriteErrorResponse_JSON() throws Exception {
+    StringWriter sw = new StringWriter();
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    when(response.getWriter()).thenReturn(new PrintWriter(sw));
+    HttpServletUtils.writeErrorResponse("example error", HttpServletUtils.ResponseFormat.JSON, response);
+    assertEquals("{\"error\":\"example error\"}", sw.toString());
+  }
+
+  @Test
+  public void testWriteErrorResponse_XML() throws Exception {
+    StringWriter sw = new StringWriter();
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    when(response.getWriter()).thenReturn(new PrintWriter(sw));
+    HttpServletUtils.writeErrorResponse("example error", HttpServletUtils.ResponseFormat.XML, response);
+    assertEquals("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><error>example error</error>", sw.toString());
+  }
 }

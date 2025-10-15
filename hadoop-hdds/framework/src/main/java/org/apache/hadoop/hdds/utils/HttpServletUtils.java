@@ -68,19 +68,20 @@ public class HttpServletUtils implements Serializable {
      *
      * @param errorMessage the error message
      * @param format       the response format
-     * @param out          the writer
+     * @param response     the response
      */
-    public static void writeErrorResponse(String errorMessage, ResponseFormat format, Writer out)
+    public static void writeErrorResponse(String errorMessage, ResponseFormat format, HttpServletResponse response)
             throws IOException {
-        switch (format) {
+      PrintWriter writer = response.getWriter();
+      switch (format) {
             case JSON:
                 Map<String, String> errorMap = new HashMap<String, String>();
                 errorMap.put("error", errorMessage);
-                out.write(JsonUtils.toJsonString(errorMap));
+                writer.write(JsonUtils.toJsonString(errorMap));
                 break;
             case XML:
             default:
-                writeXmlError(errorMessage, out);
+                writeXmlError(errorMessage, writer);
                 break;
         }
     }
