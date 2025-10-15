@@ -674,6 +674,14 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.compact.non.snapshot.diff.tables";
   public static final boolean OZONE_OM_SNAPSHOT_COMPACT_NON_SNAPSHOT_DIFF_TABLES_DEFAULT = false;
 
+  public static final String OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT =
+      "ozone.om.hierarchical.resource.locks.soft.limit";
+  public static final int OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT_DEFAULT = 1024;
+
+  public static final String OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT =
+      "ozone.om.hierarchical.resource.locks.hard.limit";
+  public static final int OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT_DEFAULT = 10000;
+
   /**
    * Never constructed.
    */

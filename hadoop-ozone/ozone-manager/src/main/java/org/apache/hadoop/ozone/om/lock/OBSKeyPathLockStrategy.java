@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.KEY_PATH_LOCK;
+import static org.apache.hadoop.ozone.om.lock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.LeveledResource.KEY_PATH_LOCK;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;

@@ -73,19 +73,6 @@ public interface IOzoneManagerLock {
   OMLockMetrics getOMLockMetrics();
 
   /**
-   * Defines a resource interface used to represent entities that can be
-   * associated with locks in the Ozone Manager Lock mechanism. A resource
-   * implementation provides a name and an associated {@link ResourceManager}
-   * to manage its locking behavior.
-   */
-  interface Resource {
-
-    String getName();
-
-    ResourceManager getResourceManager();
-  }
-
-  /**
    * The ResourceManager class provides functionality for managing
    * information about resource read and write lock usage. It tracks the time of
    * read and write locks acquired and held by individual threads, enabling

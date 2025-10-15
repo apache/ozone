@@ -26,8 +26,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
-import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock.Resource;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.lock.Resource;
 
 /**
  * Class to take multiple locks on multiple snapshots.

@@ -36,8 +36,8 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.LeveledResource;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
-import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,7 +54,7 @@ public class TestMultiSnapshotLocks {
   private IOzoneManagerLock mockLock;
 
   @Mock
-  private OzoneManagerLock.LeveledResource mockResource;
+  private LeveledResource mockResource;
 
   private MultiSnapshotLocks multiSnapshotLocks;
   private UUID obj1 = UUID.randomUUID();

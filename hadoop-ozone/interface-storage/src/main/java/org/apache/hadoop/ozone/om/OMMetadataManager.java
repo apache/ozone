@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.HierachicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -89,6 +90,11 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return OzoneManagerLock
    */
   IOzoneManagerLock getLock();
+
+  /**
+   * Returns the Hierarchical ResourceLock used on Metadata DB.
+   */
+  HierachicalResourceLockManager getHierarchicalLockManager();
 
   /**
    * Returns the epoch associated with current OM process.

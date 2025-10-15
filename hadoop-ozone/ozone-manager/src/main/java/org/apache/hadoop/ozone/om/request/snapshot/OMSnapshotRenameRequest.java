@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.LeveledResource.SNAPSHOT_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 import java.io.IOException;
