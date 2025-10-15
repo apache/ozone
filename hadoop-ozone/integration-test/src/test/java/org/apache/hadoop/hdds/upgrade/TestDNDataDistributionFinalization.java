@@ -73,7 +73,6 @@ public class TestDNDataDistributionFinalization {
 
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
-  private Future<?> finalizationFuture;
   private final String volumeName = UUID.randomUUID().toString();
   private final String bucketName = UUID.randomUUID().toString();
   private OzoneBucket bucket;
@@ -141,7 +140,7 @@ public class TestDNDataDistributionFinalization {
     // involves restarts or leader changes the client may be disconnected,
     // but finalization should still proceed.
     if (doFinalize) {
-      finalizationFuture = Executors.newSingleThreadExecutor().submit(
+      Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(
           () -> {
             try {
               scmClient.finalizeScmUpgrade(CLIENT_ID);
@@ -188,7 +187,7 @@ public class TestDNDataDistributionFinalization {
     validatePreDataDistributionFeatureState();
 
     // Now trigger finalization
-    finalizationFuture = Executors.newSingleThreadExecutor().submit(
+    Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(
         () -> {
           try {
             scmClient.finalizeScmUpgrade(CLIENT_ID);
@@ -235,7 +234,7 @@ public class TestDNDataDistributionFinalization {
       out.write(data);
     }
     bucket.deleteKey(keyName);
-    finalizationFuture = Executors.newSingleThreadExecutor().submit(
+    Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(
         () -> {
           try {
             scmClient.finalizeScmUpgrade(CLIENT_ID);
