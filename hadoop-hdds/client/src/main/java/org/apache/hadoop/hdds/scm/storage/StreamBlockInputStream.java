@@ -428,7 +428,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
 
     @Override
-    public synchronized void onNext(ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto) {
+    public void onNext(ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto) {
       try {
         ReadBlockResponseProto readBlock = containerCommandResponseProto.getReadBlock();
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
@@ -444,7 +444,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
 
     @Override
-    public synchronized void onError(Throwable throwable) {
+    public void onError(Throwable throwable) {
       if (throwable == CANCELLED_EXCEPTION) {
         completed.set(true);
       } else {
@@ -454,7 +454,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
 
     @Override
-    public synchronized void onCompleted() {
+    public void onCompleted() {
       completed.set(true);
     }
 
