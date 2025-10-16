@@ -774,6 +774,7 @@ class TestOmSnapshotManager {
     when(bucketTable.get(dbBucketKey)).thenReturn(omBucketInfo);
 
     SnapshotInfo first = createSnapshotInfo(volumeName, bucketName);
+    first.setPathPreviousSnapshotId(null);
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
 
     // Create first checkpoint for the snapshot checkpoint
@@ -797,10 +798,13 @@ class TestOmSnapshotManager {
 
   private SnapshotInfo createSnapshotInfo(String volumeName,
                                           String bucketName) {
-    return SnapshotInfo.newInstance(volumeName,
+    SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName,
         UUID.randomUUID().toString(),
         UUID.randomUUID(),
         Time.now());
+    snapshotInfo.setPathPreviousSnapshotId(null);
+    snapshotInfo.setGlobalPreviousSnapshotId(null);
+    return snapshotInfo;
   }
 }
