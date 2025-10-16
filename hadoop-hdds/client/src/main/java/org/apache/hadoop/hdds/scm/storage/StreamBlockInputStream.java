@@ -351,6 +351,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
+  /**
+   * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
+   */
   public class StreamingReader implements StreamObserver<ContainerProtos.ContainerCommandResponseProto> {
 
     private final BlockingQueue<ContainerProtos.ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>(1);
