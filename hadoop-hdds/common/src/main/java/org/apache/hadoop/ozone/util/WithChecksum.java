@@ -23,6 +23,6 @@ import org.apache.hadoop.hdds.utils.db.CopyObject;
  * Represents a generic interface for objects capable of generating or providing
  * a checksum value.
  */
-public interface Checksum<T extends Checksum<T>> extends CopyObject<T> {
+public interface WithChecksum<T extends WithChecksum<T>> extends CopyObject<T> {
   String getChecksum();
 }

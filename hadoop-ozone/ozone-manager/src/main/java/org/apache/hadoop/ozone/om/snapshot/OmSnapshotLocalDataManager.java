@@ -17,10 +17,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTENSION;
@@ -28,16 +24,18 @@ import static org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml.YAML_FILE_EXTEN
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
-import com.google.common.util.concurrent.Striped;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -49,7 +47,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.Scheduler;
@@ -62,11 +59,15 @@ import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.FlatResource;
+import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
+import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.util.ObjectSerializer;
 import org.apache.hadoop.ozone.util.YamlSerializer;
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -88,7 +89,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   // Used for acquiring locks on the entire data structure.
   private final ReadWriteLock fullLock;
   // Locks should be always acquired by iterating through the snapshot chain to avoid deadlocks.
-  private Striped<ReadWriteLock> locks;
+  private HierarchicalResourceLockManager locks;
   private Map<UUID, Integer> snapshotToBeCheckedForOrphans;
   private Scheduler scheduler;
   private volatile boolean closed;
@@ -211,7 +212,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  public void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
+  void addVersionNodeWithDependents(OmSnapshotLocalData snapshotLocalData) throws IOException {
     if (versionNodeMap.containsKey(snapshotLocalData.getSnapshotId())) {
       return;
     }
@@ -254,12 +255,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     });
   }
 
-  private void init(OzoneConfiguration configuration, SnapshotChainManager snapshotChainManager) throws IOException {
-    boolean fair = configuration.getBoolean(OZONE_MANAGER_FAIR_LOCK, OZONE_MANAGER_FAIR_LOCK_DEFAULT);
-    String stripeSizeKey = OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX + SNAPSHOT_LOCAL_DATA_LOCK_RESOURCE_NAME;
-    int size = configuration.getInt(stripeSizeKey, OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT);
+  private void init() throws IOException {
+    this.locks = omMetadataManager.getHierarchicalLockManager();
     this.snapshotToBeCheckedForOrphans = new ConcurrentHashMap<>();
-    this.locks = SimpleStriped.readWriteLock(size, fair);
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
     File snapshotDir = new File(store.getSnapshotsParentDir());
@@ -377,6 +375,38 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       if (scheduler != null) {
         scheduler.close();
       }
+      closed = true;
+    }
+  }
+
+  private static final class LockDataProviderInitResult {
+    private final OmSnapshotLocalData snapshotLocalData;
+    private final HierarchicalResourceLock lock;
+    private final HierarchicalResourceLock previousLock;
+    private final UUID previousSnapshotId;
+
+    private LockDataProviderInitResult(HierarchicalResourceLock lock, OmSnapshotLocalData snapshotLocalData,
+        HierarchicalResourceLock previousLock, UUID previousSnapshotId) {
+      this.lock = lock;
+      this.snapshotLocalData = snapshotLocalData;
+      this.previousLock = previousLock;
+      this.previousSnapshotId = previousSnapshotId;
+    }
+
+    private HierarchicalResourceLock getLock() {
+      return lock;
+    }
+
+    private HierarchicalResourceLock getPreviousLock() {
+      return previousLock;
+    }
+
+    private UUID getPreviousSnapshotId() {
+      return previousSnapshotId;
+    }
+
+    private OmSnapshotLocalData getSnapshotLocalData() {
+      return snapshotLocalData;
     }
   }
 
@@ -414,33 +444,35 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   public class ReadableOmSnapshotLocalDataProvider implements AutoCloseable {
 
     private final UUID snapshotId;
-    private final Lock lock;
+    private final HierarchicalResourceLock lock;
+    private final HierarchicalResourceLock previousLock;
     private final OmSnapshotLocalData snapshotLocalData;
     private OmSnapshotLocalData previousSnapshotLocalData;
     private volatile boolean isPreviousSnapshotLoaded = false;
     private final UUID resolvedPreviousSnapshotId;
 
     protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId) throws IOException {
-      this(snapshotId, locks.get(snapshotId).readLock());
+      this(snapshotId, true);
     }
 
     protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId, UUID snapIdToResolve) throws IOException {
-      this(snapshotId, locks.get(snapshotId).readLock(), null, snapIdToResolve);
+      this(snapshotId, true, null, snapIdToResolve);
     }
 
-    protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId, Lock lock) throws IOException {
-      this(snapshotId, lock, null, null);
+    protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId, boolean readLock) throws IOException {
+      this(snapshotId, readLock, null, null);
     }
 
-    protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId, Lock lock,
+    protected ReadableOmSnapshotLocalDataProvider(UUID snapshotId, boolean readLock,
         CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier,
         UUID snapshotIdToBeResolved) throws IOException {
       this.snapshotId = snapshotId;
-      this.lock = lock;
-      Pair<OmSnapshotLocalData, UUID> pair = initialize(lock, snapshotId, snapshotIdToBeResolved,
+      LockDataProviderInitResult result = initialize(readLock, snapshotId, snapshotIdToBeResolved,
           snapshotLocalDataSupplier);
-      this.snapshotLocalData = pair.getKey();
-      this.resolvedPreviousSnapshotId = pair.getValue();
+      this.snapshotLocalData = result.getSnapshotLocalData();
+      this.lock = result.getLock();
+      this.previousLock = result.getPreviousLock();
+      this.resolvedPreviousSnapshotId = result.getPreviousSnapshotId();
       this.previousSnapshotLocalData = null;
       this.isPreviousSnapshotLoaded = false;
     }
@@ -451,27 +483,35 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
     public synchronized OmSnapshotLocalData getPreviousSnapshotLocalData() throws IOException {
       if (!isPreviousSnapshotLoaded) {
-        File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(resolvedPreviousSnapshotId));
-        this.previousSnapshotLocalData = resolvedPreviousSnapshotId == null ? null :
-            snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+        if (resolvedPreviousSnapshotId != null) {
+          File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(resolvedPreviousSnapshotId));
+          this.previousSnapshotLocalData = snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+        }
         this.isPreviousSnapshotLoaded = true;
       }
       return previousSnapshotLocalData;
+    }
+
+    private HierarchicalResourceLock acquireLock(UUID snapId, boolean readLock) throws IOException {
+      HierarchicalResourceLock acquiredLock = readLock ? locks.acquireReadLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK,
+          snapId.toString()) : locks.acquireWriteLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK, snapId.toString());
+      if (!acquiredLock.isLockAcquired()) {
+        throw new IOException("Unable to acquire lock for snapshotId: " + snapId);
+      }
+      return acquiredLock;
     }
 
     /**
      * Intializer the snapshot local data by acquiring the lock on the snapshot and also acquires a read lock on the
      * snapshotId to be resolved by iterating through the chain of previous snapshot ids.
      */
-    private Pair<OmSnapshotLocalData, UUID> initialize(Lock snapIdLock, UUID snapId, UUID toResolveSnapshotId,
+    private LockDataProviderInitResult initialize(boolean readLock, UUID snapId, UUID toResolveSnapshotId,
         CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier)
         throws IOException {
-      snapIdLock.lock();
-      // Get the Lock instance for the snapshot id and track it.
-      ReadWriteLock lockIdAcquired = locks.get(snapId);
-      ReadWriteLock previousReadLockAcquired = null;
-      boolean haspreviousReadLockAcquiredAcquired = false;
+      HierarchicalResourceLock snapIdLock = null;
+      HierarchicalResourceLock previousReadLockAcquired = null;
       try {
+        snapIdLock = acquireLock(snapId, readLock);
         snapshotLocalDataSupplier = snapshotLocalDataSupplier == null ? () -> {
           File snapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(snapId));
           return Pair.of(snapshotLocalDataSerializer.load(snapshotLocalDataFile), snapshotLocalDataFile);
@@ -484,29 +524,22 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
               "to snapshotId " + ssLocalData.getSnapshotId() + ". Expected snapshotId " + snapId);
         }
         // Get previous snapshotId and acquire read lock on the id. We need to do this outside the loop instead of a
-        // do while loop since the nodes that may be added may not be present in the graph so it may not be possible
+        // do while loop since the nodes that need be added may not be present in the graph so it may not be possible
         // to iterate through the chain.
         UUID previousSnapshotId = ssLocalData.getPreviousSnapshotId();
         if (previousSnapshotId != null) {
-          if (versionNodeMap.containsKey(previousSnapshotId)) {
+          if (!versionNodeMap.containsKey(previousSnapshotId)) {
             throw new IOException(String.format("Operating on snapshot id : %s with previousSnapshotId: %s invalid " +
                 "since previousSnapshotId is not loaded.", snapId, previousSnapshotId));
           }
           toResolveSnapshotId = toResolveSnapshotId == null ? ssLocalData.getPreviousSnapshotId() :
               toResolveSnapshotId;
-          previousReadLockAcquired = locks.get(previousSnapshotId);
-          // Stripe lock could return the same lock object for multiple snapshotIds so in case a write lock is
-          // acquired previously on the same lock then this could cause a deadlock. If the same lock instance is
-          // returned then acquiring this read lock is unnecessary.
-          if (lockIdAcquired == previousReadLockAcquired) {
-            previousReadLockAcquired = null;
-          }
-          if (previousReadLockAcquired != null) {
-            previousReadLockAcquired.readLock().lock();
-            haspreviousReadLockAcquiredAcquired = true;
-          }
-          Map<Integer, LocalDataVersionNode> previousVersionNodeMap = versionNodeMap.get(previousSnapshotId)
-              .getSnapshotVersions();
+          previousReadLockAcquired = acquireLock(previousSnapshotId, true);
+          // Create a copy of the previous versionMap to get the previous versions corresponding to the previous
+          // snapshot. This map would mutated to resolve the previous snapshot's version corresponding to the
+          // toResolveSnapshotId by iterating through the chain of previous snapshot ids.
+          Map<Integer, LocalDataVersionNode> previousVersionNodeMap =
+              new HashMap<>(versionNodeMap.get(previousSnapshotId).getSnapshotVersions());
           UUID currentIteratedSnapshotId = previousSnapshotId;
           // Iterate through the chain of previous snapshot ids until the snapshot id to be resolved is found.
           while (!Objects.equals(currentIteratedSnapshotId, toResolveSnapshotId)) {
@@ -525,25 +558,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
                   currentIteratedSnapshotId, snapId, toResolveSnapshotId));
             }
             UUID previousId = previousIds.iterator().next();
-            ReadWriteLock lockToBeAcquired = locks.get(previousId);
-            // If stripe lock returns the same lock object corresponding to snapshot id then no read lock needs to be
-            // acquired.
-            if (lockToBeAcquired == lockIdAcquired) {
-              lockToBeAcquired = null;
-            }
-            if (lockToBeAcquired != null) {
-              // If a read lock has already been acquired on the same lock based on the previous iteration snapshot id
-              // then no need to acquire another read lock on the same lock and this lock could just piggyback on the
-              // same lock.
-              if (lockToBeAcquired != previousReadLockAcquired) {
-                lockToBeAcquired.readLock().lock();
-                haspreviousReadLockAcquiredAcquired =  true;
-              } else {
-                // Set the previous read lock to null since the same lock instance is going to be used for current
-                // iteration lock as well.
-                previousReadLockAcquired = null;
-              }
-            }
+            HierarchicalResourceLock previousToPreviousReadLockAcquired = acquireLock(previousId, true);
+
             try {
               // Get the version node for the snapshot and update the version node to the successor to point to the
               // previous node.
@@ -557,15 +573,15 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
                   throw new IOException(String.format("Snapshot %s version %d doesn't have successor",
                       currentIteratedSnapshotId, entry.getValue()));
                 }
+                // Set the version node for iterated version to the successor corresponding to the previous snapshot id.
                 entry.setValue(versionNode.iterator().next());
               }
             } finally {
-              // Release the read lock acquired on the previous snapshot id if it was acquired. Now that the instance
+              // Release the read lock acquired on the previous snapshot id acquired. Now that the instance
               // is no longer needed we can release the read lock for the snapshot iterated in the previous snapshot.
-              if (previousReadLockAcquired != null) {
-                previousReadLockAcquired.readLock().unlock();
-              }
-              previousReadLockAcquired = lockToBeAcquired;
+              // Make previousToPrevious previous for next iteration.
+              previousReadLockAcquired.close();
+              previousReadLockAcquired = previousToPreviousReadLockAcquired;
               currentIteratedSnapshotId = previousId;
             }
           }
@@ -573,6 +589,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           Map<Integer, OmSnapshotLocalData.VersionMeta> versionMetaMap = ssLocalData.getVersionSstFileInfos();
           for (Map.Entry<Integer, OmSnapshotLocalData.VersionMeta> entry : versionMetaMap.entrySet()) {
             OmSnapshotLocalData.VersionMeta versionMeta = entry.getValue();
+            // Get the relative version node which corresponds to the toResolveSnapshotId corresponding to the
+            // versionMeta which points to a particular version in the previous snapshot
             LocalDataVersionNode relativePreviousVersionNode =
                 previousVersionNodeMap.get(versionMeta.getPreviousSnapshotVersion());
             if (relativePreviousVersionNode == null) {
@@ -580,27 +598,33 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
                   " with version : %d against previous snapshot %s previous version : %d",
                   snapId, entry.getKey(), toResolveSnapshotId, versionMeta.getPreviousSnapshotVersion()));
             }
+            // Set the previous snapshot version to the relativePreviousVersionNode which was captured.
+            versionMeta.setPreviousSnapshotVersion(relativePreviousVersionNode.getVersion());
           }
         } else {
           toResolveSnapshotId = null;
         }
-        return Pair.of(ssLocalData, toResolveSnapshotId);
+        return new LockDataProviderInitResult(snapIdLock, ssLocalData, previousReadLockAcquired, toResolveSnapshotId);
       } catch (IOException e) {
         // Release all the locks in case of an exception and rethrow the exception.
-        if (previousReadLockAcquired != null && haspreviousReadLockAcquiredAcquired) {
-          previousReadLockAcquired.readLock().unlock();
+        if (previousReadLockAcquired != null) {
+          previousReadLockAcquired.close();
         }
-        snapIdLock.unlock();
+        if (snapIdLock != null) {
+          snapIdLock.close();
+        }
         throw e;
       }
     }
 
     @Override
-    public void close() {
-      if (resolvedPreviousSnapshotId != null) {
-        locks.get(resolvedPreviousSnapshotId).readLock().unlock();
+    public void close() throws IOException {
+      if (previousLock != null) {
+        previousLock.close();
       }
-      lock.unlock();
+      if (lock != null) {
+        lock.close();
+      }
     }
   }
 
@@ -622,18 +646,18 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   public final class WritableOmSnapshotLocalDataProvider extends ReadableOmSnapshotLocalDataProvider {
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId) throws IOException {
-      super(snapshotId, locks.get(snapshotId).writeLock());
+      super(snapshotId, false);
       fullLock.readLock().lock();
     }
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId, UUID snapshotIdToBeResolved) throws IOException {
-      super(snapshotId, locks.get(snapshotId).writeLock(), null, snapshotIdToBeResolved);
+      super(snapshotId, false, null, snapshotIdToBeResolved);
       fullLock.readLock().lock();
     }
 
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId,
         CheckedSupplier<Pair<OmSnapshotLocalData, File>, IOException> snapshotLocalDataSupplier) throws IOException {
-      super(snapshotId, locks.get(snapshotId).writeLock(), snapshotLocalDataSupplier, null);
+      super(snapshotId, false, snapshotLocalDataSupplier, null);
       fullLock.readLock().lock();
     }
 
@@ -659,7 +683,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return versionsToBeAdded;
     }
 
-    private void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
+    private synchronized void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
       SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
       Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
           existingSnapVersions.getSnapshotVersions();
@@ -685,6 +709,13 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       }
     }
 
+    public void addSnapshotVersion(RDBStore snapshotStore) throws IOException {
+      List<LiveFileMetaData> sstFiles = OmSnapshotManager.getSnapshotSSTFileList(snapshotStore);
+      OmSnapshotLocalData previousSnapshotLocalData = getPreviousSnapshotLocalData();
+      this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles, previousSnapshotLocalData == null ? 0 :
+          previousSnapshotLocalData.getVersion());
+    }
+
     public synchronized void commit() throws IOException {
       SnapshotVersionsMeta localDataVersionNodes = validateModification(super.snapshotLocalData);
       String filePath = getSnapshotLocalPropertyYamlPath(super.snapshotId);
@@ -696,15 +727,15 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         if (tmpFileExists) {
           tmpFileExists = !tmpFile.delete();
         }
-        if (!tmpFileExists) {
+        if (tmpFileExists) {
           throw new IOException("Unable to delete tmp file " + tmpFilePath);
         }
         snapshotLocalDataSerializer.save(new File(tmpFilePath), super.snapshotLocalData);
-        FileUtils.moveFile(tmpFile, new File(filePath), StandardCopyOption.ATOMIC_MOVE,
+        Files.move(tmpFile.toPath(), Paths.get(filePath), StandardCopyOption.ATOMIC_MOVE,
             StandardCopyOption.REPLACE_EXISTING);
       } else if (snapshotLocalDataFile.exists()) {
         LOG.info("Deleting Yaml file corresponding to snapshotId: {} in path : {}",
-             super.snapshotId, snapshotLocalDataFile.getAbsolutePath());
+            super.snapshotId, snapshotLocalDataFile.getAbsolutePath());
         if (snapshotLocalDataFile.delete()) {
           throw new IOException("Unable to delete file " + snapshotLocalDataFile.getAbsolutePath());
         }
@@ -713,7 +744,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
       super.close();
       fullLock.readLock().unlock();
     }
@@ -732,20 +763,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       this.version = version;
     }
 
-    private int getVersion() {
-      return version;
-    }
-
-    private UUID getSnapshotId() {
-      return snapshotId;
-    }
-
     private UUID getPreviousSnapshotId() {
       return previousSnapshotId;
     }
 
-    private int getPreviousSnapshotVersion() {
-      return previousSnapshotVersion;
+    private int getVersion() {
+      return version;
     }
 
     @Override

@@ -31,7 +31,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
-import org.apache.hadoop.ozone.util.Checksum;
+import org.apache.hadoop.ozone.util.WithChecksum;
 import org.apache.ozone.compaction.log.SstFileInfo;
 import org.rocksdb.LiveFileMetaData;
 import org.yaml.snakeyaml.Yaml;
@@ -40,8 +40,7 @@ import org.yaml.snakeyaml.Yaml;
  * OmSnapshotLocalData is the in-memory representation of snapshot local metadata.
  * Inspired by org.apache.hadoop.ozone.container.common.impl.ContainerData
  */
-public class OmSnapshotLocalData implements Checksum<OmSnapshotLocalData> {
-
+public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
   // Unique identifier for the snapshot. This is used to identify the snapshot.
   private UUID snapshotId;
 
@@ -185,9 +184,14 @@ public class OmSnapshotLocalData implements Checksum<OmSnapshotLocalData> {
    * Adds an entry to the defragged SST file list.
    * @param sstFiles SST file name
    */
-  public void addVersionSSTFileInfos(List<SstFileInfo> sstFiles, int previousSnapshotVersion) {
+  public void addVersionSSTFileInfos(List<LiveFileMetaData> sstFiles, int previousSnapshotVersion) {
     version++;
-    this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles));
+    this.versionSstFileInfos.put(version, new VersionMeta(previousSnapshotVersion, sstFiles.stream()
+        .map(SstFileInfo::new).collect(Collectors.toList())));
+  }
+
+  public void removeVersionSSTFileInfos(int snapshotVersion) {
+    this.versionSstFileInfos.remove(snapshotVersion);
   }
 
   public void removeVersionSSTFileInfos(int snapshotVersion) {
@@ -279,7 +283,7 @@ public class OmSnapshotLocalData implements Checksum<OmSnapshotLocalData> {
    * maintain immutability.
    */
   public static class VersionMeta implements CopyObject<VersionMeta> {
-    private final int previousSnapshotVersion;
+    private int previousSnapshotVersion;
     private final List<SstFileInfo> sstFiles;
 
     public VersionMeta(int previousSnapshotVersion, List<SstFileInfo> sstFiles) {
@@ -289,6 +293,10 @@ public class OmSnapshotLocalData implements Checksum<OmSnapshotLocalData> {
 
     public int getPreviousSnapshotVersion() {
       return previousSnapshotVersion;
+    }
+
+    public void setPreviousSnapshotVersion(int previousSnapshotVersion) {
+      this.previousSnapshotVersion = previousSnapshotVersion;
     }
 
     public List<SstFileInfo> getSstFiles() {

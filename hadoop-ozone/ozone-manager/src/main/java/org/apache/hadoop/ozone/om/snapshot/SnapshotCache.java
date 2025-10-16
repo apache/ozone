@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.FlatResource.SNAPSHOT_DB_LOCK;
+import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -148,7 +148,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   public void invalidate(UUID key) {
     dbMap.compute(key, (k, v) -> {
       if (v == null) {
-        LOG.warn("SnapshotId: '{}' does not exist in snapshot cache.", k);
+        LOG.debug("SnapshotId: '{}' does not exist in snapshot cache.", k);
       } else {
         try {
           v.get().getMetadataManager().getStore().flushDB();
