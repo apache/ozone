@@ -236,7 +236,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   }
 
   private void increamentOrphanCheckCount(UUID snapshotId) {
-    this.snapshotToBeCheckedForOrphans.compute(snapshotId, (k, v) -> v == null ? 1 : v + 1);
+    if (snapshotId != null) {
+      this.snapshotToBeCheckedForOrphans.compute(snapshotId, (k, v) -> v == null ? 1 : (v + 1));
+    }
   }
 
   private void decreamentOrphanCheckCount(UUID snapshotId, int decrementBy) {
