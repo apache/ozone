@@ -56,7 +56,7 @@ class TestHttpServletUtils {
   }
 
   @Test
-  public void testWriteErrorResponse_JSON() throws Exception {
+  public void testWriteErrorResponseJson() throws Exception {
     StringWriter sw = new StringWriter();
     HttpServletResponse response = mock(HttpServletResponse.class);
     when(response.getWriter()).thenReturn(new PrintWriter(sw));
@@ -66,7 +66,7 @@ class TestHttpServletUtils {
   }
 
   @Test
-  public void testWriteErrorResponse_XML() throws Exception {
+  public void testWriteErrorResponseXml() throws Exception {
     StringWriter sw = new StringWriter();
     HttpServletResponse response = mock(HttpServletResponse.class);
     when(response.getWriter()).thenReturn(new PrintWriter(sw));

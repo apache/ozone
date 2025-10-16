@@ -42,7 +42,16 @@ import org.apache.hadoop.util.XMLUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-public class HttpServletUtils implements Serializable {
+/**
+ * Utility class for HTTP servlet operations.
+ * Provides methods for parsing request headers and writing responses.
+ */
+public final class HttpServletUtils implements Serializable {
+
+  private HttpServletUtils() {
+    // Utility class, prevent instantiation
+  }
+
   /**
    * Get the response format from request header.
    *
@@ -109,6 +118,10 @@ public class HttpServletUtils implements Serializable {
     }
   }
 
+  /**
+   * Response format enumeration for HTTP responses.
+   * Supports JSON, XML, and UNSPECIFIED formats.
+   */
   public enum ResponseFormat {
     UNSPECIFIED("unspecified"),
     JSON("json"),
@@ -119,6 +132,11 @@ public class HttpServletUtils implements Serializable {
       this.value = value;
     }
 
+    /**
+     * Get the string value of this response format.
+     *
+     * @return the format value (e.g., "json", "xml", "unspecified")
+     */
     public String getValue() {
       return value;
     }

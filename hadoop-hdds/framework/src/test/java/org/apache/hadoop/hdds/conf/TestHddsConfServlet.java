@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import static org.apache.hadoop.conf.Configuration.dumpConfiguration;
 import static org.apache.hadoop.hdds.conf.HddsConfServlet.writeResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
