@@ -283,7 +283,7 @@ public class TestOmSnapshotLocalDataManager {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testLockOrderingAgainstAnotherSnapshot(boolean read) throws IOException {
-    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, chainManager, conf);
     List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 20);
     for (int start = 0; start < snapshotIds.size(); start++) {
       for (int end = start + 1; end < snapshotIds.size(); end++) {
@@ -327,7 +327,7 @@ public class TestOmSnapshotLocalDataManager {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testVersionLockResolution(boolean read) throws IOException {
-    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, chainManager, conf);
     List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 5);
     for (int snapIdx = 0; snapIdx < snapshotIds.size(); snapIdx++) {
       UUID snapId = snapshotIds.get(snapIdx);
@@ -365,7 +365,7 @@ public class TestOmSnapshotLocalDataManager {
 
   @Test
   public void testWriteVersionAdditionValidationWithoutPreviousSnapshotVersionExisting() throws IOException {
-    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, chainManager, conf);
     List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
     UUID snapId = snapshotIds.get(1);
     try (WritableOmSnapshotLocalDataProvider omSnapshotLocalDataProvider =
@@ -382,7 +382,7 @@ public class TestOmSnapshotLocalDataManager {
 
   @Test
   public void testAddVersionFromRDB() throws IOException {
-    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, chainManager, conf);
     List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
     addVersionsToLocalData(localDataManager, snapshotIds.get(0), ImmutableMap.of(4, 5, 6, 8));
     UUID snapId = snapshotIds.get(1);
@@ -445,7 +445,7 @@ public class TestOmSnapshotLocalDataManager {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testWriteVersionValidation(boolean nextVersionExisting) throws IOException {
-    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, chainManager, conf);
     List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
     UUID prevSnapId = snapshotIds.get(0);
     UUID snapId = snapshotIds.get(1);
@@ -502,7 +502,7 @@ public class TestOmSnapshotLocalDataManager {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testVersionResolution(boolean read) throws IOException {
-    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
+    localDataManager = new OmSnapshotLocalDataManager(omMetadataManager, chainManager, conf);
     List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 5);
     List<Map<Integer, Integer>> versionMaps = Arrays.asList(
         ImmutableMap.of(4, 1, 6, 3, 8, 9, 11, 15),

@@ -79,7 +79,6 @@ import org.yaml.snakeyaml.Yaml;
 public class OmSnapshotLocalDataManager implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataManager.class);
-  private static final String SNAPSHOT_LOCAL_DATA_LOCK_RESOURCE_NAME = "snapshot_local_data_lock";
   private static final String LOCAL_DATA_MANAGER_SERVICE_NAME = "OmSnapshotLocalDataManagerService";
 
   private final ObjectSerializer<OmSnapshotLocalData> snapshotLocalDataSerializer;
@@ -255,7 +254,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     });
   }
 
-  private void init() throws IOException {
+  private void init(OzoneConfiguration configuration, SnapshotChainManager chainManager) throws IOException {
     this.locks = omMetadataManager.getHierarchicalLockManager();
     this.snapshotToBeCheckedForOrphans = new ConcurrentHashMap<>();
     RDBStore store = (RDBStore) omMetadataManager.getStore();
@@ -281,18 +280,21 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     for (UUID snapshotId : versionNodeMap.keySet()) {
       increamentOrphanCheckCount(snapshotId);
     }
-    this.scheduler = new Scheduler(LOCAL_DATA_MANAGER_SERVICE_NAME, true, 1);
     long snapshotLocalDataManagerServiceInterval = configuration.getTimeDuration(
         OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL, OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-    this.scheduler.scheduleWithFixedDelay(
-        () -> {
-          try {
-            checkOrphanSnapshotVersions(omMetadataManager, snapshotChainManager);
-          } catch (IOException e) {
-            LOG.error("Exception while checking orphan snapshot versions", e);
-          }
-        }, snapshotLocalDataManagerServiceInterval, snapshotLocalDataManagerServiceInterval, TimeUnit.MILLISECONDS);
+    if (snapshotLocalDataManagerServiceInterval > 0) {
+      this.scheduler = new Scheduler(LOCAL_DATA_MANAGER_SERVICE_NAME, true, 1);
+      this.scheduler.scheduleWithFixedDelay(
+          () -> {
+            try {
+              checkOrphanSnapshotVersions(omMetadataManager, chainManager);
+            } catch (IOException e) {
+              LOG.error("Exception while checking orphan snapshot versions", e);
+            }
+          }, snapshotLocalDataManagerServiceInterval, snapshotLocalDataManagerServiceInterval, TimeUnit.MILLISECONDS);
+    }
+
   }
 
   private void checkOrphanSnapshotVersions(OMMetadataManager metadataManager, SnapshotChainManager chainManager)
@@ -300,25 +302,32 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     for (Map.Entry<UUID, Integer> entry : snapshotToBeCheckedForOrphans.entrySet()) {
       UUID snapshotId = entry.getKey();
       int countBeforeCheck = entry.getValue();
-      try (WritableOmSnapshotLocalDataProvider snapshotLocalDataProvider =
-               new WritableOmSnapshotLocalDataProvider(snapshotId)) {
-        OmSnapshotLocalData snapshotLocalData = snapshotLocalDataProvider.getSnapshotLocalData();
-        boolean isSnapshotPurged = SnapshotUtils.isSnapshotPurged(chainManager, metadataManager, snapshotId);
-        for (Map.Entry<Integer, LocalDataVersionNode> integerLocalDataVersionNodeEntry : getVersionNodeMap().get(
-            snapshotId).getSnapshotVersions().entrySet()) {
-          LocalDataVersionNode versionEntry = integerLocalDataVersionNodeEntry.getValue();
-          // remove the version entry if it is not referenced by any other snapshot version node. For version node 0
-          // a newly created snapshot version could point to a version with indegree 0 in such a scenario a version 0
-          // node can be only deleted if the snapshot is also purged.
-          boolean toRemove = localDataGraph.inDegree(versionEntry) == 0
-              && (versionEntry.getVersion() != 0 || isSnapshotPurged);
-          if (toRemove) {
-            snapshotLocalData.removeVersionSSTFileInfos(versionEntry.getVersion());
-          }
-        }
-        snapshotLocalDataProvider.commit();
-      }
+      checkOrphanSnapshotVersions(metadataManager, chainManager, snapshotId);
       decreamentOrphanCheckCount(snapshotId, countBeforeCheck);
+    }
+  }
+
+  @VisibleForTesting
+  void checkOrphanSnapshotVersions(OMMetadataManager metadataManager, SnapshotChainManager chainManager,
+      UUID snapshotId) throws IOException {
+    try (WritableOmSnapshotLocalDataProvider snapshotLocalDataProvider = new WritableOmSnapshotLocalDataProvider(
+        snapshotId)) {
+      OmSnapshotLocalData snapshotLocalData = snapshotLocalDataProvider.getSnapshotLocalData();
+      boolean isSnapshotPurged = SnapshotUtils.isSnapshotPurged(chainManager, metadataManager, snapshotId);
+      for (Map.Entry<Integer, LocalDataVersionNode> integerLocalDataVersionNodeEntry : getVersionNodeMap()
+          .get(snapshotId).getSnapshotVersions().entrySet()) {
+        LocalDataVersionNode versionEntry = integerLocalDataVersionNodeEntry.getValue();
+        // remove the version entry if it is not referenced by any other snapshot version node. For version node 0
+        // a newly created snapshot version could point to a version with indegree 0 in such a scenario a version 0
+        // node can be only deleted if the snapshot is also purged.
+        boolean toRemove = localDataGraph.inDegree(versionEntry) == 0
+            && ((versionEntry.getVersion() != 0 && versionEntry.getVersion() != snapshotLocalData.getVersion())
+            || isSnapshotPurged);
+        if (toRemove) {
+          snapshotLocalData.removeVersionSSTFileInfos(versionEntry.getVersion());
+        }
+      }
+      snapshotLocalDataProvider.commit();
     }
   }
 
