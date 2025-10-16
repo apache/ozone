@@ -190,6 +190,10 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
         .map(SstFileInfo::new).collect(Collectors.toList())));
   }
 
+  public void removeVersionSSTFileInfos(int snapshotVersion) {
+    this.versionSstFileInfos.remove(snapshotVersion);
+  }
+
   /**
    * Returns the checksum of the YAML representation.
    * @return checksum
@@ -275,7 +279,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * maintain immutability.
    */
   public static class VersionMeta implements CopyObject<VersionMeta> {
-    private final int previousSnapshotVersion;
+    private int previousSnapshotVersion;
     private final List<SstFileInfo> sstFiles;
 
     public VersionMeta(int previousSnapshotVersion, List<SstFileInfo> sstFiles) {
@@ -285,6 +289,10 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
 
     public int getPreviousSnapshotVersion() {
       return previousSnapshotVersion;
+    }
+
+    public void setPreviousSnapshotVersion(int previousSnapshotVersion) {
+      this.previousSnapshotVersion = previousSnapshotVersion;
     }
 
     public List<SstFileInfo> getSstFiles() {
