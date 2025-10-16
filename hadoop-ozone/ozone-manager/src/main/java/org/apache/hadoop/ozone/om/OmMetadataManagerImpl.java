@@ -103,7 +103,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
-import org.apache.hadoop.ozone.om.lock.HierachicalResourceLockManager;
+import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
@@ -136,7 +136,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private DBStore store;
 
   private final IOzoneManagerLock lock;
-  private final HierachicalResourceLockManager hierarchicalLockManager;
+  private final HierarchicalResourceLockManager hierarchicalLockManager;
 
   private TypedTable<String, PersistedUserVolumeInfo> userTable;
   private TypedTable<String, OmVolumeArgs> volumeTable;
@@ -658,7 +658,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public HierachicalResourceLockManager getHierarchicalLockManager() {
+  public HierarchicalResourceLockManager getHierarchicalLockManager() {
     return hierarchicalLockManager;
   }
 

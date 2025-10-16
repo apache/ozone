@@ -22,7 +22,7 @@ import java.io.IOException;
 /**
  * A read only lock manager that does not acquire any lock.
  */
-public class ReadOnlyHierarchicalResourceLockManager implements HierachicalResourceLockManager {
+public class ReadOnlyHierarchicalResourceLockManager implements HierarchicalResourceLockManager {
 
   private static final HierarchicalResourceLock EMPTY_LOCK_ACQUIRED = new HierarchicalResourceLock() {
     @Override

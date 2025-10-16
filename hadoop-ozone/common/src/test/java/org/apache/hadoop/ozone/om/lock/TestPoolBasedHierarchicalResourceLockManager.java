@@ -18,9 +18,7 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -42,13 +40,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.lock.HierachicalResourceLockManager.HierarchicalResourceLock;
+import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -257,14 +254,20 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   /**
    * Test different resource types can be locked independently.
    */
-  @ParameterizedTest
-  @EnumSource(FlatResource.class)
-  public void testDifferentResourceTypes(FlatResource resource) throws Exception {
-    String key = "test-key-" + resource.name();
+  @Test
+  public void testDifferentResourceTypes() throws Exception {
 
-    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(resource, key)) {
+    List<HierarchicalResourceLock> locks = new ArrayList<>();
+    for (FlatResource otherResource : FlatResource.values()) {
+      String key = "test-key";
+      locks.add(lockManager.acquireWriteLock(otherResource, key));
+    }
+    for (HierarchicalResourceLock lock : locks) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
+    }
+    for (HierarchicalResourceLock lock : locks) {
+      lock.close();
     }
   }
 
@@ -291,7 +294,7 @@ public class TestPoolBasedHierarchicalResourceLockManager {
    * Test configuration parameters are respected.
    */
   @Test
-  public void testConfigurationParameters()
+  public void testHardLimitsWithCustomConfiguration()
       throws InterruptedException, IOException, ExecutionException, TimeoutException {
     OzoneConfiguration customConf = new OzoneConfiguration();
     customConf.setInt(OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT, 100);
