@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -123,7 +122,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     this.blockInfo = blockInfo;
     this.blockID = blockInfo.getBlockID();
     this.length = blockInfo.getLength();
-    setPipeline(pipeline);
+    pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.verifyChecksum = config.isChecksumVerify();
     this.xceiverClientFactory = xceiverClientFactory;
@@ -231,7 +230,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       if (blockLocationInfo == null) {
         LOG.warn("No new block location info for block {}", blockID);
       } else {
-        setPipeline(blockLocationInfo.getPipeline());
+        pipelineRef.set((blockLocationInfo.getPipeline()));
         LOG.info("New pipeline for block {}: {}", blockID,
             blockLocationInfo.getPipeline());
 
@@ -275,26 +274,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
         xceiverClient, VALIDATORS, blockID, tokenRef.get(), pipeline.getReplicaIndexes());
     return response.getBlockData();
-  }
-
-  private void setPipeline(Pipeline pipeline) throws IOException {
-    if (pipeline == null) {
-      return;
-    }
-    long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
-
-    if (replicaIndexes > 1) {
-      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
-          pipeline));
-    }
-
-    // irrespective of the container state, we will always read via Standalone
-    // protocol.
-    boolean okForRead =
-        pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
-            || pipeline.getType() == HddsProtos.ReplicationType.EC;
-    Pipeline readPipeline = okForRead ? pipeline : pipeline.copyForRead();
-    pipelineRef.set(readPipeline);
   }
 
   private static void validate(ContainerCommandResponseProto response)

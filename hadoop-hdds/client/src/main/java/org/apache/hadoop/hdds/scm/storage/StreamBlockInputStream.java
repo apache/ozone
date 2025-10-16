@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
@@ -33,10 +31,8 @@ import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -88,7 +84,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       OzoneClientConfig config) throws IOException {
     this.blockID = blockID;
     this.blockLength = length;
-    setPipeline(pipeline);
+    pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
     this.verifyChecksum = config.isChecksumVerify();
@@ -201,25 +197,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     buffer = null;
   }
 
-  private void setPipeline(Pipeline pipeline) throws IOException {
-    if (pipeline == null) {
-      return;
-    }
-    long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
-
-    if (replicaIndexes > 1) {
-      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.", pipeline));
-    }
-
-    // irrespective of the container state, we will always read via Standalone protocol.
-    boolean okForRead = pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
-        || pipeline.getType() == HddsProtos.ReplicationType.EC;
-    Pipeline readPipeline = okForRead ? pipeline : pipeline.copyForRead().toBuilder()
-        .setReplicationConfig(StandaloneReplicationConfig.getInstance(getLegacyFactor(pipeline.getReplicationConfig())))
-        .build();
-    pipelineRef.set(readPipeline);
-  }
-
   protected synchronized void checkOpen() throws IOException {
     if (xceiverClientFactory == null) {
       throw new IOException(FSExceptionMessages.STREAM_IS_CLOSED + " Block: " + blockID);
@@ -298,7 +275,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       if (blockLocationInfo == null) {
         LOG.warn("No new block location info for block {}", blockID);
       } else {
-        setPipeline(blockLocationInfo.getPipeline());
+        pipelineRef.set(getPipeline(blockLocationInfo.getPipeline()));
         LOG.info("New pipeline for block {}: {}", blockID,
             blockLocationInfo.getPipeline());
 

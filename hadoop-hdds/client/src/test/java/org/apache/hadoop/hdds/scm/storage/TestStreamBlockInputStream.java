@@ -58,11 +58,9 @@ public class TestStreamBlockInputStream {
   private static final int BYTES_PER_CHECKSUM = 1024;
   private static final int BLOCK_SIZE = 1024;
   private StreamBlockInputStream blockStream;
-  private BlockID blockID;
-  private OzoneConfiguration conf = new OzoneConfiguration();
+  private final OzoneConfiguration conf = new OzoneConfiguration();
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientGrpc xceiverClient;
-  private Pipeline pipeline;
   private Checksum checksum;
   private ChecksumData checksumData;
   private byte[] data;
@@ -72,7 +70,7 @@ public class TestStreamBlockInputStream {
   public void setup() throws Exception {
     Token<OzoneBlockTokenIdentifier> token = mock(Token.class);
     when(token.encodeToUrlString()).thenReturn("url");
-    pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     xceiverClient = mock(XceiverClientGrpc.class);
     when(xceiverClient.getPipeline()).thenReturn(pipeline);
     xceiverClientFactory = mock(XceiverClientFactory.class);
@@ -83,7 +81,7 @@ public class TestStreamBlockInputStream {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setStreamReadBlock(true);
     Function<BlockID, BlockLocationInfo> refreshFunction = mock(Function.class);
-    blockID = new BlockID(new ContainerBlockID(1, 1));
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
     createDataAndChecksum();
     blockStream = new StreamBlockInputStream(blockID, BLOCK_SIZE, pipeline,
