@@ -25,6 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -170,6 +171,18 @@ public class TestStreamBlockInputStream {
     assertEquals(-1, blockStream.read());
     assertEquals(-1, blockStream.read());
     assertEquals(BLOCK_SIZE, blockStream.getPos());
+  }
+
+  @Test
+  public void ensureExceptionThrownForReadAfterClosed() throws IOException {
+    setupSuccessfulRead();
+    blockStream.close();
+    ByteBuffer byteBuffer = ByteBuffer.allocate(10);
+    byte[] byteArray = new byte[10];
+    assertThrows(IOException.class, () -> blockStream.read());
+    assertThrows(IOException.class, () -> blockStream.read(byteArray, 0, 10));
+    assertThrows(IOException.class, () -> blockStream.read(byteBuffer));
+    assertThrows(IOException.class, () -> blockStream.seek(10));
   }
 
   private void createDataAndChecksum() throws OzoneChecksumException {

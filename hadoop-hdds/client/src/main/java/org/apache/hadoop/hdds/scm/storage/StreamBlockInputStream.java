@@ -30,6 +30,7 @@ import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -113,6 +114,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   @Override
   public synchronized int read() throws IOException {
+    checkOpen();
     if (!dataAvailableToRead()) {
       return EOF;
     }
@@ -128,6 +130,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   @Override
   public synchronized int read(ByteBuffer targetBuf) throws IOException {
+    checkOpen();
     int read = 0;
     while (targetBuf.hasRemaining()) {
       if (!dataAvailableToRead()) {
@@ -163,6 +166,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
 
   @Override
   public synchronized void seek(long pos) throws IOException {
+    checkOpen();
     if (pos < 0) {
       throw new IOException("Cannot seek to negative offset");
     }
@@ -204,25 +208,21 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
 
     if (replicaIndexes > 1) {
-      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
-          pipeline));
+      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.", pipeline));
     }
 
-    // irrespective of the container state, we will always read via Standalone
-    // protocol.
-    boolean okForRead =
-        pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
-            || pipeline.getType() == HddsProtos.ReplicationType.EC;
+    // irrespective of the container state, we will always read via Standalone protocol.
+    boolean okForRead = pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
+        || pipeline.getType() == HddsProtos.ReplicationType.EC;
     Pipeline readPipeline = okForRead ? pipeline : pipeline.copyForRead().toBuilder()
-        .setReplicationConfig(StandaloneReplicationConfig.getInstance(
-            getLegacyFactor(pipeline.getReplicationConfig())))
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(getLegacyFactor(pipeline.getReplicationConfig())))
         .build();
     pipelineRef.set(readPipeline);
   }
 
   protected synchronized void checkOpen() throws IOException {
     if (xceiverClientFactory == null) {
-      throw new IOException("StreamBlockInputStream has been closed.");
+      throw new IOException(FSExceptionMessages.STREAM_IS_CLOSED + " Block: " + blockID);
     }
   }
 
@@ -233,8 +233,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       try {
         xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
       } catch (IOException ioe) {
-        LOG.warn("Failed to acquire client for pipeline {}, block {}",
-            pipeline, blockID);
+        LOG.warn("Failed to acquire client for pipeline {}, block {}", pipeline, blockID);
         throw ioe;
       }
     }
