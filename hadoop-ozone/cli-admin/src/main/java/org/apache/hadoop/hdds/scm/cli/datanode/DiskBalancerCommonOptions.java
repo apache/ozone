@@ -57,7 +57,8 @@ public class DiskBalancerCommonOptions {
   }
 
   public String getHostString() {
-    return isAllHosts() ? "All datanodes" : String.join("\n", getDatanodes());
+    return isAllHosts() ? "which are IN_SERVICE and HEALTHY."
+        :  ":\n" + String.join("\n", getDatanodes());
   }
 
   public List<String> getSpecifiedDatanodes() {

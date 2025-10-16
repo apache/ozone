@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -256,28 +257,26 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
         100, 5000);
 
     // Attempt to stop disk balancer on the decommissioning DN
-    diskBalancerManager.stopDiskBalancer(dnAddressList);
+    List<DatanodeAdminError> dnErrors = diskBalancerManager.stopDiskBalancer(dnAddressList);
 
-    // Verify disk balancer is now explicitly stopped (operationalState becomes STOPPED)
-    final String expectedLogForStop =
-        "DiskBalancer operational state changing from PAUSED_BY_NODE_STATE to STOPPED";
-    GenericTestUtils.waitFor(() -> serviceLog.getOutput().contains(expectedLogForStop),
-        100, 5000);
+    // Verify disk balancer stop command is not sent to decommissioning DN
+    assertEquals(1, dnErrors.size());
+    assertTrue(dnErrors.get(0).getError()
+        .contains("Datanode is not in healthy state for disk balancing"));
 
     //Recommission the node
     scmClient.recommissionNodes(dnAddressList);
     waitForDnToReachOpState(nm, dn, IN_SERVICE);
 
-    // Verify it does not automatically restart (since it was explicitly stopped)
-    HddsProtos.DatanodeDiskBalancerInfoProto statusAfterRecommission =
-        diskBalancerManager.getDiskBalancerStatus(dnAddressList, null,
-            ClientVersion.CURRENT_VERSION).stream().findFirst().orElse(null);
-    assertEquals(HddsProtos.DiskBalancerRunningStatus.STOPPED, statusAfterRecommission.getRunningStatus());
+    // Verify it automatically resumes (since explicit stop command was not sent)
+    GenericTestUtils.waitFor(() -> {
+      String dnLogs = serviceLog.getOutput();
+      return dnLogs.contains("Resuming DiskBalancerService to running state as Node state changed to IN_SERVICE.");
+    }, 100, 5000);
   }
 
   @Test
   public void testStartDiskBalancerOnDecommissioningNode() throws Exception {
-    LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);
     LogCapturer supervisorLog = LogCapturer.captureLogs(ReplicationSupervisor.class);
 
     List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
@@ -307,30 +306,26 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
         100, 5000);
 
     // Attempt to start disk balancer on the decommissioning DN
-    diskBalancerManager.startDiskBalancer(
-        10.0,
-        10L,
-        1,
-        false,
-        dnAddressList);
+    List<DatanodeAdminError> dnErrors = diskBalancerManager.startDiskBalancer(
+        10.0, 10L, 1, false, dnAddressList);
 
-    // Verify disk balancer goes to PAUSED_BY_NODE_STATE
-    final String expectedLogForPause =
-        "DiskBalancer operational state changing from STOPPED to PAUSED_BY_NODE_STATE";
-    GenericTestUtils.waitFor(() -> serviceLog.getOutput().contains(expectedLogForPause),
-        100, 5000);
+    // Verify disk balancer start command is not sent to decommissioning DN
+    assertEquals(1, dnErrors.size());
+    assertTrue(dnErrors.get(0).getError()
+        .contains("Datanode is not in healthy state for disk balancing"));
 
     //Recommission the node
     scmClient.recommissionNodes(dnAddressList);
     waitForDnToReachOpState(nm, dn, IN_SERVICE);
 
-    // Verify it automatically restart (since it was explicitly started)
+    // Verify it does not automatically resume (since it was explicit
+    // start command was not sent to decommissioning DN)
     GenericTestUtils.waitFor(() -> {
       try {
         HddsProtos.DatanodeDiskBalancerInfoProto status =
             diskBalancerManager.getDiskBalancerStatus(dnAddressList, null,
                 ClientVersion.CURRENT_VERSION).stream().findFirst().orElse(null);
-        return status != null && status.getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.RUNNING;
+        return status != null && status.getRunningStatus() == HddsProtos.DiskBalancerRunningStatus.STOPPED;
       } catch (IOException e) {
         return false;
       }

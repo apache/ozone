@@ -27,7 +27,7 @@ Check failure with non-admin user to start, stop and update diskbalancer
 Check success with admin user for start, stop and update diskbalancer
     Run Keyword         Kinit test user                 testuser                testuser.keytab
     ${result} =         Execute                         ozone admin datanode diskbalancer start -a
-                        Should Contain                  ${result}                Start DiskBalancer on datanode(s)
+                        Should Contain                  ${result}                Starting DiskBalancer on datanode(s)
     ${result} =         Execute                         ozone admin datanode diskbalancer stop -a
                         Should Contain                  ${result}                Stopping DiskBalancer on datanode(s)
     ${result} =         Execute                         ozone admin datanode diskbalancer update -t 0.0002 -a
