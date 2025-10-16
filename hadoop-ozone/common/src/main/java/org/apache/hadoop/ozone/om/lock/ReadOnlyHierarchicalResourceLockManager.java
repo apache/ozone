@@ -39,7 +39,7 @@ public class ReadOnlyHierarchicalResourceLockManager implements HierachicalResou
   private static final HierarchicalResourceLock EMPTY_LOCK_NOT_ACQUIRED = new HierarchicalResourceLock() {
     @Override
     public boolean isLockAcquired() {
-      return true;
+      return false;
     }
 
     @Override

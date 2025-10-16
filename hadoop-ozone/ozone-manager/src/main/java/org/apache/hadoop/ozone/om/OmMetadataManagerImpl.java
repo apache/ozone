@@ -483,6 +483,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       store.close();
       store = null;
     }
+    try {
+      hierarchicalLockManager.close();
+    } catch (Exception e) {
+      LOG.error("Error closing hierarchical lock manager", e);
+    }
     tableCacheMetricsMap.values().forEach(TableCacheMetrics::unregister);
     // OzoneManagerLock cleanup
     lock.cleanup();
