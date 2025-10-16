@@ -3581,7 +3581,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         } catch (Exception e) {
           LOG.error("Error during snapshot defragmentation", e);
         }
-      }, threadPrefix + "SnapshotDefrag");
+      }, threadPrefix + "SnapshotDefragTrigger-" + System.currentTimeMillis());
       t.start();
       LOG.info("User '{}' manually triggered Snapshot Defragmentation without waiting"
           + " in a new thread, tid = {}", ugi, t.getId());
