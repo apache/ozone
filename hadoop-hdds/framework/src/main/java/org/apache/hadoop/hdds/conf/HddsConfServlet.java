@@ -68,18 +68,11 @@ public class HddsConfServlet extends HttpServlet {
 
     HttpServletUtils.ResponseFormat format = HttpServletUtils.getResponseFormat(request);
     if (format == HttpServletUtils.ResponseFormat.UNSPECIFIED) {
+      // use XML as default response format
       format = HttpServletUtils.ResponseFormat.XML;
     }
 
-    switch (format) {
-    case JSON:
-      response.setContentType("application/json; charset=utf-8");
-      break;
-    case XML:
-    default:
-      response.setContentType("text/xml; charset=utf-8");
-      break;
-    }
+    response.setContentType(format.getContentType());
 
     String name = request.getParameter("name");
     Writer out = response.getWriter();
@@ -145,7 +138,6 @@ public class HddsConfServlet extends HttpServlet {
     default:
       throw new IllegalArgumentException(cmd + " is not a valid command.");
     }
-
   }
 
   private static OzoneConfiguration getOzoneConfig() {

@@ -1,14 +1,16 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.server.JsonUtils;
-import org.apache.hadoop.util.XMLUtils;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.Serializable;
+import java.io.Writer;
+import java.util.HashMap;
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -18,12 +20,10 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.Serializable;
-import java.io.Writer;
-import java.util.HashMap;
-import java.util.Map;
+import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.util.XMLUtils;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 public class HttpServletUtils implements Serializable {
   /**
@@ -109,6 +109,23 @@ public class HttpServletUtils implements Serializable {
     @Override
     public String toString() {
       return value;
+    }
+
+    /**
+     * Get Content-Type header value with UTF-8 charset for this format.
+     *
+     * @return Content-Type string (e.g., "application/json;charset=utf-8"),
+     * or null if UNSPECIFIED
+     */
+    public String getContentType() {
+      switch (this) {
+      case JSON:
+        return MediaType.APPLICATION_JSON_TYPE.withCharset("utf-8").toString();
+      case XML:
+        return MediaType.APPLICATION_XML_TYPE.withCharset("utf-8").toString();
+      default:
+        return null;
+      }
     }
   }
 }
