@@ -219,8 +219,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
   }
 
   /**
-   *
-   * builder for OMSnapshotMoveDeletedKeysResponse
+   * Builder for OMSnapshotMoveDeletedKeysResponse.
    */
   public static class Builder {
     private OMResponse omResponse;
