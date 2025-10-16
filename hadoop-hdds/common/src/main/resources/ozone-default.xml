@@ -4848,4 +4848,9 @@
     <value>10000</value>
     <description>Maximum number of lock objects that could be present in the pool.</description>
   </property>
+  <property>
+    <name>ozone.om.snapshot.local.data.manager.service.interval</name>
+    <value>5m</value>
+    <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
+  </property>
 </configuration>
