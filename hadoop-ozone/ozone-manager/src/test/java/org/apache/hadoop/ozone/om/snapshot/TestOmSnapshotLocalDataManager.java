@@ -235,9 +235,9 @@ public class TestOmSnapshotLocalDataManager {
           .flatMap(Collection::stream).collect(Collectors.toList()));
       snapshotLocalDataManager.createNewOmSnapshotLocalDataFile(snapshotStore, snapshotInfo);
       previousSnapshotInfo = snapshotInfo;
-      for (String table : liveFileMetaDataMap.keySet()) {
-        liveFileMetaDataMap.get(table).add(
-            createMockLiveFileMetaData("file" + counter++ + ".sst", table, "key1", "key4"));
+      for (Map.Entry<String, List<LiveFileMetaData>> tableEntry : liveFileMetaDataMap.entrySet()) {
+        String table = tableEntry.getKey();
+        tableEntry.getValue().add(createMockLiveFileMetaData("file" + counter++ + ".sst", table, "key1", "key4"));
       }
       snapshotIds.add(snapshotId);
     }
