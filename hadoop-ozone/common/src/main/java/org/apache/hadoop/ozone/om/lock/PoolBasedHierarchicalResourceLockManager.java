@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
  * lock dependencies, and is typically useful for structures like
  * DAGs (e.g., File System trees or snapshot chains).
  */
-public class PoolBasedHierarchicalResourceLockManager implements HierachicalResourceLockManager {
+public class PoolBasedHierarchicalResourceLockManager implements HierarchicalResourceLockManager {
   private final GenericObjectPool<ReadWriteLock> lockPool;
   private final Map<FlatResource, Map<String, LockReferenceCountPair>> lockMap;
 

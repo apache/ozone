@@ -18,9 +18,7 @@
 package org.apache.hadoop.ozone.om.lock;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -28,24 +26,26 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.lock.HierachicalResourceLockManager.HierarchicalResourceLock;
+import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -254,14 +254,20 @@ public class TestPoolBasedHierarchicalResourceLockManager {
   /**
    * Test different resource types can be locked independently.
    */
-  @ParameterizedTest
-  @EnumSource(FlatResource.class)
-  public void testDifferentResourceTypes(FlatResource resource) throws Exception {
-    String key = "test-key-" + resource.name();
+  @Test
+  public void testDifferentResourceTypes() throws Exception {
 
-    try (HierarchicalResourceLock lock = lockManager.acquireWriteLock(resource, key)) {
+    List<HierarchicalResourceLock> locks = new ArrayList<>();
+    for (FlatResource otherResource : FlatResource.values()) {
+      String key = "test-key";
+      locks.add(lockManager.acquireWriteLock(otherResource, key));
+    }
+    for (HierarchicalResourceLock lock : locks) {
       assertNotNull(lock);
       assertTrue(lock.isLockAcquired());
+    }
+    for (HierarchicalResourceLock lock : locks) {
+      lock.close();
     }
   }
 
@@ -288,7 +294,8 @@ public class TestPoolBasedHierarchicalResourceLockManager {
    * Test configuration parameters are respected.
    */
   @Test
-  public void testConfigurationParameters() {
+  public void testHardLimitsWithCustomConfiguration()
+      throws InterruptedException, IOException, ExecutionException, TimeoutException {
     OzoneConfiguration customConf = new OzoneConfiguration();
     customConf.setInt(OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT, 100);
     customConf.setInt(OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT, 500);
@@ -297,35 +304,34 @@ public class TestPoolBasedHierarchicalResourceLockManager {
              new PoolBasedHierarchicalResourceLockManager(customConf)) {
 
       // Test that manager can be created with custom configuration
+      List<HierarchicalResourceLock> locks = new ArrayList<>();
       assertNotNull(customLockManager);
-
-      // Basic functionality test with custom configuration
-      try (HierarchicalResourceLock lock = customLockManager.acquireReadLock(FlatResource.SNAPSHOT_DB_LOCK, "test")) {
-        assertTrue(lock.isLockAcquired());
-      } catch (Exception e) {
-        fail("Lock acquisition failed with custom configuration: " + e.getMessage());
+      for (int i = 0; i < 500; i++) {
+        try {
+          locks.add(customLockManager.acquireReadLock(FlatResource.SNAPSHOT_DB_LOCK, "test" + i));
+        } catch (IOException e) {
+          fail("Lock acquisition failed with custom configuration: " + e.getMessage());
+        }
       }
-    }
-  }
-
-  /**
-   * Test default configuration values.
-   */
-  @Test
-  public void testDefaultConfiguration() {
-    OzoneConfiguration defaultConf = new OzoneConfiguration();
-
-    // Verify default values
-    assertEquals(OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT_DEFAULT,
-        defaultConf.getInt(OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT,
-            OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_SOFT_LIMIT_DEFAULT));
-    assertEquals(OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT_DEFAULT,
-        defaultConf.getInt(OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT,
-            OZONE_OM_HIERARCHICAL_RESOURCE_LOCKS_HARD_LIMIT_DEFAULT));
-
-    try (PoolBasedHierarchicalResourceLockManager defaultLockManager =
-             new PoolBasedHierarchicalResourceLockManager(defaultConf)) {
-      assertNotNull(defaultLockManager);
+      CountDownLatch latch = new CountDownLatch(1);
+      CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+        // Basic functionality test with custom configuration
+        latch.countDown();
+        try (HierarchicalResourceLock lock = customLockManager.acquireReadLock(FlatResource.SNAPSHOT_DB_LOCK,
+            "test" + 501)) {
+          assertTrue(lock.isLockAcquired());
+        } catch (Exception e) {
+          fail("Lock acquisition failed with custom configuration: " + e.getMessage());
+        }
+      });
+      Thread.sleep(1000);
+      latch.await();
+      assertFalse(future.isDone());
+      locks.get(0).close();
+      future.get(5, TimeUnit.SECONDS);
+      for (HierarchicalResourceLock lock : locks) {
+        lock.close();
+      }
     }
   }
 
