@@ -645,9 +645,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               containerData.getPendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
 
-      // update pending deletion blocks count and delete transaction ID in
-      // in-memory container status
-      // Persist only if feature finalized.
+      // Update pending deletion blocks count, blocks bytes and delete transaction ID in in-memory container status.
+      // Persist pending bytes only if the feature is finalized.
       if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.DATA_DISTRIBUTION) && delTX.hasTotalBlockSize()) {
         long pendingBytes = containerData.getBlockPendingDeletionBytes();
         pendingBytes += delTX.getTotalBlockSize();
