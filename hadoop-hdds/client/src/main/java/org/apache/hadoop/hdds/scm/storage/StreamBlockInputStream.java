@@ -369,7 +369,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       long pos = getPos();
       if (pos < blockOffset) {
         // This should not happen, and if it does, we have a bug.
-        throw new IOException("Received data out of order. Position is " + position + " but received data at "
+        throw new IOException("Received data out of order. Position is " + pos + " but received data at "
             + blockOffset);
       }
       if (pos > readBlock.getOffset()) {
