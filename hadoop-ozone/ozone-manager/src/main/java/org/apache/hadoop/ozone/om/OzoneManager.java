@@ -3557,10 +3557,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public boolean triggerSnapshotDefrag(boolean noWait) throws IOException {
 
-    // OM should be leader and ready.
-    if (!isLeaderReady()) {
-      throw new OMException("OM is not leader or not ready", INVALID_REQUEST);
-    }
+    // OM does not need to be leader to trigger snapshot defrag
 
     final UserGroupInformation ugi = getRemoteUser();
     // Check Ozone admin privilege
