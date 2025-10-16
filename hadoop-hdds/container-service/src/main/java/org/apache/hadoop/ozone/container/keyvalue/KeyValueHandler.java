@@ -2069,16 +2069,14 @@ public class KeyValueHandler extends Handler {
     ContainerCommandResponseProto responseProto = null;
     if (!request.hasReadBlock()) {
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Malformed Read Block request. trace ID: {}",
-            request.getTraceID());
+        LOG.debug("Malformed Read Block request. trace ID: {}", request.getTraceID());
       }
       return malformedRequest(request);
     }
     try {
       ReadBlockRequestProto readBlock = request.getReadBlock();
 
-      BlockID blockID = BlockID.getFromProtobuf(
-          readBlock.getBlockID());
+      BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
       // This is a new api the block should always be checked.
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       BlockUtils.verifyBCSId(kvContainer, blockID);
@@ -2132,8 +2130,7 @@ public class KeyValueHandler extends Handler {
       responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ioe) {
       responseProto = ContainerUtils.logAndReturnError(LOG,
-          new StorageContainerException("Read Block failed", ioe, IO_EXCEPTION),
-          request);
+          new StorageContainerException("Read Block failed", ioe, IO_EXCEPTION), request);
     }
     return responseProto;
   }
