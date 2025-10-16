@@ -952,6 +952,10 @@
               {
                 "name": "reconstructECContainersCommand",
                 "integer": 11
+              },
+              {
+                "name": "reconcileContainerCommand",
+                "integer": 12
               }
             ]
           },
@@ -1583,7 +1587,13 @@
                 "id": 10,
                 "name": "finalhash",
                 "type": "string",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 11,
@@ -1620,6 +1630,12 @@
                     "value": "false"
                   }
                 ]
+              },
+              {
+                "id": 16,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -1728,7 +1744,13 @@
                 "id": 3,
                 "name": "bytesWritten",
                 "type": "uint64",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -1870,6 +1892,12 @@
                 "optional": true
               },
               {
+                "id": 13,
+                "name": "reconcileContainerCommandProto",
+                "type": "ReconcileContainerCommandProto",
+                "optional": true
+              },
+              {
                 "id": 15,
                 "name": "term",
                 "type": "int64",
@@ -1934,7 +1962,13 @@
                 "id": 4,
                 "name": "count",
                 "type": "int32",
-                "required": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -2303,6 +2337,23 @@
                 "required": true
               }
             ]
+          },
+          {
+            "name": "ReconcileContainerCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "peers",
+                "type": "DatanodeDetailsProto",
+                "is_repeated": true
+              }
+            ]
           }
         ],
         "services": [
@@ -2560,6 +2611,10 @@
               {
                 "name": "CONTAINER_ALREADY_CLOSING",
                 "integer": 46
+              },
+              {
+                "name": "UNSUPPORTED_OPERATION",
+                "integer": 47
               }
             ]
           },
