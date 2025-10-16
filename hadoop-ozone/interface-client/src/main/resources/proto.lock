@@ -3246,6 +3246,18 @@
                 "name": "defaultReplicationConfig",
                 "type": "hadoop.hdds.DefaultReplicationConfig",
                 "optional": true
+              },
+              {
+                "id": 21,
+                "name": "snapshotUsedBytes",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "snapshotUsedNamespace",
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -5325,6 +5337,35 @@
                 "name": "renamedKeys",
                 "type": "string",
                 "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "bucketPurgeKeysSize",
+                "type": "BucketPurgeKeysSize",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "BucketPurgeKeysSize",
+            "fields": [
+              {
+                "id": 1,
+                "name": "bucketNameInfo",
+                "type": "BucketNameInfo",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "purgedBytes",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "purgedNamespace",
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
