@@ -368,13 +368,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       // If the reader position is behind
       ByteBuffer buf = readBlock.getData().asReadOnlyByteBuffer();
       long blockOffset = readBlock.getOffset();
-      if (position < blockOffset) {
+      long pos = getPos();
+      if (pos < blockOffset) {
         // This should not happen, and if it does, we have a bug.
         throw new IOException("Received data out of order. Position is " + position + " but received data at "
             + blockOffset);
       }
-      if (position > readBlock.getOffset()) {
-        int offset = (int)(position - readBlock.getOffset());
+      if (pos > readBlock.getOffset()) {
+        int offset = (int)(pos - readBlock.getOffset());
         buf.position(offset);
       }
       return buf;
