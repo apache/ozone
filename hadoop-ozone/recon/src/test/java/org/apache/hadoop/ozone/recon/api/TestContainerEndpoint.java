@@ -1000,10 +1000,10 @@ public class TestContainerEndpoint {
     // createUnhealthyRecords(5, 4, 3, 2) will create records for containers 1-14
     // So we need to create 14 containers instead of just 6
     putContainerInfos(14);  // Changed from 6 to 14
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id1 = newDatanode("host2", "127.0.0.2");
+    id1 = newDatanode("host3", "127.0.0.3");
+    id1 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 0);
 
     // Get first batch with no pagination (prevStartKey=0, prevLastKey=0)
