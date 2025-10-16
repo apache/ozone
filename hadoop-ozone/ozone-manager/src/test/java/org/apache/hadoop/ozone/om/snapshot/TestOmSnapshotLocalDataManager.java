@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -267,7 +268,9 @@ public class TestOmSnapshotLocalDataManager {
   @ValueSource(booleans = {true, false})
   public void testLockOrderingAgainstAnotherSnapshot(boolean read) throws IOException {
     localDataManager = new OmSnapshotLocalDataManager(omMetadataManager);
-    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 20);
+    List<UUID> snapshotIds = new ArrayList<>();
+    snapshotIds.add(null);
+    snapshotIds.addAll(createSnapshotLocalData(localDataManager, 20));
     for (int start = 0; start < snapshotIds.size(); start++) {
       for (int end = start + 1; end < snapshotIds.size(); end++) {
         UUID startSnapshotId = snapshotIds.get(start);
@@ -279,8 +282,14 @@ public class TestOmSnapshotLocalDataManager {
                      localDataManager.getWritableOmSnapshotLocalData(endSnapshotId, startSnapshotId)) {
           OmSnapshotLocalData snapshotLocalData = omSnapshotLocalDataProvider.getSnapshotLocalData();
           OmSnapshotLocalData previousSnapshot = omSnapshotLocalDataProvider.getPreviousSnapshotLocalData();
-          assertEquals(startSnapshotId, previousSnapshot.getSnapshotId());
           assertEquals(endSnapshotId, snapshotLocalData.getSnapshotId());
+          if (startSnapshotId == null) {
+            assertNull(previousSnapshot);
+            assertNull(snapshotLocalData.getPreviousSnapshotId());
+            continue;
+          }
+          assertEquals(startSnapshotId, previousSnapshot.getSnapshotId());
+          assertEquals(startSnapshotId, snapshotLocalData.getPreviousSnapshotId());
           if (read) {
             assertEquals(getReadLockMessageAcquire(endSnapshotId), lockCapturor.get(logCaptorIdx++));
           } else {
