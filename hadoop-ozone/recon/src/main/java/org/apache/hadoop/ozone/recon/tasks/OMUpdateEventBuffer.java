@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.ozone.recon.metrics.ReconTaskControllerMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,20 +32,22 @@ import org.slf4j.LoggerFactory;
  */
 public class OMUpdateEventBuffer {
   private static final Logger LOG = LoggerFactory.getLogger(OMUpdateEventBuffer.class);
-  
+
   private final BlockingQueue<ReconEvent> eventQueue;
   private final int maxCapacity;
   private final AtomicLong totalBufferedEvents = new AtomicLong(0);
   private final AtomicLong droppedBatches = new AtomicLong(0);
-  
-  public OMUpdateEventBuffer(int maxCapacity) {
+  private final ReconTaskControllerMetrics metrics;
+
+  public OMUpdateEventBuffer(int maxCapacity, ReconTaskControllerMetrics metrics) {
     this.maxCapacity = maxCapacity;
     this.eventQueue = new LinkedBlockingQueue<>(maxCapacity);
+    this.metrics = metrics;
   }
 
   /**
    * Add an event to the buffer.
-   * 
+   *
    * @param event The event to buffer
    * @return true if successfully buffered, false if queue full
    */
@@ -52,10 +55,23 @@ public class OMUpdateEventBuffer {
     boolean added = eventQueue.offer(event);
     if (added) {
       totalBufferedEvents.addAndGet(event.getEventCount());
+
+      // Update metrics: track events buffered (entering queue)
+      if (metrics != null) {
+        metrics.incrEventBufferedCount(event.getEventCount());
+        metrics.setEventCurrentQueueSize(eventQueue.size());
+      }
+
       LOG.debug("Buffered event {} with {} events. Queue size: {}, Total buffered events: {}",
           event.getEventType(), event.getEventCount(), eventQueue.size(), totalBufferedEvents.get());
     } else {
       droppedBatches.incrementAndGet();
+
+      // Update metrics: track dropped events
+      if (metrics != null) {
+        metrics.incrEventDropCount(event.getEventCount());
+      }
+
       LOG.warn("Event buffer queue is full (capacity: {}). Dropping event {} with {} events. " +
               "Total dropped batches: {}",
           maxCapacity, event.getEventType(), event.getEventCount(), droppedBatches.get());
@@ -65,7 +81,7 @@ public class OMUpdateEventBuffer {
   
   /**
    * Poll an event from the buffer with timeout.
-   * 
+   *
    * @param timeoutMs timeout in milliseconds
    * @return event or null if timeout
    */
@@ -74,7 +90,14 @@ public class OMUpdateEventBuffer {
       ReconEvent event = eventQueue.poll(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
       if (event != null) {
         totalBufferedEvents.addAndGet(-event.getEventCount());
-        LOG.debug("Polled event {} with {} events. Queue size: {}, Total buffered events: {}", 
+
+        // Update metrics: track events processed (exiting queue)
+        if (metrics != null) {
+          metrics.incrTotalEventCount(event.getEventCount());
+          metrics.setEventCurrentQueueSize(eventQueue.size());
+        }
+
+        LOG.debug("Polled event {} with {} events. Queue size: {}, Total buffered events: {}",
             event.getEventType(), event.getEventCount(), eventQueue.size(), totalBufferedEvents.get());
       }
       return event;

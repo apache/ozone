@@ -46,6 +46,9 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerSizeMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
@@ -92,7 +95,9 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
 
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         ozoneConfiguration, new HashSet<>(), reconTaskStatusUpdaterManagerMock,
-        reconDbProvider, reconContainerMgr, nsSummaryManager);
+        reconDbProvider, reconContainerMgr, nsSummaryManager,
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), mock(
+        ReconContainerSizeMetadataManager.class));
 
     // Register a mock task for reinitialization
     CountDownLatch reinitLatch = new CountDownLatch(1);
@@ -174,7 +179,9 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
         reconDbProvider, mock(ReconContainerMetadataManager.class),
-        mock(ReconNamespaceSummaryManager.class));
+        mock(ReconNamespaceSummaryManager.class),
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), mock(
+        ReconContainerSizeMetadataManager.class));
         
     // Set up properly mocked ReconOMMetadataManager with required dependencies
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
@@ -243,7 +250,9 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
 
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
-        reconDbProvider, reconContainerMgr, nsSummaryManager);
+        reconDbProvider, reconContainerMgr, nsSummaryManager,
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), mock(
+        ReconContainerSizeMetadataManager.class));
 
     // Set up properly mocked ReconOMMetadataManager with required dependencies
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
@@ -385,7 +394,9 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
         reconDbProvider, mock(ReconContainerMetadataManager.class),
-        mock(ReconNamespaceSummaryManager.class));
+        mock(ReconNamespaceSummaryManager.class),
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), mock(
+        ReconContainerSizeMetadataManager.class));
         
     // Set up a mock OM metadata manager
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
@@ -446,7 +457,9 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
         reconDbProvider, mock(ReconContainerMetadataManager.class),
-        mock(ReconNamespaceSummaryManager.class));
+        mock(ReconNamespaceSummaryManager.class),
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), mock(
+        ReconContainerSizeMetadataManager.class));
         
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
     reconTaskController.updateOMMetadataManager(mockOMMetadataManager);
@@ -515,7 +528,9 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
         reconDbProvider, mock(ReconContainerMetadataManager.class),
-        mock(ReconNamespaceSummaryManager.class));
+        mock(ReconNamespaceSummaryManager.class),
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), mock(
+        ReconContainerSizeMetadataManager.class));
         
     // Set up properly mocked ReconOMMetadataManager with required dependencies
     ReconOMMetadataManager mockOMMetadataManager = mock(ReconOMMetadataManager.class);
@@ -582,7 +597,9 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
         reconDbProvider, mock(ReconContainerMetadataManager.class),
-        mock(ReconNamespaceSummaryManager.class));
+        mock(ReconNamespaceSummaryManager.class),
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), mock(
+        ReconContainerSizeMetadataManager.class));
 
     // Add some events to the buffer
     for (int i = 0; i < 5; i++) {
@@ -619,7 +636,9 @@ public class TestEventBufferOverflow extends AbstractReconSqlDBTest {
     ReconTaskControllerImpl reconTaskController = new ReconTaskControllerImpl(
         config, new HashSet<>(), taskStatusUpdaterManager,
         reconDbProvider, mock(ReconContainerMetadataManager.class),
-        mock(ReconNamespaceSummaryManager.class));
+        mock(ReconNamespaceSummaryManager.class),
+        mock(ReconGlobalStatsManager.class), mock(ReconFileMetadataManager.class), mock(
+        ReconContainerSizeMetadataManager.class));
 
     // Test resetting flags for each reason
     reconTaskController.resetEventFlags();

@@ -15,5 +15,14 @@
  * limitations under the License.
  */
 
-/** SCM protocol related interfaces. */
-package org.apache.hadoop.hdds.scm.protocol;
+package org.apache.hadoop.ozone.util;
+
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+
+/**
+ * Represents a generic interface for objects capable of generating or providing
+ * a checksum value.
+ */
+public interface WithChecksum<T extends WithChecksum<T>> extends CopyObject<T> {
+  String getChecksum();
+}

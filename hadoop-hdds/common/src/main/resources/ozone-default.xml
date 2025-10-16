@@ -2751,6 +2751,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.db.config.path</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE</tag>
+    <description>
+      Path to an ini configuration file for RocksDB on datanode component.
+    </description>
+  </property>
+  <property>
     <name>hdds.priv.key.file.name</name>
     <value>private.pem</value>
     <tag>X509, SECURITY</tag>
@@ -3751,10 +3759,25 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.defrag.limit.per.task</name>
+    <value>1</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>The maximum number of snapshots that would be defragmented in
+      each task run of snapshot defragmentation service.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.filtering.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>Time interval of the SST File filtering service from Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.defrag.service.interval</name>
+    <value>-1</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Task interval of snapshot defragmentation service.
     </description>
   </property>
   <property>
@@ -3771,6 +3794,13 @@
     <value>300000ms</value>
     <tag>OZONE, PERFORMANCE,OM</tag>
     <description>A timeout value of sst filtering service.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.defrag.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE,OM</tag>
+    <description>Timeout value of a run of snapshot defragmentation service.
     </description>
   </property>
 

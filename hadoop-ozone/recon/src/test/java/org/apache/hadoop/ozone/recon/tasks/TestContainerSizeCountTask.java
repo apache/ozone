@@ -22,66 +22,80 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
-import static org.apache.ozone.recon.schema.generated.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerSizeMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
-import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
-import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
-import org.jooq.DSLContext;
-import org.jooq.Record1;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class to test the process method of ContainerSizeCountTask.
  */
-public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
+public class TestContainerSizeCountTask {
 
-  private ContainerCountBySizeDao containerCountBySizeDao;
+  @TempDir
+  private static java.nio.file.Path temporaryFolder;
+
+  private static ReconContainerSizeMetadataManager reconContainerSizeMetadataManager;
   private ContainerSizeCountTask task;
-  private DSLContext dslContext;
+  private static Table<ContainerSizeCountKey, Long> containerCountTable;
 
-  public TestContainerSizeCountTask() {
-    super();
+  @BeforeAll
+  public static void setupOnce() throws Exception {
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
+    ReconTestInjector reconTestInjector = new ReconTestInjector.Builder(temporaryFolder.toFile())
+        .withReconSqlDb()
+        .withReconOm(reconOMMetadataManager)
+        .withContainerDB()
+        .build();
+    reconContainerSizeMetadataManager = reconTestInjector.getInstance(
+        ReconContainerSizeMetadataManager.class);
+    containerCountTable = reconContainerSizeMetadataManager.getContainerCountTable();
   }
 
   @BeforeEach
-  public void setUp() {
-    UtilizationSchemaDefinition utilizationSchemaDefinition = getSchemaDefinition(UtilizationSchemaDefinition.class);
-    dslContext = utilizationSchemaDefinition.getDSLContext();
-    containerCountBySizeDao = getDao(ContainerCountBySizeDao.class);
+  public void setUp() throws Exception {
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
     reconTaskConfig.setContainerSizeCountTaskInterval(Duration.ofSeconds(1));
     ReconTaskStatusUpdaterManager reconTaskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
-    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
-        getDao(ReconTaskStatusDao.class), "mockedTask-" + System.currentTimeMillis()));
+    when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenReturn(
+        mock(ReconTaskStatusUpdater.class));
     ContainerManager containerManager = mock(ContainerManager.class);
     task = new ContainerSizeCountTask(
         containerManager,
         reconTaskConfig,
-        containerCountBySizeDao,
-        utilizationSchemaDefinition,
+        reconContainerSizeMetadataManager,
         reconTaskStatusUpdaterManager);
-    // Truncate table before running each test
-    dslContext.truncate(CONTAINER_COUNT_BY_SIZE);
+    // Clear table before running each test
+    reconContainerSizeMetadataManager.clearContainerCountTable();
   }
 
   @Test
-  public void testProcess() {
+  public void testProcess() throws IOException {
     // mock a container with invalid used bytes
     ContainerInfo omContainerInfo0 = mock(ContainerInfo.class);
     given(omContainerInfo0.containerID()).willReturn(ContainerID.valueOf(0));
@@ -108,23 +122,26 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     task.processContainers(containers);
 
     // Verify 3 containers are in correct bins.
-    assertEquals(3, containerCountBySizeDao.count());
+    // Note: getEstimatedKeyCount() may be inaccurate in RocksDB, so we count actual entries
+    int firstCount = 0;
+    try (org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator<ContainerSizeCountKey, Long> iterator =
+         containerCountTable.iterator()) {
+      while (iterator.hasNext()) {
+        iterator.next();
+        firstCount++;
+      }
+    }
+    assertEquals(3, firstCount);
 
     // container size upper bound for
     // 1500000000L (1.5GB) is 2147483648L = 2^31 = 2GB (next highest power of 2)
-    Record1<Long> recordToFind =
-        dslContext.newRecord(
-                CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
-            .value1(2147483648L);
-    assertEquals(1L,
-        containerCountBySizeDao.findById(recordToFind.value1()).getCount()
-            .longValue());
+    ContainerSizeCountKey key1 = new ContainerSizeCountKey(2147483648L);
+    assertEquals(1L, containerCountTable.get(key1).longValue());
+
     // container size upper bound for
     // 2500000000L (2.5GB) is 4294967296L = 2^32 = 4GB (next highest power of 2)
-    recordToFind.value1(4294967296L);
-    assertEquals(1L,
-        containerCountBySizeDao.findById(recordToFind.value1()).getCount()
-            .longValue());
+    ContainerSizeCountKey key2 = new ContainerSizeCountKey(4294967296L);
+    assertEquals(1L, containerCountTable.get(key2).longValue());
 
     // Add a new container
     ContainerInfo omContainerInfo3 = mock(ContainerInfo.class);
@@ -140,36 +157,39 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     task.processContainers(containers);
 
     // Total size groups added to the database
-    assertEquals(5, containerCountBySizeDao.count());
+    // After migration to RocksDB, entries with count=0 are deleted, so we expect 4 entries
+    // Note: getEstimatedKeyCount() may be inaccurate in RocksDB, so we count actual entries
+    int actualCount = 0;
+    try (org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator<ContainerSizeCountKey, Long> iterator =
+         containerCountTable.iterator()) {
+      while (iterator.hasNext()) {
+        iterator.next();
+        actualCount++;
+      }
+    }
+    assertEquals(4, actualCount);
 
     // Check whether container size upper bound for
     // 50000L is 536870912L = 2^29 = 512MB (next highest power of 2)
-    recordToFind.value1(536870912L);
-    assertEquals(1, containerCountBySizeDao
-        .findById(recordToFind.value1())
-        .getCount()
-        .longValue());
+    ContainerSizeCountKey key3 = new ContainerSizeCountKey(536870912L);
+    assertEquals(1L, containerCountTable.get(key3).longValue());
 
     // Check whether container size of 1000000000L has been successfully updated
     // The previous value upperbound was 4294967296L which is no longer there
-    recordToFind.value1(4294967296L);
-    assertEquals(0, containerCountBySizeDao
-        .findById(recordToFind.value1())
-        .getCount()
-        .longValue());
+    ContainerSizeCountKey key4 = new ContainerSizeCountKey(4294967296L);
+    Long count = containerCountTable.get(key4);
+    assertEquals(0L, count == null ? 0L : count.longValue());
 
     // Remove the container having size 1.5GB and upperbound 2147483648L
     containers.remove(omContainerInfo1);
     task.processContainers(containers);
-    recordToFind.value1(2147483648L);
-    assertEquals(0, containerCountBySizeDao
-        .findById(recordToFind.value1())
-        .getCount()
-        .longValue());
+    ContainerSizeCountKey key5 = new ContainerSizeCountKey(2147483648L);
+    Long count2 = containerCountTable.get(key5);
+    assertEquals(0L, count2 == null ? 0L : count2.longValue());
   }
 
   @Test
-  public void testProcessDeletedAndNegativeSizedContainers() {
+  public void testProcessDeletedAndNegativeSizedContainers() throws IOException {
     // Create a list of containers, including one that is deleted
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
     given(omContainerInfo1.containerID()).willReturn(ContainerID.valueOf(1));
@@ -219,7 +239,16 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     task.processContainers(containers);
 
     // Verify that only the valid containers are counted
-    assertEquals(3, containerCountBySizeDao.count());
+    // Note: getEstimatedKeyCount() may be inaccurate in RocksDB, so we count actual entries
+    int count = 0;
+    try (org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator<ContainerSizeCountKey, Long> iterator =
+         containerCountTable.iterator()) {
+      while (iterator.hasNext()) {
+        iterator.next();
+        count++;
+      }
+    }
+    assertEquals(3, count);
   }
 
 }

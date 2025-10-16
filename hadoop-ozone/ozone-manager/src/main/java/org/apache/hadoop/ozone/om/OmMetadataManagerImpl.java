@@ -544,6 +544,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return getOzoneKeyFSO(volume, bucket, OM_KEY_PREFIX);
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public VolumeBucketId getVolumeBucketIdPairFSO(String fsoKey) throws IOException {
+    String[] keySplit = fsoKey.split(OM_KEY_PREFIX);
+    try {
+      return new VolumeBucketId(Long.parseLong(keySplit[1]), Long.parseLong(keySplit[2]));
+    } catch (NumberFormatException e) {
+      throw new IOException("Invalid format for FSO Key: " + fsoKey, e);
+    }
+  }
+
   @Override
   public String getOzoneKey(String volume, String bucket, String key) {
     StringBuilder builder = new StringBuilder()
@@ -959,7 +972,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return new ListOpenFilesResult(
-        getTotalOpenKeyCount(),
+        getTotalOpenKeyCount(bucketLayout, dbOpenKeyPrefix),
         hasMore,
         retContToken,
         openKeySessionList);
@@ -1329,11 +1342,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return getMultipartInfoTable().isExist(multipartInfoDbKey);
   }
 
-  @Override
-  public long getTotalOpenKeyCount() throws IOException {
-    // Get an estimated key count of OpenKeyTable + OpenFileTable
-    return openKeyTable.getEstimatedKeyCount()
-        + openFileTable.getEstimatedKeyCount();
+  private long getTotalOpenKeyCount(BucketLayout bucketLayout, String prefix) throws IOException {
+    long count = 0;
+    try (TableIterator<String, String>
+             keyValueTableIterator = getOpenKeyTable(bucketLayout).keyIterator(prefix)) {
+      while (keyValueTableIterator.hasNext()) {
+        count += 1;
+        keyValueTableIterator.next();
+      }
+    }
+    return count;
   }
 
   @Override

@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
@@ -144,6 +145,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
         OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
+        keyInfo.setCommittedKeyDeletedFlag(true);
         String ozoneDbKey = keySpaceOmMetadataManager.getOzonePathKey(volumeId,
             bucketId, keyInfo.getParentObjectID(), keyInfo.getFileName());
         keySpaceOmMetadataManager.getKeyTable(getBucketLayout())
@@ -154,7 +156,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
               keyInfo.getKeyName(), ozoneDbKey);
         }
 
-        RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+        RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketId,
             keyInfo, keyInfo.getUpdateID());
 
         String deletedKey = keySpaceOmMetadataManager
@@ -184,5 +186,10 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         }
       }
     }
+  }
+
+  @VisibleForTesting
+  public Map<Pair<String, String>, OmBucketInfo> getVolBucketInfoMap() {
+    return volBucketInfoMap;
   }
 }

@@ -428,10 +428,21 @@ public final class OMConfigKeys {
       "ozone.snapshot.deleting.limit.per.task";
   public static final int SNAPSHOT_DELETING_LIMIT_PER_TASK_DEFAULT = 10;
 
+  // Snapshot defragmentation service configuration
+  public static final String SNAPSHOT_DEFRAG_LIMIT_PER_TASK =
+      "ozone.snapshot.defrag.limit.per.task";
+  public static final int SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT = 1;
+
   public static final String OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL =
       "ozone.snapshot.filtering.service.interval";
   public static final String
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT = "60s";
+
+  public static final String OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL =
+      "ozone.snapshot.defrag.service.interval";
+  public static final String
+      OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL_DEFAULT = "-1";
+  // TODO: Disabled by default. Do not enable by default until upgrade handling is complete.
 
   public static final String
       OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT =

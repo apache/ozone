@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
@@ -63,7 +64,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
       bucket = bucketName;
     }
     // Add volume, bucket and key entries to OM DB.
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket,
+    OmBucketInfo omBucketInfo = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucket,
         omMetadataManager);
 
     List<String> ozoneKeyNames = new ArrayList<>(numKeys);
@@ -82,7 +83,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     List<String> deletedKeyNames = new ArrayList<>(numKeys);
     for (String ozoneKey : ozoneKeyNames) {
       String deletedKeyName = OMRequestTestUtils.deleteKey(
-          ozoneKey, omMetadataManager, trxnIndex++);
+          ozoneKey, omBucketInfo.getObjectID(), omMetadataManager, trxnIndex++);
       deletedKeyNames.add(deletedKeyName);
     }
 
@@ -162,7 +163,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
 
       OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
           omResponse, deleteKeysAndRenamedEntry.getKey(), deleteKeysAndRenamedEntry.getValue(), null,
-          null);
+          null, null);
       omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
       // Do manual commit and see whether addToBatch is successful or not.
@@ -238,7 +239,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         omMetadataManager.getStore().initBatchOperation()) {
 
       OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(omResponse, deleteKeysAndRenamedEntry.getKey(),
-          deleteKeysAndRenamedEntry.getValue(), snapInfo, null);
+          deleteKeysAndRenamedEntry.getValue(), snapInfo, null, null);
       omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
       // Do manual commit and see whether addToBatch is successful or not.
