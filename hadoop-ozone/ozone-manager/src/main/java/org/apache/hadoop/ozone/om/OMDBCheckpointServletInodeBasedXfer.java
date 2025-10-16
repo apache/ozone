@@ -54,6 +54,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
+import java.util.List;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -486,13 +487,28 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    */
   private DBCheckpoint createAndPrepareCheckpoint(Path tmpdir, boolean flush) throws IOException {
     // make tmp directories to contain the copies
-    Path tmpCompactionLogDir = tmpdir.resolve(getCompactionLogDir().getFileName());
     Path tmpSstBackupDir = tmpdir.resolve(getSstBackupDir().getFileName());
+    Files.createDirectories(tmpSstBackupDir);
 
-    // Create checkpoint and then copy the files so that it has all the compaction entries and files.
+    // Create checkpoint.
     DBCheckpoint dbCheckpoint = getDbStore().getCheckpoint(flush);
-    FileUtils.copyDirectory(getCompactionLogDir().toFile(), tmpCompactionLogDir.toFile());
-    OmSnapshotUtils.linkFiles(getSstBackupDir().toFile(), tmpSstBackupDir.toFile());
+
+    try {
+      RocksDBCheckpointDiffer differ = getDbStore().getRocksDBCheckpointDiffer();
+      List<String> sstFiles =
+          differ.getCompactionLogSstFiles(dbCheckpoint.getCheckpointLocation());
+      for (String sstFile : sstFiles) {
+        Path sstFileToLink = getSstBackupDir().resolve(sstFile);
+        if (Files.exists(sstFileToLink)) {
+          Files.createLink(tmpSstBackupDir.resolve(sstFile), sstFileToLink);
+        } else {
+          LOG.warn("SST file {} from compaction log not found in backup " +
+              "directory {}", sstFile, getSstBackupDir());
+        }
+      }
+    } catch (Exception e) {
+      throw new IOException("Error reading compaction log from checkpoint", e);
+    }
 
     return dbCheckpoint;
   }

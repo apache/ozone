@@ -88,6 +88,11 @@ import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.CompactionJobInfo;
 import org.rocksdb.LiveFileMetaData;
+import org.rocksdb.Options;
+import org.rocksdb.DBOptions;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.RocksIterator;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -1424,6 +1429,79 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     public static void invalidateCacheEntry(String cacheKey) {
       IOUtils.close(LOG, INSTANCE_MAP.remove(cacheKey));
     }
+  }
+
+  public List<String> getCompactionLogSstFiles(Path checkpointPath)
+      throws IOException {
+    List<String> sstFiles = new ArrayList<>();
+    List<ColumnFamilyDescriptor> cfDescriptors = new ArrayList<>();
+    List<byte[]> cfs;
+    try (Options options = new Options()) {
+      cfs = RocksDB.listColumnFamilies(options, checkpointPath.toString());
+    } catch (RocksDBException e) {
+      throw new IOException(e);
+    }
+
+    if (cfs == null || cfs.isEmpty()) {
+      cfs = Collections.singletonList(RocksDB.DEFAULT_COLUMN_FAMILY);
+    }
+
+    List<ColumnFamilyOptions> cfOptions = new ArrayList<>();
+    try {
+      for (byte[] cf : cfs) {
+        ColumnFamilyOptions opts = new ColumnFamilyOptions();
+        cfOptions.add(opts);
+        cfDescriptors.add(new ColumnFamilyDescriptor(cf, opts));
+      }
+
+      List<ColumnFamilyHandle> cfHandles = new ArrayList<>();
+      try (DBOptions dbOptions = new DBOptions()
+          .setCreateIfMissing(false).setCreateMissingColumnFamilies(true);
+          RocksDB db = RocksDB.openReadOnly(dbOptions,
+              checkpointPath.toString(), cfDescriptors, cfHandles)) {
+
+        ColumnFamilyHandle compactionLogCf = null;
+        for (int i = 0; i < cfs.size(); i++) {
+          if (Arrays.equals(cfs.get(i),
+              "compactionLogTable".getBytes(UTF_8))) {
+            compactionLogCf = cfHandles.get(i);
+            break;
+          }
+        }
+
+        if (compactionLogCf != null) {
+          try (RocksIterator iterator = db.newIterator(compactionLogCf)) {
+            for (iterator.seekToFirst(); iterator.isValid(); iterator.next()) {
+              try {
+                CompactionLogEntry logEntry = CompactionLogEntry.getFromProtobuf(
+                    CompactionLogEntryProto.parseFrom(iterator.value()));
+                logEntry.getInputFileInfoList().forEach(f ->
+                    sstFiles.add(f.getFileName()));
+                logEntry.getOutputFileInfoList().forEach(f ->
+                    sstFiles.add(f.getFileName()));
+              } catch (InvalidProtocolBufferException e) {
+                throw new IOException("Failed to parse CompactionLogEntryProto",
+                    e);
+              }
+            }
+          }
+        } else {
+          LOG.warn("Compaction log table not found in checkpoint at {}",
+              checkpointPath);
+        }
+      } finally {
+        for (ColumnFamilyHandle cfHandle : cfHandles) {
+          cfHandle.close();
+        }
+      }
+    } catch (RocksDBException e) {
+      throw new IOException(e);
+    } finally {
+      for (ColumnFamilyOptions opts : cfOptions) {
+        opts.close();
+      }
+    }
+    return sstFiles;
   }
 
   @Override
