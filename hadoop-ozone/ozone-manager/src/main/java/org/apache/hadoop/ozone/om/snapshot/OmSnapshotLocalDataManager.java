@@ -70,7 +70,6 @@ import org.yaml.snakeyaml.Yaml;
 public class OmSnapshotLocalDataManager implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(OmSnapshotLocalDataManager.class);
-  private static final String SNAPSHOT_LOCAL_DATA_LOCK_RESOURCE_NAME = "snapshot_local_data_lock";
 
   private final ObjectSerializer<OmSnapshotLocalData> snapshotLocalDataSerializer;
   private final MutableGraph<LocalDataVersionNode> localDataGraph;
