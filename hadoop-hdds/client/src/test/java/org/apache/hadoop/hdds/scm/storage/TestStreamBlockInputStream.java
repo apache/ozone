@@ -65,7 +65,7 @@ public class TestStreamBlockInputStream {
   private Checksum checksum;
   private ChecksumData checksumData;
   private byte[] data;
-  ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
+  private ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -171,7 +171,6 @@ public class TestStreamBlockInputStream {
     assertEquals(-1, blockStream.read());
     assertEquals(BLOCK_SIZE, blockStream.getPos());
   }
-
 
   private void createDataAndChecksum() throws OzoneChecksumException {
     data = new byte[BLOCK_SIZE];
