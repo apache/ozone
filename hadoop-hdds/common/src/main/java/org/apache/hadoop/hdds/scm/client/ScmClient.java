@@ -488,6 +488,7 @@ public interface ScmClient extends Closeable {
       @Nullable Long bandwidthInMB,
       @Nullable Integer parallelThread,
       @Nullable Boolean stopAfterDiskEven,
+      @Nullable Double minSourceVolumeDensity,
       @Nullable List<String> hosts) throws IOException;
 
   /**
@@ -505,5 +506,6 @@ public interface ScmClient extends Closeable {
       @Nullable Long bandwidth,
       @Nullable Integer parallelThread,
       @Nullable Boolean stopAfterDiskEven,
+      @Nullable Double minSourceVolumeDensity,
       @Nullable List<String> hosts) throws IOException;
 }

@@ -32,6 +32,7 @@ public class DiskBalancerInfo {
   private long bandwidthInMB;
   private int parallelThread;
   private boolean stopAfterDiskEven;
+  private double minSourceVolumeDensity;
   private DiskBalancerVersion version;
   private long successCount;
   private long failureCount;
@@ -40,30 +41,34 @@ public class DiskBalancerInfo {
   private double volumeDataDensity;
 
   public DiskBalancerInfo(DiskBalancerOperationalState operationalState, double threshold,
-      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven) {
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, double minSourceVolumeDensity) {
     this(operationalState, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
-        DiskBalancerVersion.DEFAULT_VERSION);
+        minSourceVolumeDensity, DiskBalancerVersion.DEFAULT_VERSION);
   }
 
   public DiskBalancerInfo(DiskBalancerOperationalState operationalState, double threshold,
-      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version) {
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven,
+      double minSourceVolumeDensity, DiskBalancerVersion version) {
     this.operationalState = operationalState;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
     this.stopAfterDiskEven = stopAfterDiskEven;
+    this.minSourceVolumeDensity = minSourceVolumeDensity;
     this.version = version;
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public DiskBalancerInfo(DiskBalancerOperationalState operationalState, double threshold,
-      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, DiskBalancerVersion version,
-      long successCount, long failureCount, long bytesToMove, long balancedBytes, double volumeDataDensity) {
+      long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven, double minSourceVolumeDensity,
+      DiskBalancerVersion version, long successCount, long failureCount, long bytesToMove, long balancedBytes,
+      double volumeDataDensity) {
     this.operationalState = operationalState;
     this.threshold = threshold;
     this.bandwidthInMB = bandwidthInMB;
     this.parallelThread = parallelThread;
     this.stopAfterDiskEven = stopAfterDiskEven;
+    this.minSourceVolumeDensity = minSourceVolumeDensity;
     this.version = version;
     this.successCount = successCount;
     this.failureCount = failureCount;
@@ -83,6 +88,7 @@ public class DiskBalancerInfo {
     this.bandwidthInMB = diskBalancerConf.getDiskBandwidthInMB();
     this.parallelThread = diskBalancerConf.getParallelThread();
     this.stopAfterDiskEven = diskBalancerConf.isStopAfterDiskEven();
+    this.minSourceVolumeDensity = diskBalancerConf.getMinSourceVolumeDensity();
     this.version = DiskBalancerVersion.DEFAULT_VERSION;
   }
 
@@ -99,11 +105,14 @@ public class DiskBalancerInfo {
     if (stopAfterDiskEven != diskBalancerConf.isStopAfterDiskEven()) {
       setStopAfterDiskEven(diskBalancerConf.isStopAfterDiskEven());
     }
+    if (minSourceVolumeDensity != diskBalancerConf.getMinSourceVolumeDensity()) {
+      setMinSourceVolumeDensity(diskBalancerConf.getMinSourceVolumeDensity());
+    }
   }
 
   public StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto toDiskBalancerReportProto() {
     DiskBalancerConfiguration conf = new DiskBalancerConfiguration(threshold,
-        bandwidthInMB, parallelThread, stopAfterDiskEven);
+        bandwidthInMB, parallelThread, stopAfterDiskEven, minSourceVolumeDensity);
     HddsProtos.DiskBalancerConfigurationProto confProto = conf.toProtobufBuilder().build();
 
     StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.Builder builder =
@@ -115,7 +124,7 @@ public class DiskBalancerInfo {
     builder.setBytesToMove(bytesToMove);
     builder.setBalancedBytes(balancedBytes);
     builder.setVolumeDataDensity(volumeDataDensity);
-    
+
     return builder.build();
   }
 
@@ -163,6 +172,14 @@ public class DiskBalancerInfo {
     this.stopAfterDiskEven = stopAfterDiskEven;
   }
 
+  public double getMinSourceVolumeDensity() {
+    return minSourceVolumeDensity;
+  }
+
+  public void setMinSourceVolumeDensity(double minSourceVolumeDensity) {
+    this.minSourceVolumeDensity = minSourceVolumeDensity;
+  }
+
   public boolean isPaused() {
     return this.operationalState == DiskBalancerOperationalState.PAUSED_BY_NODE_STATE;
   }
@@ -189,12 +206,13 @@ public class DiskBalancerInfo {
         bandwidthInMB == that.bandwidthInMB &&
         parallelThread == that.parallelThread &&
         stopAfterDiskEven == that.stopAfterDiskEven &&
+        minSourceVolumeDensity == that.minSourceVolumeDensity &&
         version == that.version;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(operationalState, threshold, bandwidthInMB, parallelThread, stopAfterDiskEven,
-        version);
+    return Objects.hash(operationalState, threshold, bandwidthInMB,
+        parallelThread, stopAfterDiskEven, minSourceVolumeDensity, version);
   }
 }

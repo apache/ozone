@@ -1422,6 +1422,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           conf.hasDiskBandwidthInMB() ? conf.getDiskBandwidthInMB() : null,
           conf.hasParallelThread() ? conf.getParallelThread() : null,
           conf.hasStopAfterDiskEven() ? conf.getStopAfterDiskEven() : null,
+          conf.hasMinSourceVolumeDensity() ? conf.getMinSourceVolumeDensity() : null,
           request.getHostsList().isEmpty() ? null : request.getHostsList());
       break;
     case UPDATE:
@@ -1431,6 +1432,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           conf.hasDiskBandwidthInMB() ? conf.getDiskBandwidthInMB() : null,
           conf.hasParallelThread() ? conf.getParallelThread() : null,
           conf.hasStopAfterDiskEven() ? conf.getStopAfterDiskEven() : null,
+          conf.hasMinSourceVolumeDensity() ? conf.getMinSourceVolumeDensity() : null,
           request.getHostsList().isEmpty() ? null : request.getHostsList());
       break;
     case STOP:

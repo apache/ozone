@@ -33,8 +33,9 @@ public interface DiskBalancerVolumeChoosingPolicy {
    * @param threshold - the threshold to choose source and dest volumes.
    * @param deltaSizes - the sizes changes of inProgress balancing jobs.
    * @param containerSize - the estimated size of container to be moved.
+   * @param minSourceVolumeDensity - minimum source volume density required to participate in balancing.
    * @return Source volume and Dest volume.
    */
   Pair<HddsVolume, HddsVolume> chooseVolume(MutableVolumeSet volumeSet,
-      double threshold, Map<HddsVolume, Long> deltaSizes, long containerSize);
+      double threshold, Map<HddsVolume, Long> deltaSizes, long containerSize, double minSourceVolumeDensity);
 }

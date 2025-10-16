@@ -50,7 +50,7 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
 
   @Override
   public Pair<HddsVolume, HddsVolume> chooseVolume(MutableVolumeSet volumeSet,
-      double threshold, Map<HddsVolume, Long> deltaMap, long containerSize) {
+      double threshold, Map<HddsVolume, Long> deltaMap, long containerSize, double minSourceVolumeDensity) {
     lock.lock();
     try {
       // Create truly immutable snapshot of volumes to ensure consistency
@@ -93,8 +93,25 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
         LOG.debug("Can not find appropriate Source volume and Dest Volume.");
         return null;
       }
-      AvailableSpaceFilter filter = new AvailableSpaceFilter(containerSize);
+
       HddsVolume srcVolume = volumes.get(0);
+      SpaceUsageSource sourceUsage = srcVolume.getCurrentUsage();
+      double sourceUtilization = (double) ((sourceUsage.getCapacity() - sourceUsage.getAvailable())
+          + deltaMap.getOrDefault(srcVolume, 0L) + srcVolume.getCommittedBytes())
+          / sourceUsage.getCapacity();
+
+      // Convert minSourceVolumeDensity from percentage to ratio
+      double minSourceDensityRatio = minSourceVolumeDensity / 100.0;
+
+      // if source volume utilisation is less than minimum density, return null
+      if (sourceUtilization < minSourceDensityRatio) {
+        LOG.debug("Source volume {} utilization {} is below minimum required density {}. " +
+                "Skipping disk balancing to prevent unnecessary movement of containers from under-utilized volumes.",
+            srcVolume.getStorageID(), sourceUtilization * 100, minSourceVolumeDensity);
+        return null;
+      }
+
+      AvailableSpaceFilter filter = new AvailableSpaceFilter(containerSize);
       HddsVolume destVolume = volumes.get(volumes.size() - 1);
       while (!filter.test(destVolume)) {
         // If the destination volume does not have enough space, try the next

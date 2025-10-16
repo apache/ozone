@@ -128,6 +128,7 @@ public class TestDiskBalancer {
         10L,  // bandwidth in MB
         5,    // parallel threads
         true, // stopAfterDiskEven
+        60.0, // minSourceVolumeDensity
         null); // apply to all datanodes
 
     // verify logs for all DNs has started
@@ -159,6 +160,7 @@ public class TestDiskBalancer {
         10L,  // bandwidth in MB
         5,    // parallel threads
         true, // stopAfterDiskEven
+        60.0, // minSourceVolumeDensity
         null);
 
     //all DNs IN_SERVICE, so disk balancer status for all should be present
