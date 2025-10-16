@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import java.io.IOException;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 /**
  * Abstract class used as an interface for input streams related to Ozone
@@ -38,4 +41,22 @@ public abstract class BlockExtendedInputStream extends ExtendedInputStream
 
   @Override
   public abstract long getPos();
+
+  protected Pipeline setPipeline(Pipeline pipeline) throws IOException {
+    if (pipeline == null) {
+      return null;
+    }
+    long replicaIndexes = pipeline.getNodes().stream().mapToInt(pipeline::getReplicaIndex).distinct().count();
+
+    if (replicaIndexes > 1) {
+      throw new IOException(String.format("Pipeline: %s has nodes containing different replica indexes.",
+          pipeline));
+    }
+
+    // irrespective of the container state, we will always read via Standalone protocol.
+    boolean okForRead = pipeline.getType() == HddsProtos.ReplicationType.STAND_ALONE
+            || pipeline.getType() == HddsProtos.ReplicationType.EC;
+    return okForRead ? pipeline : pipeline.copyForRead();
+  }
+
 }
