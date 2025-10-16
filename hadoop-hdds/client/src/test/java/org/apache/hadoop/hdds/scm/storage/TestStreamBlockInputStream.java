@@ -178,7 +178,10 @@ public class TestStreamBlockInputStream {
     ByteBuffer byteBuffer = ByteBuffer.allocate(10);
     byte[] byteArray = new byte[10];
     assertThrows(IOException.class, () -> blockStream.read());
-    assertThrows(IOException.class, () -> blockStream.read(byteArray, 0, 10));
+    assertThrows(IOException.class, () -> {
+      // Findbugs complains about ignored return value without this :(
+      int r = blockStream.read(byteArray, 0, 10);
+    });
     assertThrows(IOException.class, () -> blockStream.read(byteBuffer));
     assertThrows(IOException.class, () -> blockStream.seek(10));
   }
