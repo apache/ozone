@@ -29,8 +29,6 @@ import static org.mockito.Mockito.when;
 import com.google.inject.Injector;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.ReconGuiceServletContextListener;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,11 +50,7 @@ public class TestReplicatedSizeOfFilesUpgradeAction {
   @Mock
   private Injector mockInjector;
   @Mock
-  private ReconNamespaceSummaryManager mockNsSummaryManager;
-  @Mock
-  private ReconOMMetadataManager mockOmMetadataManager;
-  @Mock
-  private ReconTaskController mocReconTaskController;
+  private ReconTaskController mockReconTaskController;
 
   @BeforeEach
   public void setUp() {
@@ -68,11 +62,14 @@ public class TestReplicatedSizeOfFilesUpgradeAction {
     try (MockedStatic<ReconGuiceServletContextListener> mockStaticContext =
              mockStatic(ReconGuiceServletContextListener.class)) {
       mockStaticContext.when(ReconGuiceServletContextListener::getGlobalInjector).thenReturn(mockInjector);
-      when(mockInjector.getInstance(ReconTaskController.class)).thenReturn(mocReconTaskController);
+      when(mockInjector.getInstance(ReconTaskController.class)).thenReturn(mockReconTaskController);
+      when(mockReconTaskController.queueReInitializationEvent(
+          any(ReconTaskReInitializationEvent.ReInitializationReason.class)))
+          .thenReturn(ReconTaskController.ReInitializationResult.SUCCESS);
       upgradeAction.execute(mockDataSource);
 
       // Verify that rebuildNSSummaryTree was called exactly once.
-      verify(mocReconTaskController, times(1)).queueReInitializationEvent(any());
+      verify(mockReconTaskController, times(1)).queueReInitializationEvent(any());
     }
   }
 
@@ -81,10 +78,10 @@ public class TestReplicatedSizeOfFilesUpgradeAction {
     try (MockedStatic<ReconGuiceServletContextListener> mockStaticContext =
              mockStatic(ReconGuiceServletContextListener.class)) {
       mockStaticContext.when(ReconGuiceServletContextListener::getGlobalInjector).thenReturn(mockInjector);
-      when(mockInjector.getInstance(ReconTaskController.class)).thenReturn(mocReconTaskController);
+      when(mockInjector.getInstance(ReconTaskController.class)).thenReturn(mockReconTaskController);
 
       // Simulate a failure during the rebuild process
-      doThrow(new RuntimeException("Simulated rebuild error")).when(mocReconTaskController)
+      doThrow(new RuntimeException("Simulated rebuild error")).when(mockReconTaskController)
           .queueReInitializationEvent(any(ReconTaskReInitializationEvent.ReInitializationReason.class));
 
       RuntimeException thrown = assertThrows(RuntimeException.class, () -> upgradeAction.execute(mockDataSource));

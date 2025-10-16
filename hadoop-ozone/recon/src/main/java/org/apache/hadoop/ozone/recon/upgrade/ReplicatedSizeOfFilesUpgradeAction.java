@@ -48,10 +48,9 @@ public class ReplicatedSizeOfFilesUpgradeAction implements ReconUpgradeAction {
       ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
           ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
       if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
-        LOG.error(
-            "Failed to queue reinitialization event for manual trigger (result: {}), failing the reinitialization " +
-                "during NSSummaryAggregatedTotalsUpgrade action, will be retried as part of syncDataFromOM " +
-                "scheduler task.", result);
+        throw new RuntimeException(
+            "Failed to queue reinitialization event (result: " + result + "). " +
+                "NSSummary rebuild required for REPLICATED_SIZE_OF_FILES upgrade.");
       }
     } catch (Exception e) {
       LOG.error("Error during NSSummary rebuild for REPLICATED_SIZE_OF_FILES upgrade.", e);
