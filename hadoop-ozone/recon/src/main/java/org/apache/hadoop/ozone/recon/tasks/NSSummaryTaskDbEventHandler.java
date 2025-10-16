@@ -238,12 +238,18 @@ public class NSSummaryTaskDbEventHandler {
       // Decrement parent's totals by the deleted directory's totals
       parentNsSummary.setNumOfFiles(parentNsSummary.getNumOfFiles() - deletedDirSummary.getNumOfFiles());
       parentNsSummary.setSizeOfFiles(parentNsSummary.getSizeOfFiles() - deletedDirSummary.getSizeOfFiles());
-      parentNsSummary.setReplicatedSizeOfFiles(
-          parentNsSummary.getReplicatedSizeOfFiles() - deletedDirSummary.getReplicatedSizeOfFiles());
+      long parentReplSize = parentNsSummary.getReplicatedSizeOfFiles();
+      long deletedReplSize = deletedDirSummary.getReplicatedSizeOfFiles();
+      if (parentReplSize >= 0 && deletedReplSize >= 0) {
+        parentNsSummary.setReplicatedSizeOfFiles(parentReplSize - deletedReplSize);
+      }
       
       // Propagate the decrements upwards to all ancestors
+      if (deletedReplSize < 0) {
+        deletedReplSize = 0;
+      }
       propagateSizeUpwards(parentObjectId, -deletedDirSummary.getSizeOfFiles(),
-          -deletedDirSummary.getReplicatedSizeOfFiles(), -deletedDirSummary.getNumOfFiles(), nsSummaryMap);
+          -deletedReplSize, -deletedDirSummary.getNumOfFiles(), nsSummaryMap);
       
       // Set the deleted directory's parentId to 0 (unlink it)
       deletedDirSummary.setParentId(0);
@@ -315,7 +321,11 @@ public class NSSummaryTaskDbEventHandler {
       if (parentSummary != null) {
         // Update parent's totals
         parentSummary.setSizeOfFiles(parentSummary.getSizeOfFiles() + sizeChange);
-        parentSummary.setReplicatedSizeOfFiles(parentSummary.getReplicatedSizeOfFiles() + replicatedSizeChange);
+        long parentReplSize = parentSummary.getReplicatedSizeOfFiles();
+        if (parentReplSize < 0) {
+          parentReplSize = 0;
+        }
+        parentSummary.setReplicatedSizeOfFiles(parentReplSize + replicatedSizeChange);
         parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + countChange);
         nsSummaryMap.put(parentId, parentSummary);
         
