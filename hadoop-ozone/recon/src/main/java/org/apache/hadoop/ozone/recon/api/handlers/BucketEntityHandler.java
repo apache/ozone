@@ -123,14 +123,11 @@ public class BucketEntityHandler extends EntityHandler {
       // format with leading slash and without trailing slash
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       diskUsage.setSubpath(subpath);
-      long dataSize = getTotalSize(subdirObjectId);
 
       if (withReplica) {
-        long dirDU = getBucketHandler()
-            .calculateDUUnderObject(subdirObjectId);
-        diskUsage.setSizeWithReplica(dirDU);
+        diskUsage.setSizeWithReplica(subdirNSSummary.getReplicatedSizeOfFiles());
       }
-      diskUsage.setSize(dataSize);
+      diskUsage.setSize(subdirNSSummary.getSizeOfFiles());
       dirDUData.add(diskUsage);
     }
     if (listFile || withReplica) {

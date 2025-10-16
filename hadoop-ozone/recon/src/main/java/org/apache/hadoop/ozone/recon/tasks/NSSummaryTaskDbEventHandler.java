@@ -102,7 +102,14 @@ public class NSSummaryTaskDbEventHandler {
     // Update immediate parent's totals (includes all descendant files)
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
-    nsSummary.setReplicatedSizeOfFiles(nsSummary.getReplicatedSizeOfFiles() + keyInfo.getReplicatedSize());
+    // Before arithmetic operations, check for sentinel value
+    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+    if (currentReplSize < 0) {
+      // Old data, initialize to 0 before first use
+      currentReplSize = 0;
+      nsSummary.setReplicatedSizeOfFiles(0);
+    }
+    nsSummary.setReplicatedSizeOfFiles(currentReplSize + keyInfo.getReplicatedSize());
     int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
 
     ++fileBucket[binIndex];
@@ -188,7 +195,11 @@ public class NSSummaryTaskDbEventHandler {
     // Decrement immediate parent's totals (these fields now represent totals)
     nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() - 1);
     nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() - keyInfo.getDataSize());
-    nsSummary.setReplicatedSizeOfFiles(nsSummary.getReplicatedSizeOfFiles() - keyInfo.getReplicatedSize());
+    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+    long keyReplSize = keyInfo.getReplicatedSize();
+    if (currentReplSize >= 0 && keyReplSize >= 0) {
+      nsSummary.setReplicatedSizeOfFiles(currentReplSize - keyReplSize);
+    }
     --fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);

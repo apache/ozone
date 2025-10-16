@@ -131,17 +131,14 @@ public class DirectoryEntityHandler extends EntityHandler {
       DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
       // reformat the response
       diskUsage.setSubpath(subpath);
-      long dataSize = getTotalSize(subdirObjectId);
       if (withReplica) {
-        long subdirDU = getBucketHandler()
-                .calculateDUUnderObject(subdirObjectId);
-        diskUsage.setSizeWithReplica(subdirDU);
+        diskUsage.setSizeWithReplica(subdirNSSummary.getReplicatedSizeOfFiles());
       }
 
-      diskUsage.setSize(dataSize);
+      diskUsage.setSize(subdirNSSummary.getSizeOfFiles());
       subdirDUData.add(diskUsage);
     }
-    if (listFile) {
+    if (listFile || withReplica) {
       getBucketHandler().handleDirectKeys(dirObjectId, withReplica,
               listFile, subdirDUData, getNormalizedPath());
     }
