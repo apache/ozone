@@ -19,10 +19,8 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.time.Instant;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -42,7 +40,6 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -50,7 +47,6 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -273,7 +269,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-  private boolean shouldRetryRead(IOException cause) throws IOException {
+  @Override
+  public synchronized void close() throws IOException {
+    releaseClient();
+    xceiverClientFactory = null;
+  }
+
+  /*
+  Commenting out for now as we probably need these for retries which are yet to be implemented.
+
+    private boolean shouldRetryRead(IOException cause) throws IOException {
     RetryPolicy.RetryAction retryAction;
     try {
       retryAction = retryPolicy.shouldRetry(cause, ++retries, 0, true);
@@ -283,11 +288,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       throw new IOException(e);
     }
     return retryAction.action == RetryPolicy.RetryAction.RetryDecision.RETRY;
-  }
-
-  @VisibleForTesting
-  public boolean isVerifyChecksum() {
-    return verifyChecksum;
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {
@@ -316,17 +316,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     }
   }
 
-  /**
-   * Check if this exception is because datanodes are not reachable.
-   */
   private boolean isConnectivityIssue(IOException ex) {
     return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
-  }
-
-  @Override
-  public synchronized void close() throws IOException {
-    releaseClient();
-    xceiverClientFactory = null;
   }
 
   private void handleStorageContainerException(StorageContainerException e) throws IOException {
@@ -350,6 +341,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
       throw ioe;
     }
   }
+
+   */
 
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.

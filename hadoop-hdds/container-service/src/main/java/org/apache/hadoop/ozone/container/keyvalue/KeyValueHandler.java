@@ -92,7 +92,6 @@ import java.util.TreeMap;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -2119,23 +2118,6 @@ public class KeyValueHandler extends Handler {
           request);
     }
     return responseProto;
-  }
-
-  private Pair<Long, Long> computeChecksumBoundaries(
-      ContainerProtos.ChunkInfo chunkInfo, long startByteIndex, long dataLen) {
-
-    int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
-
-    // index of the last byte to be read from chunk, inclusively.
-    final long endByteIndex = startByteIndex + dataLen - 1;
-
-    long adjustedChunkOffset = (startByteIndex / bytesPerChecksum)
-        * bytesPerChecksum; // inclusive
-    final long endIndex = ((endByteIndex / bytesPerChecksum) + 1)
-        * bytesPerChecksum; // exclusive
-    long adjustedChunkLen =
-        Math.min(endIndex, chunkInfo.getLen()) - adjustedChunkOffset;
-    return Pair.of(adjustedChunkOffset, adjustedChunkLen);
   }
 
   @Override
