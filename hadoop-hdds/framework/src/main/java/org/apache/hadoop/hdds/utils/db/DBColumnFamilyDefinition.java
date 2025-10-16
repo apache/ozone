@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.CollectionUtils;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -78,6 +79,11 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
   public TypedTable<KEY, VALUE> getTable(DBStore db, CacheType cacheType)
       throws RocksDatabaseException, CodecException {
     return db.getTable(tableName, keyCodec, valueCodec, cacheType);
+  }
+
+  public TypedTable<KEY, VALUE> getTable(DBStore db, CacheType cacheType, Function<KEY, Boolean> keyValidator)
+      throws RocksDatabaseException, CodecException {
+    return db.getTable(tableName, keyCodec, valueCodec, cacheType, keyValidator);
   }
 
   public String getName() {
