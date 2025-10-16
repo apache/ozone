@@ -254,6 +254,10 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     });
   }
 
+  Map<UUID, Integer> getSnapshotToBeCheckedForOrphans() {
+    return snapshotToBeCheckedForOrphans;
+  }
+
   private void init(OzoneConfiguration configuration, SnapshotChainManager chainManager) throws IOException {
     this.locks = omMetadataManager.getHierarchicalLockManager();
     this.snapshotToBeCheckedForOrphans = new ConcurrentHashMap<>();
@@ -696,25 +700,37 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
       Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
           existingSnapVersions.getSnapshotVersions();
+      Map<Integer, LocalDataVersionNode> newVersions = snapshotVersions.getSnapshotVersions();
       Map<Integer, Set<LocalDataVersionNode>> predecessors = new HashMap<>();
+      boolean versionsRemoved = false;
       // Track all predecessors of the existing versions and remove the node from the graph.
       for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
         LocalDataVersionNode existingVersionNode = existingVersion.getValue();
         predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersionNode));
+        versionsRemoved = versionsRemoved || !newVersions.containsKey(existingVersion.getKey());
         localDataGraph.removeNode(existingVersionNode);
       }
 
       // Add the nodes to be added in the graph and map.
       addSnapshotVersionMeta(snapshotId, snapshotVersions);
       // Reconnect all the predecessors for existing nodes.
-      for (Map.Entry<Integer, LocalDataVersionNode> entry : snapshotVersions.getSnapshotVersions().entrySet()) {
+      for (Map.Entry<Integer, LocalDataVersionNode> entry : newVersions.entrySet()) {
         for (LocalDataVersionNode predecessor : predecessors.getOrDefault(entry.getKey(), Collections.emptySet())) {
           localDataGraph.putEdge(predecessor, entry.getValue());
         }
       }
-      // The previous snapshotId could have become an orphan entry or could have orphan versions.
       if (existingSnapVersions != null) {
-        increamentOrphanCheckCount(existingSnapVersions.getPreviousSnapshotId());
+        // The previous snapshotId could have become an orphan entry or could have orphan versions.(In case of
+        // version removals)
+        if (versionsRemoved || !Objects.equals(existingSnapVersions.getPreviousSnapshotId(),
+            snapshotVersions.getPreviousSnapshotId())) {
+          increamentOrphanCheckCount(existingSnapVersions.getPreviousSnapshotId());
+        }
+        // If the version is also updated it could mean that there could be some orphan version present within the
+        // same snapshot.
+        if (existingSnapVersions.getVersion() != snapshotVersions.getVersion()) {
+          increamentOrphanCheckCount(snapshotId);
+        }
       }
     }
 
