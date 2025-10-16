@@ -4838,4 +4838,14 @@
       warm up edek cache if none of key successful on OM start up.
     </description>
   </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.soft.limit</name>
+    <value>1024</value>
+    <description>Soft limit for number of lock objects that could be idle in the pool.</description>
+  </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.hard.limit</name>
+    <value>10000</value>
+    <description>Maximum number of lock objects that could be present in the pool.</description>
+  </property>
 </configuration>
