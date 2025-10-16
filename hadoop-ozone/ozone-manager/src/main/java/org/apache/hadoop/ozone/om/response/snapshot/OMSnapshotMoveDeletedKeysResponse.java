@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.createMergedRepe
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -236,8 +237,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       return this;
     }
 
-    public Builder setFromSnapshot(SnapshotInfo fromSnapshot) {
-      this.fromSnapshot = fromSnapshot;
+    public Builder setFromSnapshot(@Nonnull SnapshotInfo fromSnapshot) {
+      this.fromSnapshot = Objects.requireNonNull(fromSnapshot, "fromSnapshot cannot be null");
       return this;
     }
 
