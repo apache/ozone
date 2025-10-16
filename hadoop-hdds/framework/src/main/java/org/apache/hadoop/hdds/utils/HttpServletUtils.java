@@ -1,7 +1,6 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.util.XMLUtils;
 import org.w3c.dom.Document;
@@ -37,8 +36,6 @@ public class HttpServletUtils implements Serializable {
    */
   @VisibleForTesting
   public static ResponseFormat getResponseFormat(HttpServletRequest request) throws IllegalArgumentException {
-    // FIXME: parseAcceptHeader not related to ResponseFormat (name not match)
-    // this contains specic logic of HddsConfServlet: use xml as default
     String format = request.getHeader(HttpHeaders.ACCEPT);
     if (format == null) {
       return ResponseFormat.UNSPECIFIED;
