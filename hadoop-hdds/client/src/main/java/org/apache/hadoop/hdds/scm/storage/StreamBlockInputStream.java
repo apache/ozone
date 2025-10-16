@@ -36,10 +36,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockR
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -72,9 +70,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
   private StreamingReader streamingReader;
 
   private final boolean verifyChecksum;
-  private final Function<BlockID, BlockLocationInfo> refreshFunction;
-  private final RetryPolicy retryPolicy;
-  private int retries;
+  //private final Function<BlockID, BlockLocationInfo> refreshFunction;
+  //private final RetryPolicy retryPolicy;
+  //private int retries;
 
   public StreamBlockInputStream(
       BlockID blockID, long length, Pipeline pipeline,
@@ -88,9 +86,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
     this.verifyChecksum = config.isChecksumVerify();
-    this.refreshFunction = refreshFunction;
-    this.retryPolicy = HddsClientUtils.createRetryPolicy(config.getMaxReadRetryCount(),
-        TimeUnit.SECONDS.toMillis(config.getReadRetryInterval()));
+    //this.refreshFunction = refreshFunction;
+    //this.retryPolicy = HddsClientUtils.createRetryPolicy(config.getMaxReadRetryCount(),
+    //    TimeUnit.SECONDS.toMillis(config.getReadRetryInterval()));
   }
 
   @Override
