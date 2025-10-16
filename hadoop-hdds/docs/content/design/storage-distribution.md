@@ -132,6 +132,19 @@ Additionally, Recon already possesses a comprehensive physical and logical capac
 A new SCM upgrade action (ScmOnFinalizeActionForDataDistribution) is introduced. 
 This action is part of the finalization process for the DATA_DISTRIBUTION layout feature, which enables the new block size tracking capabilities.
 
+A new feature layout is added to check compatibility between components. Following is an example for handling compatability between OM and SCM
+
+| OM Version | SCM Version | Compatibility Handling                                                                                                                    |
+|------------|-------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| **Old OM** | **New SCM** | SCM receives old proto. In `ServerSideTranslatorPB`, it checks if the new block list is empty; if so, it decodes using the old structure. |
+| **New OM** | **Old SCM** | OM will be using `getScmInfo()` to fetch SCM metadata layout version. If the feature is not finalized, OM sends the old structure.        |
+| **New OM** | **New SCM** | Fully upgraded. OM sends size-aware transactions and SCM processes them accordingly.                                                      |
+| **Old OM** | **Old SCM** | Legacy setup. Both components use old proto structure.                                                                                    |
+
+Also in SCM, while upgrading for an existing Ozone cluster, all existing block deletion transactions prior to DATA_DISTRIBUTION finalized will be ignored to update DeletedBlocksTransactionSummary when it's removed from SCM DB. 
+DeletedBlocksTransactionSummary only counts the transaction after DATA_DISTRIBUTION is finalized.
+Also in DN side, newly added metadata will be persisted only if the feature is finalized.
+
 ---
 ## Approach 2: CLI-based (Not Proceeding)
 
