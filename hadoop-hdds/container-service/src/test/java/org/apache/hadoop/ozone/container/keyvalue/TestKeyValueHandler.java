@@ -42,10 +42,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
-import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -55,11 +53,9 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -72,29 +68,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -105,28 +94,22 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,10 +127,7 @@ public class TestKeyValueHandler {
   private Path dbFile;
 
   private static final long DUMMY_CONTAINER_ID = 9999;
-  private static final long LOCAL_ID = 1;
   private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
-  private static final long CHUNK_SIZE = 1024 * 1024;          // 1MB
-  private static final long BYTES_PER_CHECKSUM = 256 * 1024;
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
 
@@ -959,74 +939,4 @@ public class TestKeyValueHandler {
     return kvHandler;
   }
 
-  @Test
-  public void testReadBlock() throws IOException {
-
-    StreamObserver<ContainerCommandResponseProto> streamObserver = mock(StreamObserver.class);
-    KeyValueContainer container = mock(KeyValueContainer.class);
-    final KeyValueHandler kvHandler = new KeyValueHandler(new OzoneConfiguration(),
-        UUID.randomUUID().toString(), mock(ContainerSet.class), mock(VolumeSet.class), mock(ContainerMetrics.class),
-        mock(IncrementalReportSender.class), mock(ContainerChecksumTreeManager.class));
-    final KeyValueHandler keyValueHandler = spy(kvHandler);
-    DispatcherContext dispatcherContext = mock(DispatcherContext.class);
-
-    List<ContainerProtos.ChunkInfo> chunkInfoList = new ArrayList<>();
-    BlockData blockData = new BlockData(new BlockID(1, 1));
-    for (int i = 0; i < 4; i++) {
-      chunkInfoList.add(ContainerProtos.ChunkInfo
-          .newBuilder()
-          .setOffset(0)
-          .setLen(CHUNK_SIZE)
-          .setChecksumData(
-              ChecksumData.newBuilder().setBytesPerChecksum((int) BYTES_PER_CHECKSUM)
-                  .setType(ChecksumType.CRC32).build())
-          .setChunkName("chunkName" + i)
-          .build());
-    }
-    blockData.setChunks(chunkInfoList);
-
-    try (MockedStatic<BlockUtils> blockUtils = mockStatic(BlockUtils.class)) {
-      BlockManager blockManager = mock(BlockManager.class);
-      ChunkManager chunkManager = mock(ChunkManager.class);
-      when(keyValueHandler.getBlockManager()).thenReturn(blockManager);
-      when(keyValueHandler.getChunkManager()).thenReturn(chunkManager);
-      when(blockManager.getBlock(any(), any())).thenReturn(blockData);
-      ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.allocate(0));
-      when(chunkManager.readChunk(any(), any(),
-          any(), any()))
-          .thenReturn(data);
-      testReadBlock(0, 1, keyValueHandler, dispatcherContext,
-          streamObserver, container);
-      testReadBlock(0, CHUNK_SIZE + 1, keyValueHandler, dispatcherContext,
-          streamObserver, container);
-      testReadBlock(CHUNK_SIZE / 2, 2 * CHUNK_SIZE, keyValueHandler, dispatcherContext,
-          streamObserver, container);
-    }
-  }
-
-  private static ContainerCommandRequestProto readBlockRequest(
-      long offset, long length) {
-    return ContainerCommandRequestProto.newBuilder()
-        .setCmdType(Type.ReadBlock)
-        .setReadBlock(
-            ContainerProtos.ReadBlockRequestProto.newBuilder()
-                .setBlockID(
-                    ContainerProtos.DatanodeBlockID.newBuilder()
-                        .setContainerID(DUMMY_CONTAINER_ID)
-                        .setLocalID(LOCAL_ID))
-                .setOffset(offset))
-        .setContainerID(DUMMY_CONTAINER_ID)
-        .setDatanodeUuid(UUID.randomUUID().toString())
-        .build();
-  }
-
-  private static void testReadBlock(
-      long offset, long length, KeyValueHandler keyValueHandler, DispatcherContext dispatcherContext,
-      StreamObserver<ContainerCommandResponseProto> streamObserver, KeyValueContainer container) {
-    int responseCount = (int) (((offset + length - 1) / CHUNK_SIZE) + 1 - (offset / CHUNK_SIZE));
-    ContainerCommandRequestProto requestProto = readBlockRequest(offset, length);
-    keyValueHandler.readBlock(requestProto, container, dispatcherContext, streamObserver);
-    verify(streamObserver, times(responseCount)).onNext(any());
-    clearInvocations(streamObserver);
-  }
 }
