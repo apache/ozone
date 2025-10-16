@@ -67,13 +67,15 @@ public class HddsConfServlet extends HttpServlet {
     }
 
     HttpServletUtils.ResponseFormat format = HttpServletUtils.getResponseFormat(request);
-    // TODO: set content type should be in HttpServletUtils
+    if (format == HttpServletUtils.ResponseFormat.UNSPECIFIED) {
+      format = HttpServletUtils.ResponseFormat.XML;
+    }
+
     switch (format) {
     case JSON:
       response.setContentType("application/json; charset=utf-8");
       break;
     case XML:
-    case UNSPECIFIED:
     default:
       response.setContentType("text/xml; charset=utf-8");
       break;
@@ -91,7 +93,7 @@ public class HddsConfServlet extends HttpServlet {
       throws IOException {
     try {
       if (cmd == null) {
-        dumpConfiguration(format, out, name);
+        writeResponse(getConfFromContext(), out, format, name);
       } else {
         processConfigTagRequest(request, cmd, out);
       }
@@ -100,15 +102,19 @@ public class HddsConfServlet extends HttpServlet {
     }
   }
 
-  private void dumpConfiguration(HttpServletUtils.ResponseFormat format, Writer out, String name) throws IOException {
-    OzoneConfiguration conf = getConfFromContext();
+  /**
+   * Guts of the servlet - extracted for easy testing.
+   */
+  static void writeResponse(OzoneConfiguration conf, Writer out, HttpServletUtils.ResponseFormat format,
+                            String propertyName)
+      throws IOException, IllegalArgumentException {
     switch (format) {
     case JSON:
-      OzoneConfiguration.dumpConfiguration(conf, name, out);
+      OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
       break;
     case XML:
     default:
-      conf.writeXml(name, out);
+      conf.writeXml(propertyName, out);
       break;
     }
   }
