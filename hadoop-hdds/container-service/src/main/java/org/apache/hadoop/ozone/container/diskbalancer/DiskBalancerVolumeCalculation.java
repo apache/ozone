@@ -61,20 +61,26 @@ public final class DiskBalancerVolumeCalculation {
    * Get ideal usage from an immutable list of volumes.
    * 
    * @param volumes Immutable list of volumes
+   * @param deltaMap A map that tracks the total bytes which will be freed
+   * from each source volume during container moves
    * @return Ideal usage as a ratio (used space / total capacity)
    * @throws IllegalArgumentException if total capacity is zero
    */
-  public static double getIdealUsage(ImmutableList<HddsVolume> volumes) {
-    long totalCapacity = 0L, totalFree = 0L;
+  public static double getIdealUsage(ImmutableList<HddsVolume> volumes,
+      Map<HddsVolume, Long> deltaMap) {
+    long totalCapacity = 0L, totalEffectiveUsed = 0L;
     
     for (HddsVolume volume : volumes) {
       SpaceUsageSource usage = volume.getCurrentUsage();
       totalCapacity += usage.getCapacity();
-      totalFree += usage.getAvailable();
+      long currentUsed = usage.getCapacity() - usage.getAvailable();
+      long delta = (deltaMap != null) ? deltaMap.getOrDefault(volume, 0L) : 0L;
+      long committed = volume.getCommittedBytes();
+      totalEffectiveUsed += (currentUsed + delta + committed);
     }
     
     Preconditions.checkArgument(totalCapacity != 0);
-    return ((double) (totalCapacity - totalFree)) / totalCapacity;
+    return ((double) (totalEffectiveUsed)) / totalCapacity;
   }
   
   /**
@@ -84,7 +90,8 @@ public final class DiskBalancerVolumeCalculation {
    * @param deltaMap Map of volume to delta sizes (ongoing operations), can be null
    * @return VolumeDataDensity sum across all volumes
    */
-  public static double calculateVolumeDataDensity(ImmutableList<HddsVolume> volumeSet, Map<HddsVolume, Long> deltaMap) {
+  public static double calculateVolumeDataDensity(ImmutableList<HddsVolume> volumeSet,
+      Map<HddsVolume, Long> deltaMap) {
     if (volumeSet == null) {
       LOG.warn("VolumeSet is null, returning 0.0 for VolumeDataDensity");
       return 0.0;
@@ -97,7 +104,7 @@ public final class DiskBalancerVolumeCalculation {
       }
 
       // Calculate ideal usage using the same immutable volume snapshot
-      double idealUsage = getIdealUsage(volumeSet);
+      double idealUsage = getIdealUsage(volumeSet, deltaMap);
       double volumeDensitySum = 0.0;
 
       // Calculate density for each volume using the same snapshot

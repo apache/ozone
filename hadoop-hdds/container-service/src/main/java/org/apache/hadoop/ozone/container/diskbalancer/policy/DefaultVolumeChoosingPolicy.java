@@ -61,7 +61,7 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
       }
       
       // Calculate ideal usage using the same immutable volume
-      double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(allVolumes);
+      double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(allVolumes, deltaMap);
 
       // Threshold is given as a percentage
       double normalizedThreshold = threshold / 100;

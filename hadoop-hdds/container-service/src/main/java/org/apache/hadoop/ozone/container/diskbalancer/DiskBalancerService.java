@@ -388,7 +388,8 @@ public class DiskBalancerService extends BackgroundService {
       }
       HddsVolume sourceVolume = pair.getLeft(), destVolume = pair.getRight();
       ContainerData toBalanceContainer = containerChoosingPolicy
-          .chooseContainer(ozoneContainer, sourceVolume, inProgressContainers);
+          .chooseContainer(ozoneContainer, sourceVolume, destVolume,
+              inProgressContainers, threshold, volumeSet, deltaSizes);
       if (toBalanceContainer != null) {
         DiskBalancerTask task = new DiskBalancerTask(toBalanceContainer, sourceVolume,
             destVolume);
@@ -643,7 +644,7 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     // Calculate ideal usage
-    double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(inputVolumeSet);
+    double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(inputVolumeSet, deltaSizes);
     double normalizedThreshold = threshold / 100.0;
 
     long totalBytesToMove = 0;

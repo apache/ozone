@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
+import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 
 /**
@@ -30,11 +32,18 @@ public interface ContainerChoosingPolicy {
   /**
    * Choose a container for balancing.
    * @param ozoneContainer the OzoneContainer instance to get all containers of a particular volume.
-   * @param volume the HddsVolume instance to choose containers from.
+   * @param srcVolume the HddsVolume instance to choose containers from.
+   * @param destVolume the destination volume to which container is being moved.
    * @param inProgressContainerIDs containerIDs present in this set should be
    - avoided as these containers are already under move by diskBalancer.
+   * @param threshold the threshold value
+   * @param volumeSet the volumeSet instance
+   * @param deltaMap the deltaMap instance of source volume
    * @return a Container
    */
   ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume volume, Set<ContainerID> inProgressContainerIDs);
+      HddsVolume srcVolume, HddsVolume destVolume,
+      Set<ContainerID> inProgressContainerIDs,
+      Double threshold, MutableVolumeSet volumeSet,
+      Map<HddsVolume, Long> deltaMap);
 }
