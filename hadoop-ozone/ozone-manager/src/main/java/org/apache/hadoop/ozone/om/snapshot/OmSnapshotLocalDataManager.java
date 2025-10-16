@@ -42,7 +42,6 @@ import java.util.UUID;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -299,7 +298,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
-  private static class LockDataProviderInitResult {
+  private static final class LockDataProviderInitResult {
     private final OmSnapshotLocalData snapshotLocalData;
     private final HierarchicalResourceLock lock;
     private final HierarchicalResourceLock previousLock;
@@ -412,11 +411,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return previousSnapshotLocalData;
     }
 
-    private HierarchicalResourceLock acquireLock(UUID snapshotId, boolean readLock) throws IOException {
+    private HierarchicalResourceLock acquireLock(UUID snapId, boolean readLock) throws IOException {
       HierarchicalResourceLock acquiredLock = readLock ? locks.acquireReadLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK,
-          snapshotId.toString()) : locks.acquireWriteLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK, snapshotId.toString());
+          snapId.toString()) : locks.acquireWriteLock(FlatResource.SNAPSHOT_LOCAL_DATA_LOCK, snapId.toString());
       if (!acquiredLock.isLockAcquired()) {
-        throw new IOException("Unable to acquire lock for snapshotId: " + snapshotId);
+        throw new IOException("Unable to acquire lock for snapshotId: " + snapId);
       }
       return acquiredLock;
     }

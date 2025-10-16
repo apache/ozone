@@ -41,14 +41,12 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -215,7 +213,7 @@ public class TestOmSnapshotLocalDataManager {
         });
   }
 
-  private List<UUID> createSnapshotLocalData(OmSnapshotLocalDataManager localDataManager,
+  private List<UUID> createSnapshotLocalData(OmSnapshotLocalDataManager snapshotLocalDataManager,
       int numberOfSnapshots) throws IOException {
     SnapshotInfo previousSnapshotInfo = null;
     int counter = 0;
@@ -224,8 +222,8 @@ public class TestOmSnapshotLocalDataManager {
         Lists.newArrayList(createMockLiveFileMetaData("file1.sst", KEY_TABLE, "key1", "key2")));
     liveFileMetaDataMap.put(FILE_TABLE, Lists.newArrayList(createMockLiveFileMetaData("file2.sst", FILE_TABLE, "key1",
         "key2")));
-    liveFileMetaDataMap.put(DIRECTORY_TABLE, Lists.newArrayList(createMockLiveFileMetaData("file2.sst", DIRECTORY_TABLE, "key1",
-        "key2")));
+    liveFileMetaDataMap.put(DIRECTORY_TABLE, Lists.newArrayList(createMockLiveFileMetaData("file2.sst",
+        DIRECTORY_TABLE, "key1", "key2")));
     liveFileMetaDataMap.put("col1", Lists.newArrayList(createMockLiveFileMetaData("file2.sst", "col1", "key1",
         "key2")));
     List<UUID> snapshotIds = new ArrayList<>();
@@ -235,7 +233,7 @@ public class TestOmSnapshotLocalDataManager {
           : previousSnapshotInfo.getSnapshotId());
       mockSnapshotStore(snapshotId, liveFileMetaDataMap.values().stream()
           .flatMap(Collection::stream).collect(Collectors.toList()));
-      localDataManager.createNewOmSnapshotLocalDataFile(snapshotStore, snapshotInfo);
+      snapshotLocalDataManager.createNewOmSnapshotLocalDataFile(snapshotStore, snapshotInfo);
       previousSnapshotInfo = snapshotInfo;
       for (String table : liveFileMetaDataMap.keySet()) {
         liveFileMetaDataMap.get(table).add(
@@ -258,7 +256,12 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   /**
-   * Reading Snap1 against snap5
+   * Checks lock orders taken i.e. while reading a snapshot against the previous snapshot.
+   * Depending on read or write locks are acquired on the snapshotId and read lock is acquired on the previous
+   * snapshot. Once the instance is closed the read lock on previous snapshot is released followed by releasing the
+   * lock on the snapshotId.
+   * @param read
+   * @throws IOException
    */
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
@@ -386,7 +389,6 @@ public class TestOmSnapshotLocalDataManager {
           newVersionSstFiles.subList(0, 3).stream().map(SstFileInfo::new).collect(Collectors.toList());
       assertEquals(expectedLiveFileMetaData, versionMeta.getSstFiles());
     }
-
   }
 
   private void validateVersions(OmSnapshotLocalDataManager snapshotLocalDataManager, UUID snapId, int expectedVersion,
@@ -523,7 +525,6 @@ public class TestOmSnapshotLocalDataManager {
       }
     }
   }
-
 
   @Test
   public void testConstructor() throws IOException {
