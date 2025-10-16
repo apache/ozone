@@ -55,8 +55,6 @@ public class TestS3GatewayAuditLog {
 
   static {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
-    System.setProperty("log4j2.contextSelector",
-        "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector");
   }
 
   private String bucketName = OzoneConsts.BUCKET;

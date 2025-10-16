@@ -44,8 +44,6 @@ public class TestOzoneAuditLogger {
 
   static {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
-    System.setProperty("log4j2.contextSelector",
-        "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector");
   }
 
   private static final AuditLogger AUDIT =
