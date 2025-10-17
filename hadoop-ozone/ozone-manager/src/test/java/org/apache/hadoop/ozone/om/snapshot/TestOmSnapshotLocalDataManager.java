@@ -370,7 +370,6 @@ public class TestOmSnapshotLocalDataManager {
           "key1", "key2")), 3);
 
       IOException ex = assertThrows(IOException.class, omSnapshotLocalDataProvider::commit);
-      System.out.println(ex.getMessage());
       assertTrue(ex.getMessage().contains("since previous snapshot with version hasn't been loaded"));
     }
   }
