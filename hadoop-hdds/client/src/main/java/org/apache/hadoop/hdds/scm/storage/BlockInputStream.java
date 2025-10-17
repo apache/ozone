@@ -230,7 +230,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       if (blockLocationInfo == null) {
         LOG.warn("No new block location info for block {}", blockID);
       } else {
-        pipelineRef.set((blockLocationInfo.getPipeline()));
+        pipelineRef.set(setPipeline(blockLocationInfo.getPipeline()));
         LOG.info("New pipeline for block {}: {}", blockID,
             blockLocationInfo.getPipeline());
 
