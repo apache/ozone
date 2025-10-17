@@ -78,16 +78,16 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
+import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithLegacy;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithOBS;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -883,22 +883,22 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testKeyCountsForValidAndInvalidKeyPrefix() {
+  public void testKeyCountsForValidAndInvalidKeyPrefix() throws IOException {
     Timestamp now = new Timestamp(System.currentTimeMillis());
-    GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
+    ReconGlobalStatsManager statsManager = omdbInsightEndpoint.getReconGlobalStatsManager();
 
     // Insert valid key count with valid key prefix
-    insertGlobalStatsRecords(statsDao, now,
+    insertGlobalStatsRecords(statsManager, now,
         "openKeyTable" + "Count", 3L);
-    insertGlobalStatsRecords(statsDao, now,
+    insertGlobalStatsRecords(statsManager, now,
         "openFileTable" + "Count", 3L);
-    insertGlobalStatsRecords(statsDao, now,
+    insertGlobalStatsRecords(statsManager, now,
         "openKeyTable" + "ReplicatedDataSize", 150L);
-    insertGlobalStatsRecords(statsDao, now,
+    insertGlobalStatsRecords(statsManager, now,
         "openFileTable" + "ReplicatedDataSize", 150L);
-    insertGlobalStatsRecords(statsDao, now,
+    insertGlobalStatsRecords(statsManager, now,
         "openKeyTable" + "UnReplicatedDataSize", 50L);
-    insertGlobalStatsRecords(statsDao, now,
+    insertGlobalStatsRecords(statsManager, now,
         "openFileTable" + "UnReplicatedDataSize", 50L);
 
     Response openKeyInfoResp =
@@ -916,17 +916,18 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         openKeysSummary.get("totalUnreplicatedDataSize"));
 
     // Delete the previous records and Update the new value for valid key prefix
-    statsDao.deleteById("openKeyTable" + "Count",
-        "openFileTable" + "Count",
-        "openKeyTable" + "ReplicatedDataSize",
-        "openFileTable" + "ReplicatedDataSize",
-        "openKeyTable" + "UnReplicatedDataSize",
-        "openFileTable" + "UnReplicatedDataSize");
+    Table<String, GlobalStatsValue> globalStatsTable = statsManager.getGlobalStatsTable();
+    globalStatsTable.delete("openKeyTable" + "Count");
+    globalStatsTable.delete("openFileTable" + "Count");
+    globalStatsTable.delete("openKeyTable" + "ReplicatedDataSize");
+    globalStatsTable.delete("openFileTable" + "ReplicatedDataSize");
+    globalStatsTable.delete("openKeyTable" + "UnReplicatedDataSize");
+    globalStatsTable.delete("openFileTable" + "UnReplicatedDataSize");
 
     // Insert new record for a key with invalid prefix
-    insertGlobalStatsRecords(statsDao, now, "openKeyTable" + "InvalidPrefix",
+    insertGlobalStatsRecords(statsManager, now, "openKeyTable" + "InvalidPrefix",
         3L);
-    insertGlobalStatsRecords(statsDao, now, "openFileTable" + "InvalidPrefix",
+    insertGlobalStatsRecords(statsManager, now, "openFileTable" + "InvalidPrefix",
         3L);
 
     openKeyInfoResp =
@@ -945,27 +946,27 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testKeysSummaryAttribute() {
+  public void testKeysSummaryAttribute() throws IOException {
     Timestamp now = new Timestamp(System.currentTimeMillis());
-    GlobalStatsDao statsDao = omdbInsightEndpoint.getDao();
+    ReconGlobalStatsManager statsManager = omdbInsightEndpoint.getReconGlobalStatsManager();
     // Insert records for replicated and unreplicated data sizes
-    insertGlobalStatsRecords(statsDao, now, "openFileTableReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, now, "openFileTableReplicatedDataSize",
         30L);
-    insertGlobalStatsRecords(statsDao, now, "openKeyTableReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, now, "openKeyTableReplicatedDataSize",
         30L);
-    insertGlobalStatsRecords(statsDao, now, "deletedTableReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, now, "deletedTableReplicatedDataSize",
         30L);
-    insertGlobalStatsRecords(statsDao, now, "openFileTableUnReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, now, "openFileTableUnReplicatedDataSize",
         10L);
-    insertGlobalStatsRecords(statsDao, now, "openKeyTableUnReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, now, "openKeyTableUnReplicatedDataSize",
         10L);
-    insertGlobalStatsRecords(statsDao, now, "deletedTableUnReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, now, "deletedTableUnReplicatedDataSize",
         10L);
 
     // Insert records for table counts
-    insertGlobalStatsRecords(statsDao, now, "openKeyTableCount", 3L);
-    insertGlobalStatsRecords(statsDao, now, "openFileTableCount", 3L);
-    insertGlobalStatsRecords(statsDao, now, "deletedTableCount", 3L);
+    insertGlobalStatsRecords(statsManager, now, "openKeyTableCount", 3L);
+    insertGlobalStatsRecords(statsManager, now, "openFileTableCount", 3L);
+    insertGlobalStatsRecords(statsManager, now, "deletedTableCount", 3L);
 
     // Call the API of Open keys to get the response
     Response openKeyInfoResp =
@@ -998,11 +999,11 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         deletedKeysSummary.get("totalDeletedKeys"));
   }
 
-  private void insertGlobalStatsRecords(GlobalStatsDao statsDao,
+  private void insertGlobalStatsRecords(ReconGlobalStatsManager statsManager,
                                         Timestamp timestamp, String key,
-                                        long value) {
-    GlobalStats newRecord = new GlobalStats(key, value, timestamp);
-    statsDao.insert(newRecord);
+                                        long value) throws IOException {
+    GlobalStatsValue newRecord = new GlobalStatsValue(value);
+    statsManager.getGlobalStatsTable().put(key, newRecord);
   }
 
   @Test

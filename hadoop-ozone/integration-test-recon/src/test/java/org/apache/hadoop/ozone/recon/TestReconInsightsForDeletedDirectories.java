@@ -57,9 +57,9 @@ import org.apache.hadoop.ozone.recon.api.OMDBInsightEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -228,7 +228,7 @@ public class TestReconInsightsForDeletedDirectories {
 
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
-            mock(GlobalStatsDao.class), reconNamespaceSummaryManager);
+            mock(ReconGlobalStatsManager.class), reconNamespaceSummaryManager);
 
     // Fetch the deleted directory info from Recon OmDbInsightEndpoint.
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
@@ -308,7 +308,7 @@ public class TestReconInsightsForDeletedDirectories {
 
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
-            mock(GlobalStatsDao.class), namespaceSummaryManager);
+            mock(ReconGlobalStatsManager.class), namespaceSummaryManager);
 
     // Delete the entire root directory dir1.
     fs.delete(new Path("/dir1/dir2/dir3"), true);
@@ -381,7 +381,7 @@ public class TestReconInsightsForDeletedDirectories {
             .getOzoneManagerServiceProvider().getOMMetadataManagerInstance();
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
-            mock(GlobalStatsDao.class), namespaceSummaryManager);
+            mock(ReconGlobalStatsManager.class), namespaceSummaryManager);
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
