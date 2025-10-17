@@ -18,9 +18,10 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.ozone.recon.schema.generated.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,12 +30,15 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerSizeMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
+import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
+import org.jooq.DSLContext;
+import org.jooq.Record1;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +54,8 @@ public class ContainerSizeCountTask extends ReconScmTask {
 
   private ContainerManager containerManager;
   private final long interval;
-  private ReconContainerSizeMetadataManager reconContainerSizeMetadataManager;
+  private ContainerCountBySizeDao containerCountBySizeDao;
+  private DSLContext dslContext;
   private HashMap<ContainerID, Long> processedContainers = new HashMap<>();
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final ReconTaskStatusUpdater taskStatusUpdater;
@@ -58,11 +63,13 @@ public class ContainerSizeCountTask extends ReconScmTask {
   public ContainerSizeCountTask(
       ContainerManager containerManager,
       ReconTaskConfig reconTaskConfig,
-      ReconContainerSizeMetadataManager reconContainerSizeMetadataManager,
+      ContainerCountBySizeDao containerCountBySizeDao,
+      UtilizationSchemaDefinition utilizationSchemaDefinition,
       ReconTaskStatusUpdaterManager taskStatusUpdaterManager) {
     super(taskStatusUpdaterManager);
     this.containerManager = containerManager;
-    this.reconContainerSizeMetadataManager = reconContainerSizeMetadataManager;
+    this.containerCountBySizeDao = containerCountBySizeDao;
+    this.dslContext = utilizationSchemaDefinition.getDSLContext();
     interval = reconTaskConfig.getContainerSizeCountTaskInterval().toMillis();
     this.taskStatusUpdater = getTaskStatusUpdater();
   }
@@ -122,9 +129,8 @@ public class ContainerSizeCountTask extends ReconScmTask {
   protected void runTask() throws Exception {
     final List<ContainerInfo> containers = containerManager.getContainers();
     if (processedContainers.isEmpty()) {
-      // Clear RocksDB table instead of truncating Derby
-      reconContainerSizeMetadataManager.clearContainerCountTable();
-      LOG.debug("Cleared container count table in RocksDB");
+      int execute = dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
+      LOG.debug("Deleted {} records from {}", execute, CONTAINER_COUNT_BY_SIZE);
     }
     processContainers(containers);
   }
@@ -195,14 +201,20 @@ public class ContainerSizeCountTask extends ReconScmTask {
   }
 
   /**
-   * Populate RocksDB with the counts of container sizes using batch operations.
+   * Populate DB with the counts of container sizes calculated
+   * using the dao.
    * <p>
-   * The writeCountsToDB function updates RocksDB with the count of
-   * container sizes. It uses batch operations for atomic writes. If the database
-   * has not been truncated, it reads the current count from RocksDB, adds the
-   * delta, and either updates the entry (if new count > 0) or deletes it
-   * (if new count = 0). If the database has been truncated, it only inserts
-   * entries with non-zero counts.
+   * The writeCountsToDB function updates the database with the count of
+   * container sizes. It does this by creating two lists of records to be
+   * inserted or updated in the database. It iterates over the keys of the
+   * containerSizeCountMap and creates a new record for each key. It then
+   * checks whether the database has been truncated or not. If it has not been
+   * truncated, it attempts to find the current count for the container size
+   * in the database and either inserts a new record or updates the current
+   * record with the updated count. If the database has been truncated,
+   * it only inserts a new record if the count is non-zero. Finally, it
+   * uses the containerCountBySizeDao to insert the new records and update
+   * the existing records in the database.
    *
    * @param isDbTruncated that checks if the database has been truncated or not.
    * @param containerSizeCountMap stores counts of container sizes
@@ -210,37 +222,36 @@ public class ContainerSizeCountTask extends ReconScmTask {
   private void writeCountsToDB(boolean isDbTruncated,
                                Map<ContainerSizeCountKey, Long>
                                    containerSizeCountMap) {
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
-      for (Map.Entry<ContainerSizeCountKey, Long> entry :
-          containerSizeCountMap.entrySet()) {
-        ContainerSizeCountKey key = entry.getKey();
-        Long delta = entry.getValue();
+    List<ContainerCountBySize> insertToDb = new ArrayList<>();
+    List<ContainerCountBySize> updateInDb = new ArrayList<>();
 
-        if (!isDbTruncated) {
-          // Get current count from RocksDB
-          Long currentCount = reconContainerSizeMetadataManager
-              .getContainerSizeCount(key);
-          long newCount = (currentCount != null ? currentCount : 0L) + delta;
-
-          if (newCount > 0) {
-            reconContainerSizeMetadataManager.batchStoreContainerSizeCount(
-                rdbBatchOperation, key, newCount);
-          } else if (newCount == 0 && currentCount != null) {
-            // Delete the entry if count reaches zero
-            reconContainerSizeMetadataManager.batchDeleteContainerSizeCount(
-                rdbBatchOperation, key);
-          }
-        } else if (delta > 0) {
-          // After truncate, just insert non-zero counts
-          reconContainerSizeMetadataManager.batchStoreContainerSizeCount(
-              rdbBatchOperation, key, delta);
+    containerSizeCountMap.keySet().forEach((ContainerSizeCountKey key) -> {
+      ContainerCountBySize newRecord = new ContainerCountBySize();
+      newRecord.setContainerSize(key.containerSizeUpperBound);
+      newRecord.setCount(containerSizeCountMap.get(key));
+      if (!isDbTruncated) {
+        // Get the current count from database and update
+        Record1<Long> recordToFind =
+            dslContext.newRecord(
+                    CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE)
+                .value1(key.containerSizeUpperBound);
+        ContainerCountBySize containerCountRecord =
+            containerCountBySizeDao.findById(recordToFind.value1());
+        if (containerCountRecord == null && newRecord.getCount() > 0L) {
+          // insert new row only for non-zero counts.
+          insertToDb.add(newRecord);
+        } else if (containerCountRecord != null) {
+          newRecord.setCount(containerCountRecord.getCount() +
+              containerSizeCountMap.get(key));
+          updateInDb.add(newRecord);
         }
+      } else if (newRecord.getCount() > 0) {
+        // insert new row only for non-zero counts.
+        insertToDb.add(newRecord);
       }
-      reconContainerSizeMetadataManager.commitBatchOperation(rdbBatchOperation);
-    } catch (IOException e) {
-      LOG.error("Failed to write container size counts to RocksDB", e);
-      throw new RuntimeException(e);
-    }
+    });
+    containerCountBySizeDao.insert(insertToDb);
+    containerCountBySizeDao.update(updateInDb);
   }
 
   /**
@@ -340,6 +351,37 @@ public class ContainerSizeCountTask extends ReconScmTask {
     // Otherwise, calculate the upperSizeBound
     return new ContainerSizeCountKey(
         ReconUtils.getContainerSizeUpperBound(containerSize));
+  }
+
+  /**
+   *  The ContainerSizeCountKey class is a simple key class that has a single
+   *  field, containerSizeUpperBound, which is a Long representing the upper
+   *  bound of the container size range.
+   */
+  private static class ContainerSizeCountKey {
+
+    private Long containerSizeUpperBound;
+
+    ContainerSizeCountKey(
+        Long containerSizeUpperBound) {
+      this.containerSizeUpperBound = containerSizeUpperBound;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj instanceof ContainerSizeCountKey) {
+        ContainerSizeCountTask.ContainerSizeCountKey
+            s = (ContainerSizeCountTask.ContainerSizeCountKey) obj;
+        return
+            containerSizeUpperBound.equals(s.containerSizeUpperBound);
+      }
+      return false;
+    }
+
+    @Override
+    public int hashCode() {
+      return (containerSizeUpperBound).hashCode();
+    }
   }
 
 }
