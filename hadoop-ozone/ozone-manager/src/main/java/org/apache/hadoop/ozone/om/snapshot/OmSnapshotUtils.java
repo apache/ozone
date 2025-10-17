@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
@@ -46,6 +47,7 @@ public final class OmSnapshotUtils {
   public static final String DATA_SUFFIX = "txt";
   private static final Logger LOG =
       LoggerFactory.getLogger(OmSnapshotUtils.class);
+  public static final String PATH_SEPARATOR = "/";
 
   private OmSnapshotUtils() { }
 
@@ -149,6 +151,10 @@ public final class OmSnapshotUtils {
           }
           String from = parts[1];
           String to = parts[0];
+          String omDbPrefix = OM_DB_NAME + PATH_SEPARATOR;
+          if (to.startsWith(omDbPrefix)) {
+            to = to.substring(omDbPrefix.length());
+          }
           Path fullFromPath = Paths.get(dbPath.toString(), from);
           filesToDelete.add(fullFromPath);
           Path fullToPath = Paths.get(dbPath.toString(), to);
