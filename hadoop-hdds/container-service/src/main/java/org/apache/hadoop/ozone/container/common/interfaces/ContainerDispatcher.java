@@ -98,7 +98,6 @@ public interface ContainerDispatcher {
        ContainerCommandRequestProto msg,
        StreamObserver<ContainerCommandResponseProto> streamObserver,
        DispatcherContext dispatcherContext) {
-    throw new UnsupportedOperationException(
-         "streamDataReadOnly not supported.");
+    throw new UnsupportedOperationException("streamDataReadOnly not supported.");
   }
 }

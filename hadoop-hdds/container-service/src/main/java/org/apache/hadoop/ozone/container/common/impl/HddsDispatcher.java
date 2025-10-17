@@ -818,8 +818,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   @Override
   public void streamDataReadOnly(ContainerCommandRequestProto msg,
-                                 StreamObserver<ContainerCommandResponseProto> streamObserver,
-                                 DispatcherContext dispatcherContext) {
+      StreamObserver<ContainerCommandResponseProto> streamObserver,
+      DispatcherContext dispatcherContext) {
     Type cmdType = msg.getCmdType();
     String traceID = msg.getTraceID();
     Span span = TracingUtil.importAndCreateSpan(cmdType.toString(), traceID);
@@ -829,8 +829,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     try (UncheckedAutoCloseable ignored = protocolMetrics.measure(cmdType)) {
       Preconditions.checkNotNull(msg);
       if (LOG.isTraceEnabled()) {
-        LOG.trace("Command {}, trace ID: {}.", msg.getCmdType(),
-            traceID);
+        LOG.trace("Command {}, trace ID: {}.", msg.getCmdType(), traceID);
       }
 
       PerformanceStringBuilder perf = new PerformanceStringBuilder();
@@ -849,20 +848,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             ContainerProtos.Result.CONTAINER_MISSING);
       }
       if (container == null) {
-        throw new StorageContainerException(
-            "ContainerID " + containerID + " does not exist",
+        throw new StorageContainerException("ContainerID " + containerID + " does not exist",
             ContainerProtos.Result.CONTAINER_NOT_FOUND);
       }
       ContainerType containerType = getContainerType(container);
       Handler handler = getHandler(containerType);
       if (handler == null) {
-        throw new StorageContainerException("Invalid " +
-            "ContainerType " + containerType,
+        throw new StorageContainerException("Invalid " + "ContainerType " + containerType,
             ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
       }
       perf.appendPreOpLatencyMs(Time.monotonicNow() - startTime);
-      responseProto = handler.readBlock(
-          msg, container, dispatcherContext, streamObserver);
+      responseProto = handler.readBlock(msg, container, dispatcherContext, streamObserver);
       long oPLatencyMS = Time.monotonicNow() - startTime;
       metrics.incContainerOpsLatencies(cmdType, oPLatencyMS);
       if (responseProto == null) {
