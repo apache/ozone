@@ -147,7 +147,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Sets whether the snapshot needs defrag.
    * @param needsDefrag true if the snapshot needs defrag, false otherwise
    */
-  void setNeedsDefrag(boolean needsDefrag) {
+  public void setNeedsDefrag(boolean needsDefrag) {
     this.needsDefrag = needsDefrag;
   }
 
