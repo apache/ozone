@@ -268,6 +268,7 @@ public final class OmUtils {
       // write to OM DB. And therefore it doesn't need a OMClientRequest.
       // Although indirectly the Ranger sync service task could invoke write
       // operation SetRangerServiceVersion.
+    case SnapshotDefrag:
     case GetKeyInfo:
     case SnapshotDiff:
     case CancelSnapshotDiff:
