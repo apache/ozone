@@ -43,7 +43,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
    * for each test.
    */
 
-  private int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
+  private final int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
   private byte[] inputData;
   private TestBucket bucket;
 
