@@ -328,6 +328,27 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
   }
 
+  private synchronized void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
+    SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
+    Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
+        existingSnapVersions.getSnapshotVersions();
+    Map<Integer, Set<LocalDataVersionNode>> predecessors = new HashMap<>();
+    // Track all predecessors of the existing versions and remove the node from the graph.
+    for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
+      LocalDataVersionNode existingVersionNode = existingVersion.getValue();
+      predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersionNode));
+      localDataGraph.removeNode(existingVersionNode);
+    }
+    // Add the nodes to be added in the graph and map.
+    addSnapshotVersionMeta(snapshotId, snapshotVersions);
+    // Reconnect all the predecessors for existing nodes.
+    for (Map.Entry<Integer, LocalDataVersionNode> entry : snapshotVersions.getSnapshotVersions().entrySet()) {
+      for (LocalDataVersionNode predecessor : predecessors.getOrDefault(entry.getKey(), Collections.emptySet())) {
+        localDataGraph.putEdge(predecessor, entry.getValue());
+      }
+    }
+  }
+
   /**
    * The ReadableOmSnapshotLocalDataProvider class is responsible for managing the
    * access and initialization of local snapshot data in a thread-safe manner.
@@ -567,6 +588,8 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
    */
   public final class WritableOmSnapshotLocalDataProvider extends ReadableOmSnapshotLocalDataProvider {
 
+    private boolean dirty;
+
     private WritableOmSnapshotLocalDataProvider(UUID snapshotId) throws IOException {
       super(snapshotId, false);
       fullLock.readLock().lock();
@@ -586,6 +609,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     private SnapshotVersionsMeta validateModification(OmSnapshotLocalData snapshotLocalData)
         throws IOException {
       SnapshotVersionsMeta versionsToBeAdded = new SnapshotVersionsMeta(snapshotLocalData);
+      SnapshotVersionsMeta existingVersionsMeta = getVersionNodeMap().get(snapshotLocalData.getSnapshotId());
       for (LocalDataVersionNode node : versionsToBeAdded.getSnapshotVersions().values()) {
         validateVersionAddition(node);
       }
@@ -597,28 +621,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
           validateVersionRemoval(snapshotId, entry.getKey());
         }
       }
+      // Set Dirty if the snapshot doesn't exist or previousSnapshotId has changed.
+      if (existingVersionsMeta == null || !Objects.equals(versionsToBeAdded.getPreviousSnapshotId(),
+          existingVersionsMeta.getPreviousSnapshotId())) {
+        setDirty();
+      }
       return versionsToBeAdded;
-    }
-
-    private synchronized void upsertNode(UUID snapshotId, SnapshotVersionsMeta snapshotVersions) throws IOException {
-      SnapshotVersionsMeta existingSnapVersions = getVersionNodeMap().remove(snapshotId);
-      Map<Integer, LocalDataVersionNode> existingVersions = existingSnapVersions == null ? Collections.emptyMap() :
-          existingSnapVersions.getSnapshotVersions();
-      Map<Integer, Set<LocalDataVersionNode>> predecessors = new HashMap<>();
-      // Track all predecessors of the existing versions and remove the node from the graph.
-      for (Map.Entry<Integer, LocalDataVersionNode> existingVersion : existingVersions.entrySet()) {
-        LocalDataVersionNode existingVersionNode = existingVersion.getValue();
-        predecessors.put(existingVersion.getKey(), localDataGraph.predecessors(existingVersionNode));
-        localDataGraph.removeNode(existingVersionNode);
-      }
-      // Add the nodes to be added in the graph and map.
-      addSnapshotVersionMeta(snapshotId, snapshotVersions);
-      // Reconnect all the predecessors for existing nodes.
-      for (Map.Entry<Integer, LocalDataVersionNode> entry : snapshotVersions.getSnapshotVersions().entrySet()) {
-        for (LocalDataVersionNode predecessor : predecessors.getOrDefault(entry.getKey(), Collections.emptySet())) {
-          localDataGraph.putEdge(predecessor, entry.getValue());
-        }
-      }
     }
 
     public void addSnapshotVersion(RDBStore snapshotStore) throws IOException {
@@ -626,24 +634,50 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       OmSnapshotLocalData previousSnapshotLocalData = getPreviousSnapshotLocalData();
       this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles, previousSnapshotLocalData == null ? 0 :
           previousSnapshotLocalData.getVersion());
+      // Set Dirty if a version is added.
+      setDirty();
+    }
+
+    public void removeVersion(int version) {
+      this.getSnapshotLocalData().removeVersionSSTFileInfos(version);
+      // Set Dirty if a version is removed.
+      setDirty();
     }
 
     public synchronized void commit() throws IOException {
+      // Validate modification and commit the changes.
       SnapshotVersionsMeta localDataVersionNodes = validateModification(super.snapshotLocalData);
-      String filePath = getSnapshotLocalPropertyYamlPath(super.snapshotId);
-      String tmpFilePath = filePath + ".tmp";
-      File tmpFile = new File(tmpFilePath);
-      boolean tmpFileExists = tmpFile.exists();
-      if (tmpFileExists) {
-        tmpFileExists = !tmpFile.delete();
+      // Need to update the disk state if and only if the dirty bit is set.
+      if (isDirty()) {
+        String filePath = getSnapshotLocalPropertyYamlPath(super.snapshotId);
+        String tmpFilePath = filePath + ".tmp";
+        File tmpFile = new File(tmpFilePath);
+        boolean tmpFileExists = tmpFile.exists();
+        if (tmpFileExists) {
+          tmpFileExists = !tmpFile.delete();
+        }
+        if (tmpFileExists) {
+          throw new IOException("Unable to delete tmp file " + tmpFilePath);
+        }
+        snapshotLocalDataSerializer.save(new File(tmpFilePath), super.snapshotLocalData);
+        Files.move(tmpFile.toPath(), Paths.get(filePath), StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
+        upsertNode(super.snapshotId, localDataVersionNodes);
+        // Reset dirty bit
+        resetDirty();
       }
-      if (tmpFileExists) {
-        throw new IOException("Unable to delete tmp file " + tmpFilePath);
-      }
-      snapshotLocalDataSerializer.save(new File(tmpFilePath), super.snapshotLocalData);
-      Files.move(tmpFile.toPath(), Paths.get(filePath), StandardCopyOption.ATOMIC_MOVE,
-          StandardCopyOption.REPLACE_EXISTING);
-      upsertNode(super.snapshotId, localDataVersionNodes);
+    }
+
+    private void setDirty() {
+      dirty = true;
+    }
+
+    private void resetDirty() {
+      dirty = false;
+    }
+
+    private boolean isDirty() {
+      return dirty;
     }
 
     @Override

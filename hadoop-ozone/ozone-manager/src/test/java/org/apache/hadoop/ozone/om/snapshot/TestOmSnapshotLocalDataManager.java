@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -76,6 +77,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -87,6 +89,7 @@ import org.yaml.snakeyaml.Yaml;
 /**
  * Test class for OmSnapshotLocalDataManager.
  */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 public class TestOmSnapshotLocalDataManager {
 
   private static YamlSerializer<OmSnapshotLocalData> snapshotLocalDataYamlSerializer;
@@ -449,7 +452,7 @@ public class TestOmSnapshotLocalDataManager {
 
     if (nextVersionExisting) {
       try (WritableOmSnapshotLocalDataProvider prevSnap = localDataManager.getWritableOmSnapshotLocalData(prevSnapId)) {
-        prevSnap.getSnapshotLocalData().removeVersionSSTFileInfos(4);
+        prevSnap.removeVersion(4);
         IOException ex = assertThrows(IOException.class, prevSnap::commit);
         assertTrue(ex.getMessage().contains("Cannot remove Snapshot " + prevSnapId + " with version : 4 since it " +
             "still has predecessors"));
@@ -458,12 +461,12 @@ public class TestOmSnapshotLocalDataManager {
       validateVersions(localDataManager, prevSnapId, 4, Sets.newHashSet(0, 4));
     } else {
       try (WritableOmSnapshotLocalDataProvider snap = localDataManager.getWritableOmSnapshotLocalData(snapId)) {
-        snap.getSnapshotLocalData().removeVersionSSTFileInfos(5);
+        snap.removeVersion(5);
         snap.commit();
       }
 
       try (WritableOmSnapshotLocalDataProvider prevSnap = localDataManager.getWritableOmSnapshotLocalData(prevSnapId)) {
-        prevSnap.getSnapshotLocalData().removeVersionSSTFileInfos(4);
+        prevSnap.removeVersion(4);
         prevSnap.commit();
       }
       validateVersions(localDataManager, snapId, 5, Sets.newHashSet(0));
@@ -481,6 +484,11 @@ public class TestOmSnapshotLocalDataManager {
         snapshotLocalData.addVersionSSTFileInfos(ImmutableList.of(createMockLiveFileMetaData("file" + version +
             ".sst", KEY_TABLE, "key1", "key2")), version.getValue());
       }
+      mockSnapshotStore(snapId, ImmutableList.of(createMockLiveFileMetaData("file"
+          + snapshotLocalData.getVersion() + 1 + ".sst", KEY_TABLE, "key1", "key2")));
+      snap.addSnapshotVersion(snapshotStore);
+      snap.removeVersion(snapshotLocalData.getVersion());
+      snapshotLocalData.setVersion(snapshotLocalData.getVersion() - 1);
       snap.commit();
     }
     try (ReadableOmSnapshotLocalDataProvider snap = snapshotLocalDataManager.getOmSnapshotLocalData(snapId)) {
