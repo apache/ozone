@@ -43,7 +43,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
    * for each test.
    */
 
-  private final int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
+  private static final int DATA_LENGTH = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
   private byte[] inputData;
   private TestBucket bucket;
 
@@ -60,7 +60,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       String keyName = getNewKeyName();
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
         bucket = TestBucket.newBuilder(client).build();
-        inputData = bucket.writeRandomBytes(keyName, dataLength);
+        inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
         testReadKeyFully(keyName);
         testSeek(keyName);
         testReadEmptyBlock();
@@ -70,7 +70,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
       copy.setFromObject(clientConfig);
       try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
         bucket = TestBucket.newBuilder(client).build();
-        inputData = bucket.writeRandomBytes(keyName, dataLength);
+        inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
         testReadKeyFully(keyName);
         testSeek(keyName);
       }
@@ -84,17 +84,17 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
   private void testReadKeyFully(String key) throws Exception {
     // Read the data fully into a large enough byte array
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
-      byte[] readData = new byte[dataLength];
-      int totalRead = keyInputStream.read(readData, 0, dataLength);
-      assertEquals(dataLength, totalRead);
-      for (int i = 0; i < dataLength; i++) {
+      byte[] readData = new byte[DATA_LENGTH];
+      int totalRead = keyInputStream.read(readData, 0, DATA_LENGTH);
+      assertEquals(DATA_LENGTH, totalRead);
+      for (int i = 0; i < DATA_LENGTH; i++) {
         assertEquals(inputData[i], readData[i],
             "Read data is not same as written data at index " + i);
       }
     }
     // Read the data 1 byte at a time
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
-      for (int i = 0; i < dataLength; i++) {
+      for (int i = 0; i < DATA_LENGTH; i++) {
         int b = keyInputStream.read();
         assertEquals(inputData[i], (byte) b,
             "Read data is not same as written data at index " + i);
@@ -102,11 +102,11 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
     }
     // Read the data into a large enough ByteBuffer
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
-      ByteBuffer readBuf = ByteBuffer.allocate(dataLength);
+      ByteBuffer readBuf = ByteBuffer.allocate(DATA_LENGTH);
       int totalRead = keyInputStream.read(readBuf);
-      assertEquals(dataLength, totalRead);
+      assertEquals(DATA_LENGTH, totalRead);
       readBuf.flip();
-      for (int i = 0; i < dataLength; i++) {
+      for (int i = 0; i < DATA_LENGTH; i++) {
         assertEquals(inputData[i], readBuf.get(),
             "Read data is not same as written data at index " + i);
       }
@@ -117,7 +117,7 @@ public class TestStreamBlockInputStream extends TestInputStreamBase {
     java.util.Random random = new java.util.Random();
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(key)) {
       for (int i = 0; i < 100; i++) {
-        int position = random.nextInt(dataLength);
+        int position = random.nextInt(DATA_LENGTH);
         keyInputStream.seek(position);
         int b = keyInputStream.read();
         assertEquals(inputData[position], (byte) b, "Read data is not same as written data at index " + position);
