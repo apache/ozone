@@ -237,8 +237,8 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       return this;
     }
 
-    public Builder setFromSnapshot(@Nonnull SnapshotInfo fromSnapshot) {
-      this.fromSnapshot = Objects.requireNonNull(fromSnapshot, "fromSnapshot cannot be null");
+    public Builder setFromSnapshot(SnapshotInfo fromSnapshot) {
+      this.fromSnapshot = fromSnapshot;
       return this;
     }
 
@@ -273,6 +273,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
     }
 
     public OMSnapshotMoveDeletedKeysResponse build() {
+      Objects.requireNonNull(fromSnapshot, "fromSnapshot must not be null");
       return new OMSnapshotMoveDeletedKeysResponse(this);
     }
   }
