@@ -111,7 +111,7 @@ public class TestUsageInfoSubcommand {
 
     // then
     String output = outContent.toString(CharEncoding.UTF_8);
-    assertThat(output).contains("UUID         :");
+    assertThat(output).contains("ID           :");
     assertThat(output).contains("IP Address   :");
     assertThat(output).contains("Hostname     :");
     assertThat(output).contains("Capacity     :");
