@@ -537,4 +537,12 @@ public class SCMDeletedBlockTransactionStatusManager {
   public int getTransactionToDNsCommitMapSize() {
     return transactionToDNsCommitMap.size();
   }
+
+  public void removeTransactionFromDNsCommitMap(List<Long> txIds) {
+    txIds.forEach(transactionToDNsCommitMap::remove);
+  }
+
+  public void removeTransactionFromDNsRetryCountMap(List<Long> txIds) {
+    txIds.forEach(transactionToRetryCountMap::remove);
+  }
 }

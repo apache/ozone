@@ -409,6 +409,8 @@ public class DeletedBlockLogImpl
 
         if (!txIDs.isEmpty()) {
           deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
+          getSCMDeletedBlockTransactionStatusManager().removeTransactionFromDNsCommitMap(txIDs);
+          getSCMDeletedBlockTransactionStatusManager().removeTransactionFromDNsRetryCountMap(txIDs);
           metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
         }
       }
