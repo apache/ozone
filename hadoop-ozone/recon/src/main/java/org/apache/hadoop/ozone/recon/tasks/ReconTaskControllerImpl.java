@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.recon.metrics.ReconTaskControllerMetrics;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerSizeMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -80,7 +79,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private final ReconFileMetadataManager reconFileMetadataManager;
-  private final ReconContainerSizeMetadataManager reconContainerSizeMetadataManager;
 
   private Map<String, ReconOmTask> reconOmTasks;
   private ExecutorService executorService;
@@ -111,15 +109,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
                                  ReconContainerMetadataManager reconContainerMetadataManager,
                                  ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                  ReconGlobalStatsManager reconGlobalStatsManager,
-                                 ReconFileMetadataManager reconFileMetadataManager,
-                                 ReconContainerSizeMetadataManager reconContainerSizeMetadataManager) {
+                                 ReconFileMetadataManager reconFileMetadataManager) {
     this.configuration = configuration;
     this.reconDBProvider = reconDBProvider;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconFileMetadataManager = reconFileMetadataManager;
-    this.reconContainerSizeMetadataManager = reconContainerSizeMetadataManager;
     reconOmTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
@@ -282,7 +278,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         reconContainerMetadataManager.reinitialize(reconDBProvider);
         reconGlobalStatsManager.reinitialize(reconDBProvider);
         reconFileMetadataManager.reinitialize(reconDBProvider);
-        reconContainerSizeMetadataManager.reinitialize(reconDBProvider);
         recordAllTaskStatus(localReconOmTaskMap, 0, omMetadataManager.getLastSequenceNumberFromDB());
 
         // Track reprocess success

@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.codec.NSSummaryCodec;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
-import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountKey;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountKey;
 import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 
@@ -96,13 +95,6 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
           StringCodec.get(),
           GlobalStatsValue.getCodec());
 
-  public static final DBColumnFamilyDefinition<ContainerSizeCountKey, Long>
-      CONTAINER_COUNT_BY_SIZE =
-      new DBColumnFamilyDefinition<>(
-          "containerCountBySizeTable",
-          ContainerSizeCountKey.getCodec(),
-          LongCodec.get());
-
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(
           CONTAINER_KEY,
@@ -112,8 +104,7 @@ public class ReconDBDefinition extends DBDefinition.WithMap {
           REPLICA_HISTORY,
           REPLICA_HISTORY_V2,
           FILE_COUNT_BY_SIZE,
-          GLOBAL_STATS,
-          CONTAINER_COUNT_BY_SIZE);
+          GLOBAL_STATS);
 
   public ReconDBDefinition(String dbName) {
     super(COLUMN_FAMILIES);
