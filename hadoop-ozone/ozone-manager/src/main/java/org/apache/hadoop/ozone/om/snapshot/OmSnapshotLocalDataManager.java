@@ -228,6 +228,11 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
         if (prevSnapId != null && !versionNodeMap.containsKey(prevSnapId)) {
           File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(prevSnapId));
           OmSnapshotLocalData prevSnapshotLocalData = snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+          if (!prevSnapId.equals(prevSnapshotLocalData.getSnapshotId())) {
+            throw new IOException("SnapshotId mismatch: expected " + prevSnapId +
+                " but found " + prevSnapshotLocalData.getSnapshotId() +
+                " in file " + previousSnapshotLocalDataFile.getAbsolutePath());
+          }
           stack.push(Pair.of(prevSnapshotLocalData.getSnapshotId(), new SnapshotVersionsMeta(prevSnapshotLocalData)));
         }
         visitedSnapshotIds.add(snapId);
@@ -553,7 +558,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     }
 
     /**
-     * Intializer the snapshot local data by acquiring the lock on the snapshot and also acquires a read lock on the
+     * Intializes the snapshot local data by acquiring the lock on the snapshot and also acquires a read lock on the
      * snapshotId to be resolved by iterating through the chain of previous snapshot ids.
      */
     private LockDataProviderInitResult initialize(

@@ -115,7 +115,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Sets whether SST is filtered for this snapshot.
    * @param sstFiltered
    */
-  void setSstFiltered(boolean sstFiltered) {
+  public void setSstFiltered(boolean sstFiltered) {
     this.isSSTFiltered = sstFiltered;
   }
 
@@ -131,7 +131,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Sets the last defrag time, in epoch milliseconds.
    * @param lastDefragTime Timestamp of the last defrag
    */
-  void setLastDefragTime(Long lastDefragTime) {
+  public void setLastDefragTime(Long lastDefragTime) {
     this.lastDefragTime = lastDefragTime;
   }
 
@@ -260,7 +260,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Sets the version of the snapshot local data. A valid version shall be greater than 0.
    * @param version version
    */
-  void setVersion(int version) {
+  public void setVersion(int version) {
     this.version = version;
   }
 
