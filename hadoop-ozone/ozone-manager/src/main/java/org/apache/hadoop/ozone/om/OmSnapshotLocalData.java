@@ -260,7 +260,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Sets the version of the snapshot local data. A valid version shall be greater than 0.
    * @param version version
    */
-  void setVersion(int version) {
+  public void setVersion(int version) {
     this.version = version;
   }
 
