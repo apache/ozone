@@ -15,11 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3secret;
+package org.apache.hadoop.ozone.s3web.s3secret;
 
-import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
+import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
+import static javax.ws.rs.core.Response.Status.NOT_FOUND;
+import static javax.ws.rs.core.Response.Status.OK;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.ACCESS_DENIED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.S3_SECRET_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.notNull;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -33,29 +41,25 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Test for S3 secret generate endpoint.
+ * Test for S3 secret revoke endpoint.
  */
 @ExtendWith(MockitoExtension.class)
-class TestSecretGenerate {
+public class TestSecretRevoke {
   private static final String USER_NAME = "test";
   private static final String OTHER_USER_NAME = "test2";
-  private static final String USER_SECRET = "test_secret";
 
   private S3SecretManagementEndpoint endpoint;
 
   @Mock
-  private ClientProtocol proxy;
+  private ObjectStoreStub objectStore;
   @Mock
   private ContainerRequestContext context;
   @Mock
@@ -65,15 +69,10 @@ class TestSecretGenerate {
   @Mock
   private Principal principal;
 
-  private static S3SecretValue getS3SecretValue(InvocationOnMock invocation) {
-    Object[] args = invocation.getArguments();
-    return S3SecretValue.of((String) args[0], USER_SECRET);
-  }
-
   @BeforeEach
   void setUp() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    OzoneClient client = new OzoneClientStub(new ObjectStoreStub(conf, proxy));
+    OzoneClient client = new OzoneClientStub(objectStore);
 
     when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
     when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
@@ -84,53 +83,43 @@ class TestSecretGenerate {
     endpoint.setContext(context);
   }
 
-  @Test
-  void testSecretGenerate() throws IOException {
-    setupSecurityContext();
-    hasNoSecretYet();
-
-    S3SecretResponse response =
-        (S3SecretResponse) endpoint.generate().getEntity();
-
-    assertEquals(USER_SECRET, response.getAwsSecret());
-    assertEquals(USER_NAME, response.getAwsAccessKey());
-  }
-
-  @Test
-  void testIfSecretAlreadyExists() throws IOException {
-    setupSecurityContext();
-    hasSecretAlready();
-
-    Response response = endpoint.generate();
-
-    assertEquals(BAD_REQUEST.getStatusCode(), response.getStatus());
-    assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS.toString(),
-        response.getStatusInfo().getReasonPhrase());
-  }
-
-  @Test
-  void testSecretGenerateWithUsername() throws IOException {
-    hasNoSecretYet();
-
-    S3SecretResponse response =
-        (S3SecretResponse) endpoint.generate(OTHER_USER_NAME).getEntity();
-    assertEquals(USER_SECRET, response.getAwsSecret());
-    assertEquals(OTHER_USER_NAME, response.getAwsAccessKey());
-  }
-
-  private void setupSecurityContext() {
+  private void mockSecurityContext() {
     when(principal.getName()).thenReturn(USER_NAME);
     when(securityContext.getUserPrincipal()).thenReturn(principal);
     when(context.getSecurityContext()).thenReturn(securityContext);
   }
 
-  private void hasNoSecretYet() throws IOException {
-    when(proxy.getS3Secret(notNull()))
-        .then(TestSecretGenerate::getS3SecretValue);
+  @Test
+  void testSecretRevoke() throws IOException {
+    mockSecurityContext();
+    endpoint.revoke();
+    verify(objectStore, times(1)).revokeS3Secret(eq(USER_NAME));
   }
 
-  private void hasSecretAlready() throws IOException {
-    when(proxy.getS3Secret(notNull()))
-        .thenThrow(new OMException("Secret already exists", OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS));
+  @Test
+  void testSecretRevokeWithUsername() throws IOException {
+    endpoint.revoke(OTHER_USER_NAME);
+    verify(objectStore, times(1))
+        .revokeS3Secret(eq(OTHER_USER_NAME));
+  }
+
+  @Test
+  void testSecretSequentialRevokes() throws IOException {
+    mockSecurityContext();
+    Response firstResponse = endpoint.revoke();
+    assertEquals(OK.getStatusCode(), firstResponse.getStatus());
+    doThrow(new OMException(S3_SECRET_NOT_FOUND))
+        .when(objectStore).revokeS3Secret(any());
+    Response secondResponse = endpoint.revoke();
+    assertEquals(NOT_FOUND.getStatusCode(), secondResponse.getStatus());
+  }
+
+  @Test
+  void testSecretRevokesHandlesException() throws IOException {
+    mockSecurityContext();
+    doThrow(new OMException(ACCESS_DENIED))
+        .when(objectStore).revokeS3Secret(any());
+    Response response = endpoint.revoke();
+    assertEquals(INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
   }
 }
