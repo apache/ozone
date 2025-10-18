@@ -179,7 +179,7 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentelemetry.version>1.54.1</opentelemetry.version>
+    <opentelemetry.version>1.55.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.release>Joshua Tree</ozone.release>
     <ozone.version>2.1.0-SNAPSHOT</ozone.version>
