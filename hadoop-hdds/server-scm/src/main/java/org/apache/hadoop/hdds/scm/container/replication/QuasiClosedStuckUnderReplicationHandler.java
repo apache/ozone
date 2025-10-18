@@ -127,8 +127,7 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
     if (firstException != null || totalCommandsSent < totalRequiredReplicas) {
       // Some commands were not sent as expected (not enough nodes found or overloaded nodes), so we just rethrow
       // the first exception we encountered.
-      LOG.info(
-          "A command was not sent for all required new replicas for container {}. Total sent {}, required {} ",
+      LOG.info("A command was not sent for all required new replicas for container {}. Total sent {}, required {} ",
           containerInfo, totalCommandsSent, totalRequiredReplicas);
       metrics.incrPartialReplicationTotal();
       if (firstException != null) {
