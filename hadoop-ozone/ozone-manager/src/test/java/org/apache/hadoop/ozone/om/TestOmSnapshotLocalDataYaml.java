@@ -130,11 +130,11 @@ public class TestOmSnapshotLocalDataYaml {
 
     // Add some defragged SST files
     dataYaml.addVersionSSTFileInfos(ImmutableList.of(
-        new SstFileInfo("defragged-sst1", "k1", "k2", "table1"),
-        new SstFileInfo("defragged-sst2", "k3", "k4", "table2")),
+        createLiveFileMetaData("defragged-sst1", "table1", "k1", "k2"),
+        createLiveFileMetaData("defragged-sst2", "table2", "k3", "k4")),
         1);
     dataYaml.addVersionSSTFileInfos(Collections.singletonList(
-        new SstFileInfo("defragged-sst3", "k4", "k5", "table1")), 3);
+        createLiveFileMetaData("defragged-sst3", "table1", "k4", "k5")), 3);
 
     File yamlFile = new File(testRoot, yamlFilePath);
 
@@ -202,7 +202,7 @@ public class TestOmSnapshotLocalDataYaml {
     dataYaml.setSstFiltered(false);
     dataYaml.setNeedsDefrag(false);
     dataYaml.addVersionSSTFileInfos(
-        singletonList(new SstFileInfo("defragged-sst4", "k5", "k6", "table3")), 5);
+        singletonList(createLiveFileMetaData("defragged-sst4", "table3", "k5", "k6")), 5);
 
     // Write updated data back to file
     omSnapshotLocalDataSerializer.save(yamlFile, dataYaml);
